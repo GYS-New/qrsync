@@ -4,6 +4,7 @@ import ReportsHubClient from '@/components/reports/ReportsHubClient'
 import Topbar from '@/components/layout/Topbar'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { sayfaGorebilirMi } from '@/lib/yetki/sayfaYetkisi'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -57,6 +58,12 @@ export default async function TARaporlarPage() {
     } else {
       initialRaporTurleri = dbTurler.filter((r: any) => r.aktif !== false).map((r: any) => ({ id: r.rapor_turu, aktif: r.aktif }))
     }
+  }
+
+  // Müşteri değerlendirme yetki kontrolü — yetkisi yoksa listeden çıkar
+  const musteriGorebilir = await sayfaGorebilirMi(me.rol, 'musteri-degerlendirme')
+  if (!musteriGorebilir) {
+    initialRaporTurleri = initialRaporTurleri.filter((r: any) => r.id !== 'musteri_degerlendirme')
   }
 
   return <ReportsHubClient base="/ta" initialFirmaId={me.firma_id ?? null} isSA={false} firmaAdi={firmaAdi} initialRaporTurleri={initialRaporTurleri} />

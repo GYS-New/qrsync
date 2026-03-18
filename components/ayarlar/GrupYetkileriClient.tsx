@@ -23,6 +23,7 @@ const SAYFALAR = [
   { kod: 'arsiv',                label: 'Arşiv',                  grup: 'Görevler' },
   { kod: 'personel-takibi',      label: 'Personel Takibi',        grup: 'Raporlama' },
   { kod: 'raporlar',             label: 'Raporlar',               grup: 'Raporlama' },
+  { kod: 'musteri-degerlendirme', label: 'Müşteri Değerlendirmeleri', grup: 'Raporlama' },
 ]
 
 const YETKILER: { key: 'gorebilir' | 'ekleyebilir' | 'duzenleyebilir' | 'silebilir'; label: string }[] = [
