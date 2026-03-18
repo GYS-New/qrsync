@@ -45,7 +45,7 @@ async function getFont(): Promise<ArrayBuffer> {
   if (fontCache) return fontCache
   const { readFile } = await import('fs/promises')
   const { join }     = await import('path')
-  const fontPath     = join(process.cwd(), 'scripts', 'Inter-Bold.ttf')
+  const fontPath     = join(process.cwd(), 'public', 'fonts', 'Inter-Bold.ttf')
   const buf          = await readFile(fontPath)
   fontCache          = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
   return fontCache
