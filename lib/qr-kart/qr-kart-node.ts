@@ -74,7 +74,7 @@ async function buildTextPng(
   const sharp  = (await import('sharp')).default
   const font   = await getFont()
 
-  // Satori JSX ile metin render et (balonW x balonH kutusunda ortalanmış)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const svg = await satori(
     {
       type: 'div',
@@ -105,7 +105,7 @@ async function buildTextPng(
           },
         }],
       },
-    },
+    } as any,
     {
       width:  balonW,
       height: balonH,
