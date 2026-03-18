@@ -147,8 +147,10 @@ export async function resolveScanContext(opts: {
   return {
     kanal,
     firma: {
+      
       id: firma.id,
       ad: firma.firma_adi || firma.ticari_unvan || 'Firma',
+      aktif: firma.aktif !== false,
       qr_sistemi_aktif: firma.qr_sistemi_aktif !== false,
       nfc_sistemi_aktif: firma.nfc_sistemi_aktif !== false,
     },

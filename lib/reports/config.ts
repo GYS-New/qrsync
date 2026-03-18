@@ -106,7 +106,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
       { key: 'guncelleme_tarihi', label: 'Güncelleme Tarihi', width: 20 },
     ],
   },
-,
+
   {
     key: 'location_groups' as const,
     title: 'Lokasyon Grupları Raporu',

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server'
 import { differenceInCalendarDays, startOfDay } from 'date-fns'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
