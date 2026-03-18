@@ -115,6 +115,7 @@ export default function ReportsHubClient({
   firmaAdi,
   isSA,
   initialRaporTurleri,
+  initialFirmaId,
 }: {
   base: string
   firmaAdi?: string | null
@@ -122,6 +123,7 @@ export default function ReportsHubClient({
   // TA için SSR page.tsx'ten gelir — { id: 'ham_veri', aktif: true }[]
   // SA için geçilmez (undefined) — firma seçimine göre client'ta yüklenir
   initialRaporTurleri?: { id: string; aktif: boolean }[]
+  initialFirmaId?: string | null
 }) {
   const router     = useRouter()
   const { start }  = useRouteLoading()

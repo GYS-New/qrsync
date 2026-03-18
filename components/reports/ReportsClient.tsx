@@ -167,16 +167,18 @@ export default function ReportsClient({
   isSA,
   firmaAdi,
   projeId,
+  initialFirmaId,
 }: {
   base: '/sa' | '/ta'
   title: string
   isSA: boolean
   firmaAdi?: string | null
   projeId?: string | null
+  initialFirmaId?: string | null
 }) {
   const { start } = useRouteLoading()
   const { firmaId: saFirmaId, firmalar: saFirmalar } = useFirma()
-  const firmaId = isSA ? saFirmaId : null
+  const firmaId = isSA ? saFirmaId : (initialFirmaId ?? null)
 
   const firmaLabel = useMemo(() => {
     if (!isSA) return firmaAdi ?? 'Firma'
