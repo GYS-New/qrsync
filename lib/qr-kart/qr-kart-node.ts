@@ -7,6 +7,7 @@
 
 import QRCode  from 'qrcode'
 import JSZip   from 'jszip'
+import { getInterBoldFont } from './inter-bold-font'
 
 export interface QrKartLokasyon {
   id:     string
@@ -38,18 +39,7 @@ function safeFilename(text: string): string {
 }
 
 // ── Noto Sans font cache — satori için ArrayBuffer gerekli ───────────────────
-// Inter Bold TTF — scripts/ klasöründen okunur, harici bağlantı gerekmez
-let fontCache: ArrayBuffer | null = null
-
-async function getFont(): Promise<ArrayBuffer> {
-  if (fontCache) return fontCache
-  const { readFile } = await import('fs/promises')
-  const { join }     = await import('path')
-  const fontPath     = join(process.cwd(), 'public', 'fonts', 'Inter-Bold.ttf')
-  const buf          = await readFile(fontPath)
-  fontCache          = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
-  return fontCache
-}
+// Inter Bold TTF — base64 gömülü modülden alınır
 
 // ── Satori ile metin → SVG → sharp ile PNG ───────────────────────────────────
 async function buildTextPng(
@@ -65,7 +55,7 @@ async function buildTextPng(
 ): Promise<Buffer> {
   const satori = (await import('satori')).default
   const sharp  = (await import('sharp')).default
-  const font   = await getFont()
+  const font   = getInterBoldFont()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const svg = await satori(
