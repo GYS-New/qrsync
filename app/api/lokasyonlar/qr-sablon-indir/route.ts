@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { fillQrKartWithPython, type QrKartAyarlar } from '@/lib/qr-kart/fill-qr-kart'
+import { buildQrKartZip, type QrKartAyarlar } from '@/lib/qr-kart/qr-kart-node'
 
-export const runtime = 'nodejs'
-export const maxDuration = 120
+export const dynamic    = 'force-dynamic'
+export const runtime    = 'nodejs'
+export const maxDuration = 60
 
-/**
- * POST /api/lokasyonlar/qr-sablon-indir
- * FormData:
- *   sablon      — PNG/JPG şablon dosyası
- *   firma_id    — string
- *   proje_id    — string (opsiyonel)
- *   origin      — string (opsiyonel, QR URL base)
- *   ayarlar     — JSON string (opsiyonel koordinat overrides)
- */
 export async function POST(req: NextRequest) {
   const supabase = createClient()
   const admin    = createAdminClient()
@@ -28,14 +20,13 @@ export async function POST(req: NextRequest) {
   const isTA = me.rol === 'tenant_admin'
   if (!isSA && !isTA) return NextResponse.json({ error: 'Yetki yetersiz' }, { status: 403 })
 
-  // FormData oku
-  const form           = await req.formData()
-  const sablonFile     = form.get('sablon') as File | null
-  const firmaId        = form.get('firma_id') as string | null
-  const projeId        = form.get('proje_id') as string | null
-  const ustLokasyonId  = form.get('ust_lokasyon_id') as string | null
-  const origin         = (form.get('origin') as string | null) || 'https://app.qrsync.com'
-  const ayarlarRaw     = form.get('ayarlar') as string | null
+  const form          = await req.formData()
+  const sablonFile    = form.get('sablon') as File | null
+  const firmaId       = form.get('firma_id') as string | null
+  const projeId       = form.get('proje_id') as string | null
+  const ustLokasyonId = form.get('ust_lokasyon_id') as string | null
+  const origin        = (form.get('origin') as string | null) || 'https://app.qrsync.com'
+  const ayarlarRaw    = form.get('ayarlar') as string | null
 
   if (!sablonFile) return NextResponse.json({ error: 'Şablon dosyası zorunlu (sablon)' }, { status: 400 })
 
@@ -43,17 +34,14 @@ export async function POST(req: NextRequest) {
   if (!effectiveFirmaId) return NextResponse.json({ error: 'firma_id zorunlu' }, { status: 400 })
   if (isTA && firmaId && firmaId !== me.firma_id) return NextResponse.json({ error: 'Yetkisiz firma' }, { status: 403 })
 
-  // Ayarlar (koordinat overrides)
   let ayarlar: QrKartAyarlar = {}
   if (ayarlarRaw) {
     try { ayarlar = JSON.parse(ayarlarRaw) } catch { /* varsayılan */ }
   }
 
-  // Şablon buffer
   const sablonBuffer = Buffer.from(await sablonFile.arrayBuffer())
   const sablonExt    = sablonFile.name.split('.').pop()?.toLowerCase() ?? 'png'
 
-  // Lokasyonları çek
   let lokQuery = admin
     .from('lokasyonlar')
     .select('id,tanim,qr_veri,parent_id,aktif')
@@ -64,7 +52,6 @@ export async function POST(req: NextRequest) {
   const { data: tumLokasyonlar, error } = await lokQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Alt torun id'lerini özyinelemeli topla
   function getAllDescendantIds(rootId: string): string[] {
     const result = [rootId]
     const children = (tumLokasyonlar ?? []).filter((l: any) => l.parent_id === rootId)
@@ -80,27 +67,24 @@ export async function POST(req: NextRequest) {
   }
   if (!lokasyonlar.length) return NextResponse.json({ error: 'QR kodu olan aktif lokasyon bulunamadı' }, { status: 404 })
 
-  const idToTanim = new Map<string, string>()
-  ;(tumLokasyonlar ?? []).forEach((l: any) => idToTanim.set(l.id, l.tanim))
-
-  // Payload oluştur
-  const payload = {
-    lokasyonlar: lokasyonlar.map((l: any) => ({
-      id:     l.id,
-      tanim:  l.tanim,
-      qr_url: `${origin}/qr/${l.qr_veri}`,
-    })),
-    ayarlar,
-  }
-
-  // Python script çalıştır
-  const zipBuffer = await fillQrKartWithPython(sablonBuffer, payload, sablonExt)
+  const zipBuffer = await buildQrKartZip(
+    {
+      lokasyonlar: lokasyonlar.map((l: any) => ({
+        id:     l.id,
+        tanim:  l.tanim,
+        qr_url: `${origin}/qr/${l.qr_veri}`,
+      })),
+      ayarlar,
+    },
+    sablonBuffer,
+    sablonExt,
+  )
 
   return new NextResponse(zipBuffer as unknown as BodyInit, {
     headers: {
-      'content-type': 'application/zip',
-      'content-disposition': `attachment; filename="qr-kartlar-sablon-${new Date().toISOString().slice(0,10)}.zip"`,
-      'content-length': zipBuffer.byteLength.toString(),
+      'content-type':        'application/zip',
+      'content-disposition': `attachment; filename="qr-kartlar-sablon-${new Date().toISOString().slice(0, 10)}.zip"`,
+      'content-length':      zipBuffer.byteLength.toString(),
     },
   })
 }

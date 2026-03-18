@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { fillQrKartWithPython } from '@/lib/qr-kart/fill-qr-kart'
+import { buildQrKartZip } from '@/lib/qr-kart/qr-kart-node'
 
-export const runtime = 'nodejs'
-export const maxDuration = 120
+export const dynamic    = 'force-dynamic'
+export const runtime    = 'nodejs'
+export const maxDuration = 60
 
 export async function GET(req: NextRequest) {
   const supabase = createClient()
@@ -19,11 +20,11 @@ export async function GET(req: NextRequest) {
   const isTA = me.rol === 'tenant_admin'
   if (!isSA && !isTA) return NextResponse.json({ error: 'Yetki yetersiz' }, { status: 403 })
 
-  const url             = new URL(req.url)
-  const firmaId         = url.searchParams.get('firma_id')
-  const projeId         = url.searchParams.get('proje_id')
-  const ustLokasyonId   = url.searchParams.get('ust_lokasyon_id')   // filtre
-  const origin          = url.searchParams.get('origin') || 'https://app.qrsync.com'
+  const url           = new URL(req.url)
+  const firmaId       = url.searchParams.get('firma_id')
+  const projeId       = url.searchParams.get('proje_id')
+  const ustLokasyonId = url.searchParams.get('ust_lokasyon_id')
+  const origin        = url.searchParams.get('origin') || 'https://app.qrsync.com'
 
   const effectiveFirmaId = isSA ? firmaId : me.firma_id
   if (!effectiveFirmaId) return NextResponse.json({ error: 'firma_id zorunlu' }, { status: 400 })
@@ -39,10 +40,6 @@ export async function GET(req: NextRequest) {
   const { data: tumLokasyonlar, error } = await lokQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const idToTanim = new Map<string, string>()
-  ;(tumLokasyonlar ?? []).forEach((l: any) => idToTanim.set(l.id, l.tanim))
-
-  // Üst lokasyon seçildiyse sadece o lokasyonun tüm torunları
   function getAllDescendantIds(rootId: string): string[] {
     const result = [rootId]
     const children = (tumLokasyonlar ?? []).filter((l: any) => l.parent_id === rootId)
@@ -53,32 +50,25 @@ export async function GET(req: NextRequest) {
   let lokasyonlar = (tumLokasyonlar ?? []).filter((l: any) => l.aktif && l.qr_veri)
   if (ustLokasyonId) {
     const altIds = new Set(getAllDescendantIds(ustLokasyonId))
-    altIds.delete(ustLokasyonId) // üst lokasyonun kendisini dahil etme
+    altIds.delete(ustLokasyonId)
     lokasyonlar = lokasyonlar.filter((l: any) => altIds.has(l.id))
   }
   if (!lokasyonlar.length) return NextResponse.json({ error: 'QR kodu olan aktif lokasyon bulunamadı' }, { status: 404 })
 
-  // Minimal mod: şablon yok, Python'a '-' geçiyoruz
-  const payload = {
+  const zipBuffer = await buildQrKartZip({
     lokasyonlar: lokasyonlar.map((l: any) => ({
       id:     l.id,
       tanim:  l.tanim,
       qr_url: `${origin}/qr/${l.qr_veri}`,
     })),
     ayarlar: { minimal_boyut: 320 },
-  }
-
-  const zipBuffer = await fillQrKartWithPython(
-    Buffer.alloc(0),   // boş buffer — minimal modda kullanılmıyor
-    payload,
-    '-',               // '-' = minimal mod tetikleyici
-  )
+  })
 
   return new NextResponse(zipBuffer as unknown as BodyInit, {
     headers: {
-      'content-type': 'application/zip',
-      'content-disposition': `attachment; filename="qr-kodlar-${new Date().toISOString().slice(0,10)}.zip"`,
-      'content-length': zipBuffer.byteLength.toString(),
+      'content-type':        'application/zip',
+      'content-disposition': `attachment; filename="qr-kodlar-${new Date().toISOString().slice(0, 10)}.zip"`,
+      'content-length':      zipBuffer.byteLength.toString(),
     },
   })
 }
