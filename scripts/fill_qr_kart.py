@@ -170,27 +170,27 @@ def build_kart(sablon: Image.Image, lok: dict, ayarlar: dict) -> Image.Image:
         kart.paste(qr_img, (qr_x, qr_y), qr_img)
 
     # ── LOKASYON ADI ──
-    metin_x      = ayarlar.get('metin_x', 290)
-    metin_y      = ayarlar.get('metin_y', 255)
-    font_boyut   = ayarlar.get('font_boyut', 24)
-    balon_px     = ayarlar.get('balon_genislik', 200)  # balonun kullanılabilir piksel genişliği
+    # skip_text=True ise metin Node.js tarafında SVG overlay ile eklenir (Türkçe karakter desteği)
+    if not ayarlar.get('skip_text', False):
+        metin_x      = ayarlar.get('metin_x', 290)
+        metin_y      = ayarlar.get('metin_y', 255)
+        font_boyut   = ayarlar.get('font_boyut', 24)
+        balon_px     = ayarlar.get('balon_genislik', 200)
 
-    metin = str(lok.get('tanim', '')).upper()
-    font  = _load_font(font_boyut)
+        metin = str(lok.get('tanim', '')).upper()
+        font  = _load_font(font_boyut)
+        parcali = wrap_by_pixel(metin, font, balon_px)
 
-    # Piksel bazlı sarma
-    parcali = wrap_by_pixel(metin, font, balon_px)
-
-    draw = ImageDraw.Draw(kart)
-    draw.multiline_text(
-        (metin_x, metin_y),
-        parcali,
-        fill='black',
-        font=font,
-        align='center',
-        anchor='mm',
-        spacing=6,
-    )
+        draw = ImageDraw.Draw(kart)
+        draw.multiline_text(
+            (metin_x, metin_y),
+            parcali,
+            fill='black',
+            font=font,
+            align='center',
+            anchor='mm',
+            spacing=6,
+        )
 
     return kart.convert('RGB')
 
