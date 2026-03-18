@@ -77,7 +77,6 @@ export async function POST(req: NextRequest) {
       ayarlar,
     },
     sablonBuffer,
-    sablonExt,
   )
 
   return new NextResponse(zipBuffer as unknown as BodyInit, {
