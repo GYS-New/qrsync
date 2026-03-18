@@ -10,6 +10,9 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const fetchCache = 'force-no-store'
 
+// firma_rapor_turleri tablosundaki ID'ler alt çizgi ile — tutarlı olması için sabit liste burada
+const RAPOR_TURLERI_IDS = ['ham_veri', 'grafiksel', 'rapor_ozellestir', 'sure_analiz', 'musteri_degerlendirme']
+
 export default async function TARaporlarPage() {
   const supabase = createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -31,10 +34,8 @@ export default async function TARaporlarPage() {
     : { data: null }
   const firmaAdi = firma?.firma_adi || firma?.ticari_unvan || null
 
-  // Rapor türlerini SSR'da çek — client fetch gereksiz
   const admin = createAdminClient()
-  const RAPOR_TURLERI_IDS = ['ham_veri', 'grafiksel', 'rapor_ozellestir', 'sure_analiz', 'musteri_degerlendirme']
-  let initialRaporTurleri: any[] = []
+  let initialRaporTurleri: { id: string; aktif: boolean }[] = []
 
   if (me.firma_id) {
     const { data: dbTurler } = await admin
@@ -43,7 +44,7 @@ export default async function TARaporlarPage() {
       .eq('firma_id', me.firma_id)
 
     if (!dbTurler || dbTurler.length === 0) {
-      // İlk kez: tüm türleri aktifl olarak oluştur
+      // İlk kez: tüm türleri aktif olarak oluştur
       const { data: yeni } = await admin
         .from('firma_rapor_turleri')
         .insert(RAPOR_TURLERI_IDS.map(id => ({
@@ -54,16 +55,39 @@ export default async function TARaporlarPage() {
           guncelleyen_id: me.id,
         })))
         .select()
-      initialRaporTurleri = (yeni ?? []).filter((r: any) => r.aktif !== false).map((r: any) => ({ id: r.rapor_turu, aktif: r.aktif }))
+      initialRaporTurleri = (yeni ?? []).map((r: any) => ({ id: r.rapor_turu, aktif: r.aktif !== false }))
     } else {
-      initialRaporTurleri = dbTurler.filter((r: any) => r.aktif !== false).map((r: any) => ({ id: r.rapor_turu, aktif: r.aktif }))
+      // DB'de kayıt var ama bazı türler eksik olabilir — eksikleri aktif ekle
+      const mevcutIds = new Set(dbTurler.map((r: any) => r.rapor_turu))
+      const eksikIds = RAPOR_TURLERI_IDS.filter(id => !mevcutIds.has(id))
+
+      if (eksikIds.length > 0) {
+        await admin
+          .from('firma_rapor_turleri')
+          .insert(eksikIds.map(id => ({
+            firma_id: me.firma_id,
+            rapor_turu: id,
+            aktif: true,
+            olusturan_id: me.id,
+            guncelleyen_id: me.id,
+          })))
+        // Eksik olanları aktif olarak listeye ekle
+        const eksikTurler = eksikIds.map(id => ({ id, aktif: true }))
+        initialRaporTurleri = [
+          ...dbTurler.map((r: any) => ({ id: r.rapor_turu, aktif: r.aktif !== false })),
+          ...eksikTurler,
+        ]
+      } else {
+        initialRaporTurleri = dbTurler.map((r: any) => ({ id: r.rapor_turu, aktif: r.aktif !== false }))
+      }
     }
   }
 
-  // Müşteri değerlendirme yetki kontrolü — yetkisi yoksa listeden çıkar
+  // Müşteri değerlendirme yetki kontrolü (sayfa_kodu tire ile — GrupYetkileriClient ile tutarlı)
   const musteriGorebilir = await sayfaGorebilirMi(me.rol, 'musteri-degerlendirme')
   if (!musteriGorebilir) {
-    initialRaporTurleri = initialRaporTurleri.filter((r: any) => r.id !== 'musteri_degerlendirme')
+    // Kart ID'si alt çizgi ile — ReportsHubClient ile tutarlı
+    initialRaporTurleri = initialRaporTurleri.filter((r) => r.id !== 'musteri_degerlendirme')
   }
 
   return <ReportsHubClient base="/ta" initialFirmaId={me.firma_id ?? null} isSA={false} firmaAdi={firmaAdi} initialRaporTurleri={initialRaporTurleri} />
