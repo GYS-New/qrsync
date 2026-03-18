@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Topbar from '@/components/layout/Topbar'
 import { useRouteLoading } from '@/components/ui/RouteLoadingProvider'
 import { useToast } from '@/components/ui/ToastProvider'
-import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2 } from 'lucide-react'
+import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2, MessageSquare } from 'lucide-react'
 import { useFirma } from '@/components/layout/FirmaContext'
 
 // ─── Rapor kart tanımları — statik, DB ile ilgisi yok ────────────────────────
@@ -38,6 +38,13 @@ const RAPOR_KARTLARI = [
     eyebrow: 'SÜRE ANALİZİ', badge: 'Yakında', tone: 'amber' as const,
     icon: 'clock', path: '/raporlar/sure-analiz', disabled: false,
   },
+  {
+    id: 'musteri_degerlendirme',
+    title: 'Müşteri Değerlendirmeleri',
+    description: 'QR/NFC ile toplanan anonim müşteri memnuniyeti puanları, yorumlar ve fotoğraflar.',
+    eyebrow: 'MÜŞTERİ', badge: 'Yıldız + Yorum', tone: 'violet' as const,
+    icon: 'message', path: '/raporlar/musteri-degerlendirme', disabled: false,
+  },
 ]
 
 const IKON_MAP: Record<string, ReactNode> = {
@@ -45,6 +52,7 @@ const IKON_MAP: Record<string, ReactNode> = {
   bar:      <BarChart3 size={22} />,
   sparkles: <Sparkles size={22} />,
   clock:    <Clock3 size={22} />,
+  message:  <MessageSquare size={22} />,
 }
 
 // ─── HubCard ─────────────────────────────────────────────────────────────────

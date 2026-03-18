@@ -6,8 +6,8 @@ const RAPOR_TURLERI = [
   { id: 'ham_veri', ad: 'Ham Veri Raporları', aciklama: 'Kolon seçimi, tarih aralığı ve Excel/PDF çıktılarıyla detaylı operasyon verisi' },
   { id: 'grafiksel', ad: 'Grafiksel Raporlar', aciklama: 'Sütun, çizgi ve pasta grafiklerle hızlı görsel analiz ve canlı analiz' },
   { id: 'rapor_ozellestir', ad: 'Rapor Özelleştir', aciklama: 'Hazır şablon seçin ya da kendi Excel şablonunuzu yükleyin, parametrelerle rapor üretin' },
-  { id: 'lokasyon_qr', ad: 'Lokasyon QR Kodları', aciklama: 'Tüm lokasyonların QR kodlarını tek PDF dosyasında oluşturun ve yazdırın' },
-  { id: 'sure_analiz', ad: 'Süre Analiz Raporları', aciklama: 'Tamamlanma süresi, lokasyon bazlı bekleme zamanları ve trend karşılaştırmaları' }
+  { id: 'sure_analiz', ad: 'Süre Analiz Raporları', aciklama: 'Tamamlanma süresi, lokasyon bazlı bekleme zamanları ve trend karşılaştırmaları' },
+  { id: 'musteri_degerlendirme', ad: 'Müşteri Değerlendirmeleri', aciklama: 'QR/NFC ile toplanan anonim müşteri memnuniyeti değerlendirmeleri ve yorumları' }
 ]
 
 // GET - Firma rapor türlerini listele

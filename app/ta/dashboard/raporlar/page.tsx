@@ -32,7 +32,7 @@ export default async function TARaporlarPage() {
 
   // Rapor türlerini SSR'da çek — client fetch gereksiz
   const admin = createAdminClient()
-  const RAPOR_TURLERI_IDS = ['ham_veri', 'grafiksel', 'rapor_ozellestir', 'lokasyon_qr', 'sure_analiz']
+  const RAPOR_TURLERI_IDS = ['ham_veri', 'grafiksel', 'rapor_ozellestir', 'sure_analiz', 'musteri_degerlendirme']
   let initialRaporTurleri: any[] = []
 
   if (me.firma_id) {

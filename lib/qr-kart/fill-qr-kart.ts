@@ -24,6 +24,7 @@ export interface QrKartAyarlar {
   ust_metin_x?:    number
   ust_metin_y?:    number
   ust_font_boyut?: number
+  minimal_boyut?:  number   // şablonsuz mod için QR boyutu
 }
 
 export interface QrKartPayload {
