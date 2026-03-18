@@ -10,14 +10,16 @@ export default function QuickReportsPageClient({
   title,
   isSA,
   projeId,
+  initialFirmaId,
 }: {
   base: '/sa' | '/ta'
   title: string
   isSA: boolean
   projeId?: string | null
+  initialFirmaId?: string | null
 }) {
   const { firmaId: saFirmaId } = useFirma()
-  const firmaId = useMemo(() => (isSA ? saFirmaId : null), [isSA, saFirmaId])
+  const firmaId = useMemo(() => (isSA ? saFirmaId : (initialFirmaId ?? null)), [isSA, saFirmaId, initialFirmaId])
 
   return (
     <div>
