@@ -1,0 +1,12 @@
+QRSync projesine devam ediyoruz.
+
+Bağlam dosyaları:
+/docs/PROJECT_CONTEXT.md
+/docs/CHANGELOG.md
+/docs/TODO.md
+
+Son stabil sürüm:
+QRSYNC_revize_email_fix_v4.zip
+
+Bu bağlama göre devam edelim.
+Yeni iş: [buraya yapmak istediğin şeyi yaz]

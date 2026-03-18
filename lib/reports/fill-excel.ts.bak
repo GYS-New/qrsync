@@ -1,0 +1,104 @@
+import ExcelJS from "exceljs"
+import path from "path"
+import { GenelRaporData } from "./genel-rapor-data"
+
+export async function fillGenelRaporExcel(data: GenelRaporData) {
+
+  const workbook = new ExcelJS.Workbook()
+
+  const templatePath = path.join(
+    process.cwd(),
+    "public",
+    "report-templates",
+    "QR-SYNC_Genel_Rapor.xlsx"
+  )
+
+  await workbook.xlsx.readFile(templatePath)
+
+  const giris = workbook.getWorksheet("Giriş")
+  const gruplar = workbook.getWorksheet("Gruplar")
+  const tamamlanan = workbook.getWorksheet("Tamamlanan Frekanslar")
+  const sapmalar = workbook.getWorksheet("Sapmalar")
+
+  if (!giris || !gruplar || !tamamlanan || !sapmalar) {
+    throw new Error("Template sheet bulunamadı")
+  }
+
+  /* ------------------------------------------------ */
+  /* GİRİŞ SAYFASI */
+  /* ------------------------------------------------ */
+
+  giris.getCell("C3").value = data.firmaAdi
+  giris.getCell("C4").value = data.ustLokTanim
+  giris.getCell("C5").value = data.altLokTanim
+  giris.getCell("C6").value = data.raporuAlan
+
+  giris.getCell("F3").value = data.toplamGorev
+  giris.getCell("F4").value = data.toplamTamamlanan
+  giris.getCell("F5").value = data.toplamSapma
+  giris.getCell("F6").value = data.toplamKayip
+  giris.getCell("F7").value = data.genelBasari
+
+  /* ------------------------------------------------ */
+  /* GRUPLAR */
+  /* ------------------------------------------------ */
+
+  let row = 4
+
+  for (const g of data.grupMetrikleri) {
+
+    gruplar.getCell(`A${row}`).value = g.grup
+    gruplar.getCell(`B${row}`).value = g.lokasyon
+    gruplar.getCell(`C${row}`).value = g.gunlukFrekans
+    gruplar.getCell(`D${row}`).value = g.hedef
+    gruplar.getCell(`E${row}`).value = g.tamamlanan
+    gruplar.getCell(`F${row}`).value = g.sapma
+    gruplar.getCell(`G${row}`).value = g.kayip
+    gruplar.getCell(`H${row}`).value = g.basariOrani
+    gruplar.getCell(`I${row}`).value = g.genelOran
+
+    row++
+  }
+
+  /* ------------------------------------------------ */
+  /* TAMAMLANAN FREKANSLAR */
+  /* ------------------------------------------------ */
+
+  row = 4
+
+  for (const t of data.tamamlananGorevler) {
+
+    tamamlanan.getCell(`A${row}`).value = t.sn
+    tamamlanan.getCell(`B${row}`).value = t.personel
+    tamamlanan.getCell(`C${row}`).value = t.lokasyon
+    tamamlanan.getCell(`D${row}`).value = t.gorevNo
+    tamamlanan.getCell(`E${row}`).value = t.gorevTanimi
+    tamamlanan.getCell(`F${row}`).value = t.tarihSaat
+    tamamlanan.getCell(`G${row}`).value = t.durum
+
+    row++
+  }
+
+  /* ------------------------------------------------ */
+  /* SAPMALAR */
+  /* ------------------------------------------------ */
+
+  row = 4
+
+  for (const s of data.sapmaGorevler) {
+
+    sapmalar.getCell(`A${row}`).value = s.sn
+    sapmalar.getCell(`B${row}`).value = s.personel
+    sapmalar.getCell(`C${row}`).value = s.lokasyon
+    sapmalar.getCell(`D${row}`).value = s.gorevNo
+    sapmalar.getCell(`E${row}`).value = s.gorevTanimi
+    sapmalar.getCell(`F${row}`).value = s.tarihSaat
+    sapmalar.getCell(`G${row}`).value = s.sapmaNedeni
+
+    row++
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer()
+
+  return Buffer.from(buffer)
+}

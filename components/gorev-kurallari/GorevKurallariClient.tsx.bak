@@ -1,0 +1,514 @@
+'use client'
+
+import { useState, useMemo } from 'react'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { useToast } from '@/components/ui/ToastProvider'
+import type { GorevKurali } from '@/types'
+
+const GUN_LABELS = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
+const GUN_LABELS_FULL = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
+const IS_GUNLERI = [1, 2, 3, 4, 5]
+const TUM_GUNLER = [0, 1, 2, 3, 4, 5, 6]
+
+type Props = {
+  base: '/ta' | '/sa'
+  firmaId: string | null
+  meId: string
+  initialKuralar: any[]
+  lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[]
+  kullanicilar: { id: string; isim_soyisim: string }[]
+  readonly: boolean
+}
+
+const EMPTY_FORM = {
+  tanim: '',
+  lokasyon_id: '',
+  atanan_kullanici_id: '',
+  gunluk_frekans_sayisi: 1,
+  aktif_gunler: IS_GUNLERI,
+  aktif_olma_saati: '08:00',
+  baslangic_tarihi: new Date().toISOString().slice(0, 10),
+  bitis_tarihi: '',
+}
+
+export default function GorevKurallariClient({
+  base, firmaId, meId, initialKuralar, lokasyonlar, kullanicilar, readonly
+}: Props) {
+  const { confirm } = useConfirm()
+  const { toast } = useToast()
+
+  const [kuralar, setKuralar] = useState<any[]>(initialKuralar)
+  const [modal, setModal] = useState<null | 'create' | 'edit'>(null)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [q, setQ] = useState('')
+
+  // Lokasyon tam yol haritası
+  const lokMap = useMemo(() => {
+    const m = new Map(lokasyonlar.map(l => [l.id, l]))
+    function fullPath(id: string): string {
+      const l = m.get(id)
+      if (!l) return '—'
+      if (l.parent_id && m.has(l.parent_id)) return fullPath(l.parent_id) + ' › ' + l.tanim
+      return l.tanim
+    }
+    const result = new Map<string, string>()
+    lokasyonlar.forEach(l => result.set(l.id, fullPath(l.id)))
+    return result
+  }, [lokasyonlar])
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    if (!s) return kuralar
+    return kuralar.filter(k =>
+      k.tanim?.toLowerCase().includes(s) ||
+      lokMap.get(k.lokasyon_id)?.toLowerCase().includes(s)
+    )
+  }, [q, kuralar, lokMap])
+
+  function openCreate() {
+    setForm(EMPTY_FORM)
+    setEditId(null)
+    setModal('create')
+  }
+
+  function openEdit(k: any) {
+    setForm({
+      tanim: k.tanim ?? '',
+      lokasyon_id: k.lokasyon_id ?? '',
+      atanan_kullanici_id: k.atanan_kullanici_id ?? '',
+      gunluk_frekans_sayisi: k.gunluk_frekans_sayisi ?? 1,
+      aktif_gunler: k.aktif_gunler ?? IS_GUNLERI,
+      aktif_olma_saati: k.aktif_olma_saati?.slice(0, 5) ?? '08:00',
+      baslangic_tarihi: k.baslangic_tarihi ?? new Date().toISOString().slice(0, 10),
+      bitis_tarihi: k.bitis_tarihi ?? '',
+    })
+    setEditId(k.id)
+    setModal('edit')
+  }
+
+  function toggleGun(gun: number) {
+    setForm(prev => ({
+      ...prev,
+      aktif_gunler: prev.aktif_gunler.includes(gun)
+        ? prev.aktif_gunler.filter(g => g !== gun)
+        : [...prev.aktif_gunler, gun].sort(),
+    }))
+  }
+
+  async function handleSave() {
+    if (!form.tanim.trim()) return toast({ type: 'error', title: 'Hata', message: 'Tanım zorunlu' })
+    if (!form.lokasyon_id) return toast({ type: 'error', title: 'Hata', message: 'Lokasyon seçin' })
+    if (form.aktif_gunler.length === 0) return toast({ type: 'error', title: 'Hata', message: 'En az bir gün seçin' })
+
+    setSaving(true)
+    try {
+      const body = {
+        firma_id: firmaId,
+        tanim: form.tanim.trim(),
+        lokasyon_id: form.lokasyon_id,
+        atanan_kullanici_id: form.atanan_kullanici_id || null,
+        gunluk_frekans_sayisi: form.gunluk_frekans_sayisi,
+        aktif_gunler: form.aktif_gunler,
+        aktif_olma_saati: form.aktif_olma_saati,
+        baslangic_tarihi: form.baslangic_tarihi,
+        bitis_tarihi: form.bitis_tarihi || null,
+      }
+
+      if (modal === 'create') {
+        const res = await fetch('/api/gorev-kurallari', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        setKuralar(prev => [data, ...prev])
+        toast({ type: 'success', title: 'Başarılı', message: 'Kural oluşturuldu' })
+      } else if (modal === 'edit' && editId) {
+        const res = await fetch(`/api/gorev-kurallari/${editId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        setKuralar(prev => prev.map(k => k.id === editId ? { ...k, ...data } : k))
+        toast({ type: 'success', title: 'Başarılı', message: 'Kural güncellendi' })
+      }
+      setModal(null)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setSaving(false)
+  }
+
+  async function toggleAktif(k: any) {
+    const res = await fetch(`/api/gorev-kurallari/${k.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aktif: !k.aktif }),
+    })
+    if (res.ok) {
+      setKuralar(prev => prev.map(x => x.id === k.id ? { ...x, aktif: !k.aktif } : x))
+      toast({ type: 'success', title: 'Güncellendi', message: k.aktif ? 'Kural pasife alındı' : 'Kural aktif edildi' })
+    }
+  }
+
+  async function handleDelete(k: any) {
+    const ok = await confirm({
+      title: 'Kuralı Sil',
+      message: `"${k.tanim}" kuralını silmek istediğinizden emin misiniz?\n\nMevcut görevler silinmez, yalnızca yeni görev üretimi durur.`,
+      confirmText: 'Evet, Sil',
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+    const res = await fetch(`/api/gorev-kurallari/${k.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setKuralar(prev => prev.filter(x => x.id !== k.id))
+      toast({ type: 'success', title: 'Silindi', message: `"${k.tanim}" kuralı silindi` })
+    } else {
+      const d = await res.json()
+      toast({ type: 'error', title: 'Hata', message: d.error })
+    }
+  }
+
+  // ── GÜN GRUBU KISA ETİKETİ ──────────────────────────────────────────────
+  function gunEtiket(gunler: number[]) {
+    const s = [...gunler].sort().join(',')
+    if (s === '1,2,3,4,5') return 'Hafta içi'
+    if (s === '0,1,2,3,4,5,6') return 'Her gün'
+    if (s === '0,6') return 'Hafta sonu'
+    return gunler.sort().map(g => GUN_LABELS[g]).join(', ')
+  }
+
+  // ── RENDER ───────────────────────────────────────────────────────────────
+  return (
+    <div style={{ padding: '24px 28px' }}>
+
+      {/* Header */}
+      <div className="verde-card" style={{ padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 900, color: '#0f1a0f' }}>GÖREV KURALLARI</div>
+          <div style={{ fontSize: 13, color: '#7a907a', marginTop: 2 }}>
+            Her kural, seçilen günlerde gece 00:01'de otomatik görev üretir
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input
+            className="verde-input"
+            placeholder="Ara..."
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            style={{ minWidth: 180 }}
+          />
+          {!readonly && (
+            <button className="verde-btn-primary" onClick={openCreate}>
+              + Yeni Kural
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tablo */}
+      <div className="verde-card" style={{ overflow: 'hidden' }}>
+        <div className="verde-table-wrap">
+          <table className="verde-table">
+            <thead>
+              <tr>
+                <th>Tanım</th>
+                <th>Lokasyon</th>
+                <th>Günler</th>
+                <th>Frekans</th>
+                <th>Saat</th>
+                <th>Başlangıç</th>
+                <th>Bitiş</th>
+                <th>Atanan</th>
+                <th>Durum</th>
+                {!readonly && <th>İşlem</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(k => (
+                <tr key={k.id} style={{ opacity: k.aktif ? 1 : 0.5 }}>
+                  <td style={{ fontWeight: 600 }}>{k.tanim}</td>
+                  <td style={{ fontSize: 12.5, color: '#506050' }}>
+                    {lokMap.get(k.lokasyon_id) ?? '—'}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', fontSize: 12.5 }}>
+                    {gunEtiket(k.aktif_gunler ?? [])}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <span style={{ fontWeight: 700, color: '#2e8b2e' }}>
+                      {k.gunluk_frekans_sayisi}×
+                    </span>
+                    <span style={{ fontSize: 11.5, color: '#7a907a' }}>/gün</span>
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', fontSize: 12.5 }}>
+                    {k.aktif_olma_saati?.slice(0, 5) ?? '—'}
+                  </td>
+                  <td style={{ fontSize: 12.5, color: '#506050' }}>{k.baslangic_tarihi}</td>
+                  <td style={{ fontSize: 12.5, color: k.bitis_tarihi ? '#506050' : '#b0c0b0' }}>
+                    {k.bitis_tarihi ?? 'Süresiz'}
+                  </td>
+                  <td style={{ fontSize: 12.5, color: '#506050' }}>
+                    {k.atanan_kullanici?.isim_soyisim ?? '—'}
+                  </td>
+                  <td>
+                    <span className={`verde-badge ${k.aktif ? 'status-islemde' : 'status-iptal'}`}>
+                      {k.aktif ? 'Aktif' : 'Pasif'}
+                    </span>
+                    {k.kaynak === 'import' && (
+                      <span style={{ fontSize: 10.5, color: '#7a907a', marginLeft: 4 }}>import</span>
+                    )}
+                  </td>
+                  {!readonly && (
+                    <td>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => openEdit(k)}
+                          className="verde-btn-outline-strong"
+                          style={{ padding: '3px 10px', fontSize: 12 }}
+                        >
+                          Düzenle
+                        </button>
+                        <button
+                          onClick={() => toggleAktif(k)}
+                          className="verde-btn-outline-strong"
+                          style={{ padding: '3px 10px', fontSize: 12, color: k.aktif ? '#b45309' : '#2e8b2e' }}
+                        >
+                          {k.aktif ? 'Pasifle' : 'Aktifle'}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(k)}
+                          className="verde-btn-outline-strong"
+                          style={{ padding: '3px 10px', fontSize: 12, color: '#b91c1c' }}
+                        >
+                          Sil
+                        </button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+              {!filtered.length && (
+                <tr>
+                  <td colSpan={10} style={{ textAlign: 'center', color: '#7a907a', padding: '32px 0', fontSize: 14 }}>
+                    {q ? 'Arama kriterine uygun kural bulunamadı' : 'Henüz görev kuralı oluşturulmamış'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Özet bilgi */}
+      {kuralar.length > 0 && (
+        <div style={{ marginTop: 12, fontSize: 12.5, color: '#7a907a', display: 'flex', gap: 20 }}>
+          <span>Toplam: <strong>{kuralar.length}</strong> kural</span>
+          <span>Aktif: <strong style={{ color: '#2e8b2e' }}>{kuralar.filter(k => k.aktif).length}</strong></span>
+          <span>Pasif: <strong style={{ color: '#b45309' }}>{kuralar.filter(k => !k.aktif).length}</strong></span>
+          <span>Günlük üretim (aktif): <strong style={{ color: '#2e8b2e' }}>
+            {kuralar.filter(k => k.aktif).reduce((s, k) => s + (k.gunluk_frekans_sayisi ?? 0), 0)} görev
+          </strong></span>
+        </div>
+      )}
+
+      {/* ── MODAL ─────────────────────────────────────────────────────────── */}
+      {modal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9000,
+            background: 'rgba(15,26,15,0.30)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+          onMouseDown={e => { if (e.target === e.currentTarget) setModal(null) }}
+        >
+          <div
+            className="verde-card"
+            style={{ width: 'min(560px, calc(100vw - 24px))', borderRadius: 12, boxShadow: '0 18px 50px rgba(0,0,0,0.2)', overflow: 'hidden', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto' }}
+          >
+            {/* Modal header */}
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontWeight: 800, fontSize: 14, color: '#0f1a0f' }}>
+                {modal === 'create' ? '+ Yeni Görev Kuralı' : 'Kuralı Düzenle'}
+              </div>
+              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#7a907a' }}>✕</button>
+            </div>
+
+            {/* Modal body */}
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+              {/* Tanım */}
+              <div>
+                <label style={lbl}>Görev Tanımı *</label>
+                <input
+                  className="verde-input" style={{ width: '100%' }}
+                  value={form.tanim}
+                  onChange={e => setForm(p => ({ ...p, tanim: e.target.value }))}
+                  placeholder="örn. WC Temizliği"
+                />
+              </div>
+
+              {/* Lokasyon */}
+              <div>
+                <label style={lbl}>Lokasyon *</label>
+                <select
+                  className="verde-select" style={{ width: '100%' }}
+                  value={form.lokasyon_id}
+                  onChange={e => setForm(p => ({ ...p, lokasyon_id: e.target.value }))}
+                >
+                  <option value="">— Seçin —</option>
+                  {lokasyonlar.map(l => (
+                    <option key={l.id} value={l.id}>{lokMap.get(l.id) ?? l.tanim}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Günler */}
+              <div>
+                <label style={lbl}>Aktif Günler *</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  {GUN_LABELS_FULL.map((label, i) => {
+                    const sec = form.aktif_gunler.includes(i)
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => toggleGun(i)}
+                        style={{
+                          padding: '5px 12px', borderRadius: 6, fontSize: 12.5, cursor: 'pointer',
+                          fontWeight: sec ? 700 : 400,
+                          border: sec ? '1.5px solid #2e8b2e' : '1.5px solid #d6e4d6',
+                          background: sec ? '#f0f9f0' : '#fff',
+                          color: sec ? '#2e8b2e' : '#506050',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {/* Hızlı seçim */}
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  {[
+                    { label: 'Hafta içi', gunler: IS_GUNLERI },
+                    { label: 'Her gün', gunler: TUM_GUNLER },
+                    { label: 'Hafta sonu', gunler: [0, 6] },
+                  ].map(({ label, gunler }) => (
+                    <button key={label} type="button"
+                      onClick={() => setForm(p => ({ ...p, aktif_gunler: gunler }))}
+                      style={{ fontSize: 11.5, padding: '3px 10px', borderRadius: 5, border: '1px solid #d6e4d6', background: '#f7fbf7', cursor: 'pointer', color: '#506050' }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Frekans + Saat yan yana */}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={lbl}>Günlük Frekans *</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button type="button"
+                      onClick={() => setForm(p => ({ ...p, gunluk_frekans_sayisi: Math.max(1, p.gunluk_frekans_sayisi - 1) }))}
+                      style={stepBtn}
+                    >−</button>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: '#2e8b2e', minWidth: 28, textAlign: 'center' }}>
+                      {form.gunluk_frekans_sayisi}
+                    </span>
+                    <button type="button"
+                      onClick={() => setForm(p => ({ ...p, gunluk_frekans_sayisi: Math.min(24, p.gunluk_frekans_sayisi + 1) }))}
+                      style={stepBtn}
+                    >+</button>
+                    <span style={{ fontSize: 12, color: '#7a907a' }}>kez/gün</span>
+                  </div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={lbl}>Aktif Olma Saati *</label>
+                  <input type="time" className="verde-input" style={{ width: '100%' }}
+                    value={form.aktif_olma_saati}
+                    onChange={e => setForm(p => ({ ...p, aktif_olma_saati: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {/* Tarihler yan yana */}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={lbl}>Başlangıç Tarihi *</label>
+                  <input type="date" className="verde-input" style={{ width: '100%' }}
+                    value={form.baslangic_tarihi}
+                    onChange={e => setForm(p => ({ ...p, baslangic_tarihi: e.target.value }))}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={lbl}>Bitiş Tarihi <span style={{ fontSize: 11, color: '#7a907a' }}>(boş = süresiz)</span></label>
+                  <input type="date" className="verde-input" style={{ width: '100%' }}
+                    value={form.bitis_tarihi}
+                    onChange={e => setForm(p => ({ ...p, bitis_tarihi: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {/* Atanan kullanıcı */}
+              <div>
+                <label style={lbl}>Atanan Kullanıcı <span style={{ fontSize: 11, color: '#7a907a' }}>(opsiyonel)</span></label>
+                <select className="verde-select" style={{ width: '100%' }}
+                  value={form.atanan_kullanici_id}
+                  onChange={e => setForm(p => ({ ...p, atanan_kullanici_id: e.target.value }))}
+                >
+                  <option value="">— Atanmamış —</option>
+                  {kullanicilar.map(u => (
+                    <option key={u.id} value={u.id}>{u.isim_soyisim}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Özet */}
+              {form.lokasyon_id && form.aktif_gunler.length > 0 && (
+                <div style={{ background: '#f0f9f0', border: '1px solid #c8e6c8', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#2a4a2a' }}>
+                  <strong>Özet:</strong> {gunEtiket(form.aktif_gunler)} günlerde, saat {form.aktif_olma_saati}'de,
+                  günde <strong>{form.gunluk_frekans_sayisi}×</strong> "{form.tanim || '...'}" görevi üretilir.
+                  {form.bitis_tarihi
+                    ? ` ${form.baslangic_tarihi} – ${form.bitis_tarihi} tarihleri arasında.`
+                    : ` ${form.baslangic_tarihi} tarihinden itibaren süresiz.`}
+                </div>
+              )}
+            </div>
+
+            {/* Modal footer */}
+            <div style={{ padding: '12px 18px', borderTop: '1px solid #e8f0e8', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={() => setModal(null)} className="verde-btn-outline-strong" disabled={saving}>
+                İptal
+              </button>
+              <button onClick={handleSave} className="verde-btn-primary" disabled={saving}>
+                {saving ? 'Kaydediliyor...' : modal === 'create' ? 'Kural Oluştur' : 'Güncelle'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  // ── Yardımcı ──────────────────────────────────────────────────────────────
+  function gunEtiket(gunler: number[]) {
+    const s = [...gunler].sort().join(',')
+    if (s === '1,2,3,4,5') return 'Hafta içi'
+    if (s === '0,1,2,3,4,5,6') return 'Her gün'
+    if (s === '0,6') return 'Hafta sonu'
+    return gunler.sort().map(g => GUN_LABELS[g]).join(', ')
+  }
+}
+
+// Stil sabitleri
+const lbl: React.CSSProperties = {
+  display: 'block', fontSize: 12.5, fontWeight: 700, color: '#506050', marginBottom: 5,
+}
+const stepBtn: React.CSSProperties = {
+  width: 30, height: 30, borderRadius: 6, border: '1.5px solid #d6e4d6',
+  background: '#f7fbf7', cursor: 'pointer', fontSize: 18, fontWeight: 700,
+  color: '#2e8b2e', display: 'flex', alignItems: 'center', justifyContent: 'center',
+}
