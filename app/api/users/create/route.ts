@@ -42,12 +42,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Firma admini sadece kullanıcı oluşturabilir' }, { status: 403 })
   }
 
-  const finalFirmaId = isSA ? firma_id : me.firma_id
-  if (!finalFirmaId) {
+  // SA, alt_super_admin oluştururken firma_id gerekmez
+  const isAltSACreation = isSA && rol === 'alt_super_admin'
+
+  const finalFirmaId = isAltSACreation ? null : (isSA ? firma_id : me.firma_id)
+  if (!isAltSACreation && !finalFirmaId) {
     return NextResponse.json({ error: 'firma_id gerekli' }, { status: 400 })
   }
 
-  if (rol !== 'tenant_user' && rol !== 'tenant_admin') {
+  const allowedRols = ['tenant_user', 'tenant_admin', 'musteri', ...(isSA ? ['alt_super_admin'] : [])]
+  if (!allowedRols.includes(rol)) {
     return NextResponse.json({ error: 'Geçersiz rol' }, { status: 400 })
   }
 
@@ -72,10 +76,10 @@ export async function POST(req: Request) {
       email,
       telefon,
       rol,
-      firma_id: finalFirmaId,
+      ...(finalFirmaId ? { firma_id: finalFirmaId } : {}),
       kayit_yapan_id: me.id,
       aktif: true,
-      ...(proje_id ? { proje_id } : {}),
+      ...(proje_id && !isAltSACreation ? { proje_id } : {}),
     })
 
   if (insertErr) {
