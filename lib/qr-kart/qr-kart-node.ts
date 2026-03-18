@@ -7,7 +7,6 @@
 
 import QRCode  from 'qrcode'
 import JSZip   from 'jszip'
-import https   from 'https'
 
 export interface QrKartLokasyon {
   id:     string
@@ -39,23 +38,17 @@ function safeFilename(text: string): string {
 }
 
 // ── Noto Sans font cache — satori için ArrayBuffer gerekli ───────────────────
-const FONT_URL = 'https://fonts.gstatic.com/s/notosans/v36/o-0IIpQlx3QUlC5A4PNr5TRA.woff2'
+// Inter Bold TTF — scripts/ klasöründen okunur, harici bağlantı gerekmez
 let fontCache: ArrayBuffer | null = null
 
 async function getFont(): Promise<ArrayBuffer> {
   if (fontCache) return fontCache
-  return new Promise((resolve, reject) => {
-    https.get(FONT_URL, (res) => {
-      const chunks: Buffer[] = []
-      res.on('data', (c: Buffer) => chunks.push(c))
-      res.on('end', () => {
-        const buf = Buffer.concat(chunks)
-        fontCache = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
-        resolve(fontCache)
-      })
-      res.on('error', reject)
-    }).on('error', reject)
-  })
+  const { readFile } = await import('fs/promises')
+  const { join }     = await import('path')
+  const fontPath     = join(process.cwd(), 'scripts', 'Inter-Bold.ttf')
+  const buf          = await readFile(fontPath)
+  fontCache          = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
+  return fontCache
 }
 
 // ── Satori ile metin → SVG → sharp ile PNG ───────────────────────────────────
@@ -109,7 +102,7 @@ async function buildTextPng(
     {
       width:  balonW,
       height: balonH,
-      fonts: [{ name: 'NotoSans', data: font, weight: 700, style: 'normal' }],
+      fonts: [{ name: 'NotoSans', data: font, weight: 700, style: 'normal' as const }],
     }
   )
 
