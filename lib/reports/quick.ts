@@ -10,6 +10,7 @@ type Filters = {
   locationId?: string | null
   userId?: string | null
   status?: string | null
+  groupId?: string | null
 }
 
 type ChartDatum = Record<string, string | number>
@@ -392,7 +393,7 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     if (filters.dateTo)   gorevQ = gorevQ.lte('aktif_olma_tarihi', filters.dateTo)
 
     // Seçili grup filtresi
-    const selectedGrpId = (filters as any).groupId as string | null | undefined
+    const selectedGrpId = filters.groupId
     if (selectedGrpId && grpLocMap[selectedGrpId]) {
       gorevQ = gorevQ.in('lokasyon_id', grpLocMap[selectedGrpId])
     }
