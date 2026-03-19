@@ -1,11 +1,12 @@
-import { spawn }                        from 'child_process'
-import { getPythonCmd }                 from '@/lib/python-runner'
-import { writeFile, readFile, unlink }  from 'fs/promises'
-import { tmpdir }                       from 'os'
-import path                             from 'path'
-import { randomUUID }                   from 'crypto'
-import https                            from 'https'
-import JSZip                            from 'jszip'
+/**
+ * lib/qr-kart/fill-qr-kart.ts
+ * QR kart oluşturma — Node.js (qrcode + sharp + jszip)
+ * Python bağımlılığı yok.
+ */
+import sharp   from 'sharp'
+import QRCode  from 'qrcode'
+import JSZip   from 'jszip'
+import https   from 'https'
 
 export interface QrKartLokasyon {
   id:         string
@@ -35,33 +36,30 @@ export interface QrKartPayload {
   ayarlar?:    QrKartAyarlar
 }
 
-// ── Noto Sans font cache (Türkçe + Latin Extended) ───────────────────────────
+// ── Font cache ────────────────────────────────────────────────────────────────
 const FONT_URL = 'https://fonts.gstatic.com/s/notosans/v36/o-0IIpQlx3QUlC5A4PNr5TRA.woff2'
 let fontCache: Buffer | null = null
 
 async function getFontBase64(): Promise<string> {
   if (fontCache) return fontCache.toString('base64')
   return new Promise((resolve, reject) => {
-    https.get(FONT_URL, (res) => {
+    https.get(FONT_URL, res => {
       const chunks: Buffer[] = []
       res.on('data', (c: Buffer) => chunks.push(c))
-      res.on('end', () => {
-        fontCache = Buffer.concat(chunks)
-        resolve(fontCache!.toString('base64'))
-      })
+      res.on('end', () => { fontCache = Buffer.concat(chunks); resolve(fontCache.toString('base64')) })
       res.on('error', reject)
     }).on('error', reject)
   })
 }
 
-// ── XML escape ───────────────────────────────────────────────────────────────
+// ── XML escape ────────────────────────────────────────────────────────────────
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
 }
 
-// ── Metin satır kırma ────────────────────────────────────────────────────────
+// ── Metin satır kırma ─────────────────────────────────────────────────────────
 function wrapText(text: string, maxPx: number, fontSizePx: number): string[] {
   const charsPerLine = Math.max(1, Math.floor(maxPx / (fontSizePx * 0.58)))
   const words = text.split(' ')
@@ -76,7 +74,6 @@ function wrapText(text: string, maxPx: number, fontSizePx: number): string[] {
   return lines.length ? lines : [text]
 }
 
-// ── Font boyutunu balonun içine otomatik sığdır ──────────────────────────────
 function autoFontSize(text: string, balonW: number, balonH: number, max = 22, min = 10) {
   for (let fs = max; fs >= min; fs--) {
     const lines = wrapText(text, balonW, fs)
@@ -85,18 +82,14 @@ function autoFontSize(text: string, balonW: number, balonH: number, max = 22, mi
   return { fontSize: min, lines: wrapText(text, balonW, min) }
 }
 
-// ── Noto Sans embedded SVG metin overlay ────────────────────────────────────
+// ── SVG metin overlay ─────────────────────────────────────────────────────────
 async function buildTextOverlay(
-  imgW:     number,
-  imgH:     number,
-  lines:    string[],
-  cx:       number,
-  cy:       number,
-  fontSize: number,
-  color     = '#333333',
+  imgW: number, imgH: number,
+  lines: string[], cx: number, cy: number,
+  fontSize: number, color = '#333333',
 ): Promise<Buffer> {
   let fontB64 = ''
-  try { fontB64 = await getFontBase64() } catch { /* sistem fontu fallback */ }
+  try { fontB64 = await getFontBase64() } catch { /* fallback */ }
 
   const lineH  = fontSize + 6
   const totalH = lines.length * lineH
@@ -119,122 +112,134 @@ async function buildTextOverlay(
 </svg>`, 'utf-8')
 }
 
-// ── Ana fonksiyon: Python ile QR yerleştir + Node.js ile metin ekle ──────────
+// ── Minimal mod: şablonsuz QR + isim PNG ─────────────────────────────────────
+async function buildMinimalKart(lok: QrKartLokasyon, boyut: number): Promise<Buffer> {
+  const qrSize    = Math.round(boyut * 0.7)
+  const padding   = 16
+  const textH     = Math.round(boyut * 0.18)
+  const totalH    = qrSize + padding * 2 + textH
+  const totalW    = qrSize + padding * 2
+
+  // QR PNG
+  const qrBuf = await QRCode.toBuffer(lok.qr_url, {
+    type: 'png', width: qrSize, margin: 1, errorCorrectionLevel: 'M',
+  }) as Buffer
+
+  // Beyaz arka plan + QR
+  const canvas = await sharp({
+    create: { width: totalW, height: totalH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
+  })
+    .png()
+    .toBuffer()
+
+  // İsim overlay
+  const fontSize = Math.max(10, Math.min(16, Math.floor(totalW / (lok.tanim.length * 0.7 + 2))))
+  const textOverlay = await buildTextOverlay(
+    totalW, totalH,
+    [lok.tanim.toUpperCase()],
+    totalW / 2,
+    qrSize + padding * 2 + textH / 2,
+    fontSize,
+  )
+
+  return sharp(canvas)
+    .composite([
+      { input: qrBuf,       left: padding, top: padding },
+      { input: textOverlay, left: 0,       top: 0       },
+    ])
+    .png()
+    .toBuffer()
+}
+
+// ── Şablonlu mod: şablon üzerine QR + metin ──────────────────────────────────
+async function buildSablonluKart(
+  lok:          QrKartLokasyon,
+  sablonBuffer: Buffer,
+  ayarlar:      QrKartAyarlar,
+): Promise<Buffer> {
+  const meta    = await sharp(sablonBuffer).metadata()
+  const imgW    = meta.width  ?? 404
+  const imgH    = meta.height ?? 593
+
+  // QR
+  const qrW    = ayarlar.qr_w ?? 100
+  const qrH    = ayarlar.qr_h ?? 110
+  const qrX    = ayarlar.qr_x ?? 25
+  const qrY    = ayarlar.qr_y ?? 20
+  const qrSize = Math.min(qrW, qrH)
+
+  const qrBuf = await QRCode.toBuffer(lok.qr_url, {
+    type: 'png', width: qrSize, margin: 1, errorCorrectionLevel: 'M',
+  }) as Buffer
+
+  // Metin
+  const mX      = ayarlar.metin_x        ?? 286
+  const mY      = ayarlar.metin_y        ?? 261
+  const balonW  = ayarlar.balon_genislik ?? 196
+  const balonH  = 78
+  const label   = lok.tanim.toUpperCase()
+
+  const { fontSize, lines } = ayarlar.font_boyut
+    ? { fontSize: ayarlar.font_boyut, lines: wrapText(label, balonW, ayarlar.font_boyut) }
+    : autoFontSize(label, balonW, balonH)
+
+  const textOverlay = await buildTextOverlay(imgW, imgH, lines, mX, mY, fontSize)
+
+  const composites: sharp.OverlayOptions[] = [
+    { input: qrBuf,       left: qrX, top: qrY },
+    { input: textOverlay, left: 0,   top: 0   },
+  ]
+
+  // Üst metin (ust_tanim)
+  if (lok.ust_tanim && ayarlar.ust_metin_x != null && ayarlar.ust_metin_y != null) {
+    const uFS    = ayarlar.ust_font_boyut ?? 12
+    const uLines = wrapText(lok.ust_tanim.toUpperCase(), balonW, uFS)
+    const uOverlay = await buildTextOverlay(imgW, imgH, uLines, ayarlar.ust_metin_x, ayarlar.ust_metin_y, uFS)
+    composites.push({ input: uOverlay, left: 0, top: 0 })
+  }
+
+  return sharp(sablonBuffer).composite(composites).png().toBuffer()
+}
+
+// ── Dosya adı oluştur ─────────────────────────────────────────────────────────
+function safeFileName(tanim: string): string {
+  return tanim
+    .toUpperCase()
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '_')
+    .replace(/^-+|-+$/g, '') || 'kart'
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/**
+ * QR kartlarını oluşturur ve ZIP buffer döndürür.
+ * - sablonExt === '-' → minimal mod (şablonsuz)
+ * - sablonBuffer geçerli PNG ise → şablonlu mod
+ */
 export async function fillQrKartWithPython(
   sablonBuffer: Buffer,
-  payload: QrKartPayload,
-  sablonExt: string = 'png',
+  payload:      QrKartPayload,
+  sablonExt:    string = 'png',
 ): Promise<Buffer> {
-  const id      = randomUUID()
-  const minimal = sablonExt === '-'
+  const minimal  = sablonExt === '-'
+  const ayarlar  = payload.ayarlar ?? {}
+  const boyut    = ayarlar.minimal_boyut ?? 320
+  const zip      = new JSZip()
 
-  const sablonPath  = minimal ? '-' : path.join(tmpdir(), `qrsync_sablon_${id}.${sablonExt}`)
-  const payloadPath = path.join(tmpdir(), `qrsync_qrkart_payload_${id}.json`)
-  const outputPath  = path.join(tmpdir(), `qrsync_qrkart_output_${id}.zip`)
-  const scriptPath  = path.join(process.cwd(), 'scripts', 'fill_qr_kart.py')
+  await Promise.all(
+    payload.lokasyonlar.map(async lok => {
+      try {
+        const png = minimal
+          ? await buildMinimalKart(lok, boyut)
+          : await buildSablonluKart(lok, sablonBuffer, ayarlar)
+        zip.file(`${safeFileName(lok.tanim)}.png`, png)
+      } catch (e) {
+        // Hata olan lokasyonu atla
+        console.error(`QR kart oluşturulamadı: ${lok.tanim}`, e)
+      }
+    })
+  )
 
-  const ayarlar = payload.ayarlar ?? {}
-
-  // Python'a skip_text=true gönder — metin Node.js tarafında eklenecek
-  const pythonPayload = {
-    ...payload,
-    ayarlar: { ...ayarlar, skip_text: true },
-  }
-
-  if (!minimal) await writeFile(sablonPath, sablonBuffer)
-  await writeFile(payloadPath, JSON.stringify(pythonPayload, null, 0), 'utf-8')
-
-  try {
-    await runPython(scriptPath, sablonPath, payloadPath, outputPath)
-    const zipBuf = await readFile(outputPath)
-
-    // Python'dan gelen ZIP'i aç, her PNG'ye metin overlay ekle
-    return await addTextOverlayToZip(zipBuf, payload)
-  } finally {
-    await Promise.all([
-      minimal ? Promise.resolve() : unlink(sablonPath).catch(() => {}),
-      unlink(payloadPath).catch(() => {}),
-      unlink(outputPath).catch(() => {}),
-    ])
-  }
-}
-
-// ── ZIP içindeki her PNG'ye metin overlay ekle ───────────────────────────────
-async function addTextOverlayToZip(
-  zipBuf:  Buffer,
-  payload: QrKartPayload,
-): Promise<Buffer> {
-  const sharp = (await import('sharp')).default
-
-  const inZip  = await JSZip.loadAsync(zipBuf)
-  const outZip = new JSZip()
-  const ayarlar = payload.ayarlar ?? {}
-
-  // Balon ayarları — Atalian MMA şablonu varsayılanları
-  const metin_x      = ayarlar.metin_x        ?? 286   // balon merkezi X
-  const metin_y      = ayarlar.metin_y        ?? 261   // balon merkezi Y
-  const balon_w      = ayarlar.balon_genislik ?? 196   // balonun iç genişliği
-  const balon_h      = 78                              // balonun iç yüksekliği (sabit)
-
-  // Her lokasyon için dosya adı → tanim eşlemesi
-  const lokMap = new Map(payload.lokasyonlar.map(l => [
-    l.tanim.toUpperCase().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '_').replace(/^-+|-+$/g, '') || 'kart',
-    l,
-  ]))
-
-  for (const [filePath, zipEntry] of Object.entries(inZip.files)) {
-    if (zipEntry.dir) continue
-
-    const buf = Buffer.from(await zipEntry.async('arraybuffer'))
-
-    if (!filePath.endsWith('.png')) {
-      outZip.file(filePath, buf)
-      continue
-    }
-
-    // Dosya adından lokasyonu bul
-    const baseName = path.basename(filePath, '.png')
-    const lok = lokMap.get(baseName)
-
-    if (!lok) {
-      outZip.file(filePath, buf)
-      continue
-    }
-
-    try {
-      const meta   = await sharp(buf).metadata()
-      const imgW   = meta.width  ?? 404
-      const imgH   = meta.height ?? 593
-      const label  = lok.tanim.toUpperCase()
-
-      const { fontSize, lines } = ayarlar.font_boyut
-        ? { fontSize: ayarlar.font_boyut, lines: wrapText(label, balon_w, ayarlar.font_boyut) }
-        : autoFontSize(label, balon_w, balon_h)
-
-      const overlay = await buildTextOverlay(imgW, imgH, lines, metin_x, metin_y, fontSize)
-
-      const result = await sharp(buf)
-        .composite([{ input: overlay, left: 0, top: 0 }])
-        .png()
-        .toBuffer()
-
-      outZip.file(filePath, result)
-    } catch {
-      outZip.file(filePath, buf)  // hata olursa orijinali koy
-    }
-  }
-
-  return outZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
-}
-
-// ── Python çalıştır ──────────────────────────────────────────────────────────
-function runPython(script: string, sablon: string, payload: string, output: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(getPythonCmd(), [script, sablon, payload, output])
-    let stderr = ''
-    proc.stderr.on('data', (c: Buffer) => { stderr += c.toString() })
-    proc.stdout.on('data', (c: Buffer) => { process.stdout.write(c) })
-    proc.on('close', (code) => { code === 0 ? resolve() : reject(new Error(`Script hata kodu ${code}: ${stderr}`)) })
-    proc.on('error', (e) => reject(new Error(`Python başlatılamadı: ${e.message}`)))
-  })
+  return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
 }

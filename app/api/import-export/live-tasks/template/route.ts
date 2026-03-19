@@ -41,7 +41,7 @@ export async function GET() {
       ],
     }],
   })
-  return new NextResponse(file, {
+  return new NextResponse(new Uint8Array(file), {
     headers: {
       'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'content-disposition': 'attachment; filename="canli-gorev-import-sablonu.xlsx"',
