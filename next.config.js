@@ -3,17 +3,9 @@ const nextConfig = {
   images: {
     domains: ['mjunontyoyuvnpcxzvvt.supabase.co'],
   },
-  async headers() {
-    return [
-      {
-        source: '/api/app/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, X-Device-Token' },
-        ],
-      },
-    ]
+  // Build sırasında Supabase env yoksa bu sayfaları static render etme
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
   },
 }
 module.exports = nextConfig
