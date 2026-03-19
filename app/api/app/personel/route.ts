@@ -1,18 +1,27 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Device-Token',
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS })
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const firmaToken = searchParams.get('firma')
 
     if (!firmaToken) {
-      return NextResponse.json({ ok: false, error: 'firma parametresi gerekli' }, { status: 400 })
+      return NextResponse.json({ ok: false, error: 'firma parametresi gerekli' }, { status: 400, headers: CORS_HEADERS })
     }
 
     const admin = createAdminClient()
 
-    // Firma token ile firma bul
     const { data: linkData, error: linkErr } = await admin
       .from('app_download_links')
       .select('firma_id, aktif, mod')
@@ -20,14 +29,13 @@ export async function GET(req: Request) {
       .single()
 
     if (linkErr || !linkData) {
-      return NextResponse.json({ ok: false, error: 'Geçersiz firma linki' }, { status: 404 })
+      return NextResponse.json({ ok: false, error: 'Geçersiz firma linki' }, { status: 404, headers: CORS_HEADERS })
     }
 
     if (!linkData.aktif) {
-      return NextResponse.json({ ok: false, error: 'Bu link artık aktif değil' }, { status: 403 })
+      return NextResponse.json({ ok: false, error: 'Bu link artık aktif değil' }, { status: 403, headers: CORS_HEADERS })
     }
 
-    // Firma adını getir
     const { data: firma } = await admin
       .from('firmalar')
       .select('firma_adi, ticari_unvan')
@@ -36,7 +44,6 @@ export async function GET(req: Request) {
 
     const firmaAdi = firma?.firma_adi || firma?.ticari_unvan || ''
 
-    // Firmaya ait aktif personel listesi
     const { data: personeller, error: personelErr } = await admin
       .from('users')
       .select('id, isim_soyisim, rol')
@@ -46,7 +53,7 @@ export async function GET(req: Request) {
       .order('isim_soyisim', { ascending: true })
 
     if (personelErr) {
-      return NextResponse.json({ ok: false, error: personelErr.message }, { status: 500 })
+      return NextResponse.json({ ok: false, error: personelErr.message }, { status: 500, headers: CORS_HEADERS })
     }
 
     return NextResponse.json({
@@ -55,8 +62,9 @@ export async function GET(req: Request) {
       firmaId: linkData.firma_id,
       mod: linkData.mod || 'QR',
       personeller: personeller ?? [],
-    })
+    }, { headers: CORS_HEADERS })
+
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message ?? 'Sunucu hatası' }, { status: 500 })
+    return NextResponse.json({ ok: false, error: error?.message ?? 'Sunucu hatası' }, { status: 500, headers: CORS_HEADERS })
   }
 }
