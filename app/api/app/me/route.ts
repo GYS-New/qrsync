@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Device-Token',
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS })
+}
+
 export async function GET(req: Request) {
   try {
     const deviceToken = req.headers.get('X-Device-Token')
 
     if (!deviceToken) {
-      return NextResponse.json({ ok: false, error: 'Token gerekli' }, { status: 401 })
+      return NextResponse.json({ ok: false, error: 'Token gerekli' }, { status: 401, headers: CORS_HEADERS })
     }
 
     const admin = createAdminClient()
@@ -18,14 +28,13 @@ export async function GET(req: Request) {
       .single()
 
     if (error || !tokenData) {
-      return NextResponse.json({ ok: false, error: 'Geçersiz token' }, { status: 401 })
+      return NextResponse.json({ ok: false, error: 'Geçersiz token' }, { status: 401, headers: CORS_HEADERS })
     }
 
     if (!tokenData.aktif) {
-      return NextResponse.json({ ok: false, error: 'Cihaz devre dışı' }, { status: 403 })
+      return NextResponse.json({ ok: false, error: 'Cihaz devre dışı' }, { status: 403, headers: CORS_HEADERS })
     }
 
-    // Son kullanım zamanını güncelle
     await admin
       .from('device_tokens')
       .update({ son_kullanim: new Date().toISOString() })
@@ -38,8 +47,9 @@ export async function GET(req: Request) {
         isim_soyisim: tokenData.isim_soyisim,
         firma_id: tokenData.firma_id,
       },
-    })
+    }, { headers: CORS_HEADERS })
+
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message ?? 'Sunucu hatası' }, { status: 500 })
+    return NextResponse.json({ ok: false, error: error?.message ?? 'Sunucu hatası' }, { status: 500, headers: CORS_HEADERS })
   }
 }

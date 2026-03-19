@@ -3,8 +3,17 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { resolveScanContext } from '@/lib/scan/core'
 import { completeTask } from '@/lib/tasks/completeTask'
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Device-Token',
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS })
+}
+
 async function getAuthUser(req: Request) {
-  // Önce device token kontrol et (mobil uygulama)
   const deviceToken = req.headers.get('X-Device-Token')
   if (deviceToken) {
     const admin = createAdminClient()
@@ -16,7 +25,6 @@ async function getAuthUser(req: Request) {
     if (data?.aktif) return { id: data.user_id }
     return null
   }
-  // Web uygulaması - Supabase auth
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   return user
@@ -24,19 +32,19 @@ async function getAuthUser(req: Request) {
 
 export async function GET(req: Request, { params }: { params: { token: string } }) {
   const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 })
+  if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
   try {
     const supabase = createAdminClient()
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'QR', userId: user.id })
-    return NextResponse.json({ ok: true, ...context })
+    return NextResponse.json({ ok: true, ...context }, { headers: CORS_HEADERS })
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message ?? 'İşlem başarısız' }, { status: 400 })
+    return NextResponse.json({ ok: false, error: error?.message ?? 'İşlem başarısız' }, { status: 400, headers: CORS_HEADERS })
   }
 }
 
 export async function POST(req: Request, { params }: { params: { token: string } }) {
   const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 })
+  if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
   try {
     const body = await req.json().catch(() => ({}))
     const selectedTaskId = body?.taskId as string | undefined
@@ -46,14 +54,14 @@ export async function POST(req: Request, { params }: { params: { token: string }
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'QR', userId: user.id })
     const task = context.tasks.find((t) => t.id === selectedTaskId && t.taskType === selectedTaskType)
     if (!task) {
-      return NextResponse.json({ ok: false, error: 'Görev bulunamadı veya erişim yok' }, { status: 404 })
+      return NextResponse.json({ ok: false, error: 'Görev bulunamadı veya erişim yok' }, { status: 404, headers: CORS_HEADERS })
     }
     if (context.checklistTemplate?.items?.length) {
       const missingRequired = context.checklistTemplate.items.filter(
         (item) => item.zorunlu && !checklistResults.some((r: any) => r?.itemId === item.id && r?.durum === true)
       )
       if (missingRequired.length) {
-        return NextResponse.json({ ok: false, error: 'Zorunlu checklist maddeleri tamamlanmalı' }, { status: 400 })
+        return NextResponse.json({ ok: false, error: 'Zorunlu checklist maddeleri tamamlanmalı' }, { status: 400, headers: CORS_HEADERS })
       }
       const insertPayload = checklistResults
         .filter((r: any) => r?.itemId)
@@ -73,8 +81,8 @@ export async function POST(req: Request, { params }: { params: { token: string }
       }
     }
     await completeTask({ supabase, taskId: task.id, taskType: task.taskType, userId: user.id, channel: 'QR' })
-    return NextResponse.json({ ok: true, message: 'Görev QR ile tamamlandı' })
+    return NextResponse.json({ ok: true, message: 'Görev QR ile tamamlandı' }, { headers: CORS_HEADERS })
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message ?? 'İşlem başarısız' }, { status: 400 })
+    return NextResponse.json({ ok: false, error: error?.message ?? 'İşlem başarısız' }, { status: 400, headers: CORS_HEADERS })
   }
 }

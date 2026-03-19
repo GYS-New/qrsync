@@ -1,18 +1,27 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Device-Token',
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS })
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
     const { firma_token, device_id, user_id, isim_soyisim } = body
 
     if (!firma_token || !device_id || !user_id || !isim_soyisim) {
-      return NextResponse.json({ ok: false, error: 'Eksik parametreler' }, { status: 400 })
+      return NextResponse.json({ ok: false, error: 'Eksik parametreler' }, { status: 400, headers: CORS_HEADERS })
     }
 
     const admin = createAdminClient()
 
-    // Firma token doğrula
     const { data: linkData, error: linkErr } = await admin
       .from('app_download_links')
       .select('firma_id, aktif, mod')
@@ -20,14 +29,13 @@ export async function POST(req: Request) {
       .single()
 
     if (linkErr || !linkData) {
-      return NextResponse.json({ ok: false, error: 'Geçersiz firma linki' }, { status: 404 })
+      return NextResponse.json({ ok: false, error: 'Geçersiz firma linki' }, { status: 404, headers: CORS_HEADERS })
     }
 
     if (!linkData.aktif) {
-      return NextResponse.json({ ok: false, error: 'Bu link artık aktif değil' }, { status: 403 })
+      return NextResponse.json({ ok: false, error: 'Bu link artık aktif değil' }, { status: 403, headers: CORS_HEADERS })
     }
 
-    // Kullanıcı bu firmaya ait mi?
     const { data: kullanici, error: kullaniciErr } = await admin
       .from('users')
       .select('id, isim_soyisim, firma_id, aktif')
@@ -36,14 +44,13 @@ export async function POST(req: Request) {
       .single()
 
     if (kullaniciErr || !kullanici) {
-      return NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 404 })
+      return NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 404, headers: CORS_HEADERS })
     }
 
     if (!kullanici.aktif) {
-      return NextResponse.json({ ok: false, error: 'Hesabınız aktif değil' }, { status: 403 })
+      return NextResponse.json({ ok: false, error: 'Hesabınız aktif değil' }, { status: 403, headers: CORS_HEADERS })
     }
 
-    // Mevcut cihaz kaydı var mı?
     const { data: mevcutKayit } = await admin
       .from('device_tokens')
       .select('id, device_token')
@@ -53,7 +60,6 @@ export async function POST(req: Request) {
     let deviceToken: string
 
     if (mevcutKayit) {
-      // Mevcut kaydı güncelle
       deviceToken = mevcutKayit.device_token
       await admin
         .from('device_tokens')
@@ -66,7 +72,6 @@ export async function POST(req: Request) {
         })
         .eq('id', mevcutKayit.id)
     } else {
-      // Yeni kayıt oluştur
       const { data: yeniKayit, error: insertErr } = await admin
         .from('device_tokens')
         .insert({
@@ -81,7 +86,7 @@ export async function POST(req: Request) {
         .single()
 
       if (insertErr || !yeniKayit) {
-        return NextResponse.json({ ok: false, error: 'Kayıt oluşturulamadı: ' + insertErr?.message }, { status: 500 })
+        return NextResponse.json({ ok: false, error: 'Kayıt oluşturulamadı: ' + insertErr?.message }, { status: 500, headers: CORS_HEADERS })
       }
 
       deviceToken = yeniKayit.device_token
@@ -94,8 +99,9 @@ export async function POST(req: Request) {
       isim_soyisim: kullanici.isim_soyisim,
       firma_id: linkData.firma_id,
       mod: linkData.mod || 'QR',
-    })
+    }, { headers: CORS_HEADERS })
+
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message ?? 'Sunucu hatası' }, { status: 500 })
+    return NextResponse.json({ ok: false, error: error?.message ?? 'Sunucu hatası' }, { status: 500, headers: CORS_HEADERS })
   }
 }
