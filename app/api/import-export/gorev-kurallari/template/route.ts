@@ -40,7 +40,7 @@ export async function GET() {
       ],
     }],
   })
-  return new NextResponse(new Uint8Array(file), {
+  return new NextResponse(file, {
     headers: {
       'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'content-disposition': 'attachment; filename="gorev-kural-sablonu.xlsx"',

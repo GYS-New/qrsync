@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       { key: 'aktif', label: 'aktif', width: 12 },
       { key: 'sureli_gorev_aktif', label: 'sureli_gorev_aktif', width: 18 },
     ], rows }] })
-    return new NextResponse(new Uint8Array(file), { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="lokasyonlar.xlsx"' } })
+    return new NextResponse(file, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="lokasyonlar.xlsx"' } })
   } catch (e: any) {
     const status = e.message === 'Unauthorized' ? 401 : e.message.includes('Yetkisiz') ? 403 : 400
     return NextResponse.json({ error: e.message }, { status })
