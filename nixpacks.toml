@@ -1,15 +1,14 @@
 [phases.setup]
-nixPkgs = ["python311", "python311Packages.pip", "python311Packages.openpyxl", "python311Packages.pillow"]
+nixPkgs = ["python311", "python311Packages.pip"]
 
 [phases.install]
 cmds = [
-  "npm install --legacy-peer-deps",
-  "python3.11 -m pip install qrcode openpyxl pillow --break-system-packages || true"
+  "npm install --legacy-peer-deps"
 ]
 
 [phases.build]
 cmds = [
-  "ln -sf $(which python3.11) /usr/local/bin/python3 || true",
+  "pip install openpyxl qrcode pillow",
   "npm run build"
 ]
 
