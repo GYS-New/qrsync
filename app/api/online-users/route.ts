@@ -26,21 +26,23 @@ export async function GET(req: NextRequest) {
     .order('last_seen_at', { ascending: false })
     .limit(limit)
 
-  // Tenant scoped (TA/User): only own firm.
   if (me.rol !== 'super_admin' && me.rol !== 'alt_super_admin') {
     if (me.firma_id) q = q.eq('firma_id', me.firma_id)
   } else {
-    // SA: optionally filter by selected firm
     if (firmaParam) q = q.eq('firma_id', firmaParam)
   }
 
-  // Proje filtresi: tenant_user sadece projeye bağlı, tenant_admin her zaman
   if (projeId) {
     q = (q as any).or(`rol.eq.tenant_admin,proje_id.eq.${projeId}`)
   }
 
   const { data, error } = await q
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+
+  // Hata varsa 400 yerine boş liste döndür — dashboard çalışmaya devam etsin
+  if (error) {
+    console.error('online-users error:', error.message, error.details)
+    return NextResponse.json({ ok: true, users: [], since, _error: error.message })
+  }
 
   return NextResponse.json({ ok: true, users: data ?? [], since })
 }
