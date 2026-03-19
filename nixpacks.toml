@@ -1,16 +1,14 @@
 [phases.setup]
-nixPkgs = ["python311", "python311Packages.pip"]
+nixPkgs = ["nodejs_20", "python311", "python311Packages.pip"]
 
 [phases.install]
 cmds = [
-  "npm install --legacy-peer-deps"
+  "npm install --legacy-peer-deps",
+  "pip install openpyxl qrcode pillow"
 ]
 
 [phases.build]
-cmds = [
-  "pip install openpyxl qrcode pillow",
-  "npm run build"
-]
+cmds = ["npm run build"]
 
 [start]
 cmd = "npm start"
