@@ -119,6 +119,36 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     )
   }
 
+  // Firma personel takibi aktif mi?
+  const { data: firma } = await admin
+    .from('firmalar')
+    .select('personel_takibi_aktif')
+    .eq('id', qr.firma_id)
+    .single()
+
+  if (!firma?.personel_takibi_aktif) {
+    return NextResponse.json(
+      { ok: false, error: 'Bu firma için personel takibi aktif değil' },
+      { status: 403 }
+    )
+  }
+
+  // Proje personel takibi aktif mi?
+  if (qr.proje_id) {
+    const { data: proje } = await admin
+      .from('projeler')
+      .select('personel_takibi_aktif')
+      .eq('id', qr.proje_id)
+      .single()
+
+    if (!proje?.personel_takibi_aktif) {
+      return NextResponse.json(
+        { ok: false, error: 'Bu proje için personel takibi aktif değil' },
+        { status: 403 }
+      )
+    }
+  }
+
   const trtNow = new Date(Date.now() + 3 * 60 * 60 * 1000)
   const bugun  = trtNow.toISOString().split('T')[0]
   const simdi  = new Date().toISOString()

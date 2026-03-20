@@ -27,7 +27,25 @@ export async function GET(req: NextRequest) {
   const firmaId = isSA ? p.get('firma_id') : me.firma_id
   const projeId = p.get('proje_id') ?? null
 
-  if (!firmaId) return NextResponse.json({ ok: true, kpi: null, kayitlar: [] })
+  if (!firmaId) return NextResponse.json({ ok: true, kpi: null, kayitlar: [], personelTakibiAktif: false })
+
+  // Firma + proje personel_takibi_aktif kontrolü
+  const { data: firma } = await admin
+    .from('firmalar')
+    .select('personel_takibi_aktif')
+    .eq('id', firmaId)
+    .single()
+
+  let personelTakibiAktif = firma?.personel_takibi_aktif === true
+
+  if (personelTakibiAktif && projeId) {
+    const { data: proje } = await admin
+      .from('projeler')
+      .select('personel_takibi_aktif')
+      .eq('id', projeId)
+      .single()
+    personelTakibiAktif = proje?.personel_takibi_aktif === true
+  }
 
   // TRT bugün
   const trtNow = new Date(Date.now() + 3 * 60 * 60 * 1000)
@@ -97,7 +115,8 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    kpi:     { toplam, aktif, pasif },
+    personelTakibiAktif,
+    kpi:      { toplam, aktif, pasif },
     kayitlar: liste,
   })
 }

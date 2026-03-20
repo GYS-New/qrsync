@@ -117,13 +117,14 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
   const projeAdi = aktifProje?.ad ?? ''
 
   const [aktifSekme, setAktifSekme] = useState<'bugun' | 'qr'>('bugun')
-  const [kpi,        setKpi]        = useState<Kpi | null>(null)
-  const [liste,      setListe]      = useState<PersonelSatir[]>([])
-  const [qrKodlar,   setQrKodlar]   = useState<QrKod[]>([])
-  const [loading,    setLoading]    = useState(false)
-  const [qrLoading,  setQrLoading]  = useState(false)
-  const [hata,       setHata]       = useState<string | null>(null)
-  const [aramaQ,     setAramaQ]     = useState('')
+  const [kpi,               setKpi]              = useState<Kpi | null>(null)
+  const [liste,             setListe]             = useState<PersonelSatir[]>([])
+  const [qrKodlar,          setQrKodlar]          = useState<QrKod[]>([])
+  const [loading,           setLoading]           = useState(false)
+  const [qrLoading,         setQrLoading]         = useState(false)
+  const [hata,              setHata]              = useState<string | null>(null)
+  const [aramaQ,            setAramaQ]            = useState('')
+  const [personelTakibiAktif, setPersonelTakibiAktif] = useState<boolean | null>(null) // null = yükleniyor
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -137,6 +138,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
       const res  = await fetch(`/api/mesai/bugun?${p}`)
       const json = await res.json()
       if (!json.ok) { setHata(json.error); return }
+      setPersonelTakibiAktif(json.personelTakibiAktif ?? false)
       setKpi(json.kpi)
       setListe(json.kayitlar ?? [])
     } finally { setLoading(false) }
@@ -240,6 +242,21 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
             <QrCode size={14} style={{ display: 'inline', marginRight: 6 }} />QR / NFC Kodlar
           </button>
         </div>
+
+        {/* Personel takibi kapalı uyarısı */}
+        {personelTakibiAktif === false && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 10, fontSize: 13, color: '#92400e' }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <div>
+              <strong>Personel takibi bu {projeId ? 'proje' : 'firma'} için aktif değil.</strong>
+              <span style={{ marginLeft: 6 }}>
+                {isSA
+                  ? 'Firma Detay veya Proje Düzenle ekranından açabilirsiniz.'
+                  : 'Sistem yöneticinizle iletişime geçin.'}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* ── BUGÜN SEKMESİ ── */}
         {aktifSekme === 'bugun' && (
@@ -354,7 +371,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
               )}
             </div>
 
-            {kpi && kpi.pasif > 0 && (
+            {personelTakibiAktif && kpi && kpi.pasif > 0 && (
               <div style={{ fontSize: 12.5, color: '#dc2626', background: '#fef2f2', padding: '8px 14px', borderRadius: 8, border: '1px solid #fecaca' }}>
                 ⚠️ İşte olmayan <strong>{kpi.pasif} personele</strong> görev ataması yapılamaz. Görev atama ekranlarında bu kişiler pasif olarak gösterilir.
               </div>

@@ -12,13 +12,14 @@ type Proje = {
   aciklama?: string | null
   renk: string
   aktif: boolean
+  personel_takibi_aktif: boolean
   kayit_tarihi: string
 }
 
 const RENKLER = ['#2e8b2e', '#1d6fa8', '#9333ea', '#c2410c', '#0e7490', '#be185d', '#b45309', '#374151']
 
 const BOSH: Omit<Proje, 'id' | 'firma_id' | 'kayit_tarihi'> = {
-  ad: '', aciklama: '', renk: '#2e8b2e', aktif: true
+  ad: '', aciklama: '', renk: '#2e8b2e', aktif: true, personel_takibi_aktif: false
 }
 
 export default function ProjelerClient({
@@ -62,7 +63,7 @@ export default function ProjelerClient({
   }
 
   function openEdit(p: Proje) {
-    setForm({ ad: p.ad, aciklama: p.aciklama ?? '', renk: p.renk, aktif: p.aktif })
+    setForm({ ad: p.ad, aciklama: p.aciklama ?? '', renk: p.renk, aktif: p.aktif, personel_takibi_aktif: p.personel_takibi_aktif ?? false })
     setEditId(p.id)
     setModal('edit')
   }
@@ -186,6 +187,9 @@ variant: 'danger'
                   {!p.aktif && (
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>Pasif</span>
                   )}
+                  {p.personel_takibi_aktif && (
+                    <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: '#dbeafe', color: '#1d4ed8', fontWeight: 700 }}>👷 Personel Takibi</span>
+                  )}
                 </div>
                 {p.aciklama && <div style={{ fontSize: 12.5, color: '#7a907a', marginTop: 2 }}>{p.aciklama}</div>}
                 <div style={{ fontSize: 11.5, color: '#a0b4a0', marginTop: 3 }}>
@@ -253,6 +257,18 @@ variant: 'danger'
                     }} />
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#506050', marginBottom: 8 }}>Özellikler</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#0f1a0f', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.personel_takibi_aktif}
+                    onChange={e => setForm(p => ({ ...p, personel_takibi_aktif: e.target.checked }))}
+                  />
+                  <span>Personel Takibi — QR/NFC ile iş başı ve iş bitimi takip sistemi</span>
+                </label>
               </div>
             </div>
 

@@ -21,6 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(body.aciklama !== undefined && { aciklama: body.aciklama?.trim() || null }),
       ...(body.renk !== undefined && { renk: body.renk }),
       ...(body.aktif !== undefined && { aktif: body.aktif }),
+      ...(body.personel_takibi_aktif !== undefined && { personel_takibi_aktif: body.personel_takibi_aktif }),
     })
     .eq('id', params.id)
     .select()
