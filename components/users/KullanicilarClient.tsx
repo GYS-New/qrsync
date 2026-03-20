@@ -52,11 +52,28 @@ export default function KullanicilarClient({
   const [q, setQ] = useState('')
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [loading, setLoading] = useState(false)
+  const [deviceTokenMap, setDeviceTokenMap] = useState<Record<string, {
+    device_token: string
+    device_id: string
+    son_kullanim: string | null
+  }>>({})
   const reqId = useRef(0)
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
   // SSR yeni initialUsers getirince (firma/proje değişimi) sync et
   useEffect(() => { setUsers(initialUsers) }, [initialUsers])
+
+  // Device token'ları yükle (API üzerinden — RLS bypass)
+  useEffect(() => {
+    if (!firmaId) return
+    fetch(`/api/users/device-tokens?firma_id=${firmaId}`)
+      .then(r => r.json())
+      .then(j => {
+        if (!j.ok) return
+        setDeviceTokenMap(j.data as Record<string, { device_token: string; device_id: string; son_kullanim: string | null }>)
+      })
+      .catch(() => {})
+  }, [firmaId])
 
   // Modal state'leri
   const [openCreate, setOpenCreate] = useState(false)
@@ -250,6 +267,7 @@ export default function KullanicilarClient({
               <th>Kullanıcı</th>
               <th>Rol</th>
               <th>Telefon</th>
+              <th>Cihaz Eşleşmesi</th>
               <th>Durum</th>
               {canManage && <th>İşlem</th>}
             </tr>
@@ -276,6 +294,34 @@ export default function KullanicilarClient({
                 </td>
                 <td style={{ color: '#506050' }}>{u.telefon ?? '—'}</td>
                 <td>
+                  {deviceTokenMap[u.id] ? (() => {
+                    const d = deviceTokenMap[u.id]
+                    const sonKullanim = d.son_kullanim
+                      ? new Date(d.son_kullanim).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+                      : null
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#166534', background: '#dcfce7', padding: '3px 10px', borderRadius: 20, width: 'fit-content' }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />
+                          Cihaz Eşleşti
+                        </span>
+                        <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }} title={d.device_token}>
+                          {d.device_token.substring(0, 12)}…
+                        </span>
+                        {sonKullanim && (
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>Son: {sonKullanim}</span>
+                        )}
+                      </div>
+                    )
+                  })()
+                  : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', padding: '3px 10px', borderRadius: 20 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#cbd5e1', flexShrink: 0 }} />
+                      Eşleşme Yok
+                    </span>
+                  )}
+                </td>
+                <td>
                   <span className={`verde-badge ${u.aktif ? 'status-islemde' : 'status-iptal'}`}>{u.aktif ? 'Aktif' : 'Pasif'}</span>
                 </td>
                 {canManage && (
@@ -299,7 +345,7 @@ export default function KullanicilarClient({
               </tr>
             ))}
             {!filtered.length && (
-              <tr><td colSpan={canManage ? 5 : 4} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>Kayıt bulunamadı</td></tr>
+              <tr><td colSpan={canManage ? 6 : 5} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>Kayıt bulunamadı</td></tr>
             )}
           </tbody>
         </table>
@@ -350,6 +396,43 @@ export default function KullanicilarClient({
               <Button variant="ghost" size="sm" onClick={() => { setOpenEdit(false); setTarget(null) }} style={{ padding: '4px 10px' }}>✕</Button>
             </div>
             <div style={{ padding: 18 }}>
+              {/* Cihaz Eşleşmesi */}
+              {(() => {
+                const d = deviceTokenMap[target?.id ?? '']
+                return (
+                  <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: d ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${d ? '#86efac' : '#e2e8f0'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: d ? 8 : 0 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: d ? '#16a34a' : '#cbd5e1', flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: d ? '#166534' : '#94a3b8' }}>
+                        {d ? 'Cihaz Eşleşti' : 'Cihaz Eşleşmesi Yok'}
+                      </span>
+                      {!d && <span style={{ fontSize: 12, color: '#94a3b8' }}>— Mobil uygulama henüz kayıt olmadı</span>}
+                    </div>
+                    {d && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', minWidth: 80 }}>Token:</span>
+                          <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#334155', background: '#f1f5f9', padding: '2px 8px', borderRadius: 6 }} title={d.device_token}>
+                            {d.device_token.substring(0, 20)}…
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', minWidth: 80 }}>Cihaz ID:</span>
+                          <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#334155' }}>{d.device_id}</span>
+                        </div>
+                        {d.son_kullanim && (
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', minWidth: 80 }}>Son Kullanım:</span>
+                            <span style={{ fontSize: 12, color: '#475569' }}>
+                              {new Date(d.son_kullanim).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div><label className="verde-label">İsim Soyisim</label><input className="verde-input" value={editForm.isim_soyisim} onChange={e => setEditForm(f => ({ ...f, isim_soyisim: e.target.value }))} autoComplete="off" /></div>
                 <div><label className="verde-label">Telefon</label><input className="verde-input" value={editForm.telefon} onChange={e => setEditForm(f => ({ ...f, telefon: e.target.value }))} autoComplete="off" /></div>
