@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
-import { RefreshCw, Star } from 'lucide-react'
+import { RefreshCw, Star, Pencil, Archive, Trash2, ArchiveX, X, Check } from 'lucide-react'
 
 interface Kayit {
   id: string
@@ -15,6 +15,8 @@ interface Kayit {
   ad_soyad: string | null
   gorsel_url: string | null
   olusturma_tarihi: string
+  arsivlendi: boolean
+  arsivleme_tarihi: string | null
 }
 
 interface Props {
@@ -53,35 +55,205 @@ function YildizRow({ yildiz }: { yildiz: number }) {
   )
 }
 
+// ── Onay modalı ───────────────────────────────────────────────────────────────
+function OnayModal({
+  baslik, mesaj, onayMetin, iptalMetin, onayRenk,
+  onOnayla, onIptal, loading,
+}: {
+  baslik: string; mesaj: string; onayMetin: string; iptalMetin: string; onayRenk: string
+  onOnayla: () => void; onIptal: () => void; loading: boolean
+}) {
+  return (
+    <div onClick={onIptal} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', maxWidth: 400, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#0f1a0f', marginBottom: 8 }}>{baslik}</div>
+        <div style={{ fontSize: 13.5, color: '#475569', lineHeight: 1.6, marginBottom: 22 }}>{mesaj}</div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onIptal} disabled={loading}
+            style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+            {iptalMetin}
+          </button>
+          <button onClick={onOnayla} disabled={loading}
+            style={{ height: 36, padding: '0 16px', borderRadius: 8, border: 'none', background: onayRenk, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {loading && <RefreshCw size={13} style={{ animation: 'spin 0.9s linear infinite' }} />}
+            {onayMetin}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Düzenle modalı ────────────────────────────────────────────────────────────
+function DuzenleModal({
+  kayit, onKaydet, onIptal,
+}: {
+  kayit: Kayit
+  onKaydet: (guncelleme: { yildiz: number; yorum: string; ad_soyad: string }) => Promise<void>
+  onIptal: () => void
+}) {
+  const [yildiz,  setYildiz]  = useState(kayit.yildiz)
+  const [yorum,   setYorum]   = useState(kayit.yorum ?? '')
+  const [adSoyad, setAdSoyad] = useState(kayit.ad_soyad ?? '')
+  const [loading, setLoading] = useState(false)
+
+  async function kaydet() {
+    setLoading(true)
+    try { await onKaydet({ yildiz, yorum, ad_soyad: adSoyad }) }
+    finally { setLoading(false) }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', height: 36, padding: '0 10px', borderRadius: 8,
+    border: '1px solid #e2e8f0', fontSize: 13, boxSizing: 'border-box',
+  }
+
+  return (
+    <div onClick={onIptal} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#0f1a0f' }}>Değerlendirmeyi Düzenle</div>
+          <button onClick={onIptal} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4 }}><X size={18} /></button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Lokasyon — readonly bilgi */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Lokasyon</label>
+            <div style={{ fontSize: 13, color: '#475569', background: '#f8fafc', padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0' }}>{kayit.lokasyon_tanim}</div>
+          </div>
+
+          {/* Yıldız */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>Puan</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[1,2,3,4,5].map(n => (
+                <button key={n} onClick={() => setYildiz(n)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, transform: n === yildiz ? 'scale(1.2)' : 'scale(1)', transition: 'transform .15s' }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                      fill={n <= yildiz ? '#f59e0b' : '#e2e8f0'} stroke={n <= yildiz ? '#d97706' : '#cbd5e1'} strokeWidth="1" />
+                  </svg>
+                </button>
+              ))}
+              <span style={{ fontSize: 13, color: '#64748b', alignSelf: 'center', marginLeft: 4 }}>{YILDIZ_ETIKET[yildiz]}</span>
+            </div>
+          </div>
+
+          {/* Ad Soyad */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Ad Soyad</label>
+            <input value={adSoyad} onChange={e => setAdSoyad(e.target.value)} placeholder="İsteğe bağlı" style={inputStyle} />
+          </div>
+
+          {/* Yorum */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Yorum</label>
+            <textarea value={yorum} onChange={e => setYorum(e.target.value)} placeholder="İsteğe bağlı" rows={3}
+              style={{ ...inputStyle, height: 'auto', padding: '8px 10px', resize: 'vertical' as const }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 22 }}>
+          <button onClick={onIptal} disabled={loading}
+            style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+            İptal
+          </button>
+          <button onClick={kaydet} disabled={loading}
+            style={{ height: 36, padding: '0 18px', borderRadius: 8, border: 'none', background: '#1f6b1f', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {loading ? <RefreshCw size={13} style={{ animation: 'spin 0.9s linear infinite' }} /> : <Check size={14} />}
+            Kaydet
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Ana bileşen ───────────────────────────────────────────────────────────────
 export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFirmaId, projeId }: Props) {
   const { firmaId: saFirmaId } = useFirma()
   const firmaId = isSA ? saFirmaId : (initialFirmaId ?? null)
 
-  const [kayitlar, setKayitlar]     = useState<Kayit[]>([])
-  const [loading, setLoading]       = useState(false)
-  const [baslangic, setBaslangic]   = useState('')
-  const [bitis, setBitis]           = useState('')
-  const [filtreYildiz, setFiltreYildiz] = useState(0)
-  const [filtreKanal, setFiltreKanal]   = useState<'TUMU' | 'QR' | 'NFC'>('TUMU')
-  const [gorselModal, setGorselModal]   = useState<string | null>(null)
+  const [kayitlar, setKayitlar]       = useState<Kayit[]>([])
+  const [loading, setLoading]         = useState(false)
+  const [baslangic, setBaslangic]     = useState('')
+  const [bitis, setBitis]             = useState('')
+  const [filtreYildiz, setFiltreYildiz]   = useState(0)
+  const [filtreKanal, setFiltreKanal]     = useState<'TUMU' | 'QR' | 'NFC'>('TUMU')
+  const [arsivGorunumu, setArsivGorunumu] = useState(false)
+  const [gorselModal, setGorselModal]     = useState<string | null>(null)
+
+  // Aksiyon durumları
+  const [duzenleKayit,  setDuzenleKayit]  = useState<Kayit | null>(null)
+  const [arsivleKayit,  setArsivleKayit]  = useState<Kayit | null>(null)
+  const [silKayit,      setSilKayit]      = useState<Kayit | null>(null)
+  const [aksiyonLoading, setAksiyonLoading] = useState(false)
+  const [hata, setHata]                   = useState<string | null>(null)
 
   const spinning = { animation: 'spin 0.9s linear infinite' }
 
   async function yukle() {
     if (!firmaId) return
     setLoading(true)
+    setHata(null)
     try {
       const p = new URLSearchParams({ firma_id: firmaId })
       if (projeId) p.set('proje_id', projeId)
       if (baslangic) p.set('baslangic', baslangic)
       if (bitis) p.set('bitis', bitis)
-      const res = await fetch(`/api/raporlar/musteri-degerlendirme?${p}`, { cache: 'no-store' })
+      if (arsivGorunumu) p.set('arsivlendi', 'true')
+      const res  = await fetch(`/api/raporlar/musteri-degerlendirme?${p}`, { cache: 'no-store' })
       const json = await res.json()
       if (json.ok) setKayitlar(json.data)
+      else setHata(json.error ?? 'Yüklenemedi')
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { yukle() }, [firmaId, projeId])
+  useEffect(() => { yukle() }, [firmaId, projeId, arsivGorunumu])
+
+  // ── Aksiyon fonksiyonları ─────────────────────────────────────────────────
+
+  async function duzenleKaydet(guncelleme: { yildiz: number; yorum: string; ad_soyad: string }) {
+    if (!duzenleKayit) return
+    const res  = await fetch('/api/raporlar/musteri-degerlendirme', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: duzenleKayit.id, ...guncelleme }),
+    })
+    const json = await res.json()
+    if (!json.ok) throw new Error(json.error ?? 'Güncellenemedi')
+    setDuzenleKayit(null)
+    yukle()
+  }
+
+  async function arsivle(kayit: Kayit, hedef: boolean) {
+    setAksiyonLoading(true)
+    try {
+      const res  = await fetch('/api/raporlar/musteri-degerlendirme', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: kayit.id, arsivlendi: hedef }),
+      })
+      const json = await res.json()
+      if (!json.ok) { setHata(json.error ?? 'İşlem başarısız'); return }
+      setArsivleKayit(null)
+      yukle()
+    } finally { setAksiyonLoading(false) }
+  }
+
+  async function sil(kayit: Kayit) {
+    setAksiyonLoading(true)
+    try {
+      const res  = await fetch(`/api/raporlar/musteri-degerlendirme?id=${kayit.id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!json.ok) { setHata(json.error ?? 'Silinemedi'); return }
+      setSilKayit(null)
+      yukle()
+    } finally { setAksiyonLoading(false) }
+  }
+
+  // ── Filtrele ──────────────────────────────────────────────────────────────
 
   const filtreliKayitlar = useMemo(() => {
     return kayitlar.filter(k => {
@@ -91,7 +263,6 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     })
   }, [kayitlar, filtreYildiz, filtreKanal])
 
-  // Özet istatistikler
   const ozet = useMemo(() => {
     if (!filtreliKayitlar.length) return null
     const toplam    = filtreliKayitlar.length
@@ -107,6 +278,12 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     fontSize: 13, verticalAlign: 'top', ...extra,
   })
 
+  const aksiyon = (extra?: React.CSSProperties): React.CSSProperties => ({
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: 30, height: 30, borderRadius: 7, border: '1px solid',
+    cursor: 'pointer', background: 'none', ...extra,
+  })
+
   return (
     <div>
       <Topbar title="Müşteri Değerlendirmeleri" base={base}
@@ -114,10 +291,28 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
 
       <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
+        {/* Hata bandı */}
+        {hata && (
+          <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>{hata}</span>
+            <button onClick={() => setHata(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991b1b' }}><X size={15} /></button>
+          </div>
+        )}
+
         {/* Filtreler */}
         <div className="verde-card" style={{ padding: '14px 18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0f1a0f', margin: 0 }}>Müşteri Değerlendirmeleri</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0f1a0f', margin: 0 }}>Müşteri Değerlendirmeleri</h2>
+              {/* Arşiv toggle */}
+              <button onClick={() => setArsivGorunumu(v => !v)}
+                style={{ height: 30, padding: '0 12px', borderRadius: 8, border: '1px solid', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                  background: arsivGorunumu ? '#fef3c7' : '#f0f9f0',
+                  borderColor: arsivGorunumu ? '#fcd34d' : '#d6e4d6',
+                  color:       arsivGorunumu ? '#92400e' : '#1f6b1f' }}>
+                {arsivGorunumu ? <><ArchiveX size={13} /> Aktife Dön</> : <><Archive size={13} /> Arşivi Gör</>}
+              </button>
+            </div>
             <button onClick={yukle} disabled={loading || !firmaId}
               style={{ height: 34, padding: '0 14px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1f6b1f', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
               <RefreshCw size={13} style={loading ? spinning : {}} />
@@ -158,8 +353,8 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
           </div>
         </div>
 
-        {/* Özet kartları */}
-        {ozet && (
+        {/* Özet kartları — yalnızca aktif görünümde */}
+        {!arsivGorunumu && ozet && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 10 }}>
             {[
               { label: 'Toplam', val: ozet.toplam, color: '#0f1a0f' },
@@ -172,20 +367,20 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                 <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{label}</div>
               </div>
             ))}
-            {/* Dağılım */}
             <div className="verde-card" style={{ padding: '12px 16px', gridColumn: 'span 2' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Puan Dağılımı</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {[5,4,3,2,1].map(n => {
-                  const sayi  = ozet.dagilim.find(d => d.yildiz === n)?.sayi ?? 0
-                  const oran  = ozet.toplam > 0 ? (sayi / ozet.toplam) * 100 : 0
+                  const sayi = ozet.dagilim.find(d => d.yildiz === n)?.sayi ?? 0
+                  const oran = ozet.toplam > 0 ? (sayi / ozet.toplam) * 100 : 0
                   const { bg } = YILDIZ_RENK[n]
+                  const barColor = bg === '#d1fae5' ? '#10b981' : bg === '#dcfce7' ? '#34d399' : bg === '#fee2e2' ? '#ef4444' : bg === '#fef3c7' ? '#f59e0b' : '#94a3b8'
                   return (
                     <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 11.5, color: '#64748b', width: 12, flexShrink: 0 }}>{n}</span>
                       <Star size={11} color="#f59e0b" fill="#f59e0b" />
                       <div style={{ flex: 1, height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${oran}%`, background: bg === '#d1fae5' ? '#10b981' : bg === '#dcfce7' ? '#34d399' : bg === '#fee2e2' ? '#ef4444' : bg === '#fef3c7' ? '#f59e0b' : '#94a3b8', borderRadius: 4, transition: 'width .4s ease' }} />
+                        <div style={{ height: '100%', width: `${oran}%`, background: barColor, borderRadius: 4, transition: 'width .4s ease' }} />
                       </div>
                       <span style={{ fontSize: 11.5, color: '#64748b', width: 20, textAlign: 'right' as const }}>{sayi}</span>
                     </div>
@@ -193,6 +388,14 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                 })}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Arşiv başlığı */}
+        {arsivGorunumu && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8 }}>
+            <Archive size={15} color="#92400e" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Arşiv görünümü — Bu kayıtlar raporlara ve istatistiklere dahil edilmez.</span>
           </div>
         )}
 
@@ -207,15 +410,15 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
             </div>
           ) : filtreliKayitlar.length === 0 ? (
             <div style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>⭐</div>
-              Henüz değerlendirme yok
+              <div style={{ fontSize: 32, marginBottom: 8 }}>{arsivGorunumu ? '📦' : '⭐'}</div>
+              {arsivGorunumu ? 'Arşivde kayıt yok' : 'Henüz değerlendirme yok'}
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#1f6b1f' }}>
-                    {['Tarih', 'Lokasyon', 'Kanal', 'Puan', 'Yorum', 'Ad Soyad', 'Fotoğraf'].map(h => (
+                    {['Tarih', 'Lokasyon', 'Kanal', 'Puan', 'Yorum', 'Ad Soyad', 'Fotoğraf', 'İşlemler'].map(h => (
                       <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -251,6 +454,45 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                           </button>
                         ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                       </td>
+
+                      {/* ── Aksiyon butonları ── */}
+                      <td style={td({ whiteSpace: 'nowrap' })}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+
+                          {/* Düzenle */}
+                          <button
+                            onClick={() => setDuzenleKayit(k)}
+                            title="Düzenle"
+                            style={aksiyon({ borderColor: '#bfdbfe', color: '#1d4ed8' })}>
+                            <Pencil size={13} />
+                          </button>
+
+                          {/* Arşivle / Arşivden Çıkar */}
+                          {arsivGorunumu ? (
+                            <button
+                              onClick={() => setArsivleKayit(k)}
+                              title="Arşivden Çıkar"
+                              style={aksiyon({ borderColor: '#fcd34d', color: '#92400e' })}>
+                              <ArchiveX size={13} />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setArsivleKayit(k)}
+                              title="Arşivle"
+                              style={aksiyon({ borderColor: '#fed7aa', color: '#c2410c' })}>
+                              <Archive size={13} />
+                            </button>
+                          )}
+
+                          {/* Sil */}
+                          <button
+                            onClick={() => setSilKayit(k)}
+                            title="Kalıcı Sil"
+                            style={aksiyon({ borderColor: '#fecaca', color: '#dc2626' })}>
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -259,6 +501,47 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
           )}
         </div>
       </div>
+
+      {/* ── Modallar ──────────────────────────────────────────────────────────── */}
+
+      {/* Düzenle modalı */}
+      {duzenleKayit && (
+        <DuzenleModal
+          kayit={duzenleKayit}
+          onKaydet={duzenleKaydet}
+          onIptal={() => setDuzenleKayit(null)}
+        />
+      )}
+
+      {/* Arşivle onayı */}
+      {arsivleKayit && (
+        <OnayModal
+          baslik={arsivGorunumu ? 'Arşivden Çıkar' : 'Arşivle'}
+          mesaj={arsivGorunumu
+            ? `"${arsivleKayit.lokasyon_tanim}" lokasyonuna ait bu değerlendirme arşivden çıkarılacak ve tekrar aktif listeye eklenecek.`
+            : `"${arsivleKayit.lokasyon_tanim}" lokasyonuna ait bu değerlendirme arşivlenecek. Raporlara ve istatistiklere dahil edilmeyecek.`}
+          onayMetin={arsivGorunumu ? 'Arşivden Çıkar' : 'Arşivle'}
+          iptalMetin="İptal"
+          onayRenk={arsivGorunumu ? '#d97706' : '#c2410c'}
+          loading={aksiyonLoading}
+          onOnayla={() => arsivle(arsivleKayit, !arsivGorunumu)}
+          onIptal={() => setArsivleKayit(null)}
+        />
+      )}
+
+      {/* Sil onayı */}
+      {silKayit && (
+        <OnayModal
+          baslik="Değerlendirmeyi Kalıcı Sil"
+          mesaj={`"${silKayit.lokasyon_tanim}" lokasyonuna ait bu değerlendirme kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
+          onayMetin="Evet, Kalıcı Sil"
+          iptalMetin="Vazgeç"
+          onayRenk="#dc2626"
+          loading={aksiyonLoading}
+          onOnayla={() => sil(silKayit)}
+          onIptal={() => setSilKayit(null)}
+        />
+      )}
 
       {/* Görsel modal */}
       {gorselModal && (
