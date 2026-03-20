@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   const publicPaths = new Set(['/login', '/forgot-password', '/reset-password'])
-  const isPublicScanPath = pathname.startsWith('/qr/') || pathname.startsWith('/nfc/')
+  const isPublicScanPath = pathname.startsWith('/qr/') || pathname.startsWith('/nfc/') || pathname.startsWith('/mesai/')
 
   if (!authUser && !publicPaths.has(pathname) && !isPublicScanPath) {
     return NextResponse.redirect(new URL('/login', request.url))
