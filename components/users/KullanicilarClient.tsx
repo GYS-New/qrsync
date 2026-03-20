@@ -47,6 +47,7 @@ export default function KullanicilarClient({
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
+  const isSA = base === '/sa'
   const apiBase = base === '/sa' ? '/api/sa' : base === '/ta' ? '/api/ta' : '/api'
 
   const [q, setQ] = useState('')
@@ -265,7 +266,6 @@ export default function KullanicilarClient({
     setLoading(false)
   }
 
-  const isSA = base === '/sa'
   const isTA = base === '/ta'
 
   return (
