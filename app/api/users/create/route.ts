@@ -20,13 +20,13 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({} as any))
 
-  const email = String(body.email ?? '').trim().toLowerCase()
-  const password = String(body.password ?? '')
-  const isim_soyisim = String(body.isim_soyisim ?? '').trim()
-  const telefon = body.telefon ? String(body.telefon).trim() : null
-  const rol = String(body.rol ?? 'tenant_user')
-  const firma_id = body.firma_id ? String(body.firma_id) : null
-  const proje_id = body.proje_id ? String(body.proje_id) : null
+  const email         = String(body.email ?? '').trim().toLowerCase()
+  const password      = String(body.password ?? '')
+  const isim_soyisim  = String(body.isim_soyisim ?? '').trim()
+  const telefon       = body.telefon ? String(body.telefon).trim() : null
+  const rol           = String(body.rol ?? 'tenant_user')
+  const firma_id      = body.firma_id ? String(body.firma_id) : null
+  const body_proje_id = body.proje_id ? String(body.proje_id) : null
 
   if (!email || !password || !isim_soyisim) {
     return NextResponse.json({ error: 'Eksik alan: email, password, isim_soyisim' }, { status: 400 })
@@ -42,7 +42,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Firma admini sadece kullanıcı oluşturabilir' }, { status: 403 })
   }
 
-  // SA, alt_super_admin oluştururken firma_id gerekmez
   const isAltSACreation = isSA && rol === 'alt_super_admin'
 
   const finalFirmaId = isAltSACreation ? null : (isSA ? firma_id : me.firma_id)
@@ -57,6 +56,23 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient()
 
+  // ── proje_id belirleme ────────────────────────────────────────────────────
+  // TA: client'tan gelen değeri kullan; yoksa cookie'den (getAktifProje) fallback
+  // SA: client'tan gelen değeri kullan; yoksa proje_id null (SA kendi seçer)
+  let finalProjeId: string | null = body_proje_id
+
+  if (isTA && !finalProjeId && finalFirmaId) {
+    // TA kendi aktif projesini cookie'den oku
+    const { getAktifProje } = await import('@/lib/projeler/getAktifProje')
+    const aktifProje = await getAktifProje(finalFirmaId)
+    finalProjeId = aktifProje?.id ?? null
+  }
+
+  if (!isAltSACreation && !finalProjeId) {
+    return NextResponse.json({ error: 'Proje seçilmedi. Lütfen aktif proje seçin.' }, { status: 400 })
+  }
+
+  // ── Auth kullanıcısı oluştur ──────────────────────────────────────────────
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
@@ -79,7 +95,7 @@ export async function POST(req: Request) {
       ...(finalFirmaId ? { firma_id: finalFirmaId } : {}),
       kayit_yapan_id: me.id,
       aktif: true,
-      ...(proje_id && !isAltSACreation ? { proje_id } : {}),
+      ...(!isAltSACreation && finalProjeId ? { proje_id: finalProjeId } : {}),
     })
 
   if (insertErr) {

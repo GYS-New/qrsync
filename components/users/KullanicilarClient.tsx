@@ -84,6 +84,26 @@ export default function KullanicilarClient({
   const [editForm, setEditForm] = useState({ isim_soyisim: '', email: '', telefon: '' })
   const [newPass, setNewPass] = useState('')
 
+  // SA için form içi proje seçici
+  const [formProjeler, setFormProjeler] = useState<{ id: string; ad: string }[]>([])
+  const [formProjeId,  setFormProjeId]  = useState<string>('')
+
+  // SA kullanıcı oluşturma modalı açıldığında projeleri yükle
+  useEffect(() => {
+    if (!openCreate || !isSA || !firmaId) return
+    fetch(`/api/projeler?firma_id=${firmaId}`)
+      .then(r => r.json())
+      .then((data: any[]) => {
+        const aktifler = (data ?? []).filter((p: any) => p.aktif !== false)
+        setFormProjeler(aktifler)
+        // Mevcut aktif proje varsa default olarak seç
+        if (aktifler.length === 1) setFormProjeId(aktifler[0].id)
+        else if (projeId) setFormProjeId(projeId)
+        else setFormProjeId('')
+      })
+      .catch(() => {})
+  }, [openCreate, isSA, firmaId, projeId])
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
     if (!s) return users
@@ -167,17 +187,30 @@ export default function KullanicilarClient({
 
   async function createUser() {
     if (!createForm.isim_soyisim || !createForm.email || !createForm.password) { showErr('İsim, email ve şifre zorunludur.'); return }
+
+    // SA: alt_super_admin harici rollerde proje zorunlu
+    const isAltSA = createForm.rol === 'alt_super_admin'
+    if (isSA && !isAltSA && !formProjeId) { showErr('Lütfen bir proje seçin.'); return }
+
+    // Hangi proje_id gönderilecek: SA → formProjeId, TA → projeId (API cookie fallback yapar)
+    const gonderilenProjeId = isSA ? (isAltSA ? undefined : formProjeId) : (projeId ?? undefined)
+
     setLoading(true)
     try {
       const res = await fetch('/api/users/create', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...createForm, firma_id: firmaId, ...(projeId && createForm.rol !== 'alt_super_admin' ? { proje_id: projeId } : {}) }),
+        body: JSON.stringify({
+          ...createForm,
+          firma_id: firmaId,
+          ...(gonderilenProjeId ? { proje_id: gonderilenProjeId } : {}),
+        }),
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'Oluşturulamadı')
       showOk('Kullanıcı oluşturuldu.')
       setCreateForm({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user' })
+      setFormProjeId('')
       setOpenCreate(false)
       await refresh()
     } catch (e: any) { showErr(e.message) }
@@ -377,6 +410,49 @@ export default function KullanicilarClient({
                     SA: sisteme erişim tam yetki · TA: firma yönetimi · M: müşteri görüntüleme · U: operatör
                   </div>
                 </div>
+
+                {/* SA: proje seçici (alt_super_admin hariç) */}
+                {isSA && createForm.rol !== 'alt_super_admin' && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label className="verde-label">Proje *</label>
+                    {formProjeler.length === 0 ? (
+                      <div style={{ fontSize: 13, color: '#dc2626', padding: '8px 0' }}>
+                        Bu firmaya ait aktif proje bulunamadı. Önce proje oluşturun.
+                      </div>
+                    ) : (
+                      <select
+                        className="verde-input"
+                        value={formProjeId}
+                        onChange={e => setFormProjeId(e.target.value)}
+                      >
+                        <option value="">— Proje seçin —</option>
+                        {formProjeler.map(p => (
+                          <option key={p.id} value={p.id}>{p.ad}</option>
+                        ))}
+                      </select>
+                    )}
+                    <div style={{ fontSize: 11.5, color: '#7a907a', marginTop: 4 }}>
+                      Kullanıcı bu projeye atanacak. Sonradan değiştirilebilir.
+                    </div>
+                  </div>
+                )}
+
+                {/* TA: aktif proje bilgisi (salt okunur) */}
+                {!isSA && projeId && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label className="verde-label">Proje</label>
+                    <div style={{ fontSize: 13, color: '#0f1a0f', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 10px', fontWeight: 600 }}>
+                      ✓ Aktif proje'ye otomatik atanacak
+                    </div>
+                  </div>
+                )}
+                {!isSA && !projeId && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: 13, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px' }}>
+                      ⚠️ Aktif proje seçili değil. Üstten bir proje seçip tekrar deneyin.
+                    </div>
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <Button variant="primary" onClick={createUser} disabled={loading}>{loading ? 'Kaydediliyor…' : '✓ Oluştur'}</Button>

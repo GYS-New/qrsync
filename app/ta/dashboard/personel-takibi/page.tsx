@@ -4,8 +4,6 @@ import PersonelTakibiClient from '@/components/personel-takibi/PersonelTakibiCli
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import Topbar from '@/components/layout/Topbar'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
-import PasswordGate from '@/components/security/PasswordGate'
-
 export const dynamic = 'force-dynamic'
 
 export default async function TAPersonelTakibiPage() {
@@ -28,14 +26,5 @@ export default async function TAPersonelTakibiPage() {
     )
   }
 
-  return (
-    <PasswordGate
-      storageKey="qrsync_ta_personel_verified_at"
-      ttlMs={15 * 60 * 1000}
-      title="Personel Takibi erişimi"
-      description="Güvenlik nedeniyle Personel Takibi ekranını açmadan önce şifrenizi tekrar girmeniz gerekiyor."
-    >
-      <PersonelTakibiClient base="/ta" isSA={false} initialFirmaId={firmaId} />
-    </PasswordGate>
-  )
+  return <PersonelTakibiClient base="/ta" isSA={false} initialFirmaId={firmaId} />
 }

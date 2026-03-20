@@ -47,13 +47,13 @@ export async function GET(req: NextRequest) {
   const { data: mesaiKayitlar, error: mesaiErr } = await mesaiQ
   if (mesaiErr) return NextResponse.json({ ok: false, error: mesaiErr.message }, { status: 500 })
 
-  // Projedeki / firmadaki tüm aktif personel
+  // Projedeki / firmadaki tüm aktif personel (SA ve alt_super_admin hariç)
   let kulQ = admin
     .from('users')
-    .select('id,isim_soyisim,email,profil_foto,rol')
+    .select('id,isim_soyisim,email,profil_foto,rol,last_seen_at')
     .eq('firma_id', firmaId)
     .eq('aktif', true)
-    .in('rol', ['tenant_user', 'tenant_admin'])
+    .not('rol', 'in', '("super_admin","alt_super_admin")')
     .order('isim_soyisim')
 
   if (projeId) kulQ = (kulQ as any).eq('proje_id', projeId)
@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
       email:          u.email,
       profil_foto:    u.profil_foto ?? null,
       rol:            u.rol,
+      last_seen_at:   u.last_seen_at ?? null,
       aktif,
       mesai_id:       kayit?.id        ?? null,
       giris_saati:    kayit?.giris_saati  ?? null,

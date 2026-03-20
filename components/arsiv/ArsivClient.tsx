@@ -463,11 +463,47 @@ export default function ArsivClient({
         <>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
             <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f6b1f' }}>{filtrePersonel.length}</strong> kayıt</span>
-            <button onClick={() => csvIndir('personel', ['Personel','Email','Tarih','İş Başı','İş Bitimi','Çalışma Süresi'],
-              filtrePersonel.map((r:any) => [r.isim_soyisim,r.email,r.kayit_tarihi,saat(r.giris_saati),saat(r.cikis_saati),sureFmt(r.giris_saati,r.cikis_saati)]))}
-              disabled={!filtrePersonel.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
-              <Download size={13} /> CSV
-            </button>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => csvIndir('personel', ['Personel','Email','Tarih','İş Başı','İş Bitimi','Çalışma Süresi'],
+                filtrePersonel.map((r:any) => [r.isim_soyisim,r.email,r.kayit_tarihi,saat(r.giris_saati),saat(r.cikis_saati),sureFmt(r.giris_saati,r.cikis_saati)]))}
+                disabled={!filtrePersonel.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
+                <Download size={13} /> CSV
+              </button>
+              <button onClick={async () => {
+                const ExcelJS = (await import('exceljs')).default
+                const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+                const ws = wb.addWorksheet('Personel Arşiv')
+                ws.columns = [
+                  { header: 'Personel', key: 'isim', width: 24 }, { header: 'Email', key: 'email', width: 28 },
+                  { header: 'Tarih', key: 'tarih', width: 14 }, { header: 'İş Başı', key: 'giris', width: 12 },
+                  { header: 'İş Bitimi', key: 'cikis', width: 12 }, { header: 'Çalışma Süresi', key: 'sure', width: 18 },
+                ]
+                const hr = ws.getRow(1); hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }; hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }; hr.height = 20
+                filtrePersonel.forEach((r:any) => ws.addRow({ isim: r.isim_soyisim, email: r.email, tarih: r.kayit_tarihi, giris: saat(r.giris_saati), cikis: saat(r.cikis_saati), sure: sureFmt(r.giris_saati, r.cikis_saati) }))
+                const buf = await wb.xlsx.writeBuffer(); const a = document.createElement('a')
+                a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+                a.download = `personel-arsiv-${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(a.href)
+              }} disabled={!filtrePersonel.length}
+                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#1d6f42' }}>
+                <FileSpreadsheet size={13} /> Excel
+              </button>
+              <button onClick={() => {
+                const rows = filtrePersonel.map((r:any) =>
+                  `<tr><td>${r.isim_soyisim}</td><td>${r.email}</td><td>${r.kayit_tarihi}</td><td>${saat(r.giris_saati)}</td><td>${saat(r.cikis_saati)}</td><td>${sureFmt(r.giris_saati,r.cikis_saati)}</td></tr>`).join('')
+                const w = window.open('','_blank','width=1000,height=700'); if (!w) return
+                w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Personel Arşivi</title>
+                  <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
+                  th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
+                  td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
+                  </head><body><h2 style="color:#1f6b1f">Personel Takibi Arşivi</h2>
+                  <table><thead><tr><th>Personel</th><th>Email</th><th>Tarih</th><th>İş Başı</th><th>İş Bitimi</th><th>Çalışma Süresi</th></tr></thead>
+                  <tbody>${rows}</tbody></table></body></html>`)
+                w.document.close(); setTimeout(() => w.print(), 400)
+              }} disabled={!filtrePersonel.length}
+                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
+                <Printer size={13} /> Yazdır
+              </button>
+            </div>
           </div>
 
           <div style={filterRow}>
@@ -515,11 +551,47 @@ export default function ArsivClient({
         <>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
             <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f6b1f' }}>{filtreMusteri.length}</strong> kayıt</span>
-            <button onClick={() => csvIndir('musteri', ['Tarih','Lokasyon','Kanal','Puan','Yorum','Ad Soyad'],
-              filtreMusteri.map((r:any) => [r.olusturma_tarihi,r.lokasyon_tanim,r.kanal,String(r.yildiz),r.yorum??'',r.ad_soyad??'']))}
-              disabled={!filtreMusteri.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
-              <Download size={13} /> CSV
-            </button>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => csvIndir('musteri', ['Tarih','Lokasyon','Kanal','Puan','Yorum','Ad Soyad'],
+                filtreMusteri.map((r:any) => [r.olusturma_tarihi,r.lokasyon_tanim,r.kanal,String(r.yildiz),r.yorum??'',r.ad_soyad??'']))}
+                disabled={!filtreMusteri.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
+                <Download size={13} /> CSV
+              </button>
+              <button onClick={async () => {
+                const ExcelJS = (await import('exceljs')).default
+                const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+                const ws = wb.addWorksheet('Müşteri Değerlendirme Arşivi')
+                ws.columns = [
+                  { header: 'Tarih', key: 'tarih', width: 20 }, { header: 'Lokasyon', key: 'lokasyon', width: 24 },
+                  { header: 'Kanal', key: 'kanal', width: 10 }, { header: 'Puan', key: 'puan', width: 8 },
+                  { header: 'Yorum', key: 'yorum', width: 40 }, { header: 'Ad Soyad', key: 'ad', width: 20 },
+                ]
+                const hr = ws.getRow(1); hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }; hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }; hr.height = 20
+                filtreMusteri.forEach((r:any) => ws.addRow({ tarih: r.olusturma_tarihi, lokasyon: r.lokasyon_tanim, kanal: r.kanal, puan: r.yildiz, yorum: r.yorum??'', ad: r.ad_soyad??'' }))
+                const buf = await wb.xlsx.writeBuffer(); const a = document.createElement('a')
+                a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+                a.download = `musteri-degerlendirme-arsiv-${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(a.href)
+              }} disabled={!filtreMusteri.length}
+                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#1d6f42' }}>
+                <FileSpreadsheet size={13} /> Excel
+              </button>
+              <button onClick={() => {
+                const rows = filtreMusteri.map((r:any) =>
+                  `<tr><td>${new Date(r.olusturma_tarihi).toLocaleString('tr-TR')}</td><td>${r.lokasyon_tanim}</td><td>${r.kanal}</td><td>${'★'.repeat(r.yildiz)}</td><td>${r.yorum??'—'}</td><td>${r.ad_soyad??'—'}</td></tr>`).join('')
+                const w = window.open('','_blank','width=1000,height=700'); if (!w) return
+                w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Müşteri Değerlendirme Arşivi</title>
+                  <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
+                  th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
+                  td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
+                  </head><body><h2 style="color:#1f6b1f">Müşteri Değerlendirmeleri Arşivi</h2>
+                  <table><thead><tr><th>Tarih</th><th>Lokasyon</th><th>Kanal</th><th>Puan</th><th>Yorum</th><th>Ad Soyad</th></tr></thead>
+                  <tbody>${rows}</tbody></table></body></html>`)
+                w.document.close(); setTimeout(() => w.print(), 400)
+              }} disabled={!filtreMusteri.length}
+                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
+                <Printer size={13} /> Yazdır
+              </button>
+            </div>
           </div>
 
           <div style={filterRow}>
@@ -586,11 +658,47 @@ export default function ArsivClient({
         <>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
             <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f6b1f' }}>{filtreSpesifik.length}</strong> kayıt</span>
-            <button onClick={() => csvIndir('spesifik', ['Görev','Lokasyon','Atanan','Durum','Oluşturma','Tamamlanma'],
-              filtreSpesifik.map((r:any) => [r.tanim,r.lokasyonlar?.tanim??'',r.atanan?.isim_soyisim??'',r.durum,r.olusturma_tarihi,r.tamamlanma_tarihi??'']))}
-              disabled={!filtreSpesifik.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
-              <Download size={13} /> CSV
-            </button>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => csvIndir('spesifik', ['Görev','Lokasyon','Atanan','Durum','Oluşturma','Tamamlanma'],
+                filtreSpesifik.map((r:any) => [r.tanim,r.lokasyonlar?.tanim??'',r.atanan?.isim_soyisim??'',r.durum,r.olusturma_tarihi,r.tamamlanma_tarihi??'']))}
+                disabled={!filtreSpesifik.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
+                <Download size={13} /> CSV
+              </button>
+              <button onClick={async () => {
+                const ExcelJS = (await import('exceljs')).default
+                const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+                const ws = wb.addWorksheet('Spesifik Görevler Arşivi')
+                ws.columns = [
+                  { header: 'Görev', key: 'tanim', width: 32 }, { header: 'Lokasyon', key: 'lokasyon', width: 24 },
+                  { header: 'Atanan', key: 'atanan', width: 20 }, { header: 'Durum', key: 'durum', width: 14 },
+                  { header: 'Oluşturma', key: 'olusturma', width: 20 }, { header: 'Tamamlanma', key: 'tamamlanma', width: 20 },
+                ]
+                const hr = ws.getRow(1); hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }; hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }; hr.height = 20
+                filtreSpesifik.forEach((r:any) => ws.addRow({ tanim: r.tanim, lokasyon: r.lokasyonlar?.tanim??'', atanan: r.atanan?.isim_soyisim??'', durum: r.durum, olusturma: r.olusturma_tarihi ? formatDateTime(r.olusturma_tarihi) : '', tamamlanma: r.tamamlanma_tarihi ? formatDateTime(r.tamamlanma_tarihi) : '' }))
+                const buf = await wb.xlsx.writeBuffer(); const a = document.createElement('a')
+                a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+                a.download = `spesifik-arsiv-${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(a.href)
+              }} disabled={!filtreSpesifik.length}
+                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#1d6f42' }}>
+                <FileSpreadsheet size={13} /> Excel
+              </button>
+              <button onClick={() => {
+                const rows = filtreSpesifik.map((r:any) =>
+                  `<tr><td>${r.tanim}</td><td>${r.lokasyonlar?.tanim??'—'}</td><td>${r.atanan?.isim_soyisim??'—'}</td><td>${r.durum}</td><td>${r.olusturma_tarihi ? formatDateTime(r.olusturma_tarihi) : '—'}</td><td>${r.tamamlanma_tarihi ? formatDateTime(r.tamamlanma_tarihi) : '—'}</td></tr>`).join('')
+                const w = window.open('','_blank','width=1000,height=700'); if (!w) return
+                w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Spesifik Görevler Arşivi</title>
+                  <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
+                  th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
+                  td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
+                  </head><body><h2 style="color:#1f6b1f">Spesifik Görevler Arşivi</h2>
+                  <table><thead><tr><th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th><th>Oluşturma</th><th>Tamamlanma</th></tr></thead>
+                  <tbody>${rows}</tbody></table></body></html>`)
+                w.document.close(); setTimeout(() => w.print(), 400)
+              }} disabled={!filtreSpesifik.length}
+                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
+                <Printer size={13} /> Yazdır
+              </button>
+            </div>
           </div>
 
           <div style={filterRow}>

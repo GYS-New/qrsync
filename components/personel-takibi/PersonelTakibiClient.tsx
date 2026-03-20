@@ -24,6 +24,7 @@ interface PersonelSatir {
   email:        string
   rol:          string
   aktif:        boolean
+  last_seen_at: string | null
   giris_saati:  string | null
   cikis_saati:  string | null
   giris_tipi:   string | null
@@ -116,6 +117,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
   const [loading,    setLoading]    = useState(false)
   const [qrLoading,  setQrLoading]  = useState(false)
   const [hata,       setHata]       = useState<string | null>(null)
+  const [aramaQ,     setAramaQ]     = useState('')
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -175,14 +177,28 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
     a.click()
   }
 
+  // ── Son görülme formatı ───────────────────────────────────────────────────
+  function sonGorulme(iso: string | null): string {
+    if (!iso) return '—'
+    const dk = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+    const saatStr = new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+    if (dk < 1)   return `${saatStr} — şimdi`
+    if (dk < 60)  return `${saatStr} — ${dk} dk önce`
+    const s = Math.floor(dk / 60)
+    return `${saatStr} — ${s} sa ${dk % 60} dk önce`
+  }
+
   // ── Filtreli / sıralı liste ───────────────────────────────────────────────
-  const siraliListe = useMemo(() =>
-    [...liste].sort((a, b) => {
-      if (a.aktif && !b.aktif) return -1
-      if (!a.aktif && b.aktif) return 1
-      return (a.isim_soyisim ?? '').localeCompare(b.isim_soyisim ?? '', 'tr')
-    })
-  , [liste])
+  const siraliListe = useMemo(() => {
+    const q = aramaQ.trim().toLowerCase()
+    return [...liste]
+      .filter(p => !q || p.isim_soyisim?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q))
+      .sort((a, b) => {
+        if (a.aktif && !b.aktif) return -1
+        if (!a.aktif && b.aktif) return 1
+        return (a.isim_soyisim ?? '').localeCompare(b.isim_soyisim ?? '', 'tr')
+      })
+  }, [liste, aramaQ])
 
   const spinning = { animation: 'spin 0.9s linear infinite' }
 
@@ -238,13 +254,21 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
 
             {/* Liste + yenile */}
             <div className="verde-card" style={{ overflow: 'hidden' }}>
-              <div style={{ padding: '12px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '12px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 800, fontSize: 14 }}>Personel Durumu — Bugün</span>
-                <button onClick={yukle} disabled={loading || !firmaId}
-                  style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1f6b1f', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                  <RefreshCw size={12} style={loading ? spinning : {}} />
-                  {loading ? 'Yükleniyor…' : 'Yenile'}
-                </button>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    placeholder="İsim veya e-posta ara…"
+                    value={aramaQ}
+                    onChange={e => setAramaQ(e.target.value)}
+                    style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, width: 200 }}
+                  />
+                  <button onClick={yukle} disabled={loading || !firmaId}
+                    style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1f6b1f', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <RefreshCw size={12} style={loading ? spinning : {}} />
+                    {loading ? 'Yükleniyor…' : 'Yenile'}
+                  </button>
+                </div>
               </div>
 
               {hata ? (
@@ -262,7 +286,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#1f6b1f' }}>
-                        {['Personel', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi'].map(h => (
+                        {['Personel', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi', 'Son Görülme'].map(h => (
                           <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -298,6 +322,9 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
                             </td>
                             <td style={td({ color: '#475569' })}>
                               {sure(p.giris_saati, p.cikis_saati)}
+                            </td>
+                            <td style={td({ whiteSpace: 'nowrap', fontSize: 12, color: '#64748b' })}>
+                              {sonGorulme(p.last_seen_at)}
                             </td>
                           </tr>
                         )
