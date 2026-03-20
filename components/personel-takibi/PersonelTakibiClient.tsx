@@ -180,12 +180,17 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
   // ── Son görülme formatı ───────────────────────────────────────────────────
   function sonGorulme(iso: string | null): string {
     if (!iso) return '—'
-    const dk = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-    const saatStr = new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-    if (dk < 1)   return `${saatStr} — şimdi`
-    if (dk < 60)  return `${saatStr} — ${dk} dk önce`
-    const s = Math.floor(dk / 60)
-    return `${saatStr} — ${s} sa ${dk % 60} dk önce`
+    const tarih    = new Date(iso)
+    const dk       = Math.floor((Date.now() - tarih.getTime()) / 60000)
+    const tarihStr = tarih.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const saatStr  = tarih.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+
+    let onceStr: string
+    if (dk < 1)        onceStr = 'şimdi'
+    else if (dk < 60)  onceStr = `${dk} dk önce`
+    else               onceStr = `${Math.floor(dk/60)}s ${dk%60}dk önce`
+
+    return `${tarihStr} ${saatStr} — ${onceStr}`
   }
 
   // ── Filtreli / sıralı liste ───────────────────────────────────────────────

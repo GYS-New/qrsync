@@ -38,7 +38,7 @@ export default function MesaiTokenPage() {
       const res  = await fetch(`/api/mesai/tarat/${token}`, { method: 'POST' })
       const json = await res.json()
 
-      if (res.status === 401 && json.requireAuth) {
+      if ((res.status === 401 || res.status === 403) && json.requireAuth) {
         router.push(`/login?redirect=/mesai/${token}`)
         return
       }
@@ -51,8 +51,7 @@ export default function MesaiTokenPage() {
 
       setIsim(json.isim ?? '')
       setDurum('basarili')
-      setMesaj(json.sonuc === 'giris' ? 'İş başı yapıldı' : 'İş bitimi yapıldı')
-    } catch {
+      setMesaj(json.sonuc === 'giris' ? 'İş başı yapıldı' : 'İş bitimi yapıldı')    } catch {
       setDurum('hata')
       setMesaj('Bağlantı hatası')
     }
