@@ -48,15 +48,22 @@ export async function GET(req: NextRequest) {
   if (mesaiErr) return NextResponse.json({ ok: false, error: mesaiErr.message }, { status: 500 })
 
   // Projedeki / firmadaki tüm aktif personel (SA ve alt_super_admin hariç)
+  // TA (tenant_admin) proje_id'ye bağlı olmayabileceği için proje filtresi TA'ya uygulanmaz
   let kulQ = admin
     .from('users')
     .select('id,isim_soyisim,email,profil_foto,rol,last_seen_at')
     .eq('firma_id', firmaId)
     .eq('aktif', true)
-    .not('rol', 'in', '("super_admin","alt_super_admin")')
+    .not('rol', 'in', '(super_admin,alt_super_admin)')
     .order('isim_soyisim')
 
-  if (projeId) kulQ = (kulQ as any).eq('proje_id', projeId)
+  // Proje filtresi: tenant_admin hariç diğerlerine uygula
+  // (TA proje_id olmadan da listeye girmeli)
+  if (projeId) {
+    kulQ = (kulQ as any).or(
+      `proje_id.eq.${projeId},rol.eq.tenant_admin`
+    )
+  }
 
   const { data: kullanicilar } = await kulQ
 

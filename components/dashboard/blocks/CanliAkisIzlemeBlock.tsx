@@ -17,8 +17,6 @@ type CanliGorevRow = {
   users?: { isim_soyisim?: string | null } | null
 }
 
-const STATUS_TRY = ['TAMAMLANDI', 'IPTAL', 'KAPATILDI', 'SILINDI']
-
 export default function CanliAkisIzlemeBlock({ firmaId, basePath, projeId }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
   const supabase = createClient()
   const [rows, setRows] = useState<CanliGorevRow[]>([])
@@ -49,23 +47,24 @@ export default function CanliAkisIzlemeBlock({ firmaId, basePath, projeId }: Das
   }, [])
 
   async function fetchLive() {
-    // Try with extended statuses. If enum doesn't include some values, retry with only TAMAMLANDI.
+    // Yalnızca kullanıcı tarafından işlem yapılmış görevler
     let q = supabase
       .from('canli_gorevler')
       .select(selectCols)
-      .in('durum', STATUS_TRY)
+      .not('islemi_yapan_id', 'is', null)
       .order('durum_degisim_tarihi', { ascending: false })
       .limit(limit)
     if (firmaId) q = q.eq('firma_id', firmaId)
     if (projeId) q = (q as any).eq('proje_id', projeId)
 
     let { data, error } = await q
-    if (error && String(error.message ?? '').toLowerCase().includes('enum')) {
+    // durum_degisim_tarihi yoksa fallback
+    if (error) {
       let q2 = supabase
         .from('canli_gorevler')
         .select(selectCols)
-        .in('durum', ['TAMAMLANDI'])
-        .order('durum_degisim_tarihi', { ascending: false })
+        .not('islemi_yapan_id', 'is', null)
+        .order('olusturma_tarihi', { ascending: false })
         .limit(limit)
       if (firmaId) q2 = q2.eq('firma_id', firmaId)
       if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
@@ -140,9 +139,18 @@ export default function CanliAkisIzlemeBlock({ firmaId, basePath, projeId }: Das
                   <span>{isEmpty ? '—' : ((r as any).users?.isim_soyisim ?? '—')}</span>
                 </td>
                 <td>
-                  <span className={`verde-badge ${!isEmpty && r?.durum === 'TAMAMLANDI' ? 'status-tamamlandi' : 'status-iptal'}`}>
-                    {isEmpty ? '—' : (r?.durum ?? '—')}
-                  </span>
+                  {(() => {
+                    if (isEmpty) return <span className="verde-badge">—</span>
+                    const d = r?.durum ?? '—'
+                    const cls =
+                      d === 'TAMAMLANDI'              ? 'status-tamamlandi' :
+                      d === 'IPTAL' || d === 'SILINDI' || d === 'KAPATILDI' ? 'status-iptal' :
+                      d === 'ZAMANI_GECMIS' || d === 'ZAMANINDA_YAPILAMAYAN' ? 'status-zamaninda' :
+                      d === 'BEKLEMEDE'               ? 'status-beklemede' :
+                      d === 'HAZIR'                   ? 'status-hazir' :
+                      'status-islemde'
+                    return <span className={`verde-badge ${cls}`}>{d}</span>
+                  })()}
                 </td>
                 <td style={{ color: '#7a907a', whiteSpace: 'nowrap' }}>
                   {isEmpty ? '—' : formatDateTime((r?.durum_degisim_tarihi as any) ?? (r?.olusturma_tarihi as any))}

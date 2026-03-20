@@ -61,6 +61,12 @@ function sure(giris: string | null, cikis: string | null) {
   return `${s}s ${m}dk`
 }
 
+const ROL_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+  tenant_admin: { label: 'Firma Admin', bg: '#fff3e0', color: '#e65100' },
+  tenant_user:  { label: 'Kullanıcı',   bg: '#f3e5f5', color: '#6a1b9a' },
+  musteri:      { label: 'Müşteri',      bg: '#e3f2fd', color: '#1565c0' },
+}
+
 // ── QR Kart bileşeni ─────────────────────────────────────────────────────────
 function QrKart({ qr, origin, projeAdi, onIndir }: {
   qr: QrKod; origin: string; projeAdi: string; onIndir: () => void
@@ -291,7 +297,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#1f6b1f' }}>
-                        {['Personel', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi', 'Son Görülme'].map(h => (
+        {['Personel', 'Rol', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi', 'Son Görülme'].map(h => (
                           <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -309,6 +315,14 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
                                   <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{p.email}</div>
                                 </div>
                               </div>
+                            </td>
+                            <td style={td()}>
+                              {(() => {
+                                const rb = ROL_BADGE[p.rol]
+                                return rb
+                                  ? <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, background: rb.bg, color: rb.color, whiteSpace: 'nowrap' }}>{rb.label}</span>
+                                  : <span style={{ fontSize: 11.5, color: '#94a3b8' }}>{p.rol}</span>
+                              })()}
                             </td>
                             <td style={td()}>
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,

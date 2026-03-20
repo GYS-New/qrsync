@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { LogIn, LogOut, Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { useParams } from 'next/navigation'
+import { LogIn, LogOut, Loader2, CheckCircle, XCircle, ShieldOff } from 'lucide-react'
 
 type Durum = 'yukleniyor' | 'hazir' | 'islemde' | 'basarili' | 'hata' | 'yetki_yok'
 
@@ -14,7 +14,6 @@ interface TokenBilgi {
 
 export default function MesaiTokenPage() {
   const { token } = useParams() as { token: string }
-  const router    = useRouter()
 
   const [durum,    setDurum]    = useState<Durum>('yukleniyor')
   const [bilgi,    setBilgi]    = useState<TokenBilgi | null>(null)
@@ -39,7 +38,7 @@ export default function MesaiTokenPage() {
       const json = await res.json()
 
       if ((res.status === 401 || res.status === 403) && json.requireAuth) {
-        router.push(`/login?redirect=/mesai/${token}`)
+        setDurum('yetki_yok')
         return
       }
 
@@ -74,7 +73,7 @@ export default function MesaiTokenPage() {
         {/* Logo / ikon */}
         <div style={{
           width: 72, height: 72, borderRadius: '50%',
-          background: durum === 'basarili' ? '#dcfce7' : durum === 'hata' ? '#fee2e2' : isGiris ? '#dbeafe' : '#fef3c7',
+          background: durum === 'basarili' ? '#dcfce7' : durum === 'hata' ? '#fee2e2' : durum === 'yetki_yok' ? '#fef3c7' : isGiris ? '#dbeafe' : '#fef3c7',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           margin: '0 auto 20px',
         }}>
@@ -84,6 +83,8 @@ export default function MesaiTokenPage() {
             ? <CheckCircle size={32} color="#16a34a" />
             : durum === 'hata'
             ? <XCircle size={32} color="#dc2626" />
+            : durum === 'yetki_yok'
+            ? <ShieldOff size={32} color="#d97706" />
             : isGiris
             ? <LogIn size={32} color="#1d4ed8" />
             : <LogOut size={32} color="#d97706" />
@@ -118,6 +119,17 @@ export default function MesaiTokenPage() {
 
         {durum === 'islemde' && (
           <p style={{ color: '#64748b', fontSize: 15 }}>İşleniyor…</p>
+        )}
+
+        {durum === 'yetki_yok' && (
+          <>
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#d97706', marginBottom: 8 }}>
+              Yetkisiz Erişim
+            </div>
+            <div style={{ fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
+              Bu işlem için yetkiniz yok.
+            </div>
+          </>
         )}
 
         {durum === 'basarili' && (

@@ -56,7 +56,7 @@ function LiveHeader({
   ]
   const dotColor = streamState === 'running' ? '#2e8b2e' : streamState === 'paused' ? '#d97706' : '#9ca3af'
   const kpiCards = [
-    { label: 'Toplam bugün',    val: kpi.toplam,      bg: 'transparent',  vColor: '#0f1a0f',  lColor: '#7a907a' },
+    { label: 'Toplam',          val: kpi.toplam,      bg: 'transparent',  vColor: '#0f1a0f',  lColor: '#7a907a' },
     { label: 'Tamamlandı',      val: kpi.tamamlandi,  bg: '#f0f9f0',      vColor: '#1a5c2a',  lColor: '#3B6D11' },
     { label: 'Açık',            val: kpi.acik,        bg: '#eff6ff',      vColor: '#1d4ed8',  lColor: '#185FA5' },
     { label: 'Beklemede',       val: kpi.beklemede,   bg: '#fffbeb',      vColor: '#92400e',  lColor: '#854F0B' },
@@ -150,7 +150,8 @@ export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar
   const { toast } = useToast()
   const { confirm } = useConfirm()
   const pathname = usePathname()
-  const isTA = pathname?.startsWith('/ta')
+  const isTA  = pathname?.startsWith('/ta')
+  const isSA  = !isTA && !readonly   // SA veya alt_SA
 const [locMap, setLocMap] = useState<Record<string, { tanim: string; parent_id: string | null }>>({})
 
 const getLocPath = useMemo(() => {
@@ -333,14 +334,9 @@ useEffect(() => {
 
   async function refreshLiveFlow() {
     if (!firmaId) return
-    // Frekansiyel Akış İzleme: yalnızca kapanmış durumlar.
-    // Not: Bazı projelerde enum henüz genişletilmemiş olabilir (örn. sadece ACIK/TAMAMLANDI).
-    // Bu durumda PostgREST "invalid input value for enum" hatası verir. O yüzden kademeli fallback yapıyoruz.
-    const closedStatusesPrimary = ['TAMAMLANDI', 'IPTAL', 'KAPATILDI', 'SILINDI']
-    const closedStatusesFallback1 = ['TAMAMLANDI']
-    // Not: Bazı ortamlarda `durum_degisim_tarihi` kolonu/izinleri henüz gelmemiş olabilir.
-    // Bu durumda fallback olarak olusturma_tarihi'ne göre çekiyoruz ki tablo boş kalmasın.
-    // Not: "İşlemi Yapan" kolonu için kapanış/iptal/oluşturan kullanıcılarını da join'liyoruz.
+
+    // Yalnızca kullanıcı tarafından işlem yapılmış görevler
+    // islemi_yapan_id dolu = bir insan eli değmiştir (TAMAMLANDI, IPTAL, ZAMANINDA_YAPILAMAYAN, ZAMANI_GECMIS manuel vs.)
     const liveSelect =
       '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
@@ -348,41 +344,36 @@ useEffect(() => {
       .from('canli_gorevler')
       .select(liveSelect)
       .eq('firma_id', firmaId)
-      .in('durum', closedStatusesPrimary)
+      .not('islemi_yapan_id', 'is', null)   // kullanıcı işlemi zorunlu
       .order('durum_degisim_tarihi', { ascending: false })
       .order('olusturma_tarihi', { ascending: false })
-      .limit(30)
+      .limit(100)
+
     if (projeId) liveQ = (liveQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
-    let res = await liveQ
+
+    const res = await liveQ
 
     if (res.error) {
-      const msg = String((res.error as any)?.message ?? res.error)
-      // Enum değerleri DB'de yoksa (örn. 'IPTAL' henüz eklenmemişse) daha dar bir statü listesiyle tekrar dene.
-      if (msg.toLowerCase().includes('invalid input value for enum')) {
-        res = await supabase
-          .from('canli_gorevler')
-          .select(liveSelect)
-          .eq('firma_id', firmaId)
-          .in('durum', closedStatusesFallback1)
-          .order('durum_degisim_tarihi', { ascending: false })
-          .order('olusturma_tarihi', { ascending: false })
-          .limit(30)
-      }
-    }
-
-    if (res.error) {
-      // Fallback
-      res = await supabase
+      // durum_degisim_tarihi kolonu yoksa olusturma_tarihi ile fallback
+      const fallbackQ = supabase
         .from('canli_gorevler')
         .select(liveSelect)
         .eq('firma_id', firmaId)
-        .in('durum', closedStatusesFallback1)
+        .not('islemi_yapan_id', 'is', null)
         .order('olusturma_tarihi', { ascending: false })
-        .limit(30)
-    }
+        .limit(100)
 
-    if (res.error) {
-      console.error('LiveFlow fetch error:', res.error)
+      const res2 = projeId
+        ? await (fallbackQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+        : await fallbackQ
+
+      if (res2.error) {
+        console.error('LiveFlow fetch error:', res2.error)
+        return
+      }
+
+      const data = res2.data
+      if (data) setLiveFlowGorevler(data)
       return
     }
 
@@ -459,30 +450,44 @@ useEffect(() => {
     const patch: any = { durum: nd, durum_degisim_tarihi: nowIso, islemi_yapan_id: meId }
 
     // Önce mevcut durumu kontrol et
-    const { data: liveTask } = await supabase.from('canli_gorevler').select('durum,aktif_olma_tarihi,durum_degisim_tarihi').eq('id', gorevId).maybeSingle()
+    const { data: liveTask } = await supabase
+      .from('canli_gorevler')
+      .select('durum,aktif_olma_tarihi,durum_degisim_tarihi')
+      .eq('id', gorevId)
+      .maybeSingle()
 
-    // ZAMANI_GECMIS ve BEKLEMEDE görevlerde hiçbir işlem yapılamaz
-    if ((liveTask as any)?.durum === 'ZAMANI_GECMIS') {
-      throw new Error('Zamanı geçmiş görevlerde işlem yapılamaz')
+    const mevcutDurum = (liveTask as any)?.durum
+
+    // ZAMANI_GECMIS → SA manuel yapabilir; TA ve diğerleri yapamaz
+    if (nd === 'ZAMANI_GECMIS') {
+      if (!isSA) throw new Error('Bu işlem için yetkiniz yok.')
+      patch.iptal_eden_id = meId
+      patch.iptal_tarihi  = nowIso
+      const { error: err } = await supabase.from('canli_gorevler').update(patch).eq('id', gorevId)
+      if (err) throw err
+      return
     }
-    if ((liveTask as any)?.durum === 'BEKLEMEDE') {
-      throw new Error('Beklemede olan görevlerde manuel işlem yapılamaz. Sistem otomatik olarak işleyecektir.')
+
+    // Otomatik ZAMANI_GECMIS olan görevlerde SA hariç işlem yapılamaz
+    if (mevcutDurum === 'ZAMANI_GECMIS' && !isSA) {
+      throw new Error('Zamanı geçmiş görevlerde işlem yapılamaz.')
+    }
+    // BEKLEMEDE: hiçbir kullanıcı manuel işlem yapamaz
+    if (mevcutDurum === 'BEKLEMEDE') {
+      throw new Error('Beklemede olan görevlerde manuel işlem yapılamaz.')
     }
 
     // Duruma göre ek alanları doldur
     if (nd === 'TAMAMLANDI') {
-      if ((liveTask as any)?.durum === 'ZAMANI_GECMIS') {
-        throw new Error('Zamanı geçmiş görevlerde işlem yapılamaz')
-      }
       patch.durum = resolveLiveCompletionStatusByTask(liveTask as any, nowIso)
-      if (patch.durum === 'ZAMANI_GECMIS') {
-        throw new Error('Zamanı geçmiş görevlerde işlem yapılamaz')
+      if (patch.durum === 'ZAMANI_GECMIS' && !isSA) {
+        throw new Error('Zamanı geçmiş görevlerde işlem yapılamaz.')
       }
-      patch.tamamlanma_tarihi = nowIso
+      patch.tamamlanma_tarihi       = nowIso
       patch.tamamlayan_kullanici_id = meId
     }
     if (['IPTAL', 'KAPATILDI', 'SILINDI'].includes(nd)) {
-      patch.iptal_tarihi = nowIso
+      patch.iptal_tarihi  = nowIso
       patch.iptal_eden_id = meId
     }
 
@@ -591,6 +596,27 @@ useEffect(() => {
     refreshLiveFlow()
   }
 
+  async function handleZamanGecmis(id: string) {
+    const ok = await confirm({
+      title: 'Zamanı Geçmiş',
+      message: 'Bu görevi "Zamanı Geçmiş" olarak işaretlemek istiyor musunuz?',
+      confirmText: 'Evet',
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+    const nowIso = new Date().toISOString()
+    await supabase.from('canli_gorevler').update({
+      durum: 'ZAMANI_GECMIS',
+      durum_degisim_tarihi: nowIso,
+      iptal_eden_id: meId,
+      iptal_tarihi: nowIso,
+      islemi_yapan_id: meId,
+    }).eq('id', id)
+    refreshBrowse()
+    refreshLiveFlow()
+  }
+
   const TableRow = ({
     g,
     showOps,
@@ -657,6 +683,26 @@ useEffect(() => {
                       }}
                     >
                       Kapat
+                    </button>
+                  )}
+                  {/* SA: HAZIR/ACIK/BEKLEMEDE → Zamanı Geçmiş yapabilir */}
+                  {isSA && ['HAZIR', 'ACIK', 'BEKLEMEDE'].includes(g.durum) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleZamanGecmis(g.id)
+                      }}
+                      style={{
+                        background: '#fef2f2',
+                        border: '1px solid #fca5a5',
+                        borderRadius: 4,
+                        padding: '3px 8px',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        color: '#991b1b',
+                      }}
+                    >
+                      Z. Geçmiş
                     </button>
                   )}
                   {['HAZIR', 'ACIK'].includes(g.durum) && (
