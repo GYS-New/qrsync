@@ -205,7 +205,7 @@ export default function ArsivClient({
     try {
       await supabase.from('canli_gorevler_arsiv').delete().eq('id', row.id)
       setFrekData(p => p.filter(r => r.id !== row.id))
-      toast({ type: 'success', title: 'Silindi' })
+      toast({ type: 'success', title: 'Silindi', message: 'Arşiv kaydı kalıcı olarak silindi.' })
     } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
   }
 
@@ -220,7 +220,7 @@ export default function ArsivClient({
       })
       if (!(await res.json()).ok) throw new Error('İşlem başarısız')
       setMusteriData(p => p.filter(r => r.id !== row.id))
-      toast({ type: 'success', title: 'Arşivden çıkarıldı' })
+      toast({ type: 'success', title: 'Arşivden çıkarıldı', message: 'Değerlendirme aktif listeye taşındı.' })
     } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
   }
 
@@ -231,7 +231,7 @@ export default function ArsivClient({
       const res = await fetch(`/api/raporlar/musteri-degerlendirme?id=${row.id}`, { method: 'DELETE' })
       if (!(await res.json()).ok) throw new Error('Silinemedi')
       setMusteriData(p => p.filter(r => r.id !== row.id))
-      toast({ type: 'success', title: 'Silindi' })
+      toast({ type: 'success', title: 'Silindi', message: 'Değerlendirme kalıcı olarak silindi.' })
     } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
   }
 
