@@ -233,7 +233,7 @@ export async function GET(req: Request) {
 
       const buf = await wb.xlsx.writeBuffer()
       const tarih = new Date().toISOString().slice(0,10)
-      return new NextResponse(buf as Buffer, {
+      return new NextResponse(buf as unknown as BodyInit, {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'Content-Disposition': `attachment; filename="spesifik-rapor-${tarih}.xlsx"`,
