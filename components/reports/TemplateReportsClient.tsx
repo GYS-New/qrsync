@@ -681,7 +681,6 @@ function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: Props) {
           </div>
         )}
       </div>
-    </div>
   )
 }
 
