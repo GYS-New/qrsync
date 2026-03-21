@@ -88,13 +88,13 @@ export async function GET(req: Request) {
 
       // ── Sayfa 1: Özet ──────────────────────────────────────────────────────
       const ws1 = wb.addWorksheet('Özet')
-      const hdrStyle: Partial<ExcelJS.Style> = {
+      const hdrStyle: any = {
         font: { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 },
         fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A5C2A' } },
         alignment: { horizontal: 'center', vertical: 'middle' },
         border: { bottom: { style: 'thin', color: { argb: 'FF2E8B2E' } } },
       }
-      const addHdr = (ws: ExcelJS.Worksheet, row: number, cols: { col: number; text: string; width?: number }[]) => {
+      const addHdr = (ws: any, row: number, cols: { col: number; text: string; width?: number }[]) => {
         const r = ws.getRow(row)
         r.height = 22
         cols.forEach(({ col, text, width }) => {
