@@ -263,7 +263,7 @@ export async function GET(req: Request) {
         rows: ozetRows,
       })
       const tarih = new Date().toISOString().slice(0,10)
-      return new NextResponse(buf, {
+      return new NextResponse(buf as unknown as BodyInit, {
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="spesifik-rapor-${tarih}.pdf"`,
