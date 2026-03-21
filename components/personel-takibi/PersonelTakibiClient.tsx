@@ -373,7 +373,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Pro
 
             {personelTakibiAktif && kpi && kpi.pasif > 0 && (
               <div style={{ fontSize: 12.5, color: '#dc2626', background: '#fef2f2', padding: '8px 14px', borderRadius: 8, border: '1px solid #fecaca' }}>
-                ⚠️ İşte olmayan <strong>{kpi.pasif} personele</strong> görev ataması yapılamaz. Görev atama ekranlarında bu kişiler pasif olarak gösterilir.
+                ⚠️ İşte olmayan <strong>{kpi.pasif} personele</strong> görev ataması yapılamaz.
               </div>
             )}
           </>
