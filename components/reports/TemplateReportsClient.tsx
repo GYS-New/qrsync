@@ -625,12 +625,12 @@ function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: Props) {
         </div>
 
         {!currentFirmaId ? (
-          <div className="verde-card" style={{ padding: 48, textAlign: 'center' }}>
+          <div style={{ padding: 48, textAlign: 'center' }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: T.text, marginBottom: 8 }}>Firma Seçin</div>
             <div style={{ color: T.textSoft, fontSize: 13 }}>Raporu görüntülemek için üstten bir firma seçin.</div>
           </div>
         ) : (
-          <div className="verde-card">
+          <div>
             {/* Sekmeler */}
             <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, background: T.grayLight, overflowX: 'auto' }}>
               {TABS.map(tab => {
