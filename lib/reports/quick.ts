@@ -1,5 +1,25 @@
 import { createAdminClient } from '@/lib/supabase/server'
 
+/**
+ * Aktif canli_gorevler + canli_gorevler_arsiv tablosunu paralel çekip
+ * id bazında deduplicate ederek birleştirir.
+ * Aktif tablo kaydı her zaman arşiv kaydının önüne geçer (daha güncel).
+ */
+async function fetchCanliGorevlerMerged(admin: any, selectCols: string, filters: {
+  firmaId?: string | null
+  projeId?: string | null
+}): Promise<any[]> {
+  let qAktif = admin.from('canli_gorevler').select(selectCols)
+  let qArsiv  = admin.from('canli_gorevler_arsiv').select(selectCols)
+  if (filters.firmaId) { qAktif = qAktif.eq('firma_id', filters.firmaId); qArsiv = qArsiv.eq('firma_id', filters.firmaId) }
+  if (filters.projeId) { qAktif = (qAktif as any).eq('proje_id', filters.projeId); qArsiv = (qArsiv as any).eq('proje_id', filters.projeId) }
+  const [{ data: aktif }, { data: arsiv }] = await Promise.all([qAktif, qArsiv])
+  const map = new Map<string, any>()
+  for (const r of (arsiv  ?? [])) map.set(r.id, r)
+  for (const r of (aktif  ?? [])) map.set(r.id, r)  // aktif üzerine yazar
+  return Array.from(map.values())
+}
+
 export type QuickReportType = 'locations' | 'users' | 'live_tasks' | 'manual_tasks' | 'location_groups'
 
 type Filters = {
@@ -162,14 +182,8 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
   const userOptions = userList.map((x: any) => ({ id: x.id, label: x.isim_soyisim ?? '-' })).sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label, 'tr'))
 
   if (type === 'locations') {
-    const [{ data: liveTasks, error: liveError }, { data: manualTasks, error: manualError }] = await Promise.all([
-      (() => {
-        let q = filters.firmaId
-          ? admin.from('canli_gorevler').select('id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id').eq('firma_id', filters.firmaId)
-          : admin.from('canli_gorevler').select('id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id')
-        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
-        return q
-      })(),
+    const [liveTasks, { data: manualTasks, error: manualError }] = await Promise.all([
+      fetchCanliGorevlerMerged(admin, 'id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id', filters),
       (() => {
         let q = filters.firmaId
           ? admin.from('gorevler').select('id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id').eq('firma_id', filters.firmaId)
@@ -178,9 +192,8 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
         return q
       })(),
     ])
-    if (liveError) throw new Error(liveError.message)
     if (manualError) throw new Error(manualError.message)
-    const allTasks = [...(liveTasks ?? []), ...(manualTasks ?? [])].filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
+    const allTasks = [...liveTasks, ...(manualTasks ?? [])].filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
 
     const parentLocs = locs.filter((x: any) => !x.parent_id)
     const childCountMap: Record<string, number> = {}
@@ -252,14 +265,8 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
   }
 
   if (type === 'users') {
-    const [{ data: liveTasks, error: liveError }, { data: manualTasks, error: manualError }] = await Promise.all([
-      (() => {
-        let q = filters.firmaId
-          ? admin.from('canli_gorevler').select('id,durum,olusturma_tarihi,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,atanan_kullanici_id,firma_id').eq('firma_id', filters.firmaId)
-          : admin.from('canli_gorevler').select('id,durum,olusturma_tarihi,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,atanan_kullanici_id,firma_id')
-        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
-        return q
-      })(),
+    const [liveTasks, { data: manualTasks, error: manualError }] = await Promise.all([
+      fetchCanliGorevlerMerged(admin, 'id,durum,olusturma_tarihi,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,atanan_kullanici_id,firma_id', filters),
       (() => {
         let q = filters.firmaId
           ? admin.from('gorevler').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id').eq('firma_id', filters.firmaId)
@@ -268,10 +275,9 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
         return q
       })(),
     ])
-    if (liveError) throw new Error(liveError.message)
     if (manualError) throw new Error(manualError.message)
 
-    const rangedLive = (liveTasks ?? []).filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
+    const rangedLive   = liveTasks.filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
     const rangedManual = (manualTasks ?? []).filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
 
     const activity: Record<string, number> = {}
@@ -350,16 +356,24 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     }
   }
 
-  const tableName = type === 'live_tasks' ? 'canli_gorevler' : 'gorevler'
+  const tableName = type === 'live_tasks' ? null : 'gorevler'
   const statuses = type === 'live_tasks'
     ? ['HAZIR', 'ACIK', 'BEKLEMEDE', 'IPTAL', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS']
     : ['ACIK', 'ISLEMDE', 'IPTAL', 'TAMAMLANDI']
-  let taskQuery = admin.from(tableName).select('id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,lokasyon_id,firma_id')
-  if (filters.firmaId) taskQuery = taskQuery.eq('firma_id', filters.firmaId)
-  if (filters.projeId) taskQuery = (taskQuery as any).eq('proje_id', filters.projeId)
-  const { data: tasks, error: taskError } = await taskQuery
-  if (taskError) throw new Error(taskError.message)
-  const rangedTasks = (tasks ?? []).filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
+
+  let tasks: any[]
+  if (type === 'live_tasks') {
+    // Aktif + arşiv birleşimi
+    tasks = await fetchCanliGorevlerMerged(admin, 'id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,lokasyon_id,firma_id', filters)
+  } else {
+    let taskQuery = admin.from('gorevler').select('id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,lokasyon_id,firma_id')
+    if (filters.firmaId) taskQuery = taskQuery.eq('firma_id', filters.firmaId)
+    if (filters.projeId) taskQuery = (taskQuery as any).eq('proje_id', filters.projeId)
+    const { data: t, error: taskError } = await taskQuery
+    if (taskError) throw new Error(taskError.message)
+    tasks = t ?? []
+  }
+  const rangedTasks = tasks.filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
 
   const statusCounts = statuses.map((s) => ({ durum: s, toplam: rangedTasks.filter((x: any) => x.durum === s).length }))
   const selectedStatus = filters.status || statuses[0] || null
@@ -386,19 +400,22 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
       allLocIds.push(m.lokasyon_id)
     }
 
-    // Görevleri çek (tarih ve grup filtreli)
-    let gorevQ = admin.from('canli_gorevler').select('lokasyon_id,durum,aktif_olma_tarihi')
-    if (filters.firmaId) gorevQ = gorevQ.eq('firma_id', filters.firmaId)
-    if (filters.dateFrom) gorevQ = gorevQ.gte('aktif_olma_tarihi', filters.dateFrom)
-    if (filters.dateTo)   gorevQ = gorevQ.lte('aktif_olma_tarihi', filters.dateTo)
+    // Görevleri çek — aktif + arşiv birleşimi
+    const arsivCols = 'lokasyon_id,durum,aktif_olma_tarihi,firma_id'
+    let qAktifGrp = admin.from('canli_gorevler').select(arsivCols)
+    let qArsivGrp  = admin.from('canli_gorevler_arsiv').select(arsivCols)
+    if (filters.firmaId) { qAktifGrp = qAktifGrp.eq('firma_id', filters.firmaId); qArsivGrp = qArsivGrp.eq('firma_id', filters.firmaId) }
+    if (filters.dateFrom) { qAktifGrp = qAktifGrp.gte('aktif_olma_tarihi', filters.dateFrom); qArsivGrp = qArsivGrp.gte('aktif_olma_tarihi', filters.dateFrom) }
+    if (filters.dateTo)   { qAktifGrp = qAktifGrp.lte('aktif_olma_tarihi', filters.dateTo);   qArsivGrp = qArsivGrp.lte('aktif_olma_tarihi', filters.dateTo) }
 
-    // Seçili grup filtresi
     const selectedGrpId = filters.groupId
     if (selectedGrpId && grpLocMap[selectedGrpId]) {
-      gorevQ = gorevQ.in('lokasyon_id', grpLocMap[selectedGrpId])
+      qAktifGrp = qAktifGrp.in('lokasyon_id', grpLocMap[selectedGrpId])
+      qArsivGrp  = (qArsivGrp as any).in('lokasyon_id', grpLocMap[selectedGrpId])
     }
 
-    const { data: gorevler } = await gorevQ
+    const [{ data: aktifGrp }, { data: arsivGrp }] = await Promise.all([qAktifGrp, qArsivGrp])
+    const gorevler = [...(arsivGrp ?? []), ...(aktifGrp ?? [])]
     const locGorevMap: Record<string, { toplam: number; tamamlanan: number }> = {}
     for (const g of gorevler ?? []) {
       if (!g.lokasyon_id) continue

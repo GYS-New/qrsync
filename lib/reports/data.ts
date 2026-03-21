@@ -157,15 +157,22 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
   }
 
   if (reportKey === 'live_tasks') {
-    let query = admin
-      .from('canli_gorevler')
-      .select('id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id')
-      .order('olusturma_tarihi', { ascending: false })
-    if (filters.firmaId) query = query.eq('firma_id', filters.firmaId)
-    if (filters.projeId) query = (query as any).eq('proje_id', filters.projeId)
-    const { data, error } = await query
-    if (error) throw new Error(error.message)
-    const filtered = (data ?? []).filter((row: any) => withinRange(row.olusturma_tarihi, filters.dateFrom, filters.dateTo))
+    const liveSelect = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id'
+
+    // Aktif tablo + arşiv tablosunu paralel çek, birleştir
+    let qAktif = admin.from('canli_gorevler').select(liveSelect).order('olusturma_tarihi', { ascending: false })
+    let qArsiv = admin.from('canli_gorevler_arsiv').select(liveSelect).order('olusturma_tarihi', { ascending: false })
+    if (filters.firmaId) { qAktif = qAktif.eq('firma_id', filters.firmaId); qArsiv = qArsiv.eq('firma_id', filters.firmaId) }
+    if (filters.projeId) { qAktif = (qAktif as any).eq('proje_id', filters.projeId); qArsiv = (qArsiv as any).eq('proje_id', filters.projeId) }
+
+    const [{ data: aktifData }, { data: arsivData }] = await Promise.all([qAktif, qArsiv])
+
+    // id'ye göre deduplicate — aktif tablo öncelikli (daha güncel)
+    const mergedMap = new Map<string, any>()
+    for (const r of (arsivData ?? [])) mergedMap.set(r.id, r)
+    for (const r of (aktifData  ?? [])) mergedMap.set(r.id, r)
+
+    const filtered = Array.from(mergedMap.values()).filter((row: any) => withinRange(row.olusturma_tarihi, filters.dateFrom, filters.dateTo))
     const locIds = Array.from(new Set(filtered.map((x: any) => x.lokasyon_id).filter(Boolean)))
     const userIds = Array.from(new Set(filtered.flatMap((x: any) => [x.atanan_kullanici_id, x.baslatan_kullanici_id, x.tamamlayan_kullanici_id, x.islemi_yapan_id]).filter(Boolean)))
     const [locRes, userRes] = await Promise.all([
