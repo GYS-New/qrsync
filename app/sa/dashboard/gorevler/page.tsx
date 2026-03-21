@@ -19,7 +19,7 @@ export default async function SAGorevlerPage() {
 
   let gorevQ = firmaId
     ? supabase.from('gorevler').select('*,lokasyonlar(id,tanim,parent_id),users!atanan_kullanici_id(isim_soyisim)')
-        .eq('firma_id', firmaId).order('olusturma_tarihi', { ascending: false }).limit(200)
+        .eq('firma_id', firmaId).in('durum', ['ACIK', 'ISLEMDE']).order('olusturma_tarihi', { ascending: false }).limit(200)
     : null
   if (gorevQ && projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
 

@@ -29,6 +29,7 @@ export default async function TAGorevlerPage() {
       .select('*,lokasyonlar(id,tanim,parent_id),users!atanan_kullanici_id(isim_soyisim)')
       .eq('firma_id', firmaId)
       .eq('proje_id', aktifProje.id)
+      .in('durum', ['ACIK', 'ISLEMDE'])
       .order('olusturma_tarihi', { ascending: false })
       .limit(200),
     supabase

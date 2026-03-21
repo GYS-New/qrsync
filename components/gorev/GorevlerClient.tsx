@@ -135,6 +135,7 @@ export default function GorevlerClient({
       .from('gorevler')
       .select('*,lokasyonlar(id,tanim,parent_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
       .eq('firma_id', fid)
+      .in('durum', ['ACIK', 'ISLEMDE'])   // IPTAL ve TAMAMLANDI arşivde görünür
       .order('olusturma_tarihi', { ascending: false })
       .limit(200)
     if (projeId) gorevQuery = (gorevQuery as any).eq('proje_id', projeId)
@@ -326,16 +327,15 @@ export default function GorevlerClient({
         setGorevler(prev => prev.filter(g => g.id !== id))
       }
     } else {
-      // Listeden kaldır (soft delete — durum = SILINDI)
+      // Listeden kaldır (soft delete — durum = IPTAL, gorev_durum enum'unda SILINDI yok)
       setLoading(true); setError('')
       const { error: err } = await supabase
         .from('gorevler')
-        .update({ durum: 'SILINDI', durum_degisim_tarihi: new Date().toISOString(), islemi_yapan_id: meId })
+        .update({ durum: 'IPTAL', durum_degisim_tarihi: new Date().toISOString(), islemi_yapan_id: meId })
         .eq('id', id)
       if (err) showError(err.message)
       else {
         showSuccess('Görev listeden kaldırıldı.')
-        // State'den direkt kaldır
         setGorevler(prev => prev.filter(g => g.id !== id))
       }
     }
