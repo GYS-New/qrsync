@@ -48,37 +48,80 @@ const inp: React.CSSProperties = {
 
 // ── Mini bar chart (SVG, sıfır bağımlılık) ────────────────────────────────
 function BarChart({
-  data, valueKey, labelKey, color, height = 160,
+  data, valueKey, labelKey, color,
 }: {
   data: Record<string, any>[]
   valueKey: string
   labelKey: string
   color?: string
-  height?: number
 }) {
   if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
-  const max    = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
-  const w      = 100 / data.length
-  const barClr = color ?? T.blueMid
+
+  const barClr   = color ?? T.blueMid
+  const chartH   = 180   // toplam SVG yüksekliği
+  const barArea  = 120   // bar için kullanılabilir yükseklik
+  const bottomH  = 40    // etiket alanı
+  const topPad   = 20    // değer etiketi için üst boşluk
+  const barW     = 36    // sabit bar genişliği (px)
+  const gap      = 16    // barlar arası boşluk
+  const totalW   = data.length * (barW + gap) + gap
+
+  const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
+
   return (
-    <svg viewBox={`0 0 100 ${height}`} style={{ width: '100%', height, display: 'block' }} preserveAspectRatio="none">
-      {data.map((d, i) => {
-        const val  = Number(d[valueKey]) || 0
-        const barH = (val / max) * (height - 28)
-        const x    = i * w + w * 0.1
-        const bw   = w * 0.8
-        const y    = height - 20 - barH
-        return (
-          <g key={i}>
-            <rect x={x} y={y} width={bw} height={barH} fill={barClr} rx={1.5} opacity={0.85} />
-            <text x={x + bw/2} y={y - 3} textAnchor="middle" fontSize={5} fill={T.gray}>{val}</text>
-            <text x={x + bw/2} y={height - 4} textAnchor="middle" fontSize={4.5} fill={T.textSoft}>
-              {String(d[labelKey] ?? '').slice(0, 10)}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
+    <div style={{ overflowX: 'auto' }}>
+      <svg
+        width={totalW}
+        height={chartH}
+        style={{ display: 'block', minWidth: Math.min(totalW, 600) }}
+      >
+        {/* Izgara çizgileri */}
+        {[0.25, 0.5, 0.75, 1].map(ratio => {
+          const y = topPad + barArea * (1 - ratio)
+          return (
+            <g key={ratio}>
+              <line x1={0} y1={y} x2={totalW} y2={y} stroke="#e2e8f0" strokeWidth={0.5} />
+              <text x={2} y={y - 2} fontSize={8} fill={T.textSoft}>
+                {Math.round(max * ratio)}
+              </text>
+            </g>
+          )
+        })}
+
+        {data.map((d, i) => {
+          const val  = Number(d[valueKey]) || 0
+          const barH = (val / max) * barArea
+          const x    = gap + i * (barW + gap)
+          const y    = topPad + barArea - barH
+          const label = String(d[labelKey] ?? '').slice(0, 12)
+
+          return (
+            <g key={i}>
+              {/* Bar */}
+              <rect x={x} y={y} width={barW} height={barH} fill={barClr} rx={3} opacity={0.9} />
+              {/* Değer etiketi (bar üstü) */}
+              <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight="bold" fill={T.gray}>
+                {val}
+              </text>
+              {/* X ekseni etiketi - 45° döndürülmüş */}
+              <text
+                x={x + barW / 2}
+                y={topPad + barArea + 8}
+                textAnchor="end"
+                fontSize={9}
+                fill={T.textSoft}
+                transform={`rotate(-40, ${x + barW / 2}, ${topPad + barArea + 8})`}
+              >
+                {label}
+              </text>
+            </g>
+          )
+        })}
+
+        {/* X ekseni */}
+        <line x1={0} y1={topPad + barArea} x2={totalW} y2={topPad + barArea} stroke={T.border} strokeWidth={1} />
+      </svg>
+    </div>
   )
 }
 
@@ -383,13 +426,13 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
                 {/* Lokasyon bazlı bar grafik */}
                 <div className="verde-card" style={{ padding: '16px 20px', gridColumn: '1 / -1' }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Lokasyon Bazlı Görev Dağılımı (İlk 10)</div>
-                  <BarChart data={data.lokBazliRows.slice(0, 10)} valueKey="toplam" labelKey="lokasyon" color={T.blueMid} height={140} />
+                  <BarChart data={data.lokBazliRows.slice(0, 10)} valueKey="toplam" labelKey="lokasyon" color={T.blueMid} />
                 </div>
 
                 {/* Personel bazlı bar grafik */}
                 <div className="verde-card" style={{ padding: '16px 20px', gridColumn: '1 / -1' }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Bazlı Tamamlanan Görevler (İlk 10)</div>
-                  <BarChart data={data.persBazliRows.slice(0, 10)} valueKey="tamamlanan" labelKey="personel" color={T.greenMid} height={140} />
+                  <BarChart data={data.persBazliRows.slice(0, 10)} valueKey="tamamlanan" labelKey="personel" color={T.greenMid} />
                 </div>
               </div>
             )}
@@ -399,7 +442,7 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
               <div className="verde-card" style={{ padding: '16px 20px' }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Lokasyon Bazlı Dağılım</div>
                 <div style={{ marginBottom: 16 }}>
-                  <BarChart data={data.lokBazliRows.slice(0, 12)} valueKey="toplam" labelKey="lokasyon" color={T.blueMid} height={160} />
+                  <BarChart data={data.lokBazliRows.slice(0, 12)} valueKey="toplam" labelKey="lokasyon" color={T.blueMid} />
                 </div>
                 <DataTable
                   headers={['LOKASYON', 'TOPLAM', 'TAMAMLANAN', 'İPTAL', 'BAŞARI']}
@@ -413,7 +456,7 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
               <div className="verde-card" style={{ padding: '16px 20px' }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Bazlı Dağılım</div>
                 <div style={{ marginBottom: 16 }}>
-                  <BarChart data={data.persBazliRows.slice(0, 12)} valueKey="tamamlanan" labelKey="personel" color={T.greenMid} height={160} />
+                  <BarChart data={data.persBazliRows.slice(0, 12)} valueKey="tamamlanan" labelKey="personel" color={T.greenMid} />
                 </div>
                 <DataTable
                   headers={['PERSONEL', 'TOPLAM', 'TAMAMLANAN', 'BAŞARI']}
