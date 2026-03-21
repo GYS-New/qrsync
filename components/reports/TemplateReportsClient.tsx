@@ -483,6 +483,21 @@ const inp: React.CSSProperties = {
 }
 
 export default function TemplateReportsClient({ base, isSA, tenantFirmaId, projeId }: Props) {
+  return (
+    <div>
+      <Topbar title="Rapor Özelleştir" base={base}
+        breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: `${base}/dashboard/raporlar` }, { label: 'Rapor Özelleştir' }]} />
+      <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <GenelRaporKarti base={base} isSA={isSA} tenantFirmaId={tenantFirmaId} projeId={projeId} />
+        <SpesifikRaporKarti base={base} isSA={isSA} tenantFirmaId={tenantFirmaId} projeId={projeId} />
+      </div>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
+
+// ─── GENEL RAPOR KARTI ────────────────────────────────────────────
+function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: Props) {
   const { toast } = useToast()
   const { firmaId: saFirmaId } = useFirma()
   const [lokasyonlar, setLokasyonlar] = useState<Lokasyon[]>([])
@@ -563,19 +578,13 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
   }, [raporData, currentFirmaId, projeId, ustLokasyonId, altLokasyonId, raporBaslangic, raporBitis, raporuAlan, toast])
 
   return (
-    <div>
-      <Topbar title="Rapor Özelleştir" base={base}
-        breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: `${base}/dashboard/raporlar` }, { label: 'Rapor Özelleştir' }]} />
-
-      <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-        {/* Filtre kartı */}
-        <div className="verde-card" style={{ padding: '16px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.06em' }}>QR-SYNC Frekans Raporu</div>
-              <h2 style={{ fontSize: 18, fontWeight: 900, color: T.text, margin: 0 }}>Genel Rapor Şablonu</h2>
-            </div>
+    <div className="verde-card" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: '14px 20px', borderBottom: `1px solid ${T.border}`, background: T.grayLight }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>QR-SYNC Frekans Raporu</div>
+        <h2 style={{ fontSize: 17, fontWeight: 900, color: T.text, margin: 0 }}>Genel Rapor Şablonu</h2>
+      </div>
+      <div style={{ padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={fetchRaporData} disabled={loading || !currentFirmaId}
                 style={{ height: 36, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.textMid, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
@@ -672,7 +681,264 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
           </div>
         )}
       </div>
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   )
+}
+
+// ─── SPESİFİK RAPOR KARTI ─────────────────────────────────────────
+type SpesifikOzet = { toplam: number; tamamlanan: number; acik: number; islemde: number; iptal: number; basariOrani: number; ortSure: number | null }
+type SpesifikLokRow = { lokasyon: string; toplam: number; tamamlanan: number; iptal: number; basari: string }
+type SpesifikPersRow = { personel: string; toplam: number; tamamlanan: number; basari: string }
+type SpesifikTamamlananRow = { sn: number; tanim: string; lokasyon: string; atanan: string; tamamlayan: string; olusturma: string; tamamlanma: string; sure: string }
+type SpesifikAktifRow = { sn: number; tanim: string; lokasyon: string; atanan: string; durum: string; olusturma: string; sonIslem: string }
+type SpesifikData = {
+  meta: { firmaAdi: string; projeAdi: string; raporTarihLabel: string; raporuAlan: string }
+  ozet: SpesifikOzet
+  lokBazliRows: SpesifikLokRow[]
+  persBazliRows: SpesifikPersRow[]
+  tamamlananGorevler: SpesifikTamamlananRow[]
+  aktifGorevler: SpesifikAktifRow[]
+  lokasyonlar: { id: string; tanim: string }[]
+  kullanicilar: { id: string; isim_soyisim: string }[]
+}
+
+const SP_TABS = ['Özet', 'Tamamlanan', 'Açık / İptal', 'Lokasyon', 'Personel'] as const
+type SpTab = typeof SP_TABS[number]
+
+function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId }: Props) {
+  const { toast } = useToast()
+  const { firmaId: saFirmaId } = useFirma()
+  const currentFirmaId = isSA ? (saFirmaId ?? '') : (tenantFirmaId ?? '')
+
+  const [baslangic, setBaslangic] = useState('')
+  const [bitis,     setBitis]     = useState('')
+  const [raporuAlan, setRaporuAlan] = useState('')
+  const [lokasyonId, setLokasyonId] = useState('')
+  const [atananId,   setAtananId]   = useState('')
+  const [durum,      setDurum]      = useState('TUMU')
+  const [data,    setData]    = useState<SpesifikData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<SpTab>('Özet')
+
+  const fetchData = useCallback(async () => {
+    if (!currentFirmaId) return
+    setLoading(true)
+    try {
+      const p = new URLSearchParams({ firmaId: currentFirmaId })
+      if (projeId)    p.set('projeId', projeId)
+      if (baslangic)  p.set('baslangic', baslangic)
+      if (bitis)      p.set('bitis', bitis)
+      if (raporuAlan) p.set('raporuAlan', raporuAlan)
+      if (lokasyonId) p.set('lokasyonId', lokasyonId)
+      if (atananId)   p.set('atananId', atananId)
+      if (durum !== 'TUMU') p.set('durum', durum)
+      const res  = await fetch(`/api/reports/spesifik-rapor?${p}`, { cache: 'no-store' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error ?? 'Veri alınamadı.')
+      setData(json)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setLoading(false)
+  }, [currentFirmaId, projeId, baslangic, bitis, raporuAlan, lokasyonId, atananId, durum, toast])
+
+  const debRef = useRef<any>(null)
+  useEffect(() => {
+    if (!currentFirmaId) return
+    clearTimeout(debRef.current)
+    debRef.current = setTimeout(fetchData, 600)
+    return () => clearTimeout(debRef.current)
+  }, [fetchData, currentFirmaId])
+
+  const DURUM_LABELS: Record<string, string> = {
+    TUMU: 'Tümü', ACIK: 'Açık', ISLEMDE: 'İşlemde', TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal'
+  }
+
+  const tabStyle = (t: SpTab): React.CSSProperties => ({
+    padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600, border: 'none', cursor: 'pointer',
+    background: activeTab === t ? T.green : 'transparent', color: activeTab === t ? T.white : T.textSoft,
+    transition: 'all .15s',
+  })
+
+  const oz = data?.ozet
+
+  return (
+    <div className="verde-card" style={{ overflow: 'hidden' }}>
+      {/* Kart başlığı */}
+      <div style={{ padding: '14px 20px', borderBottom: `1px solid ${T.border}`, background: '#f0f9ff' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>QR-SYNC Spesifik Raporu</div>
+        <h2 style={{ fontSize: 17, fontWeight: 900, color: T.text, margin: 0 }}>Spesifik Görevler Raporu</h2>
+      </div>
+
+      <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+        {/* Filtreler */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 10 }}>
+          {[
+            { label: 'Başlangıç', node: <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)} style={inp} /> },
+            { label: 'Bitiş',     node: <input type="date" value={bitis}     onChange={e => setBitis(e.target.value)}     style={inp} /> },
+            { label: 'Lokasyon',  node: (
+              <select value={lokasyonId} onChange={e => setLokasyonId(e.target.value)} style={inp}>
+                <option value="">Tümü</option>
+                {(data?.lokasyonlar ?? []).map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+              </select>
+            )},
+            { label: 'Atanan',    node: (
+              <select value={atananId} onChange={e => setAtananId(e.target.value)} style={inp}>
+                <option value="">Tümü</option>
+                {(data?.kullanicilar ?? []).map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
+              </select>
+            )},
+            { label: 'Durum',     node: (
+              <select value={durum} onChange={e => setDurum(e.target.value)} style={inp}>
+                {Object.entries(DURUM_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            )},
+            { label: 'Raporu Alan', node: <input type="text" value={raporuAlan} onChange={e => setRaporuAlan(e.target.value)} placeholder="Ad Soyad" style={inp} /> },
+          ].map(({ label, node }) => (
+            <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{label}</span>
+              {node}
+            </label>
+          ))}
+        </div>
+
+        {/* Yenile butonu */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={fetchData} disabled={loading || !currentFirmaId}
+            style={{ height: 34, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.textMid, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
+            <RefreshCw size={13} style={loading ? spinning : {}} />
+            {loading ? 'Yükleniyor…' : 'Yenile'}
+          </button>
+        </div>
+
+        {/* KPI kartlar */}
+        {oz && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))', gap: 10 }}>
+            <MetricCard label="Toplam Görev"  value={oz.toplam}      color={T.blue}     icon={Activity} />
+            <MetricCard label="Tamamlanan"    value={oz.tamamlanan}  color={T.greenMid} icon={CheckCircle} sub={`%${oz.basariOrani} başarı`} />
+            <MetricCard label="Açık"          value={oz.acik}        color={T.amber}    icon={AlertTriangle} />
+            <MetricCard label="İşlemde"       value={oz.islemde}     color={T.blue}     icon={TrendingUp} />
+            <MetricCard label="İptal"         value={oz.iptal}       color={T.red}      icon={TrendingDown} />
+            {oz.ortSure != null && <MetricCard label="Ort. Sure" value={fmtSure(oz.ortSure)} color={T.gray} icon={Target} />}
+          </div>
+        )}
+
+        {/* Sekme navigasyon */}
+        {data && (
+          <>
+            <div style={{ display: 'flex', gap: 4, background: T.grayLight, borderRadius: 8, padding: 4, alignSelf: 'flex-start', flexWrap: 'wrap' }}>
+              {SP_TABS.map(t => (
+                <button key={t} style={tabStyle(t)} onClick={() => setActiveTab(t)}>{t}</button>
+              ))}
+            </div>
+
+            {/* Meta bilgi satırı */}
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: T.textSoft, padding: '8px 12px', background: T.grayLight, borderRadius: 8 }}>
+              <span><strong>Firma:</strong> {data.meta.firmaAdi}</span>
+              {data.meta.projeAdi && <span><strong>Proje:</strong> {data.meta.projeAdi}</span>}
+              <span><strong>Dönem:</strong> {data.meta.raporTarihLabel}</span>
+              {data.meta.raporuAlan && <span><strong>Raporu Alan:</strong> {data.meta.raporuAlan}</span>}
+            </div>
+
+            {/* ── ÖZET SEKMESİ ── */}
+            {activeTab === 'Özet' && oz && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <SectionHead title="GENEL DURUM" color={T.blue} />
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', fontSize: 13, minWidth: 400 }}>
+                    <tbody>
+                      {[
+                        { label: 'Toplam Görev', val: oz.toplam, color: T.text },
+                        { label: 'Tamamlanan',   val: oz.tamamlanan, color: T.greenMid },
+                        { label: 'Başarı Oranı', val: `%${oz.basariOrani}`, color: oz.basariOrani >= 80 ? T.green : oz.basariOrani >= 50 ? T.amber : T.red },
+                        { label: 'Açık',         val: oz.acik, color: T.amber },
+                        { label: 'İşlemde',      val: oz.islemde, color: T.blue },
+                        { label: 'İptal',        val: oz.iptal, color: T.red },
+                        ...(oz.ortSure != null ? [{ label: 'Ort. Tamamlanma Süresi', val: fmtSure(oz.ortSure), color: T.gray }] : []),
+                      ].map(({ label, val, color }) => (
+                        <tr key={label}>
+                          <td style={{ padding: '6px 16px 6px 0', fontWeight: 600, color: T.textSoft, fontSize: 12.5, whiteSpace: 'nowrap' }}>{label}</td>
+                          <td style={{ padding: '6px 0', fontWeight: 800, color, fontSize: 15 }}>{val}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── TAMAMLANAN SEKMESİ ── */}
+            {activeTab === 'Tamamlanan' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <SectionHead title="TAMAMLANAN GÖREVLER" color={T.greenMid} />
+                  <Badge text={`${data.tamamlananGorevler.length} kayıt`} color={T.greenMid} bg={T.greenLight} />
+                </div>
+                <DataTable
+                  headers={['SN', 'GÖREV', 'LOKASYON', 'ATANAN', 'TAMAMLAYAN', 'OLUŞTURMA', 'TAMAMLANMA', 'SÜRE']}
+                  rows={data.tamamlananGorevler.map(r => [r.sn, r.tanim, r.lokasyon, r.atanan, r.tamamlayan, r.olusturma, r.tamamlanma, r.sure])}
+                  accentCol={7} accentColor={T.greenMid}
+                />
+              </div>
+            )}
+
+            {/* ── AÇIK / İPTAL SEKMESİ ── */}
+            {activeTab === 'Açık / İptal' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <SectionHead title="AÇIK / İPTAL GÖREVLER" color={T.amber} />
+                  <Badge text={`${data.aktifGorevler.length} kayıt`} color={T.amber} bg={T.amberLight} />
+                </div>
+                <DataTable
+                  headers={['SN', 'GÖREV', 'LOKASYON', 'ATANAN', 'DURUM', 'OLUŞTURMA', 'SON İŞLEM']}
+                  rows={data.aktifGorevler.map(r => [r.sn, r.tanim, r.lokasyon, r.atanan, r.durum, r.olusturma, r.sonIslem])}
+                  accentCol={4} accentColor={T.amber}
+                />
+              </div>
+            )}
+
+            {/* ── LOKASYON SEKMESİ ── */}
+            {activeTab === 'Lokasyon' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <SectionHead title="LOKASYON BAZLI DAĞILIM" color={T.blue} />
+                <DataTable
+                  headers={['LOKASYON', 'TOPLAM', 'TAMAMLANAN', 'İPTAL', 'BAŞARI']}
+                  rows={data.lokBazliRows.map(r => [r.lokasyon, r.toplam, r.tamamlanan, r.iptal, r.basari])}
+                  accentCol={4} accentColor={T.green}
+                />
+              </div>
+            )}
+
+            {/* ── PERSONEL SEKMESİ ── */}
+            {activeTab === 'Personel' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <SectionHead title="PERSONEL BAZLI DAĞILIM" color={T.greenMid} />
+                <DataTable
+                  headers={['PERSONEL', 'TOPLAM', 'TAMAMLANAN', 'BAŞARI']}
+                  rows={data.persBazliRows.map(r => [r.personel, r.toplam, r.tamamlanan, r.basari])}
+                  accentCol={3} accentColor={T.green}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {!data && !loading && (
+          <div style={{ textAlign: 'center', padding: 48, color: T.textSoft }}>
+            <Activity size={28} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }} />
+            <div style={{ fontWeight: 700 }}>Filtre seçildiğinde rapor otomatik yüklenecek.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function fmtSure(sn: number | null | undefined) {
+  if (!sn) return '—'
+  const h = Math.floor(sn / 3600), m = Math.floor((sn % 3600) / 60), s = sn % 60
+  if (h > 0) return `${h}s ${m}dk`
+  if (m > 0) return `${m}dk ${s}sn`
+  return `${s}sn`
 }
