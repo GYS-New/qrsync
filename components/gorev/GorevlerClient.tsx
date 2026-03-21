@@ -187,6 +187,17 @@ export default function GorevlerClient({
       showError('Tanım, lokasyon ve kullanıcı zorunludur.')
       return
     }
+
+    // Personel takibi kontrolü — atanan kullanıcı iş başı yapmış mı?
+    const kontrolUrl = new URLSearchParams({ user_id: form.atanan_kullanici_id, firma_id: firmaId! })
+    if (projeId) kontrolUrl.set('proje_id', projeId)
+    const kontrolRes  = await fetch(`/api/mesai/kontrol?${kontrolUrl}`)
+    const kontrolJson = await kontrolRes.json()
+    if (kontrolJson.ok && kontrolJson.atanabilir === false) {
+      showError(kontrolJson.neden)
+      return
+    }
+
     setLoading(true); setError('')
     if (editing) {
       const reAssigned = editing.atanan_kullanici_id !== form.atanan_kullanici_id

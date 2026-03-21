@@ -504,6 +504,17 @@ useEffect(() => {
     try {
       if (!form.tanim || !form.lokasyon_id || !form.aktif_olma_tarihi) throw new Error('Lütfen gerekli alanları doldurun.')
       if (modal === 'create' && new Date(form.aktif_olma_tarihi).getTime() < Date.now()) throw new Error('Aktif olma tarihi geçmiş bir tarih olamaz.')
+
+      // Personel takibi kontrolü — atanan kullanıcı iş başı yapmış mı?
+      if (form.atanan_kullanici_id && firmaId) {
+        const kontrolUrl = new URLSearchParams({ user_id: form.atanan_kullanici_id, firma_id: firmaId })
+        if (projeId) kontrolUrl.set('proje_id', projeId)
+        const kontrolRes  = await fetch(`/api/mesai/kontrol?${kontrolUrl}`)
+        const kontrolJson = await kontrolRes.json()
+        if (kontrolJson.ok && kontrolJson.atanabilir === false) {
+          throw new Error(kontrolJson.neden)
+        }
+      }
       const payload: any = {
         tanim: form.tanim,
         lokasyon_id: form.lokasyon_id,

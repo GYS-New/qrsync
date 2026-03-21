@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { mesaiKontrolEt } from '@/lib/mesai/kontrolEt'
 
 async function authorize(req: NextRequest) {
   const supabase = createClient()
@@ -41,6 +42,24 @@ export async function PATCH(
   const update: Record<string, any> = { guncelleme_tarihi: new Date().toISOString() }
   for (const k of allowed) {
     if (k in body) update[k] = body[k]
+  }
+
+  // Atanan kullanıcı değiştiriliyor/ekleniyorsa mesai kontrolü
+  if ('atanan_kullanici_id' in body && body.atanan_kullanici_id) {
+    const { data: kural2 } = await admin
+      .from('gorev_kurallari')
+      .select('firma_id, proje_id')
+      .eq('id', params.id)
+      .single()
+
+    if (kural2) {
+      const mesaiEngel = await mesaiKontrolEt(admin, {
+        firmaId: kural2.firma_id,
+        projeId: kural2.proje_id,
+        atananUserId: body.atanan_kullanici_id,
+      })
+      if (mesaiEngel) return NextResponse.json({ error: mesaiEngel }, { status: 422 })
+    }
   }
 
   const { data, error } = await admin
