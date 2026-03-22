@@ -11,6 +11,7 @@ import { useLicenseExpired } from '@/components/hooks/useLicense'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
 import GorevKurallariClient from '@/components/gorev-kurallari/GorevKurallariClient'
+import ChecklistModal from '@/components/checklist/ChecklistModal'
 
 type SortKey = 'tanim' | 'lokasyon' | 'atanan' | 'aktif' | 'islem' | 'durum' | 'actor'
 
@@ -189,6 +190,7 @@ const getLocPath = useMemo(() => {
 
   const [gorevler, setGorevler] = useState<any[]>(initialGorevler ?? [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [checklistGorev, setChecklistGorev] = useState<{ id: string; type: 'canli_gorevler' } | null>(null)
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDuzenleMode, setBulkDuzenleMode] = useState(false)
@@ -1019,7 +1021,16 @@ async function del() {
                 <td>
                   <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
                 </td>
-                <td style={{ color: '#506050' }}>{getIslemiYapan(g)}</td>
+                <td style={{ color: '#506050' }}>{getIslemiYapan(g)}
+                  {lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setChecklistGorev({ id: g.id, type: 'canli_gorevler' }) }}
+                      style={{ marginLeft: 6, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 7px', cursor: 'pointer', fontSize: 11, color: '#1d4ed8' }}
+                    >
+                      📋 Çeklist
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {!sorted.length && (
@@ -1300,6 +1311,13 @@ async function del() {
       ) : null}
       </>)}
 
+      {checklistGorev && (
+        <ChecklistModal
+          taskId={checklistGorev.id}
+          taskType={checklistGorev.type}
+          onKapat={() => setChecklistGorev(null)}
+        />
+      )}
 </div>
   )
 }

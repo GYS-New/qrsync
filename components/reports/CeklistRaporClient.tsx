@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
+import { ChecklistTablo } from '@/components/checklist/ChecklistModal'
+import type { Sonuc as ChecklistSonuc } from '@/components/checklist/ChecklistModal'
 import { RefreshCw, CheckCircle, XCircle, Minus, ChevronDown, ChevronRight, Activity } from 'lucide-react'
 
 interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null; projeId?: string | null }
@@ -117,25 +119,8 @@ function GorevSatiri({ row }: { row: Row }) {
       </tr>
       {acik && (
         <tr>
-          <td colSpan={8} style={{ padding: '0 0 12px 32px', background: '#fafcfa' }}>
-            <div style={{ margin: '8px 12px 0 0', border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: T.green }}>
-                    {['#', 'Madde', 'Sonuç', 'Not', 'Yapan', 'Kanal', 'Tarih'].map((h, i) => (
-                      <th key={i} style={{ padding: '6px 10px', color: '#fff', fontWeight: 700, fontSize: 11, textAlign: i <= 1 ? 'left' : 'center' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {row.maddeler.map((m, i) => (
-                    <tr key={i} style={{ background: i % 2 === 0 ? T.grayLight : '#fff' }}>
-                      <MaddeRow m={m} />
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <td colSpan={8} style={{ padding: '4px 16px 16px 32px', background: '#fafcfa' }}>
+            <ChecklistTablo sonuclar={row.maddeler} />
           </td>
         </tr>
       )}

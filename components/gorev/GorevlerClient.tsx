@@ -122,6 +122,20 @@ export default function GorevlerClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firmaId])
 
+  // Mobil tamamlama/iptal realtime — gorevler tablosunu dinle
+  useEffect(() => {
+    if (!firmaId) return
+    const channel = supabase
+      .channel(`gorevler-realtime-${firmaId}`)
+      .on('postgres_changes' as any, {
+        event: 'UPDATE', schema: 'public', table: 'gorevler',
+        filter: `firma_id=eq.${firmaId}`,
+      }, () => { refreshAll(firmaId) })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaId])
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
     if (!s) return gorevler

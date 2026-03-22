@@ -43,7 +43,7 @@ export default async function SATumGorevlerPage() {
 
   let lokQ = supabase
     .from('lokasyonlar')
-    .select('id,tanim,parent_id')
+    .select('id,tanim,parent_id,checklist_sablon_id')
     .eq('firma_id', firmaId)
     .eq('aktif', true)
     .order('tanim')

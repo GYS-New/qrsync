@@ -567,36 +567,66 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
           </div>
         ) : (
           <div style={{ padding: 20, display: 'grid', gap: 20 }}>
-            <div className="verde-card" style={{ padding: 16, background: '#f9fcf9' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Uygun görevler</div>
-              <div style={{ display: 'grid', gap: 10 }}>
-                {gorevler.map(task => {
-                  const selected = task.id === selectedTaskId
-                  return (
-                    <button
-                      key={task.id}
-                      type="button"
-                      onClick={() => setSelectedTaskId(task.id)}
-                      style={{
-                        textAlign: 'left',
-                        border: selected ? '1px solid #7bbf7f' : '1px solid #d6e4d6',
-                        background: selected ? '#f0f9f0' : '#fff',
-                        borderRadius: 8,
-                        padding: '12px 14px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                        <strong>{task.tanim}</strong>
-                        <span style={{ fontSize: 12, color: '#6f846f' }}>{task.kaynak === 'gorevler' ? 'Manuel' : 'Frekans'}</span>
-                      </div>
-                      <div style={{ marginTop: 4, fontSize: 12, color: '#6f846f' }}>Durum: {task.durum}</div>
-                      {timedTaskEnabled ? <div style={{ marginTop: 4, fontSize: 12, color: '#6f846f' }}>Başlangıç: {task.baslatilma_tarihi ? new Date(task.baslatilma_tarihi).toLocaleString('tr-TR') : 'Başlatılmadı'}</div> : null}
-                    </button>
-                  )
-                })}
+            {/* Tek görev: seçim kutusu gösterme, sadece bilgi bandı */}
+            {gorevler.length === 1 ? (
+              <div style={{ padding: '12px 16px', background: '#f0f9f0', border: '1px solid #d6e4d6', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#0f1a0f' }}>{gorevler[0].tanim}</div>
+                  <div style={{ fontSize: 12, color: '#6f846f', marginTop: 2 }}>
+                    {gorevler[0].kaynak === 'gorevler' ? 'Spesifik Görev' : 'Frekansiyel Görev'} · Durum: {gorevler[0].durum}
+                    {timedTaskEnabled && gorevler[0].baslatilma_tarihi
+                      ? ` · Başlandı: ${new Date(gorevler[0].baslatilma_tarihi).toLocaleString('tr-TR')}`
+                      : timedTaskEnabled ? ' · Henüz başlatılmadı' : ''}
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#dcfce7', color: '#15803d' }}>Seçili</span>
               </div>
-            </div>
+            ) : (
+              /* Birden fazla görev: seçim listesi */
+              <div className="verde-card" style={{ padding: 16, background: '#f9fcf9' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
+                  Görev Seçin
+                  <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: '#6f846f' }}>{gorevler.length} görev mevcut</span>
+                </div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {gorevler.map(task => {
+                    const selected = task.id === selectedTaskId
+                    return (
+                      <button
+                        key={task.id}
+                        type="button"
+                        onClick={() => setSelectedTaskId(task.id)}
+                        style={{
+                          textAlign: 'left',
+                          border: selected ? '2px solid #7bbf7f' : '1px solid #d6e4d6',
+                          background: selected ? '#f0f9f0' : '#fff',
+                          borderRadius: 8,
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          transition: 'all .1s',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+                          <strong style={{ color: '#0f1a0f' }}>{task.tanim}</strong>
+                          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: task.kaynak === 'gorevler' ? '#eff6ff' : '#f0fdf4', color: task.kaynak === 'gorevler' ? '#1d4ed8' : '#15803d' }}>
+                              {task.kaynak === 'gorevler' ? 'Spesifik' : 'Frekansiyel'}
+                            </span>
+                            {selected && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#dcfce7', color: '#15803d' }}>✓ Seçili</span>}
+                          </div>
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 12, color: '#6f846f' }}>Durum: {task.durum}</div>
+                        {timedTaskEnabled && (
+                          <div style={{ marginTop: 4, fontSize: 12, color: '#6f846f' }}>
+                            Başlangıç: {task.baslatilma_tarihi ? new Date(task.baslatilma_tarihi).toLocaleString('tr-TR') : 'Başlatılmadı'}
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {sablon ? (
               <div className="verde-card" style={{ padding: 16 }}>

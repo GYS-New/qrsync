@@ -269,6 +269,12 @@ useEffect(() => {
           await Promise.all([refreshBrowse(), refreshLiveFlow()])
         },
       )
+      // Spesifik görevler de dinle (mobil tamamlama/iptal)
+      .on(
+        'postgres_changes' as any,
+        { event: 'UPDATE', schema: 'public', table: 'gorevler', filter: `firma_id=eq.${firmaId}` },
+        async () => { await refreshBrowse() },
+      )
       .subscribe()
 
     const liveInterval = setInterval(refreshLiveFlow, 1000)
