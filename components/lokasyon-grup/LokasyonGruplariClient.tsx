@@ -193,15 +193,33 @@ export default function LokasyonGruplariClient({
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const grouped = useMemo(() => {
-    return groups
-      .map((group) => ({
-        ...group,
-        topPath: group.ust_lokasyon_id ? makePath(group.ust_lokasyon_id, locMap) : '',
-        memberPaths: (group.lokasyonIds ?? []).map((id) => makePath(id, locMap)).filter(Boolean).sort((a, b) => a.localeCompare(b, 'tr')),
-      }))
-      .sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))
+  // Tüm gruplar düz liste (üst lokasyon path dahil)
+  const groupsFlat = useMemo(() => {
+    return groups.map((group) => ({
+      ...group,
+      topPath: group.ust_lokasyon_id ? makePath(group.ust_lokasyon_id, locMap) : '—',
+      topTanim: group.ust_lokasyon_id ? (locMap.get(group.ust_lokasyon_id)?.tanim ?? '—') : '—',
+      memberPaths: (group.lokasyonIds ?? []).map((id) => makePath(id, locMap)).filter(Boolean).sort((a, b) => a.localeCompare(b, 'tr')),
+    }))
   }, [groups, locMap])
+
+  // Üst lokasyon bazında grupla
+  const grouped = useMemo(() => {
+    const map = new Map<string, { topId: string; topTanim: string; topPath: string; items: typeof groupsFlat }>()
+    for (const g of groupsFlat) {
+      const key = g.ust_lokasyon_id ?? '__no_top__'
+      if (!map.has(key)) {
+        map.set(key, { topId: key, topTanim: g.topTanim, topPath: g.topPath, items: [] })
+      }
+      map.get(key)!.items.push(g)
+    }
+    // Her gruptaki itemları ada göre sırala
+    for (const v of map.values()) {
+      v.items.sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))
+    }
+    // Üst lokasyonları path'e göre sırala
+    return Array.from(map.values()).sort((a, b) => a.topPath.localeCompare(b.topPath, 'tr'))
+  }, [groupsFlat])
 
   function toggleExpand(id: string) {
     setExpandedGroups(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -215,7 +233,7 @@ export default function LokasyonGruplariClient({
         <div>
           <div style={{ fontSize: 16, fontWeight: 900, color: '#0f1a0f' }}>LOKASYON GRUPLARI</div>
           <div style={{ fontSize: 13, color: '#7a907a', marginTop: 2 }}>
-            {loading ? 'Yükleniyor…' : `${grouped.length} grup · Lokasyonları gruplandırarak toplu atama ve raporlama yapın`}
+            {loading ? 'Yükleniyor…' : `${groupsFlat.length} grup, ${grouped.length} üst lokasyon · Lokasyonları gruplandırarak toplu atama ve raporlama yapın`}
           </div>
         </div>
         <button
@@ -314,7 +332,7 @@ export default function LokasyonGruplariClient({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: '#0f1a0f' }}>Mevcut Gruplar</div>
-            <div style={{ fontSize: 12.5, color: '#7a907a' }}>{grouped.length} grup listeleniyor</div>
+            <div style={{ fontSize: 12.5, color: '#7a907a' }}>{groupsFlat.length} grup · {grouped.length} üst lokasyon</div>
           </div>
 
           {grouped.length === 0 ? (
@@ -323,59 +341,83 @@ export default function LokasyonGruplariClient({
               <div style={{ fontWeight: 600, marginBottom: 4 }}>Henüz grup yok</div>
               <div style={{ fontSize: 13 }}>Sol formu kullanarak ilk lokasyon grubunu oluşturun.</div>
             </div>
-          ) : grouped.map((group) => {
-            const expanded = expandedGroups.has(group.id)
-            const isEditing = editingId === group.id
-            return (
-              <div key={group.id} className="verde-card" style={{ overflow: 'hidden', border: isEditing ? '1.5px solid #2e8b2e' : undefined }}>
-                {/* Grup başlığı */}
-                <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer' }} onClick={() => toggleExpand(group.id)}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 8, background: isEditing ? '#dcf0dc' : '#f0f4f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Layers size={15} color={isEditing ? '#1f6b1f' : '#7a907a'} />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: '#0f1a0f', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {group.ad}
-                        {isEditing && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#dcf0dc', color: '#1f6b1f' }}>Düzenleniyor</span>}
-                      </div>
-                      <div style={{ fontSize: 12, color: '#7a907a', marginTop: 1 }}>
-                        {group.topPath && <span>Üst: {group.topPath} · </span>}
-                        <span style={{ fontWeight: 600, color: '#2e8b2e' }}>{group.memberPaths.length} lokasyon</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button onClick={(e) => { e.stopPropagation(); startEdit(group) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f8fbf8', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#506050' }}>
-                      <Pencil size={11} /> Düzenle
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(group.id) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#dc2626' }}>
-                      <Trash2 size={11} /> Sil
-                    </button>
-                    {expanded ? <ChevronDown size={16} color="#7a907a" /> : <ChevronRight size={16} color="#7a907a" />}
-                  </div>
-                </div>
+          ) : grouped.map((section) => (
+            <div key={section.topId} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-                {/* Genişletilmiş içerik */}
-                {expanded && (
-                  <div style={{ borderTop: '1px solid #e8f0e8', padding: '12px 16px' }}>
-                    {group.aciklama && <div style={{ fontSize: 13, color: '#506050', marginBottom: 10, fontStyle: 'italic' }}>{group.aciklama}</div>}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 6 }}>
-                      {group.memberPaths.length === 0 ? (
-                        <div style={{ fontSize: 13, color: '#7a907a' }}>Bu gruba henüz lokasyon eklenmemiş.</div>
-                      ) : group.memberPaths.map((path) => (
-                        <div key={`${group.id}-${path}`} style={{ padding: '7px 10px', borderRadius: 6, background: '#f8fbf8', border: '1px solid #e1ece1', fontSize: 12.5, color: '#375137', wordBreak: 'break-word' }}>
-                          {path}
-                        </div>
-                      ))}
-                    </div>
+              {/* Üst Lokasyon başlığı */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px' }}>
+                <div style={{ width: 28, height: 28, borderRadius: 7, background: '#1a5c2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Layers size={13} color="#fff" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: '#1a5c2a', letterSpacing: 0.2 }}>
+                    {section.topTanim}
                   </div>
-                )}
+                  {section.topPath !== section.topTanim && (
+                    <div style={{ fontSize: 11, color: '#7a907a' }}>{section.topPath}</div>
+                  )}
+                </div>
+                <div style={{ marginLeft: 'auto', fontSize: 11.5, color: '#7a907a', fontWeight: 600 }}>
+                  {section.items.length} grup
+                </div>
               </div>
-            )
-          })}
+
+              {/* Bu üst lokasyona ait gruplar */}
+              {section.items.map((group) => {
+                const expanded = expandedGroups.has(group.id)
+                const isEditing = editingId === group.id
+                return (
+                  <div key={group.id} className="verde-card"
+                    style={{ overflow: 'hidden', marginLeft: 20, border: isEditing ? '1.5px solid #2e8b2e' : '1px solid #e8f0e8' }}>
+                    {/* Grup başlığı */}
+                    <div style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer' }} onClick={() => toggleExpand(group.id)}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 7, background: isEditing ? '#dcf0dc' : '#f4f8f4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Layers size={13} color={isEditing ? '#1f6b1f' : '#7a907a'} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0f1a0f', display: 'flex', alignItems: 'center', gap: 7 }}>
+                            {group.ad}
+                            {isEditing && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#dcf0dc', color: '#1f6b1f' }}>Düzenleniyor</span>}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: '#7a907a', marginTop: 1 }}>
+                            <span style={{ fontWeight: 600, color: '#2e8b2e' }}>{group.memberPaths.length} lokasyon</span>
+                            {group.aciklama && <span> · {group.aciklama}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <button onClick={(e) => { e.stopPropagation(); startEdit(group) }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f8fbf8', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#506050' }}>
+                          <Pencil size={10} /> Düzenle
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); onDelete(group.id) }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#dc2626' }}>
+                          <Trash2 size={10} /> Sil
+                        </button>
+                        {expanded ? <ChevronDown size={15} color="#7a907a" /> : <ChevronRight size={15} color="#7a907a" />}
+                      </div>
+                    </div>
+
+                    {/* Genişletilmiş lokasyon listesi */}
+                    {expanded && (
+                      <div style={{ borderTop: '1px solid #e8f0e8', padding: '10px 14px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 6 }}>
+                          {group.memberPaths.length === 0 ? (
+                            <div style={{ fontSize: 13, color: '#7a907a' }}>Bu gruba henüz lokasyon eklenmemiş.</div>
+                          ) : group.memberPaths.map((path) => (
+                            <div key={`${group.id}-${path}`} style={{ padding: '6px 10px', borderRadius: 6, background: '#f8fbf8', border: '1px solid #e1ece1', fontSize: 12, color: '#375137', wordBreak: 'break-word' }}>
+                              {path}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ))}
         </div>
       </div>
     </div>

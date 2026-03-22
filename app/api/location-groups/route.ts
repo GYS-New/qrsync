@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     const isDuplicate = msg.includes('duplicate key') || msg.includes('unique constraint')
     return NextResponse.json({ 
       error: isDuplicate 
-        ? `"${ad}" adında bir lokasyon grubu bu firmada zaten mevcut. Farklı bir ad kullanın.`
+        ? `Bu üst lokasyonda "${ad}" adında bir grup zaten mevcut. Farklı bir ad kullanın.`
         : msg 
     }, { status: 500 })
   }
