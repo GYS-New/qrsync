@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { markGorevAtamaNotificationsRead } from '@/lib/notifications'
-import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
 
@@ -104,89 +102,46 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
     setLoading(true)
     setError('')
     setCompleted(false)
-    setMessage('Oturum ve lokasyon doğrulanıyor…')
+    setMessage('Bağlanıyor…')
 
-    const { data: auth } = await supabase.auth.getUser()
-    const authUser = auth.user
-    if (!authUser) {
-      setLoading(false)
-      setError('Oturum bulunamadı. Lütfen tekrar giriş yapın.')
-      return
-    }
+    try {
+      const res  = await fetch(`/api/scan/context?token=${encodeURIComponent(token)}&kanal=${kanal}`)
+      const json = await res.json()
 
-    const { data: meRow, error: meErr } = await supabase
-      .from('users')
-      .select('id,isim_soyisim,firma_id,rol')
-      .eq('id', authUser.id)
-      .single()
+      if (!json.ok) {
+        setLoading(false)
+        setError(json.error ?? 'Yüklenemedi')
+        return
+      }
 
-    if (meErr || !meRow) {
-      setLoading(false)
-      setError(meErr?.message ?? 'Kullanıcı bilgisi alınamadı')
-      return
-    }
-    setMe(meRow as any)
+      const { lokasyon: loc, kullanici, gorevler: tasks, sablon: loadedSablon } = json
 
-    setMessage('Lokasyon aranıyor…')
-    const loc = await findLokasyon(token, kanal)
-    if (!loc) {
-      setLoading(false)
-      setError('Lokasyon bulunamadı')
-      return
-    }
-    setLokasyon(loc)
+      setMe(kullanici)
+      setLokasyon(loc)
+      setGorevler(tasks)
 
-    if (meRow.firma_id && loc.firma_id !== meRow.firma_id && meRow.rol !== 'super_admin' && meRow.rol !== 'alt_super_admin') {
-      setLoading(false)
-      setError('Bu lokasyona erişim yetkiniz yok')
-      return
-    }
+      if (tasks.length === 0) {
+        setLoading(false)
+        setError('Tamamlanabilir görev bulunamadı')
+        return
+      }
 
-    if (loc.aktif === false) {
-      setLoading(false)
-      setError('Lokasyon aktif değil')
-      return
-    }
+      setSelectedTaskId(tasks[0].id)
 
-    const firmaOk = await validateFirma(loc.firma_id, kanal)
-    if (!firmaOk.ok) {
-      setLoading(false)
-      setError(firmaOk.message)
-      return
-    }
-
-    setMessage('Görevler yükleniyor…')
-    const tasks = await findTasks(loc.id, meRow.id)
-    setGorevler(tasks)
-
-    if (tasks.length === 0) {
-      setLoading(false)
-      setError('Tamamlanabilir görev bulunamadı')
-      return
-    }
-
-    const initialTask = tasks[0]
-    setSelectedTaskId(initialTask.id)
-
-    if (loc.checklist_sablon_id) {
-      setMessage('Checklist şablonu yükleniyor…')
-      const loadedSablon = await loadSablon(loc.checklist_sablon_id)
       if (loadedSablon) {
         setSablon(loadedSablon)
         const initialAnswers: Record<string, CevapState> = {}
         for (const madde of loadedSablon.maddeler) {
-          initialAnswers[madde.id] = {
-            secenek: '',
-            aciklama: '',
-            gorselUrl: '',
-            uploading: false,
-          }
+          initialAnswers[madde.id] = { secenek: '', aciklama: '', gorselUrl: '', uploading: false }
         }
         setCevaplar(initialAnswers)
       }
-    }
 
-    setLoading(false)
+      setLoading(false)
+    } catch (err: any) {
+      setLoading(false)
+      setError(err?.message ?? 'Bağlantı hatası')
+    }
   }
 
   async function findLokasyon(scanToken: string, currentKanal: Kanal): Promise<Lokasyon | null> {
@@ -388,33 +343,18 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
     if (selectedTask.baslatilma_tarihi) return
     setSubmitting(true)
     setError('')
-    const nowIso = new Date().toISOString()
     try {
-      if (selectedTask.kaynak === 'gorevler') {
-        const { error: updateErr } = await supabase
-          .from('gorevler')
-          .update({
-            durum: 'ISLEMDE',
-            baslatilma_tarihi: nowIso,
-            baslatan_kullanici_id: me.id,
-            durum_degisim_tarihi: nowIso,
-          } as any)
-          .eq('id', selectedTask.id)
-          .in('durum', ['ACIK', 'ISLEMDE'])
-        if (updateErr) throw new Error(updateErr.message)
-      } else {
-        const { error: updateErr } = await supabase
-          .from('canli_gorevler')
-          .update({
-            baslatilma_tarihi: nowIso,
-            baslatan_kullanici_id: me.id,
-            durum_degisim_tarihi: nowIso,
-          } as any)
-          .eq('id', selectedTask.id)
-          .in('durum', ['ACIK', 'BEKLEMEDE'])
-        if (updateErr) throw new Error(updateErr.message)
-      }
-      setGorevler(prev => prev.map(task => task.id === selectedTask.id ? { ...task, durum: task.kaynak === 'gorevler' ? 'ISLEMDE' : task.durum, baslatilma_tarihi: nowIso } : task))
+      const res  = await fetch('/api/scan/baslat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gorev_id: selectedTask.id, kaynak: selectedTask.kaynak }),
+      })
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error ?? 'Görev başlatılamadı')
+      const nowIso = json.baslatilma_tarihi
+      setGorevler(prev => prev.map(task => task.id === selectedTask.id
+        ? { ...task, durum: task.kaynak === 'gorevler' ? 'ISLEMDE' : task.durum, baslatilma_tarihi: nowIso }
+        : task))
       showSuccess('Görev başlatıldı')
     } catch (err: any) {
       showError(err?.message ?? 'Görev başlatılamadı')
@@ -433,91 +373,46 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
     setError('')
 
     try {
-      let sonucId: string | null = null
+      // Çeklist cevaplarını hazırla
+      const maddelerPayload = sablon ? sablon.maddeler.map(madde => ({
+        madde_id:       madde.id,
+        secenek_degeri: cevaplar[madde.id]?.secenek || null,
+        aciklama:       cevaplar[madde.id]?.aciklama?.trim() || null,
+        gorsel_url:     cevaplar[madde.id]?.gorselUrl || null,
+      })) : []
 
-      if (sablon) {
-        const payload: any = {
-          lokasyon_id: lokasyon.id,
-          sablon_id: sablon.id,
-          template_version: sablon.versiyon ?? 1,
+      const res = await fetch('/api/scan/tamamla', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gorev_id:         selectedTask.id,
+          kaynak:           selectedTask.kaynak,
+          sablon_id:        sablon?.id ?? null,
+          template_version: sablon?.versiyon ?? null,
           kanal,
-          kullanici_id: me.id,
-        }
-        if (selectedTask.kaynak === 'gorevler') payload.gorev_id = selectedTask.id
-        else payload.canli_gorev_id = selectedTask.id
+          lokasyon_id:      lokasyon.id,
+          maddeler:         maddelerPayload,
+        }),
+      })
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error ?? 'Görev tamamlanamadı')
 
-        const { data: sonucRow, error: sonucErr } = await supabase
-          .from('checklist_sonuc_basliklari')
-          .insert(payload)
-          .select('id')
-          .single()
+      showSuccess(json.mesaj ?? 'Görev tamamlandı')
 
-        if (sonucErr || !sonucRow) throw new Error(sonucErr?.message ?? 'Checklist sonucu kaydedilemedi')
-        sonucId = sonucRow.id
-
-        const itemPayload = sablon.maddeler.map(madde => ({
-          sonuc_id: sonucId,
-          madde_id: madde.id,
-          secenek_degeri: cevaplar[madde.id]?.secenek || null,
-          aciklama: cevaplar[madde.id]?.aciklama?.trim() || null,
-          gorsel_url: cevaplar[madde.id]?.gorselUrl || null,
-        }))
-
-        const { error: itemErr } = await supabase.from('checklist_sonuc_maddeleri').insert(itemPayload)
-        if (itemErr) throw new Error(itemErr.message)
-      }
-
-      const nowIso = new Date().toISOString()
-      const durationSeconds = timedTaskEnabled && selectedTask.baslatilma_tarihi
-        ? Math.max(0, Math.floor((new Date(nowIso).getTime() - new Date(selectedTask.baslatilma_tarihi).getTime()) / 1000))
-        : null
-
-      if (selectedTask.kaynak === 'gorevler') {
-        const { error: updateErr } = await supabase
-          .from('gorevler')
-          .update({
-            durum: 'TAMAMLANDI',
-            islemi_yapan_id: me.id,
-            durum_degisim_tarihi: nowIso,
-            tamamlanma_tarihi: nowIso,
-            tamamlanma_suresi_saniye: durationSeconds,
-          })
-          .eq('id', selectedTask.id)
-        if (updateErr) throw new Error(updateErr.message)
-
-        await markGorevAtamaNotificationsRead({
-          supabase,
-          gorevId: selectedTask.id,
-        })
-      } else {
-        if (selectedTask.durum === 'ZAMANI_GECMIS') {
-          throw new Error('Zamanı geçmiş görevlerde işlem yapılamaz')
-        }
-        const nextLiveStatus = resolveLiveCompletionStatusByTask(selectedTask as any, nowIso)
-        if (nextLiveStatus === 'ZAMANI_GECMIS') {
-          throw new Error('Zamanı geçmiş görevlerde işlem yapılamaz')
-        }
-        const { error: updateErr } = await supabase
-          .from('canli_gorevler')
-          .update({
-            durum: nextLiveStatus,
-            tamamlayan_kullanici_id: me.id,
-            islemi_yapan_id: me.id,
-            tamamlanma_tarihi: nowIso,
-            durum_degisim_tarihi: nowIso,
-            tamamlanma_suresi_saniye: durationSeconds,
-          } as any)
-          .eq('id', selectedTask.id)
-          .in('durum', ['ACIK', 'BEKLEMEDE'])
-        if (updateErr) throw new Error(updateErr.message)
-      }
-
-      showSuccess(timedTaskEnabled && durationSeconds ? `Görev tamamlandı · Süre: ${formatDuration(durationSeconds)}` : 'Görev tamamlandı')
+      // Görev listesinden kaldır
       const remaining = gorevler.filter(x => x.id !== selectedTask.id)
       setGorevler(remaining)
       if (remaining.length > 0) {
         setSelectedTaskId(remaining[0].id)
         setCompleted(false)
+        // Yeni görev için çeklist cevaplarını sıfırla
+        setCevaplar(prev => {
+          const fresh: Record<string, CevapState> = {}
+          if (sablon) {
+            for (const m of sablon.maddeler) fresh[m.id] = { secenek:'', aciklama:'', gorselUrl:'', uploading:false }
+          }
+          return fresh
+        })
       } else {
         setCompleted(true)
       }
@@ -567,19 +462,13 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
           </div>
         ) : (
           <div style={{ padding: 20, display: 'grid', gap: 20 }}>
-            {/* ── Görev seçimi: tek görevde liste gösterme ── */}
             {gorevler.length > 1 ? (
+              /* ── Çoklu görev: seçim listesi ── */
               <div style={{ background: '#fff', border: '1px solid #d6e4d6', borderRadius: 12, overflow: 'hidden' }}>
-                {/* Başlık */}
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid #e8f0e8', background: '#f0f9f0' }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f1a0f' }}>
-                    Hangi görevi yapacaksınız?
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6f846f', marginTop: 2 }}>
-                    Bu lokasyonda {gorevler.length} görev var — birini seçin
-                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f1a0f' }}>Hangi görevi yapacaksınız?</div>
+                  <div style={{ fontSize: 12, color: '#6f846f', marginTop: 2 }}>Bu lokasyonda {gorevler.length} görev bulundu — birini seçin</div>
                 </div>
-                {/* Liste */}
                 <div style={{ padding: '10px 12px', display: 'grid', gap: 8 }}>
                   {gorevler.map(task => {
                     const selected = task.id === selectedTaskId
@@ -587,38 +476,18 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                       ? { bg: '#eff6ff', color: '#1d4ed8', label: 'Spesifik' }
                       : { bg: '#f0fdf4', color: '#15803d', label: 'Frekansiyel' }
                     return (
-                      <button
-                        key={task.id}
-                        type="button"
-                        onClick={() => setSelectedTaskId(task.id)}
-                        style={{
-                          textAlign: 'left',
-                          border: selected ? '2px solid #2e8b2e' : '1px solid #d6e4d6',
-                          background: selected ? '#f0f9f0' : '#fff',
-                          borderRadius: 10,
-                          padding: '12px 14px',
-                          cursor: 'pointer',
-                          transition: 'all .12s',
-                        }}
-                      >
+                      <button key={task.id} type="button" onClick={() => setSelectedTaskId(task.id)}
+                        style={{ textAlign: 'left', border: selected ? '2px solid #2e8b2e' : '1px solid #d6e4d6', background: selected ? '#f0f9f0' : '#fff', borderRadius: 10, padding: '12px 14px', cursor: 'pointer', transition: 'all .12s' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                           <strong style={{ fontSize: 14, color: '#0f1a0f', lineHeight: 1.3 }}>{task.tanim}</strong>
                           <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: tipRenk.bg, color: tipRenk.color }}>
-                              {tipRenk.label}
-                            </span>
-                            {selected && (
-                              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#dcfce7', color: '#15803d' }}>
-                                ✓ Seçili
-                              </span>
-                            )}
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: tipRenk.bg, color: tipRenk.color }}>{tipRenk.label}</span>
+                            {selected && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#dcfce7', color: '#15803d' }}>✓ Seçili</span>}
                           </div>
                         </div>
                         {timedTaskEnabled && (
                           <div style={{ marginTop: 6, fontSize: 12, color: '#6f846f' }}>
-                            {task.baslatilma_tarihi
-                              ? `▶ Başlandı: ${new Date(task.baslatilma_tarihi).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
-                              : '○ Henüz başlatılmadı'}
+                            {task.baslatilma_tarihi ? `▶ ${new Date(task.baslatilma_tarihi).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : '○ Henüz başlatılmadı'}
                           </div>
                         )}
                       </button>
@@ -627,7 +496,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                 </div>
               </div>
             ) : (
-              /* Tek görev: sadece bilgi bandı, seçim yok */
+              /* ── Tek görev: sadece bilgi bandı ── */
               <div style={{ padding: '12px 16px', background: '#f0f9f0', border: '1px solid #d6e4d6', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 800, fontSize: 15, color: '#0f1a0f' }}>{gorevler[0]?.tanim}</div>
@@ -635,12 +504,8 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                     <span style={{ fontWeight: 600, color: gorevler[0]?.kaynak === 'gorevler' ? '#1d4ed8' : '#15803d' }}>
                       {gorevler[0]?.kaynak === 'gorevler' ? 'Spesifik' : 'Frekansiyel'}
                     </span>
-                    {timedTaskEnabled && (
-                      <span>
-                        {gorevler[0]?.baslatilma_tarihi
-                          ? `▶ Başlandı: ${new Date(gorevler[0].baslatilma_tarihi).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
-                          : '○ Henüz başlatılmadı'}
-                      </span>
+                    {timedTaskEnabled && gorevler[0]?.baslatilma_tarihi && (
+                      <span>▶ {new Date(gorevler[0].baslatilma_tarihi).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
                     )}
                   </div>
                 </div>

@@ -6,7 +6,7 @@ import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
 import { ChecklistTablo } from '@/components/checklist/ChecklistModal'
 import type { Sonuc } from '@/components/checklist/ChecklistModal'
-import { RefreshCw, ChevronDown, ChevronRight, Activity } from 'lucide-react'
+import { RefreshCw, ChevronDown, ChevronRight, Activity, FileSpreadsheet, FileText, Download } from 'lucide-react'
 
 interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null; projeId?: string | null }
 
@@ -121,6 +121,7 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
   const [gorevTipi,  setGorevTipi]  = useState('hepsi')
   const [data,       setData]       = useState<{ rows: Row[]; ozet: Ozet; lokasyonlar: any[]; kullanicilar: any[] } | null>(null)
   const [loading,    setLoading]    = useState(false)
+  const [dlLoading,  setDlLoading]  = useState<'excel'|'csv'|'pdf'|null>(null)
   const debRef = useRef<any>(null)
 
   const buildParams = useCallback(() => {
@@ -135,6 +136,25 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
     if (gorevTipi !== 'hepsi') p.set('gorevTipi', gorevTipi)
     return p
   }, [currentFirmaId, projeId, baslangic, bitis, lokasyonId, yapan, tanim, durum, gorevTipi])
+
+  async function download(format: 'excel' | 'csv' | 'pdf') {
+    if (!currentFirmaId) return
+    setDlLoading(format)
+    try {
+      const p = buildParams(); p.set('format', format)
+      const res = await fetch(`/api/reports/ceklist-rapor-export?${p}`)
+      if (!res.ok) throw new Error('İndirme başarısız.')
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      const ext  = format === 'excel' ? 'xlsx' : format
+      a.href = url; a.download = `ceklist-rapor-${new Date().toISOString().slice(0,10)}.${ext}`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setDlLoading(null)
+  }
 
   const fetchData = useCallback(async () => {
     if (!currentFirmaId) return
@@ -173,11 +193,28 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
               <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>QR-SYNC</div>
               <h2 style={{ fontSize: 17, fontWeight: 900, color: T.text, margin: 0 }}>Çeklist Raporları</h2>
             </div>
-            <button onClick={fetchData} disabled={loading || !currentFirmaId}
-              style={{ height: 36, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.gray, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
-              <RefreshCw size={13} style={loading ? spinning : {}} />
-              {loading ? 'Yükleniyor…' : 'Yenile'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={fetchData} disabled={loading || !currentFirmaId}
+                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.gray, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                <RefreshCw size={13} style={loading ? spinning : {}} />
+                {loading ? 'Yükleniyor…' : 'Yenile'}
+              </button>
+              <button onClick={() => download('excel')} disabled={!data || dlLoading !== null}
+                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #d1fae5', background: '#f0fdf4', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                <FileSpreadsheet size={13} style={dlLoading === 'excel' ? spinning : {}} />
+                Excel
+              </button>
+              <button onClick={() => download('csv')} disabled={!data || dlLoading !== null}
+                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #dbeafe', background: '#eff6ff', color: T.blue, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                <Download size={13} style={dlLoading === 'csv' ? spinning : {}} />
+                CSV
+              </button>
+              <button onClick={() => download('pdf')} disabled={!data || dlLoading !== null}
+                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #fecaca', background: '#fef2f2', color: T.red, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                <FileText size={13} style={dlLoading === 'pdf' ? spinning : {}} />
+                PDF
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: 10 }}>
