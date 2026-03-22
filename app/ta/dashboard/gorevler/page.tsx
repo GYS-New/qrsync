@@ -34,7 +34,7 @@ export default async function TAGorevlerPage() {
       .limit(200),
     supabase
       .from('lokasyonlar')
-      .select('id,tanim,aktif,parent_id')
+      .select('id,tanim,aktif,parent_id,checklist_sablon_id')
       .eq('firma_id', firmaId)
       .eq('proje_id', aktifProje.id)
       .eq('aktif', true)

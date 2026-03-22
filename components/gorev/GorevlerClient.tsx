@@ -140,7 +140,7 @@ export default function GorevlerClient({
       .order('olusturma_tarihi', { ascending: false })
       .limit(200)
     if (projeId) gorevQuery = (gorevQuery as any).eq('proje_id', projeId)
-    let lokQuery = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id').eq('firma_id', fid).eq('aktif', true).order('tanim')
+    let lokQuery = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id').eq('firma_id', fid).eq('aktif', true).order('tanim')
     if (projeId) lokQuery = (lokQuery as any).eq('proje_id', projeId)
     const [gRes, lRes, uRes] = await Promise.all([
       gorevQuery,
@@ -317,11 +317,11 @@ export default function GorevlerClient({
         setGorevler(prev => prev.filter(g => g.id !== id))
       }
     } else {
-      // Listeden kaldır (soft delete — durum = SILINDI)
+      // Listeden kaldır (soft delete — durum = IPTAL, gorev_durum enum'unda SILINDI yok)
       setLoading(true); setError('')
       const { error: err } = await supabase
         .from('gorevler')
-        .update({ durum: 'SILINDI', durum_degisim_tarihi: new Date().toISOString(), islemi_yapan_id: meId })
+        .update({ durum: 'IPTAL', durum_degisim_tarihi: new Date().toISOString(), islemi_yapan_id: meId })
         .eq('id', id)
       if (err) showError(err.message)
       else {

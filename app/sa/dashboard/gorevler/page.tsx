@@ -24,7 +24,7 @@ export default async function SAGorevlerPage() {
   if (gorevQ && projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
 
   let lokQ = firmaId
-    ? supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id').eq('firma_id', firmaId).eq('aktif', true).order('tanim')
+    ? supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id').eq('firma_id', firmaId).eq('aktif', true).order('tanim')
     : null
   if (lokQ && projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
 
