@@ -22,6 +22,7 @@ export async function GET(req: Request) {
 
     const admin = createAdminClient()
 
+    // Firma token ile firma bul
     const { data: linkData, error: linkErr } = await admin
       .from('app_download_links')
       .select('firma_id, aktif, mod')
@@ -36,6 +37,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: 'Bu link artık aktif değil' }, { status: 403, headers: CORS_HEADERS })
     }
 
+    // Firma adını getir
     const { data: firma } = await admin
       .from('firmalar')
       .select('firma_adi, ticari_unvan')
@@ -44,6 +46,16 @@ export async function GET(req: Request) {
 
     const firmaAdi = firma?.firma_adi || firma?.ticari_unvan || ''
 
+    // Zaten kayıtlı cihazı olan kullanıcıları bul
+    const { data: kayitliCihazlar } = await admin
+      .from('device_tokens')
+      .select('user_id')
+      .eq('firma_id', linkData.firma_id)
+      .eq('aktif', true)
+
+    const kayitliUserIdler = (kayitliCihazlar ?? []).map((d: any) => d.user_id)
+
+    // Henüz uygulamayı yüklememiş aktif personel listesi
     const { data: personeller, error: personelErr } = await admin
       .from('users')
       .select('id, isim_soyisim, rol')
@@ -56,12 +68,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: personelErr.message }, { status: 500, headers: CORS_HEADERS })
     }
 
+    // Kayıtlı olanları filtrele
+    const kayitsizPersonel = (personeller ?? []).filter(
+      (p: any) => !kayitliUserIdler.includes(p.id)
+    )
+
     return NextResponse.json({
       ok: true,
       firmaAdi,
       firmaId: linkData.firma_id,
       mod: linkData.mod || 'QR',
-      personeller: personeller ?? [],
+      personeller: kayitsizPersonel,
     }, { headers: CORS_HEADERS })
 
   } catch (error: any) {

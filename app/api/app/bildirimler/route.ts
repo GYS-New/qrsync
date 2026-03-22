@@ -29,10 +29,22 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
 
   const admin = createAdminClient()
+
+  // 3 günden eski bildirimleri sil
+  const ucGunOnce = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  await admin
+    .from('bildirimler')
+    .delete()
+    .eq('alici_id', user.id)
+    .eq('okundu', true)
+    .lt('tarih', ucGunOnce)
+
+  // Son 3 günün bildirimlerini getir
   const { data, error } = await admin
     .from('bildirimler')
     .select('*')
     .eq('alici_id', user.id)
+    .gte('tarih', ucGunOnce)
     .order('tarih', { ascending: false })
     .limit(50)
 

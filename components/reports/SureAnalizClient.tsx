@@ -1,0 +1,557 @@
+'use client'
+
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import Topbar from '@/components/layout/Topbar'
+import { useFirma } from '@/components/layout/FirmaContext'
+import { useToast } from '@/components/ui/ToastProvider'
+import { RefreshCw, Clock, TrendingUp, TrendingDown, Activity, BarChart2, Users, MapPin, Zap } from 'lucide-react'
+
+interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null; projeId?: string | null }
+
+type Analiz = {
+  ort: number; min: number; max: number; p50: number; p75: number; p90: number; p95: number
+  ortBekleme: number; tamamlananSayi: number; toplam: number
+}
+type GunlukRow     = { tarih: string; ort_sure: number; adet: number }
+type LokasyonRow   = { lokasyon: string; ort_sure: number; min_sure: number; max_sure: number; adet: number }
+type PersonelRow   = { personel: string; ort_sure: number; tamamlanan: number; en_hizli: number; en_yavas: number }
+type DagilimRow    = { aralik: string; adet: number }
+type Bolum         = { analiz: Analiz; gunlukTrend: GunlukRow[]; lokasyon: LokasyonRow[]; personel: PersonelRow[]; dagilim: DagilimRow[] }
+type SureData      = { ok: boolean; frekansiyel: Bolum; spesifik: Bolum; meta: { lokasyonlar: any[]; kullanicilar: any[] } }
+
+// ── Tokens ────────────────────────────────────────────────────────────────
+const T = {
+  green: '#1a5c2a', greenMid: '#2e8b2e', greenLight: '#f0fdf4',
+  blue: '#1d4ed8', blueMid: '#3b82f6', blueLight: '#eff6ff',
+  amber: '#d97706', amberLight: '#fef3c7',
+  red: '#dc2626', redLight: '#fee2e2',
+  purple: '#7c3aed', purpleLight: '#f5f3ff',
+  teal: '#0d9488', tealLight: '#f0fdfa',
+  gray: '#475569', grayLight: '#f8fafc', border: '#e2e8f0',
+  text: '#0f172a', textSoft: '#64748b',
+}
+const spinning = { animation: 'spin 0.9s linear infinite' }
+const inp: React.CSSProperties = {
+  height: 34, padding: '0 10px', borderRadius: 8,
+  border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, width: '100%',
+}
+
+// ── Süre format ───────────────────────────────────────────────────────────
+function fmtS(sn: number): string {
+  if (!sn || sn <= 0) return '—'
+  const h = Math.floor(sn / 3600), m = Math.floor((sn % 3600) / 60), s = sn % 60
+  if (h > 0) return `${h}s ${m}dk`
+  if (m > 0) return `${m}dk ${s}sn`
+  return `${s}sn`
+}
+
+// ── KPI Kart ──────────────────────────────────────────────────────────────
+function KpiCard({ label, value, sub, color, Icon, wide }: {
+  label: string; value: string; sub?: string; color: string; Icon: any; wide?: boolean
+}) {
+  return (
+    <div style={{
+      background: '#fff', border: `1px solid ${T.border}`, borderRadius: 12,
+      padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12,
+      gridColumn: wide ? 'span 2' : undefined,
+    }}>
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: color + '18', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+        <Icon size={18} color={color} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: T.text, lineHeight: 1 }}>{value}</div>
+        {sub && <div style={{ fontSize: 11, color: T.textSoft, marginTop: 3 }}>{sub}</div>}
+      </div>
+    </div>
+  )
+}
+
+// ── Yatay BarChart (SVG) ──────────────────────────────────────────────────
+function HBarChart({ data, valueKey, labelKey, color }: {
+  data: Record<string, any>[]; valueKey: string; labelKey: string; color: string
+}) {
+  if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '16px 0', textAlign: 'center' }}>Veri yok</div>
+  const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
+  const rowH = 28
+  const labelW = 110
+  const chartW = 300
+  const totalH = data.length * rowH + 10
+  return (
+    <svg width="100%" viewBox={`0 0 ${labelW + chartW + 60} ${totalH}`} style={{ display: 'block' }}>
+      {data.map((d, i) => {
+        const val  = Number(d[valueKey]) || 0
+        const bw   = (val / max) * chartW
+        const y    = i * rowH
+        const label = String(d[labelKey] ?? '').slice(0, 16)
+        return (
+          <g key={i}>
+            <text x={labelW - 6} y={y + rowH * 0.65} textAnchor="end" fontSize={9} fill={T.gray}>{label}</text>
+            <rect x={labelW} y={y + 4} width={Math.max(bw, 2)} height={rowH - 10} fill={color} rx={3} opacity={0.85} />
+            <text x={labelW + bw + 5} y={y + rowH * 0.65} fontSize={9} fontWeight="bold" fill={T.gray}>{fmtS(val)}</text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ── Dikey BarChart (SVG) ──────────────────────────────────────────────────
+function VBarChart({ data, valueKey, labelKey, color }: {
+  data: Record<string, any>[]; valueKey: string; labelKey: string; color: string
+}) {
+  if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '16px 0', textAlign: 'center' }}>Veri yok</div>
+  const max  = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
+  const barW = 32, gap = 10, barAreaH = 120, bottomH = 48, topPad = 20
+  const totalW = data.length * (barW + gap) + gap
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <svg width={totalW} height={barAreaH + bottomH + topPad} style={{ display: 'block', minWidth: Math.min(totalW, 500) }}>
+        {[0.25, 0.5, 0.75, 1].map(r => {
+          const y = topPad + barAreaH * (1 - r)
+          return <g key={r}>
+            <line x1={0} y1={y} x2={totalW} y2={y} stroke="#e2e8f0" strokeWidth={0.5} />
+            <text x={2} y={y - 2} fontSize={7} fill={T.textSoft}>{fmtS(Math.round(max * r))}</text>
+          </g>
+        })}
+        {data.map((d, i) => {
+          const val  = Number(d[valueKey]) || 0
+          const bh   = (val / max) * barAreaH
+          const x    = gap + i * (barW + gap)
+          const y    = topPad + barAreaH - bh
+          const lbl  = String(d[labelKey] ?? '').slice(0, 10)
+          return (
+            <g key={i}>
+              <rect x={x} y={y} width={barW} height={bh} fill={color} rx={3} opacity={0.88} />
+              <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={8} fontWeight="bold" fill={T.gray}>{fmtS(val)}</text>
+              <text x={x + barW / 2} y={topPad + barAreaH + 10} textAnchor="end" fontSize={7.5} fill={T.textSoft}
+                transform={`rotate(-38, ${x + barW / 2}, ${topPad + barAreaH + 10})`}>{lbl}</text>
+            </g>
+          )
+        })}
+        <line x1={0} y1={topPad + barAreaH} x2={totalW} y2={topPad + barAreaH} stroke={T.border} strokeWidth={1} />
+      </svg>
+    </div>
+  )
+}
+
+// ── Çizgi Grafik (SVG trend) ──────────────────────────────────────────────
+function LineChart({ data, valueKey, labelKey, color }: {
+  data: Record<string, any>[]; valueKey: string; labelKey: string; color: string
+}) {
+  if (data.length < 2) return <div style={{ color: T.textSoft, fontSize: 13, padding: '16px 0', textAlign: 'center' }}>{data.length === 1 ? 'Tek veri noktası' : 'Veri yok'}</div>
+  const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
+  const W = 460, H = 110, padX = 8, padT = 16, padB = 24
+  const plotW = W - padX * 2, plotH = H - padT - padB
+  const pts   = data.map((d, i) => {
+    const x = padX + (i / (data.length - 1)) * plotW
+    const y = padT + plotH - (Number(d[valueKey]) / max) * plotH
+    return { x, y, val: Number(d[valueKey]), lbl: String(d[labelKey] ?? '') }
+  })
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const areaD = `${pathD} L${pts[pts.length - 1].x.toFixed(1)},${(padT + plotH).toFixed(1)} L${pts[0].x.toFixed(1)},${(padT + plotH).toFixed(1)} Z`
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', width: '100%' }}>
+        <defs>
+          <linearGradient id={`lg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+            <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        {[0.25, 0.5, 0.75, 1].map(r => {
+          const y = padT + plotH * (1 - r)
+          return <line key={r} x1={padX} y1={y} x2={W - padX} y2={y} stroke="#e2e8f0" strokeWidth={0.5} />
+        })}
+        <path d={areaD} fill={`url(#lg-${color.replace('#','')})`} />
+        <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
+        {pts.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.x} cy={p.y} r={3} fill={color} />
+            {i % Math.max(1, Math.floor(pts.length / 8)) === 0 && (
+              <text x={p.x} y={H - 4} textAnchor="middle" fontSize={7} fill={T.textSoft}>
+                {p.lbl.slice(5)}
+              </text>
+            )}
+          </g>
+        ))}
+        <line x1={padX} y1={padT + plotH} x2={W - padX} y2={padT + plotH} stroke={T.border} />
+      </svg>
+    </div>
+  )
+}
+
+// ── Dağılım Bar ───────────────────────────────────────────────────────────
+function DagilimBar({ data, color }: { data: DagilimRow[]; color: string }) {
+  const max = Math.max(...data.map(d => d.adet), 1)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {data.map((d, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: T.textSoft, width: 70, flexShrink: 0, textAlign: 'right' }}>{d.aralik}</span>
+          <div style={{ flex: 1, height: 16, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${(d.adet / max) * 100}%`, background: color, borderRadius: 3, transition: 'width .5s ease', minWidth: d.adet > 0 ? 4 : 0 }} />
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, color: T.text, width: 28, textAlign: 'right' }}>{d.adet}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Yüzdelik dilim göstergesi ─────────────────────────────────────────────
+function PercentileCard({ analiz }: { analiz: Analiz }) {
+  const items = [
+    { label: 'Medyan (P50)', val: analiz.p50, color: T.green },
+    { label: 'P75', val: analiz.p75, color: T.amber },
+    { label: 'P90', val: analiz.p90, color: T.red },
+    { label: 'P95', val: analiz.p95, color: '#9f1239' },
+  ]
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      {items.map(({ label, val, color }) => (
+        <div key={label} style={{ padding: '10px 12px', background: color + '10', border: `1px solid ${color}30`, borderRadius: 8, borderLeft: `3px solid ${color}` }}>
+          <div style={{ fontSize: 10.5, color, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{label}</div>
+          <div style={{ fontSize: 18, fontWeight: 900, color: T.text, marginTop: 2 }}>{fmtS(val)}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Tablo ─────────────────────────────────────────────────────────────────
+function Tablo({ headers, rows, color }: { headers: string[]; rows: (string|number)[][]; color: string }) {
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+        <thead>
+          <tr>{headers.map((h, i) => (
+            <th key={i} style={{ padding: '7px 10px', background: color, color: '#fff', fontWeight: 700, fontSize: 11, textAlign: i === 0 ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
+          ))}</tr>
+        </thead>
+        <tbody>
+          {rows.length === 0
+            ? <tr><td colSpan={headers.length} style={{ padding: '20px', textAlign: 'center', color: T.textSoft }}>Veri bulunamadı.</td></tr>
+            : rows.map((row, ri) => (
+              <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : '#fff' }}>
+                {row.map((cell, ci) => (
+                  <td key={ci} style={{ padding: '6px 10px', borderBottom: `1px solid ${T.border}`, textAlign: ci === 0 ? 'left' : 'center', fontSize: 12.5, fontWeight: ci === 0 ? 600 : 400 }}>{String(cell ?? '')}</td>
+                ))}
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Bölüm başlığı ─────────────────────────────────────────────────────────
+function SekHead({ title, color }: { title: string; color: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <div style={{ width: 3, height: 16, borderRadius: 2, background: color }} />
+      <span style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{title}</span>
+    </div>
+  )
+}
+
+// ── Tek görev tipi analiz paneli ──────────────────────────────────────────
+function BolumPanel({ bolum, renk, tip }: { bolum: Bolum; renk: string; tip: 'frekansiyel' | 'spesifik' }) {
+  const a = bolum.analiz
+  const basariOrani = a.toplam > 0 ? Math.round((a.tamamlananSayi / a.toplam) * 100) : 0
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* KPI grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 10 }}>
+        <KpiCard label="Ort. Süre"     value={fmtS(a.ort)}       color={renk}       Icon={Clock}       sub={`${a.tamamlananSayi} tamamlanan görev`} />
+        <KpiCard label="En Hızlı"      value={fmtS(a.min)}       color={T.green}    Icon={Zap}         />
+        <KpiCard label="En Yavaş"      value={fmtS(a.max)}       color={T.red}      Icon={TrendingUp}  />
+        <KpiCard label="Medyan"        value={fmtS(a.p50)}       color={T.purple}   Icon={Activity}    sub="P50 — yarısı bu sürenin altında" />
+        <KpiCard label="Ort. Bekleme"  value={fmtS(a.ortBekleme)} color={T.amber}   Icon={TrendingDown} sub="Oluşturma → Başlama" />
+        <KpiCard label="Başarı Oranı"  value={`%${basariOrani}`} color={renk}       Icon={BarChart2}   sub={`${a.toplam} toplam`} />
+      </div>
+
+      {/* Yüzdelik dilimler */}
+      <div className="verde-card" style={{ padding: '16px 18px' }}>
+        <SekHead title="Yüzdelik Dilimler (Tamamlanma Süresi)" color={renk} />
+        <PercentileCard analiz={a} />
+        <div style={{ marginTop: 10, fontSize: 11.5, color: T.textSoft, lineHeight: 1.6 }}>
+          Görevlerin <strong>%50'si</strong> {fmtS(a.p50)} içinde, <strong>%90'ı</strong> {fmtS(a.p90)} içinde tamamlanmıştır.
+          {a.p90 > a.ort * 2 && <span style={{ color: T.red }}> Yüksek sapmalar gözlemlendi — belirli görevler süreci yavaşlatıyor olabilir.</span>}
+        </div>
+      </div>
+
+      {/* Dağılım */}
+      <div className="verde-card" style={{ padding: '16px 18px' }}>
+        <SekHead title="Süre Dağılımı" color={renk} />
+        <DagilimBar data={bolum.dagilim} color={renk} />
+      </div>
+
+      {/* Günlük trend */}
+      <div className="verde-card" style={{ padding: '16px 18px' }}>
+        <SekHead title="Günlük Ortalama Süre Trendi" color={renk} />
+        <LineChart data={bolum.gunlukTrend} valueKey="ort_sure" labelKey="tarih" color={renk} />
+        {bolum.gunlukTrend.length > 1 && (() => {
+          const first = bolum.gunlukTrend[0].ort_sure
+          const last  = bolum.gunlukTrend[bolum.gunlukTrend.length - 1].ort_sure
+          const fark  = Math.round(((last - first) / first) * 100)
+          return (
+            <div style={{ marginTop: 8, fontSize: 11.5, color: fark < 0 ? T.green : T.red, fontWeight: 600 }}>
+              {fark < 0 ? `↘ Son dönemde %${Math.abs(fark)} iyileşme gözlemlendi.` : fark > 0 ? `↗ Son dönemde %${fark} yavaşlama gözlemlendi.` : 'Süre trendi stabil.'}
+            </div>
+          )
+        })()}
+      </div>
+
+      {/* Lokasyon bazlı */}
+      <div className="verde-card" style={{ padding: '16px 18px' }}>
+        <SekHead title="Lokasyon Bazlı Ortalama Süre" color={renk} />
+        <div style={{ marginBottom: 14 }}>
+          <HBarChart data={bolum.lokasyon.slice(0, 10)} valueKey="ort_sure" labelKey="lokasyon" color={renk} />
+        </div>
+        <Tablo
+          color={renk}
+          headers={['LOKASYON', 'ADET', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
+          rows={bolum.lokasyon.map(r => [r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)])}
+        />
+      </div>
+
+      {/* Personel bazlı */}
+      <div className="verde-card" style={{ padding: '16px 18px' }}>
+        <SekHead title="Personel Bazlı Süre Analizi" color={renk} />
+        <div style={{ marginBottom: 14 }}>
+          <VBarChart data={bolum.personel.slice(0, 10)} valueKey="ort_sure" labelKey="personel" color={renk} />
+        </div>
+        <Tablo
+          color={renk}
+          headers={['PERSONEL', 'TAMAMLANAN', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
+          rows={bolum.personel.map(r => [r.personel, r.tamamlanan, fmtS(r.ort_sure), fmtS(r.en_hizli), fmtS(r.en_yavas)])}
+        />
+        {bolum.personel.length > 0 && (() => {
+          const sorted = [...bolum.personel].sort((a, b) => a.ort_sure - b.ort_sure)
+          return (
+            <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ padding: '8px 14px', background: T.green + '18', border: `1px solid ${T.green}30`, borderRadius: 8, fontSize: 12, color: T.green, fontWeight: 700 }}>
+                🏆 En hızlı: {sorted[0].personel} — {fmtS(sorted[0].ort_sure)}
+              </div>
+              {sorted.length > 1 && (
+                <div style={{ padding: '8px 14px', background: T.amber + '18', border: `1px solid ${T.amber}30`, borderRadius: 8, fontSize: 12, color: T.amber, fontWeight: 700 }}>
+                  ⚠️ En yavaş: {sorted[sorted.length - 1].personel} — {fmtS(sorted[sorted.length - 1].ort_sure)}
+                </div>
+              )}
+            </div>
+          )
+        })()}
+      </div>
+    </div>
+  )
+}
+
+// ── Ana bileşen ────────────────────────────────────────────────────────────
+const ANA_TABS = ['Frekansiyel Görevler', 'Spesifik Görevler', 'Karşılaştırma'] as const
+type AnaTab = typeof ANA_TABS[number]
+
+export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId }: Props) {
+  const { toast } = useToast()
+  const { firmaId: saFirmaId } = useFirma()
+  const currentFirmaId = isSA ? (saFirmaId ?? '') : (tenantFirmaId ?? '')
+
+  const [baslangic, setBaslangic] = useState('')
+  const [bitis,     setBitis]     = useState('')
+  const [data,      setData]      = useState<SureData | null>(null)
+  const [loading,   setLoading]   = useState(false)
+  const [activeTab, setActiveTab] = useState<AnaTab>('Frekansiyel Görevler')
+  const debRef = useRef<any>(null)
+
+  const fetchData = useCallback(async () => {
+    if (!currentFirmaId) return
+    setLoading(true)
+    try {
+      const p = new URLSearchParams({ firmaId: currentFirmaId })
+      if (projeId)   p.set('projeId', projeId)
+      if (baslangic) p.set('baslangic', baslangic)
+      if (bitis)     p.set('bitis', bitis)
+      const res  = await fetch(`/api/reports/sure-analiz?${p}`, { cache: 'no-store' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error ?? 'Veri alınamadı.')
+      setData(json)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setLoading(false)
+  }, [currentFirmaId, projeId, baslangic, bitis, toast])
+
+  useEffect(() => {
+    if (!currentFirmaId) return
+    clearTimeout(debRef.current)
+    debRef.current = setTimeout(fetchData, 600)
+    return () => clearTimeout(debRef.current)
+  }, [fetchData, currentFirmaId])
+
+  const tabStyle = (t: AnaTab): React.CSSProperties => ({
+    padding: '8px 18px', borderRadius: 8, fontSize: 13.5, fontWeight: 700,
+    border: 'none', cursor: 'pointer', transition: 'all .15s',
+    background: activeTab === t ? (t === 'Spesifik Görevler' ? T.blue : t === 'Karşılaştırma' ? T.purple : T.green) : T.grayLight,
+    color: activeTab === t ? '#fff' : T.textSoft,
+  })
+
+  const freqRenk = T.greenMid
+  const specRenk = T.blue
+
+  return (
+    <div>
+      <Topbar title="Süre Analiz Raporları" base={base}
+        breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: `${base}/dashboard/raporlar` }, { label: 'Süre Analiz Raporları' }]} />
+
+      <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Filtreler */}
+        <div className="verde-card" style={{ padding: '16px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>QR-SYNC</div>
+              <h2 style={{ fontSize: 18, fontWeight: 900, color: T.text, margin: 0 }}>Süre Analiz Raporları</h2>
+              <div style={{ fontSize: 13, color: T.textSoft, marginTop: 2 }}>Tamamlanma süreleri, bekleme analizleri ve personel/lokasyon karşılaştırmaları</div>
+            </div>
+            <button onClick={fetchData} disabled={loading || !currentFirmaId}
+              style={{ height: 36, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.gray, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
+              <RefreshCw size={13} style={loading ? spinning : {}} />
+              {loading ? 'Yükleniyor…' : 'Yenile'}
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: 10 }}>
+            {[
+              { label: 'Başlangıç', node: <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)} style={inp} /> },
+              { label: 'Bitiş',     node: <input type="date" value={bitis}     onChange={e => setBitis(e.target.value)}     style={inp} /> },
+            ].map(({ label, node }) => (
+              <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{label}</span>
+                {node}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Boş durum */}
+        {!data && !loading && (
+          <div className="verde-card" style={{ padding: 48, textAlign: 'center', color: T.textSoft }}>
+            <Clock size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Süre analizi yükleniyor…</div>
+            <div style={{ fontSize: 13, marginTop: 4 }}>Firma seçildiğinde veriler otomatik yüklenecek.</div>
+          </div>
+        )}
+
+        {/* İçerik */}
+        {data && (
+          <>
+            {/* Özet karşılaştırma bandı */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {[
+                { label: 'Frekansiyel Ort. Süre', val: fmtS(data.frekansiyel.analiz.ort), sub: `${data.frekansiyel.analiz.tamamlananSayi} görev`, color: freqRenk, Icon: Activity },
+                { label: 'Spesifik Ort. Süre',    val: fmtS(data.spesifik.analiz.ort),    sub: `${data.spesifik.analiz.tamamlananSayi} görev`, color: specRenk, Icon: Activity },
+              ].map(({ label, val, sub, color, Icon }) => (
+                <div key={label} style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px', borderTop: `4px solid ${color}` }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 32, fontWeight: 900, color: T.text, lineHeight: 1 }}>{val}</div>
+                  <div style={{ fontSize: 12, color: T.textSoft, marginTop: 4 }}>{sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Ana sekmeler */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {ANA_TABS.map(t => <button key={t} style={tabStyle(t)} onClick={() => setActiveTab(t)}>{t}</button>)}
+            </div>
+
+            {/* Frekansiyel panel */}
+            {activeTab === 'Frekansiyel Görevler' && (
+              <BolumPanel bolum={data.frekansiyel} renk={freqRenk} tip="frekansiyel" />
+            )}
+
+            {/* Spesifik panel */}
+            {activeTab === 'Spesifik Görevler' && (
+              <BolumPanel bolum={data.spesifik} renk={specRenk} tip="spesifik" />
+            )}
+
+            {/* Karşılaştırma */}
+            {activeTab === 'Karşılaştırma' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                {/* Yan yana metrik karşılaştırması */}
+                <div className="verde-card" style={{ padding: '16px 18px' }}>
+                  <SekHead title="Metrik Karşılaştırması" color={T.purple} />
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: '8px 14px', background: T.purple, color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left' }}>METRİK</th>
+                          <th style={{ padding: '8px 14px', background: freqRenk, color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'center' }}>FREKANSİYEL</th>
+                          <th style={{ padding: '8px 14px', background: specRenk, color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'center' }}>SPESİFİK</th>
+                          <th style={{ padding: '8px 14px', background: '#64748b', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'center' }}>FARK</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { label: 'Ortalama Süre',      f: data.frekansiyel.analiz.ort,       s: data.spesifik.analiz.ort,       fmt: fmtS },
+                          { label: 'Medyan (P50)',        f: data.frekansiyel.analiz.p50,       s: data.spesifik.analiz.p50,       fmt: fmtS },
+                          { label: 'P90',                 f: data.frekansiyel.analiz.p90,       s: data.spesifik.analiz.p90,       fmt: fmtS },
+                          { label: 'En Hızlı',            f: data.frekansiyel.analiz.min,       s: data.spesifik.analiz.min,       fmt: fmtS },
+                          { label: 'En Yavaş',            f: data.frekansiyel.analiz.max,       s: data.spesifik.analiz.max,       fmt: fmtS },
+                          { label: 'Ort. Bekleme Süresi', f: data.frekansiyel.analiz.ortBekleme, s: data.spesifik.analiz.ortBekleme, fmt: fmtS },
+                          { label: 'Tamamlanan Görev',    f: data.frekansiyel.analiz.tamamlananSayi, s: data.spesifik.analiz.tamamlananSayi, fmt: (v: number) => String(v) },
+                        ].map(({ label, f, s, fmt }, i) => {
+                          const fark = f > 0 && s > 0 ? Math.round(((s - f) / f) * 100) : null
+                          return (
+                            <tr key={label} style={{ background: i % 2 === 0 ? T.grayLight : '#fff' }}>
+                              <td style={{ padding: '8px 14px', fontWeight: 600, color: T.text }}>{label}</td>
+                              <td style={{ padding: '8px 14px', textAlign: 'center', fontWeight: 700, color: freqRenk }}>{fmt(f)}</td>
+                              <td style={{ padding: '8px 14px', textAlign: 'center', fontWeight: 700, color: specRenk }}>{fmt(s)}</td>
+                              <td style={{ padding: '8px 14px', textAlign: 'center', fontWeight: 700, color: fark === null ? T.textSoft : fark > 0 ? T.red : T.green }}>
+                                {fark === null ? '—' : fark > 0 ? `+%${fark} yavaş` : `%${Math.abs(fark)} hızlı`}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Dağılım karşılaştırması yan yana */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="verde-card" style={{ padding: '16px 18px' }}>
+                    <SekHead title="Frekansiyel Dağılım" color={freqRenk} />
+                    <DagilimBar data={data.frekansiyel.dagilim} color={freqRenk} />
+                  </div>
+                  <div className="verde-card" style={{ padding: '16px 18px' }}>
+                    <SekHead title="Spesifik Dağılım" color={specRenk} />
+                    <DagilimBar data={data.spesifik.dagilim} color={specRenk} />
+                  </div>
+                </div>
+
+                {/* Trend karşılaştırması */}
+                <div className="verde-card" style={{ padding: '16px 18px' }}>
+                  <SekHead title="Günlük Trend Karşılaştırması" color={T.purple} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: freqRenk, marginBottom: 8 }}>● Frekansiyel</div>
+                      <LineChart data={data.frekansiyel.gunlukTrend} valueKey="ort_sure" labelKey="tarih" color={freqRenk} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: specRenk, marginBottom: 8 }}>● Spesifik</div>
+                      <LineChart data={data.spesifik.gunlukTrend} valueKey="ort_sure" labelKey="tarih" color={specRenk} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+    </div>
+  )
+}
