@@ -73,11 +73,11 @@ export async function GET(req: NextRequest) {
     // Görevleri çek — frekansiyel + spesifik + arşiv
     const SEL = 'id,firma_id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id,tamamlayan_kullanici_id'
 
-    const buildQ = (table: string) => {
+    const buildQ = (table: string): Promise<any> => {
       let q = admin.from(table).select(SEL).eq('firma_id', firmaId).in('lokasyon_id', lokIds)
       if (projeId) q = (q as any).eq('proje_id', projeId)
       if (durumFil && durumFil !== 'TUMU') q = (q as any).eq('durum', durumFil)
-      return q.then((r: any) => r)  // execute → Promise
+      return Promise.resolve(q)
     }
 
     const queries: Promise<any>[] = []
