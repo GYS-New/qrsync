@@ -10,7 +10,7 @@ import { RefreshCw, CheckCircle, XCircle, Minus, ChevronDown, ChevronRight, Acti
 
 interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null; projeId?: string | null }
 
-type Madde = { sira: number; madde: string; zorunlu: boolean; durum: boolean | null; not: string | null; yapan: string | null; tarih: string | null; kanal: string | null }
+type Madde = { sira: number; madde: string; zorunlu: boolean; durum: boolean | null; not: string | null; gorsel_url: string | null; yapan: string | null; tarih: string | null; kanal: string | null; dolduruldu: boolean }
 type Row   = {
   gorev_id: string; tanim: string; gorev_tipi: string; durum: string; lokasyon: string
   atanan: string; tamamlayan: string; olusturma: string; tamamlanma: string
