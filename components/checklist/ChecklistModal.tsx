@@ -142,7 +142,7 @@ export function ChecklistTablo({ sonuclar, mesaj, sablonBaslik }: {
                   <img
                     src={s.gorsel_url}
                     alt="çeklist"
-                    onClick={() => setBuyukFoto(s.gorsel_url)}
+                    onClick={() => setBuyukFoto(s.gorsel_url!)}
                     style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0', cursor: 'zoom-in', flexShrink: 0 }}
                     title="Büyütmek için tıkla"
                   />

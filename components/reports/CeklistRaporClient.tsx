@@ -5,17 +5,16 @@ import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
 import { ChecklistTablo } from '@/components/checklist/ChecklistModal'
-import type { Sonuc as ChecklistSonuc } from '@/components/checklist/ChecklistModal'
-import { RefreshCw, CheckCircle, XCircle, Minus, ChevronDown, ChevronRight, Activity } from 'lucide-react'
+import type { Sonuc } from '@/components/checklist/ChecklistModal'
+import { RefreshCw, ChevronDown, ChevronRight, Activity } from 'lucide-react'
 
 interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null; projeId?: string | null }
 
-type Madde = { sira: number; madde: string; zorunlu: boolean; gorsel_gerekli?: boolean; secenekler?: string[]; durum: boolean | null; secenek: string | null; not: string | null; gorsel_url: string | null; yapan: string | null; tarih: string | null; kanal: string | null; dolduruldu: boolean }
 type Row   = {
-  gorev_id: string; tanim: string; gorev_tipi: string; durum: string; lokasyon: string
+  gorev_id: string; task_type: string; tanim: string; gorev_tipi: string; durum: string; lokasyon: string
   atanan: string; tamamlayan: string; olusturma: string; tamamlanma: string
   madde_toplam: number; madde_dolduruldu: number; madde_tamamlanan: number; basari_pct: number
-  maddeler: Madde[]
+  maddeler: Sonuc[]
 }
 type Ozet  = { toplam: number; dolduruldu: number; tamamlanan: number; ort_basari: number }
 
@@ -59,26 +58,6 @@ function KpiCard({ label, value, sub, color }: { label: string; value: string | 
   )
 }
 
-function MaddeRow({ m }: { m: Madde }) {
-  return (
-    <tr style={{ borderBottom: `1px solid ${T.border}` }}>
-      <td style={{ padding: '6px 10px', color: T.textSoft, width: 32, textAlign: 'center', fontSize: 12 }}>{m.sira}</td>
-      <td style={{ padding: '6px 10px', fontSize: 12.5 }}>
-        <div style={{ fontWeight: 500 }}>{m.madde}</div>
-        {m.zorunlu && <span style={{ fontSize: 10, fontWeight: 700, color: T.red, background: T.redLight, padding: '1px 5px', borderRadius: 4 }}>Zorunlu</span>}
-      </td>
-      <td style={{ padding: '6px 10px', textAlign: 'center', width: 60 }}>
-        {m.durum === null ? <Minus size={14} color={T.textSoft} /> : m.durum ? <CheckCircle size={16} color="#16a34a" /> : <XCircle size={16} color={T.red} />}
-      </td>
-      <td style={{ padding: '6px 10px', fontSize: 12, color: T.gray, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={m.not ?? ''}>{m.not ?? '—'}</td>
-      <td style={{ padding: '6px 10px', fontSize: 11.5, color: T.textSoft, whiteSpace: 'nowrap' }}>{m.yapan ?? '—'}</td>
-      <td style={{ padding: '6px 10px', textAlign: 'center', width: 54 }}>
-        {m.kanal ? <span style={{ fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 6, background: m.kanal === 'QR' ? T.blueLight : T.greenLight, color: m.kanal === 'QR' ? T.blue : T.green }}>{m.kanal}</span> : <span style={{ color: T.textSoft }}>—</span>}
-      </td>
-      <td style={{ padding: '6px 10px', fontSize: 11, color: T.textSoft, whiteSpace: 'nowrap' }}>{m.tarih ?? '—'}</td>
-    </tr>
-  )
-}
 
 function GorevSatiri({ row }: { row: Row }) {
   const [acik, setAcik] = useState(false)
