@@ -37,7 +37,7 @@ export default async function TATumGorevlerPage() {
       .limit(500),
     supabase
       .from('lokasyonlar')
-      .select('id,tanim,parent_id')
+      .select('id,tanim,parent_id,checklist_sablon_id')
       .eq('firma_id', firmaId)
       .eq('proje_id', aktifProje.id)
       .eq('aktif', true)

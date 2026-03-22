@@ -62,7 +62,7 @@ export default function TumGorevlerClient({
   firmaId: string
   meId: string
   readonly: boolean
-  lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[]
+  lokasyonlar: { id: string; tanim: string; parent_id?: string | null; checklist_sablon_id?: string | null }[]
   kullanicilar: { id: string; isim_soyisim: string }[]
   initialGorevler: any[]
   projeId?: string | null
