@@ -91,7 +91,8 @@ export default function LokasyonGruplariClient({
   const [topLocationId, setTopLocationId] = useState<string>('')
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
   const [q, setQ] = useState('')
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [expandedGroups,   setExpandedGroups]   = useState<Set<string>>(new Set())
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
 
   const locMap = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations])
 
@@ -221,6 +222,10 @@ export default function LokasyonGruplariClient({
     return Array.from(map.values()).sort((a, b) => a.topPath.localeCompare(b.topPath, 'tr'))
   }, [groupsFlat])
 
+  function toggleSection(id: string) {
+    setExpandedSections(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
   function toggleExpand(id: string) {
     setExpandedGroups(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
@@ -329,11 +334,12 @@ export default function LokasyonGruplariClient({
         </div>
 
         {/* SAĞ: GRUP LİSTESİ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <div style={{ position: 'sticky', top: 88, maxHeight: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexShrink: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: '#0f1a0f' }}>Mevcut Gruplar</div>
             <div style={{ fontSize: 12.5, color: '#7a907a' }}>{groupsFlat.length} grup · {grouped.length} üst lokasyon</div>
           </div>
+          <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, flex: 1, paddingRight: 4 }}>
 
           {grouped.length === 0 ? (
             <div className="verde-card" style={{ padding: 32, textAlign: 'center', color: '#7a907a' }}>
@@ -344,26 +350,36 @@ export default function LokasyonGruplariClient({
           ) : grouped.map((section) => (
             <div key={section.topId} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-              {/* Üst Lokasyon başlığı */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px' }}>
-                <div style={{ width: 28, height: 28, borderRadius: 7, background: '#1a5c2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Layers size={13} color="#fff" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 900, color: '#1a5c2a', letterSpacing: 0.2 }}>
-                    {section.topTanim}
-                  </div>
-                  {section.topPath !== section.topTanim && (
-                    <div style={{ fontSize: 11, color: '#7a907a' }}>{section.topPath}</div>
-                  )}
-                </div>
-                <div style={{ marginLeft: 'auto', fontSize: 11.5, color: '#7a907a', fontWeight: 600 }}>
-                  {section.items.length} grup
-                </div>
-              </div>
+              {/* Üst Lokasyon başlığı - tıklanabilir */}
+              {(() => {
+                const sectionExpanded = expandedSections.has(section.topId)
+                return (
+                  <>
+                    <div
+                      onClick={() => toggleSection(section.topId)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: sectionExpanded ? '#f0f9f0' : '#f4f8f4', border: `1px solid ${sectionExpanded ? '#b8e0b8' : '#e2ece2'}`, transition: 'all .15s' }}
+                    >
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: '#1a5c2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Layers size={13} color="#fff" />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 900, color: '#1a5c2a', letterSpacing: 0.2 }}>
+                          {section.topTanim}
+                        </div>
+                        {section.topPath !== section.topTanim && (
+                          <div style={{ fontSize: 11, color: '#7a907a' }}>{section.topPath}</div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11.5, color: '#7a907a', fontWeight: 600 }}>{section.items.length} grup</span>
+                        {sectionExpanded
+                          ? <ChevronDown size={15} color="#2e8b2e" />
+                          : <ChevronRight size={15} color="#7a907a" />}
+                      </div>
+                    </div>
 
-              {/* Bu üst lokasyona ait gruplar */}
-              {section.items.map((group) => {
+                    {/* Bu üst lokasyona ait gruplar - section açıksa göster */}
+                    {sectionExpanded && section.items.map((group) => {
                 const expanded = expandedGroups.has(group.id)
                 const isEditing = editingId === group.id
                 return (
@@ -415,9 +431,13 @@ export default function LokasyonGruplariClient({
                     )}
                   </div>
                 )
-              })}
+                    })}
+                  </>
+                )
+              })()}
             </div>
           ))}
+          </div>
         </div>
       </div>
     </div>
