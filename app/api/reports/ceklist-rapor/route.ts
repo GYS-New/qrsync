@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       let q = admin.from(table).select(SEL).eq('firma_id', firmaId).in('lokasyon_id', lokIds)
       if (projeId) q = (q as any).eq('proje_id', projeId)
       if (durumFil && durumFil !== 'TUMU') q = (q as any).eq('durum', durumFil)
-      return q
+      return q.then((r: any) => r)  // execute → Promise
     }
 
     const queries: Promise<any>[] = []
