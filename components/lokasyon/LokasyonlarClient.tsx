@@ -121,6 +121,7 @@ export default function LokasyonlarClient({
       const fd = new FormData()
       fd.append('file', file)
       if (firmaId) fd.append('firmaId', firmaId)
+      if (projeId) fd.append('proje_id', projeId)
       const res = await fetch('/api/import-export/locations/import', { method: 'POST', body: fd })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'İmport başarısız')
