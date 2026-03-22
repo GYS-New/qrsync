@@ -136,7 +136,15 @@ export async function POST(req: NextRequest) {
     .select('id,firma_id,ad,aciklama,aktif,kayit_tarihi,guncelleme_tarihi,kayit_yapan_id,ust_lokasyon_id')
     .single()
 
-  if (insertErr || !inserted) return NextResponse.json({ error: insertErr?.message ?? 'Grup kaydedilemedi' }, { status: 500 })
+  if (insertErr || !inserted) {
+    const msg = insertErr?.message ?? 'Grup kaydedilemedi'
+    const isDuplicate = msg.includes('duplicate key') || msg.includes('unique constraint')
+    return NextResponse.json({ 
+      error: isDuplicate 
+        ? `"${ad}" adında bir lokasyon grubu bu firmada zaten mevcut. Farklı bir ad kullanın.`
+        : msg 
+    }, { status: 500 })
+  }
 
   if (lokasyonIds.length > 0) {
     const { error: memberErr } = await admin.from('lokasyon_grup_uyeleri').insert(
