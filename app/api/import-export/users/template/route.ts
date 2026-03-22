@@ -11,9 +11,10 @@ export async function GET() {
         { key: 'email', label: 'email', width: 32 },
         { key: 'telefon', label: 'telefon', width: 18 },
         { key: 'password', label: 'password', width: 18 },
+        { key: 'rol', label: 'rol', width: 16 },
       ],
       rows: [
-        { isim_soyisim: 'Örnek Kullanıcı', email: 'ornek@example.com', telefon: '05550000000', password: '123456' },
+        { isim_soyisim: 'Örnek Kullanıcı', email: 'ornek@example.com', telefon: '05550000000', password: '123456', rol: 'tenant_user' },
       ],
     }],
   })

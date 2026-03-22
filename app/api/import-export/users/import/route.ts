@@ -25,9 +25,19 @@ export async function POST(req: NextRequest) {
       const email = normalizeEmail(row.email)
       const telefon = normalizeText(row.telefon) || null
       const password = normalizeText(row.password)
+      const rolRaw  = normalizeText(row.rol).toLowerCase() || 'tenant_user'
       if (!isim_soyisim || !email || !password) {
         errors.push(`Satır ${rowNo}: isim_soyisim, email ve password zorunludur.`)
         continue
+      }
+      const GECERLI_ROLLER = ['tenant_user', 'tenant_admin', 'musteri']
+      const SA_ROLLER      = ['super_admin', 'alt_super_admin']
+      const rol = GECERLI_ROLLER.includes(rolRaw) ? rolRaw : 'tenant_user'
+      if (SA_ROLLER.includes(rolRaw)) {
+        if (!scope.isSA) {
+          errors.push(`Satır ${rowNo}: ${rolRaw} rolü eklemek için yetkiniz yok.`)
+          continue
+        }
       }
       const { data: createdUser, error: createErr } = await scope.admin.auth.admin.createUser({ email, password, email_confirm: true })
       if (createErr || !createdUser?.user) {
@@ -40,7 +50,7 @@ export async function POST(req: NextRequest) {
         isim_soyisim,
         email,
         telefon,
-        rol: 'tenant_user',
+        rol: scope.isSA && SA_ROLLER.includes(rolRaw) ? rolRaw : rol,
         firma_id: scope.firmaId,
         proje_id: projeIdParam ?? null,
         kayit_yapan_id: scope.me.id,

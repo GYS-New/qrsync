@@ -51,11 +51,7 @@ export async function createGorevAtamaNotification(opts: {
     tip: 'gorev_atama',
   })
 
-  // FCM push bildirim — lazy import ile server-side
-  try {
-    const { sendFCMToUser } = await import('./fcm-sender')
-    await sendFCMToUser(aliciId, 'Yeni Görev', `${tanim} görevi size atandı.`)
-  } catch {}
+
 }
 
 export async function notifyTenantAdminsOnGorevStatusChange(opts: {
