@@ -36,7 +36,7 @@ export default async function SACanliIslemlerPage() {
   const aktifProje = await getAktifProje(firmaId)
   const projeId = aktifProje?.id ?? null
 
-  let lokQ = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id').eq('firma_id', firmaId).eq('aktif', true).order('tanim')
+  let lokQ = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id').eq('firma_id', firmaId).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
 
   let gorevQ = supabase.from('canli_gorevler')

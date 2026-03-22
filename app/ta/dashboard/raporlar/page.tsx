@@ -11,7 +11,7 @@ export const revalidate = 0
 export const fetchCache = 'force-no-store'
 
 // firma_rapor_turleri tablosundaki ID'ler alt çizgi ile — tutarlı olması için sabit liste burada
-const RAPOR_TURLERI_IDS = ['ham_veri', 'grafiksel', 'rapor_ozellestir', 'sure_analiz', 'musteri_degerlendirme']
+const RAPOR_TURLERI_IDS = ['ham_veri', 'grafiksel', 'ceklist', 'rapor_ozellestir', 'sure_analiz', 'musteri_degerlendirme']
 
 export default async function TARaporlarPage() {
   const supabase = createClient()
