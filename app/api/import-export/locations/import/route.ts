@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
     const form = await req.formData()
     const file = form.get('file')
     const firmaIdParam = form.get('firmaId') ? String(form.get('firmaId')) : null
+    const projeIdParam  = form.get('proje_id') ? String(form.get('proje_id')) : null
     if (!(file instanceof File)) return NextResponse.json({ error: 'Dosya bulunamadı' }, { status: 400 })
     const scope = await requireImportScope(firmaIdParam)
     const parsed = await readXlsxFromBuffer(Buffer.from(await file.arrayBuffer()))
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
           tanim: part,
           aktif: idx === levels.length - 1 ? parseBool(row.aktif, true) : true,
           aciklama: idx === levels.length - 1 ? (normalizeText(row.aciklama) || null) : null,
+          proje_id: projeIdParam ?? null,
           nfc_token: randomUUID(),
           checklist_sablon_id: null,
           sureli_gorev_aktif: idx === levels.length - 1 ? parseBool(row.sureli_gorev_aktif, false) : false,
