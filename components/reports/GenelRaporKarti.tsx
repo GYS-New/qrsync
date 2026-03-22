@@ -376,7 +376,7 @@ function SapmaSheet({ data }: { data: RaporData }) {
         <Badge text={`${data.sapmaGorevler.length} kayıt`} color={T.amber} bg={T.amberLight} />
       </div>
       <DataTable
-        headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'SAPMA NEDENİ']}
+        headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
         rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.sapmaNedeni])}
         accentCol={6} accentColor={T.amber}
       />

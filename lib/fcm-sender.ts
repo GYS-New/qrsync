@@ -6,8 +6,11 @@ export async function sendFCMToUser(userId: string, title: string, body: string)
     const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n')
     if (!projectId || !clientEmail || !privateKey) return
 
-    const { createAdminClient } = await import('@/lib/supabase/server')
-    const admin = createAdminClient()
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
+    const admin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const { data: devices } = await admin
       .from('device_tokens')
       .select('fcm_token')

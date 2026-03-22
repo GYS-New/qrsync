@@ -5,9 +5,7 @@ const nextConfig = {
   },
   experimental: {
     missingSuspenseWithCSRBailout: false,
+    serverComponentsExternalPackages: ['@supabase/ssr'],
   },
-  // @supabase/ssr'ın next/headers kullanmasından kaynaklanan
-  // client bundle hatası için: server-only paketleri dışarıda tut
-  serverExternalPackages: ['@supabase/ssr'],
 }
 module.exports = nextConfig

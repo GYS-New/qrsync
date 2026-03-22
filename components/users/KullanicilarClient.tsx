@@ -157,11 +157,12 @@ export default function KullanicilarClient({
       const fd = new FormData()
       fd.append('file', file)
       if (firmaId) fd.append('firmaId', firmaId)
+      if (projeId) fd.append('projeId', projeId)
       const res = await fetch('/api/import-export/users/import', { method: 'POST', body: fd })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'Import başarısız')
       await refresh()
-      const extra = j.errors?.length ? ` Hata: ${j.errors.slice(0, 3).join(' | ')}` : ''
+      const extra = j.errors?.length ? `\n${j.errors.slice(0, 10).join('\n')}` : ''
       showOk(`${j.created} kayıt içe aktarıldı.${extra}`)
     } catch (e: any) { showErr(e.message) }
     e.target.value = ''

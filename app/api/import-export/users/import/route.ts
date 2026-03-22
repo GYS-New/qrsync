@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
     const form = await req.formData()
     const file = form.get('file')
     const firmaIdParam = form.get('firmaId') ? String(form.get('firmaId')) : null
+    const projeIdParam  = form.get('projeId')  ? String(form.get('projeId'))  : null
     if (!(file instanceof File)) return NextResponse.json({ error: 'Dosya bulunamadı' }, { status: 400 })
     const scope = await requireImportScope(firmaIdParam)
     const parsed = await readXlsxFromBuffer(Buffer.from(await file.arrayBuffer()))
@@ -16,6 +17,8 @@ export async function POST(req: NextRequest) {
     let created = 0
     const errors: string[] = []
     for (let i = 0; i < parsed.rows.length; i++) {
+      // Supabase Auth rate limit koruması: her 10 kayıtta 1 saniye bekle
+      if (i > 0 && i % 10 === 0) await new Promise(r => setTimeout(r, 1100))
       const row = parsed.rows[i]
       const rowNo = i + 2
       const isim_soyisim = normalizeText(row.isim_soyisim)
@@ -39,6 +42,7 @@ export async function POST(req: NextRequest) {
         telefon,
         rol: 'tenant_user',
         firma_id: scope.firmaId,
+        proje_id: projeIdParam ?? null,
         kayit_yapan_id: scope.me.id,
         aktif: true,
       })
@@ -49,7 +53,7 @@ export async function POST(req: NextRequest) {
       }
       created++
     }
-    return NextResponse.json({ ok: true, created, failed: errors.length, errors })
+    return NextResponse.json({ ok: true, created, failed: errors.length, errors: errors.slice(0, 50) })
   } catch (e: any) {
     const status = e.message === 'Unauthorized' ? 401 : e.message.includes('Yetkisiz') ? 403 : 400
     return NextResponse.json({ error: e.message }, { status })
