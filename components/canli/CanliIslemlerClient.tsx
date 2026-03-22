@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Pause, Play, Square } from 'lucide-react'
+import ChecklistModal from '@/components/checklist/ChecklistModal'
 
 // datetime-local input Türkiye saatini bekler — UTC Date'i Istanbul local string'e çevir
 function toIstanbulLocalInput(d: Date): string {
@@ -194,6 +195,7 @@ const getLocPath = useMemo(() => {
   const [liveFlowGorevler, setLiveFlowGorevler] = useState<any[]>([])
   const [highlightId, setHighlightId] = useState<string | null>(null)
   const lastTopIdRef = useRef<string | null>(null)
+  const [checklistGorev, setChecklistGorev] = useState<{ id: string; type: 'canli_gorevler' } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedGorev, setSelectedGorev] = useState<any | null>(null)
 
@@ -673,6 +675,16 @@ useEffect(() => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <span style={{ fontSize: fs, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>{getIslemiYapan()}</span>
 
+              {/* Çeklist butonu — her durumda, lokasyonda şablon varsa */}
+              {lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setChecklistGorev({ id: g.id, type: 'canli_gorevler' }) }}
+                  style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontSize: 11, color: '#1d4ed8', flexShrink: 0 }}
+                >
+                  📋 Çeklist
+                </button>
+              )}
+
               {/* Yetkili kullanıcılar için butonlar aynı hücrede kalsın */}
               {showOps && !readonly && (
                 <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
@@ -800,6 +812,14 @@ useEffect(() => {
           </table>
         </div>
       </div>
+
+      {checklistGorev && (
+        <ChecklistModal
+          taskId={checklistGorev.id}
+          taskType={checklistGorev.type}
+          onKapat={() => setChecklistGorev(null)}
+        />
+      )}
     </div>
   )
 }

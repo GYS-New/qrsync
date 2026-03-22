@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { createGorevAtamaNotification, notifyTenantAdminsOnGorevStatusChange, type GorevDurum } from '@/lib/notifications'
 import { useFirma } from '@/components/layout/FirmaContext'
+import ChecklistModal from '@/components/checklist/ChecklistModal'
 
 const DURUM_RENK: Record<string, string> = {
   ACIK: 'status-acik',
@@ -44,6 +45,7 @@ export default function GorevlerClient({
   const [tenantFirmaId] = useState<string | null>(initialFirmaId ?? null)
   const firmaId = base === '/sa' ? saFirmaId : tenantFirmaId
   const [gorevler, setGorevler] = useState<any[]>(initialGorevler)
+  const [checklistGorev, setChecklistGorev] = useState<{ id: string; type: 'gorevler' | 'canli_gorevler' } | null>(null)
   const [lokasyonlar, setLokasyonlar] = useState(initialLokasyonlar)
   const [kullanicilar, setKullanicilar] = useState(initialKullanicilar)
   const [q, setQ] = useState('')
@@ -135,7 +137,6 @@ export default function GorevlerClient({
       .from('gorevler')
       .select('*,lokasyonlar(id,tanim,parent_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
       .eq('firma_id', fid)
-      .in('durum', ['ACIK', 'ISLEMDE'])   // IPTAL ve TAMAMLANDI arşivde görünür
       .order('olusturma_tarihi', { ascending: false })
       .limit(200)
     if (projeId) gorevQuery = (gorevQuery as any).eq('proje_id', projeId)
@@ -188,17 +189,6 @@ export default function GorevlerClient({
       showError('Tanım, lokasyon ve kullanıcı zorunludur.')
       return
     }
-
-    // Personel takibi kontrolü — atanan kullanıcı iş başı yapmış mı?
-    const kontrolUrl = new URLSearchParams({ user_id: form.atanan_kullanici_id, firma_id: firmaId! })
-    if (projeId) kontrolUrl.set('proje_id', projeId)
-    const kontrolRes  = await fetch(`/api/mesai/kontrol?${kontrolUrl}`)
-    const kontrolJson = await kontrolRes.json()
-    if (kontrolJson.ok && kontrolJson.atanabilir === false) {
-      showError(kontrolJson.neden)
-      return
-    }
-
     setLoading(true); setError('')
     if (editing) {
       const reAssigned = editing.atanan_kullanici_id !== form.atanan_kullanici_id
@@ -327,15 +317,16 @@ export default function GorevlerClient({
         setGorevler(prev => prev.filter(g => g.id !== id))
       }
     } else {
-      // Listeden kaldır (soft delete — durum = IPTAL, gorev_durum enum'unda SILINDI yok)
+      // Listeden kaldır (soft delete — durum = SILINDI)
       setLoading(true); setError('')
       const { error: err } = await supabase
         .from('gorevler')
-        .update({ durum: 'IPTAL', durum_degisim_tarihi: new Date().toISOString(), islemi_yapan_id: meId })
+        .update({ durum: 'SILINDI', durum_degisim_tarihi: new Date().toISOString(), islemi_yapan_id: meId })
         .eq('id', id)
       if (err) showError(err.message)
       else {
         showSuccess('Görev listeden kaldırıldı.')
+        // State'den direkt kaldır
         setGorevler(prev => prev.filter(g => g.id !== id))
       }
     }
@@ -395,6 +386,10 @@ export default function GorevlerClient({
                   {canManage && (
                     <td style={{ width: 320, whiteSpace:'nowrap' }}>
                       <div style={{ display:'flex', gap:6, flexWrap:'nowrap', justifyContent:'flex-end' }}>
+                        {/* Lokasyonda checklist şablonu varsa buton göster */}
+                        {(initialLokasyonlar.find((l: any) => l.id === g.lokasyon_id) as any)?.checklist_sablon_id && (
+                          <RowActionButton variant="base" onClick={() => setChecklistGorev({ id: g.id, type: 'gorevler' })}>📋 Çeklist</RowActionButton>
+                        )}
                         <RowActionButton variant="base" onClick={() => openEdit(g)}>Düzenle</RowActionButton>
                         <RowActionButton variant="success" onClick={() => setDurum(g,'ISLEMDE')}>İşlemde</RowActionButton>
                         <RowActionButton variant="success" onClick={() => setDurum(g,'TAMAMLANDI')}>Tamamla</RowActionButton>
@@ -516,6 +511,15 @@ export default function GorevlerClient({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Çeklist görüntüle modal */}
+      {checklistGorev && (
+        <ChecklistModal
+          taskId={checklistGorev.id}
+          taskType={checklistGorev.type}
+          onKapat={() => setChecklistGorev(null)}
+        />
       )}
     </div>
   )

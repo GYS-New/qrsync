@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Topbar from '@/components/layout/Topbar'
 import { useRouteLoading } from '@/components/ui/RouteLoadingProvider'
 import { useToast } from '@/components/ui/ToastProvider'
-import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2, MessageSquare } from 'lucide-react'
+import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2, MessageSquare, CheckSquare } from 'lucide-react'
 import { useFirma } from '@/components/layout/FirmaContext'
 
 // ─── Rapor kart tanımları — statik, DB ile ilgisi yok ────────────────────────
@@ -23,6 +23,13 @@ const RAPOR_KARTLARI = [
     description: 'Sütun, çizgi ve pasta grafiklerle hızlı görsel analiz alın; PNG / Excel formatında dışa aktarın.',
     eyebrow: 'GRAFİKSEL', badge: 'Canlı analiz', tone: 'violet' as const,
     icon: 'bar', path: '/raporlar/grafiksel', disabled: false,
+  },
+  {
+    id: 'ceklist',
+    title: 'Çeklist Raporları',
+    description: 'Tüm görev türleri için çeklist tamamlanma verileri, madde bazlı analiz ve filtrelenebilir raporlar.',
+    eyebrow: 'ÇEKLİST', badge: 'Tüm Görev Türleri', tone: 'green' as const,
+    icon: 'checklist', path: '/raporlar/ceklist', disabled: false,
   },
   {
     id: 'rapor_ozellestir',
@@ -52,7 +59,8 @@ const IKON_MAP: Record<string, ReactNode> = {
   bar:      <BarChart3 size={22} />,
   sparkles: <Sparkles size={22} />,
   clock:    <Clock3 size={22} />,
-  message:  <MessageSquare size={22} />,
+  message:   <MessageSquare size={22} />,
+  checklist: <CheckSquare size={22} />,
 }
 
 // ─── HubCard ─────────────────────────────────────────────────────────────────
