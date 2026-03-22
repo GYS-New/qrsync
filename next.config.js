@@ -3,9 +3,11 @@ const nextConfig = {
   images: {
     domains: ['mjunontyoyuvnpcxzvvt.supabase.co'],
   },
-  // Build sırasında Supabase env yoksa bu sayfaları static render etme
   experimental: {
     missingSuspenseWithCSRBailout: false,
   },
+  // @supabase/ssr'ın next/headers kullanmasından kaynaklanan
+  // client bundle hatası için: server-only paketleri dışarıda tut
+  serverExternalPackages: ['@supabase/ssr'],
 }
 module.exports = nextConfig
