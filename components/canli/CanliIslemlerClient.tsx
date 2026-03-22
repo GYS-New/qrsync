@@ -801,7 +801,7 @@ useEffect(() => {
             </tr></thead>
             <tbody>
               {filteredLive.map((g: any) => (
-                <TableRow key={g.id} g={g} showOps showActor fontSize={14} />
+                <TableRow key={g.id} g={g} showOps={false} showActor fontSize={14} />
               ))}
               {!filteredLive.length && (
                 <tr><td colSpan={7} style={{ textAlign: 'center', color: '#7a907a', padding: '22px 0', fontSize: 14 }}>

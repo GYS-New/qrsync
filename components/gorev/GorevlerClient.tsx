@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateTime, GOREV_DURUM_LABEL } from '@/lib/utils'
@@ -135,8 +136,9 @@ export default function GorevlerClient({
     setLoading(true); setError('')
     let gorevQuery = supabase
       .from('gorevler')
-      .select('*,lokasyonlar(id,tanim,parent_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
+      .select('*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
       .eq('firma_id', fid)
+      .in('durum', ['ACIK', 'ISLEMDE'])
       .order('olusturma_tarihi', { ascending: false })
       .limit(200)
     if (projeId) gorevQuery = (gorevQuery as any).eq('proje_id', projeId)
@@ -200,7 +202,7 @@ export default function GorevlerClient({
         .from('gorevler')
         .update(patch)
         .eq('id', editing.id)
-        .select('*,lokasyonlar(id,tanim,parent_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
+        .select('*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
         .single()
 
       if (err) showError(err.message)
@@ -234,7 +236,7 @@ export default function GorevlerClient({
           durum_degisim_tarihi: new Date().toISOString(),
           ...(projeId ? { proje_id: projeId } : {}),
         })
-        .select('*,lokasyonlar(id,tanim,parent_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
+        .select('*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
         .single()
       if (err) showError(err.message)
       else {
@@ -263,7 +265,7 @@ export default function GorevlerClient({
       .from('gorevler')
       .update(patch)
       .eq('id', g.id)
-      .select('*,lokasyonlar(id,tanim,parent_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
+      .select('*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
       .single()
 
     if (err) showError(err.message)
@@ -317,7 +319,7 @@ export default function GorevlerClient({
         setGorevler(prev => prev.filter(g => g.id !== id))
       }
     } else {
-      // Listeden kaldır (soft delete — durum = IPTAL, gorev_durum enum'unda SILINDI yok)
+      // Listeden kaldır (soft delete — durum = SILINDI)
       setLoading(true); setError('')
       const { error: err } = await supabase
         .from('gorevler')
@@ -384,18 +386,23 @@ export default function GorevlerClient({
                   <td style={{ color:'#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace:'nowrap' }} title={g.islemi_yapan?.isim_soyisim ?? ''}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
                   <td style={{ color:'#7a907a', fontSize: 13, whiteSpace:'nowrap' }}>{g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—'}</td>
                   {canManage && (
-                    <td style={{ width: 320, whiteSpace:'nowrap' }}>
-                      <div style={{ display:'flex', gap:6, flexWrap:'nowrap', justifyContent:'flex-end' }}>
-                        {/* Lokasyonda checklist şablonu varsa buton göster */}
-                        {(initialLokasyonlar.find((l: any) => l.id === g.lokasyon_id) as any)?.checklist_sablon_id && (
-                          <RowActionButton variant="base" onClick={() => setChecklistGorev({ id: g.id, type: 'gorevler' })}>📋 Çeklist</RowActionButton>
-                        )}
-                        <RowActionButton variant="base" onClick={() => openEdit(g)}>Düzenle</RowActionButton>
-                        <RowActionButton variant="success" onClick={() => setDurum(g,'ISLEMDE')}>İşlemde</RowActionButton>
-                        <RowActionButton variant="success" onClick={() => setDurum(g,'TAMAMLANDI')}>Tamamla</RowActionButton>
-                        <RowActionButton variant="warning" onClick={() => setDurum(g,'IPTAL')}>İptal</RowActionButton>
-                        <RowActionButton variant="danger" onClick={() => del(g.id)}>Sil</RowActionButton>
-                      </div>
+                    <td style={{ whiteSpace:'nowrap', paddingRight:12 }}>
+                      <details style={{ position:'relative', display:'inline-block' }}>
+                        <summary style={{ listStyle:'none', cursor:'pointer', padding:'5px 12px', borderRadius:6, border:'1px solid #d6e4d6', background:'#f0f9f0', color:'#1a5c2a', fontSize:12.5, fontWeight:600 }}>
+                          İşlemler ▾
+                        </summary>
+                        <div
+                          style={{ position:'absolute', right:0, top:'calc(100% + 4px)', zIndex:200, background:'#fff', border:'1px solid #e2e8f0', borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.12)', padding:'4px 0', minWidth:155 }}
+                          onClick={e => (e.currentTarget.closest('details') as HTMLDetailsElement)?.removeAttribute('open')}
+                        >
+                          <button onClick={() => openEdit(g)} style={{ display:'block', width:'100%', padding:'7px 14px', background:'none', border:'none', textAlign:'left', cursor:'pointer', fontSize:13, color:'#334155' }}>✏️ Düzenle</button>
+                          <button onClick={() => setDurum(g,'ISLEMDE')} style={{ display:'block', width:'100%', padding:'7px 14px', background:'none', border:'none', textAlign:'left', cursor:'pointer', fontSize:13, color:'#334155' }}>🔄 İşlemde</button>
+                          <button onClick={() => setDurum(g,'TAMAMLANDI')} style={{ display:'block', width:'100%', padding:'7px 14px', background:'none', border:'none', textAlign:'left', cursor:'pointer', fontSize:13, color:'#15803d' }}>✅ Tamamla</button>
+                          <button onClick={() => setDurum(g,'IPTAL')} style={{ display:'block', width:'100%', padding:'7px 14px', background:'none', border:'none', textAlign:'left', cursor:'pointer', fontSize:13, color:'#d97706' }}>⛔ İptal</button>
+                          <div style={{ borderTop:'1px solid #f1f5f9', margin:'4px 0' }} />
+                          <button onClick={() => del(g.id)} style={{ display:'block', width:'100%', padding:'7px 14px', background:'none', border:'none', textAlign:'left', cursor:'pointer', fontSize:13, color:'#dc2626' }}>🗑️ Sil</button>
+                        </div>
+                      </details>
                     </td>
                   )}
                 </tr>
