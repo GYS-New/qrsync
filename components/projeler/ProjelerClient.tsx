@@ -125,6 +125,25 @@ variant: 'danger'
     }
   }
 
+  async function toggleSureliGorevler(p: Proje) {
+    const ok = await confirm({
+      title: 'Süreli Görevleri Değiştir',
+      message: `"${p.ad}" projesindeki tüm lokasyonların süreli görev durumu toplu olarak değiştirilecek. Devam edilsin mi?`,
+      confirmText: 'Devam Et',
+      cancelText: 'Vazgeç',
+      variant: 'danger',
+    })
+    if (!ok) return
+    try {
+      const res = await fetch(`/api/projeler/${p.id}/toggle-sureli-gorev`, { method: 'POST' })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? 'İşlem başarısız')
+      toast({ type: 'success', title: 'Tamamlandı', message: j.message ?? 'Güncellendi' })
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+  }
+
   const aktifler = projeler.filter(p => p.aktif)
   const pasifler = projeler.filter(p => !p.aktif)
 
@@ -210,6 +229,18 @@ variant: 'danger'
                     }}
                   >
                     {p.aktif ? 'Pasife Al' : 'Aktife Al'}
+                  </button>
+                  {/* Süreli Görev AÇ/KAPAT */}
+                  <button
+                    onClick={() => toggleSureliGorevler(p)}
+                    title="Projedeki tüm lokasyonlarda süreli görevi toplu aç/kapat"
+                    style={{
+                      padding: '5px 12px', borderRadius: 6, border: '1px solid #e9d5ff',
+                      background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      color: '#7c3aed',
+                    }}
+                  >
+                    ⚡ SG AÇ/KAPAT
                   </button>
                   <button onClick={() => openEdit(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                     <Pencil size={14} style={{ color: '#506050' }} />

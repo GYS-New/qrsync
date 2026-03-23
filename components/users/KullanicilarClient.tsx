@@ -267,6 +267,26 @@ export default function KullanicilarClient({
     setLoading(false)
   }
 
+  async function deleteDeviceToken(u: User) {
+    const ok = await confirm({
+      title: 'Cihaz Eşlemesini Sil',
+      message: `"${u.isim_soyisim}" kullanıcısının cihaz eşlemesi silinecek.\n\nKullanıcı tekrar kayıt olana kadar mobil uygulamayı kullanamaz. Onaylıyor musunuz?`,
+      confirmText: 'Evet, Sil',
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/users/${u.id}/device-token`, { method: 'DELETE' })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? 'Silinemedi')
+      showOk('Cihaz eşlemesi silindi.')
+      setDeviceTokenMap(prev => { const n = { ...prev }; delete n[u.id]; return n })
+    } catch (e: any) { showErr(e.message) }
+    setLoading(false)
+  }
+
   const isTA = base === '/ta'
 
   return (
@@ -370,6 +390,9 @@ export default function KullanicilarClient({
                           {isSA && <RowActionButton variant="base" onClick={() => setRole(u, 'tenant_user')}>Kullanıcı Yap</RowActionButton>}
                           <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>
                           <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
+                          {deviceTokenMap[u.id] && (
+                            <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>
+                          )}
                           <RowActionButton variant="danger" onClick={() => deleteUser(u)}>Sil</RowActionButton>
                         </>
                       )}

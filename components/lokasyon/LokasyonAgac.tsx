@@ -36,7 +36,7 @@ function LokasyonNode({
   qrSablonAktif?: boolean
   readonly?: boolean
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const hasChildren = (lok.children?.length ?? 0) > 0
   const isRoot = depth === 0
 

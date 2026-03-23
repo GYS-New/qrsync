@@ -6,7 +6,7 @@ import LokasyonAgac from '@/components/lokasyon/LokasyonAgac'
 import QrKodModal from '@/components/lokasyon/QrKodModal'
 import type { Lokasyon } from '@/types'
 import Button from '@/components/ui/Button'
-import { Download, FileSpreadsheet, Power, Upload, QrCode } from 'lucide-react'
+import { Download, FileSpreadsheet, Upload, QrCode } from 'lucide-react'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
@@ -338,34 +338,8 @@ export default function LokasyonlarClient({
     setLoading(false)
   }
 
-  async function toggleAllTimedTasks() {
-    if (!firmaId) { showError('Firma seçilmedi'); return }
-    if (!lokasyonlar.length) { showError('İşlem yapılacak lokasyon bulunamadı'); return }
 
-    const enableAll = lokasyonlar.some(l => !(l as any).sureli_gorev_aktif)
-    const ok = await confirm({
-      title: enableAll ? "Tüm Süreli Görevleri Aç" : "Tüm Süreli Görevleri Kapat",
-      message: enableAll
-        ? 'Bu firmadaki tüm lokasyonlarda süreli görev özelliği aktif edilecek.'
-        : 'Bu firmadaki tüm lokasyonlarda süreli görev özelliği kapatılacak.',
-      confirmText: enableAll ? 'Tümünü Aç' : 'Tümünü Kapat',
-      cancelText: 'İptal',
-      variant: 'danger',
-    })
-    if (!ok) return
 
-    setLoading(true); setError('')
-    const { error: err } = await supabase
-      .from('lokasyonlar')
-      .update({ sureli_gorev_aktif: enableAll })
-      .eq('firma_id', firmaId)
-
-    if (err) showError(err.message)
-    else showSuccess(enableAll ? 'Tüm süreli görevler açıldı.' : 'Tüm süreli görevler kapatıldı.')
-
-    await refresh(firmaId)
-    setLoading(false)
-  }
 
   return (
     <div style={{ padding:'24px 28px' }}>
@@ -391,9 +365,6 @@ export default function LokasyonlarClient({
                 }
                 e.target.value = ''
               }} />
-            {!readonly && (
-              <Button variant="ghost" onClick={toggleAllTimedTasks} disabled={!firmaId || loading} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}><Power size={16} /> SG'leri AÇ-KAPAT</Button>
-            )}
             {!readonly && (
               <Button variant="primary" onClick={() => openCreate(null)} disabled={!firmaId} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>＋ Lokasyon Ekle</Button>
             )}

@@ -30,6 +30,20 @@ export default function SuperAdminlerClient({
 
   useEffect(() => { setUsers(initialUsers) }, [initialUsers])
 
+  const [deviceTokenMap, setDeviceTokenMap] = useState<Record<string, {
+    device_token: string
+    device_id: string
+    son_kullanim: string | null
+  }>>({})
+
+  // SA kullanıcılarının cihaz tokenlarını yükle
+  useEffect(() => {
+    fetch('/api/users/device-tokens')
+      .then(r => r.json())
+      .then(j => { if (j.ok) setDeviceTokenMap(j.data ?? {}) })
+      .catch(() => {})
+  }, [])
+
   // Modal state
   const [openCreate, setOpenCreate] = useState(false)
   const [createForm, setCreateForm] = useState({
@@ -155,6 +169,26 @@ export default function SuperAdminlerClient({
     setLoading(false)
   }
 
+  async function deleteDeviceToken(u: User) {
+    const ok = await confirm({
+      title: 'Cihaz Eşlemesini Sil',
+      message: `"${u.isim_soyisim}" kullanıcısının cihaz eşlemesi silinecek.\n\nKullanıcı tekrar kayıt olana kadar mobil uygulamayı kullanamaz. Onaylıyor musunuz?`,
+      confirmText: 'Evet, Sil',
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/users/${u.id}/device-token`, { method: 'DELETE' })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? 'Silinemedi')
+      showOk('Cihaz eşlemesi silindi.')
+      setDeviceTokenMap(prev => { const n = { ...prev }; delete n[u.id]; return n })
+    } catch (e: any) { showErr(e.message) }
+    setLoading(false)
+  }
+
   return (
     <div className="users-scale" style={{ padding: '24px 28px' }}>
       <div className="verde-card">
@@ -236,6 +270,9 @@ export default function SuperAdminlerClient({
                         setOpenEdit(true)
                       }}>Düzenle</RowActionButton>
                       <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
+                      {deviceTokenMap[u.id] && (
+                        <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>
+                      )}
                       {!isSelf && (
                         <RowActionButton variant="danger" onClick={() => deleteUser(u)}>Sil</RowActionButton>
                       )}
