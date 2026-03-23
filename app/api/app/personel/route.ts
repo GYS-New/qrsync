@@ -15,6 +15,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const firmaToken = searchParams.get('firma')
+    const projeId    = searchParams.get('proje') ?? null
 
     if (!firmaToken) {
       return NextResponse.json({ ok: false, error: 'firma parametresi gerekli' }, { status: 400, headers: CORS_HEADERS })
@@ -46,6 +47,14 @@ export async function GET(req: Request) {
 
     const firmaAdi = firma?.firma_adi || firma?.ticari_unvan || ''
 
+    // Firmaya ait projeleri getir
+    const { data: projeler } = await admin
+      .from('projeler')
+      .select('id, ad')
+      .eq('firma_id', linkData.firma_id)
+      .eq('aktif', true)
+      .order('ad', { ascending: true })
+
     // Zaten kayıtlı cihazı olan kullanıcıları bul
     const { data: kayitliCihazlar } = await admin
       .from('device_tokens')
@@ -55,14 +64,20 @@ export async function GET(req: Request) {
 
     const kayitliUserIdler = (kayitliCihazlar ?? []).map((d: any) => d.user_id)
 
-    // Henüz uygulamayı yüklememiş aktif personel listesi
-    const { data: personeller, error: personelErr } = await admin
+    // Personel listesi - proje seçildiyse o projenin personelleri
+    let personelQuery = admin
       .from('users')
       .select('id, isim_soyisim, rol')
       .eq('firma_id', linkData.firma_id)
       .eq('aktif', true)
       .in('rol', ['tenant_user', 'tenant_admin'])
       .order('isim_soyisim', { ascending: true })
+
+    if (projeId) {
+      personelQuery = (personelQuery as any).eq('proje_id', projeId)
+    }
+
+    const { data: personeller, error: personelErr } = await personelQuery
 
     if (personelErr) {
       return NextResponse.json({ ok: false, error: personelErr.message }, { status: 500, headers: CORS_HEADERS })
@@ -79,6 +94,7 @@ export async function GET(req: Request) {
       firmaId: linkData.firma_id,
       mod: linkData.mod || 'QR',
       personeller: kayitsizPersonel,
+      projeler: projeler ?? [],
     }, { headers: CORS_HEADERS })
 
   } catch (error: any) {

@@ -10,6 +10,7 @@ export type ScanTask = {
   durum: string
   atanan_kullanici_id: string | null
   olusturma_tarihi?: string | null
+  baslatilma_tarihi?: string | null
 }
 
 export type ScanChecklistItem = {
@@ -32,6 +33,7 @@ export type ScanContext = {
     id: string
     tanim: string
     aktif: boolean
+    sureli_gorev_aktif: boolean
   }
   checklistTemplate: {
     id: string
@@ -58,7 +60,8 @@ export async function resolveScanContext(opts: {
       tanim,
       aktif,
       ${tokenColumn},
-      checklist_template_id,
+      checklist_sablon_id,
+      sureli_gorev_aktif,
       firmalar(id, firma_adi, ticari_unvan, aktif, qr_sistemi_aktif, nfc_sistemi_aktif)
     `)
     .eq(tokenColumn, token)
@@ -88,15 +91,15 @@ export async function resolveScanContext(opts: {
   const [manualRes, liveRes] = await Promise.all([
     supabase
       .from('gorevler')
-      .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi')
+      .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi,baslatilma_tarihi')
       .eq('lokasyon_id', loc.id)
-      .eq('durum', 'ACIK')
+      .in('durum', ['ACIK', 'ISLEMDE'])
       .order('olusturma_tarihi', { ascending: true }),
     supabase
       .from('canli_gorevler')
-      .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi')
+      .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi,baslatilma_tarihi')
       .eq('lokasyon_id', loc.id)
-      .eq('durum', 'ACIK')
+      .in('durum', ['ACIK', 'ISLEMDE'])
       .order('olusturma_tarihi', { ascending: true }),
   ])
 
@@ -112,11 +115,11 @@ export async function resolveScanContext(opts: {
     .map((t: any) => ({ ...t, taskType: 'canli_gorevler' }))
 
   let checklistTemplate: ScanContext['checklistTemplate'] = null
-  const checklistTemplateId = (loc as any).checklist_template_id as string | null
+  const checklistTemplateId = (loc as any).checklist_sablon_id as string | null
   if (checklistTemplateId) {
     const { data: template, error: templateError } = await supabase
-      .from('checklist_templates')
-      .select('id,isim')
+      .from('checklist_sablonlari')
+      .select('id,baslik')
       .eq('id', checklistTemplateId)
       .single()
 
@@ -124,21 +127,21 @@ export async function resolveScanContext(opts: {
 
     if (template) {
       const { data: items, error: itemsError } = await supabase
-        .from('checklist_items')
-        .select('id,sira,madde,zorunlu')
-        .eq('template_id', template.id)
+        .from('checklist_sablon_maddeleri')
+        .select('id,sira_no,baslik,zorunlu_cevap')
+        .eq('sablon_id', template.id)
         .order('sira', { ascending: true })
 
       if (itemsError) throw new Error(itemsError.message)
 
       checklistTemplate = {
         id: (template as any).id,
-        isim: (template as any).isim,
+        isim: (template as any).baslik,
         items: ((items as any[]) ?? []).map((item: any) => ({
           id: item.id,
-          sira: item.sira,
-          madde: item.madde,
-          zorunlu: !!item.zorunlu,
+          sira: item.sira_no,
+          madde: item.baslik,
+          zorunlu: item.zorunlu_cevap !== false,
         })),
       }
     }
@@ -158,6 +161,7 @@ export async function resolveScanContext(opts: {
       id: loc.id,
       tanim: loc.tanim,
       aktif: !!loc.aktif,
+      sureli_gorev_aktif: !!(loc as any).sureli_gorev_aktif,
     },
     checklistTemplate,
     tasks: [...visibleManual, ...visibleLive],

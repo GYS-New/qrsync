@@ -40,12 +40,22 @@ export async function GET(req: Request) {
       .update({ son_kullanim: new Date().toISOString() })
       .eq('device_token', deviceToken)
 
+    // users tablosundan güncel bilgileri al
+    const { data: userData } = await admin
+      .from('users')
+      .select('id, isim_soyisim, rol, firma_id, proje_id, email')
+      .eq('id', tokenData.user_id)
+      .single()
+
     return NextResponse.json({
       ok: true,
       user: {
         id: tokenData.user_id,
-        isim_soyisim: tokenData.isim_soyisim,
-        firma_id: tokenData.firma_id,
+        isim_soyisim: userData?.isim_soyisim ?? tokenData.isim_soyisim,
+        firma_id: userData?.firma_id ?? tokenData.firma_id,
+        proje_id: userData?.proje_id ?? null,
+        rol: userData?.rol ?? 'tenant_user',
+        email: userData?.email ?? null,
       },
     }, { headers: CORS_HEADERS })
 
