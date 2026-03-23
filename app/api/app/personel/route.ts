@@ -11,6 +11,15 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: CORS_HEADERS })
 }
 
+function rolAdi(rol: string): string {
+  switch (rol) {
+    case 'tenant_admin': return 'Yönetici'
+    case 'tenant_user':  return 'Saha Personeli'
+    case 'musteri':      return 'Müşteri'
+    default:             return 'Saha Personeli'
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -64,7 +73,7 @@ export async function GET(req: Request) {
 
     const kayitliUserIdler = (kayitliCihazlar ?? []).map((d: any) => d.user_id)
 
-    // Personel listesi - proje seçildiyse o projenin personelleri
+    // Personel listesi
     let personelQuery = admin
       .from('users')
       .select('id, isim_soyisim, rol')
@@ -93,7 +102,11 @@ export async function GET(req: Request) {
       firmaAdi,
       firmaId: linkData.firma_id,
       mod: linkData.mod || 'QR',
-      personeller: kayitsizPersonel,
+      // Rol adlarını Türkçe olarak dönüştür
+      personeller: kayitsizPersonel.map((p: any) => ({
+        ...p,
+        rol: rolAdi(p.rol),
+      })),
       projeler: projeler ?? [],
     }, { headers: CORS_HEADERS })
 
