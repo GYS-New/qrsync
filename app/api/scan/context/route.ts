@@ -128,6 +128,8 @@ export async function GET(req: NextRequest) {
       kullanici: { id: me.id, isim_soyisim: me.isim_soyisim, firma_id: me.firma_id },
       gorevler,
       sablon,
+    }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
     })
   } catch (err: any) {
     console.error('[scan/context]', err)

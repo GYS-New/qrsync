@@ -126,11 +126,8 @@ export default function LokasyonlarClient({
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'İmport başarısız')
       if (firmaId) await refresh(firmaId)
-      const groupMsg = (j.groups_created || j.groups_updated)
-        ? ` ${j.groups_created ?? 0} grup oluşturuldu, ${j.groups_updated ?? 0} grup güncellendi.`
-        : ''
       const extra = j.errors?.length ? ` Hata: ${j.errors.slice(0, 3).join(' | ')}` : ''
-      showSuccess(`${j.created} lokasyon içe aktarıldı.${groupMsg}${extra}`)
+      showSuccess(`${j.created} lokasyon içe aktarıldı.${extra}`)
     } catch (err: any) {
       showError(err.message)
     }
@@ -177,17 +174,14 @@ export default function LokasyonlarClient({
       .eq('firma_id', fid)
       .order('kayit_tarihi', { ascending: true })
     if (projeId) lokQuery = (lokQuery as any).eq('proje_id', projeId)
-    let tplQuery = supabase
-      .from('checklist_sablonlari')
-      .select('id,baslik,aktif,firma_id')
-      .eq('firma_id', fid)
-      .eq('aktif', true)
-      .order('baslik', { ascending: true })
-    if (projeId) tplQuery = (tplQuery as any).eq('proje_id', projeId)
-
     const [locRes, tplRes] = await Promise.all([
       lokQuery,
-      tplQuery,
+      supabase
+        .from('checklist_sablonlari')
+        .select('id,baslik,aktif,firma_id')
+        .eq('firma_id', fid)
+        .eq('aktif', true)
+        .order('baslik', { ascending: true }),
     ])
     if (locRes.error) showError(locRes.error.message)
     if (tplRes.error) showError(tplRes.error.message)

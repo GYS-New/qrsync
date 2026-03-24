@@ -56,6 +56,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
       : isMusteri
       ? [
           // musteri: sınırlı görüntüleme
+          { label: 'Kullanıcılar', href: `${base}/dashboard/kullanicilar`, icon: '👥' },
           { label: 'Lokasyonlar', href: `${base}/dashboard/lokasyonlar`, icon: '📍' },
           { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
           { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler`, icon: '⚡' },
@@ -223,7 +224,6 @@ export default function Sidebar({ user, firma }: { user: User; firma: any }) {
     } else {
       map[`${base}/dashboard/kullanicilar`] = { value: counts.users_total, tone: 'green' }
     }
-
     // Locations / Tasks / Live
     map[`${base}/dashboard/lokasyonlar`] = { value: counts.locations_total, tone: 'blue' }
     map[`${base}/dashboard/gorevler`] = { value: counts.tasks_total, tone: 'yellow' }

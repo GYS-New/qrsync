@@ -13,10 +13,9 @@ export async function GET() {
         { key: 'aciklama', label: 'aciklama', width: 28 },
         { key: 'aktif', label: 'aktif', width: 12 },
         { key: 'sureli_gorev_aktif', label: 'sureli_gorev_aktif', width: 18 },
-        { key: 'grup', label: 'grup', width: 28 },
       ],
       rows: [
-        { seviye_1: 'Merkez', seviye_2: 'Kat 1', seviye_3: 'Depo', aciklama: 'Örnek lokasyon', aktif: 'evet', sureli_gorev_aktif: 'evet', grup: 'Depo Grubu' },
+        { seviye_1: 'Merkez', seviye_2: 'Kat 1', seviye_3: 'Depo', aciklama: 'Örnek lokasyon', aktif: 'evet', sureli_gorev_aktif: 'evet' },
       ],
     }],
   })

@@ -105,7 +105,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
     setMessage('Bağlanıyor…')
 
     try {
-      const res  = await fetch(`/api/scan/context?token=${encodeURIComponent(token)}&kanal=${kanal}`)
+      const res  = await fetch(`/api/scan/context?token=${encodeURIComponent(token)}&kanal=${kanal}`, { cache: 'no-store' })
       const json = await res.json()
 
       if (!json.ok) {
@@ -118,7 +118,17 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
 
       setMe(kullanici)
       setLokasyon(loc)
-      setGorevler(tasks)
+      // DB'den gelen baslatilma_tarihi null ise local state'deki değeri koru (tekrar yüklemede kayıp olmasın)
+      setGorevler(prev => {
+        const prevMap = Object.fromEntries(prev.map(t => [t.id, t]))
+        return (tasks as GorevOzet[]).map(t => {
+          const existing = prevMap[t.id]
+          if (existing && !t.baslatilma_tarihi && existing.baslatilma_tarihi) {
+            return { ...t, baslatilma_tarihi: existing.baslatilma_tarihi }
+          }
+          return t
+        })
+      })
 
       if (tasks.length === 0) {
         setLoading(false)
@@ -429,8 +439,9 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
     if (!loading && canAutoComplete && !completed && !submitting) {
       void completeSelectedTask()
     }
+    // completeSelectedTask intentionally included — avoids stale closure on auto-complete
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, canAutoComplete])
+  }, [loading, canAutoComplete, completed, submitting, completeSelectedTask])
 
   return (
     <div style={{ maxWidth: 920, margin: '0 auto', padding: '24px 16px 40px' }}>
