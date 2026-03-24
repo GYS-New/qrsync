@@ -169,7 +169,7 @@ export default function ReportsClient({
   projeId,
   initialFirmaId,
 }: {
-  base: '/sa' | '/ta'
+  base: '/sa' | '/ta' | '/u'
   title: string
   isSA: boolean
   firmaAdi?: string | null

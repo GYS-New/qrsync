@@ -12,7 +12,7 @@ export default function QuickReportsPageClient({
   projeId,
   initialFirmaId,
 }: {
-  base: '/sa' | '/ta'
+  base: '/sa' | '/ta' | '/u'
   title: string
   isSA: boolean
   projeId?: string | null
