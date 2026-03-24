@@ -7,7 +7,7 @@ export default async function ULayout({ children }: { children: React.ReactNode 
   const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) redirect('/login')
   const { data: user } = await supabase.from('users').select('*').eq('id', authUser.id).single()
-  if (!user || user.rol !== 'tenant_user') redirect('/login')
+  if (!user || (user.rol !== 'tenant_user' && user.rol !== 'musteri')) redirect('/login')
   const { data: firma } = user.firma_id
     ? await supabase.from('firmalar').select('ticari_unvan,firma_adi,logo_url').eq('id', user.firma_id).single()
     : { data: null }

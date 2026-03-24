@@ -14,7 +14,7 @@ export default async function UPersonelTakibiPage() {
     .select('id,rol,firma_id,proje_id')
     .eq('id', authUser.id)
     .single()
-  if (!me || me.rol !== 'tenant_user') redirect('/login')
+  if (!me || (me.rol !== 'tenant_user' && me.rol !== 'musteri')) redirect('/login')
 
   const firmaId = me.firma_id
   const projeId = me.proje_id
