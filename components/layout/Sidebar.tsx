@@ -240,10 +240,13 @@ export default function Sidebar({ user, firma }: { user: User; firma: any }) {
       map[`${base}/dashboard/firmalar`] = { value: counts.firms_total, tone: 'green' }
       map[`${base}/dashboard/personel-takibi`] = { value: counts.personnel_tracking_total, tone: 'green' }
       map[`${base}/dashboard/raporlar`] = { value: counts.reports_total, tone: 'blue' }
-    } else if (isTA) {
-      // TA specific counts
+    } else {
+      // TA + musteri + tenant_user — hepsi personel-takibi badge'i alır
       map[`${base}/dashboard/personel-takibi`] = { value: counts.personnel_tracking_total, tone: 'green' }
-      map[`${base}/dashboard/raporlar`] = { value: counts.reports_total, tone: 'blue' }
+      // TA ve musteri raporlar sayfasına sahip
+      if (isTA || user.rol === 'musteri') {
+        map[`${base}/dashboard/raporlar`] = { value: counts.reports_total, tone: 'blue' }
+      }
     }
 
     return map

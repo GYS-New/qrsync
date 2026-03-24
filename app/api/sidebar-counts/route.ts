@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
   const { data: me, error: meErr } = await supabase
     .from('users')
-    .select('id,rol,firma_id')
+    .select('id,rol,firma_id,proje_id')
     .eq('id', authUser.id)
     .single()
 
@@ -65,26 +65,37 @@ export async function GET(request: Request) {
       locationsQuery = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true })
     }
   } else {
-    // TA / tenant_user / musteri: proje filtresi varsa o projeye + firmaya göre, yoksa firmaya göre
-    if (projeId && firmaId) {
-      // Proje seçiliyse: hem firma_id hem proje_id filtrele (cross-firm sızmasını engelle)
-      usersQuery = supabase.from('users').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId)
-      tasksQuery = supabase.from('gorevler').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId)
-      liveQuery = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId).eq('durum', 'ACIK')
-      locationsQuery = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId)
-    } else if (projeId) {
-      // firmaId yoksa (beklenmedik durum) sadece proje_id filtrele
-      usersQuery = supabase.from('users').select('id', { count: 'exact', head: true }).eq('proje_id', projeId)
-      tasksQuery = supabase.from('gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', projeId)
-      liveQuery = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', projeId).eq('durum', 'ACIK')
-      locationsQuery = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('proje_id', projeId)
+    // tenant_user / musteri: proje_id query param olmaz (ProjeProvider yok),
+    // bu roller için kendi user kaydındaki proje_id'yi kullan.
+    // tenant_admin: proje_id query param olarak ProjeProvider'dan gelir.
+    const isUserRole = me.rol === 'tenant_user' || me.rol === 'musteri'
+    const effectiveProjeId = projeId || (isUserRole ? ((me as any).proje_id ?? null) : null)
+
+    if (effectiveProjeId) {
+      // Proje seçiliyse: o projeye ait kullanıcılar
+      usersQuery = supabase.from('users').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId!).eq('proje_id', effectiveProjeId)
     } else {
-      // Proje seçili değilse: firmaya ait tüm veriler
+      // Proje seçili değilse: firmaya ait kullanıcılar
       usersQuery = !firmaId ? usersBase : usersBase.eq('firma_id', firmaId)
+    }
+    
+    if (effectiveProjeId) {
+      // Proje seçiliyse: o projeye ait görevler ve canlı görevler
+      tasksQuery = supabase.from('gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+      liveQuery = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId).eq('durum', 'ACIK')
+    } else {
+      // Proje seçili değilse: firmaya ait görevler
       tasksQuery = !firmaId ? tasksBase : tasksBase.eq('firma_id', firmaId)
       liveQuery = !firmaId ? liveBase : liveBase.eq('firma_id', firmaId)
-      locationsQuery = !firmaId
-        ? locationsBase
+    }
+    
+    if (effectiveProjeId) {
+      // Proje seçiliyse o projeye ait lokasyonlar
+      locationsQuery = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+    } else {
+      // Proje seçili değilse firma bazlı
+      locationsQuery = !firmaId 
+        ? locationsBase 
         : locationsBase.eq('firma_id', firmaId)
     }
   }
@@ -107,11 +118,13 @@ export async function GET(request: Request) {
       projectsQuery = supabase.from('projeler').select('id', { count: 'exact', head: true })
     }
   } else {
-    if (projeId) {
-      // TA: seçili proje varsa 1 dön (mevcut proje)
-      projectsQuery = supabase.from('projeler').select('id', { count: 'exact', head: true }).eq('id', projeId)
+    const isUserRole = me.rol === 'tenant_user' || me.rol === 'musteri'
+    const ep = projeId || (isUserRole ? ((me as any).proje_id ?? null) : null)
+    if (ep) {
+      // seçili proje varsa 1 dön (mevcut proje)
+      projectsQuery = supabase.from('projeler').select('id', { count: 'exact', head: true }).eq('id', ep)
     } else {
-      // TA: tüm projeler veya firma bazlı
+      // tüm projeler veya firma bazlı
       projectsQuery = !firmaId 
         ? supabase.from('projeler').select('id', { count: 'exact', head: true })
         : supabase.from('projeler').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId)
@@ -122,49 +135,57 @@ export async function GET(request: Request) {
     ? (firmaIdParam 
         ? supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true }).eq('firma_id', firmaIdParam)
         : supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true }))
-    : (projeId && firmaId
-        ? supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId)
-        : projeId
-        ? supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true }).eq('proje_id', projeId)
-        : (!firmaId 
-            ? supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true })
-            : supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId)))
+    : (() => {
+        const isUserRole = me.rol === 'tenant_user' || me.rol === 'musteri'
+        const ep = projeId || (isUserRole ? ((me as any).proje_id ?? null) : null)
+        return ep
+          ? supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true }).eq('proje_id', ep)
+          : (!firmaId
+              ? supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true })
+              : supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId))
+      })()
 
   const checklistTemplatesQuery = isSA 
     ? (firmaIdParam 
         ? supabase.from('checklist_sablonlari').select('id', { count: 'exact', head: true }).eq('firma_id', firmaIdParam)
         : supabase.from('checklist_sablonlari').select('id', { count: 'exact', head: true }))
-    : (projeId && firmaId
-        ? supabase.from('checklist_sablonlari').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId)
-        : projeId
-        ? supabase.from('checklist_sablonlari').select('id', { count: 'exact', head: true }).eq('proje_id', projeId)
-        : (!firmaId 
-            ? supabase.from('checklist_sablonlari').select('id', { count: 'exact', head: true })
-            : supabase.from('checklist_sablonlari').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId)))
+    : (() => {
+        const isUserRole = me.rol === 'tenant_user' || me.rol === 'musteri'
+        const ep = projeId || (isUserRole ? ((me as any).proje_id ?? null) : null)
+        return ep
+          ? supabase.from('checklist_sablonlari').select('id', { count: 'exact', head: true }).eq('proje_id', ep)
+          : (!firmaId
+              ? supabase.from('checklist_sablonlari').select('id', { count: 'exact', head: true })
+              : supabase.from('checklist_sablonlari').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId))
+      })()
 
   const personnelTrackingQuery = isSA 
     ? (firmaIdParam 
         ? supabase.from('personel_takibi').select('id', { count: 'exact', head: true }).eq('firma_id', firmaIdParam)
         : supabase.from('personel_takibi').select('id', { count: 'exact', head: true }))
-    : (projeId && firmaId
-        ? supabase.from('personel_takibi').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId)
-        : projeId
-        ? supabase.from('personel_takibi').select('id', { count: 'exact', head: true }).eq('proje_id', projeId)
-        : (!firmaId 
-            ? supabase.from('personel_takibi').select('id', { count: 'exact', head: true })
-            : supabase.from('personel_takibi').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId)))
+    : (() => {
+        const isUserRole = me.rol === 'tenant_user' || me.rol === 'musteri'
+        const ep = projeId || (isUserRole ? ((me as any).proje_id ?? null) : null)
+        return ep
+          ? supabase.from('personel_takibi').select('id', { count: 'exact', head: true }).eq('proje_id', ep)
+          : (!firmaId
+              ? supabase.from('personel_takibi').select('id', { count: 'exact', head: true })
+              : supabase.from('personel_takibi').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId))
+      })()
 
   const reportsQuery = isSA 
     ? (firmaIdParam 
         ? supabase.from('raporlar').select('id', { count: 'exact', head: true }).eq('firma_id', firmaIdParam)
         : supabase.from('raporlar').select('id', { count: 'exact', head: true }))
-    : (projeId && firmaId
-        ? supabase.from('raporlar').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId)
-        : projeId
-        ? supabase.from('raporlar').select('id', { count: 'exact', head: true }).eq('proje_id', projeId)
-        : (!firmaId 
-            ? supabase.from('raporlar').select('id', { count: 'exact', head: true })
-            : supabase.from('raporlar').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId)))
+    : (() => {
+        const isUserRole = me.rol === 'tenant_user' || me.rol === 'musteri'
+        const ep = projeId || (isUserRole ? ((me as any).proje_id ?? null) : null)
+        return ep
+          ? supabase.from('raporlar').select('id', { count: 'exact', head: true }).eq('proje_id', ep)
+          : (!firmaId
+              ? supabase.from('raporlar').select('id', { count: 'exact', head: true })
+              : supabase.from('raporlar').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId))
+      })()
 
 
   // Arşiv count
@@ -172,11 +193,15 @@ export async function GET(request: Request) {
     ? (firmaIdParam
         ? supabase.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true }).eq('firma_id', firmaIdParam)
         : supabase.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true }))
-    : (projeId
-        ? supabase.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId!).eq('proje_id', projeId)
-        : firmaId
-            ? supabase.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId)
-            : supabase.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true }))
+    : (() => {
+        const isUserRole = me.rol === 'tenant_user' || me.rol === 'musteri'
+        const ep = projeId || (isUserRole ? ((me as any).proje_id ?? null) : null)
+        return ep
+          ? supabase.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId!).eq('proje_id', ep)
+          : firmaId
+              ? supabase.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId)
+              : supabase.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true })
+      })()
   // SA için split counts — admins proje bağımsız, employees proje bazlı olabilir
   let adminsQuery = null
   let employeesQuery = null
@@ -284,13 +309,11 @@ export async function GET(request: Request) {
     arsiv_total: arsivRes?.count ?? 0,
     debug: {
       isSA,
+      rol: me.rol,
       firmaId,
       projeId,
+      effectiveProjeId: !isSA ? (projeId || ((me.rol === 'tenant_user' || me.rol === 'musteri') ? ((me as any).proje_id ?? null) : null)) : null,
       firmaIdParam,
-      queries: {
-        usersQuery: isSA ? (firmaIdParam ? `firma_id=${firmaIdParam}` : 'all') : (projeId ? `proje_id=${projeId}` : (firmaId ? `firma_id=${firmaId}` : 'all')),
-        projectsQuery: isSA ? (firmaIdParam ? `firma_id=${firmaIdParam}` : 'all') : (projeId ? `proje_id=${projeId}` : (firmaId ? `firma_id=${firmaId}` : 'all')),
-      }
     }
   })
 }
