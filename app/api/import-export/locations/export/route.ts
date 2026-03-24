@@ -23,12 +23,39 @@ function buildPathMap(rows: any[]) {
 export async function GET(req: NextRequest) {
   try {
     const scope = await requireImportScope(req.nextUrl.searchParams.get('firmaId'))
-    const { data, error } = await scope.admin.from('lokasyonlar').select('id,parent_id,tanim,aciklama,aktif,sureli_gorev_aktif').eq('firma_id', scope.firmaId).order('kayit_tarihi', { ascending: true })
-    if (error) throw new Error(error.message)
-    const pathOf = buildPathMap(data ?? [])
-    const rows = (data ?? []).map((x: any) => {
+    const projeIdParam = req.nextUrl.searchParams.get('proje_id') ?? null
+
+    let lokQuery = scope.admin.from('lokasyonlar').select('id,parent_id,tanim,aciklama,aktif,sureli_gorev_aktif').eq('firma_id', scope.firmaId).order('kayit_tarihi', { ascending: true })
+    if (projeIdParam) lokQuery = (lokQuery as any).eq('proje_id', projeIdParam)
+
+    const [lokRes, groupsRes, membersRes] = await Promise.all([
+      lokQuery,
+      scope.admin.from('lokasyon_gruplari').select('id,ad,ust_lokasyon_id').eq('firma_id', scope.firmaId),
+      scope.admin.from('lokasyon_grup_uyeleri').select('grup_id,lokasyon_id'),
+    ])
+    if (lokRes.error) throw new Error(lokRes.error.message)
+    if (groupsRes.error) throw new Error(groupsRes.error.message)
+    if (membersRes.error) throw new Error(membersRes.error.message)
+
+    // lokasyon_id → grup adı map
+    const grupMap = new Map<string, string>()
+    for (const member of membersRes.data ?? []) {
+      const group = (groupsRes.data ?? []).find((g: any) => g.id === member.grup_id)
+      if (group) grupMap.set(member.lokasyon_id, group.ad)
+    }
+
+    const pathOf = buildPathMap(lokRes.data ?? [])
+    const rows = (lokRes.data ?? []).map((x: any) => {
       const parts = pathOf(x.id)
-      return { seviye_1: parts[0] ?? '', seviye_2: parts[1] ?? '', seviye_3: parts[2] ?? '', aciklama: x.aciklama ?? '', aktif: x.aktif ? 'evet' : 'hayir', sureli_gorev_aktif: x.sureli_gorev_aktif ? 'evet' : 'hayir' }
+      return {
+        seviye_1: parts[0] ?? '',
+        seviye_2: parts[1] ?? '',
+        seviye_3: parts[2] ?? '',
+        aciklama: x.aciklama ?? '',
+        aktif: x.aktif ? 'evet' : 'hayir',
+        sureli_gorev_aktif: x.sureli_gorev_aktif ? 'evet' : 'hayir',
+        grup: grupMap.get(x.id) ?? '',
+      }
     })
     const file = await buildXlsxBuffer({ sheets: [{ name: 'Lokasyonlar', headers: [
       { key: 'seviye_1', label: 'seviye_1', width: 22 },
@@ -37,6 +64,7 @@ export async function GET(req: NextRequest) {
       { key: 'aciklama', label: 'aciklama', width: 28 },
       { key: 'aktif', label: 'aktif', width: 12 },
       { key: 'sureli_gorev_aktif', label: 'sureli_gorev_aktif', width: 18 },
+      { key: 'grup', label: 'grup', width: 28 },
     ], rows }] })
     return new NextResponse(file, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="lokasyonlar.xlsx"' } })
   } catch (e: any) {

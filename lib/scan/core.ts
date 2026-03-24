@@ -99,7 +99,7 @@ export async function resolveScanContext(opts: {
       .from('canli_gorevler')
       .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi,baslatilma_tarihi')
       .eq('lokasyon_id', loc.id)
-      .in('durum', ['ACIK', 'ISLEMDE'])
+      .in('durum', ['ACIK', 'BEKLEMEDE'])
       .order('olusturma_tarihi', { ascending: true }),
   ])
 
