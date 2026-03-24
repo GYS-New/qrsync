@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (meError || !me) return NextResponse.json({ error: 'Kullanıcı profili bulunamadı.' }, { status: 403 })
-    if (!['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
+    if (!['super_admin', 'alt_super_admin', 'tenant_admin', 'musteri', 'tenant_user'].includes(me.rol)) {
       return NextResponse.json({ error: 'Bu rapora erişim yetkiniz yok.' }, { status: 403 })
     }
 

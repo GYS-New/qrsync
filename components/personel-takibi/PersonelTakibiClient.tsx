@@ -34,9 +34,10 @@ interface PersonelSatir {
 interface Kpi { toplam: number; aktif: number; pasif: number }
 
 interface Props {
-  base:           string
-  isSA:           boolean
+  base:            string
+  isSA:            boolean
   initialFirmaId?: string | null
+  initialProjeId?: string | null
 }
 
 // ── QR görsel üretici ─────────────────────────────────────────────────────────
@@ -108,12 +109,12 @@ function QrKart({ qr, origin, projeAdi, onIndir }: {
 }
 
 // ── Ana bileşen ───────────────────────────────────────────────────────────────
-export default function PersonelTakibiClient({ base, isSA, initialFirmaId }: Props) {
+export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initialProjeId }: Props) {
   const { firmaId: saFirmaId } = useFirma()
   const { aktifProje } = useProje()
 
   const firmaId = isSA ? saFirmaId : (initialFirmaId ?? null)
-  const projeId = aktifProje?.id ?? null
+  const projeId = aktifProje?.id ?? initialProjeId ?? null
   const projeAdi = aktifProje?.ad ?? ''
 
   const [aktifSekme, setAktifSekme] = useState<'bugun' | 'qr'>('bugun')

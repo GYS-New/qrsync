@@ -43,7 +43,8 @@ export async function GET(req: Request) {
 
     const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
     const isTA = me.rol === 'tenant_admin'
-    if (!isSA && !isTA) return NextResponse.json({ error: 'Yetkisiz erişim.' }, { status: 403 })
+    const isTenantViewer = me.rol === 'musteri' || me.rol === 'tenant_user'
+    if (!isSA && !isTA && !isTenantViewer) return NextResponse.json({ error: 'Yetkisiz erişim.' }, { status: 403 })
 
     const p = new URL(req.url).searchParams
     const firmaId       = isSA ? p.get('firmaId') : me.firma_id

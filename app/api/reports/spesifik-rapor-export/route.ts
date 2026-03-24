@@ -36,7 +36,7 @@ export async function GET(req: Request) {
     const { data: { user: authUser } } = await supabase.auth.getUser()
     if (!authUser) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
     const { data: me } = await supabase.from('users').select('id,rol,firma_id,isim_soyisim').eq('id', authUser.id).single()
-    if (!me || !['super_admin','alt_super_admin','tenant_admin'].includes(me.rol)) return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 })
+    if (!me || !['super_admin','alt_super_admin','tenant_admin','musteri','tenant_user'].includes(me.rol)) return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 })
 
     const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
     const p = new URL(req.url).searchParams

@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const deviceToken = req.headers.get('X-Device-Token')
 
     if (!deviceToken) {
-      return NextResponse.json({ ok: false, error: 'Token gerekli' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ ok: false, error: 'Token gerekli', kod: 'ESLESMEDI' }, { status: 401, headers: CORS_HEADERS })
     }
 
     const admin = createAdminClient()
@@ -28,11 +28,11 @@ export async function GET(req: Request) {
       .single()
 
     if (error || !tokenData) {
-      return NextResponse.json({ ok: false, error: 'Geçersiz token' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ ok: false, error: 'Geçersiz token', kod: 'ESLESMEDI' }, { status: 401, headers: CORS_HEADERS })
     }
 
     if (!tokenData.aktif) {
-      return NextResponse.json({ ok: false, error: 'Cihaz devre dışı' }, { status: 403, headers: CORS_HEADERS })
+      return NextResponse.json({ ok: false, error: 'Cihaz devre dışı', kod: 'ESLESMEDI' }, { status: 403, headers: CORS_HEADERS })
     }
 
     await admin

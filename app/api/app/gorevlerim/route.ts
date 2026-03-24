@@ -12,7 +12,7 @@ export async function GET(req: Request) {
 
     const deviceToken = req.headers.get('X-Device-Token')
     if (!deviceToken) {
-      return NextResponse.json({ ok: false, error: 'X-Device-Token gerekli' }, { status: 401 })
+      return NextResponse.json({ ok: false, error: 'X-Device-Token gerekli', kod: 'ESLESMEDI' }, { status: 401 })
     }
 
     const { data: tokenData, error: tokenErr } = await admin
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
       .single()
 
     if (tokenErr || !tokenData) {
-      return NextResponse.json({ ok: false, error: 'Geçersiz cihaz token' }, { status: 401 })
+      return NextResponse.json({ ok: false, error: 'Geçersiz cihaz token', kod: 'ESLESMEDI' }, { status: 401 })
     }
 
     const { user_id: userId, firma_id: firmaId } = tokenData

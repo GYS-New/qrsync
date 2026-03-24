@@ -29,7 +29,8 @@ export async function GET(request: Request) {
 
     const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
     const isTA = me.rol === 'tenant_admin'
-    if (!isSA && !isTA) return NextResponse.json({ error: 'Bu işlem için yetkiniz yok.' }, { status: 403 })
+    const isTenantViewer = me.rol === 'musteri' || me.rol === 'tenant_user'
+    if (!isSA && !isTA && !isTenantViewer) return NextResponse.json({ error: 'Bu işlem için yetkiniz yok.' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const report = searchParams.get('report') as ReportKey | null

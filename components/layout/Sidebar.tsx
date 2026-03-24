@@ -70,6 +70,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
           { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler`, icon: '⚡' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
+          { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
         ]
 
   return [

@@ -168,7 +168,7 @@ export async function GET(req: Request) {
       .select('id,rol,firma_id,isim_soyisim')
       .eq('id', authUser.id)
       .single()
-    if (!me || !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
+    if (!me || !['super_admin', 'alt_super_admin', 'tenant_admin', 'musteri', 'tenant_user'].includes(me.rol)) {
       return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 })
     }
 

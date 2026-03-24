@@ -40,8 +40,16 @@ export async function completeTask(input: CompleteTaskInput) {
     }
 
     const sureli = !!(task as any).lokasyonlar?.sureli_gorev_aktif
+    const baslatilmaTarihi = task.baslatilma_tarihi ?? (sureli ? nowIso : null)
+
     if (sureli && !task.baslatilma_tarihi) {
-      throw new Error('Bu lokasyonda görev önce başlatılmalıdır')
+      // Başlatılmamışsa şimdi başlat
+      await supabase.from('gorevler').update({
+        baslatilma_tarihi: nowIso,
+        baslatan_kullanici_id: userId,
+        durum: 'ISLEMDE',
+        durum_degisim_tarihi: nowIso,
+      } as any).eq('id', taskId)
     }
 
     const { error: updateError } = await supabase
@@ -50,7 +58,7 @@ export async function completeTask(input: CompleteTaskInput) {
         durum: 'TAMAMLANDI',
         durum_degisim_tarihi: nowIso,
         tamamlanma_tarihi: nowIso,
-        tamamlanma_suresi_saniye: calcDurationSeconds(task.baslatilma_tarihi, nowIso),
+        tamamlanma_suresi_saniye: calcDurationSeconds(baslatilmaTarihi, nowIso),
         islemi_yapan_id: userId,
       } as any)
       .eq('id', taskId)
@@ -77,8 +85,15 @@ export async function completeTask(input: CompleteTaskInput) {
   }
 
   const sureli = !!(liveTask as any).lokasyonlar?.sureli_gorev_aktif
+  const liveBaslatilmaTarihi = liveTask.baslatilma_tarihi ?? (sureli ? nowIso : null)
+
   if (sureli && !liveTask.baslatilma_tarihi) {
-    throw new Error('Bu lokasyonda görev önce başlatılmalıdır')
+    // Başlatılmamışsa şimdi başlat
+    await supabase.from('canli_gorevler').update({
+      baslatilma_tarihi: nowIso,
+      baslatan_kullanici_id: userId,
+      durum_degisim_tarihi: nowIso,
+    } as any).eq('id', taskId)
   }
 
   const liveCompletionStatus = resolveLiveCompletionStatusByTask(liveTask as any, nowIso)
@@ -89,7 +104,7 @@ export async function completeTask(input: CompleteTaskInput) {
       durum: liveCompletionStatus,
       durum_degisim_tarihi: nowIso,
       tamamlanma_tarihi: nowIso,
-      tamamlanma_suresi_saniye: calcDurationSeconds(liveTask.baslatilma_tarihi, nowIso),
+      tamamlanma_suresi_saniye: calcDurationSeconds(liveBaslatilmaTarihi, nowIso),
       tamamlayan_kullanici_id: userId,
       islemi_yapan_id: userId,
     } as any)

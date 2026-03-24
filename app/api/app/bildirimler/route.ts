@@ -53,7 +53,7 @@ async function getAuthUser(req: Request) {
 
 export async function GET(req: Request) {
   const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
+  if (!user) return NextResponse.json({ ok: false, error: 'auth_required', kod: 'ESLESMEDI' }, { status: 401, headers: CORS_HEADERS })
 
   const admin = createAdminClient()
   const ucGunOnce = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()

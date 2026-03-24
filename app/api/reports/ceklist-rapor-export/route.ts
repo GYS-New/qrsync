@@ -144,7 +144,7 @@ export async function GET(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
     const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
-    if (!me || !['super_admin','alt_super_admin','tenant_admin'].includes(me.rol)) {
+    if (!me || !['super_admin','alt_super_admin','tenant_admin','musteri','tenant_user'].includes(me.rol)) {
       return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 })
     }
     const isSA    = me.rol === 'super_admin' || me.rol === 'alt_super_admin'

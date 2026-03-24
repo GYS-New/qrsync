@@ -70,6 +70,15 @@ export async function POST(req: Request, { params }: { params: { token: string }
         if (error) throw new Error(error.message)
       }
     }
+    // Süreli görev: baslatilma_tarihi yoksa otomatik başlat
+    if (context.lokasyon.sureli_gorev_aktif && !task.baslatilma_tarihi) {
+      const nowIso = new Date().toISOString()
+      const tablo = task.taskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'
+      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso }
+      if (task.taskType === 'gorevler') updatePayload.durum = 'ISLEMDE'
+      await supabase.from(tablo).update(updatePayload).eq('id', task.id)
+      ;(task as any).baslatilma_tarihi = nowIso
+    }
     await completeTask({ supabase, taskId: task.id, taskType: task.taskType, userId: user.id, channel: 'NFC' })
     return NextResponse.json({ ok: true, message: 'Görev NFC ile tamamlandı' })
   } catch (error: any) {

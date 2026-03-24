@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
       .single()
 
     if (meError || !me) return NextResponse.json({ error: 'Kullanıcı profili bulunamadı.' }, { status: 403 })
-    if (!['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
+    const isTenantViewer = me.rol === 'musteri' || me.rol === 'tenant_user'
+    if (!['super_admin', 'alt_super_admin', 'tenant_admin', 'musteri', 'tenant_user'].includes(me.rol)) {
       return NextResponse.json({ error: 'Bu rapora erişim yetkiniz yok.' }, { status: 403 })
     }
 
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
     }
 
     const requestedFirmaId = searchParams.get('firmaId') || null
-    const firmaId = me.rol === 'tenant_admin' ? me.firma_id ?? null : requestedFirmaId
+    const firmaId = (me.rol === 'tenant_admin' || isTenantViewer) ? me.firma_id ?? null : requestedFirmaId
     const projeId = searchParams.get('projeId') || null
 
     const payload = await buildQuickReport(type, {
