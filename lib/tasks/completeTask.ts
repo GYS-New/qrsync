@@ -52,7 +52,6 @@ export async function completeTask(input: CompleteTaskInput) {
         tamamlanma_tarihi: nowIso,
         tamamlanma_suresi_saniye: calcDurationSeconds(task.baslatilma_tarihi, nowIso),
         islemi_yapan_id: userId,
-        son_tamamlama_kanali: channel,
       } as any)
       .eq('id', taskId)
 
@@ -93,7 +92,6 @@ export async function completeTask(input: CompleteTaskInput) {
       tamamlanma_suresi_saniye: calcDurationSeconds(liveTask.baslatilma_tarihi, nowIso),
       tamamlayan_kullanici_id: userId,
       islemi_yapan_id: userId,
-      son_tamamlama_kanali: channel,
     } as any)
     .eq('id', taskId)
 

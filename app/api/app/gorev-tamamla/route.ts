@@ -97,7 +97,6 @@ export async function POST(req: Request) {
         tamamlanma_tarihi:        nowIso,
         tamamlanma_suresi_saniye: sureSaniye,
         islemi_yapan_id:          userId,
-        son_tamamlama_kanali:     'MOBIL',
       } as any)
       .eq('id', gorevId)
 

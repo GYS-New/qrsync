@@ -96,7 +96,6 @@ export async function POST(req: Request) {
         durum_degisim_tarihi:     nowIso,
         tamamlanma_tarihi:        nowIso,
         tamamlanma_suresi_saniye: sureSaniye,
-        son_tamamlama_kanali:     kanal,
       } as any).eq('id', gorev_id)
       if (updErr) throw new Error(updErr.message)
     } else {
@@ -111,7 +110,6 @@ export async function POST(req: Request) {
         tamamlanma_tarihi:        nowIso,
         durum_degisim_tarihi:     nowIso,
         tamamlanma_suresi_saniye: sureSaniye,
-        son_tamamlama_kanali:     kanal,
       } as any).eq('id', gorev_id)
       if (updErr) throw new Error(updErr.message)
     }
