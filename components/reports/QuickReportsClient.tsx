@@ -963,7 +963,7 @@ export default function QuickReportsClient({
 }: {
   open?: boolean
   firmaId: string | null
-  base?: '/sa' | '/ta'
+  base?: '/sa' | '/ta' | '/u'
   projeId?: string | null
 }) {
   const sectionRef = useRef<HTMLDivElement | null>(null)
