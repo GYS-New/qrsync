@@ -16,7 +16,7 @@ export default async function URaporlarOzellestirPage() {
   const { data: me } = await supabase.from('users').select('id,rol,firma_id,proje_id').eq('id', authUser.id).single()
   if (!me || (me.rol !== 'tenant_user' && me.rol !== 'musteri')) redirect('/u/dashboard')
 
-  const gorebilir = await sayfaGorebilirMi(me.rol, 'raporlar')
+  const gorebilir = await sayfaGorebilirMi(me.rol, 'raporlar', (me as any).firma_id ?? null)
   if (!gorebilir) redirect('/u/dashboard')
 
   const { data: firmaData } = me?.firma_id

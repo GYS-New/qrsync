@@ -11,7 +11,7 @@ export default async function GrupYetkileriPage() {
   if (!authUser) redirect('/login')
 
   const { data: me } = await supabase.from('users').select('rol').eq('id', authUser.id).single()
-  if (!me || me.rol !== 'super_admin') redirect('/sa/dashboard')
+  if (!me || (me.rol !== 'super_admin' && me.rol !== 'alt_super_admin')) redirect('/sa/dashboard')
 
   const admin = createAdminClient()
   const { data: yetkileri } = await admin

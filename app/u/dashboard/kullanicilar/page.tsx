@@ -15,7 +15,7 @@ export default async function UKullanicilarPage() {
   if (!me) redirect('/login')
 
   // Yetki kontrolü — görüntüleme kapalıysa dashboard'a yönlendir
-  const gorebilir = await sayfaGorebilirMi(me.rol, 'kullanicilar')
+  const gorebilir = await sayfaGorebilirMi(me.rol, 'kullanicilar', (me as any).firma_id ?? null)
   if (!gorebilir) redirect('/u/dashboard')
 
   const firmaId = me.firma_id

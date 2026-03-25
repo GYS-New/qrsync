@@ -17,7 +17,7 @@ export default async function UPersonelTakibiPage() {
     .single()
   if (!me || (me.rol !== 'tenant_user' && me.rol !== 'musteri')) redirect('/login')
 
-  const gorebilir = await sayfaGorebilirMi(me.rol, 'personel-takibi')
+  const gorebilir = await sayfaGorebilirMi(me.rol, 'personel-takibi', (me as any).firma_id ?? null)
   if (!gorebilir) redirect('/u/dashboard')
 
   return (

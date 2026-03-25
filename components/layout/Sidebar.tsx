@@ -82,6 +82,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
         { label: 'Profil Ayarları', href: `${base}/dashboard/ayarlar`, icon: '⚙' },
         { label: 'Dashboard Ayarları', href: `${base}/dashboard/ayarlar/dashboard`, icon: '🧩' },
         ...(isSA ? [{ label: 'Kullanıcı Grubu Yetkileri', href: `${base}/dashboard/ayarlar/kullanici-grubu-yetkileri`, icon: '🔐' }] : []),
+        ...(isTA ? [{ label: 'Kullanıcı Grubu Yetkileri', href: `${base}/dashboard/ayarlar/kullanici-grubu-yetkileri`, icon: '🔐' }] : []),
       ],
     },
   ]
@@ -156,6 +157,9 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user:
 
   const [counts, setCounts] = useState<SidebarCounts | null>(null)
   const [countsError, setCountsError] = useState(false)
+  // U ve M rolleri için sayfa yetkileri (dinamik nav filtresi)
+  const isUOrM = user.rol === 'tenant_user' || user.rol === 'musteri'
+  const [navYetkileri, setNavYetkileri] = useState<Record<string, boolean> | null>(null)
 
   const base =
     user.rol === 'super_admin' || user.rol === 'alt_super_admin'
@@ -165,6 +169,15 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user:
         : '/u'  // musteri ve tenant_user her ikisi de /u kullanır
 
   const groups = getNav(base, user.rol)
+
+  // U ve M için sayfa yetkileri çek
+  useEffect(() => {
+    if (!isUOrM) return
+    fetch('/api/auth/sayfa-yetkileri', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.ok) setNavYetkileri(j.gorebilir) })
+      .catch(() => {})
+  }, [isUOrM])
 
   // Fetch sidebar badge counts
   useEffect(() => {
@@ -381,7 +394,21 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user:
           </span>
         </div>
 
-        {groups.map((g) => (
+        {groups.map((g) => {
+          // U ve M rolleri için yetki filtresi uygula
+          const filteredItems = isUOrM && navYetkileri
+            ? g.items.filter(item => {
+                // href'ten sayfa kodunu çıkar: /u/dashboard/lokasyon-gruplari → lokasyon-gruplari
+                const parts = item.href.split('/')
+                const kod = parts[parts.length - 1]
+                // Yetki map'te yoksa açık kabul et
+                return navYetkileri[kod] !== false
+              })
+            : g.items
+
+          if (filteredItems.length === 0) return null
+
+          return (
           <div key={g.label} style={{ marginBottom: 4 }}>
             <div
               style={{
@@ -396,7 +423,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user:
               {g.label}
             </div>
 
-            {g.items.map((item) => (
+            {filteredItems.map((item) => (
               <div
                 key={item.href}
                 onClick={() => go(item.href)}
@@ -431,7 +458,8 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user:
               </div>
             ))}
           </div>
-        ))}
+          )
+        })}
       </nav>
 
       {/* Footer */}

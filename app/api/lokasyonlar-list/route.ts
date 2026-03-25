@@ -13,11 +13,14 @@ export async function GET(request: Request) {
 
     const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
     const isTA = me.rol === 'tenant_admin'
-    if (!isSA && !isTA) return NextResponse.json([], { status: 200 })
+    const isTenantViewer = me.rol === 'musteri' || me.rol === 'tenant_user'
+
+    if (!isSA && !isTA && !isTenantViewer) return NextResponse.json([], { status: 200 })
 
     const { searchParams } = new URL(request.url)
     const requestedFirmaId = searchParams.get('firmaId')
     const projeId = searchParams.get('projeId') || null
+    // SA: query param'dan firma; TA/M/U: kendi firma_id'si
     const firmaId = isSA ? requestedFirmaId : me.firma_id
 
     const admin = createAdminClient()

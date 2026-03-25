@@ -19,7 +19,7 @@ export default async function URaporlarPage() {
   if (!me || (me.rol !== 'tenant_user' && me.rol !== 'musteri')) redirect('/u/dashboard')
 
   // Yetki kontrolü
-  const gorebilir = await sayfaGorebilirMi(me.rol, 'raporlar')
+  const gorebilir = await sayfaGorebilirMi(me.rol, 'raporlar', (me as any).firma_id ?? null)
   if (!gorebilir) redirect('/u/dashboard')
 
   const { data: firma } = me.firma_id
@@ -49,7 +49,7 @@ export default async function URaporlarPage() {
   }
 
   // Müşteri değerlendirme yetki kontrolü
-  const musteriGorebilir = await sayfaGorebilirMi(me.rol, 'musteri-degerlendirme')
+  const musteriGorebilir = await sayfaGorebilirMi(me.rol, 'musteri-degerlendirme', (me as any).firma_id ?? null)
   if (!musteriGorebilir) {
     initialRaporTurleri = initialRaporTurleri.filter((r) => r.id !== 'musteri_degerlendirme')
   }

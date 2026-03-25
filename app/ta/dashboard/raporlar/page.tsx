@@ -84,7 +84,7 @@ export default async function TARaporlarPage() {
   }
 
   // Müşteri değerlendirme yetki kontrolü (sayfa_kodu tire ile — GrupYetkileriClient ile tutarlı)
-  const musteriGorebilir = await sayfaGorebilirMi(me.rol, 'musteri-degerlendirme')
+  const musteriGorebilir = await sayfaGorebilirMi(me.rol, 'musteri-degerlendirme', (me as any).firma_id ?? null)
   if (!musteriGorebilir) {
     // Kart ID'si alt çizgi ile — ReportsHubClient ile tutarlı
     initialRaporTurleri = initialRaporTurleri.filter((r) => r.id !== 'musteri_degerlendirme')

@@ -83,10 +83,21 @@ for (const s of SAYFALAR) {
   }
 }
 
-export default function GrupYetkileriClient({ initialYetkileri }: { initialYetkileri: Yetki[] }) {
+export default function GrupYetkileriClient({
+  initialYetkileri,
+  firmaId = null,
+  apiEndpoint = '/api/sa/grup-yetkileri',
+  limitRoller,
+}: {
+  initialYetkileri: Yetki[]
+  firmaId?: string | null
+  apiEndpoint?: string
+  limitRoller?: string[]  // TA sadece musteri + tenant_user görecek
+}) {
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
-  const [aktifRol, setAktifRol] = useState(ROLLER[0].rol)
+  const gorünürRoller = limitRoller ? ROLLER.filter(r => limitRoller.includes(r.rol)) : ROLLER
+  const [aktifRol, setAktifRol] = useState(gorünürRoller[0]?.rol ?? ROLLER[0].rol)
   const [dirty, setDirty] = useState(false)
 
   const [yetkileriMap, setYetkileriMap] = useState<Record<string, Yetki>>(
@@ -115,10 +126,10 @@ export default function GrupYetkileriClient({ initialYetkileri }: { initialYetki
     setSaving(true)
     try {
       const rows = Object.values(yetkileriMap)
-      const res = await fetch('/api/sa/grup-yetkileri', {
+      const res = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ yetkileri: rows }),
+        body: JSON.stringify({ yetkileri: rows, firma_id: firmaId }),
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'Kaydedilemedi')
@@ -136,14 +147,14 @@ export default function GrupYetkileriClient({ initialYetkileri }: { initialYetki
     setSaving(false)
   }
 
-  const aktifRolBilgi = ROLLER.find(r => r.rol === aktifRol)!
+  const aktifRolBilgi = ROLLER.find(r => r.rol === aktifRol) ?? ROLLER[0]
 
   return (
     <div style={{ padding: '24px 28px' }}>
 
       {/* Rol seçim tabları */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {ROLLER.map(r => (
+        {gorünürRoller.map(r => (
           <button
             key={r.rol}
             onClick={() => setAktifRol(r.rol)}
@@ -221,7 +232,7 @@ export default function GrupYetkileriClient({ initialYetkileri }: { initialYetki
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 12, color: '#7a907a' }}>
-          Tüm roller için değişiklikler birlikte kaydedilir. Firma bazlı ayarlar ilerleyen sürümlerde eklenecektir.
+          {firmaId ? 'Bu firmaya özel yetki ayarları. Global ayarlar üzerine öncelik kazanır.' : 'Global yetki ayarları. Firma bazlı ayarlar bunların üzerine yazılabilir.'}
         </div>
         <button
           onClick={kaydet}

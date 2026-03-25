@@ -16,7 +16,7 @@ export default async function TAMusteriDegerlendirmePage() {
   if (!me || me.rol !== 'tenant_admin') redirect('/ta/dashboard')
 
   // Kullanıcı grubu yetki kontrolü
-  const gorebilir = await sayfaGorebilirMi(me.rol, 'musteri-degerlendirme')
+  const gorebilir = await sayfaGorebilirMi(me.rol, 'musteri-degerlendirme', (me as any).firma_id ?? null)
   if (!gorebilir) redirect('/ta/dashboard/raporlar')
 
   const aktifProje = await getAktifProje(me.firma_id ?? null)

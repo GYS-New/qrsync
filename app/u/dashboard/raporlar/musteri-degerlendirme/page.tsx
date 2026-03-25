@@ -16,8 +16,8 @@ export default async function URaporlarMusteriDegerlendirmePage() {
 
   // Hem raporlar hem müşteri değerlendirme yetki kontrolü
   const [raporGorebilir, musteriGorebilir] = await Promise.all([
-    sayfaGorebilirMi(me.rol, 'raporlar'),
-    sayfaGorebilirMi(me.rol, 'musteri-degerlendirme'),
+    sayfaGorebilirMi(me.rol, 'raporlar', (me as any).firma_id ?? null),
+    sayfaGorebilirMi(me.rol, 'musteri-degerlendirme', (me as any).firma_id ?? null),
   ])
   if (!raporGorebilir || !musteriGorebilir) redirect('/u/dashboard/raporlar')
 
