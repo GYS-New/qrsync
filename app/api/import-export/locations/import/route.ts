@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       .select('grup_id,lokasyon_id')
     const memberSet = new Set<string>() // "grup_id|lokasyon_id"
     for (const m of existingMembers ?? []) {
-      memberSet.set(`${m.grup_id}|${m.lokasyon_id}`)
+      memberSet.add(`${m.grup_id}|${m.lokasyon_id}`)
     }
 
     // ── Satır işleme ──────────────────────────────────────────────────────
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
             errors.push(`Satır ${rowNo}: Grup oluşturulamadı — ${grupErr?.message ?? 'bilinmeyen hata'}`)
           } else {
             grupId = newGrup.id
-            grupKeyMap.set(grupKey, grupId)
+            grupKeyMap.set(grupKey, newGrup.id as string)
             grupCreated++
           }
         }
