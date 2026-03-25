@@ -22,8 +22,9 @@ async function getAuthUser(req: Request) {
       .select('user_id, aktif')
       .eq('device_token', deviceToken)
       .single()
-    if (data?.aktif) return { id: data.user_id }
-    return null
+    if (!data) return NextResponse.json({ ok: false, error: 'Geçersiz cihaz token', kod: 'ESLESMEDI' }, { status: 401, headers: CORS_HEADERS })
+    if (!data.aktif) return NextResponse.json({ ok: false, error: 'Cihaz devre dışı', kod: 'ESLESMEDI' }, { status: 401, headers: CORS_HEADERS })
+    return { id: data.user_id }
   }
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -31,8 +32,10 @@ async function getAuthUser(req: Request) {
 }
 
 export async function GET(req: Request, { params }: { params: { token: string } }) {
-  const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
+  const authResult = await getAuthUser(req)
+  if (!authResult) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
+  if (authResult instanceof NextResponse) return authResult
+  const user = authResult as { id: string }
   try {
     const supabase = createAdminClient()
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'QR', userId: user.id })
@@ -43,19 +46,38 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 }
 
 export async function POST(req: Request, { params }: { params: { token: string } }) {
-  const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
+  const authResult = await getAuthUser(req)
+  if (!authResult) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
+  if (authResult instanceof NextResponse) return authResult
+  const user = authResult as { id: string }
+
   try {
     const body = await req.json().catch(() => ({}))
     const selectedTaskId = body?.taskId as string | undefined
     const selectedTaskType = body?.taskType as 'gorevler' | 'canli_gorevler' | undefined
     const checklistResults = Array.isArray(body?.checklistResults) ? body.checklistResults : []
+    const action = body?.action as string | undefined // 'basla' veya undefined (tamamla)
+
     const supabase = createAdminClient()
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'QR', userId: user.id })
     const task = context.tasks.find((t) => t.id === selectedTaskId && t.taskType === selectedTaskType)
+
     if (!task) {
       return NextResponse.json({ ok: false, error: 'Görev bulunamadı veya erişim yok' }, { status: 404, headers: CORS_HEADERS })
     }
+
+    // ── GÖREVE BAŞLA ──────────────────────────────────────────────────────────
+    if (action === 'basla') {
+      const nowIso = new Date().toISOString()
+      const table = selectedTaskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'
+      await supabase.from(table as any).update({
+        baslatilma_tarihi: nowIso,
+        durum: selectedTaskType === 'gorevler' ? 'ISLEMDE' : 'ACIK',
+      } as any).eq('id', selectedTaskId!)
+      return NextResponse.json({ ok: true, message: 'Görev başlatıldı', baslatilma_tarihi: nowIso }, { headers: CORS_HEADERS })
+    }
+
+    // ── GÖREVİ TAMAMLA ───────────────────────────────────────────────────────
     if (context.checklistTemplate?.items?.length) {
       const missingRequired = context.checklistTemplate.items.filter(
         (item) => item.zorunlu && !checklistResults.some((r: any) => r?.itemId === item.id && r?.durum === true)
@@ -80,16 +102,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
         if (error) throw new Error(error.message)
       }
     }
-    // Süreli görev: baslatilma_tarihi yoksa otomatik başlat
-    if (context.lokasyon.sureli_gorev_aktif && !task.baslatilma_tarihi) {
-      const nowIso = new Date().toISOString()
-      const tablo = task.taskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'
-      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso }
-      if (task.taskType === 'gorevler') updatePayload.durum = 'ISLEMDE'
-      await supabase.from(tablo).update(updatePayload).eq('id', task.id)
-      // Local task objesini güncelle — completeTask süre hesaplasın
-      ;(task as any).baslatilma_tarihi = nowIso
-    }
+
     await completeTask({ supabase, taskId: task.id, taskType: task.taskType, userId: user.id, channel: 'QR' })
     return NextResponse.json({ ok: true, message: 'Görev QR ile tamamlandı' }, { headers: CORS_HEADERS })
   } catch (error: any) {

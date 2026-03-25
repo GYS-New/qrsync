@@ -256,7 +256,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
               <span style={{ marginLeft: 6 }}>
                 {isSA
                   ? 'Firma Detay veya Proje Düzenle ekranından açabilirsiniz.'
-                  : 'Sistem yöneticinizle iletişime geçin.'}
+                  : 'Personel İşe Giriş-Çıkış Takibi Yapılmıyor.'}
               </span>
             </div>
           </div>
