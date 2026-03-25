@@ -55,20 +55,26 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
         ]
       : isMusteri
       ? [
-          // musteri: sınırlı görüntüleme
+          // musteri: tüm potansiyel sayfalar — navYetkileri dinamik filtresi kaldırır
           { label: 'Kullanıcılar', href: `${base}/dashboard/kullanicilar`, icon: '👥' },
           { label: 'Lokasyonlar', href: `${base}/dashboard/lokasyonlar`, icon: '📍' },
+          { label: 'Lokasyon Grupları', href: `${base}/dashboard/lokasyon-gruplari`, icon: '🗺️' },
           { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
+          { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
           { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler`, icon: '⚡' },
+          { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
         ]
       : [
-          // tenant_user: görüntüleme yetkisi olan menüler
+          // tenant_user: tüm potansiyel sayfalar — navYetkileri dinamik filtresi kaldırır
           { label: 'Kullanıcılar', href: `${base}/dashboard/kullanicilar`, icon: '👥' },
           { label: 'Lokasyonlar', href: `${base}/dashboard/lokasyonlar`, icon: '📍' },
+          { label: 'Lokasyon Grupları', href: `${base}/dashboard/lokasyon-gruplari`, icon: '🗺️' },
           { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
+          { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
           { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler`, icon: '⚡' },
+          { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
         ]
@@ -159,7 +165,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user:
   const [countsError, setCountsError] = useState(false)
   // U ve M rolleri için sayfa yetkileri (dinamik nav filtresi)
   const isUOrM = user.rol === 'tenant_user' || user.rol === 'musteri'
-  const [navYetkileri, setNavYetkileri] = useState<Record<string, boolean> | null>(null)
+  const [navYetkileri, setNavYetkileri] = useState<Record<string, { gorebilir: boolean }> | null>(null)
 
   const base =
     user.rol === 'super_admin' || user.rol === 'alt_super_admin'
@@ -175,7 +181,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user:
     if (!isUOrM) return
     fetch('/api/auth/sayfa-yetkileri', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
-      .then(j => { if (j?.ok) setNavYetkileri(j.gorebilir) })
+      .then(j => { if (j?.ok) setNavYetkileri(j.yetkileri) })
       .catch(() => {})
   }, [isUOrM])
 
@@ -402,7 +408,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user:
                 const parts = item.href.split('/')
                 const kod = parts[parts.length - 1]
                 // Yetki map'te yoksa açık kabul et
-                return navYetkileri[kod] !== false
+                return navYetkileri[kod]?.gorebilir !== false
               })
             : g.items
 

@@ -89,12 +89,16 @@ export default function GrupYetkileriClient({
   apiEndpoint = '/api/sa/grup-yetkileri',
   limitRoller,
   gizliSayfalar,
+  firmalar,
+  currentPath,
 }: {
   initialYetkileri: Yetki[]
   firmaId?: string | null
   apiEndpoint?: string
   limitRoller?: string[]
-  gizliSayfalar?: string[]  // TA için 'firmalar' gibi sayfaları gizler
+  gizliSayfalar?: string[]
+  firmalar?: { id: string; firma_adi?: string; ticari_unvan?: string }[]
+  currentPath?: string
 }) {
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
@@ -159,6 +163,33 @@ export default function GrupYetkileriClient({
 
   return (
     <div style={{ padding: '24px 28px' }}>
+
+      {/* Firma seçici — SA için */}
+      {firmalar && firmalar.length > 0 && currentPath && (
+        <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, background: '#f0f9f0', border: '1px solid #d6e4d6', borderRadius: 10, padding: '12px 16px' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#1f6b1f', whiteSpace: 'nowrap' }}>Firma Bazlı Yetki:</span>
+          <select
+            defaultValue={firmaId ?? ''}
+            onChange={e => {
+              const val = e.target.value
+              window.location.href = val ? `${currentPath}?firma_id=${val}` : currentPath
+            }}
+            style={{ flex: 1, maxWidth: 320, height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #d6e4d6', fontSize: 13, background: '#fff' }}
+          >
+            <option value="">🌐 Global (tüm firmalar için varsayılan)</option>
+            {firmalar.map(f => (
+              <option key={f.id} value={f.id}>
+                {f.firma_adi || f.ticari_unvan}
+              </option>
+            ))}
+          </select>
+          {firmaId && (
+            <span style={{ fontSize: 12, color: '#e65100', fontWeight: 700, background: '#fff3e0', padding: '3px 10px', borderRadius: 6, border: '1px solid #ffd0a0', whiteSpace: 'nowrap' }}>
+              Firmaya Özel
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Rol seçim tabları */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
