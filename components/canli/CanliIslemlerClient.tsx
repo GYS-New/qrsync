@@ -38,7 +38,7 @@ type BrowseFilter = 'ACIK' | 'IPTAL' | 'KAPALI' | 'TARIHI_GECMIS'
 
 // ── CANLI AKIŞ HEADER BİLEŞENİ ─────────────────────────────────────────
 function LiveHeader({
-  kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly,
+  kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly, showTumGorevler = true,
 }: {
   kpi: { toplam: number; tamamlandi: number; acik: number; beklemede: number; gecmis: number }
   durumFilter: string
@@ -48,6 +48,7 @@ function LiveHeader({
   setStreamState: (v: any) => void
   pathname: string | null
   readonly: boolean
+  showTumGorevler?: boolean
 }) {
   const FILTERS = [
     { key: 'TÜMÜ',      label: 'Tümü',          count: kpi.toplam },
@@ -769,7 +770,7 @@ useEffect(() => {
   if (readonly) {
     return (
       <div style={{ padding: '24px 28px' }}>
-        {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: true })}
+        {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: true, showTumGorevler })}
         <div className="verde-card" style={{ overflow: 'hidden', marginTop: 12 }}>
           <div className="verde-table-wrap">
             <table className="verde-table">
@@ -798,7 +799,7 @@ useEffect(() => {
     <div style={{ padding: '24px 28px' }}>
 
       {/* ── YENİ HEADER + KPI ── */}
-      {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: false })}
+      {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: false, showTumGorevler })}
 
       {/* ── GÖREV TABLOSU ── */}
       <div className="verde-card" style={{ overflow: 'hidden', marginBottom: 16, marginTop: 12 }}>
