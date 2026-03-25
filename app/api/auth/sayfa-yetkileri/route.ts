@@ -1,8 +1,8 @@
 /**
  * GET /api/auth/sayfa-yetkileri
- * Kullanıcının erişebildiği sayfa kodlarını döner.
- * SA her zaman tüm sayfaları görebilir.
- * Diğer roller için: önce firma bazlı kayıt, yoksa global kayıt, o da yoksa → açık (true).
+ * Kullanıcının tüm sayfa yetki haritasını döner (4 boyut: gorebilir, ekleyebilir, duzenleyebilir, silebilir).
+ * SA her zaman tüm sayfaları tam yetkiyle görür.
+ * Öncelik: firma bazlı kayıt → global kayıt → açık (true)
  */
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
@@ -13,6 +13,11 @@ const TÜM_SAYFA_KODLARI = [
   'personel-takibi', 'raporlar', 'musteri-degerlendirme',
 ]
 
+type YetkiRow = { gorebilir: boolean; ekleyebilir: boolean; duzenleyebilir: boolean; silebilir: boolean }
+type YetkiMap = Record<string, YetkiRow>
+
+const ACIK: YetkiRow = { gorebilir: true, ekleyebilir: true, duzenleyebilir: true, silebilir: true }
+
 export async function GET() {
   try {
     const supabase = createClient()
@@ -20,67 +25,61 @@ export async function GET() {
     if (!authUser) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
     const { data: me } = await supabase
-      .from('users')
-      .select('id,rol,firma_id')
-      .eq('id', authUser.id)
-      .single()
+      .from('users').select('id,rol,firma_id').eq('id', authUser.id).single()
     if (!me) return NextResponse.json({ ok: false, error: 'user_not_found' }, { status: 404 })
 
-    // SA her zaman her şeyi görebilir
+    // SA tam yetkili
     if (me.rol === 'super_admin' || me.rol === 'alt_super_admin') {
-      const map: Record<string, boolean> = {}
-      TÜM_SAYFA_KODLARI.forEach(k => { map[k] = true })
-      return NextResponse.json({ ok: true, gorebilir: map }, {
+      const yetkileri: YetkiMap = {}
+      TÜM_SAYFA_KODLARI.forEach(k => { yetkileri[k] = { ...ACIK } })
+      return NextResponse.json({ ok: true, yetkileri }, {
         headers: { 'Cache-Control': 'private, max-age=30' },
       })
     }
 
     const admin = createAdminClient()
+    const firmaId = me.firma_id ?? null
 
-    // Firma bazlı + global kayıtları tek sorguda çek
-    const sorguFirmaId = me.firma_id ?? null
+    const SELECT = 'sayfa_kodu,gorebilir,ekleyebilir,duzenleyebilir,silebilir'
 
-    // Firma bazlı kayıtlar (öncelikli)
-    const firmaRows = sorguFirmaId
-      ? (await admin
-          .from('kullanici_grubu_yetkileri')
-          .select('sayfa_kodu,gorebilir')
-          .eq('firma_id', sorguFirmaId)
-          .eq('rol', me.rol)).data ?? []
-      : []
+    // Firma bazlı + global kayıtları paralel çek
+    const [firmaRes, globalRes] = await Promise.all([
+      firmaId
+        ? admin.from('kullanici_grubu_yetkileri').select(SELECT)
+            .eq('firma_id', firmaId).eq('rol', me.rol)
+        : { data: [] as any[] },
+      admin.from('kullanici_grubu_yetkileri').select(SELECT)
+        .is('firma_id', null).eq('rol', me.rol),
+    ])
 
-    // Global kayıtlar (fallback)
-    const globalRows = (await admin
-      .from('kullanici_grubu_yetkileri')
-      .select('sayfa_kodu,gorebilir')
-      .is('firma_id', null)
-      .eq('rol', me.rol)).data ?? []
-
-    // Firma bazlı map
-    const firmaMap: Record<string, boolean> = {}
-    for (const r of firmaRows) {
-      firmaMap[r.sayfa_kodu] = r.gorebilir === true
-    }
-
-    // Global map
-    const globalMap: Record<string, boolean> = {}
-    for (const r of globalRows) {
-      globalMap[r.sayfa_kodu] = r.gorebilir === true
-    }
-
-    // Sonuç: firma bazlı varsa onu kullan, yoksa global, o da yoksa true (açık)
-    const gorebilir: Record<string, boolean> = {}
-    for (const kod of TÜM_SAYFA_KODLARI) {
-      if (kod in firmaMap) {
-        gorebilir[kod] = firmaMap[kod]
-      } else if (kod in globalMap) {
-        gorebilir[kod] = globalMap[kod]
-      } else {
-        gorebilir[kod] = true // kayıt yoksa açık
+    const firmaMap: Record<string, YetkiRow> = {}
+    for (const r of firmaRes.data ?? []) {
+      firmaMap[r.sayfa_kodu] = {
+        gorebilir: r.gorebilir === true, ekleyebilir: r.ekleyebilir === true,
+        duzenleyebilir: r.duzenleyebilir === true, silebilir: r.silebilir === true,
       }
     }
 
-    return NextResponse.json({ ok: true, gorebilir }, {
+    const globalMap: Record<string, YetkiRow> = {}
+    for (const r of globalRes.data ?? []) {
+      globalMap[r.sayfa_kodu] = {
+        gorebilir: r.gorebilir === true, ekleyebilir: r.ekleyebilir === true,
+        duzenleyebilir: r.duzenleyebilir === true, silebilir: r.silebilir === true,
+      }
+    }
+
+    const yetkileri: YetkiMap = {}
+    for (const kod of TÜM_SAYFA_KODLARI) {
+      if (kod in firmaMap) {
+        yetkileri[kod] = firmaMap[kod]
+      } else if (kod in globalMap) {
+        yetkileri[kod] = globalMap[kod]
+      } else {
+        yetkileri[kod] = { ...ACIK }
+      }
+    }
+
+    return NextResponse.json({ ok: true, yetkileri }, {
       headers: { 'Cache-Control': 'private, max-age=30' },
     })
   } catch (err: any) {

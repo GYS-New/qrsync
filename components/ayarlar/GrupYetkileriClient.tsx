@@ -88,16 +88,24 @@ export default function GrupYetkileriClient({
   firmaId = null,
   apiEndpoint = '/api/sa/grup-yetkileri',
   limitRoller,
+  gizliSayfalar,
 }: {
   initialYetkileri: Yetki[]
   firmaId?: string | null
   apiEndpoint?: string
-  limitRoller?: string[]  // TA sadece musteri + tenant_user görecek
+  limitRoller?: string[]
+  gizliSayfalar?: string[]  // TA için 'firmalar' gibi sayfaları gizler
 }) {
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
   const gorünürRoller = limitRoller ? ROLLER.filter(r => limitRoller.includes(r.rol)) : ROLLER
   const [aktifRol, setAktifRol] = useState(gorünürRoller[0]?.rol ?? ROLLER[0].rol)
+  const gorünürSayfalarGrouped = gizliSayfalar
+    ? SAYFALAR_GROUPED.map(g => ({
+        ...g,
+        sayfalar: g.sayfalar.filter(s => !gizliSayfalar.includes(s.kod)),
+      })).filter(g => g.sayfalar.length > 0)
+    : SAYFALAR_GROUPED
   const [dirty, setDirty] = useState(false)
 
   const [yetkileriMap, setYetkileriMap] = useState<Record<string, Yetki>>(
@@ -196,7 +204,7 @@ export default function GrupYetkileriClient({
             </tr>
           </thead>
           <tbody>
-            {SAYFALAR_GROUPED.map(({ grup, sayfalar }) => (
+            {gorünürSayfalarGrouped.map(({ grup, sayfalar }) => (
               <React.Fragment key={grup}>
                 <tr>
                   <td colSpan={5} style={{

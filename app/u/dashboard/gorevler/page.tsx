@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
-import GorevlerUserClient from '@/components/gorev/GorevlerUserClient'
+import GorevlerClient from '@/components/gorev/GorevlerClient'
 import { redirect } from 'next/navigation'
+import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,31 +13,58 @@ export default async function UGorevlerPage() {
 
   const { data: me } = await supabase
     .from('users')
-    .select('id,firma_id,proje_id')
+    .select('id,rol,firma_id,proje_id')
     .eq('id', authUser.id)
     .single()
   if (!me) redirect('/login')
 
   const firmaId = me.firma_id
-  const projeId = me.proje_id  // U sadece kendi projesini görür
-  const meId = me.id
+  const projeId = me.proje_id
 
-  // Proje filtresi: U sadece kendi projesine ait görevleri görür
-  let q = supabase
+  // Yetki kontrolü
+  const yetki = await sayfaYetkileri(me.rol, 'gorevler', firmaId ?? null)
+  if (!yetki.gorebilir) redirect('/u/dashboard')
+
+  const readonly = !yetki.ekleyebilir && !yetki.duzenleyebilir && !yetki.silebilir
+
+  let gorevQ = supabase
     .from('gorevler')
     .select('*,lokasyonlar(id,tanim,parent_id),atanan:users!atanan_kullanici_id(isim_soyisim)')
     .eq('firma_id', firmaId)
     .order('olusturma_tarihi', { ascending: false })
     .limit(500)
+  if (projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
+  const { data: gorevler } = await gorevQ
 
-  if (projeId) q = (q as any).eq('proje_id', projeId)
+  let lokQ = supabase
+    .from('lokasyonlar')
+    .select('id,tanim,aktif,parent_id')
+    .eq('firma_id', firmaId)
+    .eq('aktif', true)
+    .order('tanim')
+  if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+  const { data: lokasyonlar } = await lokQ
 
-  const { data: gorevler } = await q
+  const { data: kullanicilar } = await supabase
+    .from('users')
+    .select('id,isim_soyisim,aktif')
+    .eq('firma_id', firmaId)
+    .eq('aktif', true)
+    .order('isim_soyisim')
 
   return (
     <div>
-      <Topbar title="Görevler" base="/u" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Görevler' }]} />
-      <GorevlerUserClient meId={meId} firmaId={firmaId} initialGorevler={(gorevler as any) ?? []} />
+      <Topbar title="Spesifik Görevler" base="/u" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Spesifik Görevler' }]} />
+      <GorevlerClient
+        base="/u"
+        meId={me.id}
+        readonly={readonly}
+        initialFirmaId={firmaId}
+        initialGorevler={(gorevler as any) ?? []}
+        initialLokasyonlar={(lokasyonlar as any) ?? []}
+        initialKullanicilar={(kullanicilar as any) ?? []}
+        projeId={projeId ?? null}
+      />
     </div>
   )
 }

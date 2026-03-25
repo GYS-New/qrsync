@@ -55,6 +55,7 @@ export default async function TAGrupYetkileriPage() {
         firmaId={me.firma_id}
         apiEndpoint="/api/ta/grup-yetkileri"
         limitRoller={['musteri', 'tenant_user']}
+        gizliSayfalar={['firmalar', 'projeler']}
       />
     </div>
   )

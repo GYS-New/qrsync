@@ -31,6 +31,7 @@ interface Props {
   meId: string
   readonly: boolean
   projeId?: string | null
+  showTumGorevler?: boolean  // false yapılırsa "Tüm Görevler" linki gizlenir
 }
 
 type BrowseFilter = 'ACIK' | 'IPTAL' | 'KAPALI' | 'TARIHI_GECMIS'
@@ -107,10 +108,12 @@ function LiveHeader({
           </div>
         )}
 
-        <Link href={`${pathname}/tum-gorevler`}
-          style={{ fontSize: 12.5, fontWeight: 700, color: '#2e8b2e', textDecoration: 'none', border: '1px solid #b8e0b8', borderRadius: 7, padding: '5px 12px', background: '#f0f9f0', whiteSpace: 'nowrap', flexShrink: 0 }}>
-          Tüm Görevler →
-        </Link>
+        {showTumGorevler && (
+          <Link href={`${pathname}/tum-gorevler`}
+            style={{ fontSize: 12.5, fontWeight: 700, color: '#2e8b2e', textDecoration: 'none', border: '1px solid #b8e0b8', borderRadius: 7, padding: '5px 12px', background: '#f0f9f0', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            Tüm Görevler →
+          </Link>
+        )}
       </div>
 
       {/* ── KPI SATIRI ── */}
@@ -146,7 +149,7 @@ function LiveHeader({
   )
 }
 
-export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, readonly, projeId }: Props) {
+export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, readonly, projeId, showTumGorevler = true }: Props) {
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()

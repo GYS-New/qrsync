@@ -68,12 +68,14 @@ export default function LokasyonGruplariClient({
   initialGroups,
   initialLocations,
   projeId,
+  readonly = false,
 }: {
-  base: '/sa' | '/ta'
+  base: '/sa' | '/ta' | '/u'
   initialFirmaId?: string | null
   initialGroups: GroupRow[]
   initialLocations: LocationRow[]
   projeId?: string | null
+  readonly?: boolean
 }) {
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -250,9 +252,10 @@ export default function LokasyonGruplariClient({
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 380px) 1fr', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: readonly ? '1fr' : 'minmax(320px, 380px) 1fr', gap: 20, alignItems: 'start' }}>
 
-        {/* SOL: FORM */}
+        {/* SOL: FORM — sadece readonly olmayanlarda */}
+        {!readonly && (
         <div className="verde-card" style={{ padding: '18px 20px', position: 'sticky', top: 88 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -332,6 +335,7 @@ export default function LokasyonGruplariClient({
             </button>
           </div>
         </div>
+        )}
 
         {/* SAĞ: GRUP LİSTESİ */}
         <div style={{ position: 'sticky', top: 88, maxHeight: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
@@ -403,6 +407,8 @@ export default function LokasyonGruplariClient({
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        {!readonly && (
+                        <>
                         <button onClick={(e) => { e.stopPropagation(); startEdit(group) }}
                           style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f8fbf8', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#506050' }}>
                           <Pencil size={10} /> Düzenle
@@ -411,6 +417,8 @@ export default function LokasyonGruplariClient({
                           style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#dc2626' }}>
                           <Trash2 size={10} /> Sil
                         </button>
+                        </>
+                        )}
                         {expanded ? <ChevronDown size={15} color="#7a907a" /> : <ChevronRight size={15} color="#7a907a" />}
                       </div>
                     </div>
