@@ -47,11 +47,27 @@ export async function POST(req: Request, { params }: { params: { token: string }
   if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
   try {
     const body = await req.json().catch(() => ({}))
+    const action         = body?.action as string | undefined
     const selectedTaskId   = body?.taskId   as string | undefined
     const selectedTaskType = body?.taskType as 'gorevler' | 'canli_gorevler' | undefined
     const checklistResults = Array.isArray(body?.checklistResults) ? body.checklistResults : []
     const supabase = createAdminClient()
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'QR', userId: user.id })
+
+    // ── action: 'basla' → görevi sadece başlat, tamamlama ───────────────────
+    if (action === 'basla' && selectedTaskId) {
+      const tablo = selectedTaskType === 'canli_gorevler' ? 'canli_gorevler' : 'gorevler'
+      const nowIso = new Date().toISOString()
+      // Zaten başlatılmış mı kontrol et
+      const { data: gorev } = await supabase.from(tablo).select('id,baslatilma_tarihi,durum').eq('id', selectedTaskId).maybeSingle()
+      if (gorev?.baslatilma_tarihi) {
+        return NextResponse.json({ ok: true, baslatilma_tarihi: gorev.baslatilma_tarihi, mesaj: 'Zaten başlatılmış' }, { headers: CORS_HEADERS })
+      }
+      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso }
+      if (tablo === 'gorevler') updatePayload.durum = 'ISLEMDE'
+      await supabase.from(tablo).update(updatePayload).eq('id', selectedTaskId)
+      return NextResponse.json({ ok: true, baslatilma_tarihi: nowIso, mesaj: 'Görev başlatıldı' }, { headers: CORS_HEADERS })
+    }
 
     // taskType gelmemişse id'ye göre her iki tipte ara
     let task = context.tasks.find((t) => t.id === selectedTaskId && t.taskType === selectedTaskType)
