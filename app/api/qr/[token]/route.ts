@@ -47,13 +47,41 @@ export async function POST(req: Request, { params }: { params: { token: string }
   if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
   try {
     const body = await req.json().catch(() => ({}))
-    const selectedTaskId = body?.taskId as string | undefined
+    const selectedTaskId   = body?.taskId   as string | undefined
     const selectedTaskType = body?.taskType as 'gorevler' | 'canli_gorevler' | undefined
     const checklistResults = Array.isArray(body?.checklistResults) ? body.checklistResults : []
     const supabase = createAdminClient()
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'QR', userId: user.id })
-    const task = context.tasks.find((t) => t.id === selectedTaskId && t.taskType === selectedTaskType)
+
+    // taskType gelmemişse id'ye göre her iki tipte ara
+    let task = context.tasks.find((t) => t.id === selectedTaskId && t.taskType === selectedTaskType)
+    if (!task && selectedTaskId && !selectedTaskType) {
+      task = context.tasks.find((t) => t.id === selectedTaskId)
+    }
+
     if (!task) {
+      // Görev context'te yok — zaten tamamlanmış olabilir (idempotent kontrol)
+      if (selectedTaskId) {
+        const tablo = selectedTaskType ?? 'canli_gorevler'
+        const { data: dbGorev } = await supabase
+          .from(tablo)
+          .select('id,durum')
+          .eq('id', selectedTaskId)
+          .maybeSingle()
+        if (dbGorev && ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'KAPATILDI'].includes(dbGorev.durum)) {
+          return NextResponse.json({ ok: true, message: 'Görev zaten tamamlanmış', durum: dbGorev.durum }, { headers: CORS_HEADERS })
+        }
+        // İkinci tabloyu da dene
+        const digerTablo = tablo === 'gorevler' ? 'canli_gorevler' : 'gorevler'
+        const { data: dbGorev2 } = await supabase
+          .from(digerTablo)
+          .select('id,durum')
+          .eq('id', selectedTaskId)
+          .maybeSingle()
+        if (dbGorev2 && ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'KAPATILDI'].includes(dbGorev2.durum)) {
+          return NextResponse.json({ ok: true, message: 'Görev zaten tamamlanmış', durum: dbGorev2.durum }, { headers: CORS_HEADERS })
+        }
+      }
       return NextResponse.json({ ok: false, error: 'Görev bulunamadı veya erişim yok' }, { status: 404, headers: CORS_HEADERS })
     }
     if (context.checklistTemplate?.items?.length) {

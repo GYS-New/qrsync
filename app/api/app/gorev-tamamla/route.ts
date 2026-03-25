@@ -48,19 +48,42 @@ export async function POST(req: Request) {
 
     const nowIso = new Date().toISOString()
 
-    // ── Görev kontrolü ───────────────────────────────────────────────────────
-    const { data: gorev, error: gorevErr } = await admin
+    // ── Görev kontrolü — önce belirtilen tabloda ara, bulamazsa diğer tabloda dene ──
+    let gorev: any = null
+    let gercekGorevTipi = gorevTipi
+
+    const { data: gorev1, error: gorevErr1 } = await admin
       .from(gorevTipi)
       .select('id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi')
       .eq('id', gorevId)
-      .single()
+      .maybeSingle()
 
-    if (gorevErr || !gorev) {
-      return NextResponse.json({ ok: false, error: 'Görev bulunamadı' }, { status: 404 })
+    if (gorev1) {
+      gorev = gorev1
+    } else {
+      // Belirtilen tabloda bulunamadı — diğer tabloyu dene
+      const digerTablo = gorevTipi === 'gorevler' ? 'canli_gorevler' : 'gorevler'
+      const { data: gorev2 } = await admin
+        .from(digerTablo)
+        .select('id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi')
+        .eq('id', gorevId)
+        .maybeSingle()
+      if (gorev2) {
+        gorev = gorev2
+        gercekGorevTipi = digerTablo
+      }
     }
 
-    // Firma güvenlik kontrolü
-    if (gorev.firma_id !== firmaId) {
+    if (!gorev) {
+      return NextResponse.json({
+        ok: false,
+        error: 'Görev bulunamadı',
+        debug: { gorevTipi, gorevId, dbError: gorevErr1?.message ?? null }
+      }, { status: 404 })
+    }
+
+    // Firma güvenlik kontrolü — firmaId null ise atla (eski device_token kayıtları)
+    if (firmaId && gorev.firma_id !== firmaId) {
       return NextResponse.json({ ok: false, error: 'Bu göreve erişim yetkiniz yok' }, { status: 403 })
     }
 
@@ -70,14 +93,20 @@ export async function POST(req: Request) {
     }
 
     // Durum kontrolü
-    const tamamlanabilir = gorevTipi === 'gorevler'
+    const tamamlanmis = ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'KAPATILDI'].includes(gorev.durum)
+    if (tamamlanmis) {
+      // Zaten tamamlanmış — idempotent başarı döndür
+      return NextResponse.json({ ok: true, mesaj: 'Görev zaten tamamlanmış', durum: gorev.durum, gorev_id: gorevId, gorev_tipi: gercekGorevTipi })
+    }
+
+    const tamamlanabilir = gercekGorevTipi === 'gorevler'
       ? ['ACIK', 'ISLEMDE'].includes(gorev.durum)
       : ['ACIK', 'ISLEMDE', 'BEKLEMEDE'].includes(gorev.durum)
 
     if (!tamamlanabilir) {
       return NextResponse.json({
         ok: false,
-        error: `Görev zaten ${gorev.durum} durumunda, tamamlanamaz`,
+        error: `Görev ${gorev.durum} durumunda, tamamlanamaz`,
       }, { status: 409 })
     }
 
@@ -90,7 +119,7 @@ export async function POST(req: Request) {
 
     // ── Görevi tamamla ───────────────────────────────────────────────────────
     const { error: updateErr } = await admin
-      .from(gorevTipi)
+      .from(gercekGorevTipi)
       .update({
         durum:                    'TAMAMLANDI',
         durum_degisim_tarihi:     nowIso,
@@ -114,7 +143,7 @@ export async function POST(req: Request) {
       ok: true,
       mesaj: 'Görev başarıyla tamamlandı',
       gorev_id: gorevId,
-      gorev_tipi: gorevTipi,
+      gorev_tipi: gercekGorevTipi,
       tamamlanma_tarihi: nowIso,
     })
 
