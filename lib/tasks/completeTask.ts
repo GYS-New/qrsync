@@ -28,7 +28,7 @@ export async function completeTask(input: CompleteTaskInput) {
     // Önce görevi çek (lokasyon join olmadan — join hatası "Görev bulunamadı" maskelemesini önler)
     const { data: task, error } = await supabase
       .from('gorevler')
-      .select('id,durum,atanan_kullanici_id,baslatilma_tarihi,aktif_olma_tarihi,lokasyon_id')
+      .select('id,durum,atanan_kullanici_id,baslatilma_tarihi,lokasyon_id')
       .eq('id', taskId)
       .single()
 
