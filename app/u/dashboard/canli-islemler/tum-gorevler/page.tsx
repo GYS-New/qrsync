@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import TumGorevlerClient from '@/components/canli/TumGorevlerClient'
 import { redirect } from 'next/navigation'
+import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,20 +13,26 @@ export default async function UTumGorevlerPage() {
 
   const { data: me } = await supabase
     .from('users')
-    .select('id,firma_id,proje_id')
+    .select('id,rol,firma_id,proje_id')
     .eq('id', authUser.id)
     .single()
   if (!me) redirect('/login')
 
   const firmaId = me.firma_id
-  const projeId = me.proje_id  // U sadece kendi projesini görür
+  const projeId = me.proje_id
   if (!firmaId) redirect('/login')
+
+  // Yetki kontrolü
+  const yetki = await sayfaYetkileri(me.rol, 'tum-gorevler', firmaId ?? null)
+  if (!yetki.gorebilir) redirect('/u/dashboard')
+
+  // readonly: düzenleme/silme yetkisi yoksa
+  const readonly = !yetki.duzenleyebilir && !yetki.silebilir
 
   const plus24h = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   const minus7d  = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  // Proje filtresini her iki sorguya uygula
   let q1base = supabase
     .from('canli_gorevler').select(sel)
     .eq('firma_id', firmaId)
@@ -54,7 +61,6 @@ export default async function UTumGorevlerPage() {
     new Date(b.aktif_olma_tarihi).getTime() - new Date(a.aktif_olma_tarihi).getTime()
   )
 
-  // Lokasyonlar: sadece U'nun projesine ait
   let lokQ = supabase
     .from('lokasyonlar').select('id,tanim')
     .eq('firma_id', firmaId).eq('aktif', true).order('tanim')
@@ -72,7 +78,7 @@ export default async function UTumGorevlerPage() {
         base="/u"
         firmaId={firmaId}
         meId={me.id}
-        readonly={true}
+        readonly={readonly}
         projeId={projeId ?? null}
         lokasyonlar={(lokasyonlar as any) ?? []}
         kullanicilar={(kullanicilar as any) ?? []}
