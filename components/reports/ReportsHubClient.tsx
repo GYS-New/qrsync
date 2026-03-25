@@ -7,6 +7,7 @@ import { useRouteLoading } from '@/components/ui/RouteLoadingProvider'
 import { useToast } from '@/components/ui/ToastProvider'
 import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2, MessageSquare, CheckSquare } from 'lucide-react'
 import { useFirma } from '@/components/layout/FirmaContext'
+import { useProje } from '@/components/projeler/ProjeContext'
 
 // ─── Rapor kart tanımları — statik, DB ile ilgisi yok ────────────────────────
 const RAPOR_KARTLARI = [
@@ -65,11 +66,13 @@ const IKON_MAP: Record<string, ReactNode> = {
 
 // ─── HubCard ─────────────────────────────────────────────────────────────────
 function HubCard({
-  title, description, eyebrow, icon, tone, cta, badge, disabled, onClick,
+  title, description, eyebrow, icon, tone, cta, badge, disabled, sureliGorevBadge, onClick,
 }: {
   title: string; description: string; eyebrow: string
   icon: ReactNode; tone: 'green' | 'violet' | 'amber'
-  cta: string; badge: string; disabled?: boolean; onClick?: () => void
+  cta: string; badge: string; disabled?: boolean
+  sureliGorevBadge?: boolean  // undefined = gösterme, true = aktif, false = pasif
+  onClick?: () => void
 }) {
   const p = {
     green:  { iconBg: '#f0f9f0', iconColor: '#1f6b1f', chipBg: '#eef8ee', chipText: '#2f6a2f', border: '#d6e4d6' },
@@ -99,6 +102,12 @@ function HubCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 999, background: p.chipBg, color: p.chipText, letterSpacing: 0.3 }}>{eyebrow}</span>
           <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#f0f9f0', color: '#506050', border: '1px solid #d6e4d6' }}>{badge}</span>
+          {sureliGorevBadge === true && (
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#f3e8ff', color: '#7c3aed', border: '1px solid #c4b5fd' }}>⚡ Süreli Görev Takibi Aktif</span>
+          )}
+          {sureliGorevBadge === false && (
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}>⚡ Süreli Görev Takibi Pasif</span>
+          )}
         </div>
         <div style={{ fontSize: 16, fontWeight: 800, color: '#0f1a0f', marginBottom: 4 }}>{title}</div>
         <div style={{ fontSize: 13.5, color: '#506050', lineHeight: 1.5 }}>{description}</div>
@@ -124,14 +133,14 @@ export default function ReportsHubClient({
   isSA,
   initialRaporTurleri,
   initialFirmaId,
+  sureliGorevAktif,
 }: {
   base: string
   firmaAdi?: string | null
   isSA: boolean
-  // TA için SSR page.tsx'ten gelir — { id: 'ham_veri', aktif: true }[]
-  // SA için geçilmez (undefined) — firma seçimine göre client'ta yüklenir
   initialRaporTurleri?: { id: string; aktif: boolean }[]
   initialFirmaId?: string | null
+  sureliGorevAktif?: boolean  // Süre Analiz kartında gösterge için
 }) {
   const router     = useRouter()
   const { start }  = useRouteLoading()
@@ -140,11 +149,14 @@ export default function ReportsHubClient({
   toastRef.current = toast
 
   const { firmaId: saFirmaId, firmalar: saFirmalar } = useFirma()
+  const { aktifProje } = useProje()
 
   // SA: dinamik firma değişimine göre yüklenen aktif türler
   // TA: hiç kullanılmaz — initialRaporTurleri prop'undan direkt hesaplanır
   const [saAktifTurler, setSaAktifTurler] = useState<Set<string> | null>(null)
   const [saLoading, setSaLoading]         = useState(false)
+  // SA için aktif projede süreli görev aktif mi? (client-side fetch)
+  const [saSureliGorevAktif, setSaSureliGorevAktif] = useState<boolean | undefined>(undefined)
 
   const firmaLabel = useMemo(() => {
     if (!isSA) return firmaAdi ?? 'Firma'
@@ -190,6 +202,17 @@ export default function ReportsHubClient({
 
     return () => { cancelled = true }
   }, [isSA, saFirmaId]) // saFirmaId değişince yeniden yükle
+
+  // SA: aktif proje değişince süreli görev durumunu çek
+  useEffect(() => {
+    if (!isSA || !aktifProje?.id) { setSaSureliGorevAktif(undefined); return }
+    fetch(`/api/lokasyonlar-list?firmaId=${saFirmaId ?? ''}&projeId=${aktifProje.id}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : [])
+      .then((loks: any[]) => {
+        setSaSureliGorevAktif(Array.isArray(loks) && loks.some((l: any) => l.sureli_gorev_aktif))
+      })
+      .catch(() => setSaSureliGorevAktif(undefined))
+  }, [isSA, aktifProje?.id, saFirmaId])
 
   // Gösterilecek kartlar:
   //   SA → saAktifTurler'e göre (null ise tümü göster)
@@ -260,6 +283,7 @@ export default function ReportsHubClient({
                 tone={kart.tone}
                 cta={kart.disabled ? 'Yakında' : 'Aç'}
                 disabled={kart.disabled}
+                sureliGorevBadge={kart.id === 'sure_analiz' ? (isSA ? saSureliGorevAktif : sureliGorevAktif) : undefined}
                 onClick={() => { if (!kart.disabled) { start(); router.push(kart.href) } }}
               />
             ))

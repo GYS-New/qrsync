@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import Topbar from '@/components/layout/Topbar'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
@@ -10,6 +10,7 @@ export const revalidate = 0
 
 export default async function TASureAnalizPage() {
   const supabase = createClient()
+  const admin = createAdminClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) redirect('/login')
   const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', authUser.id).single()
@@ -21,5 +22,17 @@ export default async function TASureAnalizPage() {
       <ProjeSecilmedi />
     </div>
   )
-  return <SureAnalizClient base="/ta" isSA={false} tenantFirmaId={me.firma_id ?? null} projeId={aktifProje.id} />
+    // Projede süreli görev aktif mi? (herhangi bir lokasyonda açıksa aktif)
+  let sureliGorevAktif = false
+  if (aktifProje) {
+    const { data: loks } = await admin
+      .from('lokasyonlar')
+      .select('sureli_gorev_aktif')
+      .eq('proje_id', aktifProje.id)
+      .eq('sureli_gorev_aktif', true)
+      .limit(1)
+    sureliGorevAktif = (loks?.length ?? 0) > 0
+  }
+
+return <SureAnalizClient base="/ta" isSA={false} tenantFirmaId={me.firma_id ?? null} projeId={aktifProje.id} sureliGorevAktif={sureliGorevAktif} />
 }

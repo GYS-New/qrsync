@@ -55,7 +55,21 @@ export default async function URaporlarPage() {
   }
 
   return (
-    <ReportsHubClient
+    
+  // Süre analiz kartı için süreli görev durumu
+  let sureliGorevAktif: boolean | undefined = undefined
+  if (me.proje_id) {
+    const admin = createAdminClient()
+    const { data: loks } = await admin
+      .from('lokasyonlar')
+      .select('sureli_gorev_aktif')
+      .eq('proje_id', me.proje_id)
+      .eq('sureli_gorev_aktif', true)
+      .limit(1)
+    sureliGorevAktif = (loks?.length ?? 0) > 0
+  }
+
+<ReportsHubClient
       base="/u"
       initialFirmaId={me.firma_id ?? null}
       isSA={false}

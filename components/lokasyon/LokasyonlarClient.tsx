@@ -127,7 +127,10 @@ export default function LokasyonlarClient({
       if (!res.ok) throw new Error(j.error ?? 'İmport başarısız')
       if (firmaId) await refresh(firmaId)
       const extra = j.errors?.length ? ` Hata: ${j.errors.slice(0, 3).join(' | ')}` : ''
-      showSuccess(`${j.created} lokasyon içe aktarıldı.${extra}`)
+      const grupInfo = (j.grupCreated || j.grupUyeAdded)
+        ? ` | ${j.grupCreated ?? 0} grup oluşturuldu, ${j.grupUyeAdded ?? 0} grup üyeliği eklendi.`
+        : ''
+      showSuccess(`${j.created} lokasyon içe aktarıldı.${grupInfo}${extra}`)
     } catch (err: any) {
       showError(err.message)
     }

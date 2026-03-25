@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const admin = createAdminClient()
     let query = admin
       .from('lokasyonlar')
-      .select('id,tanim,parent_id')
+      .select('id,tanim,parent_id,sureli_gorev_aktif')
       .eq('aktif', true)
       .order('tanim', { ascending: true })
 

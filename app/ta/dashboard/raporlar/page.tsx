@@ -90,5 +90,19 @@ export default async function TARaporlarPage() {
     initialRaporTurleri = initialRaporTurleri.filter((r) => r.id !== 'musteri_degerlendirme')
   }
 
-  return <ReportsHubClient base="/ta" initialFirmaId={me.firma_id ?? null} isSA={false} firmaAdi={firmaAdi} initialRaporTurleri={initialRaporTurleri} />
+  
+  // Süre analiz kartı için süreli görev durumu
+  let sureliGorevAktif: boolean | undefined = undefined
+  if (aktifProje) {
+    const admin = createAdminClient()
+    const { data: loks } = await admin
+      .from('lokasyonlar')
+      .select('sureli_gorev_aktif')
+      .eq('proje_id', aktifProje.id)
+      .eq('sureli_gorev_aktif', true)
+      .limit(1)
+    sureliGorevAktif = (loks?.length ?? 0) > 0
+  }
+
+return <ReportsHubClient base="/ta" initialFirmaId={me.firma_id ?? null} isSA={false} firmaAdi={firmaAdi} initialRaporTurleri={initialRaporTurleri} sureliGorevAktif={sureliGorevAktif} />
 }

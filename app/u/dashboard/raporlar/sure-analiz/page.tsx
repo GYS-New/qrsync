@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import SureAnalizClient from '@/components/reports/SureAnalizClient'
 import Topbar from '@/components/layout/Topbar'
 import { sayfaGorebilirMi } from '@/lib/yetki/sayfaYetkisi'
@@ -25,12 +25,26 @@ export default async function URaporlarSureAnalizPage() {
     </div>
   )
 
-  return (
+    // Projede süreli görev aktif mi?
+  let sureliGorevAktif = false
+  if (me.proje_id) {
+    const admin = createAdminClient()
+    const { data: loks } = await admin
+      .from('lokasyonlar')
+      .select('sureli_gorev_aktif')
+      .eq('proje_id', me.proje_id)
+      .eq('sureli_gorev_aktif', true)
+      .limit(1)
+    sureliGorevAktif = (loks?.length ?? 0) > 0
+  }
+
+return (
     <SureAnalizClient
       base="/u"
       isSA={false}
       tenantFirmaId={me.firma_id ?? null}
       projeId={me.proje_id}
+      sureliGorevAktif={sureliGorevAktif}
     />
   )
 }

@@ -6,7 +6,7 @@ import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
 import { RefreshCw, Clock, TrendingUp, TrendingDown, Activity, BarChart2, Users, MapPin, Zap } from 'lucide-react'
 
-interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null; projeId?: string | null }
+interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null; projeId?: string | null; sureliGorevAktif?: boolean }
 
 type Analiz = {
   ort: number; min: number; max: number; p50: number; p75: number; p90: number; p95: number
@@ -354,7 +354,7 @@ function BolumPanel({ bolum, renk, tip }: { bolum: Bolum; renk: string; tip: 'fr
 const ANA_TABS = ['Frekansiyel Görevler', 'Spesifik Görevler', 'Karşılaştırma'] as const
 type AnaTab = typeof ANA_TABS[number]
 
-export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId }: Props) {
+export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, sureliGorevAktif = true }: Props) {
   const { toast } = useToast()
   const { firmaId: saFirmaId } = useFirma()
   const currentFirmaId = isSA ? (saFirmaId ?? '') : (tenantFirmaId ?? '')
@@ -407,6 +407,17 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId }:
         breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: `${base}/dashboard/raporlar` }, { label: 'Süre Analiz Raporları' }]} />
 
       <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Süreli Görev Takibi uyarısı */}
+        {!sureliGorevAktif && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10 }}>
+            <span style={{ fontSize: 22 }}>⏱️</span>
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#9a3412' }}>Süreli Görev Takibi Pasif</div>
+              <div style={{ fontSize: 13, color: '#c2410c', marginTop: 2 }}>Bu proje için görev süreleri takip edilmiyor. Süre analizi yapılabilmesi için Süreli Görev Takibi aktif olmalıdır.</div>
+            </div>
+          </div>
+        )}
 
         {/* Filtreler */}
         <div className="verde-card" style={{ padding: '16px 20px' }}>
