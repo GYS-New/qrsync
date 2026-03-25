@@ -26,29 +26,28 @@ async function getAuthUser(req: Request) {
 
 export async function GET(req: Request) {
   const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ ok: false, error: 'auth_required', kod: 'ESLESMEDI' }, { status: 401, headers: CORS_HEADERS })
+  if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
 
   const admin = createAdminClient()
 
-  // Manuel görevler (gorevler tablosu)
+  // Manuel görevler — islemi_yapan_id VEYA atanan_kullanici_id
   const { data: gorevler } = await admin
     .from('gorevler')
     .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .eq('islemi_yapan_id', user.id)
+    .or(`islemi_yapan_id.eq.${user.id},atanan_kullanici_id.eq.${user.id}`)
     .in('durum', ['TAMAMLANDI', 'ZAMANI_GECMIS', 'ZAMANINDA_YAPILAMAYAN'])
     .order('durum_degisim_tarihi', { ascending: false })
     .limit(30)
 
-  // Canlı görevler (canli_gorevler tablosu)
+  // Canlı görevler
   const { data: canliGorevler } = await admin
     .from('canli_gorevler')
     .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .eq('islemi_yapan_id', user.id)
+    .or(`islemi_yapan_id.eq.${user.id},atanan_kullanici_id.eq.${user.id}`)
     .in('durum', ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANI_GECMIS', 'ZAMANINDA_YAPILAMAYAN'])
     .order('durum_degisim_tarihi', { ascending: false })
     .limit(30)
 
-  // İkisini birleştir ve tarihe göre sırala
   const tumGorevler = [
     ...(gorevler ?? []).map((g: any) => ({
       id: g.id,
