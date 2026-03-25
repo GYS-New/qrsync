@@ -25,9 +25,10 @@ export async function completeTask(input: CompleteTaskInput) {
   const nowIso = new Date().toISOString()
 
   if (taskType === 'gorevler') {
+    // Önce görevi çek (lokasyon join olmadan — join hatası "Görev bulunamadı" maskelemesini önler)
     const { data: task, error } = await supabase
       .from('gorevler')
-      .select('id,durum,atanan_kullanici_id,baslatilma_tarihi,aktif_olma_tarihi,lokasyon_id,lokasyonlar!inner(sureli_gorev_aktif)')
+      .select('id,durum,atanan_kullanici_id,baslatilma_tarihi,aktif_olma_tarihi,lokasyon_id')
       .eq('id', taskId)
       .single()
 
@@ -39,11 +40,20 @@ export async function completeTask(input: CompleteTaskInput) {
       throw new Error('Bu görev size atanmış değil')
     }
 
-    const sureli = !!(task as any).lokasyonlar?.sureli_gorev_aktif
+    // Lokasyondan süreli görev durumunu ayrı sorgula (null-safe)
+    let sureli = false
+    if (task.lokasyon_id) {
+      const { data: lok } = await supabase
+        .from('lokasyonlar')
+        .select('sureli_gorev_aktif')
+        .eq('id', task.lokasyon_id)
+        .maybeSingle()
+      sureli = !!(lok as any)?.sureli_gorev_aktif
+    }
+
     const baslatilmaTarihi = task.baslatilma_tarihi ?? (sureli ? nowIso : null)
 
     if (sureli && !task.baslatilma_tarihi) {
-      // Başlatılmamışsa şimdi başlat
       await supabase.from('gorevler').update({
         baslatilma_tarihi: nowIso,
         baslatan_kullanici_id: userId,
@@ -67,9 +77,10 @@ export async function completeTask(input: CompleteTaskInput) {
     return { ok: true as const, taskType, taskId }
   }
 
+  // canli_gorevler
   const { data: liveTask, error: liveError } = await supabase
     .from('canli_gorevler')
-    .select('id,durum,atanan_kullanici_id,baslatilma_tarihi,aktif_olma_tarihi,lokasyon_id,lokasyonlar!inner(sureli_gorev_aktif)')
+    .select('id,durum,atanan_kullanici_id,baslatilma_tarihi,aktif_olma_tarihi,lokasyon_id')
     .eq('id', taskId)
     .single()
 
@@ -84,11 +95,20 @@ export async function completeTask(input: CompleteTaskInput) {
     throw new Error('Bu görev size atanmış değil')
   }
 
-  const sureli = !!(liveTask as any).lokasyonlar?.sureli_gorev_aktif
+  // Lokasyondan süreli görev durumunu ayrı sorgula
+  let sureli = false
+  if (liveTask.lokasyon_id) {
+    const { data: lok } = await supabase
+      .from('lokasyonlar')
+      .select('sureli_gorev_aktif')
+      .eq('id', liveTask.lokasyon_id)
+      .maybeSingle()
+    sureli = !!(lok as any)?.sureli_gorev_aktif
+  }
+
   const liveBaslatilmaTarihi = liveTask.baslatilma_tarihi ?? (sureli ? nowIso : null)
 
   if (sureli && !liveTask.baslatilma_tarihi) {
-    // Başlatılmamışsa şimdi başlat
     await supabase.from('canli_gorevler').update({
       baslatilma_tarihi: nowIso,
       baslatan_kullanici_id: userId,
