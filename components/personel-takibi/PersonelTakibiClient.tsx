@@ -38,6 +38,7 @@ interface Props {
   isSA:            boolean
   initialFirmaId?: string | null
   initialProjeId?: string | null
+  readonly?:       boolean   // M/U rolleri için QR sekme ve oluşturma gizlenir
 }
 
 // ── QR görsel üretici ─────────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ function QrKart({ qr, origin, projeAdi, onIndir }: {
 }
 
 // ── Ana bileşen ───────────────────────────────────────────────────────────────
-export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initialProjeId }: Props) {
+export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initialProjeId, readonly = false }: Props) {
   const { firmaId: saFirmaId } = useFirma()
   const { aktifProje } = useProje()
 
@@ -239,9 +240,11 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
           <button style={sekme('bugun')} onClick={() => setAktifSekme('bugun')}>
             <Users size={14} style={{ display: 'inline', marginRight: 6 }} />Bugün
           </button>
-          <button style={sekme('qr')} onClick={() => setAktifSekme('qr')}>
-            <QrCode size={14} style={{ display: 'inline', marginRight: 6 }} />QR / NFC Kodlar
-          </button>
+          {!readonly && (
+            <button style={sekme('qr')} onClick={() => setAktifSekme('qr')}>
+              <QrCode size={14} style={{ display: 'inline', marginRight: 6 }} />QR / NFC Kodlar
+            </button>
+          )}
         </div>
 
         {/* Personel takibi kapalı uyarısı */}

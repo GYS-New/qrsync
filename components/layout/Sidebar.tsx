@@ -90,6 +90,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
 interface SidebarProps {
   user: User
   firma?: { ticari_unvan: string; firma_adi?: string; logo_url?: string } | null
+  projeAdi?: string | null
 }
 
 type SidebarCounts = {
@@ -142,7 +143,7 @@ function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' |
   )
 }
 
-export default function Sidebar({ user, firma }: { user: User; firma: any }) {
+export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user: User; firma: any; projeAdi?: string | null }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeLoading = useRouteLoading()
@@ -199,7 +200,9 @@ export default function Sidebar({ user, firma }: { user: User; firma: any }) {
   }
 
   const firmaLabel = firma?.firma_adi || firma?.ticari_unvan || ''
-  const footerSubLabel = isSA ? 'Sistem' : firmaLabel
+  // Footer: SA → 'Sistem', diğerleri → aktif proje adı (yoksa firma adı)
+  const projeLabel = aktifProje?.ad || projeAdiProp || null
+  const footerSubLabel = isSA ? 'Sistem' : (projeLabel || firmaLabel)
 
   const go = (href: string) => {
     // If already on the target route, don't start the loader (otherwise it can get stuck).

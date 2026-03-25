@@ -26,6 +26,7 @@ export default async function UPersonelTakibiPage() {
       isSA={false}
       initialFirmaId={me.firma_id ?? null}
       initialProjeId={me.proje_id ?? null}
+      readonly={true}
     />
   )
 }

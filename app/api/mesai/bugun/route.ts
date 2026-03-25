@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
 
   const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
   const isTA = me.rol === 'tenant_admin'
-  if (!isSA && !isTA) return NextResponse.json({ ok: false, error: 'Yetki yetersiz' }, { status: 403 })
+  const isTenantViewer = me.rol === 'musteri' || me.rol === 'tenant_user'
+  if (!isSA && !isTA && !isTenantViewer) return NextResponse.json({ ok: false, error: 'Yetki yetersiz' }, { status: 403 })
 
   const p       = new URL(req.url).searchParams
   const firmaId = isSA ? p.get('firma_id') : me.firma_id

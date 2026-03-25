@@ -8,6 +8,19 @@ async function yetkiKontrol(supabase: any) {
   if (!me) return { ok: false, me: null }
   const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
   const isTA = me.rol === 'tenant_admin'
+  const isTenantViewer = me.rol === 'musteri' || me.rol === 'tenant_user'
+  if (!isSA && !isTA && !isTenantViewer) return { ok: false, me: null }
+  return { ok: true, me: { ...me, isSA, isTA, isTenantViewer } }
+}
+
+// SA/TA yetkisi gerektiren işlemler için ayrı kontrol
+async function yetkiKontrolYonetici(supabase: any) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, me: null }
+  const { data: me } = await supabase.from('users').select('rol,firma_id').eq('id', user.id).single()
+  if (!me) return { ok: false, me: null }
+  const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
+  const isTA = me.rol === 'tenant_admin'
   if (!isSA && !isTA) return { ok: false, me: null }
   return { ok: true, me: { ...me, isSA, isTA } }
 }
@@ -43,7 +56,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const supabase = createClient()
   const admin    = createAdminClient()
-  const { ok, me } = await yetkiKontrol(supabase)
+  const { ok, me } = await yetkiKontrolYonetici(supabase)
   if (!ok || !me) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 })
 
   let body: any
@@ -98,7 +111,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const supabase = createClient()
   const admin    = createAdminClient()
-  const { ok, me } = await yetkiKontrol(supabase)
+  const { ok, me } = await yetkiKontrolYonetici(supabase)
   if (!ok || !me) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 })
 
   const id = new URL(req.url).searchParams.get('id')
