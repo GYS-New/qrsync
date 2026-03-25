@@ -834,7 +834,8 @@ async function del() {
           <Button className="text-[13.5px]" variant="ghost" type="button" style={IMPORT_EXPORT_BUTTON_STYLE}>⚡ Canlı Akış</Button>
         </a>
 
-        {/* Toplu Düzenle — tüm roller */}
+        {/* Toplu Düzenle — readonly olmayanlara göster */}
+        {!readonly && (
         <Button
           className="text-[13.5px]"
           variant={bulkDuzenleMode ? (bulkDuzenleIds.size > 0 ? 'primary' : 'ghost') : 'ghost'}
@@ -860,6 +861,7 @@ async function del() {
               : 'Vazgeç'
             : '✏️ Toplu Düzenle'}
         </Button>
+        )}
 
         {/* Import/Export — U göremez */}
         {!isU && (<>
@@ -874,7 +876,9 @@ async function del() {
         {!isU && (
           <Button className="text-[13.5px]" variant="primary" disabled={readonly || saving || (!licenseLoading && licenseExpired)} onClick={openCreate} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}>+ Ekle</Button>
         )}
-        <Button className="text-[13.5px]" variant="primary" disabled={readonly || saving || !selected} onClick={openEdit} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}><Pencil size={14} /> Düzenle</Button>
+        {!readonly && (
+          <Button className="text-[13.5px]" variant="primary" disabled={saving || !selected} onClick={openEdit} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}><Pencil size={14} /> Düzenle</Button>
+        )}
         {!isU && (<>
           <Button className="text-[13.5px]" variant="danger" disabled={readonly || saving || bulkMode} onClick={del} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}><Trash2 size={14} /> Sil</Button>
           <Button

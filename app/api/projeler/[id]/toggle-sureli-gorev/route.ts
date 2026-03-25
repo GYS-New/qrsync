@@ -29,6 +29,7 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
+    sureli_aktif: enableAll,
     message: enableAll
       ? `${loks.length} lokasyonda süreli görev açıldı.`
       : `${loks.length} lokasyonda süreli görev kapatıldı.`,

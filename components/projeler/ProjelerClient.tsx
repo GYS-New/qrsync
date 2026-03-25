@@ -13,13 +13,14 @@ type Proje = {
   renk: string
   aktif: boolean
   personel_takibi_aktif: boolean
+  sureli_gorev_aktif?: boolean  // lokasyonlardan hesaplanan özet durum
   kayit_tarihi: string
 }
 
 const RENKLER = ['#2e8b2e', '#1d6fa8', '#9333ea', '#c2410c', '#0e7490', '#be185d', '#b45309', '#374151']
 
 const BOSH: Omit<Proje, 'id' | 'firma_id' | 'kayit_tarihi'> = {
-  ad: '', aciklama: '', renk: '#2e8b2e', aktif: true, personel_takibi_aktif: false
+  ad: '', aciklama: '', renk: '#2e8b2e', aktif: true, personel_takibi_aktif: false, sureli_gorev_aktif: false
 }
 
 export default function ProjelerClient({
@@ -46,7 +47,30 @@ export default function ProjelerClient({
     try {
       const res = await fetch(`/api/projeler?firma_id=${firmaId}`)
       const data = await res.json()
-      setProjeler(Array.isArray(data) ? data : [])
+      const list: Proje[] = Array.isArray(data) ? data : []
+
+      // Her proje için sureli_gorev_aktif özetini lokasyonlardan hesapla
+      if (list.length > 0) {
+        const supabase = (await import('@/lib/supabase/client')).createClient()
+        const { data: loks } = await supabase
+          .from('lokasyonlar')
+          .select('proje_id, sureli_gorev_aktif')
+          .eq('firma_id', firmaId)
+          .eq('aktif', true)
+
+        if (loks) {
+          const sureliMap: Record<string, boolean> = {}
+          for (const lok of loks) {
+            if (!lok.proje_id) continue
+            if (lok.sureli_gorev_aktif) sureliMap[lok.proje_id] = true
+          }
+          setProjeler(list.map(p => ({ ...p, sureli_gorev_aktif: !!sureliMap[p.id] })))
+        } else {
+          setProjeler(list)
+        }
+      } else {
+        setProjeler(list)
+      }
     } catch {
       toast({ type: 'error', title: 'Hata', message: 'Projeler yüklenemedi' })
     } finally {
@@ -125,6 +149,22 @@ variant: 'danger'
     }
   }
 
+  async function togglePersonelTakibi(p: Proje) {
+    const yeniDurum = !p.personel_takibi_aktif
+    try {
+      const res = await fetch(`/api/projeler/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personel_takibi_aktif: yeniDurum }),
+      })
+      if (!res.ok) throw new Error('Güncellenemedi')
+      setProjeler(prev => prev.map(x => x.id === p.id ? { ...x, personel_takibi_aktif: yeniDurum } : x))
+      toast({ type: 'success', title: 'Güncellendi', message: yeniDurum ? 'Personel Takibi açıldı.' : 'Personel Takibi kapatıldı.' })
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+  }
+
   async function toggleSureliGorevler(p: Proje) {
     const ok = await confirm({
       title: 'Süreli Görevleri Değiştir',
@@ -138,6 +178,8 @@ variant: 'danger'
       const res = await fetch(`/api/projeler/${p.id}/toggle-sureli-gorev`, { method: 'POST' })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'İşlem başarısız')
+      const yeniSureli = j.sureli_aktif ?? !p.sureli_gorev_aktif
+      setProjeler(prev => prev.map(x => x.id === p.id ? { ...x, sureli_gorev_aktif: yeniSureli } : x))
       toast({ type: 'success', title: 'Tamamlandı', message: j.message ?? 'Güncellendi' })
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
@@ -209,6 +251,9 @@ variant: 'danger'
                   {p.personel_takibi_aktif && (
                     <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: '#dbeafe', color: '#1d4ed8', fontWeight: 700 }}>👷 Personel Takibi</span>
                   )}
+                  {p.sureli_gorev_aktif && (
+                    <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: '#f3e8ff', color: '#7c3aed', fontWeight: 700 }}>⚡ Süreli Görev</span>
+                  )}
                 </div>
                 {p.aciklama && <div style={{ fontSize: 12.5, color: '#7a907a', marginTop: 2 }}>{p.aciklama}</div>}
                 <div style={{ fontSize: 11.5, color: '#a0b4a0', marginTop: 3 }}>
@@ -230,17 +275,33 @@ variant: 'danger'
                   >
                     {p.aktif ? 'Pasife Al' : 'Aktife Al'}
                   </button>
+                  {/* Personel Takibi AÇ/KAPAT */}
+                  <button
+                    onClick={() => togglePersonelTakibi(p)}
+                    title="Proje için personel takibini aç/kapat"
+                    style={{
+                      padding: '5px 12px', borderRadius: 6,
+                      border: p.personel_takibi_aktif ? '1px solid #93c5fd' : '1px solid #d6e4d6',
+                      background: p.personel_takibi_aktif ? '#dbeafe' : '#fff',
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      color: p.personel_takibi_aktif ? '#1d4ed8' : '#7a907a',
+                    }}
+                  >
+                    👷 PT {p.personel_takibi_aktif ? 'Kapat' : 'Aç'}
+                  </button>
                   {/* Süreli Görev AÇ/KAPAT */}
                   <button
                     onClick={() => toggleSureliGorevler(p)}
                     title="Projedeki tüm lokasyonlarda süreli görevi toplu aç/kapat"
                     style={{
-                      padding: '5px 12px', borderRadius: 6, border: '1px solid #e9d5ff',
-                      background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      color: '#7c3aed',
+                      padding: '5px 12px', borderRadius: 6,
+                      border: p.sureli_gorev_aktif ? '1px solid #c4b5fd' : '1px solid #e9d5ff',
+                      background: p.sureli_gorev_aktif ? '#f3e8ff' : '#fff',
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      color: p.sureli_gorev_aktif ? '#7c3aed' : '#9ca3af',
                     }}
                   >
-                    ⚡ SG AÇ/KAPAT
+                    ⚡ SG {p.sureli_gorev_aktif ? 'Kapat' : 'Aç'}
                   </button>
                   <button onClick={() => openEdit(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                     <Pencil size={14} style={{ color: '#506050' }} />
@@ -288,18 +349,6 @@ variant: 'danger'
                     }} />
                   ))}
                 </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#506050', marginBottom: 8 }}>Özellikler</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#0f1a0f', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={form.personel_takibi_aktif}
-                    onChange={e => setForm(p => ({ ...p, personel_takibi_aktif: e.target.checked }))}
-                  />
-                  <span>Personel Takibi — QR/NFC ile iş başı ve iş bitimi takip sistemi</span>
-                </label>
               </div>
             </div>
 
