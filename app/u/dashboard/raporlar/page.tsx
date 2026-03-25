@@ -54,8 +54,6 @@ export default async function URaporlarPage() {
     initialRaporTurleri = initialRaporTurleri.filter((r) => r.id !== 'musteri_degerlendirme')
   }
 
-  return (
-    
   // Süre analiz kartı için süreli görev durumu
   let sureliGorevAktif: boolean | undefined = undefined
   if (me.proje_id) {
@@ -69,12 +67,14 @@ export default async function URaporlarPage() {
     sureliGorevAktif = (loks?.length ?? 0) > 0
   }
 
-<ReportsHubClient
+  return (
+    <ReportsHubClient
       base="/u"
       initialFirmaId={me.firma_id ?? null}
       isSA={false}
       firmaAdi={firmaAdi}
       initialRaporTurleri={initialRaporTurleri}
+      sureliGorevAktif={sureliGorevAktif}
     />
   )
 }
