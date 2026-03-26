@@ -39,8 +39,6 @@ export async function createGorevAtamaNotification(opts: {
     `Görev: ${tanim}`,
     `Lokasyon: ${lokasyonTanim ?? '—'}`,
     `Tarih: ${tarihIso ? formatDateTime(tarihIso) : '—'}`,
-    '',
-    'Bu görev için işlem seçin: Kabul / Reddet.',
     `#gorev:${gorevId}`,
   ]
 

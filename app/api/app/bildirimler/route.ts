@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { sendFCMToUser } from '@/lib/fcm-sender'
 
 const CORS_HEADERS = {
@@ -10,33 +11,6 @@ const CORS_HEADERS = {
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: CORS_HEADERS })
 }
-
-// Supabase webhook — yeni bildirim eklenince çağrılır
-export async function POST(req: Request) {
-  try {
-    const secret = req.headers.get('X-Webhook-Secret')
-    if (secret !== process.env.WEBHOOK_SECRET) {
-      return NextResponse.json({ ok: false }, { status: 401, headers: CORS_HEADERS })
-    }
-
-    const body = await req.json()
-    const record = body.record // Supabase webhook yeni kaydı buraya koyar
-
-    if (!record?.alici_id || !record?.baslik) {
-      return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
-    }
-
-    const mesajKisa = (record.mesaj || '').split('\n').slice(0, 2).join(' ').substring(0, 100)
-    await sendFCMToUser(record.alici_id, record.baslik, mesajKisa)
-
-    return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500, headers: CORS_HEADERS })
-  }
-}
-
-// Mevcut GET ve mobil bildirim POST endpoint'leri
-import { createAdminClient } from '@/lib/supabase/server'
 
 async function getAuthUser(req: Request) {
   const deviceToken = req.headers.get('X-Device-Token')
@@ -53,7 +27,7 @@ async function getAuthUser(req: Request) {
 
 export async function GET(req: Request) {
   const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ ok: false, error: 'auth_required', kod: 'ESLESMEDI' }, { status: 401, headers: CORS_HEADERS })
+  if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
 
   const admin = createAdminClient()
   const ucGunOnce = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
@@ -70,4 +44,63 @@ export async function GET(req: Request) {
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500, headers: CORS_HEADERS })
   return NextResponse.json({ ok: true, bildirimler: data ?? [] }, { headers: CORS_HEADERS })
+}
+
+export async function POST(req: Request) {
+  const webhookSecret = req.headers.get('X-Webhook-Secret')
+  const deviceToken = req.headers.get('X-Device-Token')
+
+  // ── Supabase Webhook ──────────────────────────────────────────
+  if (webhookSecret) {
+    if (webhookSecret !== process.env.WEBHOOK_SECRET) {
+      return NextResponse.json({ ok: false }, { status: 401, headers: CORS_HEADERS })
+    }
+    try {
+      const body = await req.json()
+      const record = body.record
+      if (!record?.alici_id || !record?.baslik) {
+        return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
+      }
+      const mesajKisa = (record.mesaj || '').split('\n').slice(0, 2).join(' ').substring(0, 100)
+      await sendFCMToUser(record.alici_id, record.baslik, mesajKisa)
+      return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
+    } catch (e: any) {
+      return NextResponse.json({ ok: false, error: e.message }, { status: 500, headers: CORS_HEADERS })
+    }
+  }
+
+  // ── Mobil uygulama — okundu işaretle ─────────────────────────
+  if (deviceToken) {
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
+
+    const admin = createAdminClient()
+    try {
+      const body = await req.json()
+
+      if (body.tumunu) {
+        await admin
+          .from('bildirimler')
+          .update({ okundu: true })
+          .eq('alici_id', user.id)
+          .eq('okundu', false)
+        return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
+      }
+
+      if (body.id) {
+        await admin
+          .from('bildirimler')
+          .update({ okundu: true })
+          .eq('id', body.id)
+          .eq('alici_id', user.id)
+        return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
+      }
+
+      return NextResponse.json({ ok: false, error: 'missing_params' }, { status: 400, headers: CORS_HEADERS })
+    } catch (e: any) {
+      return NextResponse.json({ ok: false, error: e.message }, { status: 500, headers: CORS_HEADERS })
+    }
+  }
+
+  return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401, headers: CORS_HEADERS })
 }
