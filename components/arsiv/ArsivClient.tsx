@@ -106,6 +106,36 @@ export default function ArsivClient({
   const [spesifikFrom,    setSpesifikFrom]    = useState('')
   const [spesifikTo,      setSpesifikTo]      = useState('')
 
+  // ── Lokasyon hiyerarşisi ──────────────────────────────────────────────────
+  const [lokasyonlarTum, setLokasyonlarTum] = useState<any[]>([])
+
+  useEffect(() => {
+    if (!firmaId) return
+    supabase.from('lokasyonlar').select('id,tanim,parent_id').eq('firma_id', firmaId)
+      .then(({ data }) => { if (data) setLokasyonlarTum(data) })
+  }, [firmaId])
+
+  const locMap = useMemo(() => {
+    const m: Record<string, { tanim: string; parent_id: string | null }> = {}
+    lokasyonlarTum.forEach(l => { m[l.id] = { tanim: l.tanim, parent_id: l.parent_id ?? null } })
+    return m
+  }, [lokasyonlarTum])
+
+  const getLocPath = useCallback((lokasyonId: string | null | undefined): string => {
+    if (!lokasyonId) return '—'
+    const parts: string[] = []
+    let cur: string | null = lokasyonId
+    let guard = 0
+    while (cur && guard < 8) {
+      const node = locMap[cur]
+      if (!node) break
+      parts.push(node.tanim)
+      cur = node.parent_id
+      guard++
+    }
+    return parts.reverse().join(' / ') || '—'
+  }, [locMap])
+
   // ── Yükleme fonksiyonları ─────────────────────────────────────────────────
 
   const yukle_frekansiyel = useCallback(async () => {
@@ -161,16 +191,17 @@ export default function ArsivClient({
     setSpesifikLoading(true)
     try {
       const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      const { data, error } = await supabase
+      let q2 = supabase
         .from('gorevler')
-        .select(`id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,
-          lokasyonlar(tanim),
+        .select(`id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,
           atanan:users!atanan_kullanici_id(isim_soyisim),
           olusturan:users!olusturan_id(isim_soyisim)`)
         .eq('firma_id', firmaId)
         .or(`durum.eq.IPTAL,and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.lt.${sinir24s})`)
         .order('olusturma_tarihi', { ascending: false })
-        .limit(1000) as any
+        .limit(1000)
+      if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
+      const { data, error } = await q2 as any
       if (error) throw error
       setSpesifikData(data ?? [])
     } catch (e: any) { toast({ type: 'error', title: 'Yüklenemedi', message: e.message })
@@ -432,7 +463,7 @@ export default function ArsivClient({
                  filtreFrek.map((r: any) => (
                   <tr key={r.id}>
                     <td style={{ fontWeight: 600 }}>{r.tanim}</td>
-                    <td style={td({ color:'#64748b' })}>{r.lokasyonlar?.tanim ?? '—'}</td>
+                    <td style={td({ color:'#64748b' })}>{getLocPath(r.lokasyon_id)}</td>
                     <td style={td({ color:'#64748b' })}>{r.atanan?.isim_soyisim ?? '—'}</td>
                     <td><span className={`verde-badge ${DURUM_RENK[r.durum] ?? 'status-acik'}`}>{CANLI_DURUM_LABEL[r.durum] ?? r.durum}</span></td>
                     <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.aktif_olma_tarihi ? formatDateTime(r.aktif_olma_tarihi) : '—'}</td>
@@ -724,7 +755,7 @@ export default function ArsivClient({
                  filtreSpesifik.map((r: any) => (
                   <tr key={r.id}>
                     <td style={{ fontWeight:600 }}>{r.tanim}</td>
-                    <td style={{ color:'#64748b' }}>{r.lokasyonlar?.tanim ?? '—'}</td>
+                    <td style={{ color:'#64748b' }}>{getLocPath(r.lokasyon_id)}</td>
                     <td style={{ color:'#64748b' }}>{r.atanan?.isim_soyisim ?? '—'}</td>
                     <td>
                       <span style={{ padding:'2px 8px', borderRadius:12, fontSize:12, fontWeight:700,
