@@ -685,7 +685,7 @@ async function del() {
       const toISO   = to   ? new Date(to).toISOString()   : null
       let q2 = supabase.from('canli_gorevler_arsiv').select(SEL_ARSIV + ',arsiv_tarihi,arsiv_nedeni')
         .eq('firma_id', firmaId).order('arsiv_tarihi', { ascending: false }).limit(500)
-      if (projeId) q2 = (q2 as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+      if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
       if (lokasyonId) q2 = (q2 as any).eq('lokasyon_id', lokasyonId)
       if (atananId) q2 = (q2 as any).eq('atanan_kullanici_id', atananId)
       if (durum) q2 = (q2 as any).eq('durum', durum)
