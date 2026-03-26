@@ -776,7 +776,19 @@ async function del() {
   const combinedRows = useMemo(() => {
     if (!arsivAktif) return sorted.map(r => ({ ...r, _source: 'tablo' as const }))
     const tablo = sorted.map(r => ({ ...r, _source: 'tablo' as const }))
-    const arsiv = arsivRows.map(r => ({ ...r, _source: 'arsiv' as const }))
+
+    // Arşiv satırlarına da q ve actor client-side filtrelerini uygula
+    const s = q.trim().toLowerCase()
+    const filteredArsiv = arsivRows.filter((g: any) => {
+      if (s) {
+        const hay = [g.tanim ?? '', g.lokasyonlar?.tanim ?? '', g.atanan?.isim_soyisim ?? '', getIslemiYapan(g) ?? ''].join(' ').toLowerCase()
+        if (!hay.includes(s)) return false
+      }
+      if (actor && getIslemiYapan(g) !== actor) return false
+      return true
+    })
+
+    const arsiv = filteredArsiv.map(r => ({ ...r, _source: 'arsiv' as const }))
     const all = [...tablo, ...arsiv]
     all.sort((a, b) => {
       const da = a._source === 'arsiv' ? (a.arsiv_tarihi ?? a.aktif_olma_tarihi) : a.aktif_olma_tarihi
@@ -784,7 +796,7 @@ async function del() {
       return new Date(db ?? 0).getTime() - new Date(da ?? 0).getTime()
     })
     return all
-  }, [arsivAktif, sorted, arsivRows])
+  }, [arsivAktif, sorted, arsivRows, q, actor])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
