@@ -773,6 +773,19 @@ async function del() {
     return arr
   }, [filtered, sortKey, sortDir, sortDir])
 
+  const combinedRows = useMemo(() => {
+    if (!arsivAktif) return sorted.map(r => ({ ...r, _source: 'tablo' as const }))
+    const tablo = sorted.map(r => ({ ...r, _source: 'tablo' as const }))
+    const arsiv = arsivRows.map(r => ({ ...r, _source: 'arsiv' as const }))
+    const all = [...tablo, ...arsiv]
+    all.sort((a, b) => {
+      const da = a._source === 'arsiv' ? (a.arsiv_tarihi ?? a.aktif_olma_tarihi) : a.aktif_olma_tarihi
+      const db = b._source === 'arsiv' ? (b.arsiv_tarihi ?? b.aktif_olma_tarihi) : b.aktif_olma_tarihi
+      return new Date(db ?? 0).getTime() - new Date(da ?? 0).getTime()
+    })
+    return all
+  }, [arsivAktif, sorted, arsivRows])
+
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
     else {
@@ -1019,70 +1032,77 @@ async function del() {
             <tr>
               {bulkMode ? <th style={{ width: 44 }}></th> : null}
               {bulkDuzenleMode ? <th style={{ width: 44 }}></th> : null}
+              {arsivAktif && <th>Kayıt Türü</th>}
               <th>{thBtn('Görev', 'tanim')}</th>
               <th>{thBtn('Lokasyon', 'lokasyon')}</th>
               <th>{thBtn('Atanan', 'atanan')}</th>
               <th>{thBtn('Aktif Saat', 'aktif')}</th>
-              <th>{thBtn('İŞLEM TARİH-SAAT', 'islem')}</th>
+              <th>{thBtn(arsivAktif ? 'İşlem / Arşiv Tarihi' : 'İŞLEM TARİH-SAAT', 'islem')}</th>
               <th>{thBtn('Durum', 'durum')}</th>
               <th>{thBtn('İşlemi Yapan', 'actor')}</th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map((g: any) => (
-              <tr key={g.id} onClick={() => {
-                  if (bulkMode) {
-                    toggleBulk(g.id)
-                    setSelectedId(null)
-                  } else if (bulkDuzenleMode) {
-                    if (canBulkDuzenle(g)) toggleBulkDuzenleId(g.id)
-                  } else {
-                    setSelectedId(g.id)
-                  }
+            {combinedRows.map((g: any) => {
+              const isArsiv = g._source === 'arsiv'
+              return (
+              <tr key={`${g._source}-${g.id}`} onClick={() => {
+                  if (isArsiv) return
+                  if (bulkMode) { toggleBulk(g.id); setSelectedId(null) }
+                  else if (bulkDuzenleMode) { if (canBulkDuzenle(g)) toggleBulkDuzenleId(g.id) }
+                  else { setSelectedId(g.id) }
                 }} style={{
-                  cursor: 'pointer',
-                  background: bulkMode
-                    ? (selectedIds.has(g.id) ? '#e7f9e7' : undefined)
-                    : bulkDuzenleMode
-                      ? (bulkDuzenleIds.has(g.id) ? '#e7f0ff' : undefined)
-                      : (g.id===selectedId ? '#e7f9e7' : undefined)
+                  cursor: isArsiv ? 'default' : 'pointer',
+                  background: isArsiv
+                    ? '#f8fafc'
+                    : bulkMode
+                      ? (selectedIds.has(g.id) ? '#e7f9e7' : undefined)
+                      : bulkDuzenleMode
+                        ? (bulkDuzenleIds.has(g.id) ? '#e7f0ff' : undefined)
+                        : (g.id===selectedId ? '#e7f9e7' : undefined)
                 }}>
                 {bulkMode ? (
                   <td onClick={(e) => e.stopPropagation()} style={{ width: 44 }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(g.id)}
-                      onChange={() => toggleBulk(g.id)}
-                      style={{ width: 16, height: 16 }}
-                    />
+                    {!isArsiv && (
+                      <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleBulk(g.id)} style={{ width: 16, height: 16 }} />
+                    )}
                   </td>
                 ) : null}
                 {bulkDuzenleMode ? (
                   <td onClick={(e) => e.stopPropagation()} style={{ width: 44, textAlign: 'center' }}>
-                    {canBulkDuzenle(g) ? (
-                      <input
-                        type="checkbox"
-                        checked={bulkDuzenleIds.has(g.id)}
-                        onChange={() => toggleBulkDuzenleId(g.id)}
-                        style={{ width: 16, height: 16, accentColor: '#7c3aed' }}
-                      />
+                    {!isArsiv && canBulkDuzenle(g) ? (
+                      <input type="checkbox" checked={bulkDuzenleIds.has(g.id)} onChange={() => toggleBulkDuzenleId(g.id)} style={{ width: 16, height: 16, accentColor: '#7c3aed' }} />
                     ) : (
                       <span style={{ fontSize: 11, color: '#c0c0c0' }}>—</span>
                     )}
                   </td>
                 ) : null}
-                <td style={{ fontWeight: 600 }}>{g.tanim}</td>
-                <td style={{ color: '#506050' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-                <td style={{ color: '#506050' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
-                <td style={{ color: '#7a907a', whiteSpace: 'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
-                <td style={{ color: '#7a907a', whiteSpace: 'nowrap', fontSize: 13 }}>
-                  {g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—'}
+                {arsivAktif && (
+                  <td>
+                    <span style={{
+                      display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                      background: isArsiv ? '#f1f5f9' : '#e7f9e7',
+                      color: isArsiv ? '#64748b' : '#1f6b1f',
+                      border: `1px solid ${isArsiv ? '#cbd5e1' : '#bbf7d0'}`,
+                    }}>
+                      {isArsiv ? 'Arşiv' : 'Tablo'}
+                    </span>
+                  </td>
+                )}
+                <td style={{ fontWeight: 600, color: isArsiv ? '#475569' : undefined }}>{g.tanim}</td>
+                <td style={{ color: isArsiv ? '#64748b' : '#506050' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
+                <td style={{ color: isArsiv ? '#64748b' : '#506050' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', whiteSpace: 'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
+                <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', whiteSpace: 'nowrap', fontSize: 13 }}>
+                  {isArsiv
+                    ? (g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—')
+                    : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
                 </td>
                 <td>
                   <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
                 </td>
-                <td style={{ color: '#506050' }}>{getIslemiYapan(g)}
-                  {lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) && (
+                <td style={{ color: isArsiv ? '#94a3b8' : '#506050' }}>{getIslemiYapan(g)}
+                  {!isArsiv && lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setChecklistGorev({ id: g.id, type: 'canli_gorevler' }) }}
                       style={{ marginLeft: 6, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 7px', cursor: 'pointer', fontSize: 11, color: '#1d4ed8' }}
@@ -1092,10 +1112,11 @@ async function del() {
                   )}
                 </td>
               </tr>
-            ))}
-            {!sorted.length && (
+              )
+            })}
+            {!combinedRows.length && (
               <tr>
-                <td colSpan={(bulkMode || bulkDuzenleMode) ? 8 : 7} style={{ textAlign: 'center', color: '#7a907a', padding: '26px 0', fontSize: 13 }}>
+                <td colSpan={(bulkMode || bulkDuzenleMode) ? (arsivAktif ? 9 : 8) : (arsivAktif ? 8 : 7)} style={{ textAlign: 'center', color: '#7a907a', padding: '26px 0', fontSize: 13 }}>
                   Kriterlere uygun görev bulunamadı
                 </td>
               </tr>
@@ -1103,52 +1124,6 @@ async function del() {
           </tbody>
         </table>
       </div>
-
-      {/* ── ARŞİV KAYITLARI (Uygula'ya basılınca görünür) ── */}
-      {arsivAktif && (
-        <div style={{ marginTop: 24 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>
-            ARŞİV ({arsivRows.length} kayıt)
-          </div>
-          <div className="verde-table-wrap" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 290px)' }}>
-            <table className="verde-table" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui', fontSize: 13 }}>
-              <thead>
-                <tr>
-                  <th>Görev</th>
-                  <th>Lokasyon</th>
-                  <th>Atanan</th>
-                  <th>Aktif Saat</th>
-                  <th>Durum</th>
-                  <th>İşlemi Yapan</th>
-                  <th>Arşiv Tarihi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {arsivRows.map((g: any) => (
-                  <tr key={g.id} style={{ background: '#f8fafc' }}>
-                    <td style={{ fontWeight: 600, color: '#475569' }}>{g.tanim}</td>
-                    <td style={{ color: '#64748b' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-                    <td style={{ color: '#64748b' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
-                    <td style={{ color: '#94a3b8', whiteSpace: 'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
-                    <td>
-                      <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
-                    </td>
-                    <td style={{ color: '#94a3b8', fontSize: 13 }}>{getIslemiYapan(g)}</td>
-                    <td style={{ color: '#94a3b8', whiteSpace: 'nowrap', fontSize: 13 }}>{g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—'}</td>
-                  </tr>
-                ))}
-                {!arsivRows.length && (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', color: '#7a907a', padding: '20px 0', fontSize: 13 }}>
-                      Kriterlere uygun arşiv kaydı bulunamadı.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* ── TOPLU DÜZENLE UYARI POPUP ── */}
       {bulkDuzenleUyari.length > 0 && (
