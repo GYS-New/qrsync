@@ -1,73 +1,148 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { formatDateTime, GOREV_DURUM_LABEL } from '@/lib/utils'
+import { useCallback, useMemo, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { formatDateTime, CANLI_DURUM_LABEL } from '@/lib/utils'
 
 const DURUM_RENK: Record<string, string> = {
-  ACIK: 'status-acik',
-  ISLEMDE: 'status-islemde',
-  TAMAMLANDI: 'status-tamamlandi',
-  IPTAL: 'status-iptal',
+  HAZIR: 'status-hazir', ACIK: 'status-acik', BEKLEMEDE: 'status-beklemede',
+  TAMAMLANDI: 'status-tamamlandi', ZAMANINDA_YAPILAMAYAN: 'status-zamaninda',
+  ZAMANINDA_TAMAMLANDI: 'status-tamamlandi', ZAMANI_GECMIS: 'status-zamaninda',
+  IPTAL: 'status-iptal', SILINDI: 'status-silindi', KAPATILDI: 'status-kapatildi',
 }
+
+const SEL = '*,lokasyonlar(id,tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim)'
 
 export default function TumGorevlerClient({
   base,
+  firmaId,
+  projeId,
   readonly,
   lokasyonlar,
   kullanicilar,
   initialGorevler,
 }: {
   base: '/sa' | '/ta' | '/u'
+  firmaId: string
+  projeId?: string | null
   readonly: boolean
-  lokasyonlar: { id: string; tanim: string }[]
+  lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[]
   kullanicilar: { id: string; isim_soyisim: string }[]
   initialGorevler: any[]
 }) {
-  const [q, setQ] = useState('')
-  const [lokasyonId, setLokasyonId] = useState('')
-  const [kullaniciId, setKullaniciId] = useState('')
-  const [durum, setDurum] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
+  const supabase = createClient()
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase()
-    const fromD = from ? new Date(from + 'T00:00:00') : null
-    const toD = to ? new Date(to + 'T23:59:59') : null
+  // ── Filtre state (draft — Uygula'ya basılmadan etkilenmez) ───────────────
+  const [q,          setQ]          = useState('')
+  const [kullaniciId,setKullaniciId]= useState('')
+  const [durum,      setDurum]      = useState('')
+  const [from,       setFrom]       = useState('')
+  const [to,         setTo]         = useState('')
 
-    return (initialGorevler ?? []).filter((g: any) => {
-      if (s) {
-        const hay = [
-          g.tanim ?? '',
-          g.lokasyonlar?.tanim ?? '',
-          g.users?.isim_soyisim ?? '',
-        ].join(' ').toLowerCase()
-        if (!hay.includes(s)) return false
-      }
+  // ── Lokasyon hiyerarşisi (3 seviye) ──────────────────────────────────────
+  const [loc1, setLoc1] = useState('')
+  const [loc2, setLoc2] = useState('')
+  const [loc3, setLoc3] = useState('')
 
-      if (lokasyonId && g.lokasyon_id !== lokasyonId) return false
-      if (kullaniciId && g.atanan_kullanici_id !== kullaniciId) return false
-      if (durum && g.durum !== durum) return false
+  const locMap = useMemo(() => {
+    const m: Record<string, { tanim: string; parent_id: string | null }> = {}
+    lokasyonlar.forEach(l => { m[l.id] = { tanim: l.tanim, parent_id: l.parent_id ?? null } })
+    return m
+  }, [lokasyonlar])
 
-      if (fromD || toD) {
-        const d = g.olusturma_tarihi ? new Date(g.olusturma_tarihi) : null
-        if (!d) return false
-        if (fromD && d < fromD) return false
-        if (toD && d > toD) return false
-      }
-
-      return true
+  const childrenOf = useMemo(() => {
+    const byParent: Record<string, typeof lokasyonlar> = {}
+    lokasyonlar.forEach(l => {
+      const p = l.parent_id ?? null
+      if (!p) return
+      if (!byParent[p]) byParent[p] = []
+      byParent[p].push(l)
     })
-  }, [q, lokasyonId, kullaniciId, durum, from, to, initialGorevler])
+    Object.values(byParent).forEach(arr => arr.sort((a, b) => a.tanim.localeCompare(b.tanim)))
+    return byParent
+  }, [lokasyonlar])
 
+  const roots       = useMemo(() => lokasyonlar.filter(l => !l.parent_id).sort((a,b) => a.tanim.localeCompare(b.tanim)), [lokasyonlar])
+  const loc2Options = useMemo(() => loc1 ? (childrenOf[loc1] ?? []) : [], [childrenOf, loc1])
+  const loc3Options = useMemo(() => loc2 ? (childrenOf[loc2] ?? []) : [], [childrenOf, loc2])
+  const selectedLokasyonId = loc3 || loc2 || loc1
+
+  const getLocPath = useCallback((lokasyonId: string | null | undefined): string => {
+    if (!lokasyonId) return '—'
+    const parts: string[] = []
+    let cur: string | null = lokasyonId
+    let guard = 0
+    while (cur && guard < 8) {
+      const node: { tanim: string; parent_id: string | null } | undefined = locMap[cur]
+      if (!node) break
+      parts.push(node.tanim)
+      cur = node.parent_id
+      guard++
+    }
+    return parts.reverse().join(' / ') || '—'
+  }, [locMap])
+
+  // ── Veri state ───────────────────────────────────────────────────────────
+  const [rows,      setRows]      = useState<any[]>(initialGorevler)
+  const [arsivRows, setArsivRows] = useState<any[]>([])
+  const [loading,   setLoading]   = useState(false)
+  const [filtered,  setFiltered]  = useState(false)
+
+  // ── Uygula ───────────────────────────────────────────────────────────────
+  const uygula = useCallback(async () => {
+    setLoading(true)
+    try {
+      const fromISO = from ? new Date(from + 'T00:00:00').toISOString() : null
+      const toISO   = to   ? new Date(to   + 'T23:59:59').toISOString() : null
+
+      function applyFilters(q: any, tarihField: string) {
+        if (projeId) q = q.or(`proje_id.eq.${projeId},proje_id.is.null`)
+        if (selectedLokasyonId) q = q.eq('lokasyon_id', selectedLokasyonId)
+        if (kullaniciId) q = q.eq('atanan_kullanici_id', kullaniciId)
+        if (durum) q = q.eq('durum', durum)
+        if (fromISO) q = q.gte(tarihField, fromISO)
+        if (toISO)   q = q.lte(tarihField, toISO)
+        return q
+      }
+
+      let tblQ = supabase.from('canli_gorevler').select(SEL).eq('firma_id', firmaId)
+        .order('aktif_olma_tarihi', { ascending: false }).limit(500)
+      tblQ = applyFilters(tblQ, 'aktif_olma_tarihi')
+
+      let arsQ = supabase.from('canli_gorevler_arsiv').select(SEL + ',arsiv_tarihi,arsiv_nedeni,kural:gorev_kurallari!arsiv_kural_fkey(tanim)')
+        .eq('firma_id', firmaId).order('arsiv_tarihi', { ascending: false }).limit(500)
+      arsQ = applyFilters(arsQ, 'arsiv_tarihi')
+
+      const [tblRes, arsRes] = await Promise.all([tblQ, arsQ])
+      setRows(tblRes.data ?? [])
+      setArsivRows(arsRes.data ?? [])
+      setFiltered(true)
+    } finally { setLoading(false) }
+  }, [firmaId, projeId, selectedLokasyonId, kullaniciId, durum, from, to, supabase])
+
+  // ── Temizle ──────────────────────────────────────────────────────────────
   function clear() {
-    setQ('')
-    setLokasyonId('')
-    setKullaniciId('')
-    setDurum('')
-    setFrom('')
-    setTo('')
+    setQ(''); setLoc1(''); setLoc2(''); setLoc3('')
+    setKullaniciId(''); setDurum(''); setFrom(''); setTo('')
+    setRows(initialGorevler); setArsivRows([]); setFiltered(false)
   }
+
+  // ── Metin filtresi (sadece arama kutusu için client-side) ─────────────────
+  const displayRows = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    if (!s) return rows
+    return rows.filter((g: any) =>
+      [g.tanim ?? '', getLocPath(g.lokasyon_id), g.atanan?.isim_soyisim ?? ''].join(' ').toLowerCase().includes(s)
+    )
+  }, [rows, q, getLocPath])
+
+  const displayArsiv = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    if (!s) return arsivRows
+    return arsivRows.filter((g: any) =>
+      [g.tanim ?? '', getLocPath(g.lokasyon_id), g.atanan?.isim_soyisim ?? ''].join(' ').toLowerCase().includes(s)
+    )
+  }, [arsivRows, q, getLocPath])
 
   return (
     <div className="verde-card" style={{ padding: 16 }}>
@@ -75,95 +150,141 @@ export default function TumGorevlerClient({
         <div>
           <div style={{ fontSize: 16, fontWeight: 900, color: '#0f1a0f' }}>FREKANSİYEL GÖREV YÖNETİMİ</div>
           <div style={{ fontSize: 14, color: '#7a907a', marginTop: 2 }}>
-            Başlıklara göre filtrele • Tarih aralığı + kişi filtresi birlikte uygulanır
+            Filtreleri seçip <strong>Uygula</strong>'ya basın — tablo ve arşiv kayıtları birlikte görünür
           </div>
         </div>
-
         <a href={`${base}/dashboard/canli-islemler`} className="text-[14px] underline" style={{ color:'#2e8b2e' }}>
           Canlı Görevler'e Dön
         </a>
       </div>
 
-      <div style={{ display:'flex', gap: 10, flexWrap:'wrap', marginBottom: 14 }}>
+      {/* ── Filtre satırı ── */}
+      <div style={{ display:'flex', gap: 8, flexWrap:'wrap', marginBottom: 14, alignItems:'center' }}>
         <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Ara (görev, lokasyon, kişi)"
-          className="verde-input"
-          style={{ minWidth: 220 }}
+          value={q} onChange={e => setQ(e.target.value)}
+          placeholder="Görev / kişi ara…"
+          className="verde-input" style={{ minWidth: 180 }}
         />
 
-        <select className="verde-select" value={lokasyonId} onChange={(e) => setLokasyonId(e.target.value)} style={{ minWidth: 180 }}>
+        {/* Lokasyon — 3 seviye */}
+        <select className="verde-select" value={loc1} onChange={e => { setLoc1(e.target.value); setLoc2(''); setLoc3('') }} style={{ minWidth: 160 }}>
           <option value="">Lokasyon (Tümü)</option>
-          {lokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+          {roots.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
         </select>
+        {loc2Options.length > 0 && (
+          <select className="verde-select" value={loc2} onChange={e => { setLoc2(e.target.value); setLoc3('') }} style={{ minWidth: 150 }}>
+            <option value="">Alt Lokasyon</option>
+            {loc2Options.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+          </select>
+        )}
+        {loc3Options.length > 0 && (
+          <select className="verde-select" value={loc3} onChange={e => setLoc3(e.target.value)} style={{ minWidth: 150 }}>
+            <option value="">Alt-Alt Lokasyon</option>
+            {loc3Options.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+          </select>
+        )}
 
-        <select className="verde-select" value={kullaniciId} onChange={(e) => setKullaniciId(e.target.value)} style={{ minWidth: 200 }}>
+        <select className="verde-select" value={kullaniciId} onChange={e => setKullaniciId(e.target.value)} style={{ minWidth: 180 }}>
           <option value="">Atanan (Tümü)</option>
           {kullanicilar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
         </select>
 
-        <select className="verde-select" value={durum} onChange={(e) => setDurum(e.target.value)} style={{ minWidth: 170 }}>
+        <select className="verde-select" value={durum} onChange={e => setDurum(e.target.value)} style={{ minWidth: 160 }}>
           <option value="">Durum (Tümü)</option>
-          <option value="ACIK">Açık</option>
-          <option value="ISLEMDE">İşlemde</option>
-          <option value="TAMAMLANDI">Tamamlandı</option>
-          <option value="IPTAL">İptal</option>
+          {Object.entries(CANLI_DURUM_LABEL).map(([k,v]) => <option key={k} value={k}>{v as string}</option>)}
         </select>
 
-        <div style={{ display:'flex', gap: 8, alignItems:'center', flexWrap:'wrap' }}>
-          <div style={{ fontSize: 13, color:'#506050' }}>Tarih:</div>
-          <input type="date" className="verde-input" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <div style={{ fontSize: 13, color:'#506050' }}>—</div>
-          <input type="date" className="verde-input" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
+        <input type="date" className="verde-input" value={from} onChange={e => setFrom(e.target.value)} />
+        <span style={{ color:'#94a3b8', fontSize:13 }}>—</span>
+        <input type="date" className="verde-input" value={to} onChange={e => setTo(e.target.value)} />
 
         <button
-          type="button"
-          onClick={clear}
-          className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[14px] hover:bg-[#f3faf3]"
-        >
+          type="button" onClick={uygula} disabled={loading}
+          style={{ height:36, padding:'0 16px', borderRadius:8, border:'none', background:'#1f6b1f', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', opacity: loading ? 0.7 : 1 }}>
+          {loading ? 'Yükleniyor…' : '▶ Uygula'}
+        </button>
+        <button
+          type="button" onClick={clear}
+          className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[14px] hover:bg-[#f3faf3]">
           Temizle
         </button>
       </div>
 
-      <div className="verde-table-wrap">
+      {/* ── Tablo — Aktif kayıtlar ── */}
+      <div style={{ fontSize:12, fontWeight:700, color:'#1f6b1f', marginBottom:4 }}>
+        TABLO ({displayRows.length} kayıt)
+      </div>
+      <div className="verde-table-wrap" style={{ marginBottom: filtered && displayArsiv.length > 0 ? 24 : 0 }}>
         <table className="verde-table">
           <thead>
             <tr>
-              <th>Görev</th>
-              <th>Lokasyon</th>
-              <th>Atanan</th>
-              <th>Aktif Saat</th>
-              <th>Durum</th>
-              <th>İşlemi Yapan</th>
+              <th>Görev</th><th>Lokasyon</th><th>Atanan</th>
+              <th>Aktif Saat</th><th>Durum</th><th>İşlemi Yapan</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((g: any) => (
+            {displayRows.map((g: any) => (
               <tr key={g.id}>
                 <td style={{ fontWeight: 600 }}>{g.tanim}</td>
-                <td style={{ color:'#506050' }}>{g.lokasyonlar?.tanim ?? '—'}</td>
-                <td style={{ color:'#506050' }}>{g.users?.isim_soyisim ?? '—'}</td>
-                <td style={{ color:'#7a907a', whiteSpace:'nowrap', fontSize: 14 }}>{g.olusturma_tarihi ? formatDateTime(g.olusturma_tarihi) : '—'}</td>
+                <td style={{ color:'#506050' }}>{getLocPath(g.lokasyon_id)}</td>
+                <td style={{ color:'#506050' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                <td style={{ color:'#7a907a', whiteSpace:'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
                 <td>
                   <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>
-                    {GOREV_DURUM_LABEL[g.durum] ?? g.durum}
+                    {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
                   </span>
                 </td>
-                <td style={{ color:'#7a907a' }}>—</td>
+                <td style={{ color:'#7a907a', fontSize:13 }}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
               </tr>
             ))}
-            {!filtered.length && (
-              <tr>
-                <td colSpan={6} style={{ textAlign:'center', color:'#7a907a', padding:'26px 0', fontSize: 14 }}>
-                  Kriterlere uygun görev bulunamadı
-                </td>
-              </tr>
+            {!displayRows.length && (
+              <tr><td colSpan={6} style={{ textAlign:'center', color:'#7a907a', padding:'26px 0', fontSize: 14 }}>
+                {filtered ? 'Kriterlere uygun aktif kayıt bulunamadı.' : 'Görev bulunamadı.'}
+              </td></tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {/* ── Arşiv kayıtları (sadece filtre uygulandıysa) ── */}
+      {filtered && (
+        <>
+          <div style={{ fontSize:12, fontWeight:700, color:'#64748b', marginBottom:4, marginTop: 8 }}>
+            ARŞİV ({displayArsiv.length} kayıt)
+          </div>
+          <div className="verde-table-wrap">
+            <table className="verde-table">
+              <thead>
+                <tr>
+                  <th>Görev</th><th>Lokasyon</th><th>Atanan</th>
+                  <th>Aktif Saat</th><th>Durum</th><th>Arşiv Tarihi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayArsiv.map((g: any) => (
+                  <tr key={g.id} style={{ background:'#f8fafc' }}>
+                    <td style={{ fontWeight: 600, color:'#475569' }}>{g.tanim}</td>
+                    <td style={{ color:'#64748b' }}>{getLocPath(g.lokasyon_id)}</td>
+                    <td style={{ color:'#64748b' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                    <td style={{ color:'#94a3b8', whiteSpace:'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
+                    <td>
+                      <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>
+                        {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
+                      </span>
+                    </td>
+                    <td style={{ color:'#94a3b8', whiteSpace:'nowrap', fontSize: 13 }}>{g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—'}</td>
+                  </tr>
+                ))}
+                {!displayArsiv.length && (
+                  <tr><td colSpan={6} style={{ textAlign:'center', color:'#7a907a', padding:'20px 0', fontSize: 14 }}>
+                    Kriterlere uygun arşiv kaydı bulunamadı.
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

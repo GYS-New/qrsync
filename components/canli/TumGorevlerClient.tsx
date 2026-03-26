@@ -652,7 +652,9 @@ async function del() {
 
 
   const [q, setQ] = useState('')
-  const [lokasyonId, setLokasyonId] = useState('')
+  const [filterLoc1, setFilterLoc1] = useState('')
+  const [filterLoc2, setFilterLoc2] = useState('')
+  const [filterLoc3, setFilterLoc3] = useState('')
   const [atananId, setAtananId] = useState('')
   const [durum, setDurum] = useState('')
   const [actor, setActor] = useState('')
@@ -660,6 +662,39 @@ async function del() {
   const [to, setTo] = useState('')
   const [islemFrom, setIslemFrom] = useState('')
   const [islemTo, setIslemTo] = useState('')
+
+  // Seçili lokasyon filtresi (3 seviyeden en derini)
+  const lokasyonId = filterLoc3 || filterLoc2 || filterLoc1
+
+  // Filtre lokasyon seçenekleri
+  const filterLoc2Options = useMemo(() => filterLoc1 ? (allLocs.filter(l => l.parent_id === filterLoc1).sort((a,b) => a.tanim.localeCompare(b.tanim))) : [], [allLocs, filterLoc1])
+  const filterLoc3Options = useMemo(() => filterLoc2 ? (allLocs.filter(l => l.parent_id === filterLoc2).sort((a,b) => a.tanim.localeCompare(b.tanim))) : [], [allLocs, filterLoc2])
+
+  // Arşiv verisi (Uygula'ya basılınca yüklenir)
+  const [arsivRows, setArsivRows] = useState<any[]>([])
+  const [arsivLoading, setArsivLoading] = useState(false)
+  const [arsivAktif, setArsivAktif] = useState(false)
+
+  const SEL_ARSIV = '*,lokasyonlar(id,tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim)'
+
+  async function uygula() {
+    setArsivLoading(true)
+    setArsivAktif(true)
+    try {
+      const fromISO = from ? new Date(from).toISOString() : null
+      const toISO   = to   ? new Date(to).toISOString()   : null
+      let q2 = supabase.from('canli_gorevler_arsiv').select(SEL_ARSIV + ',arsiv_tarihi,arsiv_nedeni')
+        .eq('firma_id', firmaId).order('arsiv_tarihi', { ascending: false }).limit(500)
+      if (projeId) q2 = (q2 as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+      if (lokasyonId) q2 = (q2 as any).eq('lokasyon_id', lokasyonId)
+      if (atananId) q2 = (q2 as any).eq('atanan_kullanici_id', atananId)
+      if (durum) q2 = (q2 as any).eq('durum', durum)
+      if (fromISO) q2 = (q2 as any).gte('arsiv_tarihi', fromISO)
+      if (toISO)   q2 = (q2 as any).lte('arsiv_tarihi', toISO)
+      const { data } = await q2
+      setArsivRows(data ?? [])
+    } finally { setArsivLoading(false) }
+  }
 
   const [sortKey, setSortKey] = useState<SortKey>('aktif')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -748,7 +783,9 @@ async function del() {
 
   function clear() {
     setQ('')
-    setLokasyonId('')
+    setFilterLoc1('')
+    setFilterLoc2('')
+    setFilterLoc3('')
     setAtananId('')
     setDurum('')
     setActor('')
@@ -756,6 +793,8 @@ async function del() {
     setTo('')
     setIslemFrom('')
     setIslemTo('')
+    setArsivRows([])
+    setArsivAktif(false)
   }
 
   const thBtn = (label: string, key: SortKey) => (
@@ -908,10 +947,23 @@ async function del() {
 
       {/* ── SATIR 2: Filtreler ── */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center', padding: '10px 12px', background: '#f8fbf8', borderRadius: 8, border: '1px solid #e8f0e8' }}>
-        <select className="verde-select" value={lokasyonId} onChange={e => setLokasyonId(e.target.value)} style={{ width: 148 }}>
+        {/* Lokasyon — 3 seviye */}
+        <select className="verde-select" value={filterLoc1} onChange={e => { setFilterLoc1(e.target.value); setFilterLoc2(''); setFilterLoc3('') }} style={{ width: 148 }}>
           <option value="">Lokasyon (Tümü)</option>
-          {lokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+          {rootLocs.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
         </select>
+        {filterLoc2Options.length > 0 && (
+          <select className="verde-select" value={filterLoc2} onChange={e => { setFilterLoc2(e.target.value); setFilterLoc3('') }} style={{ width: 148 }}>
+            <option value="">Alt Lokasyon</option>
+            {filterLoc2Options.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+          </select>
+        )}
+        {filterLoc3Options.length > 0 && (
+          <select className="verde-select" value={filterLoc3} onChange={e => setFilterLoc3(e.target.value)} style={{ width: 148 }}>
+            <option value="">Alt-Alt Lokasyon</option>
+            {filterLoc3Options.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+          </select>
+        )}
 
         <select className="verde-select" value={atananId} onChange={e => setAtananId(e.target.value)} style={{ width: 148 }}>
           <option value="">Atanan (Tümü)</option>
@@ -951,6 +1003,10 @@ async function del() {
           <input type="datetime-local" className="verde-input" style={{ width: 155 }} value={islemTo} onChange={e => setIslemTo(e.target.value)} />
         </div>
 
+        <button type="button" onClick={uygula} disabled={arsivLoading}
+          style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: '#1f6b1f', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: arsivLoading ? 0.7 : 1 }}>
+          {arsivLoading ? 'Yükleniyor…' : '▶ Uygula'}
+        </button>
         <button type="button" onClick={clear}
           style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#fff', fontSize: 13, color: '#506050', cursor: 'pointer' }}>
           Temizle
@@ -1047,7 +1103,52 @@ async function del() {
           </tbody>
         </table>
       </div>
-    
+
+      {/* ── ARŞİV KAYITLARI (Uygula'ya basılınca görünür) ── */}
+      {arsivAktif && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>
+            ARŞİV ({arsivRows.length} kayıt)
+          </div>
+          <div className="verde-table-wrap" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 290px)' }}>
+            <table className="verde-table" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th>Görev</th>
+                  <th>Lokasyon</th>
+                  <th>Atanan</th>
+                  <th>Aktif Saat</th>
+                  <th>Durum</th>
+                  <th>İşlemi Yapan</th>
+                  <th>Arşiv Tarihi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {arsivRows.map((g: any) => (
+                  <tr key={g.id} style={{ background: '#f8fafc' }}>
+                    <td style={{ fontWeight: 600, color: '#475569' }}>{g.tanim}</td>
+                    <td style={{ color: '#64748b' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
+                    <td style={{ color: '#64748b' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                    <td style={{ color: '#94a3b8', whiteSpace: 'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
+                    <td>
+                      <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
+                    </td>
+                    <td style={{ color: '#94a3b8', fontSize: 13 }}>{getIslemiYapan(g)}</td>
+                    <td style={{ color: '#94a3b8', whiteSpace: 'nowrap', fontSize: 13 }}>{g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—'}</td>
+                  </tr>
+                ))}
+                {!arsivRows.length && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', color: '#7a907a', padding: '20px 0', fontSize: 13 }}>
+                      Kriterlere uygun arşiv kaydı bulunamadı.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── TOPLU DÜZENLE UYARI POPUP ── */}
       {bulkDuzenleUyari.length > 0 && (
