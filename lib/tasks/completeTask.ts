@@ -88,7 +88,7 @@ export async function completeTask(input: CompleteTaskInput) {
   if (liveTask.durum === 'ZAMANI_GECMIS') {
     throw new Error('Zamanı geçmiş görevlerde işlem yapılamaz')
   }
-  if (!['ACIK', 'BEKLEMEDE'].includes(liveTask.durum)) {
+  if (!['ACIK', 'BEKLEMEDE', 'ISLEMDE'].includes(liveTask.durum)) {
     throw new Error('Bu görev henüz tamamlanabilir durumda değil')
   }
   if (liveTask.atanan_kullanici_id && liveTask.atanan_kullanici_id !== userId) {
@@ -112,6 +112,7 @@ export async function completeTask(input: CompleteTaskInput) {
     await supabase.from('canli_gorevler').update({
       baslatilma_tarihi: nowIso,
       baslatan_kullanici_id: userId,
+      durum: 'ISLEMDE',
       durum_degisim_tarihi: nowIso,
     } as any).eq('id', taskId)
   }
