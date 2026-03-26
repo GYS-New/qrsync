@@ -23,13 +23,14 @@ export default async function TAGorevlerPage() {
     </div>
   )
 
+  const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }] = await Promise.all([
     supabase
       .from('gorevler')
       .select('*,lokasyonlar(id,tanim,parent_id),users!atanan_kullanici_id(isim_soyisim)')
       .eq('firma_id', firmaId)
       .eq('proje_id', aktifProje.id)
-      .in('durum', ['ACIK', 'ISLEMDE'])
+      .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
       .order('olusturma_tarihi', { ascending: false })
       .limit(200),
     supabase

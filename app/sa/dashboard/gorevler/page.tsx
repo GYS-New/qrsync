@@ -17,9 +17,10 @@ export default async function SAGorevlerPage() {
   const aktifProje = firmaId ? await getAktifProje(firmaId) : null
   const projeId = aktifProje?.id ?? null
 
+  const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   let gorevQ = firmaId
     ? supabase.from('gorevler').select('*,lokasyonlar(id,tanim,parent_id),users!atanan_kullanici_id(isim_soyisim)')
-        .eq('firma_id', firmaId).in('durum', ['ACIK', 'ISLEMDE']).order('olusturma_tarihi', { ascending: false }).limit(200)
+        .eq('firma_id', firmaId).or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`).order('olusturma_tarihi', { ascending: false }).limit(200)
     : null
   if (gorevQ && projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
 

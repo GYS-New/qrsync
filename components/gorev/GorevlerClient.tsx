@@ -148,11 +148,12 @@ export default function GorevlerClient({
 
   async function refreshAll(fid: string) {
     setLoading(true); setError('')
+    const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     let gorevQuery = supabase
       .from('gorevler')
       .select('*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)')
       .eq('firma_id', fid)
-      .in('durum', ['ACIK', 'ISLEMDE'])
+      .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
       .order('olusturma_tarihi', { ascending: false })
       .limit(200)
     if (projeId) gorevQuery = (gorevQuery as any).eq('proje_id', projeId)
