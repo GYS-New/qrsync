@@ -106,6 +106,12 @@ export default function ArsivClient({
   const [spesifikFrom,    setSpesifikFrom]    = useState('')
   const [spesifikTo,      setSpesifikTo]      = useState('')
 
+  // ── Toplu sil modal ───────────────────────────────────────────────────────
+  const [topluSilSekme,  setTopluSilSekme]  = useState<Sekme | null>(null)
+  const [topluSilFrom,   setTopluSilFrom]   = useState('')
+  const [topluSilTo,     setTopluSilTo]     = useState('')
+  const [topluSilYukleniyor, setTopluSilYukleniyor] = useState(false)
+
   // ── Lokasyon hiyerarşisi ──────────────────────────────────────────────────
   const [lokasyonlarTum, setLokasyonlarTum] = useState<any[]>([])
 
@@ -265,6 +271,90 @@ export default function ArsivClient({
       setMusteriData(p => p.filter(r => r.id !== row.id))
       toast({ type: 'success', title: 'Silindi', message: 'Değerlendirme kalıcı olarak silindi.' })
     } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
+  }
+
+  // ── Aksiyon: Spesifik ────────────────────────────────────────────────────
+  async function spesifikRestore(row: any) {
+    const ok = await confirm({ title: 'Geri Yükle', message: `"${row.tanim}" görevi tekrar aktif listeye alınsın mı?\nDurum "Açık" olarak güncellenecek.`, confirmText: 'Geri Yükle' })
+    if (!ok) return
+    try {
+      const { error } = await supabase.from('gorevler')
+        .update({ durum: 'ACIK', durum_degisim_tarihi: new Date().toISOString(), tamamlanma_tarihi: null, tamamlanma_suresi_saniye: null })
+        .eq('id', row.id)
+      if (error) throw error
+      setSpesifikData(p => p.filter(r => r.id !== row.id))
+      toast({ type: 'success', title: 'Geri yüklendi', message: 'Görev aktif listeye alındı.' })
+    } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
+  }
+
+  async function spesifikSil(row: any) {
+    const ok = await confirm({ title: 'Kalıcı Sil', message: `"${row.tanim}" kalıcı silinsin mi?\nBu işlem geri alınamaz.`, confirmText: 'Kalıcı Sil', variant: 'danger' })
+    if (!ok) return
+    try {
+      const { error } = await supabase.from('gorevler').delete().eq('id', row.id)
+      if (error) throw error
+      setSpesifikData(p => p.filter(r => r.id !== row.id))
+      toast({ type: 'success', title: 'Silindi', message: 'Görev kalıcı olarak silindi.' })
+    } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
+  }
+
+  // ── Toplu sil ─────────────────────────────────────────────────────────────
+  async function topluSilUygula() {
+    if (!topluSilSekme || !firmaId) return
+    const ok = await confirm({
+      title: '⚠️ Toplu Kalıcı Silme',
+      message: `Seçilen tarih aralığındaki tüm kayıtlar kalıcı olarak silinecek.\n\nBu işlem GERİ ALINAMAZ. Onaylıyor musunuz?`,
+      confirmText: 'Evet, Kalıcı Sil',
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setTopluSilYukleniyor(true)
+    try {
+      const fromISO = topluSilFrom ? new Date(topluSilFrom + 'T00:00:00').toISOString() : null
+      const toISO   = topluSilTo   ? new Date(topluSilTo   + 'T23:59:59').toISOString() : null
+
+      if (topluSilSekme === 'frekansiyel') {
+        let q = supabase.from('canli_gorevler_arsiv').delete().eq('firma_id', firmaId)
+        if (projeId) q = (q as any).eq('proje_id', projeId)
+        if (fromISO) q = (q as any).gte('arsiv_tarihi', fromISO)
+        if (toISO)   q = (q as any).lte('arsiv_tarihi', toISO)
+        const { error } = await q
+        if (error) throw error
+        await yukle_frekansiyel()
+
+      } else if (topluSilSekme === 'personel') {
+        let q = supabase.from('personel_mesai_kayitlari').delete().eq('firma_id', firmaId).eq('arsivlendi', true)
+        if (fromISO) q = (q as any).gte('giris_saati', fromISO)
+        if (toISO)   q = (q as any).lte('giris_saati', toISO)
+        const { error } = await q
+        if (error) throw error
+        await yukle_personel()
+
+      } else if (topluSilSekme === 'musteri') {
+        let q = supabase.from('musteri_degerlendirmeleri').delete().eq('firma_id', firmaId).eq('arsivlendi', true)
+        if (fromISO) q = (q as any).gte('olusturma_tarihi', fromISO)
+        if (toISO)   q = (q as any).lte('olusturma_tarihi', toISO)
+        const { error } = await q
+        if (error) throw error
+        await yukle_musteri()
+
+      } else if (topluSilSekme === 'spesifik') {
+        const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        let q = supabase.from('gorevler').delete().eq('firma_id', firmaId)
+          .or(`durum.eq.IPTAL,and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.lt.${sinir24s})`)
+        if (projeId) q = (q as any).eq('proje_id', projeId)
+        if (fromISO) q = (q as any).gte('olusturma_tarihi', fromISO)
+        if (toISO)   q = (q as any).lte('olusturma_tarihi', toISO)
+        const { error } = await q
+        if (error) throw error
+        await yukle_spesifik()
+      }
+
+      toast({ type: 'success', title: 'Tamamlandı', message: 'Seçilen kayıtlar kalıcı olarak silindi.' })
+      setTopluSilSekme(null); setTopluSilFrom(''); setTopluSilTo('')
+    } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message })
+    } finally { setTopluSilYukleniyor(false) }
   }
 
   // ── Filtreli listeler ─────────────────────────────────────────────────────
@@ -428,6 +518,10 @@ export default function ArsivClient({
                 className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color: '#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
+              <button onClick={() => { setTopluSilSekme('frekansiyel'); setTopluSilFrom(''); setTopluSilTo('') }}
+                className="border px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2" style={{ borderColor:'#fca5a5', background:'#fff1f2', color:'#dc2626', fontWeight:600 }}>
+                <Trash2 size={13} /> Kayıtları Sil
+              </button>
             </div>
           </div>
 
@@ -535,6 +629,10 @@ export default function ArsivClient({
                 className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
+              <button onClick={() => { setTopluSilSekme('personel'); setTopluSilFrom(''); setTopluSilTo('') }}
+                className="border px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2" style={{ borderColor:'#fca5a5', background:'#fff1f2', color:'#dc2626', fontWeight:600 }}>
+                <Trash2 size={13} /> Kayıtları Sil
+              </button>
             </div>
           </div>
 
@@ -622,6 +720,10 @@ export default function ArsivClient({
               }} disabled={!filtreMusteri.length}
                 className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
                 <Printer size={13} /> Yazdır
+              </button>
+              <button onClick={() => { setTopluSilSekme('musteri'); setTopluSilFrom(''); setTopluSilTo('') }}
+                className="border px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2" style={{ borderColor:'#fca5a5', background:'#fff1f2', color:'#dc2626', fontWeight:600 }}>
+                <Trash2 size={13} /> Kayıtları Sil
               </button>
             </div>
           </div>
@@ -730,6 +832,10 @@ export default function ArsivClient({
                 className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
+              <button onClick={() => { setTopluSilSekme('spesifik'); setTopluSilFrom(''); setTopluSilTo('') }}
+                className="border px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2" style={{ borderColor:'#fca5a5', background:'#fff1f2', color:'#dc2626', fontWeight:600 }}>
+                <Trash2 size={13} /> Kayıtları Sil
+              </button>
             </div>
           </div>
 
@@ -747,11 +853,11 @@ export default function ArsivClient({
             <table className="verde-table">
               <thead><tr>
                 <th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th>
-                <th>Oluşturma</th><th>Tamamlanma</th>
+                <th>Oluşturma</th><th>Tamamlanma</th><th style={{ textAlign:'center' }}>İşlem</th>
               </tr></thead>
               <tbody>
-                {spesifikLoading ? <YukleniyorSatir cols={6} /> :
-                 filtreSpesifik.length === 0 ? <BosKayit cols={6} mesaj="Spesifik görev arşivi boş." /> :
+                {spesifikLoading ? <YukleniyorSatir cols={7} /> :
+                 filtreSpesifik.length === 0 ? <BosKayit cols={7} mesaj="Spesifik görev arşivi boş." /> :
                  filtreSpesifik.map((r: any) => (
                   <tr key={r.id}>
                     <td style={{ fontWeight:600 }}>{r.tanim}</td>
@@ -766,6 +872,10 @@ export default function ArsivClient({
                     </td>
                     <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.olusturma_tarihi ? formatDateTime(r.olusturma_tarihi) : '—'}</td>
                     <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.tamamlanma_tarihi ? formatDateTime(r.tamamlanma_tarihi) : '—'}</td>
+                    <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
+                      <button onClick={() => spesifikRestore(r)} title="Geri Yükle" style={aksBtn('#2e8b2e','#e8f4e8')}><RotateCcw size={13} /></button>
+                      <button onClick={() => spesifikSil(r)}     title="Kalıcı Sil" style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>
+                    </div></td>
                   </tr>
                 ))}
               </tbody>
@@ -775,6 +885,60 @@ export default function ArsivClient({
       )}
 
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+
+      {/* ── Toplu Sil Modalı ─────────────────────────────────────────────── */}
+      {topluSilSekme && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:80, display:'flex', alignItems:'center', justifyContent:'center' }}
+          onClick={() => !topluSilYukleniyor && setTopluSilSekme(null)}>
+          <div className="verde-card" style={{ width:420, padding:0, overflow:'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding:'14px 18px', borderBottom:'1px solid #fca5a5', background:'#fff1f2', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#dc2626' }}>
+                <Trash2 size={14} style={{ display:'inline', marginRight:6 }} />
+                Kayıtları Kalıcı Sil — {
+                  topluSilSekme === 'frekansiyel' ? 'Frekansiyel Görevler' :
+                  topluSilSekme === 'personel'   ? 'Personel Takibi' :
+                  topluSilSekme === 'musteri'    ? 'Müşteri Değerlendirmeleri' :
+                  'Spesifik Görevler'
+                }
+              </div>
+              {!topluSilYukleniyor && (
+                <button onClick={() => setTopluSilSekme(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:16 }}>✕</button>
+              )}
+            </div>
+            <div style={{ padding:18 }}>
+              <div style={{ fontSize:13, color:'#475569', marginBottom:14 }}>
+                Silmek istediğiniz tarih aralığını seçin. Aralık seçilmezse <strong>tüm kayıtlar</strong> silinir.
+              </div>
+              <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:18 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11, color:'#64748b', marginBottom:4 }}>Başlangıç</div>
+                  <input type="date" value={topluSilFrom} onChange={e => setTopluSilFrom(e.target.value)}
+                    style={{ width:'100%', height:34, padding:'0 10px', borderRadius:8, border:'1px solid #e2e8f0', fontSize:13 }} />
+                </div>
+                <div style={{ marginTop:18, color:'#94a3b8' }}>—</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11, color:'#64748b', marginBottom:4 }}>Bitiş</div>
+                  <input type="date" value={topluSilTo} onChange={e => setTopluSilTo(e.target.value)}
+                    style={{ width:'100%', height:34, padding:'0 10px', borderRadius:8, border:'1px solid #e2e8f0', fontSize:13 }} />
+                </div>
+              </div>
+              <div style={{ background:'#fff7ed', border:'1px solid #fed7aa', borderRadius:8, padding:'10px 14px', fontSize:12, color:'#9a3412', marginBottom:16 }}>
+                ⚠️ Bu işlem geri alınamaz. Seçilen aralıktaki tüm kayıtlar veritabanından kalıcı olarak silinir.
+              </div>
+              <div style={{ display:'flex', gap:8 }}>
+                <button onClick={topluSilUygula} disabled={topluSilYukleniyor}
+                  style={{ flex:1, height:38, borderRadius:8, border:'none', background:'#dc2626', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, opacity: topluSilYukleniyor ? 0.7 : 1 }}>
+                  {topluSilYukleniyor ? <><RefreshCw size={13} style={spinning} /> Siliniyor…</> : <><Trash2 size={13} /> Kalıcı Sil</>}
+                </button>
+                <button onClick={() => setTopluSilSekme(null)} disabled={topluSilYukleniyor}
+                  style={{ height:38, padding:'0 18px', borderRadius:8, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontSize:13 }}>
+                  İptal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
