@@ -402,6 +402,37 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     })
   }
 
+  // Aynı isimli grupları birleştir (Tümü seçilince farklı üst lokasyonlardaki aynı isimli gruplar tekrarlanır)
+  const birlesikGruplar = new Map<string, GrupMetrik>()
+  for (const gm of grupMetrikleri) {
+    const mevcut = birlesikGruplar.get(gm.grup)
+    if (!mevcut) {
+      birlesikGruplar.set(gm.grup, { ...gm })
+    } else {
+      const yeniHedef     = mevcut.hedef + gm.hedef
+      const yeniTamamlanan = mevcut.tamamlanan + gm.tamamlanan
+      const yeniSapma     = mevcut.sapma + gm.sapma
+      const yeniKayip     = mevcut.kayip + gm.kayip
+      const yeniGunluk    = mevcut.gunlukFrekans + gm.gunlukFrekans
+      const basariOran    = yeniHedef > 0 ? Math.round((yeniTamamlanan / yeniHedef) * 100) : 0
+      const genelOran     = yeniHedef > 0 ? Math.round(((yeniTamamlanan + yeniSapma) / yeniHedef) * 100) : 0
+      birlesikGruplar.set(gm.grup, {
+        grup: gm.grup,
+        lokasyon: mevcut.lokasyon,
+        gorevTanimi: mevcut.gorevTanimi || gm.gorevTanimi,
+        gunlukFrekans: yeniGunluk,
+        hedef: yeniHedef,
+        tamamlanan: yeniTamamlanan,
+        sapma: yeniSapma,
+        kayip: yeniKayip,
+        basariOrani: `%${basariOran}`,
+        genelOran: `%${genelOran}`,
+      })
+    }
+  }
+  grupMetrikleri.length = 0
+  grupMetrikleri.push(...Array.from(birlesikGruplar.values()))
+
   // Grup yoksa genel toplamı göster
   if (grupMetrikleri.length === 0) {
     let hedef = 0, tamamlanan = 0, sapma = 0, kayip = 0
