@@ -66,20 +66,28 @@ export async function POST(req: Request, { params }: { params: { token: string }
 
     if (!task) {
       if (selectedTaskId) {
-        const tablo = selectedTaskType ?? 'canli_gorevler'
-        const { data: dbGorev } = await supabase
-          .from(tablo).select('id,durum').eq('id', selectedTaskId).maybeSingle()
-        if (dbGorev && ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'KAPATILDI'].includes(dbGorev.durum)) {
-          return NextResponse.json({ ok: true, message: 'Görev zaten tamamlanmış', durum: dbGorev.durum })
-        }
-        const digerTablo = tablo === 'gorevler' ? 'canli_gorevler' : 'gorevler'
-        const { data: dbGorev2 } = await supabase
-          .from(digerTablo).select('id,durum').eq('id', selectedTaskId).maybeSingle()
-        if (dbGorev2 && ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'KAPATILDI'].includes(dbGorev2.durum)) {
-          return NextResponse.json({ ok: true, message: 'Görev zaten tamamlanmış', durum: dbGorev2.durum })
+        const tablolar = selectedTaskType
+          ? [selectedTaskType, selectedTaskType === 'gorevler' ? 'canli_gorevler' : 'gorevler']
+          : ['canli_gorevler', 'gorevler']
+        for (const tablo of tablolar) {
+          const { data: dbGorev } = await supabase
+            .from(tablo)
+            .select('id,tanim,durum,atanan_kullanici_id,baslatilma_tarihi')
+            .eq('id', selectedTaskId)
+            .maybeSingle()
+          if (!dbGorev) continue
+          if (['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'KAPATILDI'].includes(dbGorev.durum)) {
+            return NextResponse.json({ ok: true, message: 'Görev zaten tamamlanmış', durum: dbGorev.durum })
+          }
+          if (['ACIK', 'BEKLEMEDE', 'ISLEMDE'].includes(dbGorev.durum)) {
+            task = { id: dbGorev.id, taskType: tablo as any, tanim: dbGorev.tanim ?? '', durum: dbGorev.durum, atanan_kullanici_id: dbGorev.atanan_kullanici_id, baslatilma_tarihi: dbGorev.baslatilma_tarihi }
+            break
+          }
         }
       }
-      return NextResponse.json({ ok: false, error: 'Görev bulunamadı veya erişim yok' }, { status: 404 })
+      if (!task) {
+        return NextResponse.json({ ok: false, error: 'Görev bulunamadı veya erişim yok' }, { status: 404 })
+      }
     }
     if (context.checklistTemplate?.items?.length) {
       const missingRequired = context.checklistTemplate.items.filter(
