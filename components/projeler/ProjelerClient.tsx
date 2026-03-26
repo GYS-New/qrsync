@@ -89,7 +89,7 @@ export default function ProjelerClient({
   }
 
   function openEdit(p: Proje) {
-    setForm({ ad: p.ad, aciklama: p.aciklama ?? '', renk: p.renk, aktif: p.aktif, personel_takibi_aktif: p.personel_takibi_aktif ?? false })
+    setForm({ ad: p.ad, aciklama: p.aciklama ?? '', renk: p.renk, aktif: p.aktif, personel_takibi_aktif: p.personel_takibi_aktif ?? false, qr_sistemi_aktif: p.qr_sistemi_aktif ?? true, nfc_sistemi_aktif: p.nfc_sistemi_aktif ?? true })
     setEditId(p.id)
     setModal('edit')
   }
