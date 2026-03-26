@@ -574,15 +574,16 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                           )}
 
                           <div>
-                            <label className="verde-label">Görüntü ekle {madde.gorsel_gerekli ? '*' : ''}</label>
+                            <label className="verde-label">Fotoğraf çek {madde.gorsel_gerekli ? '*' : ''}</label>
                             <input
                               className="verde-input"
                               type="file"
-                              accept="image/png,image/jpeg,image/jpg"
+                              accept="image/*"
+                              capture="environment"
                               onChange={e => void uploadGorsel(madde.id, e.target.files?.[0] ?? null)}
                             />
                             <div style={{ marginTop: 6, fontSize: 12, color: '#6f846f' }}>
-                              {cevap.uploading ? 'Yükleniyor…' : cevap.gorselUrl ? 'Görsel yüklendi' : 'Görsel eklemek isteğe bağlı'}
+                              {cevap.uploading ? 'Yükleniyor…' : cevap.gorselUrl ? 'Fotoğraf yüklendi' : 'Fotoğraf çekmek isteğe bağlı'}
                             </div>
                             {cevap.gorselUrl ? (
                               <a href={cevap.gorselUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#166534' }}>Yüklenen görseli aç</a>
