@@ -82,9 +82,9 @@ export async function GET(req: NextRequest) {
     // ── 4. Sonuç başlığını bul (bu göreve ait) ───────────────────────────
     const gorevIdKolonu = taskType === 'gorevler' ? 'gorev_id' : 'canli_gorev_id'
     const { data: sonuclar } = await admin.from('checklist_sonuc_basliklari')
-      .select('id,kullanici_id,kanal,created_at')
+      .select('id,kullanici_id,kanal,kayit_tarihi')
       .eq(gorevIdKolonu, taskId)
-      .order('created_at', { ascending: false })
+      .order('kayit_tarihi', { ascending: false })
       .limit(1)
 
     const sonucBaslik = sonuclar?.[0] ?? null
@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
         not:       c?.aciklama ?? null,
         gorsel_url: c?.gorsel_url ?? null,
         yapan:     sonucBaslik ? yapanAdi : null,
-        tarih:     sonucBaslik?.created_at ? fmt(sonucBaslik.created_at) : null,
+        tarih:     sonucBaslik?.kayit_tarihi ? fmt(sonucBaslik.kayit_tarihi) : null,
         kanal:     sonucBaslik?.kanal ?? null,
         dolduruldu: !!c,
       }
@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
     const tables = task_type === 'canli_gorevler' ? ['canli_gorevler', 'canli_gorevler_arsiv'] : ['gorevler']
     let gorev: any = null
     for (const tbl of tables) {
-      const { data } = await admin.from(tbl).select('id,firma_id').eq('id', task_id).maybeSingle()
+      const { data } = await admin.from(tbl).select('id,firma_id,lokasyon_id').eq('id', task_id).maybeSingle()
       if (data) { gorev = data; break }
     }
     if (!gorev) return NextResponse.json({ error: 'Görev bulunamadı' }, { status: 404 })
@@ -179,19 +179,36 @@ export async function POST(req: NextRequest) {
 
     const gorevIdKolonu = task_type === 'gorevler' ? 'gorev_id' : 'canli_gorev_id'
 
+    // Lokasyon → sablon bilgisi
+    const { data: lokasyon } = await admin.from('lokasyonlar')
+      .select('id,checklist_sablon_id').eq('id', gorev.lokasyon_id).maybeSingle()
+    const sablonId = lokasyon?.checklist_sablon_id ?? null
+    let templateVersion = 1
+    if (sablonId) {
+      const { data: sablon } = await admin.from('checklist_sablonlari')
+        .select('versiyon').eq('id', sablonId).maybeSingle()
+      templateVersion = sablon?.versiyon ?? 1
+    }
+
     // Mevcut sonuç başlığını bul veya oluştur
     const { data: mevcutlar } = await admin.from('checklist_sonuc_basliklari')
-      .select('id').eq(gorevIdKolonu, task_id).order('created_at', { ascending: false }).limit(1)
+      .select('id').eq(gorevIdKolonu, task_id).order('kayit_tarihi', { ascending: false }).limit(1)
 
     let sonucId: string
     if (mevcutlar && mevcutlar.length > 0) {
       sonucId = mevcutlar[0].id
     } else {
-      const insertPayload: any = { kullanici_id: me.id, kanal: 'WEB' }
+      const insertPayload: any = {
+        kullanici_id:     me.id,
+        kanal:            'WEB',
+        lokasyon_id:      gorev.lokasyon_id,
+        sablon_id:        sablonId,
+        template_version: templateVersion,
+      }
       insertPayload[gorevIdKolonu] = task_id
       const { data: yeni, error: insertErr } = await admin
         .from('checklist_sonuc_basliklari').insert(insertPayload).select('id').single()
-      if (insertErr || !yeni) return NextResponse.json({ error: 'Sonuç başlığı oluşturulamadı' }, { status: 500 })
+      if (insertErr || !yeni) return NextResponse.json({ error: insertErr?.message ?? 'Sonuç başlığı oluşturulamadı' }, { status: 500 })
       sonucId = yeni.id
     }
 

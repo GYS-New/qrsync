@@ -130,9 +130,9 @@ export async function GET(req: NextRequest) {
     // Her görev için en son sonucu al
     const { data: sonucBasliklari } = await admin
       .from('checklist_sonuc_basliklari')
-      .select('id,gorev_id,canli_gorev_id,kullanici_id,kanal,created_at')
+      .select('id,gorev_id,canli_gorev_id,kullanici_id,kanal,kayit_tarihi')
       .or(gorevIds.map(id => `gorev_id.eq.${id},canli_gorev_id.eq.${id}`).join(','))
-      .order('created_at', { ascending: false })
+      .order('kayit_tarihi', { ascending: false })
 
     // gorevId → en son sonuç başlığı
     const sonucBaslikMap = new Map<string, any>()
@@ -208,7 +208,7 @@ export async function GET(req: NextRequest) {
             not:        c?.aciklama ?? null,
             gorsel_url: c?.gorsel_url ?? null,
             yapan:      sonucBaslik ? yapanAdi2 : null,
-            tarih:      sonucBaslik?.created_at ? fmt(sonucBaslik.created_at) : null,
+            tarih:      sonucBaslik?.kayit_tarihi ? fmt(sonucBaslik.kayit_tarihi) : null,
             kanal:      sonucBaslik?.kanal ?? null,
             dolduruldu: !!c,
             durum:      c ? true : null,
