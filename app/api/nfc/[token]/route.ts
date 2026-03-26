@@ -95,21 +95,32 @@ export async function POST(req: Request, { params }: { params: { token: string }
       if (missingRequired.length) {
         return NextResponse.json({ ok: false, error: 'Zorunlu checklist maddeleri tamamlanmalı' }, { status: 400 })
       }
-      const insertPayload = checklistResults
-        .filter((r: any) => r?.itemId)
+      const { data: sablonRow } = await supabase
+        .from('checklist_sablonlari').select('versiyon').eq('id', context.checklistTemplate.id).maybeSingle()
+      const templateVersion = (sablonRow as any)?.versiyon ?? 1
+      const gorevIdKolonu = task.taskType === 'gorevler' ? 'gorev_id' : 'canli_gorev_id'
+      const baslikPayload: any = {
+        lokasyon_id: context.lokasyon.id,
+        sablon_id: context.checklistTemplate.id,
+        template_version: templateVersion,
+        kanal: 'NFC',
+        kullanici_id: user.id,
+      }
+      baslikPayload[gorevIdKolonu] = task.id
+      const { data: sonucBaslik, error: baslikError } = await supabase
+        .from('checklist_sonuc_basliklari').insert(baslikPayload).select('id').single()
+      if (baslikError) throw new Error(baslikError.message)
+      const maddePayload = checklistResults
+        .filter((r: any) => r?.itemId && r?.durum === true)
         .map((r: any) => ({
-          task_id: task.id,
-          task_type: task.taskType,
-          item_id: r.itemId,
-          durum: !!r.durum,
-          not_metni: typeof r.not === 'string' && r.not.trim() ? r.not.trim() : null,
-          kullanici_id: user.id,
-          tarih: new Date().toISOString(),
-          kanal: 'NFC',
+          sonuc_id: sonucBaslik.id,
+          madde_id: r.itemId,
+          secenek_degeri: 'EVET',
+          aciklama: typeof r.not === 'string' && r.not.trim() ? r.not.trim() : null,
         }))
-      if (insertPayload.length) {
-        const { error } = await supabase.from('checklist_results').insert(insertPayload as any)
-        if (error) throw new Error(error.message)
+      if (maddePayload.length) {
+        const { error: maddeError } = await supabase.from('checklist_sonuc_maddeleri').insert(maddePayload)
+        if (maddeError) throw new Error(maddeError.message)
       }
     }
     // Süreli görev: baslatilma_tarihi yoksa otomatik başlat
