@@ -872,7 +872,11 @@ export default function ArsivClient({
                     </td>
                     <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.olusturma_tarihi ? formatDateTime(r.olusturma_tarihi) : '—'}</td>
                     <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.tamamlanma_tarihi ? formatDateTime(r.tamamlanma_tarihi) : '—'}</td>
-                    <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.durum_degisim_tarihi ? formatDateTime(r.durum_degisim_tarihi) : '—'}</td>
+                    <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>
+                      {r.durum === 'TAMAMLANDI' && r.tamamlanma_tarihi
+                        ? formatDateTime(new Date(new Date(r.tamamlanma_tarihi).getTime() + 24 * 60 * 60 * 1000).toISOString())
+                        : r.durum_degisim_tarihi ? formatDateTime(r.durum_degisim_tarihi) : '—'}
+                    </td>
                     <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
                       <button onClick={() => spesifikRestore(r)} title="Geri Yükle" style={aksBtn('#2e8b2e','#e8f4e8')}><RotateCcw size={13} /></button>
                       <button onClick={() => spesifikSil(r)}     title="Kalıcı Sil" style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>
