@@ -160,6 +160,7 @@ export default function ArsivClient({
     if (!firmaId) { setSpesifikData([]); return }
     setSpesifikLoading(true)
     try {
+      const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       const { data, error } = await supabase
         .from('gorevler')
         .select(`id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,
@@ -167,7 +168,7 @@ export default function ArsivClient({
           atanan:users!atanan_kullanici_id(isim_soyisim),
           olusturan:users!olusturan_id(isim_soyisim)`)
         .eq('firma_id', firmaId)
-        .in('durum', ['IPTAL','TAMAMLANDI'])
+        .or(`durum.eq.IPTAL,and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.lt.${sinir24s})`)
         .order('olusturma_tarihi', { ascending: false })
         .limit(1000) as any
       if (error) throw error
