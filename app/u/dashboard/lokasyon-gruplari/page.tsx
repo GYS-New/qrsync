@@ -25,24 +25,24 @@ export default async function ULokasyonGruplariPage() {
 
   if (!firmaId) redirect('/u/dashboard')
 
+  let groupQ = admin.from('lokasyon_gruplari')
+    .select('id,firma_id,ad,aciklama,aktif,kayit_tarihi,guncelleme_tarihi,kayit_yapan_id,ust_lokasyon_id')
+    .eq('firma_id', firmaId).order('ad')
+  if (projeId) groupQ = (groupQ as any).eq('proje_id', projeId)
+
+  let locQ = admin.from('lokasyonlar')
+    .select('id,firma_id,parent_id,tanim,aktif,kayit_tarihi')
+    .eq('firma_id', firmaId).eq('aktif', true).order('kayit_tarihi', { ascending: true })
+  if (projeId) locQ = (locQ as any).eq('proje_id', projeId)
+
   const [groupsRes, membersRes, locationsRes] = await Promise.all([
-    admin.from('lokasyon_gruplari').select('id,firma_id,ad,aciklama,aktif,kayit_tarihi,guncelleme_tarihi,kayit_yapan_id,ust_lokasyon_id')
-      .eq('firma_id', firmaId)
-      .order('ad'),
+    groupQ,
     admin.from('lokasyon_grup_uyeleri').select('grup_id,lokasyon_id'),
-    admin.from('lokasyonlar').select('id,firma_id,parent_id,tanim,aktif,kayit_tarihi')
-      .eq('firma_id', firmaId)
-      .eq('aktif', true)
-      .order('kayit_tarihi', { ascending: true }),
+    locQ,
   ])
 
-  // projeId filtresi uygula
-  const groups = projeId
-    ? (groupsRes.data ?? []).filter((g: any) => g.proje_id === projeId || !g.proje_id)
-    : (groupsRes.data ?? [])
-  const locations = projeId
-    ? (locationsRes.data ?? []).filter((l: any) => l.proje_id === projeId)
-    : (locationsRes.data ?? [])
+  const groups = groupsRes.data ?? []
+  const locations = locationsRes.data ?? []
 
   const initialGroups = groups.map((g: any) => ({
     ...g,
