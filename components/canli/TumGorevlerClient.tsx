@@ -1390,13 +1390,26 @@ async function del() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
-              <Button variant="ghost" disabled={saving} onClick={() => setModal(null)} type="button">
-                Vazgeç
-              </Button>
-              <Button variant="primary" disabled={saving || !form.tanim?.trim() || !loc1} onClick={save} type="button">
-                {saving ? 'Kaydediliyor...' : 'Kaydet'}
-              </Button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 14 }}>
+              <div>
+                {modal === 'edit' && selected && lokasyonlar.find((l: any) => l.id === form.lokasyon_id && (l as any).checklist_sablon_id) && (
+                  <button
+                    type="button"
+                    onClick={() => { setModal(null); setChecklistGorev({ id: selected.id, type: 'canli_gorevler' }) }}
+                    style={{ height: 36, padding: '0 14px', borderRadius: 8, border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    📋 Çeklisti Düzenle
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button variant="ghost" disabled={saving} onClick={() => setModal(null)} type="button">
+                  Vazgeç
+                </Button>
+                <Button variant="primary" disabled={saving || !form.tanim?.trim() || !loc1} onClick={save} type="button">
+                  {saving ? 'Kaydediliyor...' : 'Kaydet'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
