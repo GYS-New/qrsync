@@ -14,13 +14,15 @@ type Proje = {
   aktif: boolean
   personel_takibi_aktif: boolean
   sureli_gorev_aktif?: boolean  // lokasyonlardan hesaplanan özet durum
+  qr_sistemi_aktif: boolean
+  nfc_sistemi_aktif: boolean
   kayit_tarihi: string
 }
 
 const RENKLER = ['#2e8b2e', '#1d6fa8', '#9333ea', '#c2410c', '#0e7490', '#be185d', '#b45309', '#374151']
 
 const BOSH: Omit<Proje, 'id' | 'firma_id' | 'kayit_tarihi'> = {
-  ad: '', aciklama: '', renk: '#2e8b2e', aktif: true, personel_takibi_aktif: false, sureli_gorev_aktif: false
+  ad: '', aciklama: '', renk: '#2e8b2e', aktif: true, personel_takibi_aktif: false, sureli_gorev_aktif: false, qr_sistemi_aktif: true, nfc_sistemi_aktif: true
 }
 
 export default function ProjelerClient({
@@ -165,6 +167,38 @@ variant: 'danger'
     }
   }
 
+  async function toggleQrSistemi(p: Proje) {
+    const yeniDurum = !p.qr_sistemi_aktif
+    try {
+      const res = await fetch(`/api/projeler/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qr_sistemi_aktif: yeniDurum }),
+      })
+      if (!res.ok) throw new Error('Güncellenemedi')
+      setProjeler(prev => prev.map(x => x.id === p.id ? { ...x, qr_sistemi_aktif: yeniDurum } : x))
+      toast({ type: 'success', title: 'Güncellendi', message: yeniDurum ? 'QR Sistemi açıldı.' : 'QR Sistemi kapatıldı.' })
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+  }
+
+  async function toggleNfcSistemi(p: Proje) {
+    const yeniDurum = !p.nfc_sistemi_aktif
+    try {
+      const res = await fetch(`/api/projeler/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nfc_sistemi_aktif: yeniDurum }),
+      })
+      if (!res.ok) throw new Error('Güncellenemedi')
+      setProjeler(prev => prev.map(x => x.id === p.id ? { ...x, nfc_sistemi_aktif: yeniDurum } : x))
+      toast({ type: 'success', title: 'Güncellendi', message: yeniDurum ? 'NFC Sistemi açıldı.' : 'NFC Sistemi kapatıldı.' })
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+  }
+
   async function toggleSureliGorevler(p: Proje) {
     const ok = await confirm({
       title: 'Süreli Görevleri Değiştir',
@@ -254,6 +288,12 @@ variant: 'danger'
                   {p.sureli_gorev_aktif && (
                     <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: '#f3e8ff', color: '#7c3aed', fontWeight: 700 }}>⚡ Süreli Görev</span>
                   )}
+                  {p.qr_sistemi_aktif && (
+                    <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>📷 QR Aktif</span>
+                  )}
+                  {p.nfc_sistemi_aktif && (
+                    <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: '#e0f2fe', color: '#0369a1', fontWeight: 700 }}>📶 NFC Aktif</span>
+                  )}
                 </div>
                 {p.aciklama && <div style={{ fontSize: 12.5, color: '#7a907a', marginTop: 2 }}>{p.aciklama}</div>}
                 <div style={{ fontSize: 11.5, color: '#a0b4a0', marginTop: 3 }}>
@@ -288,6 +328,34 @@ variant: 'danger'
                     }}
                   >
                     👷 PT {p.personel_takibi_aktif ? 'Kapat' : 'Aç'}
+                  </button>
+                  {/* QR Sistemi AÇ/KAPAT */}
+                  <button
+                    onClick={() => toggleQrSistemi(p)}
+                    title="Proje için QR sistemini aç/kapat"
+                    style={{
+                      padding: '5px 12px', borderRadius: 6,
+                      border: p.qr_sistemi_aktif ? '1px solid #86efac' : '1px solid #d6e4d6',
+                      background: p.qr_sistemi_aktif ? '#dcfce7' : '#fff',
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      color: p.qr_sistemi_aktif ? '#15803d' : '#7a907a',
+                    }}
+                  >
+                    📷 QR {p.qr_sistemi_aktif ? 'Kapat' : 'Aç'}
+                  </button>
+                  {/* NFC Sistemi AÇ/KAPAT */}
+                  <button
+                    onClick={() => toggleNfcSistemi(p)}
+                    title="Proje için NFC sistemini aç/kapat"
+                    style={{
+                      padding: '5px 12px', borderRadius: 6,
+                      border: p.nfc_sistemi_aktif ? '1px solid #7dd3fc' : '1px solid #d6e4d6',
+                      background: p.nfc_sistemi_aktif ? '#e0f2fe' : '#fff',
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      color: p.nfc_sistemi_aktif ? '#0369a1' : '#7a907a',
+                    }}
+                  >
+                    📶 NFC {p.nfc_sistemi_aktif ? 'Kapat' : 'Aç'}
                   </button>
                   {/* Süreli Görev AÇ/KAPAT */}
                   <button

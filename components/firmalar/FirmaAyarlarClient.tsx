@@ -23,8 +23,6 @@ export default function FirmaAyarlarClient({ firma }: { firma: Firma }) {
     yetkili_tel: firma.yetkili_tel ?? '',
     aciklama: firma.aciklama ?? '',
     logo_url: (firma as any).logo_url ?? null,
-    qr_sistemi_aktif: (firma as any).qr_sistemi_aktif !== false,
-    nfc_sistemi_aktif: (firma as any).nfc_sistemi_aktif !== false,
   })
 
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -118,9 +116,6 @@ setForm((p) => ({ ...p, logo_url: null }))
           yetkili_isim: form.yetkili_isim.trim(),
           yetkili_tel: form.yetkili_tel.trim(),
           aciklama: form.aciklama.trim() || null,
-          // Firma pasif veya lisans dolmuşsa QR/NFC DB'ye false yazılır
-          qr_sistemi_aktif: firmaDurum ? false : form.qr_sistemi_aktif,
-          nfc_sistemi_aktif: firmaDurum ? false : form.nfc_sistemi_aktif,
         })
         .eq('id', firma.id)
       if (error) throw new Error(error.message)
@@ -254,50 +249,6 @@ setForm((p) => ({ ...p, logo_url: null }))
         <Row label="Açıklama">
           <input className="verde-input" value={form.aciklama} onChange={(e) => setForm({ ...form, aciklama: e.target.value })} />
         </Row>
-
-        {/* QR/NFC sistem kontrolleri — firma pasif veya lisans dolmuşsa kilitli */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <Row label="QR Sistemi">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: firmaDurum ? 0.5 : 1 }}>
-                <input
-                  type="checkbox"
-                  checked={firmaDurum ? false : form.qr_sistemi_aktif}
-                  disabled={!!firmaDurum}
-                  onChange={(e) => setForm({ ...form, qr_sistemi_aktif: e.target.checked })}
-                />
-                <span style={{ color: firmaDurum ? '#9ca3af' : undefined }}>
-                  {firmaDurum ? 'Pasif (sistem kısıtlı)' : form.qr_sistemi_aktif ? 'Aktif' : 'Pasif'}
-                </span>
-              </label>
-              {firmaDurum && (
-                <div style={{ fontSize: 11.5, color: firmaDurum === 'pasif' ? '#dc2626' : '#d97706' }}>
-                  {firmaDurum === 'pasif' ? 'Firma pasif — değiştirilemez' : 'Lisans süresi doldu — değiştirilemez'}
-                </div>
-              )}
-            </div>
-          </Row>
-          <Row label="NFC Sistemi">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: firmaDurum ? 0.5 : 1 }}>
-                <input
-                  type="checkbox"
-                  checked={firmaDurum ? false : form.nfc_sistemi_aktif}
-                  disabled={!!firmaDurum}
-                  onChange={(e) => setForm({ ...form, nfc_sistemi_aktif: e.target.checked })}
-                />
-                <span style={{ color: firmaDurum ? '#9ca3af' : undefined }}>
-                  {firmaDurum ? 'Pasif (sistem kısıtlı)' : form.nfc_sistemi_aktif ? 'Aktif' : 'Pasif'}
-                </span>
-              </label>
-              {firmaDurum && (
-                <div style={{ fontSize: 11.5, color: firmaDurum === 'pasif' ? '#dc2626' : '#d97706' }}>
-                  {firmaDurum === 'pasif' ? 'Firma pasif — değiştirilemez' : 'Lisans süresi doldu — değiştirilemez'}
-                </div>
-              )}
-            </div>
-          </Row>
-        </div>
 
       </div>
     </div>

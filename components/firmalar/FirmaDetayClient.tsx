@@ -138,9 +138,6 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
         lisans_gecerlilik_tarihi: form.lisans_gecerlilik_tarihi
           ? new Date(form.lisans_gecerlilik_tarihi + 'T23:59:59').toISOString()
           : null,
-        // Firma pasife alınırsa QR/NFC sistemleri otomatik kapat
-        // Aktif edilince DB'deki mevcut değer korunur (TA kendi ayarını geri alır)
-        ...(form.aktif === false ? { qr_sistemi_aktif: false, nfc_sistemi_aktif: false } : {}),
       })
       .eq('id', firma.id)
 
