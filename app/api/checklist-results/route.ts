@@ -212,10 +212,33 @@ export async function POST(req: NextRequest) {
       sonucId = yeni.id
     }
 
-    // Mevcut madde cevaplarını sil, yeniden kaydet
+    // ── Şablon maddelerini çek (validasyon için) ─────────────────────────
+    const { data: sablonMaddeler } = await admin.from('checklist_sablon_maddeleri')
+      .select('id,zorunlu_cevap,gorsel_gerekli')
+      .in('id', maddeler.map(m => m.madde_id))
+
+    if (sablonMaddeler) {
+      const cevapMap = new Map(maddeler.map(m => [m.madde_id, m]))
+      for (const sm of sablonMaddeler) {
+        const cevap = cevapMap.get(sm.id)
+        const dolu = !!(cevap?.secenek_degeri || cevap?.aciklama)
+        if (sm.zorunlu_cevap !== false && !dolu) {
+          return NextResponse.json({ error: 'Zorunlu alanlar eksik', validation: true }, { status: 422 })
+        }
+      }
+    }
+
+    // ── Mevcut gorsel_url'leri koru, diğerlerini sil ─────────────────────
+    const { data: mevcutCevaplar } = await admin.from('checklist_sonuc_maddeleri')
+      .select('madde_id,gorsel_url').eq('sonuc_id', sonucId)
+    const gorselMap = new Map<string, string | null>()
+    for (const mc of mevcutCevaplar ?? []) {
+      if (mc.gorsel_url) gorselMap.set(mc.madde_id, mc.gorsel_url)
+    }
+
     await admin.from('checklist_sonuc_maddeleri').delete().eq('sonuc_id', sonucId)
 
-    const doldurulanlar = maddeler.filter(m => m.secenek_degeri || m.aciklama)
+    const doldurulanlar = maddeler.filter(m => m.secenek_degeri || m.aciklama || gorselMap.has(m.madde_id))
     if (doldurulanlar.length > 0) {
       const { error: maddeErr } = await admin.from('checklist_sonuc_maddeleri').insert(
         doldurulanlar.map(m => ({
@@ -223,7 +246,7 @@ export async function POST(req: NextRequest) {
           madde_id:       m.madde_id,
           secenek_degeri: m.secenek_degeri || null,
           aciklama:       m.aciklama?.trim() || null,
-          gorsel_url:     null,
+          gorsel_url:     gorselMap.get(m.madde_id) ?? null,
         }))
       )
       if (maddeErr) return NextResponse.json({ error: maddeErr.message }, { status: 500 })

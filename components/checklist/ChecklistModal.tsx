@@ -185,6 +185,7 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
 
   // Düzenleme state: madde_id → { secenek, not }
   const [cevaplar, setCevaplar] = useState<Record<string, { secenek: string; not: string }>>({})
+  const [eksikIds, setEksikIds] = useState<Set<string>>(new Set())
 
   function loadData() {
     setLoading(true); setHata(null)
@@ -208,6 +209,23 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
 
   async function handleKaydet() {
     if (!data) return
+
+    // Validasyon
+    const yeniEksik = new Set<string>()
+    for (const s of data.sonuclar) {
+      const cv = cevaplar[s.madde_id]
+      const dolu = !!(cv?.secenek || cv?.not)
+      if (s.zorunlu && !dolu) yeniEksik.add(s.madde_id)
+      if (s.gorsel_gerekli && !s.gorsel_url) yeniEksik.add(s.madde_id)
+    }
+    if (yeniEksik.size > 0) {
+      setEksikIds(yeniEksik)
+      setHata('Zorunlu alanları doldurun')
+      return
+    }
+    setEksikIds(new Set())
+    setHata(null)
+
     setKayit(true)
     try {
       const maddeler = data.sonuclar.map(s => ({
@@ -281,8 +299,9 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
               {data.sonuclar.map((s, i) => {
                 const cv = cevaplar[s.madde_id] ?? { secenek: '', not: '' }
                 const dolu = !!(cv.secenek || cv.not)
+                const eksik = eksikIds.has(s.madde_id)
                 return (
-                  <div key={s.madde_id} style={{ border: `1px solid ${dolu ? '#bbf7d0' : s.zorunlu ? '#fecaca' : '#e2e8f0'}`, borderRadius: 10, padding: '12px 14px', background: dolu ? '#f0fdf4' : '#fff' }}>
+                  <div key={s.madde_id} style={{ border: `2px solid ${eksik ? '#dc2626' : dolu ? '#bbf7d0' : s.zorunlu ? '#fecaca' : '#e2e8f0'}`, borderRadius: 10, padding: '12px 14px', background: eksik ? '#fff5f5' : dolu ? '#f0fdf4' : '#fff' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                       {dolu ? <CheckCircle size={15} color="#16a34a" /> : <Minus size={15} color="#94a3b8" />}
                       <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', flex: 1 }}>
@@ -290,6 +309,9 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
                       </span>
                       {s.zorunlu && (
                         <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: 4 }}>Zorunlu</span>
+                      )}
+                      {s.gorsel_gerekli && !s.gorsel_url && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#d97706', background: '#fef3c7', padding: '1px 6px', borderRadius: 4 }}>📷 Fotoğraf gerekli</span>
                       )}
                     </div>
 
