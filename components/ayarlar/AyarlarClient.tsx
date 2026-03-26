@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import UserAvatar from '@/components/layout/UserAvatar'
 import type { User } from '@/types'
@@ -32,6 +32,17 @@ export default function AyarlarClient({
   const [pw1, setPw1] = useState('')
   const [pw2, setPw2] = useState('')
   const [pwLoading, setPwLoading] = useState(false)
+
+  // Cihaz eşleşme bilgisi
+  const [cihaz, setCihaz] = useState<{ device_id: string; aktif: boolean; son_kullanim: string | null } | null | 'loading'>('loading')
+  const [cihazSilLoading, setCihazSilLoading] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/profile/device-token')
+      .then(r => r.json())
+      .then(j => setCihaz(j.ok ? (j.data ?? null) : null))
+      .catch(() => setCihaz(null))
+  }, [])
 
   const emailErrorMessage = useMemo(
     () => ({
@@ -168,6 +179,22 @@ export default function AyarlarClient({
     }
   }
 
+  async function cihazSil() {
+    if (!confirm('Cihaz eşleşmesi silinecek. Mobil uygulamada tekrar giriş yapmanız gerekecektir. Devam edilsin mi?')) return
+    setCihazSilLoading(true)
+    try {
+      const res = await fetch('/api/profile/device-token', { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error ?? 'Silinemedi')
+      setCihaz(null)
+      toast({ type: 'success', title: 'Başarılı', message: 'Cihaz eşleşmesi silindi.' })
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e?.message ?? 'Cihaz eşleşmesi silinemedi' })
+    } finally {
+      setCihazSilLoading(false)
+    }
+  }
+
   async function changePassword(e: React.FormEvent) {
     e.preventDefault()
     if (pwLoading || loading || emailLoading) return
@@ -296,6 +323,36 @@ export default function AyarlarClient({
               </Button>
             </div>
           </form>
+        </div>
+        <div className="verde-card" style={{ padding: 18 }}>
+          <div style={{ fontWeight: 800, color: '#0f1a0f', marginBottom: 4 }}>Cihaz Eşleşmesi</div>
+          <div style={{ fontSize: 12, color: '#7a907a', marginBottom: 12 }}>Mobil uygulamaya bağlı cihaz bilgisi.</div>
+          {cihaz === 'loading' ? (
+            <div style={{ fontSize: 13, color: '#7a907a' }}>Yükleniyor…</div>
+          ) : cihaz ? (
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 12, background: '#f0f7f0', borderRadius: 6, padding: '4px 10px', color: '#1a5c1a', fontFamily: 'monospace' }}>
+                  {cihaz.device_id ?? '—'}
+                </div>
+                <div style={{ fontSize: 12, color: cihaz.aktif ? '#166534' : '#9a3412' }}>
+                  {cihaz.aktif ? '● Aktif' : '○ Pasif'}
+                </div>
+              </div>
+              {cihaz.son_kullanim && (
+                <div style={{ fontSize: 11, color: '#7a907a' }}>
+                  Son kullanım: {new Date(cihaz.son_kullanim).toLocaleString('tr-TR')}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                <Button variant="danger" type="button" onClick={cihazSil} disabled={cihazSilLoading}>
+                  {cihazSilLoading ? 'Siliniyor…' : 'Cihaz Eşleşmesini Sil'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: '#7a907a' }}>Eşleştirilmiş cihaz bulunamadı.</div>
+          )}
         </div>
       </div>
     </div>
