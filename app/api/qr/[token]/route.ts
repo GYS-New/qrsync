@@ -63,8 +63,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
       if (gorev?.baslatilma_tarihi) {
         return NextResponse.json({ ok: true, baslatilma_tarihi: gorev.baslatilma_tarihi, mesaj: 'Zaten başlatılmış' }, { headers: CORS_HEADERS })
       }
-      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso }
-      if (tablo === 'gorevler') updatePayload.durum = 'ISLEMDE'
+      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
       await supabase.from(tablo).update(updatePayload).eq('id', selectedTaskId)
       return NextResponse.json({ ok: true, baslatilma_tarihi: nowIso, mesaj: 'Görev başlatıldı' }, { headers: CORS_HEADERS })
     }
@@ -130,8 +129,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
     if (context.lokasyon.sureli_gorev_aktif && !task.baslatilma_tarihi) {
       const nowIso = new Date().toISOString()
       const tablo = task.taskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'
-      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso }
-      if (task.taskType === 'gorevler') updatePayload.durum = 'ISLEMDE'
+      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
       await supabase.from(tablo).update(updatePayload).eq('id', task.id)
       // Local task objesini güncelle — completeTask süre hesaplasın
       ;(task as any).baslatilma_tarihi = nowIso
