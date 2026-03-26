@@ -131,9 +131,13 @@ export async function GET(request: Request) {
     }
   }
 
-  const locationGroupsQuery = isSA 
-    ? (firmaIdParam 
-        ? supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true }).eq('firma_id', firmaIdParam)
+  const locationGroupsQuery = isSA
+    ? (firmaIdParam
+        ? (() => {
+            let q = supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true }).eq('firma_id', firmaIdParam)
+            if (projeId) q = (q as any).eq('proje_id', projeId)
+            return q
+          })()
         : supabase.from('lokasyon_gruplari').select('id', { count: 'exact', head: true }))
     : (() => {
         const isUserRole = me.rol === 'tenant_user' || me.rol === 'musteri'

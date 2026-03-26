@@ -164,7 +164,8 @@ export async function GET(req: NextRequest) {
 
       const maddeler     = sablonMaddeMap.get(lok.checklist_sablon_id) ?? []
       const sonucBaslik  = sonucBaslikMap.get(g.id)
-      const gorevCevaplar = sonucBaslik ? cevapMap.get(sonucBaslik.id) ?? new Map() : new Map()
+      if (!sonucBaslik) continue  // Çeklist doldurulmamış görevleri listeleme
+      const gorevCevaplar = cevapMap.get(sonucBaslik.id) ?? new Map()
 
       const dolduruldu = maddeler.filter((m: any) => gorevCevaplar.has(m.id)).length
       const tamamlanan = maddeler.filter((m: any) => {
