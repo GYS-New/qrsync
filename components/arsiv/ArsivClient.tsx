@@ -199,7 +199,7 @@ export default function ArsivClient({
       const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       let q2 = supabase
         .from('gorevler')
-        .select(`id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,
+        .select(`id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,durum_degisim_tarihi,
           atanan:users!atanan_kullanici_id(isim_soyisim),
           olusturan:users!olusturan_id(isim_soyisim)`)
         .eq('firma_id', firmaId)
@@ -853,11 +853,11 @@ export default function ArsivClient({
             <table className="verde-table">
               <thead><tr>
                 <th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th>
-                <th>Oluşturma</th><th>Tamamlanma</th><th style={{ textAlign:'center' }}>İşlem</th>
+                <th>Oluşturma</th><th>Tamamlanma</th><th>Arşivlenme</th><th style={{ textAlign:'center' }}>İşlem</th>
               </tr></thead>
               <tbody>
-                {spesifikLoading ? <YukleniyorSatir cols={7} /> :
-                 filtreSpesifik.length === 0 ? <BosKayit cols={7} mesaj="Spesifik görev arşivi boş." /> :
+                {spesifikLoading ? <YukleniyorSatir cols={8} /> :
+                 filtreSpesifik.length === 0 ? <BosKayit cols={8} mesaj="Spesifik görev arşivi boş." /> :
                  filtreSpesifik.map((r: any) => (
                   <tr key={r.id}>
                     <td style={{ fontWeight:600 }}>{r.tanim}</td>
@@ -872,6 +872,7 @@ export default function ArsivClient({
                     </td>
                     <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.olusturma_tarihi ? formatDateTime(r.olusturma_tarihi) : '—'}</td>
                     <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.tamamlanma_tarihi ? formatDateTime(r.tamamlanma_tarihi) : '—'}</td>
+                    <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.durum_degisim_tarihi ? formatDateTime(r.durum_degisim_tarihi) : '—'}</td>
                     <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
                       <button onClick={() => spesifikRestore(r)} title="Geri Yükle" style={aksBtn('#2e8b2e','#e8f4e8')}><RotateCcw size={13} /></button>
                       <button onClick={() => spesifikSil(r)}     title="Kalıcı Sil" style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>
