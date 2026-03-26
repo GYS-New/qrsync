@@ -4,7 +4,10 @@ import ProjelerClient from './ProjelerClient'
 import { useFirma } from '@/components/layout/FirmaContext'
 
 export default function ProjelerSAWrapper() {
-  const { firmaId, loading } = useFirma()
+  const { firmaId, firmalar, loading } = useFirma()
+
+  const aktifFirma = firmalar.find(f => f.id === firmaId)
+  const firmaBirimFiyatAktif = aktifFirma?.birim_fiyat_aktif !== false
 
   return (
     <div style={{ padding: 24 }}>
@@ -19,7 +22,7 @@ export default function ProjelerSAWrapper() {
           Proje yönetimi için bir firma seçin.
         </div>
       ) : (
-        <ProjelerClient firmaId={firmaId} readonly={false} isSA />
+        <ProjelerClient firmaId={firmaId} readonly={false} isSA firmaBirimFiyatAktif={firmaBirimFiyatAktif} />
       )}
     </div>
   )

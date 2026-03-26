@@ -10,7 +10,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 const TÜM_SAYFA_KODLARI = [
   'firmalar', 'projeler', 'kullanicilar', 'lokasyonlar', 'lokasyon-gruplari',
   'gorevler', 'checklist-sablonlari', 'canli-islemler', 'tum-gorevler', 'arsiv',
-  'personel-takibi', 'raporlar', 'musteri-degerlendirme',
+  'personel-takibi', 'raporlar', 'musteri-degerlendirme', 'birim-fiyatlar',
 ]
 
 type YetkiRow = { gorebilir: boolean; ekleyebilir: boolean; duzenleyebilir: boolean; silebilir: boolean }

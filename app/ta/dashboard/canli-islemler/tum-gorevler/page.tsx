@@ -32,7 +32,7 @@ export default async function TATumGorevlerPage() {
       .select(sel)
       .eq('firma_id', firmaId)
       .or(`proje_id.eq.${aktifProje.id},proje_id.is.null`)
-      .in('durum', ['HAZIR', 'ACIK', 'BEKLEMEDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI'])
+      .in('durum', ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI'])
       .order('aktif_olma_tarihi', { ascending: false })
       .limit(500),
     supabase

@@ -32,7 +32,7 @@ export const GOREV_DURUM_LABEL: Record<string, string> = {
 }
 
 export const CANLI_DURUM_LABEL: Record<string, string> = {
-  HAZIR: 'Hazır', ACIK: 'Açık', BEKLEMEDE: 'Beklemede',
+  HAZIR: 'Hazır', ACIK: 'Açık', BEKLEMEDE: 'Beklemede', ISLEMDE: 'İşlemde',
   IPTAL: 'İptal', TAMAMLANDI: 'Tamamlandı', ZAMANINDA_YAPILAMAYAN: 'Zamanında Yapılamayan',
   ZAMANI_GECMIS: 'Zamanı Geçmiş',
   KAPATILDI: 'Kapatıldı',

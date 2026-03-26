@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   ])
 
   const tamamlandiDurumlar = new Set(['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
-  const bekleyenDurumlar   = new Set(['HAZIR', 'ACIK', 'BEKLEMEDE'])
+  const bekleyenDurumlar   = new Set(['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE'])
 
   // kural_id bazında grupla
   const ozet: Record<string, { uretilen: number; tamamlandi: number; bekliyor: number; kayip: number }> = {}

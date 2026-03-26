@@ -29,6 +29,7 @@ export default function FirmaDetayClient({ firma }: { firma: Firma }) {
     qr_sablon_aktif: (firma as any).qr_sablon_aktif !== false,
     rapor_ozellestir_aktif: (firma as any).rapor_ozellestir_aktif !== false,
     personel_takibi_aktif: (firma as any).personel_takibi_aktif === true,
+    birim_fiyat_aktif: (firma as any).birim_fiyat_aktif === true,
     logo_url: (firma as any).logo_url ?? null,
     lisans_gecerlilik_tarihi: (firma as any).lisans_gecerlilik_tarihi
       ? new Date((firma as any).lisans_gecerlilik_tarihi).toISOString().slice(0, 10)
@@ -135,6 +136,7 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
         qr_sablon_aktif: form.qr_sablon_aktif,
         rapor_ozellestir_aktif: form.rapor_ozellestir_aktif,
         personel_takibi_aktif: form.personel_takibi_aktif,
+        birim_fiyat_aktif: form.birim_fiyat_aktif,
         lisans_gecerlilik_tarihi: form.lisans_gecerlilik_tarihi
           ? new Date(form.lisans_gecerlilik_tarihi + 'T23:59:59').toISOString()
           : null,
@@ -274,6 +276,19 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
           ) : (
             <span className={`verde-badge ${(firma as any).personel_takibi_aktif === true ? 'status-tamamlandi' : 'status-iptal'}`}>
               {(firma as any).personel_takibi_aktif === true ? 'Aktif' : 'Pasif'}
+            </span>
+          )}
+        </Row>
+
+        <Row label="Birim Fiyat Sistemi">
+          {edit ? (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={form.birim_fiyat_aktif} onChange={(e) => setForm({ ...form, birim_fiyat_aktif: e.target.checked })} />
+              {form.birim_fiyat_aktif ? 'Aktif' : 'Pasif'}
+            </label>
+          ) : (
+            <span className={`verde-badge ${(firma as any).birim_fiyat_aktif === true ? 'status-tamamlandi' : 'status-iptal'}`}>
+              {(firma as any).birim_fiyat_aktif === true ? 'Aktif' : 'Pasif'}
             </span>
           )}
         </Row>

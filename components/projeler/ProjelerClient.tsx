@@ -16,23 +16,26 @@ type Proje = {
   sureli_gorev_aktif?: boolean  // lokasyonlardan hesaplanan özet durum
   qr_sistemi_aktif: boolean
   nfc_sistemi_aktif: boolean
+  birim_fiyat_aktif: boolean
   kayit_tarihi: string
 }
 
 const RENKLER = ['#2e8b2e', '#1d6fa8', '#9333ea', '#c2410c', '#0e7490', '#be185d', '#b45309', '#374151']
 
 const BOSH: Omit<Proje, 'id' | 'firma_id' | 'kayit_tarihi'> = {
-  ad: '', aciklama: '', renk: '#2e8b2e', aktif: true, personel_takibi_aktif: false, sureli_gorev_aktif: false, qr_sistemi_aktif: true, nfc_sistemi_aktif: true
+  ad: '', aciklama: '', renk: '#2e8b2e', aktif: true, personel_takibi_aktif: false, sureli_gorev_aktif: false, qr_sistemi_aktif: true, nfc_sistemi_aktif: true, birim_fiyat_aktif: false
 }
 
 export default function ProjelerClient({
   firmaId,
   readonly = false,
   isSA = false,
+  firmaBirimFiyatAktif = true,
 }: {
   firmaId: string | null
   readonly?: boolean
   isSA?: boolean
+  firmaBirimFiyatAktif?: boolean
 }) {
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -89,7 +92,7 @@ export default function ProjelerClient({
   }
 
   function openEdit(p: Proje) {
-    setForm({ ad: p.ad, aciklama: p.aciklama ?? '', renk: p.renk, aktif: p.aktif, personel_takibi_aktif: p.personel_takibi_aktif ?? false, qr_sistemi_aktif: p.qr_sistemi_aktif ?? true, nfc_sistemi_aktif: p.nfc_sistemi_aktif ?? true })
+    setForm({ ad: p.ad, aciklama: p.aciklama ?? '', renk: p.renk, aktif: p.aktif, personel_takibi_aktif: p.personel_takibi_aktif ?? false, qr_sistemi_aktif: p.qr_sistemi_aktif ?? true, nfc_sistemi_aktif: p.nfc_sistemi_aktif ?? true, birim_fiyat_aktif: p.birim_fiyat_aktif ?? false })
     setEditId(p.id)
     setModal('edit')
   }
@@ -194,6 +197,22 @@ variant: 'danger'
       if (!res.ok) throw new Error('Güncellenemedi')
       setProjeler(prev => prev.map(x => x.id === p.id ? { ...x, nfc_sistemi_aktif: yeniDurum } : x))
       toast({ type: 'success', title: 'Güncellendi', message: yeniDurum ? 'NFC Sistemi açıldı.' : 'NFC Sistemi kapatıldı.' })
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+  }
+
+  async function toggleBirimFiyat(p: Proje) {
+    const yeniDurum = !p.birim_fiyat_aktif
+    try {
+      const res = await fetch(`/api/projeler/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ birim_fiyat_aktif: yeniDurum }),
+      })
+      if (!res.ok) throw new Error('Güncellenemedi')
+      setProjeler(prev => prev.map(x => x.id === p.id ? { ...x, birim_fiyat_aktif: yeniDurum } : x))
+      toast({ type: 'success', title: 'Güncellendi', message: yeniDurum ? 'Birim Fiyatlar açıldı.' : 'Birim Fiyatlar kapatıldı.' })
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
     }
@@ -357,6 +376,22 @@ variant: 'danger'
                   >
                     📶 NFC {p.nfc_sistemi_aktif ? 'Kapat' : 'Aç'}
                   </button>
+                  {/* Birim Fiyat AÇ/KAPAT — firma'da aktifse göster */}
+                  {firmaBirimFiyatAktif && (
+                    <button
+                      onClick={() => toggleBirimFiyat(p)}
+                      title="Proje için birim fiyat sistemini aç/kapat"
+                      style={{
+                        padding: '5px 12px', borderRadius: 6,
+                        border: p.birim_fiyat_aktif ? '1px solid #fbbf24' : '1px solid #d6e4d6',
+                        background: p.birim_fiyat_aktif ? '#fef9c3' : '#fff',
+                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                        color: p.birim_fiyat_aktif ? '#92400e' : '#7a907a',
+                      }}
+                    >
+                      💰 Birim Fiyat {p.birim_fiyat_aktif ? 'Kapat' : 'Aç'}
+                    </button>
+                  )}
                   {/* Süreli Görev AÇ/KAPAT */}
                   <button
                     onClick={() => toggleSureliGorevler(p)}
@@ -418,6 +453,17 @@ variant: 'danger'
                   ))}
                 </div>
               </div>
+
+              {firmaBirimFiyatAktif && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: '#0f1a0f', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.birim_fiyat_aktif ?? false}
+                    onChange={e => setForm(p => ({ ...p, birim_fiyat_aktif: e.target.checked }))}
+                  />
+                  <span>💰 Birim Fiyat Sistemi</span>
+                </label>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>

@@ -217,6 +217,7 @@ const getLocPath = useMemo(() => {
     HAZIR: 'status-hazir',
     ACIK: 'status-islemde',
     BEKLEMEDE: 'status-beklemede',
+    ISLEMDE: 'status-islemde',
     IPTAL: 'status-iptal',
     TAMAMLANDI: 'status-tamamlandi',
     ZAMANINDA_YAPILAMAYAN: 'status-zamaninda',
@@ -413,7 +414,7 @@ useEffect(() => {
   const kpi = useMemo(() => ({
     toplam:     liveFlowGorevler.length,
     tamamlandi: liveFlowGorevler.filter((g:any) => g.durum === 'TAMAMLANDI').length,
-    acik:       liveFlowGorevler.filter((g:any) => ['HAZIR','ACIK'].includes(g.durum)).length,
+    acik:       liveFlowGorevler.filter((g:any) => ['HAZIR','ACIK','ISLEMDE'].includes(g.durum)).length,
     beklemede:  liveFlowGorevler.filter((g:any) => g.durum === 'BEKLEMEDE').length,
     gecmis:     liveFlowGorevler.filter((g:any) => ['ZAMANI_GECMIS','ZAMANINDA_YAPILAMAYAN'].includes(g.durum)).length,
   }), [liveFlowGorevler])
@@ -422,14 +423,14 @@ useEffect(() => {
   const filteredLive = useMemo(() => {
     if (durumFilter === 'TÜMÜ') return liveFlowGorevler
     if (durumFilter === 'TAMAMLANDI') return liveFlowGorevler.filter((g:any) => g.durum === 'TAMAMLANDI')
-    if (durumFilter === 'ACIK') return liveFlowGorevler.filter((g:any) => ['HAZIR','ACIK'].includes(g.durum))
+    if (durumFilter === 'ACIK') return liveFlowGorevler.filter((g:any) => ['HAZIR','ACIK','ISLEMDE'].includes(g.durum))
     if (durumFilter === 'BEKLEMEDE') return liveFlowGorevler.filter((g:any) => g.durum === 'BEKLEMEDE')
     if (durumFilter === 'GECMİŞ') return liveFlowGorevler.filter((g:any) => ['ZAMANI_GECMIS','ZAMANINDA_YAPILAMAYAN'].includes(g.durum))
     return liveFlowGorevler
   }, [liveFlowGorevler, durumFilter])
 
   const browseList = useMemo(() => {
-    if (browse === 'ACIK') return browseGorevler.filter((g) => ['HAZIR', 'ACIK', 'BEKLEMEDE'].includes(g.durum))
+    if (browse === 'ACIK') return browseGorevler.filter((g) => ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE'].includes(g.durum))
     if (browse === 'IPTAL') return browseGorevler.filter((g) => g.durum === 'IPTAL')
     if (browse === 'KAPALI') return browseGorevler.filter((g) => ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum))
     // TARIHI_GECMIS
@@ -718,8 +719,8 @@ useEffect(() => {
                       Kapat
                     </button>
                   )}
-                  {/* SA: HAZIR/ACIK/BEKLEMEDE → Zamanı Geçmiş yapabilir */}
-                  {isSA && ['HAZIR', 'ACIK', 'BEKLEMEDE'].includes(g.durum) && (
+                  {/* SA: HAZIR/ACIK/BEKLEMEDE/ISLEMDE → Zamanı Geçmiş yapabilir */}
+                  {isSA && ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE'].includes(g.durum) && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -738,7 +739,7 @@ useEffect(() => {
                       Z. Geçmiş
                     </button>
                   )}
-                  {['HAZIR', 'ACIK'].includes(g.durum) && (
+                  {['HAZIR', 'ACIK', 'ISLEMDE'].includes(g.durum) && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation()

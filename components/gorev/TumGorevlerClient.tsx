@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatDateTime, CANLI_DURUM_LABEL } from '@/lib/utils'
 
 const DURUM_RENK: Record<string, string> = {
-  HAZIR: 'status-hazir', ACIK: 'status-acik', BEKLEMEDE: 'status-beklemede',
+  HAZIR: 'status-hazir', ACIK: 'status-acik', BEKLEMEDE: 'status-beklemede', ISLEMDE: 'status-islemde',
   TAMAMLANDI: 'status-tamamlandi', ZAMANINDA_YAPILAMAYAN: 'status-zamaninda',
   ZAMANINDA_TAMAMLANDI: 'status-tamamlandi', ZAMANI_GECMIS: 'status-zamaninda',
   IPTAL: 'status-iptal', SILINDI: 'status-silindi', KAPATILDI: 'status-kapatildi',

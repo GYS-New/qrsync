@@ -358,7 +358,7 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
 
   const tableName = type === 'live_tasks' ? null : 'gorevler'
   const statuses = type === 'live_tasks'
-    ? ['HAZIR', 'ACIK', 'BEKLEMEDE', 'IPTAL', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS']
+    ? ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'IPTAL', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS']
     : ['ACIK', 'ISLEMDE', 'IPTAL', 'TAMAMLANDI']
 
   let tasks: any[]

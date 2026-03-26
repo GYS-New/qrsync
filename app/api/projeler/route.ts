@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       renk: renk || '#2e8b2e',
       kayit_yapan_id: user.id,
       personel_takibi_aktif: body.personel_takibi_aktif === true,
+      birim_fiyat_aktif: body.birim_fiyat_aktif === true,
     })
     .select()
     .single()

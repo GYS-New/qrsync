@@ -39,6 +39,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
         { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
         { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
         { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
+        { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
       ]
     : isTA
       ? [
@@ -52,6 +53,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
+          { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
         ]
       : isMusteri
       ? [
@@ -65,6 +67,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
+          { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
         ]
       : [
           // tenant_user: tüm potansiyel sayfalar — navYetkileri dinamik filtresi kaldırır
@@ -77,6 +80,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
+          { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
         ]
 
   return [
@@ -150,7 +154,7 @@ function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' |
   )
 }
 
-export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user: User; firma: any; projeAdi?: string | null }) {
+export default function Sidebar({ user, firma, projeAdi: projeAdiProp, birimFiyatAktifProp }: { user: User; firma: any; projeAdi?: string | null; birimFiyatAktifProp?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeLoading = useRouteLoading()
@@ -184,6 +188,8 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user:
       .then(j => { if (j?.ok) setNavYetkileri(j.yetkileri) })
       .catch(() => {})
   }, [isUOrM])
+
+  const birimFiyatAktif = aktifProje?.birim_fiyat_aktif === true || birimFiyatAktifProp === true
 
   // Fetch sidebar badge counts
   useEffect(() => {
@@ -401,16 +407,19 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp }: { user:
         </div>
 
         {groups.map((g) => {
-          // U ve M rolleri için yetki filtresi uygula
-          const filteredItems = isUOrM && navYetkileri
+          // U ve M rolleri için yetki filtresi uygula + birim-fiyatlar proje bayrağı kontrolü
+          const filteredItems = (isUOrM && navYetkileri
             ? g.items.filter(item => {
-                // href'ten sayfa kodunu çıkar: /u/dashboard/lokasyon-gruplari → lokasyon-gruplari
                 const parts = item.href.split('/')
                 const kod = parts[parts.length - 1]
-                // Yetki map'te yoksa açık kabul et
                 return navYetkileri[kod]?.gorebilir !== false
               })
             : g.items
+          ).filter(item => {
+            // birim-fiyatlar: sadece aktif proje'de birim_fiyat_aktif=true ise göster
+            if (item.href.includes('/birim-fiyatlar')) return birimFiyatAktif
+            return true
+          })
 
           if (filteredItems.length === 0) return null
 

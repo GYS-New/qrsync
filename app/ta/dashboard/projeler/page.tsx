@@ -13,6 +13,12 @@ export default async function TAProjelerPage() {
   const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', authUser.id).single()
   if (!me || me.rol !== 'tenant_admin') redirect('/ta/dashboard')
 
+  let firmaBirimFiyatAktif = true
+  if (me.firma_id) {
+    const { data: firma } = await supabase.from('firmalar').select('birim_fiyat_aktif').eq('id', me.firma_id).single()
+    firmaBirimFiyatAktif = firma?.birim_fiyat_aktif !== false
+  }
+
   return (
     <div>
       <Topbar
@@ -21,7 +27,7 @@ export default async function TAProjelerPage() {
         breadcrumbs={[{ label: 'Yönetim' }, { label: 'Projeler' }]}
       />
       <div style={{ padding: 24 }}>
-        <ProjelerClient firmaId={me.firma_id} readonly={false} isSA={false} />
+        <ProjelerClient firmaId={me.firma_id} readonly={false} isSA={false} firmaBirimFiyatAktif={firmaBirimFiyatAktif} />
       </div>
     </div>
   )

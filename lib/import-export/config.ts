@@ -433,7 +433,7 @@ async function importLiveTasks(firmaId: string, actor: Actor, rows: Record<strin
       continue
     }
 
-    if (!['HAZIR', 'ACIK', 'BEKLEMEDE', 'IPTAL', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS'].includes(durum)) {
+    if (!['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'IPTAL', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS'].includes(durum)) {
       errors.push(`Satır ${rowNo}: durum geçersiz (${durum}).`)
       continue
     }

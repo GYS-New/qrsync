@@ -26,76 +26,49 @@ async function getAuthUser(req: Request) {
 
 export async function GET(req: Request) {
   const user = await getAuthUser(req)
-  if (!user) return NextResponse.json({ ok: false, error: 'auth_required', kod: 'ESLESMEDI' }, { status: 401, headers: CORS_HEADERS })
+  if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
 
   const admin = createAdminClient()
 
-  // 24 saat öncesinin sınırı — bu tarihten önce tamamlananlar arşive taşınmış sayılır
-  const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
-  // Manuel görevler (gorevler tablosu) — bu tablo hiç arşiv tablosuna taşınmaz
+  // Manuel görevler (gorevler tablosu)
+  // islemi_yapan_id VEYA atanan_kullanici_id eşleşenler
   const { data: gorevler } = await admin
     .from('gorevler')
-    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .eq('islemi_yapan_id', user.id)
+    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim), islemi_yapan_id, atanan_kullanici_id')
+    .or(`islemi_yapan_id.eq.${user.id},atanan_kullanici_id.eq.${user.id}`)
     .in('durum', ['TAMAMLANDI', 'ZAMANI_GECMIS', 'ZAMANINDA_YAPILAMAYAN'])
-    .lt('tamamlanma_tarihi', sinir24s)
     .order('durum_degisim_tarihi', { ascending: false })
     .limit(30)
 
-  // Canlı görevler — aktif tablodan (24 saat dolmamış, henüz arşive taşınmamış)
+  // Canlı görevler (canli_gorevler tablosu)
   const { data: canliGorevler } = await admin
     .from('canli_gorevler')
-    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .eq('islemi_yapan_id', user.id)
-    .in('durum', ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANI_GECMIS', 'ZAMANINDA_YAPILAMAYAN'])
-    .lt('tamamlanma_tarihi', sinir24s)
-    .order('durum_degisim_tarihi', { ascending: false })
-    .limit(30)
-
-  // Canlı görevler — arşiv tablosundan (cron tarafından taşınmış frekansiyel görevler)
-  const { data: canliArsiv } = await admin
-    .from('canli_gorevler_arsiv')
-    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .eq('islemi_yapan_id', user.id)
+    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim), islemi_yapan_id, atanan_kullanici_id')
+    .or(`islemi_yapan_id.eq.${user.id},atanan_kullanici_id.eq.${user.id}`)
     .in('durum', ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANI_GECMIS', 'ZAMANINDA_YAPILAMAYAN'])
     .order('durum_degisim_tarihi', { ascending: false })
     .limit(30)
 
-  // Üçünü birleştir, tekrar eden id'leri temizle (aktif tablo + arşiv çakışabilir), tarihe göre sırala
-  const gorevMap = new Map<string, any>()
-
-  for (const g of gorevler ?? []) {
-    gorevMap.set(g.id, {
-      id: g.id, tanim: g.tanim, durum: g.durum,
+  // İkisini birleştir ve tarihe göre sırala
+  const tumGorevler = [
+    ...(gorevler ?? []).map((g: any) => ({
+      id: g.id,
+      tanim: g.tanim,
+      durum: g.durum,
       tarih: g.tamamlanma_tarihi || g.durum_degisim_tarihi,
-      lokasyon: (g.lokasyonlar as any)?.tanim || '',
+      lokasyon: g.lokasyonlar?.tanim || '',
       tip: 'manuel',
-    })
-  }
-  for (const g of canliGorevler ?? []) {
-    gorevMap.set(g.id, {
-      id: g.id, tanim: g.tanim, durum: g.durum,
+    })),
+    ...(canliGorevler ?? []).map((g: any) => ({
+      id: g.id,
+      tanim: g.tanim,
+      durum: g.durum,
       tarih: g.tamamlanma_tarihi || g.durum_degisim_tarihi,
-      lokasyon: (g.lokasyonlar as any)?.tanim || '',
+      lokasyon: g.lokasyonlar?.tanim || '',
       tip: 'canli',
-    })
-  }
-  // Arşivden gelenler: aktif tabloda zaten yoksa ekle (çakışma koruması)
-  for (const g of canliArsiv ?? []) {
-    if (!gorevMap.has(g.id)) {
-      gorevMap.set(g.id, {
-        id: g.id, tanim: g.tanim, durum: g.durum,
-        tarih: g.tamamlanma_tarihi || g.durum_degisim_tarihi,
-        lokasyon: (g.lokasyonlar as any)?.tanim || '',
-        tip: 'canli',
-      })
-    }
-  }
-
-  const tumGorevler = Array.from(gorevMap.values())
-    .sort((a, b) => new Date(b.tarih || 0).getTime() - new Date(a.tarih || 0).getTime())
-    .slice(0, 50)
+    })),
+  ].sort((a, b) => new Date(b.tarih || 0).getTime() - new Date(a.tarih || 0).getTime())
+   .slice(0, 50)
 
   return NextResponse.json({ ok: true, gorevler: tumGorevler }, { headers: CORS_HEADERS })
 }

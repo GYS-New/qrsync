@@ -24,6 +24,7 @@ const SAYFALAR = [
   { kod: 'personel-takibi',       label: 'Personel Takibi',            grup: 'Raporlama' },
   { kod: 'raporlar',              label: 'Raporlar',                   grup: 'Raporlama' },
   { kod: 'musteri-degerlendirme', label: 'Müşteri Değerlendirmeleri',  grup: 'Raporlama' },
+  { kod: 'birim-fiyatlar',       label: 'Birim Fiyatlar',             grup: 'Raporlama' },
 ]
 
 const YETKILER = [

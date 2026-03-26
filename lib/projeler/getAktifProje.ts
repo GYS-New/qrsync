@@ -8,6 +8,7 @@ export type AktifProje = {
   ad: string
   aciklama?: string | null
   renk?: string
+  birim_fiyat_aktif?: boolean
 }
 
 /**
@@ -24,7 +25,7 @@ export async function getAktifProje(firmaId: string | null): Promise<AktifProje 
   const admin = createAdminClient()
   const { data } = await admin
     .from('projeler')
-    .select('id,ad,aciklama,renk')
+    .select('id,ad,aciklama,renk,birim_fiyat_aktif')
     .eq('id', projeId)
     .eq('firma_id', firmaId)
     .eq('aktif', true)

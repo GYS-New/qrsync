@@ -23,7 +23,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(body.aktif !== undefined && { aktif: body.aktif }),
       ...(body.personel_takibi_aktif !== undefined && { personel_takibi_aktif: body.personel_takibi_aktif }),
       ...(body.qr_sistemi_aktif  !== undefined && { qr_sistemi_aktif:  body.qr_sistemi_aktif }),
-      ...(body.nfc_sistemi_aktif !== undefined && { nfc_sistemi_aktif: body.nfc_sistemi_aktif }),
+      ...(body.nfc_sistemi_aktif  !== undefined && { nfc_sistemi_aktif:  body.nfc_sistemi_aktif }),
+      ...(body.birim_fiyat_aktif !== undefined && { birim_fiyat_aktif: body.birim_fiyat_aktif }),
     })
     .eq('id', params.id)
     .select()

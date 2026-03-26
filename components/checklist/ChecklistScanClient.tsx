@@ -206,7 +206,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
         .from('canli_gorevler')
         .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye')
         .eq('lokasyon_id', lokasyonId)
-        .in('durum', ['ACIK', 'BEKLEMEDE'])
+        .in('durum', ['ACIK', 'BEKLEMEDE', 'ISLEMDE'])
         .order('olusturma_tarihi', { ascending: true }),
     ])
 

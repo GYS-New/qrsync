@@ -288,9 +288,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       }
     } else {
       // gfs=0 → tekil görev
-      // HAZIR/ACIK: hedef'e dahil edilir ama tekil sayımına girmiyor (hazirAcikSayisi ayrıca ekleniyor)
+      // HAZIR/ACIK/ISLEMDE: hedef'e dahil edilir ama tekil sayımına girmiyor (hazirAcikSayisi ayrıca ekleniyor)
       const durumTekil = (g as any).durum
-      if (durumTekil !== 'HAZIR' && durumTekil !== 'ACIK') {
+      if (durumTekil !== 'HAZIR' && durumTekil !== 'ACIK' && durumTekil !== 'ISLEMDE') {
         entry.tekil++
       }
     }
@@ -300,11 +300,11 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     // TAMAMLANDI                          → tamamlanan
     // ZAMANINDA_YAPILAMAYAN               → sapma
     // ZAMANI_GECMIS, IPTAL, SILINDI, BEKLEMEDE → kayıp
-    // HAZIR, ACIK                         → hedef'e girer ama kategoriye girmez (henüz aktif)
+    // HAZIR, ACIK, ISLEMDE               → hedef'e girer ama kategoriye girmez (henüz aktif)
     if (durum === 'TAMAMLANDI') entry.tamamlanan++
     else if (durum === 'ZAMANINDA_YAPILAMAYAN') entry.sapma++
     else if (durum === 'ZAMANI_GECMIS' || durum === 'IPTAL' || durum === 'SILINDI' || durum === 'BEKLEMEDE') entry.kayip++
-    // HAZIR, ACIK: sayılmaz (aktif görevler)
+    // HAZIR, ACIK, ISLEMDE: sayılmaz (aktif görevler)
   }
   // Günlük frekans = günlükFrekansToplamı / gunSayisi
   // (11 gün × 6/gün = 66 → toplam 66 kayıt, 66/11 = 6 günlük frekans)
@@ -349,9 +349,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     const gunlukFrekansToplamı = Array.from(grupTanimGfs.values()).reduce((s, v) => s + v, 0)
 
     // Hedef = rapor tarih aralığında kaydedilen TÜM görevler (duruma bakılmaz)
-    // HAZIR/ACIK da dahil — henüz tamamlanmamış ama planlanmış görevler
+    // HAZIR/ACIK/ISLEMDE da dahil — henüz tamamlanmamış ama planlanmış görevler
     const hazirAcikSayisi = (tumGorevler as any[]).filter((g: any) =>
-      filteredLokIds.includes(g.lokasyon_id) && (g.durum === 'HAZIR' || g.durum === 'ACIK')
+      filteredLokIds.includes(g.lokasyon_id) && (g.durum === 'HAZIR' || g.durum === 'ACIK' || g.durum === 'ISLEMDE')
     ).length
     const toplamGrupGorev = tamamlanan + sapma + kayip + tekilToplamı + hazirAcikSayisi
     const hedef = toplamGrupGorev
@@ -442,7 +442,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       if (durum === 'TAMAMLANDI') tamamlanan++
       else if (durum === 'ZAMANINDA_YAPILAMAYAN') sapma++
       else if (durum === 'ZAMANI_GECMIS' || durum === 'IPTAL' || durum === 'SILINDI' || durum === 'BEKLEMEDE') kayip++
-      // HAZIR, ACIK: hedefe girer ama kategoriye girmez
+      // HAZIR, ACIK, ISLEMDE: hedefe girer ama kategoriye girmez
     }
     if (hedef > 0) {
       grupMetrikleri.push({
@@ -465,7 +465,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   const toplamGorev      = tumGorevler.length
   const toplamTamamlanan = tumGorevler.filter((g: any) => g.durum === 'TAMAMLANDI').length
   const toplamSapma      = tumGorevler.filter((g: any) => g.durum === 'ZAMANINDA_YAPILAMAYAN').length
-  // Kayıp: ZAMANI_GECMIS + IPTAL + SILINDI + BEKLEMEDE
+  // Kayıp: ZAMANI_GECMIS + IPTAL + SILINDI + BEKLEMEDE (HAZIR/ACIK/ISLEMDE aktif sayılır, kayıp değil)
   const toplamKayip      = tumGorevler.filter((g: any) =>
     g.durum === 'ZAMANI_GECMIS' || g.durum === 'IPTAL' || g.durum === 'SILINDI' || g.durum === 'BEKLEMEDE'
   ).length
@@ -508,8 +508,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     })
 
   // 10b. Kayıp görevler: ZAMANI_GECMIS, IPTAL, SILINDI, BEKLEMEDE
-  // HAZIR, ACIK → henüz aktif, kayıp değil
-  const KAYIP_HARIC_DURUMLAR = new Set(['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'HAZIR', 'ACIK'])
+  // HAZIR, ACIK, ISLEMDE → henüz aktif, kayıp değil
+  const KAYIP_HARIC_DURUMLAR = new Set(['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'HAZIR', 'ACIK', 'ISLEMDE'])
   const kayipGorevler: KayipRow[] = tumGorevler
     .filter((g: any) => !KAYIP_HARIC_DURUMLAR.has(g.durum))
     .map((g: any, i: number) => {

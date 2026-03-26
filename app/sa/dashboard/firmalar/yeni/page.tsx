@@ -10,7 +10,7 @@ export default function FirmaYeniPage() {
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
-  const [form, setForm] = useState({ ticari_unvan:'', firma_adi:'', adres:'', vergi_dairesi:'', vergi_no:'', yetkili_isim:'', yetkili_tel:'', aciklama:'', qr_sablon_aktif: true, rapor_ozellestir_aktif: true, personel_takibi_aktif: false })
+  const [form, setForm] = useState({ ticari_unvan:'', firma_adi:'', adres:'', vergi_dairesi:'', vergi_no:'', yetkili_isim:'', yetkili_tel:'', aciklama:'', qr_sablon_aktif: true, rapor_ozellestir_aktif: true, personel_takibi_aktif: false, birim_fiyat_aktif: false })
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -123,6 +123,10 @@ export default function FirmaYeniPage() {
                 <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#0f1a0f',cursor:'pointer'}}>
                   <input type="checkbox" checked={form.personel_takibi_aktif} onChange={e => setForm(f => ({...f, personel_takibi_aktif: e.target.checked}))} />
                   <span>Personel Takibi — QR/NFC ile iş başı ve iş bitimi takip sistemi</span>
+                </label>
+                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#0f1a0f',cursor:'pointer'}}>
+                  <input type="checkbox" checked={form.birim_fiyat_aktif} onChange={e => setForm(f => ({...f, birim_fiyat_aktif: e.target.checked}))} />
+                  <span>Birim Fiyat Sistemi — Lokasyon grupları ve lokasyonlar için birim fiyat girişi</span>
                 </label>
               </div>
             </div>

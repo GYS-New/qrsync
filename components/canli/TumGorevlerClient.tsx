@@ -30,6 +30,7 @@ const DURUM_RENK: Record<string, string> = {
   HAZIR: 'status-hazir',
   ACIK: 'status-islemde',
   BEKLEMEDE: 'status-beklemede',
+  ISLEMDE: 'status-islemde',
   IPTAL: 'status-iptal',
   TAMAMLANDI: 'status-tamamlandi',
   ZAMANINDA_YAPILAMAYAN: 'status-zamaninda',
@@ -71,7 +72,7 @@ export default function TumGorevlerClient({
   const isU = base === '/u'
   const [sekme, setSekme] = useState<'gorevler' | 'kurallar'>('gorevler')
   // Sistem tarafından yönetilen durumlar (TA bu durumlara manuel geçiş yapamaz)
-  const SYSTEM_STATUSES = ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS']
+  const SYSTEM_STATUSES = ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS']
   // TA'nın seçebileceği hedef durumlar
   const TA_ALLOWED_TARGET_STATUSES = ['TAMAMLANDI', 'IPTAL', 'KAPATILDI', 'SILINDI']
   const supabase = createClient()
@@ -214,8 +215,8 @@ const getLocPath = useMemo(() => {
       await fetch('/api/canli-gorevler/check', { cache: 'no-store' }).catch(() => null)
 
       const durumlar = isTA
-        ? ['HAZIR','ACIK', 'BEKLEMEDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI']
-        : ['HAZIR','ACIK', 'BEKLEMEDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI', 'SILINDI']
+        ? ['HAZIR','ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI']
+        : ['HAZIR','ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI', 'SILINDI']
 
       let q = supabase
         .from('canli_gorevler')

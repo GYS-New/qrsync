@@ -9,6 +9,7 @@ export type Proje = {
   aciklama?: string | null
   renk?: string
   aktif: boolean
+  birim_fiyat_aktif?: boolean
 }
 
 type ProjeCtx = {
