@@ -1,15 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, CheckCircle, XCircle, Minus, AlertCircle, RefreshCw } from 'lucide-react'
+import { X, CheckCircle, Minus, AlertCircle, RefreshCw } from 'lucide-react'
 
 interface Props {
   taskId: string
   taskType: 'gorevler' | 'canli_gorevler'
   onKapat: () => void
+  duzenleme?: boolean        // düzenleme modu
+  onKaydet?: () => void      // kaydet sonrası geri dön callback
 }
 
 export type Sonuc = {
+  madde_id: string
   sira: number
   madde: string
   zorunlu: boolean
@@ -174,22 +177,61 @@ export function ChecklistTablo({ sonuclar, mesaj, sablonBaslik }: {
 }
 
 // ── Modal bileşeni ────────────────────────────────────────────────────────────
-export default function ChecklistModal({ taskId, taskType, onKapat }: Props) {
-  const [data,    setData]    = useState<ChecklistData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [hata,    setHata]    = useState<string | null>(null)
+export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = false, onKaydet }: Props) {
+  const [data,     setData]     = useState<ChecklistData | null>(null)
+  const [loading,  setLoading]  = useState(true)
+  const [hata,     setHata]     = useState<string | null>(null)
+  const [kayit,    setKayit]    = useState(false)
 
-  useEffect(() => {
+  // Düzenleme state: madde_id → { secenek, not }
+  const [cevaplar, setCevaplar] = useState<Record<string, { secenek: string; not: string }>>({})
+
+  function loadData() {
     setLoading(true); setHata(null)
     fetch(`/api/checklist-results?task_id=${taskId}&task_type=${taskType}`)
       .then(r => r.json())
-      .then(j => { if (!j.ok) throw new Error(j.error ?? 'Yüklenemedi'); setData(j) })
+      .then(j => {
+        if (!j.ok) throw new Error(j.error ?? 'Yüklenemedi')
+        setData(j)
+        // Mevcut cevapları düzenleme state'e yükle
+        const init: Record<string, { secenek: string; not: string }> = {}
+        for (const s of j.sonuclar ?? []) {
+          init[s.madde_id] = { secenek: s.secenek ?? '', not: s.not ?? '' }
+        }
+        setCevaplar(init)
+      })
       .catch(e => setHata(e.message))
       .finally(() => setLoading(false))
-  }, [taskId, taskType])
+  }
+
+  useEffect(() => { loadData() }, [taskId, taskType])
+
+  async function handleKaydet() {
+    if (!data) return
+    setKayit(true)
+    try {
+      const maddeler = data.sonuclar.map(s => ({
+        madde_id:       s.madde_id,
+        secenek_degeri: cevaplar[s.madde_id]?.secenek || null,
+        aciklama:       cevaplar[s.madde_id]?.not || null,
+      }))
+      const res = await fetch('/api/checklist-results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: taskId, task_type: taskType, maddeler }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Kayıt başarısız')
+      onKaydet ? onKaydet() : onKapat()
+    } catch (e: any) {
+      setHata(e.message)
+    } finally {
+      setKayit(false)
+    }
+  }
 
   return (
-    <div onClick={onKapat}
+    <div onClick={duzenleme ? undefined : onKapat}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div onClick={e => e.stopPropagation()}
         style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 680, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
@@ -197,7 +239,9 @@ export default function ChecklistModal({ taskId, taskType, onKapat }: Props) {
         {/* Başlık */}
         <div style={{ padding: '16px 22px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Çeklist Sonuçları</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: duzenleme ? '#1d4ed8' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
+              {duzenleme ? '✏️ Çeklist Düzenleme' : 'Çeklist Sonuçları'}
+            </div>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{data?.gorev.tanim ?? '—'}</div>
             <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap', fontSize: 12, color: '#64748b' }}>
               <span>📍 {data?.lokasyon ?? '—'}</span>
@@ -206,9 +250,11 @@ export default function ChecklistModal({ taskId, taskType, onKapat }: Props) {
               {data?.gorev.tamamlanma_tarihi && <span>✓ {fmtTarih(data.gorev.tamamlanma_tarihi)}</span>}
             </div>
           </div>
-          <button onClick={onKapat} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, flexShrink: 0 }}>
-            <X size={20} />
-          </button>
+          {!duzenleme && (
+            <button onClick={onKapat} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, flexShrink: 0 }}>
+              <X size={20} />
+            </button>
+          )}
         </div>
 
         {/* İçerik */}
@@ -220,25 +266,93 @@ export default function ChecklistModal({ taskId, taskType, onKapat }: Props) {
             </div>
           )}
           {hata && (
-            <div style={{ padding: '12px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, color: '#991b1b', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ padding: '12px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, color: '#991b1b', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <AlertCircle size={16} /> {hata}
             </div>
           )}
-          {!loading && !hata && data && (
-            <ChecklistTablo
-              sonuclar={data.sonuclar}
-              mesaj={data.mesaj}
-              sablonBaslik={data.sablon?.baslik}
-            />
+          {!loading && !hata && data && !duzenleme && (
+            <ChecklistTablo sonuclar={data.sonuclar} mesaj={data.mesaj} sablonBaslik={data.sablon?.baslik} />
+          )}
+          {!loading && data && duzenleme && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {data.sablon?.baslik && (
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 4 }}>📋 {data.sablon.baslik}</div>
+              )}
+              {data.sonuclar.map((s, i) => {
+                const cv = cevaplar[s.madde_id] ?? { secenek: '', not: '' }
+                const dolu = !!(cv.secenek || cv.not)
+                return (
+                  <div key={s.madde_id} style={{ border: `1px solid ${dolu ? '#bbf7d0' : s.zorunlu ? '#fecaca' : '#e2e8f0'}`, borderRadius: 10, padding: '12px 14px', background: dolu ? '#f0fdf4' : '#fff' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      {dolu ? <CheckCircle size={15} color="#16a34a" /> : <Minus size={15} color="#94a3b8" />}
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', flex: 1 }}>
+                        {s.sira}. {s.madde}
+                      </span>
+                      {s.zorunlu && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: 4 }}>Zorunlu</span>
+                      )}
+                    </div>
+
+                    {/* Seçenek */}
+                    {s.secenekler && s.secenekler.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                        {s.secenekler.map(sec => (
+                          <button key={sec} type="button"
+                            onClick={() => setCevaplar(prev => ({ ...prev, [s.madde_id]: { ...cv, secenek: cv.secenek === sec ? '' : sec } }))}
+                            style={{ padding: '5px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `2px solid ${cv.secenek === sec ? '#1d4ed8' : '#e2e8f0'}`, background: cv.secenek === sec ? '#dbeafe' : '#f8fafc', color: cv.secenek === sec ? '#1d4ed8' : '#475569', transition: 'all 0.1s' }}>
+                            {sec}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="Cevap girin…"
+                        value={cv.secenek}
+                        onChange={e => setCevaplar(prev => ({ ...prev, [s.madde_id]: { ...cv, secenek: e.target.value } }))}
+                        style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 7, border: '1px solid #e2e8f0', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }}
+                      />
+                    )}
+
+                    {/* Not */}
+                    <textarea
+                      placeholder="Not (isteğe bağlı)…"
+                      value={cv.not}
+                      rows={2}
+                      onChange={e => setCevaplar(prev => ({ ...prev, [s.madde_id]: { ...cv, not: e.target.value } }))}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid #e2e8f0', fontSize: 12.5, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', color: '#475569' }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '12px 22px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
-          <button onClick={onKapat}
-            style={{ height: 34, padding: '0 18px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
-            Kapat
-          </button>
+        <div style={{ padding: '12px 22px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: duzenleme ? 'space-between' : 'flex-end', alignItems: 'center', gap: 10 }}>
+          {duzenleme ? (
+            <>
+              <span style={{ fontSize: 12, color: '#64748b' }}>
+                {Object.values(cevaplar).filter(c => c.secenek || c.not).length} / {data?.sonuclar.length ?? 0} madde dolduruldu
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={onKapat} disabled={kayit}
+                  style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+                  Vazgeç
+                </button>
+                <button onClick={handleKaydet} disabled={kayit || loading}
+                  style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: '#1f6b1f', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, opacity: (kayit || loading) ? 0.7 : 1 }}>
+                  {kayit ? 'Kaydediliyor…' : '💾 Kaydet'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <button onClick={onKapat}
+              style={{ height: 34, padding: '0 18px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+              Kapat
+            </button>
+          )}
         </div>
       </div>
       <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
