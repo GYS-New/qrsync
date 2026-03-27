@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
+import { useProje } from '@/components/projeler/ProjeContext'
 import { RefreshCw, Star, Pencil, Trash2, RotateCcw, X, Check } from 'lucide-react'
 
 interface Kayit {
@@ -154,7 +155,9 @@ function DuzenleModal({ kayit, onKaydet, onIptal }: {
 // ── Ana bileşen ───────────────────────────────────────────────────────────────
 export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFirmaId, projeId }: Props) {
   const { firmaId: saFirmaId } = useFirma()
+  const { aktifProje } = useProje()
   const firmaId = isSA ? saFirmaId : (initialFirmaId ?? null)
+  const effectiveProjeId = isSA ? (aktifProje?.id ?? null) : (projeId ?? null)
 
   const [kayitlar, setKayitlar]         = useState<Kayit[]>([])
   const [loading, setLoading]           = useState(false)
@@ -179,7 +182,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     setHata(null)
     try {
       const p = new URLSearchParams({ firma_id: firmaId })
-      if (projeId)   p.set('proje_id', projeId)
+      if (effectiveProjeId) p.set('proje_id', effectiveProjeId)
       if (baslangic) p.set('baslangic', baslangic)
       if (bitis)     p.set('bitis', bitis)
       // arsivlendi parametresi yok → aktif kayıtlar gelir (default false)
@@ -190,7 +193,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { yukle() }, [firmaId, projeId])
+  useEffect(() => { yukle() }, [firmaId, effectiveProjeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtreliKayitlar = useMemo(() => {
     return kayitlar.filter(k => {
