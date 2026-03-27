@@ -125,7 +125,29 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
   }
 
   function handlePdf() {
-    window.print()
+    const el = document.getElementById('hakedis-print-table')
+    if (!el) return
+    const pw = window.open('', '_blank', 'width=1200,height=800')
+    if (!pw) return
+    pw.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Hakediş Raporu</title><style>
+      body{font-family:Arial,sans-serif;font-size:11px;margin:20px;color:#111}
+      h2{font-size:14px;margin:0 0 4px}
+      .sub{font-size:10px;color:#666;margin-bottom:14px}
+      table{width:100%;border-collapse:collapse}
+      th{background:#e8f5e8;padding:7px 8px;text-align:left;border:1px solid #b0ccb0;font-size:10px;font-weight:bold}
+      td{padding:5px 8px;border:1px solid #e0ece0;font-size:11px}
+      tr:nth-child(even) td{background:#f8fcf8}
+      .total td{background:#dff0df;font-weight:bold;border-top:2px solid #90c090}
+      .num{text-align:right} .ctr{text-align:center}
+      @media print{@page{size:A4 landscape;margin:10mm}}
+    </style></head><body>
+      <h2>HAKEDİŞ RAPORU</h2>
+      <div class="sub">Tarih: ${baslangic ?? '—'} — ${bitis ?? '—'}</div>
+      ${el.outerHTML}
+    </body></html>`)
+    pw.document.close()
+    pw.focus()
+    setTimeout(() => { pw.print() }, 400)
   }
 
   const paraBirimi = rows[0]?.para_birimi ?? 'TRY'
@@ -139,20 +161,10 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
         breadcrumbs={[{ label: 'Raporlar', href: `${base}/dashboard/raporlar` }, { label: 'Hakediş Raporu' }]}
       />
 
-      <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          body { background: white !important; }
-          .verde-card { box-shadow: none !important; border: 1px solid #ccc !important; }
-        }
-        .print-only { display: none; }
-      `}</style>
-
       <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Filtreler */}
-        <div className="verde-card no-print" style={{ padding: '14px 18px', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+        <div className="verde-card" style={{ padding: '14px 18px', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <label style={{ fontSize: 11, fontWeight: 700, color: '#506050' }}>BAŞLANGIÇ</label>
             <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)}
@@ -235,7 +247,7 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table id="hakedis-print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f0f7f0' }}>
                     {[
