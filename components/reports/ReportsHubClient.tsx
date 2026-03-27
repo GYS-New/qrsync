@@ -158,6 +158,11 @@ export default function ReportsHubClient({
   const toastRef   = useRef(toast)
   toastRef.current = toast
 
+  // U/M rolleri için router cache'i atla — sayfa her mount'ta sunucudan taze veri alır
+  useEffect(() => {
+    if (!isSA) router.refresh()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const { firmaId: saFirmaId, firmalar: saFirmalar } = useFirma()
   const { aktifProje } = useProje()
 
