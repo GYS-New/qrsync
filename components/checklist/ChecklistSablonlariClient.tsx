@@ -536,7 +536,6 @@ export default function ChecklistSablonlariClient({
         title: 'Bağlama Yapılamaz',
         message: 'Pasif şablona lokasyon bağlanamaz. Şablonu önce aktifleştirin.',
         confirmText: 'Anladım',
-        variant: 'warning',
       })
       return
     }
