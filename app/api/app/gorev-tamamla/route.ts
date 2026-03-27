@@ -38,6 +38,12 @@ export async function POST(req: Request) {
 
     const gorevId   = body?.gorev_id as string | undefined
     const gorevTipi = (body?.gorev_tipi as string | undefined) ?? 'gorevler'
+    const maddeler  = (body?.maddeler ?? []) as {
+      madde_id: string
+      secenek_degeri: string | null
+      aciklama: string | null
+      gorsel_url: string | null
+    }[]
 
     if (!gorevId) {
       return NextResponse.json({ ok: false, error: 'gorev_id gerekli' }, { status: 400 })
@@ -54,7 +60,7 @@ export async function POST(req: Request) {
 
     const { data: gorev1, error: gorevErr1 } = await admin
       .from(gorevTipi)
-      .select('id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi')
+      .select('id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi, lokasyon_id')
       .eq('id', gorevId)
       .maybeSingle()
 
@@ -65,7 +71,7 @@ export async function POST(req: Request) {
       const digerTablo = gorevTipi === 'gorevler' ? 'canli_gorevler' : 'gorevler'
       const { data: gorev2 } = await admin
         .from(digerTablo)
-        .select('id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi')
+        .select('id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi, lokasyon_id')
         .eq('id', gorevId)
         .maybeSingle()
       if (gorev2) {
@@ -110,6 +116,49 @@ export async function POST(req: Request) {
       }, { status: 409 })
     }
 
+    // ── Çeklist validasyonu ──────────────────────────────────────────────────
+    // Lokasyona bağlı şablon varsa zorunlu alanları kontrol et
+    const { data: lokasyon } = await admin
+      .from('lokasyonlar')
+      .select('id,checklist_sablon_id')
+      .eq('id', gorev.lokasyon_id ?? '')
+      .maybeSingle()
+
+    const sablonId = lokasyon?.checklist_sablon_id ?? null
+
+    if (sablonId && maddeler.length > 0) {
+      const { data: sablonMaddeler } = await admin
+        .from('checklist_sablon_maddeleri')
+        .select('id,zorunlu_cevap,gorsel_gerekli,aciklama_gerekli_yapilamadi')
+        .eq('sablon_id', sablonId)
+
+      const cevapMap = new Map(maddeler.map(m => [m.madde_id, m]))
+      const eksikler: string[] = []
+
+      for (const sm of sablonMaddeler ?? []) {
+        const c = cevapMap.get(sm.id)
+        if (sm.zorunlu_cevap !== false && !c?.secenek_degeri) {
+          eksikler.push(sm.id)
+        }
+        if (sm.gorsel_gerekli && !c?.gorsel_url) {
+          eksikler.push(sm.id)
+        }
+        const yapilamadi = (c?.secenek_degeri ?? '').toLowerCase().includes('yapılamad')
+          || (c?.secenek_degeri ?? '').toLowerCase().includes('yapilamad')
+        if (yapilamadi && sm.aciklama_gerekli_yapilamadi !== false && !c?.aciklama?.trim()) {
+          eksikler.push(sm.id)
+        }
+      }
+
+      if (eksikler.length > 0) {
+        return NextResponse.json({
+          ok: false,
+          error: 'Zorunlu çeklist alanları eksik',
+          eksik_madde_idler: eksikler,
+        }, { status: 422 })
+      }
+    }
+
     // ── Süre hesaplama ───────────────────────────────────────────────────────
     let sureSaniye: number | null = null
     if (gorev.baslatilma_tarihi) {
@@ -131,6 +180,46 @@ export async function POST(req: Request) {
 
     if (updateErr) {
       return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 })
+    }
+
+    // ── Çeklist cevaplarını kaydet ───────────────────────────────────────────
+    if (sablonId && maddeler.length > 0) {
+      const { data: sablon } = await admin
+        .from('checklist_sablonlari')
+        .select('versiyon')
+        .eq('id', sablonId)
+        .maybeSingle()
+
+      const gorevIdKolonu = gercekGorevTipi === 'gorevler' ? 'gorev_id' : 'canli_gorev_id'
+      const insertPayload: any = {
+        kullanici_id:     userId,
+        kanal:            'APP',
+        lokasyon_id:      lokasyon?.id ?? null,
+        sablon_id:        sablonId,
+        template_version: sablon?.versiyon ?? 1,
+      }
+      insertPayload[gorevIdKolonu] = gorevId
+
+      const { data: sonucBaslik } = await admin
+        .from('checklist_sonuc_basliklari')
+        .insert(insertPayload)
+        .select('id')
+        .single()
+
+      if (sonucBaslik) {
+        const doldurulanlar = maddeler.filter(m => m.secenek_degeri || m.aciklama || m.gorsel_url)
+        if (doldurulanlar.length > 0) {
+          await admin.from('checklist_sonuc_maddeleri').insert(
+            doldurulanlar.map(m => ({
+              sonuc_id:       sonucBaslik.id,
+              madde_id:       m.madde_id,
+              secenek_degeri: m.secenek_degeri || null,
+              aciklama:       m.aciklama?.trim() || null,
+              gorsel_url:     m.gorsel_url || null,
+            }))
+          )
+        }
+      }
     }
 
     // ── Cihaz son kullanım güncelle ──────────────────────────────────────────

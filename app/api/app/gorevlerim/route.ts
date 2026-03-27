@@ -30,68 +30,111 @@ export async function GET(req: Request) {
     // 24 saat öncesinin ISO tarihi — bu sınırdan yeni tamamlananlar hâlâ görevlerimde görünür
     const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-    // Spesifik görevler (gorevler tablosu) — atanan_kullanici_id = userId
-    // Aktif (ACIK/ISLEMDE) + son 24 saat içinde tamamlananlar
-    const { data: gorevler } = await admin
-      .from('gorevler')
-      .select(`
+    // Spesifik + canlı görevleri paralel çek
+    const [gorevlerRes, canliGorevlerRes] = await Promise.all([
+      admin.from('gorevler').select(`
         id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
-        lokasyonlar ( id, tanim, ust_tanim:parent_id(tanim) )
-      `)
-      .eq('firma_id', firmaId)
-      .eq('atanan_kullanici_id', userId)
-      .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
-      .order('olusturma_tarihi', { ascending: false })
-
-    // Canlı görevler (canli_gorevler tablosu) — atanan_kullanici_id = userId
-    // Aktif (ACIK/ISLEMDE/BEKLEMEDE) + son 24 saat içinde tamamlananlar
-    const { data: canliGorevler } = await admin
-      .from('canli_gorevler')
-      .select(`
+        lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
+      `).eq('firma_id', firmaId).eq('atanan_kullanici_id', userId)
+        .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
+        .order('olusturma_tarihi', { ascending: false }),
+      admin.from('canli_gorevler').select(`
         id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
-        lokasyonlar ( id, tanim, ust_tanim:parent_id(tanim) )
-      `)
-      .eq('firma_id', firmaId)
-      .eq('atanan_kullanici_id', userId)
-      .or(`durum.in.(ACIK,ISLEMDE,BEKLEMEDE),and(durum.in.(TAMAMLANDI,ZAMANINDA_TAMAMLANDI),tamamlanma_tarihi.gt.${sinir24s})`)
-      .order('aktif_olma_tarihi', { ascending: false })
+        lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
+      `).eq('firma_id', firmaId).eq('atanan_kullanici_id', userId)
+        .or(`durum.in.(ACIK,ISLEMDE,BEKLEMEDE),and(durum.in.(TAMAMLANDI,ZAMANINDA_TAMAMLANDI),tamamlanma_tarihi.gt.${sinir24s})`)
+        .order('aktif_olma_tarihi', { ascending: false }),
+    ])
+
+    const gorevler      = gorevlerRes.data ?? []
+    const canliGorevler = canliGorevlerRes.data ?? []
+
+    // ── Çeklist şablonlarını batch yükle ────────────────────────────────────
+    const tumGorevler = [...gorevler, ...canliGorevler] as any[]
+    const sablonIdler = [...new Set(
+      tumGorevler.map((g: any) => g.lokasyonlar?.checklist_sablon_id).filter(Boolean)
+    )] as string[]
+
+    // sablon_id → { baslik, versiyon, maddeler[] } map'i
+    const sablonMap = new Map<string, any>()
+    if (sablonIdler.length > 0) {
+      const [sablonlarRes, maddelerRes] = await Promise.all([
+        admin.from('checklist_sablonlari')
+          .select('id,baslik,versiyon')
+          .in('id', sablonIdler),
+        admin.from('checklist_sablon_maddeleri')
+          .select('id,sablon_id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli,checklist_madde_secenekleri(id,deger,sira_no)')
+          .in('sablon_id', sablonIdler)
+          .order('sira_no', { ascending: true }),
+      ])
+
+      for (const s of sablonlarRes.data ?? []) {
+        sablonMap.set(s.id, {
+          id:       s.id,
+          baslik:   s.baslik,
+          versiyon: s.versiyon ?? 1,
+          maddeler: [],
+        })
+      }
+      for (const m of (maddelerRes.data ?? []) as any[]) {
+        const s = sablonMap.get(m.sablon_id)
+        if (!s) continue
+        s.maddeler.push({
+          id:                          m.id,
+          sira_no:                     m.sira_no ?? 0,
+          baslik:                      m.baslik ?? '',
+          zorunlu_cevap:               m.zorunlu_cevap !== false,
+          aciklama_gerekli_yapilamadi: m.aciklama_gerekli_yapilamadi !== false,
+          gorsel_gerekli:              !!m.gorsel_gerekli,
+          secenekler: ((m.checklist_madde_secenekleri ?? []) as any[])
+            .sort((a: any, b: any) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
+            .map((o: any) => o.deger),
+        })
+      }
+    }
+
+    function buildChecklist(lok: any) {
+      if (!lok?.checklist_sablon_id) return null
+      return sablonMap.get(lok.checklist_sablon_id) ?? null
+    }
 
     // ── Cihaz son kullanım ───────────────────────────────────────────────────
-    await admin
-      .from('device_tokens')
+    await admin.from('device_tokens')
       .update({ son_kullanim: new Date().toISOString() })
       .eq('device_token', deviceToken)
 
     return NextResponse.json({
       ok: true,
       kullanici: {
-        id:            userId,
-        isim_soyisim:  tokenData.isim_soyisim,
-        firma_id:      firmaId,
+        id:           userId,
+        isim_soyisim: tokenData.isim_soyisim,
+        firma_id:     firmaId,
       },
-      gorevler: (gorevler ?? []).map((g: any) => ({
-        id:                  g.id,
-        tanim:               g.tanim,
-        durum:               g.durum,
-        gorev_tipi:          'gorevler',
-        olusturma_tarihi:    g.olusturma_tarihi,
-        baslatilma_tarihi:   g.baslatilma_tarihi,
-        tamamlanma_tarihi:   g.tamamlanma_tarihi ?? null,
-        lokasyon:            g.lokasyonlar
+      gorevler: gorevler.map((g: any) => ({
+        id:               g.id,
+        tanim:            g.tanim,
+        durum:            g.durum,
+        gorev_tipi:       'gorevler',
+        olusturma_tarihi: g.olusturma_tarihi,
+        baslatilma_tarihi: g.baslatilma_tarihi,
+        tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
+        lokasyon: g.lokasyonlar
           ? { id: g.lokasyonlar.id, tanim: g.lokasyonlar.tanim, ust_tanim: g.lokasyonlar.ust_tanim?.tanim ?? null }
           : null,
+        checklist: buildChecklist(g.lokasyonlar),
       })),
-      canli_gorevler: (canliGorevler ?? []).map((g: any) => ({
-        id:                  g.id,
-        tanim:               g.tanim,
-        durum:               g.durum,
-        gorev_tipi:          'canli_gorevler',
-        olusturma_tarihi:    g.aktif_olma_tarihi,
-        baslatilma_tarihi:   g.baslatilma_tarihi,
-        tamamlanma_tarihi:   g.tamamlanma_tarihi ?? null,
-        lokasyon:            g.lokasyonlar
+      canli_gorevler: canliGorevler.map((g: any) => ({
+        id:               g.id,
+        tanim:            g.tanim,
+        durum:            g.durum,
+        gorev_tipi:       'canli_gorevler',
+        olusturma_tarihi: g.aktif_olma_tarihi,
+        baslatilma_tarihi: g.baslatilma_tarihi,
+        tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
+        lokasyon: g.lokasyonlar
           ? { id: g.lokasyonlar.id, tanim: g.lokasyonlar.tanim, ust_tanim: g.lokasyonlar.ust_tanim?.tanim ?? null }
           : null,
+        checklist: buildChecklist(g.lokasyonlar),
       })),
     })
 
