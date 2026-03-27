@@ -245,7 +245,7 @@ export default function ReportsHubClient({
     if (isSA) {
       // SA: saAktifTurler null ise (henüz yüklenmedi veya hata) tümünü göster
       if (!saAktifTurler) return kartlar
-      return kartlar.filter(k => saAktifTurler.has(k.id))
+      return kartlar.filter(k => k.id === 'hakedis' || saAktifTurler.has(k.id))
     }
 
     // TA: initialRaporTurleri prop'undan direkt hesapla
@@ -256,7 +256,8 @@ export default function ReportsHubClient({
     )
     // Aktif ID seti boşsa (hepsi pasif) tümünü göster — bu bir veri tutarsızlığıdır
     if (aktifIdler.size === 0) return kartlar
-    return kartlar.filter(k => aktifIdler.has(k.id))
+    // hakedis firma_rapor_turleri'nde kayıtlı değil — görünürlüğü hakedisGoster ile kontrol edilir
+    return kartlar.filter(k => k.id === 'hakedis' || aktifIdler.has(k.id))
   }, [isSA, saAktifTurler, base, initialRaporTurleri, hakedisGoster])
   // ↑ TA için: sadece `base` veya `initialRaporTurleri` prop'u değişirse yeniden hesaplanır
   //   ProjeContext, FirmaContext, Sidebar, Topbar yeniden render'ı bu hesaplamayı ETKİLEMEZ
