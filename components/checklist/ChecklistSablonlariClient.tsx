@@ -176,7 +176,7 @@ export default function ChecklistSablonlariClient({
   const ustLokasyonlar = useMemo(() => baglaLokList.filter(l => !l.parent_id), [baglaLokList])
 
   const gruplar = useMemo(() =>
-    baglaLokList.filter(l => (childrenByParent[l.id]?.length ?? 0) > 0),
+    baglaLokList.filter(l => l.parent_id !== null && (childrenByParent[l.id]?.length ?? 0) > 0),
     [baglaLokList, childrenByParent]
   )
 
@@ -516,7 +516,12 @@ export default function ChecklistSablonlariClient({
 
     setLoading(true)
     await supabase.from('lokasyonlar').update({ checklist_sablon_id: null }).eq('checklist_sablon_id', item.id)
-    await supabase.from('checklist_sonuc_basliklari').delete().eq('sablon_id', item.id)
+    const { data: baslikRows } = await supabase.from('checklist_sonuc_basliklari').select('id').eq('sablon_id', item.id)
+    const baslikIds = ((baslikRows ?? []) as any[]).map(x => x.id)
+    if (baslikIds.length) {
+      await supabase.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', baslikIds)
+      await supabase.from('checklist_sonuc_basliklari').delete().in('id', baslikIds)
+    }
     const { data: itemRows } = await supabase.from('checklist_sablon_maddeleri').select('id').eq('sablon_id', item.id)
     const ids = ((itemRows ?? []) as any[]).map(x => x.id)
     if (ids.length) {
