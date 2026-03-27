@@ -509,12 +509,12 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                     Seçilen tarih aralığında kayıt bulunamadı
                   </div>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
+                      <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                         <tr style={{ background: '#1f6b1f' }}>
                           {['Personel', 'Rol', 'Tarih', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi'].map(h => (
-                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap', background: '#1f6b1f' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -545,12 +545,12 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                 siraliListe.length === 0 ? (
                   <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Bu proje için personel bulunamadı</div>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
+                      <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                         <tr style={{ background: '#1f6b1f' }}>
                           {['Personel', 'Rol', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi', 'Son Görülme'].map(h => (
-                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap', background: '#1f6b1f' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
