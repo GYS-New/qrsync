@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Topbar from '@/components/layout/Topbar'
 import { useRouteLoading } from '@/components/ui/RouteLoadingProvider'
 import { useToast } from '@/components/ui/ToastProvider'
-import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2, MessageSquare, CheckSquare } from 'lucide-react'
+import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2, MessageSquare, CheckSquare, Receipt } from 'lucide-react'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 
@@ -53,6 +53,13 @@ const RAPOR_KARTLARI = [
     eyebrow: 'MÜŞTERİ', badge: 'Yıldız + Yorum', tone: 'violet' as const,
     icon: 'message', path: '/raporlar/musteri-degerlendirme', disabled: false,
   },
+  {
+    id: 'hakedis',
+    title: 'Hakediş Raporu',
+    description: 'Birim fiyatlı lokasyonlar için tamamlanan, gecikmeli ve kayıp frekansiyel görevlere göre hakediş hesabı.',
+    eyebrow: 'HAKEDİŞ', badge: 'Excel + PDF', tone: 'amber' as const,
+    icon: 'receipt', path: '/raporlar/hakedis', disabled: false,
+  },
 ]
 
 const IKON_MAP: Record<string, ReactNode> = {
@@ -62,6 +69,7 @@ const IKON_MAP: Record<string, ReactNode> = {
   clock:    <Clock3 size={22} />,
   message:   <MessageSquare size={22} />,
   checklist: <CheckSquare size={22} />,
+  receipt:   <Receipt size={22} />,
 }
 
 // ─── HubCard ─────────────────────────────────────────────────────────────────
@@ -134,13 +142,15 @@ export default function ReportsHubClient({
   initialRaporTurleri,
   initialFirmaId,
   sureliGorevAktif,
+  birimFiyatAktif,
 }: {
   base: string
   firmaAdi?: string | null
   isSA: boolean
   initialRaporTurleri?: { id: string; aktif: boolean }[]
   initialFirmaId?: string | null
-  sureliGorevAktif?: boolean  // Süre Analiz kartında gösterge için
+  sureliGorevAktif?: boolean
+  birimFiyatAktif?: boolean  // Hakediş kartı görünürlüğü
 }) {
   const router     = useRouter()
   const { start }  = useRouteLoading()
@@ -150,6 +160,12 @@ export default function ReportsHubClient({
 
   const { firmaId: saFirmaId, firmalar: saFirmalar } = useFirma()
   const { aktifProje } = useProje()
+
+  // SA: firma bazlı birim fiyat aktif mi?
+  const saBirimFiyatAktif = isSA
+    ? saFirmalar?.find(f => f.id === saFirmaId)?.birim_fiyat_aktif === true
+    : false
+  const hakedisGoster = isSA ? saBirimFiyatAktif : birimFiyatAktif === true
 
   // SA: dinamik firma değişimine göre yüklenen aktif türler
   // TA: hiç kullanılmaz — initialRaporTurleri prop'undan direkt hesaplanır
@@ -220,9 +236,11 @@ export default function ReportsHubClient({
   //        prop değişmediği sürece bu hesaplama yeniden yapılmaz
   //        herhangi bir client state değişimi bu değeri ETKILEYEMEZ
   const gorunurKartlar = useMemo(() => {
-    const kartlar = RAPOR_KARTLARI.map(k => ({
-      ...k, icon: IKON_MAP[k.icon], href: `${base}/dashboard${k.path}`,
-    }))
+    const kartlar = RAPOR_KARTLARI
+      .filter(k => k.id !== 'hakedis' || hakedisGoster)
+      .map(k => ({
+        ...k, icon: IKON_MAP[k.icon], href: `${base}/dashboard${k.path}`,
+      }))
 
     if (isSA) {
       // SA: saAktifTurler null ise (henüz yüklenmedi veya hata) tümünü göster
@@ -239,7 +257,7 @@ export default function ReportsHubClient({
     // Aktif ID seti boşsa (hepsi pasif) tümünü göster — bu bir veri tutarsızlığıdır
     if (aktifIdler.size === 0) return kartlar
     return kartlar.filter(k => aktifIdler.has(k.id))
-  }, [isSA, saAktifTurler, base, initialRaporTurleri])
+  }, [isSA, saAktifTurler, base, initialRaporTurleri, hakedisGoster])
   // ↑ TA için: sadece `base` veya `initialRaporTurleri` prop'u değişirse yeniden hesaplanır
   //   ProjeContext, FirmaContext, Sidebar, Topbar yeniden render'ı bu hesaplamayı ETKİLEMEZ
 

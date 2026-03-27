@@ -30,9 +30,10 @@ export default async function TARaporlarPage() {
   )
 
   const { data: firma } = me.firma_id
-    ? await supabase.from('firmalar').select('firma_adi,ticari_unvan').eq('id', me.firma_id).single()
+    ? await supabase.from('firmalar').select('firma_adi,ticari_unvan,birim_fiyat_aktif').eq('id', me.firma_id).single()
     : { data: null }
   const firmaAdi = firma?.firma_adi || firma?.ticari_unvan || null
+  const birimFiyatAktif = (firma as any)?.birim_fiyat_aktif === true
 
   const admin = createAdminClient()
   let initialRaporTurleri: { id: string; aktif: boolean }[] = []
@@ -104,5 +105,5 @@ export default async function TARaporlarPage() {
     sureliGorevAktif = (loks?.length ?? 0) > 0
   }
 
-return <ReportsHubClient base="/ta" initialFirmaId={me.firma_id ?? null} isSA={false} firmaAdi={firmaAdi} initialRaporTurleri={initialRaporTurleri} sureliGorevAktif={sureliGorevAktif} />
+return <ReportsHubClient base="/ta" initialFirmaId={me.firma_id ?? null} isSA={false} firmaAdi={firmaAdi} initialRaporTurleri={initialRaporTurleri} sureliGorevAktif={sureliGorevAktif} birimFiyatAktif={birimFiyatAktif} />
 }
