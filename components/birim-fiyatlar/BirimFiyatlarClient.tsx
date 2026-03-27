@@ -110,6 +110,7 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
     const fiyatNum = parseFloat(draft.fiyat.replace(',', '.')) || 0
     setSaving(key)
     try {
+      // 1) Grup fiyatlarını kaydet
       for (const id of grupIds) {
         const body = { proje_id: projeId, fiyat: fiyatNum, para_birimi: draft.para_birimi, grup_id: id }
         const res = await fetch('/api/birim-fiyatlar', {
@@ -125,10 +126,29 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
           setFiyatlar(prev => [...prev.filter(f => f.grup_id !== id), json.data])
         }
       }
+
+      // 2) Gruba ait tüm lokasyonları da aynı fiyatla kaydet
+      const allLokIds = [...new Set(grupIds.flatMap(gid => grupLokMap.get(gid) ?? []))]
+      for (const lokId of allLokIds) {
+        const body = { proje_id: projeId, fiyat: fiyatNum, para_birimi: draft.para_birimi, lokasyon_id: lokId }
+        const res = await fetch('/api/birim-fiyatlar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error)
+        if (json.deleted) {
+          setFiyatlar(prev => prev.filter(f => f.lokasyon_id !== lokId))
+        } else {
+          setFiyatlar(prev => [...prev.filter(f => f.lokasyon_id !== lokId), json.data])
+        }
+      }
+
       if (fiyatNum === 0) {
         setDrafts(prev => { const n = { ...prev }; delete n[key]; return n })
       }
-      toast({ type: 'success', title: 'Kaydedildi', message: fiyatNum === 0 ? 'Fiyat silindi.' : 'Fiyat kaydedildi.' })
+      toast({ type: 'success', title: 'Kaydedildi', message: fiyatNum === 0 ? 'Fiyat silindi.' : `Grup ve ${allLokIds.length} lokasyon fiyatı kaydedildi.` })
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message ?? 'Kaydedilemedi' })
     } finally {
@@ -197,10 +217,11 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
           const allLokIds = [...new Set(grupIds.flatMap(gid => grupLokMap.get(gid) ?? []))]
           const kayitliLokasyonlar = lokasyonlar.filter(l => allLokIds.includes(l.id))
 
-          // Herhangi bir grup ID'sinde kayıtlı fiyat var mı?
+          // Grup fiyatı var mı? (DB'deki kayıt VEYA henüz kaydedilmemiş draft)
           const grupFiyatliMi = grupIds.some(gid => grupFiyatMap.has(gid))
-          // Herhangi bir lokasyonda kayıtlı fiyat var mı?
-          const lokFiyatliMi = allLokIds.some(lid => lokFiyatMap.has(lid))
+            || (parseFloat(getDraft(key).fiyat.replace(',', '.')) || 0) > 0
+          // Herhangi bir lokasyonda kayıtlı fiyat var mı? (grup fiyatı yoksa anlamlı)
+          const lokFiyatliMi = !grupFiyatliMi && allLokIds.some(lid => lokFiyatMap.has(lid))
 
           const grupDisabled = readonly || lokFiyatliMi
 
