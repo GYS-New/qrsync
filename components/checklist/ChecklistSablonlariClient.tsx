@@ -176,7 +176,7 @@ export default function ChecklistSablonlariClient({
   const ustLokasyonlar = useMemo(() => baglaLokList.filter(l => !l.parent_id), [baglaLokList])
 
   const gruplar = useMemo(() =>
-    baglaLokList.filter(l => (childrenByParent[l.id]?.length ?? 0) > 0),
+    baglaLokList.filter(l => l.parent_id !== null && (childrenByParent[l.id]?.length ?? 0) > 0),
     [baglaLokList, childrenByParent]
   )
 
@@ -531,6 +531,15 @@ export default function ChecklistSablonlariClient({
 
   // ── Bağla — 13 ───────────────────────────────────────────────────────────
   async function openBagla(sablon: SablonOzet) {
+    if (!sablon.aktif) {
+      confirm({
+        title: 'Bağlama Yapılamaz',
+        message: 'Pasif şablona lokasyon bağlanamaz. Şablonu önce aktifleştirin.',
+        confirmText: 'Anladım',
+        variant: 'warning',
+      })
+      return
+    }
     setBaglaLoading(true)
     setBaglaInfo({ sablon, asama: 'secim' })
     setSecilenLok(new Set())
