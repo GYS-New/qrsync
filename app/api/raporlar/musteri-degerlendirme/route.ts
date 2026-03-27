@@ -11,7 +11,8 @@ async function yetkiKontrol(supabase: any) {
 
   const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
   const isTA = me.rol === 'tenant_admin'
-  if (!isSA && !isTA) return { ok: false, me: null, status: 403 }
+  const isU  = me.rol === 'tenant_user' || me.rol === 'musteri'
+  if (!isSA && !isTA && !isU) return { ok: false, me: null, status: 403 }
 
   return { ok: true, me: { ...me, isSA, isTA } }
 }
