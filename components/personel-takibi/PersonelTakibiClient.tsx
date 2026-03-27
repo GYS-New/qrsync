@@ -6,7 +6,7 @@ import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 import {
   RefreshCw, QrCode, Download, RotateCcw,
-  LogIn, LogOut, Users, UserCheck, UserX,
+  LogIn, LogOut, Users, UserCheck, UserX, Filter, X,
 } from 'lucide-react'
 import QRCode from 'qrcode'
 
@@ -29,6 +29,21 @@ interface PersonelSatir {
   cikis_saati:  string | null
   giris_tipi:   string | null
   cikis_tipi:   string | null
+}
+
+interface MesaiKayit {
+  id:           string
+  user_id:      string
+  isim_soyisim: string
+  email:        string
+  rol:          string
+  kayit_tarihi: string
+  giris_saati:  string | null
+  cikis_saati:  string | null
+  giris_tipi:   string | null
+  cikis_tipi:   string | null
+  aktif:        boolean
+  arsivlendi:   boolean
 }
 
 interface Kpi { toplam: number; aktif: number; pasif: number }
@@ -61,6 +76,12 @@ function sure(giris: string | null, cikis: string | null) {
   const s     = Math.floor(dk / 60)
   const m     = dk % 60
   return `${s}s ${m}dk`
+}
+
+function tarihFormatla(kayitTarihi: string) {
+  // kayit_tarihi YYYY-MM-DD formatında
+  const [y, m, d] = kayitTarihi.split('-')
+  return `${d}.${m}.${y}`
 }
 
 const ROL_BADGE: Record<string, { label: string; bg: string; color: string }> = {
@@ -114,19 +135,29 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   const { firmaId: saFirmaId } = useFirma()
   const { aktifProje } = useProje()
 
-  const firmaId = isSA ? saFirmaId : (initialFirmaId ?? null)
-  const projeId = aktifProje?.id ?? initialProjeId ?? null
+  const firmaId  = isSA ? saFirmaId : (initialFirmaId ?? null)
+  const projeId  = aktifProje?.id ?? initialProjeId ?? null
   const projeAdi = aktifProje?.ad ?? ''
 
   const [aktifSekme, setAktifSekme] = useState<'bugun' | 'qr'>('bugun')
-  const [kpi,               setKpi]              = useState<Kpi | null>(null)
-  const [liste,             setListe]             = useState<PersonelSatir[]>([])
-  const [qrKodlar,          setQrKodlar]          = useState<QrKod[]>([])
-  const [loading,           setLoading]           = useState(false)
-  const [qrLoading,         setQrLoading]         = useState(false)
-  const [hata,              setHata]              = useState<string | null>(null)
-  const [aramaQ,            setAramaQ]            = useState('')
-  const [personelTakibiAktif, setPersonelTakibiAktif] = useState<boolean | null>(null) // null = yükleniyor
+  const [kpi,        setKpi]        = useState<Kpi | null>(null)
+  const [liste,      setListe]      = useState<PersonelSatir[]>([])
+  const [qrKodlar,   setQrKodlar]   = useState<QrKod[]>([])
+  const [loading,    setLoading]    = useState(false)
+  const [qrLoading,  setQrLoading]  = useState(false)
+  const [hata,       setHata]       = useState<string | null>(null)
+  const [personelTakibiAktif, setPersonelTakibiAktif] = useState<boolean | null>(null)
+
+  // ── Filtre state ──────────────────────────────────────────────────────────
+  const [filtreAcik,      setFiltreAcik]      = useState(false)
+  const [filtreBaslangic, setFiltreBaslangic] = useState('')
+  const [filtreBitis,     setFiltreBitis]     = useState('')
+  const [filtreArama,     setFiltreArama]     = useState('')
+  const [kayitListe,      setKayitListe]      = useState<MesaiKayit[]>([])
+  const [kayitLoading,    setKayitLoading]    = useState(false)
+
+  const filtreAktif       = !!(filtreBaslangic || filtreBitis)
+  const aktifFiltreSayisi = [filtreBaslangic, filtreBitis].filter(Boolean).length
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -146,6 +177,22 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
     } finally { setLoading(false) }
   }, [firmaId, projeId])
 
+  // ── Filtrelenmiş kayıtları yükle ─────────────────────────────────────────
+  const yukleKayitlar = useCallback(async () => {
+    if (!firmaId) return
+    setKayitLoading(true); setHata(null)
+    try {
+      const p = new URLSearchParams({ firma_id: firmaId })
+      if (projeId)         p.set('proje_id', projeId)
+      if (filtreBaslangic) p.set('baslangic', filtreBaslangic)
+      if (filtreBitis)     p.set('bitis', filtreBitis)
+      const res  = await fetch(`/api/mesai/liste?${p}`)
+      const json = await res.json()
+      if (json.ok) setKayitListe(json.data ?? [])
+      else setHata(json.error)
+    } finally { setKayitLoading(false) }
+  }, [firmaId, projeId, filtreBaslangic, filtreBitis])
+
   // ── QR kodları yükle ─────────────────────────────────────────────────────
   const yukleQr = useCallback(async () => {
     if (!firmaId) return
@@ -161,6 +208,16 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
 
   useEffect(() => { yukle() }, [yukle])
   useEffect(() => { if (aktifSekme === 'qr') yukleQr() }, [aktifSekme, yukleQr])
+
+  function filtreleUygula() {
+    if (filtreAktif) yukleKayitlar()
+    else yukle()
+  }
+
+  function filtreyiTemizle() {
+    setFiltreBaslangic(''); setFiltreBitis(''); setFiltreArama(''); setKayitListe([])
+    yukle()
+  }
 
   // ── QR oluştur / yenile ───────────────────────────────────────────────────
   async function qrOlustur(yenile = false) {
@@ -203,9 +260,9 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
     return `${tarihStr} ${saatStr} — ${onceStr}`
   }
 
-  // ── Filtreli / sıralı liste ───────────────────────────────────────────────
+  // ── Filtreli / sıralı liste (bugün modu) ─────────────────────────────────
   const siraliListe = useMemo(() => {
-    const q = aramaQ.trim().toLowerCase()
+    const q = filtreArama.trim().toLowerCase()
     return [...liste]
       .filter(p => !q || p.isim_soyisim?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q))
       .sort((a, b) => {
@@ -213,9 +270,21 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
         if (!a.aktif && b.aktif) return 1
         return (a.isim_soyisim ?? '').localeCompare(b.isim_soyisim ?? '', 'tr')
       })
-  }, [liste, aramaQ])
+  }, [liste, filtreArama])
 
-  const spinning = { animation: 'spin 0.9s linear infinite' }
+  // ── Filtreli / sıralı liste (kayıt modu) ─────────────────────────────────
+  const siraliKayitlar = useMemo(() => {
+    const q = filtreArama.trim().toLowerCase()
+    return [...kayitListe]
+      .filter(k => !q || k.isim_soyisim?.toLowerCase().includes(q) || k.email?.toLowerCase().includes(q))
+      .sort((a, b) => {
+        if (a.kayit_tarihi !== b.kayit_tarihi) return b.kayit_tarihi.localeCompare(a.kayit_tarihi)
+        return (a.isim_soyisim ?? '').localeCompare(b.isim_soyisim ?? '', 'tr')
+      })
+  }, [kayitListe, filtreArama])
+
+  const spinning    = { animation: 'spin 0.9s linear infinite' }
+  const isLoading   = filtreAktif ? kayitLoading : loading
 
   const td = (e?: React.CSSProperties): React.CSSProperties => ({
     padding: '10px 14px', borderBottom: '1px solid #e8f0e8', fontSize: 13, verticalAlign: 'middle', ...e,
@@ -228,6 +297,49 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
     color:      aktifSekme === id ? '#fff'    : '#475569',
   } as React.CSSProperties)
 
+  // ── Durum badge ───────────────────────────────────────────────────────────
+  function durumBadge(aktif: boolean) {
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+        background: aktif ? '#dcfce7' : '#fef2f2',
+        color:      aktif ? '#166534' : '#dc2626',
+      }}>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+          background: aktif ? '#16a34a' : '#ef4444' }} />
+        {aktif ? 'Aktif' : 'Aktif Değil'}
+      </span>
+    )
+  }
+
+  // ── Personel avatar + isim hücresi ───────────────────────────────────────
+  function personelHucresi(isim: string, email: string, dim: boolean) {
+    const initials = isim?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    const tc = dim ? '#94a3b8' : '#0f1a0f'
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+          background: dim ? '#e2e8f0' : 'linear-gradient(135deg,#2e8b2e,#1f6b1f)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: dim ? '#94a3b8' : '#fff', fontSize: 12, fontWeight: 800,
+        }}>{initials}</div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: tc }}>{isim}</div>
+          <div style={{ fontSize: 11.5, color: dim ? '#cbd5e1' : '#94a3b8' }}>{email}</div>
+        </div>
+      </div>
+    )
+  }
+
+  function rolBadge(rol: string, dim: boolean) {
+    const rb = ROL_BADGE[rol]
+    return rb
+      ? <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, background: rb.bg, color: rb.color, whiteSpace: 'nowrap', opacity: dim ? 0.5 : 1 }}>{rb.label}</span>
+      : <span style={{ fontSize: 11.5, color: dim ? '#94a3b8' : '#64748b' }}>{rol}</span>
+  }
+
   return (
     <div>
       <Topbar title="Personel Takibi" base={base}
@@ -238,7 +350,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
         {/* Sekmeler */}
         <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 10, padding: 4, alignSelf: 'flex-start' }}>
           <button style={sekme('bugun')} onClick={() => setAktifSekme('bugun')}>
-            <Users size={14} style={{ display: 'inline', marginRight: 6 }} />Bugün
+            <Users size={14} style={{ display: 'inline', marginRight: 6 }} />Personel
           </button>
           {!readonly && (
             <button style={sekme('qr')} onClick={() => setAktifSekme('qr')}>
@@ -262,16 +374,16 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
           </div>
         )}
 
-        {/* ── BUGÜN SEKMESİ ── */}
+        {/* ── PERSONEL SEKMESİ ── */}
         {aktifSekme === 'bugun' && (
           <>
-            {/* KPI kartlar */}
-            {kpi && (
+            {/* KPI kartlar — bugün modu */}
+            {kpi && !filtreAktif && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
                 {[
-                  { label: 'Toplam Personel', val: kpi.toplam, icon: <Users size={20} color="#1f6b1f" />,  bg: '#f0fdf4' },
-                  { label: 'İşte (Aktif)',    val: kpi.aktif,  icon: <UserCheck size={20} color="#1d4ed8" />, bg: '#eff6ff' },
-                  { label: 'İşte Değil',      val: kpi.pasif,  icon: <UserX size={20} color="#dc2626" />,    bg: '#fef2f2' },
+                  { label: 'Toplam Personel', val: kpi.toplam, icon: <Users size={20} color="#1f6b1f" />,     bg: '#f0fdf4' },
+                  { label: 'Aktif',           val: kpi.aktif,  icon: <UserCheck size={20} color="#16a34a" />, bg: '#dcfce7' },
+                  { label: 'Aktif Değil',     val: kpi.pasif,  icon: <UserX size={20} color="#dc2626" />,     bg: '#fef2f2' },
                 ].map(({ label, val, icon, bg }) => (
                   <div key={label} className="verde-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, background: bg }}>
                     <div style={{ width: 42, height: 42, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>{icon}</div>
@@ -284,100 +396,190 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
               </div>
             )}
 
-            {/* Liste + yenile */}
+            {/* KPI kartlar — filtre modu */}
+            {filtreAktif && siraliKayitlar.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+                {[
+                  { label: 'Toplam Kayıt', val: siraliKayitlar.length,                          icon: <Users size={20} color="#1f6b1f" />,     bg: '#f0fdf4' },
+                  { label: 'Tamamlanan',   val: siraliKayitlar.filter(k => k.cikis_saati).length, icon: <UserCheck size={20} color="#16a34a" />, bg: '#dcfce7' },
+                  { label: 'Eksik Çıkış',  val: siraliKayitlar.filter(k => !k.cikis_saati).length, icon: <UserX size={20} color="#f59e0b" />,   bg: '#fffbeb' },
+                ].map(({ label, val, icon, bg }) => (
+                  <div key={label} className="verde-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, background: bg }}>
+                    <div style={{ width: 42, height: 42, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>{icon}</div>
+                    <div>
+                      <div style={{ fontSize: 26, fontWeight: 900, color: '#0f1a0f', lineHeight: 1 }}>{val}</div>
+                      <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 3 }}>{label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Liste + araç çubuğu */}
             <div className="verde-card" style={{ overflow: 'hidden' }}>
+              {/* Başlık + araçlar */}
               <div style={{ padding: '12px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 800, fontSize: 14 }}>Personel Durumu — Bugün</span>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontWeight: 800, fontSize: 14 }}>
+                  {filtreAktif ? 'Filtreli Kayıtlar' : 'Personel Durumu — Bugün'}
+                </span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <input
                     placeholder="İsim veya e-posta ara…"
-                    value={aramaQ}
-                    onChange={e => setAramaQ(e.target.value)}
+                    value={filtreArama}
+                    onChange={e => setFiltreArama(e.target.value)}
                     style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, width: 200 }}
                   />
-                  <button onClick={yukle} disabled={loading || !firmaId}
-                    style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1f6b1f', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                    <RefreshCw size={12} style={loading ? spinning : {}} />
-                    {loading ? 'Yükleniyor…' : 'Yenile'}
+                  <button
+                    onClick={() => setFiltreAcik(v => !v)}
+                    style={{
+                      height: 32, padding: '0 12px', borderRadius: 8, fontWeight: 700, fontSize: 12,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                      border: `1px solid ${filtreAcik || filtreAktif ? '#1f6b1f' : '#e2e8f0'}`,
+                      background: filtreAcik || filtreAktif ? '#f0fdf4' : '#fff',
+                      color: filtreAcik || filtreAktif ? '#1f6b1f' : '#475569',
+                    }}>
+                    <Filter size={12} /> Filtrele
+                    {aktifFiltreSayisi > 0 && (
+                      <span style={{ background: '#1f6b1f', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                        {aktifFiltreSayisi}
+                      </span>
+                    )}
                   </button>
+                  {!filtreAktif && (
+                    <button onClick={yukle} disabled={loading || !firmaId}
+                      style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1f6b1f', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                      <RefreshCw size={12} style={loading ? spinning : {}} />
+                      {loading ? 'Yükleniyor…' : 'Yenile'}
+                    </button>
+                  )}
                 </div>
               </div>
 
+              {/* Filtre paneli */}
+              {filtreAcik && (
+                <div style={{ padding: '14px 18px', background: '#f8fafc', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Başlangıç Tarihi</div>
+                    <input
+                      type="date"
+                      value={filtreBaslangic}
+                      onChange={e => setFiltreBaslangic(e.target.value)}
+                      style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }}
+                    />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Bitiş Tarihi</div>
+                    <input
+                      type="date"
+                      value={filtreBitis}
+                      onChange={e => setFiltreBitis(e.target.value)}
+                      style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }}
+                    />
+                  </div>
+                  <button
+                    onClick={filtreleUygula}
+                    disabled={kayitLoading}
+                    style={{ height: 32, padding: '0 16px', borderRadius: 8, border: 'none', background: '#1f6b1f', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Filter size={12} /> {kayitLoading ? 'Yükleniyor…' : 'Uygula'}
+                  </button>
+                  {filtreAktif && (
+                    <button
+                      onClick={filtreyiTemizle}
+                      style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <X size={12} /> Temizle
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* İçerik */}
               {hata ? (
                 <div style={{ padding: 32, textAlign: 'center', color: '#dc2626', fontSize: 13 }}>{hata}</div>
               ) : !firmaId ? (
                 <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Firma seçin</div>
-              ) : loading ? (
+              ) : isLoading ? (
                 <div style={{ padding: 40, textAlign: 'center' }}>
                   <RefreshCw size={22} style={{ ...spinning, color: '#1f6b1f', display: 'block', margin: '0 auto 10px' }} />
                 </div>
-              ) : siraliListe.length === 0 ? (
-                <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Bu proje için personel bulunamadı</div>
+              ) : filtreAktif ? (
+
+                /* ── Filtre modu tablosu ── */
+                siraliKayitlar.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+                    Seçilen tarih aralığında kayıt bulunamadı
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#1f6b1f' }}>
+                          {['Personel', 'Rol', 'Tarih', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi'].map(h => (
+                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {siraliKayitlar.map((k, i) => {
+                          const dim = !k.aktif
+                          const tc  = dim ? '#94a3b8' : '#0f1a0f'
+                          return (
+                            <tr key={k.id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
+                              <td style={td()}>{personelHucresi(k.isim_soyisim, k.email, dim)}</td>
+                              <td style={td()}>{rolBadge(k.rol, dim)}</td>
+                              <td style={td({ fontWeight: 600, color: tc })}>{tarihFormatla(k.kayit_tarihi)}</td>
+                              <td style={td()}>{durumBadge(k.aktif)}</td>
+                              <td style={td({ fontWeight: 600, color: k.giris_saati ? tc : '#cbd5e1' })}>{saat(k.giris_saati)}</td>
+                              <td style={td({ color: k.cikis_saati ? tc : '#cbd5e1' })}>{saat(k.cikis_saati)}</td>
+                              <td style={td({ color: dim ? '#cbd5e1' : '#475569' })}>{sure(k.giris_saati, k.cikis_saati)}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: '#1f6b1f' }}>
-        {['Personel', 'Rol', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi', 'Son Görülme'].map(h => (
-                          <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {siraliListe.map((p, i) => {
-                        const initials = p.isim_soyisim?.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
-                        return (
-                          <tr key={p.user_id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
-                            <td style={td()}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#2e8b2e,#1f6b1f)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{initials}</div>
-                                <div>
-                                  <div style={{ fontWeight: 700, fontSize: 13 }}>{p.isim_soyisim}</div>
-                                  <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{p.email}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td style={td()}>
-                              {(() => {
-                                const rb = ROL_BADGE[p.rol]
-                                return rb
-                                  ? <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, background: rb.bg, color: rb.color, whiteSpace: 'nowrap' }}>{rb.label}</span>
-                                  : <span style={{ fontSize: 11.5, color: '#94a3b8' }}>{p.rol}</span>
-                              })()}
-                            </td>
-                            <td style={td()}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-                                background: p.aktif ? '#dcfce7' : p.giris_saati ? '#f1f5f9' : '#fef2f2',
-                                color:      p.aktif ? '#166534' : p.giris_saati ? '#475569' : '#dc2626',
-                              }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: p.aktif ? '#16a34a' : p.giris_saati ? '#94a3b8' : '#ef4444' }} />
-                                {p.aktif ? 'İşte' : p.giris_saati ? 'Çıktı' : 'Gelmedi'}
-                              </span>
-                            </td>
-                            <td style={td({ fontWeight: 600, color: p.giris_saati ? '#0f1a0f' : '#cbd5e1' })}>
-                              {saat(p.giris_saati)}
-                            </td>
-                            <td style={td({ color: p.cikis_saati ? '#0f1a0f' : '#cbd5e1' })}>
-                              {saat(p.cikis_saati)}
-                            </td>
-                            <td style={td({ color: '#475569' })}>
-                              {sure(p.giris_saati, p.cikis_saati)}
-                            </td>
-                            <td style={td({ whiteSpace: 'nowrap', fontSize: 12, color: '#64748b' })}>
-                              {sonGorulme(p.last_seen_at)}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+
+                /* ── Bugün modu tablosu ── */
+                siraliListe.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Bu proje için personel bulunamadı</div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#1f6b1f' }}>
+                          {['Personel', 'Rol', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi', 'Son Görülme'].map(h => (
+                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {siraliListe.map((p, i) => {
+                          const dim = !p.aktif
+                          const tc  = dim ? '#94a3b8' : '#0f1a0f'
+                          return (
+                            <tr key={p.user_id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
+                              <td style={td()}>{personelHucresi(p.isim_soyisim, p.email, dim)}</td>
+                              <td style={td()}>{rolBadge(p.rol, dim)}</td>
+                              <td style={td()}>{durumBadge(p.aktif)}</td>
+                              <td style={td({ fontWeight: 600, color: p.giris_saati ? tc : '#cbd5e1' })}>{saat(p.giris_saati)}</td>
+                              <td style={td({ color: p.cikis_saati ? tc : '#cbd5e1' })}>{saat(p.cikis_saati)}</td>
+                              <td style={td({ color: dim ? '#cbd5e1' : '#475569' })}>{sure(p.giris_saati, p.cikis_saati)}</td>
+                              <td style={td({ whiteSpace: 'nowrap', fontSize: 12, color: dim ? '#cbd5e1' : '#64748b' })}>{sonGorulme(p.last_seen_at)}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
               )}
             </div>
 
-            {personelTakibiAktif && kpi && kpi.pasif > 0 && (
+            {personelTakibiAktif && kpi && kpi.pasif > 0 && !filtreAktif && (
               <div style={{ fontSize: 12.5, color: '#dc2626', background: '#fef2f2', padding: '8px 14px', borderRadius: 8, border: '1px solid #fecaca' }}>
-                ⚠️ İşte olmayan <strong>{kpi.pasif} personele</strong> görev ataması yapılamaz.
+                ⚠️ Aktif olmayan <strong>{kpi.pasif} personele</strong> görev ataması yapılamaz.
               </div>
             )}
           </>

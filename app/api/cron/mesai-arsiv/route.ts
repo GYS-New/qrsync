@@ -3,8 +3,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/cron/mesai-arsiv
- * Her saat başı çalışır (railway.json'a ekleyin).
- * Girişi 24 saatten önce olan ve henüz arşivlenmemiş kayıtları arşive taşır.
+ * Her gün 23:59 TRT'de çalışır (railway.json: "59 20 * * *" = 20:59 UTC = 23:59 TRT).
+ * Bugün ve önceki tarihe ait henüz arşivlenmemiş tüm kayıtları arşive taşır (gün sonu).
  */
 export async function GET(req: NextRequest) {
   const url      = new URL(req.url)
@@ -16,9 +16,11 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // 24 saatten eski kayıtları arşivle
-  const sinir = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  // TRT bugünün tarihi (UTC+3)
+  const trtNow = new Date(Date.now() + 3 * 60 * 60 * 1000)
+  const bugun  = trtNow.toISOString().split('T')[0]
 
+  // Bugün ve önceki tarihlere ait arşivlenmemiş kayıtları arşivle
   const { data, error } = await admin
     .from('personel_mesai_kayitlari')
     .update({
@@ -26,7 +28,7 @@ export async function GET(req: NextRequest) {
       arsivleme_tarihi:  new Date().toISOString(),
     })
     .eq('arsivlendi', false)
-    .lt('giris_saati', sinir)
+    .lte('kayit_tarihi', bugun)
     .select('id')
 
   if (error) {

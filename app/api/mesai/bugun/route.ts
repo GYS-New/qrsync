@@ -94,13 +94,20 @@ export async function GET(req: NextRequest) {
   const liste = (kullanicilar ?? []).map((u: any) => {
     const kayit = mesaiMap.get(u.id) ?? null
     const aktif = kayit !== null && kayit.cikis_saati === null
+
+    // Son görülme: users.last_seen_at, giris_saati ve cikis_saati'nin maksimumu
+    const sonGorulenler = [u.last_seen_at, kayit?.giris_saati, kayit?.cikis_saati].filter(Boolean) as string[]
+    const effectiveLastSeen = sonGorulenler.length > 0
+      ? sonGorulenler.sort().reverse()[0]
+      : null
+
     return {
       user_id:        u.id,
       isim_soyisim:   u.isim_soyisim,
       email:          u.email,
       profil_foto:    u.profil_foto ?? null,
       rol:            u.rol,
-      last_seen_at:   u.last_seen_at ?? null,
+      last_seen_at:   effectiveLastSeen,
       aktif,
       mesai_id:       kayit?.id        ?? null,
       giris_saati:    kayit?.giris_saati  ?? null,
