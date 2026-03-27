@@ -85,15 +85,12 @@ export async function POST(req: NextRequest) {
     updated_at: new Date().toISOString(),
   }
 
-  let conflictCol: string
   if (grup_id) {
     payload.grup_id = grup_id
     payload.lokasyon_id = null
-    conflictCol = 'birim_fiyatlar_grup_uniq'
   } else {
     payload.lokasyon_id = lokasyon_id
     payload.grup_id = null
-    conflictCol = 'birim_fiyatlar_lok_uniq'
   }
 
   // Fiyat 0 ise kaydı sil
@@ -106,11 +103,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, deleted: true })
   }
 
-  const { data, error } = await admin
-    .from('birim_fiyatlar')
-    .upsert(payload, { onConflict: grup_id ? 'proje_id,grup_id' : 'proje_id,lokasyon_id', ignoreDuplicates: false })
-    .select()
-    .single()
+  // Kayıt var mı kontrol et → varsa update, yoksa insert
+  const existsQ = grup_id
+    ? admin.from('birim_fiyatlar').select('id').eq('proje_id', proje_id).eq('grup_id', grup_id).maybeSingle()
+    : admin.from('birim_fiyatlar').select('id').eq('proje_id', proje_id).eq('lokasyon_id', lokasyon_id).maybeSingle()
+  const { data: existing } = await existsQ
+
+  let data: any, error: any
+  if (existing?.id) {
+    ;({ data, error } = await admin.from('birim_fiyatlar').update(payload).eq('id', existing.id).select().single())
+  } else {
+    ;({ data, error } = await admin.from('birim_fiyatlar').insert(payload).select().single())
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true, data })
