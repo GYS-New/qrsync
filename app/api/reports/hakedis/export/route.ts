@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
   ]
 
   const buf = await wb.xlsx.writeBuffer()
-  return new NextResponse(buf as Buffer, {
+  return new NextResponse(buf as unknown as BodyInit, {
     headers: {
       'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'content-disposition': `attachment; filename=hakedis_raporu_${Date.now()}.xlsx`,
