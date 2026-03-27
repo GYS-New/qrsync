@@ -137,7 +137,10 @@ export async function GET(req: NextRequest) {
         lokasyon_id: l.id,
         lokasyon_tanim: l.tanim,
         ust_tanim: ust,
-        grup_adi: ef.grup_id ? (grupMap.get(ef.grup_id) ?? null) : null,
+        grup_adi: (() => {
+          const gid = ef.grup_id ?? lokGrupMap.get(l.id)?.[0]
+          return gid ? (grupMap.get(gid) ?? null) : null
+        })(),
         birim_fiyat: ef.fiyat,
         para_birimi: ef.para_birimi,
         fiyat_turu: ef.turu,
