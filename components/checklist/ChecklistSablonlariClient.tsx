@@ -32,6 +32,16 @@ type MaddeForm = {
   secenekler: string[]
 }
 
+type BaglaAsama = 'secim' | 'lokasyon' | 'grup'
+
+type LokasyonRow = {
+  id: string
+  tanim: string
+  parent_id: string | null
+  checklist_sablon_id: string | null
+  aktif: boolean
+}
+
 function emptyMadde(index: number): MaddeForm {
   return {
     localId: `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -72,6 +82,15 @@ export default function ChecklistSablonlariClient({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ baslik: '', tanim: '', aktif: true })
   const [maddeler, setMaddeler] = useState<MaddeForm[]>([emptyMadde(1)])
+
+  // ── Bağla popup state ─────────────────────────────────────────────────────
+  const [baglaInfo,    setBaglaInfo]    = useState<{ sablon: SablonOzet; asama: BaglaAsama } | null>(null)
+  const [baglaLokList, setBaglaLokList] = useState<LokasyonRow[]>([])
+  const [baglaLoading, setBaglaLoading] = useState(false)
+  const [secilenLok,   setSecilenLok]   = useState<Set<string>>(new Set())
+  const [secilenGrup,  setSecilenGrup]  = useState<string>('')
+  const [lokArama,     setLokArama]     = useState('')
+  const [lokUstFiltre, setLokUstFiltre] = useState('')
 
   function showError(message: string) {
     toast({ type: 'error', title: 'İşlem başarısız', message })
@@ -121,7 +140,7 @@ export default function ChecklistSablonlariClient({
     setSablonlar(
       sablonRows.map(row => ({
         ...row,
-        madde_sayisi: maddeCount[row.id] ?? 0,
+        madde_sayisi:    maddeCount[row.id]    ?? 0,
         kullanim_sayisi: lokasyonCount[row.id] ?? 0,
       }))
     )
@@ -136,12 +155,43 @@ export default function ChecklistSablonlariClient({
 
   const filtered = useMemo(() => {
     return sablonlar.filter(item => {
-      const matchesText = !q.trim() || `${item.baslik} ${item.tanim}`.toLowerCase().includes(q.trim().toLowerCase())
+      const matchesText  = !q.trim() || `${item.baslik} ${item.tanim}`.toLowerCase().includes(q.trim().toLowerCase())
       const matchesDurum = durum === 'tum' || (durum === 'aktif' ? item.aktif : !item.aktif)
       return matchesText && matchesDurum
     })
   }, [durum, q, sablonlar])
 
+  // ── Bağla türev veriler ───────────────────────────────────────────────────
+  const childrenByParent = useMemo(() => {
+    const m: Record<string, LokasyonRow[]> = {}
+    for (const l of baglaLokList) {
+      if (l.parent_id) {
+        if (!m[l.parent_id]) m[l.parent_id] = []
+        m[l.parent_id].push(l)
+      }
+    }
+    return m
+  }, [baglaLokList])
+
+  const ustLokasyonlar = useMemo(() => baglaLokList.filter(l => !l.parent_id), [baglaLokList])
+
+  const gruplar = useMemo(() =>
+    baglaLokList.filter(l => (childrenByParent[l.id]?.length ?? 0) > 0),
+    [baglaLokList, childrenByParent]
+  )
+
+  const filteredLokasyonlar = useMemo(() => baglaLokList.filter(l => {
+    if (lokUstFiltre && l.parent_id !== lokUstFiltre) return false
+    if (lokArama && !l.tanim.toLowerCase().includes(lokArama.toLowerCase())) return false
+    return true
+  }), [baglaLokList, lokUstFiltre, lokArama])
+
+  const filteredGruplar = useMemo(() =>
+    gruplar.filter(g => !lokUstFiltre || g.parent_id === lokUstFiltre),
+    [gruplar, lokUstFiltre]
+  )
+
+  // ── Form yardımcıları ─────────────────────────────────────────────────────
   function resetForm() {
     setEditingId(null)
     setForm({ baslik: '', tanim: '', aktif: true })
@@ -182,13 +232,13 @@ export default function ChecklistSablonlariClient({
     setEditingId(id)
     setForm({ baslik: sablon.baslik ?? '', tanim: sablon.tanim ?? '', aktif: !!sablon.aktif })
     const mapped = (((maddeRows as any[]) ?? []).map((row, index) => ({
-      id: row.id,
-      localId: row.id,
-      sira_no: row.sira_no ?? index + 1,
-      baslik: row.baslik ?? '',
-      zorunlu_cevap: row.zorunlu_cevap !== false,
+      id:                          row.id,
+      localId:                     row.id,
+      sira_no:                     row.sira_no ?? index + 1,
+      baslik:                      row.baslik ?? '',
+      zorunlu_cevap:               row.zorunlu_cevap !== false,
       aciklama_gerekli_yapilamadi: row.aciklama_gerekli_yapilamadi !== false,
-      gorsel_gerekli: !!row.gorsel_gerekli,
+      gorsel_gerekli:              !!row.gorsel_gerekli,
       secenekler: ((row.checklist_madde_secenekleri ?? []) as any[])
         .sort((a, b) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
         .map(opt => opt.deger)
@@ -208,9 +258,12 @@ export default function ChecklistSablonlariClient({
   }
 
   function removeMadde(localId: string) {
-    setMaddeler(prev => prev.filter(item => item.localId !== localId).map((item, index) => ({ ...item, sira_no: index + 1 })))
+    setMaddeler(prev =>
+      prev.filter(item => item.localId !== localId).map((item, index) => ({ ...item, sira_no: index + 1 }))
+    )
   }
 
+  // ── Kaydet ────────────────────────────────────────────────────────────────
   async function save() {
     if (!firmaId) return showError('Firma seçilmedi')
     if (!form.baslik.trim()) return showError('Başlık zorunludur')
@@ -219,14 +272,29 @@ export default function ChecklistSablonlariClient({
 
     const temizMaddeler = maddeler.map((item, index) => ({
       ...item,
-      sira_no: index + 1,
-      baslik: item.baslik.trim(),
+      sira_no:   index + 1,
+      baslik:    item.baslik.trim(),
       secenekler: item.secenekler.map(x => x.trim()).filter(Boolean),
     }))
 
     if (!temizMaddeler[0]?.baslik) return showError('Madde 1 zorunludur')
     if (temizMaddeler.some(item => item.baslik.length === 0)) return showError('Boş madde başlığı bırakılamaz')
     if (temizMaddeler.some(item => item.secenekler.length === 0)) return showError('Her madde için en az bir dropdown seçeneği girilmelidir')
+
+    // 15 — Bağlı lokasyonlara güncelleme uyarısı
+    if (editingId) {
+      const current = sablonlar.find(x => x.id === editingId)
+      if ((current?.kullanim_sayisi ?? 0) > 0) {
+        const ok = await confirm({
+          title: 'Şablonu Güncelle',
+          message: `Güncelleme bağlı olan tüm ${current!.kullanim_sayisi} lokasyona uygulanacak. Devam etmek istiyor musunuz?`,
+          confirmText: 'Tamam',
+          cancelText: 'İptal',
+          variant: 'danger',
+        })
+        if (!ok) return
+      }
+    }
 
     setLoading(true)
 
@@ -239,11 +307,11 @@ export default function ChecklistSablonlariClient({
       const { error } = await supabase
         .from('checklist_sablonlari')
         .update({
-          baslik: form.baslik.trim(),
-          tanim: form.tanim.trim(),
-          aktif: form.aktif,
-          versiyon: nextVersion,
-          guncelleme_tarihi: new Date().toISOString(),
+          baslik:             form.baslik.trim(),
+          tanim:              form.tanim.trim(),
+          aktif:              form.aktif,
+          versiyon:           nextVersion,
+          guncelleme_tarihi:  new Date().toISOString(),
         })
         .eq('id', editingId)
       if (error) {
@@ -252,8 +320,8 @@ export default function ChecklistSablonlariClient({
       }
 
       const { data: mevcutMaddeler } = await supabase.from('checklist_sablon_maddeleri').select('id').eq('sablon_id', editingId)
-      const mevcutIds = new Set(((mevcutMaddeler ?? []) as any[]).map(x => x.id))
-      const gelenIds = new Set(temizMaddeler.map(x => x.id).filter(Boolean) as string[])
+      const mevcutIds  = new Set(((mevcutMaddeler ?? []) as any[]).map(x => x.id))
+      const gelenIds   = new Set(temizMaddeler.map(x => x.id).filter(Boolean) as string[])
       const silinecekler = Array.from(mevcutIds).filter(id => !gelenIds.has(id))
 
       if (silinecekler.length) {
@@ -265,9 +333,9 @@ export default function ChecklistSablonlariClient({
         .from('checklist_sablonlari')
         .insert({
           firma_id: firmaId,
-          baslik: form.baslik.trim(),
-          tanim: form.tanim.trim(),
-          aktif: form.aktif,
+          baslik:   form.baslik.trim(),
+          tanim:    form.tanim.trim(),
+          aktif:    form.aktif,
           versiyon: 1,
           ...(projeId ? { proje_id: projeId } : {}),
         })
@@ -286,11 +354,11 @@ export default function ChecklistSablonlariClient({
         const { error } = await supabase
           .from('checklist_sablon_maddeleri')
           .update({
-            sira_no: item.sira_no,
-            baslik: item.baslik,
-            zorunlu_cevap: item.zorunlu_cevap,
+            sira_no:                     item.sira_no,
+            baslik:                      item.baslik,
+            zorunlu_cevap:               item.zorunlu_cevap,
             aciklama_gerekli_yapilamadi: item.aciklama_gerekli_yapilamadi,
-            gorsel_gerekli: item.gorsel_gerekli,
+            gorsel_gerekli:              item.gorsel_gerekli,
           })
           .eq('id', maddeId)
         if (error) {
@@ -302,12 +370,12 @@ export default function ChecklistSablonlariClient({
         const { data, error } = await supabase
           .from('checklist_sablon_maddeleri')
           .insert({
-            sablon_id: sablonId,
-            sira_no: item.sira_no,
-            baslik: item.baslik,
-            zorunlu_cevap: item.zorunlu_cevap,
+            sablon_id:                   sablonId,
+            sira_no:                     item.sira_no,
+            baslik:                      item.baslik,
+            zorunlu_cevap:               item.zorunlu_cevap,
             aciklama_gerekli_yapilamadi: item.aciklama_gerekli_yapilamadi,
-            gorsel_gerekli: item.gorsel_gerekli,
+            gorsel_gerekli:              item.gorsel_gerekli,
           })
           .select('id')
           .single()
@@ -333,18 +401,41 @@ export default function ChecklistSablonlariClient({
     setLoading(false)
   }
 
+  // ── Pasife Al / Aktifleştir — 12 ─────────────────────────────────────────
   async function toggleAktif(item: SablonOzet) {
-    setLoading(true)
-    const { error } = await supabase
-      .from('checklist_sablonlari')
-      .update({ aktif: !item.aktif, guncelleme_tarihi: new Date().toISOString() })
-      .eq('id', item.id)
-    if (error) showError(error.message)
-    else showSuccess(item.aktif ? 'Şablon pasife alındı.' : 'Şablon aktifleştirildi.')
+    if (item.aktif) {
+      const ok = await confirm({
+        title: 'Pasife Al',
+        message:
+          'Bu işlem şablonu tüm lokasyonlardan temizler. Emin misiniz?\n\n' +
+          'Çeklist şablonu aktife alınsa bile bu şablon sıfırlanmış olur. Aktif olmadan da tekrar kullanılamaz.',
+        confirmText: 'Pasife Al',
+        cancelText: 'İptal',
+        variant: 'danger',
+      })
+      if (!ok) return
+      setLoading(true)
+      await supabase.from('lokasyonlar').update({ checklist_sablon_id: null }).eq('checklist_sablon_id', item.id)
+      const { error } = await supabase
+        .from('checklist_sablonlari')
+        .update({ aktif: false, guncelleme_tarihi: new Date().toISOString() })
+        .eq('id', item.id)
+      if (error) showError(error.message)
+      else showSuccess('Şablon pasife alındı ve lokasyonlardan temizlendi.')
+    } else {
+      setLoading(true)
+      const { error } = await supabase
+        .from('checklist_sablonlari')
+        .update({ aktif: true, guncelleme_tarihi: new Date().toISOString() })
+        .eq('id', item.id)
+      if (error) showError(error.message)
+      else showSuccess('Şablon aktifleştirildi.')
+    }
     if (firmaId) await refresh(firmaId)
     setLoading(false)
   }
 
+  // ── Kopyala — 16 (projeId fix) ────────────────────────────────────────────
   async function duplicateItem(item: SablonOzet) {
     setLoading(true)
     const { data: maddeRows, error } = await supabase
@@ -360,11 +451,12 @@ export default function ChecklistSablonlariClient({
     const { data: yeni, error: yeniErr } = await supabase
       .from('checklist_sablonlari')
       .insert({
-        firma_id: item.firma_id,
-        baslik: `${item.baslik} (Kopya)`,
-        tanim: item.tanim,
-        aktif: false,
+        firma_id: firmaId ?? item.firma_id,
+        baslik:   `${item.baslik} (Kopya)`,
+        tanim:    item.tanim,
+        aktif:    false,
         versiyon: 1,
+        ...(projeId ? { proje_id: projeId } : {}),
       })
       .select('id')
       .single()
@@ -378,13 +470,13 @@ export default function ChecklistSablonlariClient({
       const { data: newItem, error: mErr } = await supabase
         .from('checklist_sablon_maddeleri')
         .insert({
-          sablon_id: yeni.id,
-          sira_no: row.sira_no,
-          baslik: row.baslik,
-          aciklama: null,
-          zorunlu_cevap: row.zorunlu_cevap,
+          sablon_id:                   yeni.id,
+          sira_no:                     row.sira_no,
+          baslik:                      row.baslik,
+          aciklama:                    null,
+          zorunlu_cevap:               row.zorunlu_cevap,
           aciklama_gerekli_yapilamadi: row.aciklama_gerekli_yapilamadi,
-          gorsel_gerekli: row.gorsel_gerekli,
+          gorsel_gerekli:              row.gorsel_gerekli,
         })
         .select('id')
         .single()
@@ -394,8 +486,8 @@ export default function ChecklistSablonlariClient({
       }
       const options = ((row.checklist_madde_secenekleri ?? []) as any[]).map((opt, index) => ({
         madde_id: newItem.id,
-        sira_no: index + 1,
-        deger: opt.deger,
+        sira_no:  index + 1,
+        deger:    opt.deger,
       }))
       if (options.length) {
         const { error: oErr } = await supabase.from('checklist_madde_secenekleri').insert(options)
@@ -411,20 +503,19 @@ export default function ChecklistSablonlariClient({
     setLoading(false)
   }
 
+  // ── Sil — 14 ─────────────────────────────────────────────────────────────
   async function deleteItem(item: SablonOzet) {
-    if ((item.kullanim_sayisi ?? 0) > 0) {
-      return showError('Bu şablon lokasyonlarda kullanılıyor. Önce pasife alın veya lokasyonlardan kaldırın.')
-    }
     const ok = await confirm({
-      title: 'Şablon Sil',
-      message: 'Bu şablon kalıcı olarak silinecek. Emin misiniz?',
+      title:       'Şablon Sil',
+      message:     'Bu çeklist tüm lokasyonlardan temizlenecek ve kalıcı olarak silinecek. Emin misiniz?',
       confirmText: 'Sil',
-      cancelText: 'İptal',
-      variant: 'danger',
+      cancelText:  'İptal',
+      variant:     'danger',
     })
     if (!ok) return
 
     setLoading(true)
+    await supabase.from('lokasyonlar').update({ checklist_sablon_id: null }).eq('checklist_sablon_id', item.id)
     const { data: itemRows } = await supabase.from('checklist_sablon_maddeleri').select('id').eq('sablon_id', item.id)
     const ids = ((itemRows ?? []) as any[]).map(x => x.id)
     if (ids.length) {
@@ -438,6 +529,68 @@ export default function ChecklistSablonlariClient({
     setLoading(false)
   }
 
+  // ── Bağla — 13 ───────────────────────────────────────────────────────────
+  async function openBagla(sablon: SablonOzet) {
+    setBaglaLoading(true)
+    setBaglaInfo({ sablon, asama: 'secim' })
+    setSecilenLok(new Set())
+    setSecilenGrup('')
+    setLokArama('')
+    setLokUstFiltre('')
+    const fid = firmaId ?? sablon.firma_id
+    let q = supabase
+      .from('lokasyonlar')
+      .select('id, tanim, parent_id, checklist_sablon_id, aktif')
+      .eq('firma_id', fid)
+      .eq('aktif', true)
+      .order('tanim')
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    const { data } = await q
+    setBaglaLokList((data ?? []) as LokasyonRow[])
+    setBaglaLoading(false)
+  }
+
+  async function baglayiKaydet() {
+    if (!baglaInfo) return
+    if (baglaInfo.asama === 'lokasyon') {
+      const ids = Array.from(secilenLok)
+      if (ids.length === 0) return showError('En az bir lokasyon seçin')
+      setLoading(true)
+      const { error } = await supabase
+        .from('lokasyonlar')
+        .update({ checklist_sablon_id: baglaInfo.sablon.id })
+        .in('id', ids)
+      if (error) showError(error.message)
+      else showSuccess(`${ids.length} lokasyona bağlandı.`)
+    } else if (baglaInfo.asama === 'grup') {
+      if (!secilenGrup) return showError('Bir grup seçin')
+      const children = baglaLokList.filter(l => l.parent_id === secilenGrup)
+      if (children.length === 0) return showError('Bu grubun lokasyonu yok')
+      setLoading(true)
+      const { error } = await supabase
+        .from('lokasyonlar')
+        .update({ checklist_sablon_id: baglaInfo.sablon.id })
+        .in('id', children.map(c => c.id))
+      if (error) showError(error.message)
+      else showSuccess(`${children.length} lokasyona bağlandı.`)
+    }
+    setBaglaInfo(null)
+    setSecilenLok(new Set())
+    setSecilenGrup('')
+    if (firmaId) await refresh(firmaId)
+    setLoading(false)
+  }
+
+  function toggleLokSec(id: string) {
+    setSecilenLok(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ padding: '24px 28px' }}>
       <div className="verde-card">
@@ -481,13 +634,27 @@ export default function ChecklistSablonlariClient({
                       <td style={{ padding: '12px 8px' }}>{item.kullanim_sayisi ?? 0}</td>
                       <td style={{ padding: '12px 8px' }}>v{item.versiyon ?? 1}</td>
                       <td style={{ padding: '12px 8px' }}>
-                        <span style={{ display: 'inline-flex', padding: '4px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: item.aktif ? '#ecfdf3' : '#fff7ed', color: item.aktif ? '#166534' : '#b45309', border: item.aktif ? '1px solid #bbf7d0' : '1px solid #fed7aa' }}>{item.aktif ? 'Aktif' : 'Pasif'}</span>
+                        <span style={{
+                          display: 'inline-flex', padding: '4px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+                          background: item.aktif ? '#ecfdf3' : '#fff7ed',
+                          color:      item.aktif ? '#166534'  : '#b45309',
+                          border:     item.aktif ? '1px solid #bbf7d0' : '1px solid #fed7aa',
+                        }}>{item.aktif ? 'Aktif' : 'Pasif'}</span>
                       </td>
-                      <td style={{ padding: '12px 8px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <RowActionButton onClick={() => openEdit(item.id)}>Düzenle</RowActionButton>
-                        <RowActionButton variant="success" onClick={() => duplicateItem(item)}>Kopyala</RowActionButton>
-                        <RowActionButton variant="warning" onClick={() => toggleAktif(item)}>{item.aktif ? 'Pasife Al' : 'Aktifleştir'}</RowActionButton>
-                        <RowActionButton variant="danger" onClick={() => deleteItem(item)}>Sil</RowActionButton>
+                      <td style={{ padding: '12px 8px' }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <RowActionButton onClick={() => openEdit(item.id)}>Düzenle</RowActionButton>
+                          <RowActionButton variant="success" onClick={() => duplicateItem(item)}>Kopyala</RowActionButton>
+                          {!readonly && (
+                            <RowActionButton onClick={() => openBagla(item)}>Bağla</RowActionButton>
+                          )}
+                          <RowActionButton variant="warning" onClick={() => toggleAktif(item)}>
+                            {item.aktif ? 'Pasife Al' : 'Aktifleştir'}
+                          </RowActionButton>
+                          {!readonly && (
+                            <RowActionButton variant="danger" onClick={() => deleteItem(item)}>Sil</RowActionButton>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -501,6 +668,7 @@ export default function ChecklistSablonlariClient({
         )}
       </div>
 
+      {/* ── Şablon Form Modalı ── */}
       {openForm && !readonly && (
         <div onClick={() => setOpenForm(false)} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.42)', overflowY: 'auto', padding: '40px 20px' }}>
           <div className="verde-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 980, margin: '0 auto', overflow: 'hidden' }}>
@@ -570,7 +738,7 @@ export default function ChecklistSablonlariClient({
                           </select>
                         </div>
                         <div>
-                          <label className="verde-label">“Yapılamadı” seçilince açıklama</label>
+                          <label className="verde-label">"Yapılamadı" seçilince açıklama</label>
                           <select className="verde-input" value={madde.aciklama_gerekli_yapilamadi ? 'zorunlu' : 'opsiyonel'} onChange={e => updateMadde(madde.localId, { aciklama_gerekli_yapilamadi: e.target.value === 'zorunlu' })}>
                             <option value="zorunlu">Zorunlu</option>
                             <option value="opsiyonel">İsteğe Bağlı</option>
@@ -613,6 +781,157 @@ export default function ChecklistSablonlariClient({
                 <Button variant="primary" onClick={save} disabled={loading}>{loading ? 'Kaydediliyor…' : 'Kaydet'}</Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bağla Modalı ── */}
+      {baglaInfo && (
+        <div
+          onClick={() => setBaglaInfo(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(0,0,0,0.42)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div
+            className="verde-card"
+            onClick={e => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 560, maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+            {/* Modal başlık */}
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#102110' }}>
+                  {baglaInfo.asama === 'secim'   && 'Şablonu Bağla'}
+                  {baglaInfo.asama === 'lokasyon' && 'Lokasyon Seç'}
+                  {baglaInfo.asama === 'grup'     && 'Lokasyon Grubu Seç'}
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7f6b', marginTop: 2 }}>{baglaInfo.sablon.baslik}</div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setBaglaInfo(null)}>✕</Button>
+            </div>
+
+            {baglaLoading ? (
+              <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Lokasyonlar yükleniyor…</div>
+            ) : (
+              <>
+                {/* ── Seçim aşaması ── */}
+                {baglaInfo.asama === 'secim' && (
+                  <div style={{ padding: 28, display: 'flex', gap: 16 }}>
+                    <button
+                      onClick={() => { setBaglaInfo(prev => prev ? { ...prev, asama: 'lokasyon' } : null); setLokUstFiltre(''); setLokArama('') }}
+                      style={{ flex: 1, padding: '20px 14px', borderRadius: 12, border: '2px solid #d6e4d6', background: '#f0f9f0', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: '#1f6b1f', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 30 }}>📍</span>
+                      Lokasyona Bağla
+                      <span style={{ fontSize: 11, fontWeight: 400, color: '#6b7f6b', textAlign: 'center' }}>Birden fazla lokasyon seçin</span>
+                    </button>
+                    <button
+                      onClick={() => { setBaglaInfo(prev => prev ? { ...prev, asama: 'grup' } : null); setLokUstFiltre('') }}
+                      style={{ flex: 1, padding: '20px 14px', borderRadius: 12, border: '2px solid #d6e4d6', background: '#f0f9f0', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: '#1f6b1f', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 30 }}>🗂️</span>
+                      Lokasyon Grubuna Bağla
+                      <span style={{ fontSize: 11, fontWeight: 400, color: '#6b7f6b', textAlign: 'center' }}>Grup altındaki tüm lokasyonlar</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* ── Lokasyon seçim aşaması ── */}
+                {baglaInfo.asama === 'lokasyon' && (
+                  <>
+                    <div style={{ padding: '12px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+                      <select
+                        value={lokUstFiltre}
+                        onChange={e => { setLokUstFiltre(e.target.value); setSecilenLok(new Set()) }}
+                        style={{ height: 32, padding: '0 8px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, minWidth: 140 }}>
+                        <option value="">Tüm Üst Lokasyonlar</option>
+                        {ustLokasyonlar.map(l => (
+                          <option key={l.id} value={l.id}>{l.tanim}</option>
+                        ))}
+                      </select>
+                      <input
+                        placeholder="Lokasyon ara…"
+                        value={lokArama}
+                        onChange={e => setLokArama(e.target.value)}
+                        style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, flex: 1, minWidth: 120 }}
+                      />
+                    </div>
+                    <div style={{ overflowY: 'auto', flex: 1 }}>
+                      {filteredLokasyonlar.length === 0 ? (
+                        <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Lokasyon bulunamadı</div>
+                      ) : filteredLokasyonlar.map(l => {
+                        const ustAdi     = l.parent_id ? baglaLokList.find(x => x.id === l.parent_id)?.tanim : null
+                        const zatenBagli = l.checklist_sablon_id === baglaInfo.sablon.id
+                        const baskaBagli = !!l.checklist_sablon_id && l.checklist_sablon_id !== baglaInfo.sablon.id
+                        return (
+                          <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', cursor: 'pointer', background: secilenLok.has(l.id) ? '#f0fdf4' : 'transparent', borderBottom: '1px solid #f1f5f1' }}>
+                            <input type="checkbox" checked={secilenLok.has(l.id)} onChange={() => toggleLokSec(l.id)} style={{ width: 16, height: 16, flexShrink: 0 }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: '#102110' }}>
+                                {ustAdi ? <span style={{ color: '#6b7f6b' }}>{ustAdi} / </span> : null}{l.tanim}
+                              </div>
+                              {zatenBagli && <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>✓ Bu şablona zaten bağlı</div>}
+                              {baskaBagli && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>⚠ Başka bir şablona bağlı</div>}
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <div style={{ padding: '12px 18px', borderTop: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, color: '#64748b' }}>{secilenLok.size} lokasyon seçili</span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Button variant="ghost" size="sm" onClick={() => setBaglaInfo(prev => prev ? { ...prev, asama: 'secim' } : null)}>← Geri</Button>
+                        <Button variant="primary" size="sm" onClick={baglayiKaydet} disabled={secilenLok.size === 0 || loading}>
+                          {loading ? 'Bağlanıyor…' : `Bağla (${secilenLok.size})`}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ── Grup seçim aşaması ── */}
+                {baglaInfo.asama === 'grup' && (
+                  <>
+                    <div style={{ padding: '12px 18px', borderBottom: '1px solid #e8f0e8', flexShrink: 0 }}>
+                      <select
+                        value={lokUstFiltre}
+                        onChange={e => { setLokUstFiltre(e.target.value); setSecilenGrup('') }}
+                        style={{ height: 32, padding: '0 8px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, width: '100%' }}>
+                        <option value="">Tüm Üst Lokasyonlar</option>
+                        {ustLokasyonlar.map(l => (
+                          <option key={l.id} value={l.id}>{l.tanim}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ overflowY: 'auto', flex: 1 }}>
+                      {filteredGruplar.length === 0 ? (
+                        <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Grup bulunamadı</div>
+                      ) : filteredGruplar.map(g => {
+                        const children = childrenByParent[g.id] ?? []
+                        return (
+                          <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', cursor: 'pointer', background: secilenGrup === g.id ? '#f0fdf4' : 'transparent', borderBottom: '1px solid #f1f5f1' }}>
+                            <input type="radio" name="grup" checked={secilenGrup === g.id} onChange={() => setSecilenGrup(g.id)} style={{ width: 16, height: 16, flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: '#102110' }}>{g.tanim}</div>
+                              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{children.length} lokasyon</div>
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <div style={{ padding: '12px 18px', borderTop: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, color: '#64748b' }}>
+                        {secilenGrup
+                          ? `${childrenByParent[secilenGrup]?.length ?? 0} lokasyon bağlanacak`
+                          : 'Bir grup seçin'}
+                      </span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Button variant="ghost" size="sm" onClick={() => setBaglaInfo(prev => prev ? { ...prev, asama: 'secim' } : null)}>← Geri</Button>
+                        <Button variant="primary" size="sm" onClick={baglayiKaydet} disabled={!secilenGrup || loading}>
+                          {loading ? 'Bağlanıyor…' : 'Bağla'}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
