@@ -31,6 +31,7 @@ export type Sonuc = {
 export type ChecklistData = {
   gorev: { id: string; tanim: string; durum: string; tamamlanma_tarihi: string | null; atanan: string | null }
   lokasyon: string
+  lokasyon_id?: string | null
   sablon: { baslik: string; tanim: string } | null
   sonuclar: Sonuc[]
   mesaj?: string
@@ -186,6 +187,35 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
   // Düzenleme state: madde_id → { secenek, not }
   const [cevaplar, setCevaplar] = useState<Record<string, { secenek: string; not: string }>>({})
   const [eksikIds, setEksikIds] = useState<Set<string>>(new Set())
+  // Fotoğraf upload state: madde_id → { url, uploading }
+  const [gorselState, setGorselState] = useState<Record<string, { url: string; uploading: boolean }>>({})
+
+  function updateGorsel(maddeId: string, patch: { url?: string; uploading?: boolean }) {
+    setGorselState(prev => ({
+      ...prev,
+      [maddeId]: { url: prev[maddeId]?.url ?? '', uploading: prev[maddeId]?.uploading ?? false, ...patch },
+    }))
+  }
+
+  async function uploadGorselWeb(maddeId: string, file: File | null) {
+    if (!file || !data) return
+    updateGorsel(maddeId, { uploading: true })
+    try {
+      const formData = new FormData()
+      formData.set('file', file)
+      formData.set('taskId', taskId)
+      formData.set('maddeId', maddeId)
+      formData.set('lokasyonId', data.lokasyon_id ?? '')
+      formData.set('kanal', 'WEB')
+      const res  = await fetch('/api/upload/checklist', { method: 'POST', body: formData })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Görsel yükleme başarısız')
+      updateGorsel(maddeId, { url: json.publicUrl || '', uploading: false })
+    } catch (e: any) {
+      updateGorsel(maddeId, { uploading: false })
+      setHata(e.message)
+    }
+  }
 
   function loadData() {
     setLoading(true); setHata(null)
@@ -196,10 +226,13 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
         setData(j)
         // Mevcut cevapları düzenleme state'e yükle
         const init: Record<string, { secenek: string; not: string }> = {}
+        const gorselInit: Record<string, { url: string; uploading: boolean }> = {}
         for (const s of j.sonuclar ?? []) {
           init[s.madde_id] = { secenek: s.secenek ?? '', not: s.not ?? '' }
+          gorselInit[s.madde_id] = { url: s.gorsel_url ?? '', uploading: false }
         }
         setCevaplar(init)
+        setGorselState(gorselInit)
       })
       .catch(e => setHata(e.message))
       .finally(() => setLoading(false))
@@ -213,10 +246,11 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
     // Validasyon
     const yeniEksik = new Set<string>()
     for (const s of data.sonuclar) {
-      const cv = cevaplar[s.madde_id]
+      const cv  = cevaplar[s.madde_id]
+      const url = gorselState[s.madde_id]?.url || s.gorsel_url
       const dolu = !!(cv?.secenek || cv?.not)
       if (s.zorunlu && !dolu) yeniEksik.add(s.madde_id)
-      if (s.gorsel_gerekli && !s.gorsel_url) yeniEksik.add(s.madde_id)
+      if (s.gorsel_gerekli && !url) yeniEksik.add(s.madde_id)
     }
     if (yeniEksik.size > 0) {
       setEksikIds(yeniEksik)
@@ -232,6 +266,7 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
         madde_id:       s.madde_id,
         secenek_degeri: cevaplar[s.madde_id]?.secenek || null,
         aciklama:       cevaplar[s.madde_id]?.not || null,
+        gorsel_url:     gorselState[s.madde_id]?.url || s.gorsel_url || null,
       }))
       const res = await fetch('/api/checklist-results', {
         method: 'POST',
@@ -297,53 +332,96 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 4 }}>📋 {data.sablon.baslik}</div>
               )}
               {data.sonuclar.map((s, i) => {
-                const cv = cevaplar[s.madde_id] ?? { secenek: '', not: '' }
-                const dolu = !!(cv.secenek || cv.not)
-                const eksik = eksikIds.has(s.madde_id)
+                const cv     = cevaplar[s.madde_id] ?? { secenek: '', not: '' }
+                const gs     = gorselState[s.madde_id]
+                const gorsel = gs?.url || s.gorsel_url || ''
+                const dolu   = !!(cv.secenek || cv.not)
+                const eksik  = eksikIds.has(s.madde_id)
+                const labelS: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }
+                const opsStr = <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, color: '#94a3b8' }}> (isteğe bağlı)</span>
                 return (
-                  <div key={s.madde_id} style={{ border: `2px solid ${eksik ? '#dc2626' : dolu ? '#bbf7d0' : s.zorunlu ? '#fecaca' : '#e2e8f0'}`, borderRadius: 10, padding: '12px 14px', background: eksik ? '#fff5f5' : dolu ? '#f0fdf4' : '#fff' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                      {dolu ? <CheckCircle size={15} color="#16a34a" /> : <Minus size={15} color="#94a3b8" />}
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', flex: 1 }}>
-                        {s.sira}. {s.madde}
-                      </span>
+                  <div key={s.madde_id} style={{
+                    border: `2px solid ${eksik ? '#dc2626' : dolu || gorsel ? '#bbf7d0' : s.zorunlu ? '#fecaca' : '#e2e8f0'}`,
+                    borderRadius: 10, padding: '14px 16px',
+                    background: eksik ? '#fff5f5' : dolu || gorsel ? '#f0fdf4' : '#fff',
+                  }}>
+                    {/* Başlık */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                      {dolu || gorsel ? <CheckCircle size={15} color="#16a34a" /> : <Minus size={15} color="#94a3b8" />}
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', flex: 1 }}>{s.sira}. {s.madde}</span>
                       {s.zorunlu && (
                         <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: 4 }}>Zorunlu</span>
                       )}
-                      {s.gorsel_gerekli && !s.gorsel_url && (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#d97706', background: '#fef3c7', padding: '1px 6px', borderRadius: 4 }}>📷 Fotoğraf gerekli</span>
+                      {s.gorsel_gerekli && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#d97706', background: '#fef3c7', padding: '1px 6px', borderRadius: 4 }}>📷{gorsel ? ' ✓' : ' Gerekli'}</span>
                       )}
                     </div>
 
-                    {/* Seçenek */}
-                    {s.secenekler && s.secenekler.length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-                        {s.secenekler.map(sec => (
-                          <button key={sec} type="button"
-                            onClick={() => setCevaplar(prev => ({ ...prev, [s.madde_id]: { ...cv, secenek: cv.secenek === sec ? '' : sec } }))}
-                            style={{ padding: '5px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `2px solid ${cv.secenek === sec ? '#1d4ed8' : '#e2e8f0'}`, background: cv.secenek === sec ? '#dbeafe' : '#f8fafc', color: cv.secenek === sec ? '#1d4ed8' : '#475569', transition: 'all 0.1s' }}>
-                            {sec}
-                          </button>
-                        ))}
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      {/* Seçenek */}
+                      <div>
+                        <label style={labelS}>Cevap {s.zorunlu ? <span style={{ color: '#dc2626' }}>*</span> : opsStr}</label>
+                        {s.secenekler && s.secenekler.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {s.secenekler.map(sec => (
+                              <button key={sec} type="button"
+                                onClick={() => { setCevaplar(prev => ({ ...prev, [s.madde_id]: { ...cv, secenek: cv.secenek === sec ? '' : sec } })); setEksikIds(prev => { const n = new Set(prev); n.delete(s.madde_id); return n }) }}
+                                style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `2px solid ${cv.secenek === sec ? '#1d4ed8' : '#e2e8f0'}`, background: cv.secenek === sec ? '#dbeafe' : '#f8fafc', color: cv.secenek === sec ? '#1d4ed8' : '#475569', transition: 'all 0.1s' }}>
+                                {sec}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <input type="text" placeholder="Cevap girin…" value={cv.secenek}
+                            onChange={e => { setCevaplar(prev => ({ ...prev, [s.madde_id]: { ...cv, secenek: e.target.value } })); setEksikIds(prev => { const n = new Set(prev); n.delete(s.madde_id); return n }) }}
+                            style={{ width: '100%', height: 36, padding: '0 10px', borderRadius: 7, border: `1px solid ${eksik && s.zorunlu && !cv.secenek ? '#dc2626' : '#e2e8f0'}`, fontSize: 13, boxSizing: 'border-box' }}
+                          />
+                        )}
                       </div>
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="Cevap girin…"
-                        value={cv.secenek}
-                        onChange={e => setCevaplar(prev => ({ ...prev, [s.madde_id]: { ...cv, secenek: e.target.value } }))}
-                        style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 7, border: '1px solid #e2e8f0', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }}
-                      />
-                    )}
 
-                    {/* Not */}
-                    <textarea
-                      placeholder="Not (isteğe bağlı)…"
-                      value={cv.not}
-                      rows={2}
-                      onChange={e => setCevaplar(prev => ({ ...prev, [s.madde_id]: { ...cv, not: e.target.value } }))}
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid #e2e8f0', fontSize: 12.5, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', color: '#475569' }}
-                    />
+                      {/* Not */}
+                      <div>
+                        <label style={labelS}>Açıklama / Not {opsStr}</label>
+                        <textarea placeholder="Not ekleyin…" value={cv.not} rows={2}
+                          onChange={e => setCevaplar(prev => ({ ...prev, [s.madde_id]: { ...cv, not: e.target.value } }))}
+                          style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid #e2e8f0', fontSize: 12.5, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', color: '#475569' }}
+                        />
+                      </div>
+
+                      {/* Fotoğraf */}
+                      <div>
+                        <label style={labelS}>Fotoğraf {s.gorsel_gerekli ? <span style={{ color: '#dc2626' }}>*</span> : opsStr}</label>
+                        {gs?.uploading ? (
+                          <div style={{ padding: '14px', background: '#f0f9f0', border: '2px dashed #d6e4d6', borderRadius: 8, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
+                            <RefreshCw size={16} style={{ animation: 'spin 0.9s linear infinite', marginBottom: 4, display: 'block', margin: '0 auto 4px' }} />
+                            Yükleniyor…
+                          </div>
+                        ) : gorsel ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: 8 }}>
+                            <img src={gorsel} alt="görsel" onClick={() => {}} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid #bbf7d0', flexShrink: 0, cursor: 'zoom-in' }} />
+                            <div>
+                              <div style={{ fontSize: 12, color: '#1f6b1f', fontWeight: 700 }}>✓ Fotoğraf mevcut</div>
+                              <button type="button" onClick={() => updateGorsel(s.madde_id, { url: '' })}
+                                style={{ marginTop: 4, fontSize: 11, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 5, cursor: 'pointer', padding: '1px 8px', fontWeight: 600 }}>
+                                Kaldır
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label style={{
+                            display: 'block', border: `2px dashed ${eksik && s.gorsel_gerekli ? '#dc2626' : '#d6e4d6'}`,
+                            borderRadius: 8, padding: '16px', textAlign: 'center', cursor: 'pointer',
+                            background: eksik && s.gorsel_gerekli ? '#fff5f5' : '#f9fcf9',
+                          }}>
+                            <div style={{ fontSize: 26, marginBottom: 4 }}>📷</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#1f6b1f' }}>Fotoğraf Ekle</div>
+                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Dosya seçmek için tıkla</div>
+                            <input type="file" accept="image/*" style={{ display: 'none' }}
+                              onChange={e => void uploadGorselWeb(s.madde_id, e.target.files?.[0] ?? null)} />
+                          </label>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )
               })}

@@ -64,7 +64,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         gorev: { id: gorev.id, tanim: gorev.tanim, durum: gorev.durum, tamamlanma_tarihi: gorev.tamamlanma_tarihi, atanan: null },
-        lokasyon: lok?.tanim ?? '—',
+        lokasyon:    lok?.tanim ?? '—',
+        lokasyon_id: lok?.id ?? null,
         sablon: null,
         sonuclar: [],
         mesaj: 'Bu lokasyona bağlı çeklist şablonu yok',
@@ -135,7 +136,8 @@ export async function GET(req: NextRequest) {
         id: gorev.id, tanim: gorev.tanim, durum: gorev.durum,
         tamamlanma_tarihi: gorev.tamamlanma_tarihi, atanan: yapanAdi,
       },
-      lokasyon: lok?.tanim ?? '—',
+      lokasyon:    lok?.tanim ?? '—',
+      lokasyon_id: lok?.id ?? null,
       sablon: sablonRow ? { baslik: (sablonRow as any).baslik, tanim: (sablonRow as any).tanim } : null,
       sonuclar: birlesik,
     })
@@ -160,7 +162,7 @@ export async function POST(req: NextRequest) {
     const { task_id, task_type, maddeler } = body as {
       task_id: string
       task_type: 'gorevler' | 'canli_gorevler'
-      maddeler: { madde_id: string; secenek_degeri: string | null; aciklama: string | null }[]
+      maddeler: { madde_id: string; secenek_degeri: string | null; aciklama: string | null; gorsel_url?: string | null }[]
     }
     if (!task_id || !task_type) return NextResponse.json({ error: 'task_id ve task_type gerekli' }, { status: 400 })
 
@@ -238,7 +240,7 @@ export async function POST(req: NextRequest) {
 
     await admin.from('checklist_sonuc_maddeleri').delete().eq('sonuc_id', sonucId)
 
-    const doldurulanlar = maddeler.filter(m => m.secenek_degeri || m.aciklama || gorselMap.has(m.madde_id))
+    const doldurulanlar = maddeler.filter(m => m.secenek_degeri || m.aciklama || m.gorsel_url || gorselMap.has(m.madde_id))
     if (doldurulanlar.length > 0) {
       const { error: maddeErr } = await admin.from('checklist_sonuc_maddeleri').insert(
         doldurulanlar.map(m => ({
@@ -246,7 +248,7 @@ export async function POST(req: NextRequest) {
           madde_id:       m.madde_id,
           secenek_degeri: m.secenek_degeri || null,
           aciklama:       m.aciklama?.trim() || null,
-          gorsel_url:     gorselMap.get(m.madde_id) ?? null,
+          gorsel_url:     m.gorsel_url !== undefined ? (m.gorsel_url || null) : (gorselMap.get(m.madde_id) ?? null),
         }))
       )
       if (maddeErr) return NextResponse.json({ error: maddeErr.message }, { status: 500 })

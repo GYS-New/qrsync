@@ -80,6 +80,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
   const [message, setMessage] = useState('Yükleniyor…')
   const [error, setError] = useState('')
   const [completed, setCompleted] = useState(false)
+  const [eksikMaddeler, setEksikMaddeler] = useState<Set<string>>(new Set())
 
   function showError(msg: string) {
     setError(msg)
@@ -322,19 +323,31 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
 
   function validateChecklist(): string | null {
     if (!sablon) return null
+    const eksik = new Set<string>()
+    let ilkHata: string | null = null
     for (const madde of sablon.maddeler) {
       const cevap = cevaplar[madde.id]
+      let maddeEksik = false
       if (madde.zorunlu_cevap && !cevap?.secenek) {
-        return `${madde.sira_no}. madde için cevap seçmelisiniz`
+        if (!ilkHata) ilkHata = `${madde.sira_no}. madde için cevap seçmelisiniz`
+        maddeEksik = true
       }
-      if (cevap?.secenek && isYapilamadi(cevap.secenek) && madde.aciklama_gerekli_yapilamadi && !cevap.aciklama.trim()) {
-        return `${madde.sira_no}. madde için açıklama zorunlu`
+      if (cevap?.secenek && isYapilamadi(cevap.secenek) && madde.aciklama_gerekli_yapilamadi && !cevap.aciklama?.trim()) {
+        if (!ilkHata) ilkHata = `${madde.sira_no}. madde için açıklama zorunlu`
+        maddeEksik = true
       }
       if (madde.gorsel_gerekli && !cevap?.gorselUrl) {
-        return `${madde.sira_no}. madde için görsel zorunlu`
+        if (!ilkHata) ilkHata = `${madde.sira_no}. madde için fotoğraf zorunlu`
+        maddeEksik = true
       }
+      if (maddeEksik) eksik.add(madde.id)
     }
-    return null
+    setEksikMaddeler(eksik)
+    return ilkHata
+  }
+
+  function temizleEksik(maddeId: string) {
+    setEksikMaddeler(prev => { const s = new Set(prev); s.delete(maddeId); return s })
   }
 
   function formatDuration(seconds?: number | null) {
@@ -538,21 +551,53 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                   {sablon.maddeler.map(madde => {
                     const cevap = cevaplar[madde.id] ?? { secenek: '', aciklama: '', gorselUrl: '', uploading: false }
                     const yapilamadi = isYapilamadi(cevap.secenek)
+                    const aciklamaZorunlu = yapilamadi && madde.aciklama_gerekli_yapilamadi
+                    const eksik = eksikMaddeler.has(madde.id)
+
+                    const labelStyle: React.CSSProperties = {
+                      fontSize: 11, fontWeight: 700, color: '#64748b',
+                      textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6,
+                    }
+                    const opsStr = <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, color: '#94a3b8', fontSize: 11 }}> (isteğe bağlı)</span>
+
                     return (
-                      <div key={madde.id} style={{ border: '1px solid #e8f0e8', borderRadius: 10, padding: 14 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
-                          <div>
-                            <div style={{ fontWeight: 700 }}>{madde.sira_no}. {madde.baslik}</div>
+                      <div key={madde.id} style={{
+                        border: `2px solid ${eksik ? '#dc2626' : cevap.secenek ? '#bbf7d0' : '#e2e8f0'}`,
+                        borderRadius: 12, padding: 16,
+                        background: eksik ? '#fff5f5' : '#fff',
+                        transition: 'border-color 0.2s',
+                      }}>
+                        {/* Başlık + rozetler */}
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 14 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: '#0f1a0f', lineHeight: 1.4, flex: 1 }}>
+                            {madde.sira_no}. {madde.baslik}
                           </div>
-                          <div style={{ fontSize: 11, color: '#6f846f', whiteSpace: 'nowrap' }}>
-                            {madde.zorunlu_cevap ? 'Cevap zorunlu' : 'Cevap opsiyonel'}
+                          <div style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {madde.zorunlu_cevap && (
+                              <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '2px 7px', borderRadius: 4 }}>Zorunlu</span>
+                            )}
+                            {madde.gorsel_gerekli && (
+                              <span style={{ fontSize: 10, fontWeight: 700, color: '#d97706', background: '#fef3c7', padding: '2px 7px', borderRadius: 4 }}>📷 Fotoğraf</span>
+                            )}
                           </div>
                         </div>
 
-                        <div style={{ display: 'grid', gap: 10 }}>
+                        <div style={{ display: 'grid', gap: 14 }}>
+                          {/* Cevap seçimi */}
                           <div>
-                            <label className="verde-label">Kullanıcı cevabı</label>
-                            <select className="verde-input" value={cevap.secenek} onChange={e => updateCevap(madde.id, { secenek: e.target.value })}>
+                            <label style={labelStyle}>
+                              Cevap {madde.zorunlu_cevap ? <span style={{ color: '#dc2626' }}>*</span> : opsStr}
+                            </label>
+                            <select
+                              value={cevap.secenek}
+                              onChange={e => { updateCevap(madde.id, { secenek: e.target.value }); temizleEksik(madde.id) }}
+                              style={{
+                                width: '100%', height: 46, padding: '0 12px', borderRadius: 10,
+                                border: `2px solid ${eksik && madde.zorunlu_cevap && !cevap.secenek ? '#dc2626' : '#e2e8f0'}`,
+                                fontSize: 15, background: '#fff', color: cevap.secenek ? '#0f1a0f' : '#9ca3af',
+                                boxSizing: 'border-box',
+                              }}
+                            >
                               <option value="">Seçiniz…</option>
                               {madde.secenekler.map(opt => (
                                 <option key={opt.id || opt.deger} value={opt.deger}>{opt.deger}</option>
@@ -560,34 +605,65 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                             </select>
                           </div>
 
-                          {(yapilamadi || !madde.zorunlu_cevap) && (
-                            <div>
-                              <label className="verde-label">Açıklama {yapilamadi && madde.aciklama_gerekli_yapilamadi ? '*' : ''}</label>
-                              <textarea
-                                className="verde-input"
-                                rows={3}
-                                value={cevap.aciklama}
-                                onChange={e => updateCevap(madde.id, { aciklama: e.target.value })}
-                                placeholder={yapilamadi ? 'Neden yapılamadığını yazın' : 'İsteğe bağlı açıklama'}
-                              />
-                            </div>
-                          )}
-
+                          {/* Açıklama — her zaman görünür */}
                           <div>
-                            <label className="verde-label">Fotoğraf çek {madde.gorsel_gerekli ? '*' : ''}</label>
-                            <input
-                              className="verde-input"
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              onChange={e => void uploadGorsel(madde.id, e.target.files?.[0] ?? null)}
+                            <label style={labelStyle}>
+                              Açıklama {aciklamaZorunlu ? <span style={{ color: '#dc2626' }}>*</span> : opsStr}
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={cevap.aciklama}
+                              onChange={e => { updateCevap(madde.id, { aciklama: e.target.value }); temizleEksik(madde.id) }}
+                              placeholder={yapilamadi ? 'Neden yapılamadığını yazın…' : 'Not ekleyin (isteğe bağlı)…'}
+                              style={{
+                                width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 14,
+                                border: `2px solid ${eksik && aciklamaZorunlu && !cevap.aciklama?.trim() ? '#dc2626' : '#e2e8f0'}`,
+                                resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: 1.5,
+                              }}
                             />
-                            <div style={{ marginTop: 6, fontSize: 12, color: '#6f846f' }}>
-                              {cevap.uploading ? 'Yükleniyor…' : cevap.gorselUrl ? 'Fotoğraf yüklendi' : 'Fotoğraf çekmek isteğe bağlı'}
-                            </div>
-                            {cevap.gorselUrl ? (
-                              <a href={cevap.gorselUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#166534' }}>Yüklenen görseli aç</a>
-                            ) : null}
+                          </div>
+
+                          {/* Fotoğraf — mobil uyumlu label butonu */}
+                          <div>
+                            <label style={labelStyle}>
+                              Fotoğraf {madde.gorsel_gerekli ? <span style={{ color: '#dc2626' }}>*</span> : opsStr}
+                            </label>
+                            {cevap.uploading ? (
+                              <div style={{ padding: '18px', background: '#f0f9f0', border: '2px dashed #d6e4d6', borderRadius: 10, textAlign: 'center', color: '#6f846f', fontSize: 13 }}>
+                                <div style={{ fontSize: 20, marginBottom: 4 }}>⏳</div>
+                                Yükleniyor…
+                              </div>
+                            ) : cevap.gorselUrl ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: 10 }}>
+                                <img src={cevap.gorselUrl} alt="çekildi"
+                                  style={{ width: 68, height: 68, objectFit: 'cover', borderRadius: 8, border: '2px solid #bbf7d0', flexShrink: 0 }} />
+                                <div>
+                                  <div style={{ fontSize: 13, color: '#1f6b1f', fontWeight: 700 }}>✓ Fotoğraf yüklendi</div>
+                                  <button type="button" onClick={() => { updateCevap(madde.id, { gorselUrl: '' }); temizleEksik(madde.id) }}
+                                    style={{ marginTop: 6, fontSize: 12, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer', padding: '2px 10px', fontWeight: 600 }}>
+                                    Kaldır
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <label style={{
+                                display: 'block', border: `2px dashed ${eksik && madde.gorsel_gerekli ? '#dc2626' : '#d6e4d6'}`,
+                                borderRadius: 12, padding: '22px 16px', textAlign: 'center', cursor: 'pointer',
+                                background: eksik && madde.gorsel_gerekli ? '#fff5f5' : '#f9fcf9',
+                                WebkitTapHighlightColor: 'rgba(0,0,0,0.05)',
+                              }}>
+                                <div style={{ fontSize: 34, marginBottom: 6 }}>📷</div>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: '#1f6b1f' }}>Fotoğraf Çek / Seç</div>
+                                <div style={{ fontSize: 12, color: '#6f846f', marginTop: 3 }}>Kameradan çek veya galeriden seç</div>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  style={{ display: 'none' }}
+                                  onChange={e => { void uploadGorsel(madde.id, e.target.files?.[0] ?? null); temizleEksik(madde.id) }}
+                                />
+                              </label>
+                            )}
                           </div>
                         </div>
                       </div>
