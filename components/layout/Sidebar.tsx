@@ -163,7 +163,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, birimFiya
 
   // SA ve TA her ikisi de ProjeContext + FirmaContext kullanır
   const { aktifProje } = useProje()
-  const { firmaId: saFirmaId } = useFirma()
+  const { firmaId: saFirmaId, firmalar } = useFirma()
 
   const [counts, setCounts] = useState<SidebarCounts | null>(null)
   const [countsError, setCountsError] = useState(false)
@@ -189,7 +189,11 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, birimFiya
       .catch(() => {})
   }, [isUOrM])
 
-  const birimFiyatAktif = aktifProje?.birim_fiyat_aktif === true || birimFiyatAktifProp === true
+  // SA: firma bazlı kontrol (FirmaContext); TA/U: layout'tan server-side geçilir
+  const aktifFirma = isSA ? firmalar.find(f => f.id === saFirmaId) : null
+  const birimFiyatAktif = isSA
+    ? aktifFirma?.birim_fiyat_aktif === true
+    : birimFiyatAktifProp === true
 
   // Fetch sidebar badge counts
   useEffect(() => {

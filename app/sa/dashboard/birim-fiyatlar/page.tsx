@@ -30,19 +30,6 @@ export default async function SABirimFiyatlarPage() {
     )
   }
 
-  if (!aktifProje.birim_fiyat_aktif) {
-    return (
-      <div>
-        <Topbar title="Birim Fiyatlar" base="/sa" breadcrumbs={[{ label: 'Birim Fiyatlar' }]} />
-        <div style={{ padding: '48px 28px', textAlign: 'center', color: '#7a907a' }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>💰</div>
-          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Birim Fiyat Sistemi Pasif</div>
-          <div style={{ fontSize: 13 }}>Bu proje için birim fiyat sistemi aktif değil. Proje ayarlarından etkinleştirilebilir.</div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <Topbar title="Birim Fiyatlar" base="/sa" breadcrumbs={[{ label: 'Birim Fiyatlar' }]} />
