@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     const deviceToken = req.headers.get('X-Device-Token')
     if (!deviceToken) {
       return NextResponse.json(
-        { ok: false, error: 'X-Device-Token gerekli', kod: 'ESLESMEDI' },
+        { ok: false, error: 'X-Device-Token gerekli' },
         { status: 401, headers: CORS }
       )
     }
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
     if (tokenErr || !tokenData) {
       return NextResponse.json(
-        { ok: false, error: 'Geçersiz veya eşleştirilmemiş cihaz', kod: 'ESLESMEDI' },
+        { ok: false, error: 'Geçersiz veya eşleştirilmemiş cihaz' },
         { status: 401, headers: CORS }
       )
     }
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
 
     if (!qr) {
       return NextResponse.json(
-        { ok: false, error: 'Geçersiz mesai kodu' },
+        { ok: false, error: 'Geçersiz mesai kodu', durum: 'mesai_kodu_degil' },
         { status: 404, headers: CORS }
       )
     }
