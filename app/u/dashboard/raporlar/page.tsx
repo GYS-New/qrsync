@@ -49,11 +49,25 @@ export default async function URaporlarPage() {
     }
   }
 
-  // Müşteri değerlendirme yetki kontrolü
-  const musteriGorebilir = await sayfaGorebilirMi(me.rol, 'musteri-degerlendirme', (me as any).firma_id ?? null)
-  if (!musteriGorebilir) {
-    initialRaporTurleri = initialRaporTurleri.filter((r) => r.id !== 'musteri_degerlendirme')
+  // Rapor bazlı yetki filtresi
+  const RAPOR_YETKI_MAP: Record<string, string> = {
+    ham_veri: 'ham-veri-raporlari',
+    grafiksel: 'grafiksel-raporlar',
+    ceklist: 'ceklist-raporlari',
+    rapor_ozellestir: 'rapor-ozellestir',
+    sure_analiz: 'sure-analiz-raporlari',
+    musteri_degerlendirme: 'musteri-degerlendirme',
+    hakedis: 'hakedis-raporu',
   }
+  const raporYetkiSonuclari = await Promise.all(
+    initialRaporTurleri.map(async r => ({
+      ...r,
+      gorebilir: RAPOR_YETKI_MAP[r.id]
+        ? await sayfaGorebilirMi(me.rol, RAPOR_YETKI_MAP[r.id], (me as any).firma_id ?? null)
+        : true,
+    }))
+  )
+  initialRaporTurleri = raporYetkiSonuclari.filter(r => r.gorebilir)
 
   // Süre analiz kartı için süreli görev durumu
   let sureliGorevAktif: boolean | undefined = undefined

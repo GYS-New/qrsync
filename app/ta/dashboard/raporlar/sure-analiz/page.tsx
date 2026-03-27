@@ -4,6 +4,7 @@ import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import Topbar from '@/components/layout/Topbar'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import SureAnalizClient from '@/components/reports/SureAnalizClient'
+import { sayfaGorebilirMi } from '@/lib/yetki/sayfaYetkisi'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -15,6 +16,7 @@ export default async function TASureAnalizPage() {
   if (!authUser) redirect('/login')
   const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', authUser.id).single()
   if (!me || me.rol !== 'tenant_admin') redirect('/ta/dashboard')
+  if (!await sayfaGorebilirMi(me.rol, 'sure-analiz-raporlari', me.firma_id ?? null)) redirect('/ta/dashboard/raporlar')
   const aktifProje = await getAktifProje(me?.firma_id ?? null)
   if (!aktifProje) return (
     <div>
