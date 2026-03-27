@@ -11,20 +11,29 @@ const ROLLER = [
 ]
 
 const SAYFALAR = [
+  // Yönetim
   { kod: 'firmalar',              label: 'Firmalar',                   grup: 'Yönetim' },
   { kod: 'projeler',              label: 'Projeler',                   grup: 'Yönetim' },
   { kod: 'kullanicilar',          label: 'Kullanıcılar',               grup: 'Yönetim' },
   { kod: 'lokasyonlar',           label: 'Lokasyonlar',                grup: 'Yönetim' },
   { kod: 'lokasyon-gruplari',     label: 'Lokasyon Grupları',          grup: 'Yönetim' },
+  { kod: 'birim-fiyatlar',        label: 'Birim Fiyatlar',             grup: 'Yönetim' },
+  // Görevler
   { kod: 'gorevler',              label: 'Spesifik Görevler',          grup: 'Görevler' },
-  { kod: 'checklist-sablonlari',  label: 'Checklist Şablonları',       grup: 'Görevler' },
   { kod: 'canli-islemler',        label: 'Frekansiyel Görevler',       grup: 'Görevler' },
   { kod: 'tum-gorevler',          label: 'Tüm Görevler',               grup: 'Görevler' },
+  { kod: 'checklist-sablonlari',  label: 'Checklist Şablonları',       grup: 'Görevler' },
   { kod: 'arsiv',                 label: 'Arşiv',                      grup: 'Görevler' },
-  { kod: 'personel-takibi',       label: 'Personel Takibi',            grup: 'Raporlama' },
-  { kod: 'raporlar',              label: 'Raporlar',                   grup: 'Raporlama' },
+  // Raporlama
   { kod: 'musteri-degerlendirme', label: 'Müşteri Değerlendirmeleri',  grup: 'Raporlama' },
-  { kod: 'birim-fiyatlar',       label: 'Birim Fiyatlar',             grup: 'Raporlama' },
+  { kod: 'personel-takibi',       label: 'Personel Takibi',            grup: 'Raporlama' },
+  // Raporlar
+  { kod: 'ham-veri-raporlari',    label: 'Ham Veri Raporları',         grup: 'Raporlar' },
+  { kod: 'grafiksel-raporlar',    label: 'Grafiksel Raporlar',         grup: 'Raporlar' },
+  { kod: 'ceklist-raporlari',     label: 'Checklist Raporları',        grup: 'Raporlar' },
+  { kod: 'rapor-ozellestir',      label: 'Rapor Özelleştir',           grup: 'Raporlar' },
+  { kod: 'sure-analiz-raporlari', label: 'Süre Analiz Raporları',      grup: 'Raporlar' },
+  { kod: 'hakedis-raporu',        label: 'Hakediş Raporu',             grup: 'Raporlar' },
 ]
 
 const YETKILER = [
