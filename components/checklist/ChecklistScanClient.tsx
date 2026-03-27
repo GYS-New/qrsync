@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -81,6 +81,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
   const [error, setError] = useState('')
   const [completed, setCompleted] = useState(false)
   const [eksikMaddeler, setEksikMaddeler] = useState<Set<string>>(new Set())
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   function showError(msg: string) {
     setError(msg)
@@ -623,11 +624,19 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                             />
                           </div>
 
-                          {/* Fotoğraf — mobil uyumlu label butonu */}
+                          {/* Fotoğraf — ref tabanlı mobil uyumlu buton */}
                           <div>
-                            <label style={labelStyle}>
+                            <div style={labelStyle}>
                               Fotoğraf {madde.gorsel_gerekli ? <span style={{ color: '#dc2626' }}>*</span> : opsStr}
-                            </label>
+                            </div>
+                            {/* Gizli file input — her madde için ayrı ref */}
+                            <input
+                              ref={el => { fileInputRefs.current[madde.id] = el }}
+                              type="file"
+                              accept="image/*"
+                              style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }}
+                              onChange={e => { void uploadGorsel(madde.id, e.target.files?.[0] ?? null); temizleEksik(madde.id) }}
+                            />
                             {cevap.uploading ? (
                               <div style={{ padding: '18px', background: '#f0f9f0', border: '2px dashed #d6e4d6', borderRadius: 10, textAlign: 'center', color: '#6f846f', fontSize: 13 }}>
                                 <div style={{ fontSize: 20, marginBottom: 4 }}>⏳</div>
@@ -646,23 +655,20 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                                 </div>
                               </div>
                             ) : (
-                              <label style={{
-                                display: 'block', border: `2px dashed ${eksik && madde.gorsel_gerekli ? '#dc2626' : '#d6e4d6'}`,
-                                borderRadius: 12, padding: '22px 16px', textAlign: 'center', cursor: 'pointer',
-                                background: eksik && madde.gorsel_gerekli ? '#fff5f5' : '#f9fcf9',
-                                WebkitTapHighlightColor: 'rgba(0,0,0,0.05)',
-                              }}>
+                              <button
+                                type="button"
+                                onClick={() => fileInputRefs.current[madde.id]?.click()}
+                                style={{
+                                  display: 'block', width: '100%', border: `2px dashed ${eksik && madde.gorsel_gerekli ? '#dc2626' : '#d6e4d6'}`,
+                                  borderRadius: 12, padding: '22px 16px', textAlign: 'center', cursor: 'pointer',
+                                  background: eksik && madde.gorsel_gerekli ? '#fff5f5' : '#f9fcf9',
+                                  WebkitTapHighlightColor: 'rgba(0,0,0,0.05)',
+                                }}
+                              >
                                 <div style={{ fontSize: 34, marginBottom: 6 }}>📷</div>
                                 <div style={{ fontSize: 14, fontWeight: 700, color: '#1f6b1f' }}>Fotoğraf Çek / Seç</div>
                                 <div style={{ fontSize: 12, color: '#6f846f', marginTop: 3 }}>Kameradan çek veya galeriden seç</div>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  capture="environment"
-                                  style={{ display: 'none' }}
-                                  onChange={e => { void uploadGorsel(madde.id, e.target.files?.[0] ?? null); temizleEksik(madde.id) }}
-                                />
-                              </label>
+                              </button>
                             )}
                           </div>
                         </div>
