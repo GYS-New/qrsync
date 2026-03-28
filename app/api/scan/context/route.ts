@@ -108,9 +108,15 @@ export async function GET(req: NextRequest) {
             zorunlu_cevap:                row.zorunlu_cevap !== false,
             aciklama_gerekli_yapilamadi:  row.aciklama_gerekli_yapilamadi !== false,
             gorsel_gerekli:               !!row.gorsel_gerekli,
-            secenekler: ((row.checklist_madde_secenekleri ?? []) as any[])
-              .sort((a: any, b: any) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
-              .map((opt: any) => ({ id: opt.id, deger: opt.deger, sira_no: opt.sira_no ?? 0, aciklama_gerekli: opt.aciklama_gerekli === true })),
+            secenekler: (() => {
+              const opts = ((row.checklist_madde_secenekleri ?? []) as any[])
+                .sort((a: any, b: any) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
+                .map((opt: any) => ({ id: opt.id, deger: opt.deger, sira_no: opt.sira_no ?? 0, aciklama_gerekli: opt.aciklama_gerekli === true }))
+              return opts.length > 0 ? opts : [
+                { id: '', deger: 'EVET', sira_no: 1, aciklama_gerekli: false },
+                { id: '', deger: 'HAYIR', sira_no: 2, aciklama_gerekli: false },
+              ]
+            })(),
           })),
         }
       }

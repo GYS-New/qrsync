@@ -1,23 +1,17 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
 
 type Kanal = 'QR' | 'NFC'
 
-type Kullanici = { id: string; isim_soyisim?: string | null; firma_id?: string | null; rol?: string | null }
+type Kullanici = { id: string; isim_soyisim?: string | null; firma_id?: string | null }
 type Lokasyon = {
   id: string
   firma_id: string
   tanim: string
-  aktif?: boolean | null
-  qr_veri?: string | null
-  qr_id?: string | null
-  nfc_token?: string | null
-  checklist_sablon_id?: string | null
-  sureli_gorev_aktif?: boolean | null
+  sureli_gorev_aktif: boolean
   aciklama?: string | null
 }
 
@@ -33,14 +27,15 @@ type GorevOzet = {
   tamamlanma_suresi_saniye?: number | null
 }
 
+type Secenek = { id: string; deger: string; sira_no: number; aciklama_gerekli: boolean }
+
 type Madde = {
   id: string
   sira_no: number
   baslik: string
   zorunlu_cevap: boolean
-  aciklama_gerekli_yapilamadi: boolean
   gorsel_gerekli: boolean
-  secenekler: { id: string; deger: string; sira_no: number; aciklama_gerekli: boolean }[]
+  secenekler: Secenek[]
 }
 
 type Sablon = {
@@ -58,26 +53,25 @@ type CevapState = {
   uploading: boolean
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
+const BOSH_CEVAP: CevapState = { secenek: '', aciklama: '', gorselUrl: '', uploading: false }
 
 export default function ChecklistScanClient({ token, kanal }: { token: string; kanal: Kanal }) {
-  const supabase = createClient()
   const { toast } = useToast()
 
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]       = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [me, setMe] = useState<Kullanici | null>(null)
-  const [lokasyon, setLokasyon] = useState<Lokasyon | null>(null)
-  const [gorevler, setGorevler] = useState<GorevOzet[]>([])
+  const [me, setMe]                 = useState<Kullanici | null>(null)
+  const [lokasyon, setLokasyon]     = useState<Lokasyon | null>(null)
+  const [gorevler, setGorevler]     = useState<GorevOzet[]>([])
   const [selectedTaskId, setSelectedTaskId] = useState<string>('')
-  const [sablon, setSablon] = useState<Sablon | null>(null)
-  const [cevaplar, setCevaplar] = useState<Record<string, CevapState>>({})
-  const [message, setMessage] = useState('Yükleniyor…')
-  const [error, setError] = useState('')
-  const [completed, setCompleted] = useState(false)
+  const [sablon, setSablon]         = useState<Sablon | null>(null)
+  const [cevaplar, setCevaplar]     = useState<Record<string, CevapState>>({})
+  const [message, setMessage]       = useState('Yükleniyor…')
+  const [error, setError]           = useState('')
+  const [completed, setCompleted]   = useState(false)
   const [eksikMaddeler, setEksikMaddeler] = useState<Set<string>>(new Set())
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const autoCompleteStarted = useRef(false)
 
   function showError(msg: string) {
     setError(msg)
@@ -88,18 +82,15 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
     toast({ type: 'success', title: 'Başarılı', message: msg })
   }
 
-  const selectedTask = useMemo(() => gorevler.find(x => x.id === selectedTaskId) ?? null, [gorevler, selectedTaskId])
+  const selectedTask  = useMemo(() => gorevler.find(x => x.id === selectedTaskId) ?? null, [gorevler, selectedTaskId])
   const timedTaskEnabled = !!lokasyon?.sureli_gorev_aktif
-
-  useEffect(() => {
-    void init()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, kanal])
+  const canAutoComplete  = !timedTaskEnabled && !sablon && gorevler.length === 1 && !!selectedTask
 
   async function init() {
     setLoading(true)
     setError('')
     setCompleted(false)
+    autoCompleteStarted.current = false
     setMessage('Bağlanıyor…')
 
     try {
@@ -107,8 +98,8 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
       const json = await res.json()
 
       if (!json.ok) {
-        setLoading(false)
         setError(json.error ?? 'Yüklenemedi')
+        setLoading(false)
         return
       }
 
@@ -116,7 +107,6 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
 
       setMe(kullanici)
       setLokasyon(loc)
-      // DB'den gelen baslatilma_tarihi null ise local state'deki değeri koru (tekrar yüklemede kayıp olmasın)
       setGorevler(prev => {
         const prevMap = Object.fromEntries(prev.map(t => [t.id, t]))
         return (tasks as GorevOzet[]).map(t => {
@@ -129,170 +119,95 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
       })
 
       if (tasks.length === 0) {
-        setLoading(false)
         setError('Tamamlanabilir görev bulunamadı')
+        setLoading(false)
         return
       }
 
       setSelectedTaskId(tasks[0].id)
 
       if (loadedSablon) {
-        setSablon(loadedSablon)
+        const maddeler: Madde[] = (loadedSablon.maddeler ?? []).map((m: any) => ({
+          id:            m.id,
+          sira_no:       m.sira_no ?? 0,
+          baslik:        m.baslik ?? '',
+          zorunlu_cevap: m.zorunlu_cevap !== false,
+          gorsel_gerekli: !!m.gorsel_gerekli,
+          secenekler: Array.isArray(m.secenekler) && m.secenekler.length > 0
+            ? m.secenekler
+            : [{ id: '', deger: 'EVET', sira_no: 1, aciklama_gerekli: false }, { id: '', deger: 'HAYIR', sira_no: 2, aciklama_gerekli: false }],
+        }))
+        const safeSablon: Sablon = {
+          id:       loadedSablon.id,
+          baslik:   loadedSablon.baslik ?? '',
+          tanim:    loadedSablon.tanim ?? '',
+          versiyon: loadedSablon.versiyon ?? 1,
+          maddeler,
+        }
+        setSablon(safeSablon)
         const initialAnswers: Record<string, CevapState> = {}
-        for (const madde of loadedSablon.maddeler) {
-          initialAnswers[madde.id] = { secenek: '', aciklama: '', gorselUrl: '', uploading: false }
+        for (const madde of maddeler) {
+          initialAnswers[madde.id] = { ...BOSH_CEVAP }
         }
         setCevaplar(initialAnswers)
+      } else {
+        setSablon(null)
+        setCevaplar({})
       }
 
       setLoading(false)
     } catch (err: any) {
-      setLoading(false)
       setError(err?.message ?? 'Bağlantı hatası')
+      setLoading(false)
     }
   }
 
-  async function findLokasyon(scanToken: string, currentKanal: Kanal): Promise<Lokasyon | null> {
-    if (currentKanal === 'NFC') {
-      const { data } = await supabase.from('lokasyonlar').select('*').eq('nfc_token', scanToken).maybeSingle()
-      return (data as any) ?? null
-    }
+  useEffect(() => {
+    void init()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, kanal])
 
-    const { data: byQrVeri } = await supabase.from('lokasyonlar').select('*').eq('qr_veri', scanToken).maybeSingle()
-    if (byQrVeri) return byQrVeri as any
-
-    if (UUID_RE.test(scanToken)) {
-      const { data: byQrId } = await supabase.from('lokasyonlar').select('*').eq('qr_id', scanToken).maybeSingle()
-      if (byQrId) return byQrId as any
-    }
-
-    return null
-  }
-
-  async function validateFirma(firmaId: string, currentKanal: Kanal): Promise<{ ok: boolean; message: string }> {
-    const { data, error: firmaErr } = await supabase.from('firmalar').select('*').eq('id', firmaId).single()
-    if (firmaErr || !data) return { ok: false, message: firmaErr?.message ?? 'Firma bulunamadı' }
-
-    const firma: any = data
-    if (firma.aktif === false) return { ok: false, message: 'Firma aktif değil' }
-
-    const validUntil = firma.lisans_gecerlilik_tarihi ? new Date(firma.lisans_gecerlilik_tarihi) : null
-    if (validUntil && !Number.isNaN(validUntil.valueOf())) {
-      const now = new Date()
-      if (validUntil.getTime() < now.getTime()) {
-        return { ok: false, message: 'Firma lisansı aktif değil' }
+  // Auto-complete: only when there is no checklist and a single task
+  useEffect(() => {
+    if (loading || !canAutoComplete || completed || submitting) return
+    if (autoCompleteStarted.current) return
+    autoCompleteStarted.current = true
+    void (async () => {
+      if (!me || !lokasyon || !selectedTask) return
+      setSubmitting(true)
+      setError('')
+      try {
+        const res = await fetch('/api/scan/tamamla', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gorev_id:    selectedTask.id,
+            kaynak:      selectedTask.kaynak,
+            sablon_id:   null,
+            kanal,
+            lokasyon_id: lokasyon.id,
+            maddeler:    [],
+          }),
+        })
+        const json = await res.json()
+        if (!json.ok) throw new Error(json.error ?? 'Görev tamamlanamadı')
+        showSuccess(json.mesaj ?? 'Görev tamamlandı')
+        setGorevler([])
+        setCompleted(true)
+      } catch (err: any) {
+        showError(err?.message ?? 'Görev tamamlanamadı')
+        autoCompleteStarted.current = false
+      } finally {
+        setSubmitting(false)
       }
-    }
-
-    if (currentKanal === 'QR' && firma.qr_sistemi_aktif === false) return { ok: false, message: 'QR sistemi aktif değil' }
-    if (currentKanal === 'NFC' && firma.nfc_sistemi_aktif === false) return { ok: false, message: 'NFC sistemi aktif değil' }
-
-    return { ok: true, message: '' }
-  }
-
-  async function findTasks(lokasyonId: string, userId: string): Promise<GorevOzet[]> {
-    await fetch('/api/canli-gorevler/check', { cache: 'no-store' }).catch(() => null)
-
-    const [manualRes, liveRes] = await Promise.all([
-      supabase
-        .from('gorevler')
-        .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye')
-        .eq('lokasyon_id', lokasyonId)
-        .in('durum', ['ACIK', 'ISLEMDE'])
-        .order('olusturma_tarihi', { ascending: true }),
-      supabase
-        .from('canli_gorevler')
-        .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye')
-        .eq('lokasyon_id', lokasyonId)
-        .in('durum', ['ACIK', 'BEKLEMEDE', 'ISLEMDE'])
-        .order('olusturma_tarihi', { ascending: true }),
-    ])
-
-    const manual = ((manualRes.data ?? []) as any[])
-      .filter(task => !task.atanan_kullanici_id || task.atanan_kullanici_id === userId)
-      .map(task => ({
-        id: task.id,
-        kaynak: 'gorevler' as const,
-        tanim: task.tanim,
-        durum: task.durum,
-        atanan_kullanici_id: task.atanan_kullanici_id,
-        olusma: task.olusturma_tarihi,
-        baslatilma_tarihi: task.baslatilma_tarihi,
-        tamamlanma_tarihi: task.tamamlanma_tarihi,
-        tamamlanma_suresi_saniye: task.tamamlanma_suresi_saniye,
-      }))
-
-    const live = ((liveRes.data ?? []) as any[])
-      .filter(task => !task.atanan_kullanici_id || task.atanan_kullanici_id === userId)
-      .map(task => ({
-        id: task.id,
-        kaynak: 'canli_gorevler' as const,
-        tanim: task.tanim,
-        durum: task.durum,
-        atanan_kullanici_id: task.atanan_kullanici_id,
-        olusma: task.olusturma_tarihi,
-        baslatilma_tarihi: task.baslatilma_tarihi,
-        tamamlanma_tarihi: task.tamamlanma_tarihi,
-        tamamlanma_suresi_saniye: task.tamamlanma_suresi_saniye,
-      }))
-
-    return [...manual, ...live]
-  }
-
-  async function loadSablon(sablonId: string): Promise<Sablon | null> {
-    const { data: sablonRow, error: sErr } = await supabase
-      .from('checklist_sablonlari')
-      .select('id,baslik,tanim,versiyon')
-      .eq('id', sablonId)
-      .maybeSingle()
-
-    if (sErr || !sablonRow) {
-      showError(sErr?.message ?? 'Checklist şablonu bulunamadı')
-      return null
-    }
-
-    const { data: itemRows, error: iErr } = await supabase
-      .from('checklist_sablon_maddeleri')
-      .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli, checklist_madde_secenekleri(id,deger,sira_no,aciklama_gerekli)')
-      .eq('sablon_id', sablonId)
-      .order('sira_no', { ascending: true })
-
-    if (iErr) {
-      showError(iErr.message)
-      return null
-    }
-
-    const maddeler: Madde[] = ((itemRows ?? []) as any[]).map(row => ({
-      id: row.id,
-      sira_no: row.sira_no ?? 0,
-      baslik: row.baslik ?? '',
-      zorunlu_cevap: row.zorunlu_cevap !== false,
-      aciklama_gerekli_yapilamadi: row.aciklama_gerekli_yapilamadi !== false,
-      gorsel_gerekli: !!row.gorsel_gerekli,
-      secenekler: ((row.checklist_madde_secenekleri ?? []) as any[])
-        .sort((a, b) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
-        .map(opt => ({ id: opt.id, deger: opt.deger, sira_no: opt.sira_no ?? 0, aciklama_gerekli: opt.aciklama_gerekli === true })),
-    }))
-
-    return {
-      id: sablonRow.id,
-      baslik: (sablonRow as any).baslik,
-      tanim: (sablonRow as any).tanim,
-      versiyon: (sablonRow as any).versiyon ?? 1,
-      maddeler,
-    }
-  }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, canAutoComplete, completed, submitting])
 
   function updateCevap(maddeId: string, patch: Partial<CevapState>) {
     setCevaplar(prev => ({
       ...prev,
-      [maddeId]: {
-        secenek: prev[maddeId]?.secenek ?? '',
-        aciklama: prev[maddeId]?.aciklama ?? '',
-        gorselUrl: prev[maddeId]?.gorselUrl ?? '',
-        uploading: prev[maddeId]?.uploading ?? false,
-        ...patch,
-      },
+      [maddeId]: { ...(prev[maddeId] ?? BOSH_CEVAP), ...patch },
     }))
   }
 
@@ -306,8 +221,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
       formData.set('maddeId', maddeId)
       formData.set('lokasyonId', lokasyon.id)
       formData.set('kanal', kanal)
-
-      const res = await fetch('/api/upload/checklist', { method: 'POST', body: formData })
+      const res  = await fetch('/api/upload/checklist', { method: 'POST', body: formData })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Görsel yükleme başarısız')
       updateCevap(maddeId, { uploading: false, gorselUrl: json.publicUrl || '' })
@@ -323,18 +237,18 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
     const eksik = new Set<string>()
     let ilkHata: string | null = null
     for (const madde of sablon.maddeler) {
-      const cevap = cevaplar[madde.id]
+      const cevap = cevaplar[madde.id] ?? BOSH_CEVAP
       let maddeEksik = false
-      if (madde.zorunlu_cevap && !cevap?.secenek) {
+      if (madde.zorunlu_cevap && !cevap.secenek) {
         if (!ilkHata) ilkHata = `${madde.sira_no}. madde için cevap seçmelisiniz`
         maddeEksik = true
       }
-      const secilenOpt = madde.secenekler.find(s => s.deger === cevap?.secenek)
-      if (cevap?.secenek && secilenOpt?.aciklama_gerekli && !cevap.aciklama?.trim()) {
+      const secilenOpt = madde.secenekler.find(s => s.deger === cevap.secenek)
+      if (cevap.secenek && secilenOpt?.aciklama_gerekli && !cevap.aciklama?.trim()) {
         if (!ilkHata) ilkHata = `${madde.sira_no}. madde için açıklama zorunlu`
         maddeEksik = true
       }
-      if (madde.gorsel_gerekli && !cevap?.gorselUrl) {
+      if (madde.gorsel_gerekli && !cevap.gorselUrl) {
         if (!ilkHata) ilkHata = `${madde.sira_no}. madde için fotoğraf zorunlu`
         maddeEksik = true
       }
@@ -394,12 +308,11 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
     setError('')
 
     try {
-      // Çeklist cevaplarını hazırla
       const maddelerPayload = sablon ? sablon.maddeler.map(madde => ({
         madde_id:       madde.id,
-        secenek_degeri: cevaplar[madde.id]?.secenek || null,
-        aciklama:       cevaplar[madde.id]?.aciklama?.trim() || null,
-        gorsel_url:     cevaplar[madde.id]?.gorselUrl || null,
+        secenek_degeri: (cevaplar[madde.id] ?? BOSH_CEVAP).secenek || null,
+        aciklama:       (cevaplar[madde.id] ?? BOSH_CEVAP).aciklama?.trim() || null,
+        gorsel_url:     (cevaplar[madde.id] ?? BOSH_CEVAP).gorselUrl || null,
       })) : []
 
       const res = await fetch('/api/scan/tamamla', {
@@ -420,20 +333,16 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
 
       showSuccess(json.mesaj ?? 'Görev tamamlandı')
 
-      // Görev listesinden kaldır
       const remaining = gorevler.filter(x => x.id !== selectedTask.id)
       setGorevler(remaining)
       if (remaining.length > 0) {
         setSelectedTaskId(remaining[0].id)
         setCompleted(false)
-        // Yeni görev için çeklist cevaplarını sıfırla
-        setCevaplar(prev => {
+        if (sablon) {
           const fresh: Record<string, CevapState> = {}
-          if (sablon) {
-            for (const m of sablon.maddeler) fresh[m.id] = { secenek:'', aciklama:'', gorselUrl:'', uploading:false }
-          }
-          return fresh
-        })
+          for (const m of sablon.maddeler) fresh[m.id] = { ...BOSH_CEVAP }
+          setCevaplar(fresh)
+        }
       } else {
         setCompleted(true)
       }
@@ -444,15 +353,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
     }
   }
 
-  const canAutoComplete = !timedTaskEnabled && !sablon && gorevler.length === 1 && selectedTask
-
-  useEffect(() => {
-    if (!loading && canAutoComplete && !completed && !submitting) {
-      void completeSelectedTask()
-    }
-    // completeSelectedTask intentionally included — avoids stale closure on auto-complete
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, canAutoComplete, completed, submitting, completeSelectedTask])
+  /* ─────────────────────────── RENDER ─────────────────────────────── */
 
   return (
     <div style={{ maxWidth: 920, margin: '0 auto', padding: '24px 16px 40px' }}>
@@ -518,7 +419,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                 </div>
               </div>
             ) : (
-              /* ── Tek görev: sadece bilgi bandı ── */
+              /* ── Tek görev: bilgi bandı ── */
               <div style={{ padding: '12px 16px', background: '#f0f9f0', border: '1px solid #d6e4d6', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 800, fontSize: 15, color: '#0f1a0f' }}>{gorevler[0]?.tanim}</div>
@@ -547,7 +448,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
 
                 <div style={{ display: 'grid', gap: 14 }}>
                   {sablon.maddeler.map(madde => {
-                    const cevap = cevaplar[madde.id] ?? { secenek: '', aciklama: '', gorselUrl: '', uploading: false }
+                    const cevap = cevaplar[madde.id] ?? BOSH_CEVAP
                     const secilenOpt = madde.secenekler.find(s => s.deger === cevap.secenek)
                     const aciklamaZorunlu = !!(cevap.secenek && secilenOpt?.aciklama_gerekli)
                     const eksik = eksikMaddeler.has(madde.id)
@@ -597,13 +498,13 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                               }}
                             >
                               <option value="">Seçiniz…</option>
-                              {madde.secenekler.map(opt => (
-                                <option key={opt.id || opt.deger} value={opt.deger}>{opt.deger}</option>
+                              {madde.secenekler.map((opt, idx) => (
+                                <option key={opt.id || `${madde.id}-${idx}`} value={opt.deger}>{opt.deger}</option>
                               ))}
                             </select>
                           </div>
 
-                          {/* Açıklama — her zaman görünür */}
+                          {/* Açıklama */}
                           <div>
                             <label style={labelStyle}>
                               Açıklama {aciklamaZorunlu ? <span style={{ color: '#dc2626' }}>*</span> : opsStr}
@@ -621,12 +522,11 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                             />
                           </div>
 
-                          {/* Fotoğraf — ref tabanlı mobil uyumlu buton */}
+                          {/* Fotoğraf */}
                           <div>
                             <div style={labelStyle}>
                               Fotoğraf {madde.gorsel_gerekli ? <span style={{ color: '#dc2626' }}>*</span> : opsStr}
                             </div>
-                            {/* Gizli file input — her madde için ayrı ref */}
                             <input
                               ref={el => { fileInputRefs.current[madde.id] = el }}
                               type="file"
@@ -676,7 +576,10 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
               </div>
             ) : (
               <div className="verde-card" style={{ padding: 16, background: '#f9fcf9', color: '#6f846f' }}>
-                Bu lokasyona bağlı checklist şablonu yok. {timedTaskEnabled ? 'Süreli görev aktif olduğu için önce başlatıp sonra tamamlamalısınız.' : 'Tek görev varsa otomatik tamamlanır, birden fazla görev varsa seçim yaptıktan sonra tamamlayabilirsiniz.'}
+                Bu lokasyona bağlı checklist şablonu yok.{' '}
+                {timedTaskEnabled
+                  ? 'Süreli görev aktif olduğu için önce başlatıp sonra tamamlamalısınız.'
+                  : 'Tek görev varsa otomatik tamamlanır, birden fazla görev varsa seçim yaptıktan sonra tamamlayabilirsiniz.'}
               </div>
             )}
 
@@ -684,7 +587,9 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
               <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ fontSize: 12, color: '#6f846f' }}>
                   Mod: {timedTaskEnabled ? 'Süreli görev (Başlat → Tamamla)' : 'Tek adımda tamamlama'}
-                  {timedTaskEnabled && selectedTask?.baslatilma_tarihi ? ` · Geçen süre: ${formatDuration(Math.max(0, Math.floor((Date.now() - new Date(selectedTask.baslatilma_tarihi).getTime()) / 1000)))}` : ''}
+                  {timedTaskEnabled && selectedTask?.baslatilma_tarihi
+                    ? ` · Geçen süre: ${formatDuration(Math.max(0, Math.floor((Date.now() - new Date(selectedTask.baslatilma_tarihi).getTime()) / 1000)))}`
+                    : ''}
                 </div>
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                   <Button variant="ghost" onClick={() => void init()} disabled={loading || submitting}>↻ Yenile</Button>
