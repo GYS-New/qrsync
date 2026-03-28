@@ -163,6 +163,8 @@ export default function ChecklistSablonlariClient({
   }, [durum, q, sablonlar])
 
   // ── Bağla türev veriler ───────────────────────────────────────────────────
+
+  // parent_id → children haritası (tüm lista)
   const childrenByParent = useMemo(() => {
     const m: Record<string, LokasyonRow[]> = {}
     for (const l of baglaLokList) {
@@ -174,38 +176,44 @@ export default function ChecklistSablonlariClient({
     return m
   }, [baglaLokList])
 
-  // Aktif projenin lokasyonlarından hangi üst lokasyonların altında kayıt var?
-  const projeUstIdSet = useMemo(() => {
-    if (!projeId) return null // projeId yoksa tüm üstler
-    const set = new Set<string>()
-    for (const l of baglaLokList) {
-      if (l.proje_id === projeId && l.parent_id) set.add(l.parent_id)
-    }
-    return set
-  }, [baglaLokList, projeId])
-
-  const ustLokasyonlar = useMemo(() =>
-    baglaLokList.filter(l => {
-      if (l.parent_id) return false // sadece kök (üst) lokasyonlar
-      if (projeUstIdSet === null) return true
-      // Bu üst lokasyonun altında proje lokasyonu ya da grup var mı?
-      const directChildren = childrenByParent[l.id] ?? []
-      return projeUstIdSet.has(l.id) ||
-        directChildren.some(c => projeUstIdSet.has(c.id))
-    }),
-    [baglaLokList, childrenByParent, projeUstIdSet]
+  // ── LOKASYON EKRANI türevleri ─────────────────────────────────────────────
+  // Seçilebilecek lokasyonlar: projeId varsa sadece o projenin lokasyonları
+  const lokasyonListe = useMemo(() =>
+    baglaLokList.filter(l => !projeId || l.proje_id === projeId),
+    [baglaLokList, projeId]
   )
 
-  const gruplar = useMemo(() =>
-    baglaLokList.filter(l => l.parent_id !== null && (childrenByParent[l.id]?.length ?? 0) > 0),
-    [baglaLokList, childrenByParent]
-  )
+  // Lokasyon ekranı filtre seçenekleri: lokasyonListe'nin benzersiz parent'ları
+  const lokasyonUstFiltreler = useMemo(() => {
+    const parentIds = new Set(lokasyonListe.map(l => l.parent_id).filter(Boolean) as string[])
+    return baglaLokList.filter(l => parentIds.has(l.id))
+  }, [baglaLokList, lokasyonListe])
 
-  const filteredLokasyonlar = useMemo(() => baglaLokList.filter(l => {
+  const filteredLokasyonlar = useMemo(() => lokasyonListe.filter(l => {
     if (lokUstFiltre && l.parent_id !== lokUstFiltre) return false
     if (lokArama && !l.tanim.toLowerCase().includes(lokArama.toLowerCase())) return false
     return true
-  }), [baglaLokList, lokUstFiltre, lokArama])
+  }), [lokasyonListe, lokUstFiltre, lokArama])
+
+  // ── GRUP EKRANI türevleri ─────────────────────────────────────────────────
+  // Gruplar: parent_id'si olan ve kendisinin child'ları bulunan lokasyonlar
+  // projeId varsa: grubun proje_id'si eşleşmeli VEYA child'larından biri eşleşmeli
+  const gruplar = useMemo(() =>
+    baglaLokList.filter(l => {
+      if (!l.parent_id) return false
+      const children = childrenByParent[l.id] ?? []
+      if (children.length === 0) return false
+      if (!projeId) return true
+      return l.proje_id === projeId || children.some(c => c.proje_id === projeId)
+    }),
+    [baglaLokList, childrenByParent, projeId]
+  )
+
+  // Grup ekranı filtre seçenekleri: grupların benzersiz kök (parent_id=null) parent'ları
+  const grupUstFiltreler = useMemo(() => {
+    const parentIds = new Set(gruplar.map(g => g.parent_id).filter(Boolean) as string[])
+    return baglaLokList.filter(l => !l.parent_id && parentIds.has(l.id))
+  }, [baglaLokList, gruplar])
 
   const filteredGruplar = useMemo(() =>
     gruplar.filter(g => !lokUstFiltre || g.parent_id === lokUstFiltre),
@@ -862,7 +870,7 @@ export default function ChecklistSablonlariClient({
                         onChange={e => { setLokUstFiltre(e.target.value); setSecilenLok(new Set()) }}
                         style={{ height: 32, padding: '0 8px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, minWidth: 140 }}>
                         <option value="">Tüm Üst Lokasyonlar</option>
-                        {ustLokasyonlar.map(l => (
+                        {lokasyonUstFiltreler.map(l => (
                           <option key={l.id} value={l.id}>{l.tanim}</option>
                         ))}
                       </select>
@@ -915,7 +923,7 @@ export default function ChecklistSablonlariClient({
                         onChange={e => { setLokUstFiltre(e.target.value); setSecilenGrup('') }}
                         style={{ height: 32, padding: '0 8px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, width: '100%' }}>
                         <option value="">Tüm Üst Lokasyonlar</option>
-                        {ustLokasyonlar.map(l => (
+                        {grupUstFiltreler.map(l => (
                           <option key={l.id} value={l.id}>{l.tanim}</option>
                         ))}
                       </select>
