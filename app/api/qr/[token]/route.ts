@@ -101,9 +101,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
         return NextResponse.json({ ok: false, error: 'Görev bulunamadı veya erişim yok' }, { status: 404, headers: CORS_HEADERS })
       }
     }
-    if (context.checklistTemplate?.items?.length) {
-      const missingRequired = context.checklistTemplate.items.filter(
-        (item) => item.zorunlu && !checklistResults.some((r: any) => r?.itemId === item.id && r?.secenek)
+    if (context.checklistTemplate?.maddeler?.length) {
+      const missingRequired = context.checklistTemplate.maddeler.filter(
+        (madde) => madde.zorunlu_cevap && !checklistResults.some((r: any) => r?.itemId === madde.id && r?.secenek)
       )
       if (missingRequired.length) {
         return NextResponse.json({ ok: false, error: 'Zorunlu checklist maddeleri tamamlanmalı' }, { status: 400, headers: CORS_HEADERS })
@@ -129,7 +129,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
           sonuc_id:       sonucBaslik.id,
           madde_id:       r.itemId,
           secenek_degeri: r.secenek,
-          aciklama:       typeof r.not === 'string' && r.not.trim() ? r.not.trim() : null,
+          aciklama:       typeof r.aciklama === 'string' && r.aciklama.trim() ? r.aciklama.trim() : null,
           gorsel_url:     typeof r.gorsel_url === 'string' && r.gorsel_url ? r.gorsel_url : null,
         }))
       if (maddePayload.length) {

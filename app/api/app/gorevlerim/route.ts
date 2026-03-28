@@ -63,7 +63,7 @@ export async function GET(req: Request) {
           .select('id,baslik,versiyon')
           .in('id', sablonIdler),
         admin.from('checklist_sablon_maddeleri')
-          .select('id,sablon_id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli,checklist_madde_secenekleri(id,deger,sira_no)')
+          .select('id,sablon_id,sira_no,baslik,zorunlu_cevap,gorsel_gerekli,checklist_madde_secenekleri(id,deger,sira_no,aciklama_gerekli)')
           .in('sablon_id', sablonIdler)
           .order('sira_no', { ascending: true }),
       ])
@@ -80,15 +80,14 @@ export async function GET(req: Request) {
         const s = sablonMap.get(m.sablon_id)
         if (!s) continue
         s.maddeler.push({
-          id:                          m.id,
-          sira_no:                     m.sira_no ?? 0,
-          baslik:                      m.baslik ?? '',
-          zorunlu_cevap:               m.zorunlu_cevap !== false,
-          aciklama_gerekli_yapilamadi: m.aciklama_gerekli_yapilamadi !== false,
-          gorsel_gerekli:              !!m.gorsel_gerekli,
+          id:             m.id,
+          sira_no:        m.sira_no ?? 0,
+          baslik:         m.baslik ?? '',
+          zorunlu_cevap:  m.zorunlu_cevap !== false,
+          gorsel_gerekli: !!m.gorsel_gerekli,
           secenekler: ((m.checklist_madde_secenekleri ?? []) as any[])
             .sort((a: any, b: any) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
-            .map((o: any) => o.deger),
+            .map((o: any) => ({ deger: o.deger as string, aciklama_gerekli: o.aciklama_gerekli === true })),
         })
       }
     }

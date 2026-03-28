@@ -13,14 +13,27 @@ export type ScanTask = {
   baslatilma_tarihi?: string | null
 }
 
-export type ScanChecklistItem = {
+/** Tek bir çeklist maddesi — QR, NFC ve gorevlerim API'larında ortak format */
+export type ScanChecklistMadde = {
   id: string
-  sira: number
-  madde: string
-  zorunlu: boolean
+  sira_no: number
+  baslik: string
+  zorunlu_cevap: boolean
   gorsel_gerekli: boolean
+  /** Her seçenek için açıklama zorunluluğu burada taşınır */
   secenekler: { deger: string; aciklama_gerekli: boolean }[]
 }
+
+/** Çeklist şablonu — tüm API yanıtlarında ortak format */
+export type ScanChecklistTemplate = {
+  id: string
+  baslik: string
+  versiyon: number
+  maddeler: ScanChecklistMadde[]
+}
+
+// Geriye dönük uyumluluk için alias
+export type ScanChecklistItem = ScanChecklistMadde
 
 export type ScanContext = {
   kanal: CompletionChannel
@@ -37,11 +50,8 @@ export type ScanContext = {
     aktif: boolean
     sureli_gorev_aktif: boolean
   }
-  checklistTemplate: {
-    id: string
-    isim: string
-    items: ScanChecklistItem[]
-  } | null
+  /** Standart çeklist şablonu — null ise lokasyona şablon bağlı değil */
+  checklistTemplate: ScanChecklistTemplate | null
   tasks: ScanTask[]
 }
 
@@ -137,19 +147,22 @@ export async function resolveScanContext(opts: {
       if (itemsError) throw new Error(itemsError.message)
 
       checklistTemplate = {
-        id: (template as any).id,
-        isim: (template as any).baslik,
-        items: ((items as any[]) ?? []).map((item: any) => {
+        id:       (template as any).id,
+        baslik:   (template as any).baslik,
+        versiyon: (template as any).versiyon ?? 1,
+        maddeler: ((items as any[]) ?? []).map((item: any) => {
           const secenekler = ((item.checklist_madde_secenekleri ?? []) as any[])
             .sort((a: any, b: any) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
             .map((s: any) => ({ deger: s.deger as string, aciklama_gerekli: s.aciklama_gerekli === true }))
           return {
-            id: item.id,
-            sira: item.sira_no,
-            madde: item.baslik,
-            zorunlu: item.zorunlu_cevap !== false,
+            id:            item.id,
+            sira_no:       item.sira_no ?? 0,
+            baslik:        item.baslik ?? '',
+            zorunlu_cevap: item.zorunlu_cevap !== false,
             gorsel_gerekli: item.gorsel_gerekli === true,
-            secenekler: secenekler.length > 0 ? secenekler : [{ deger: 'EVET', aciklama_gerekli: false }, { deger: 'HAYIR', aciklama_gerekli: false }],
+            secenekler:    secenekler.length > 0
+              ? secenekler
+              : [{ deger: 'Yapıldı', aciklama_gerekli: false }, { deger: 'Yapılamadı', aciklama_gerekli: true }],
           }
         }),
       }
