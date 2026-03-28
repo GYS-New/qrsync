@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
     const tanimAra  = p.get('tanim')     ?? null
     const durumFil  = p.get('durum')     ?? null
     const gorevTipi = p.get('gorevTipi') ?? 'hepsi'
+    const kaynak    = p.get('kaynak')    ?? 'hepsi' // 'canli' | 'arsiv' | 'hepsi'
 
     if (!firmaId) return NextResponse.json({ error: 'Firma ID gerekli' }, { status: 400 })
 
@@ -117,16 +118,18 @@ export async function GET(req: NextRequest) {
       return Promise.resolve(q)
     }
 
+    // kaynak: 'canli' → sadece canli_gorevler + gorevler
+    //         'arsiv' → sadece canli_gorevler_arsiv
+    //         'hepsi' → tümü (varsayılan)
     const queries: Promise<any>[] = []
-    if (gorevTipi !== 'spesifik')    queries.push(buildQ('canli_gorevler'), buildQ('canli_gorevler_arsiv'))
-    if (gorevTipi !== 'frekansiyel') queries.push(buildQ('gorevler'))
+    const tables: string[] = []
+    if (kaynak !== 'arsiv' && gorevTipi !== 'spesifik')    { queries.push(buildQ('canli_gorevler')); tables.push('canli_gorevler') }
+    if (kaynak !== 'canli' && gorevTipi !== 'spesifik')    { queries.push(buildQ('canli_gorevler_arsiv')); tables.push('canli_gorevler_arsiv') }
+    if (kaynak !== 'arsiv' && gorevTipi !== 'frekansiyel') { queries.push(buildQ('gorevler')); tables.push('gorevler') }
 
     const results  = await Promise.all(queries)
     const gorevMap = new Map<string, { g: any; tip: string }>()
     const tipOf    = (tbl: string) => tbl === 'gorevler' ? 'Spesifik' : 'Frekansiyel'
-    const tables   = gorevTipi !== 'spesifik'
-      ? (gorevTipi !== 'frekansiyel' ? ['canli_gorevler','canli_gorevler_arsiv','gorevler'] : ['canli_gorevler','canli_gorevler_arsiv'])
-      : ['gorevler']
 
     results.forEach((r, i) => {
       for (const g of r.data ?? []) {

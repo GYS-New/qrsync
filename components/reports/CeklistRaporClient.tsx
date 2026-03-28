@@ -125,7 +125,7 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
   const [filtreUygulandı, setFiltreUygulandı] = useState(false)
 
   const buildParams = useCallback(() => {
-    const p = new URLSearchParams({ firmaId: currentFirmaId })
+    const p = new URLSearchParams({ firmaId: currentFirmaId, kaynak: 'hepsi' })
     if (projeId)    p.set('projeId', projeId)
     if (baslangic)  p.set('baslangic', baslangic)
     if (bitis)      p.set('bitis', bitis)
@@ -193,7 +193,7 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
     setBitis(bit)
     setFiltreUygulandı(true)
     setLoading(true)
-    const p = new URLSearchParams({ firmaId: currentFirmaId })
+    const p = new URLSearchParams({ firmaId: currentFirmaId, kaynak: 'canli' })
     if (projeId) p.set('projeId', projeId)
     p.set('baslangic', bas)
     p.set('bitis', bit)
@@ -222,15 +222,6 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
               <h2 style={{ fontSize: 17, fontWeight: 900, color: T.text, margin: 0 }}>Çeklist Raporları</h2>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button onClick={temizle} disabled={loading}
-                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.gray, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
-                Temizle
-              </button>
-              <button onClick={uygula} disabled={loading || !currentFirmaId}
-                style={{ height: 36, padding: '0 16px', borderRadius: 8, border: 'none', background: T.green, color: '#fff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
-                <RefreshCw size={13} style={loading ? spinning : {}} />
-                {loading ? 'Yükleniyor…' : '▶ Uygula'}
-              </button>
               <button onClick={() => download('excel')} disabled={!data || dlLoading !== null}
                 style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #d1fae5', background: '#f0fdf4', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
                 <FileSpreadsheet size={13} style={dlLoading === 'excel' ? spinning : {}} />
@@ -283,6 +274,18 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
                 {node}
               </label>
             ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+            <button onClick={temizle} disabled={loading}
+              style={{ height: 34, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.gray, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+              Temizle
+            </button>
+            <button onClick={uygula} disabled={loading || !currentFirmaId}
+              style={{ height: 34, padding: '0 18px', borderRadius: 8, border: 'none', background: T.green, color: '#fff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+              <RefreshCw size={13} style={loading ? spinning : {}} />
+              {loading ? 'Yükleniyor…' : '▶ Uygula'}
+            </button>
           </div>
         </div>
 
