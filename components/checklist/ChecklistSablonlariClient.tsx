@@ -515,21 +515,9 @@ export default function ChecklistSablonlariClient({
     if (!ok) return
 
     setLoading(true)
-    await supabase.from('lokasyonlar').update({ checklist_sablon_id: null }).eq('checklist_sablon_id', item.id)
-    const { data: baslikRows } = await supabase.from('checklist_sonuc_basliklari').select('id').eq('sablon_id', item.id)
-    const baslikIds = ((baslikRows ?? []) as any[]).map(x => x.id)
-    if (baslikIds.length) {
-      await supabase.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', baslikIds)
-      await supabase.from('checklist_sonuc_basliklari').delete().in('id', baslikIds)
-    }
-    const { data: itemRows } = await supabase.from('checklist_sablon_maddeleri').select('id').eq('sablon_id', item.id)
-    const ids = ((itemRows ?? []) as any[]).map(x => x.id)
-    if (ids.length) {
-      await supabase.from('checklist_madde_secenekleri').delete().in('madde_id', ids)
-      await supabase.from('checklist_sablon_maddeleri').delete().in('id', ids)
-    }
-    const { error } = await supabase.from('checklist_sablonlari').delete().eq('id', item.id)
-    if (error) showError(error.message)
+    const res = await fetch(`/api/checklist/sablon?id=${item.id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!json.ok) showError(json.error ?? 'Şablon silinemedi.')
     else showSuccess('Şablon silindi.')
     if (firmaId) await refresh(firmaId)
     setLoading(false)
