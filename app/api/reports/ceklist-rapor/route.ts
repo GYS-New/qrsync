@@ -53,17 +53,44 @@ export async function GET(req: NextRequest) {
 
     // ── 1. Lokasyonlar (checklist şablonu olanlar) ────────────────────────
     let lokQ = admin.from('lokasyonlar')
-      .select('id,tanim,checklist_sablon_id')
+      .select('id,tanim,parent_id,checklist_sablon_id')
       .eq('firma_id', firmaId)
       .not('checklist_sablon_id', 'is', null)
     if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
     if (lokId)   lokQ = (lokQ as any).eq('id', lokId)
     const { data: loks } = await lokQ
-    const lokMap = new Map<string, any>((loks ?? []).map((l: any) => [l.id, l]))
     const lokIds = (loks ?? []).map((l: any) => l.id)
     if (!lokIds.length) {
       return NextResponse.json({ ok: true, rows: [], ozet: { toplam:0,dolduruldu:0,tamamlanan:0,ort_basari:0 }, lokasyonlar:[], kullanicilar:[] })
     }
+
+    // Lokasyon hiyerarşisi — parent ve grandparent'ları çek
+    const allLokRaw = new Map<string, any>((loks ?? []).map((l: any) => [l.id, l]))
+    const parentIds1 = [...new Set((loks ?? []).map((l: any) => l.parent_id).filter(Boolean) as string[])].filter(id => !allLokRaw.has(id))
+    if (parentIds1.length) {
+      const { data: p1 } = await admin.from('lokasyonlar').select('id,tanim,parent_id').in('id', parentIds1)
+      for (const l of p1 ?? []) allLokRaw.set(l.id, l)
+    }
+    const parentIds2 = [...new Set([...allLokRaw.values()].map((l: any) => l.parent_id).filter(Boolean) as string[])].filter(id => !allLokRaw.has(id))
+    if (parentIds2.length) {
+      const { data: p2 } = await admin.from('lokasyonlar').select('id,tanim,parent_id').in('id', parentIds2)
+      for (const l of p2 ?? []) allLokRaw.set(l.id, l)
+    }
+
+    // id → tam yol (Üst / Alt / Lokasyon)
+    function lokYolu(id: string): string {
+      const parts: string[] = []
+      let cur: string | null = id
+      while (cur) {
+        const l = allLokRaw.get(cur)
+        if (!l) break
+        parts.unshift(l.tanim)
+        cur = l.parent_id ?? null
+      }
+      return parts.join(' / ')
+    }
+
+    const lokMap = new Map<string, any>((loks ?? []).map((l: any) => [l.id, { ...l, yol: lokYolu(l.id) }]))
 
     // ── 2. Şablon maddeleri (checklist_sablon_maddeleri) ─────────────────
     const sablonIds = [...new Set((loks ?? []).map((l: any) => l.checklist_sablon_id).filter(Boolean))]
@@ -189,7 +216,7 @@ export async function GET(req: NextRequest) {
         tanim:            g.tanim,
         gorev_tipi:       tip,
         durum:            g.durum,
-        lokasyon:         lok.tanim,
+        lokasyon:         lok.yol ?? lok.tanim,
         atanan:           g.atanan_kullanici_id ? userMap.get(g.atanan_kullanici_id) ?? '—' : '—',
         tamamlayan:       tamamlayan ?? '—',
         olusturma:        fmt(g.olusturma_tarihi),
@@ -225,7 +252,8 @@ export async function GET(req: NextRequest) {
     }
 
     const kullanicilar = (usersData ?? []).map((u: any) => ({ id: u.id, isim_soyisim: u.isim_soyisim }))
-    return NextResponse.json({ ok: true, rows, ozet, lokasyonlar: loks ?? [], kullanicilar })
+    const lokasyonlar  = (loks ?? []).map((l: any) => ({ id: l.id, tanim: lokYolu(l.id) }))
+    return NextResponse.json({ ok: true, rows, ozet, lokasyonlar, kullanicilar })
   } catch (err: any) {
     console.error('[ceklist-rapor]', err)
     return NextResponse.json({ error: err?.message ?? 'Sunucu hatası' }, { status: 500 })

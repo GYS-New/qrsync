@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -122,7 +122,7 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
   const [data,       setData]       = useState<{ rows: Row[]; ozet: Ozet; lokasyonlar: any[]; kullanicilar: any[] } | null>(null)
   const [loading,    setLoading]    = useState(false)
   const [dlLoading,  setDlLoading]  = useState<'excel'|'csv'|'pdf'|null>(null)
-  const debRef = useRef<any>(null)
+  const [filtreUygulandı, setFiltreUygulandı] = useState(false)
 
   const buildParams = useCallback(() => {
     const p = new URLSearchParams({ firmaId: currentFirmaId })
@@ -170,12 +170,22 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
     setLoading(false)
   }, [buildParams, currentFirmaId, toast])
 
+  function uygula() {
+    setFiltreUygulandı(true)
+    fetchData()
+  }
+
+  function temizle() {
+    setBaslangic(''); setBitis(''); setLokasyonId(''); setYapan('')
+    setTanim(''); setDurum('TUMU'); setGorevTipi('hepsi')
+    setData(null); setFiltreUygulandı(false)
+  }
+
+  // Firma değişince listeyi sıfırla
   useEffect(() => {
-    if (!currentFirmaId) return
-    clearTimeout(debRef.current)
-    debRef.current = setTimeout(fetchData, 700)
-    return () => clearTimeout(debRef.current)
-  }, [fetchData, currentFirmaId])
+    setData(null)
+    setFiltreUygulandı(false)
+  }, [currentFirmaId])
 
   const oz = data?.ozet
 
@@ -194,10 +204,14 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
               <h2 style={{ fontSize: 17, fontWeight: 900, color: T.text, margin: 0 }}>Çeklist Raporları</h2>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button onClick={fetchData} disabled={loading || !currentFirmaId}
+              <button onClick={temizle} disabled={loading}
                 style={{ height: 36, padding: '0 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.gray, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                Temizle
+              </button>
+              <button onClick={uygula} disabled={loading || !currentFirmaId}
+                style={{ height: 36, padding: '0 16px', borderRadius: 8, border: 'none', background: T.green, color: '#fff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
                 <RefreshCw size={13} style={loading ? spinning : {}} />
-                {loading ? 'Yükleniyor…' : 'Yenile'}
+                {loading ? 'Yükleniyor…' : '▶ Uygula'}
               </button>
               <button onClick={() => download('excel')} disabled={!data || dlLoading !== null}
                 style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #d1fae5', background: '#f0fdf4', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
@@ -265,10 +279,16 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
         )}
 
         {/* Tablo */}
-        {!data && !loading && (
+        {loading && (
+          <div className="verde-card" style={{ padding: 48, textAlign: 'center', color: T.textSoft }}>
+            <RefreshCw size={28} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.4, ...spinning }} />
+            <div style={{ fontWeight: 700 }}>Veriler yükleniyor…</div>
+          </div>
+        )}
+        {!loading && !filtreUygulandı && (
           <div className="verde-card" style={{ padding: 48, textAlign: 'center', color: T.textSoft }}>
             <Activity size={28} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }} />
-            <div style={{ fontWeight: 700 }}>Filtre seçildiğinde çeklist verileri yüklenecek.</div>
+            <div style={{ fontWeight: 700 }}>Filtreleri seçip <strong>▶ Uygula</strong> butonuna basın.</div>
           </div>
         )}
 
