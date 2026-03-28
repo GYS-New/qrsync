@@ -945,8 +945,8 @@ export default function ArsivClient({
             <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f6b1f' }}>{ceklistRows.length}</strong> kayıt</span>
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => csvIndir('ceklist',
-                ['Görev','Tip','Durum','Lokasyon','Tamamlayan','Tamamlanma','Madde Toplam','Dolduruldu','Başarı %'],
-                ceklistRows.map((r:any) => [r.tanim,r.gorev_tipi,r.durum,r.lokasyon,r.tamamlayan,r.tamamlanma,String(r.madde_toplam),String(r.madde_dolduruldu),String(r.basari_pct)]))}
+                ['Görev','Tip','Durum','Lokasyon','Kaydeden','Kayıt Tarihi','Kanal','Madde Toplam','Dolduruldu','Başarı %'],
+                ceklistRows.map((r:any) => [r.tanim,r.gorev_tipi,r.durum,r.lokasyon,r.yapan,r.kayit_tarihi,r.kanal,String(r.madde_toplam),String(r.madde_dolduruldu),String(r.basari_pct)]))}
                 disabled={!ceklistRows.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
                 <Download size={13} /> CSV
               </button>
@@ -957,12 +957,13 @@ export default function ArsivClient({
                 ws.columns = [
                   { header: 'Görev', key: 'tanim', width: 32 }, { header: 'Tip', key: 'tip', width: 14 },
                   { header: 'Durum', key: 'durum', width: 18 }, { header: 'Lokasyon', key: 'lokasyon', width: 28 },
-                  { header: 'Tamamlayan', key: 'tamamlayan', width: 22 }, { header: 'Tamamlanma', key: 'tamamlanma', width: 20 },
+                  { header: 'Kaydeden', key: 'yapan', width: 22 }, { header: 'Kayıt Tarihi', key: 'kayit_tarihi', width: 20 },
+                  { header: 'Kanal', key: 'kanal', width: 10 },
                   { header: 'Madde Toplam', key: 'toplam', width: 14 }, { header: 'Dolduruldu', key: 'dolduruldu', width: 12 },
                   { header: 'Başarı %', key: 'basari', width: 10 },
                 ]
                 const hr = ws.getRow(1); hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }; hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }; hr.height = 20
-                ceklistRows.forEach((r:any) => ws.addRow({ tanim: r.tanim, tip: r.gorev_tipi, durum: r.durum, lokasyon: r.lokasyon, tamamlayan: r.tamamlayan, tamamlanma: r.tamamlanma, toplam: r.madde_toplam, dolduruldu: r.madde_dolduruldu, basari: r.basari_pct }))
+                ceklistRows.forEach((r:any) => ws.addRow({ tanim: r.tanim, tip: r.gorev_tipi, durum: r.durum, lokasyon: r.lokasyon, yapan: r.yapan, kayit_tarihi: r.kayit_tarihi, kanal: r.kanal, toplam: r.madde_toplam, dolduruldu: r.madde_dolduruldu, basari: r.basari_pct }))
                 const buf = await wb.xlsx.writeBuffer(); const a = document.createElement('a')
                 a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
                 a.download = `ceklist-arsiv-${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(a.href)
@@ -972,14 +973,14 @@ export default function ArsivClient({
               </button>
               <button onClick={() => {
                 const rows = ceklistRows.map((r:any) =>
-                  `<tr><td>${r.tanim??''}</td><td>${r.gorev_tipi??''}</td><td>${r.durum??''}</td><td>${r.lokasyon??'—'}</td><td>${r.tamamlayan??'—'}</td><td>${r.tamamlanma??'—'}</td><td>${r.madde_dolduruldu}/${r.madde_toplam}</td><td>%${r.basari_pct}</td></tr>`).join('')
+                  `<tr><td>${r.tanim??''}</td><td>${r.gorev_tipi??''}</td><td>${r.durum??''}</td><td>${r.lokasyon??'—'}</td><td>${r.yapan??'—'}</td><td>${r.kayit_tarihi??'—'}</td><td>${r.kanal??'—'}</td><td>${r.madde_dolduruldu}/${r.madde_toplam}</td><td>%${r.basari_pct}</td></tr>`).join('')
                 const w = window.open('','_blank','width=1100,height=700'); if (!w) return
                 w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Çeklist Raporları</title>
                   <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
                   th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
                   td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
                   </head><body><h2 style="color:#1f6b1f">Çeklist Raporları</h2>
-                  <table><thead><tr><th>Görev</th><th>Tip</th><th>Durum</th><th>Lokasyon</th><th>Tamamlayan</th><th>Tamamlanma</th><th>İlerleme</th><th>Başarı</th></tr></thead>
+                  <table><thead><tr><th>Görev</th><th>Tip</th><th>Durum</th><th>Lokasyon</th><th>Kaydeden</th><th>Kayıt Tarihi</th><th>Kanal</th><th>İlerleme</th><th>Başarı</th></tr></thead>
                   <tbody>${rows}</tbody></table></body></html>`)
                 w.document.close(); setTimeout(() => w.print(), 400)
               }} disabled={!ceklistRows.length}
@@ -1015,18 +1016,18 @@ export default function ArsivClient({
               <thead><tr>
                 <th style={{ width:24 }}></th>
                 <th>Görev</th><th>Tip</th><th>Durum</th><th>Lokasyon</th>
-                <th>Tamamlayan</th><th>Tamamlanma</th><th>İlerleme</th>
+                <th>Kaydeden</th><th>Kayıt Tarihi</th><th>Kanal</th><th>İlerleme</th>
               </tr></thead>
               <tbody>
                 {ceklistLoading ? <YukleniyorSatir cols={8} /> :
                  ceklistRows.length === 0 ? <BosKayit cols={8} mesaj="Arşivlenmiş çeklist kaydı bulunamadı." /> :
                  ceklistRows.map((r: any) => {
-                   const acik = ceklistExpanded.has(r.gorev_id)
+                   const acik = ceklistExpanded.has(r.sonuc_id)
                    const basariColor = r.basari_pct === 100 ? '#1a5c2a' : r.basari_pct >= 50 ? '#d97706' : r.basari_pct > 0 ? '#dc2626' : '#94a3b8'
                    return (
-                     <React.Fragment key={r.gorev_id}>
+                     <React.Fragment key={r.sonuc_id}>
                        <tr
-                         onClick={() => setCeklistExpanded(prev => { const s = new Set(prev); acik ? s.delete(r.gorev_id) : s.add(r.gorev_id); return s })}
+                         onClick={() => setCeklistExpanded(prev => { const s = new Set(prev); acik ? s.delete(r.sonuc_id) : s.add(r.sonuc_id); return s })}
                          style={{ cursor:'pointer', background: acik ? '#f0f9f0' : 'inherit', borderBottom:'1px solid #e8f0e8' }}>
                          <td style={{ padding:'9px 8px', color:'#94a3b8' }}>{acik ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
                          <td style={{ fontWeight:600, maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={r.tanim}>{r.tanim}</td>
@@ -1045,8 +1046,15 @@ export default function ArsivClient({
                            </span>
                          </td>
                          <td style={{ color:'#64748b', fontSize:12.5 }}>{r.lokasyon}</td>
-                         <td style={{ color:'#64748b', fontSize:12.5 }}>{r.tamamlayan}</td>
-                         <td style={{ color:'#94a3b8', fontSize:12, whiteSpace:'nowrap' }}>{r.tamamlanma}</td>
+                         <td style={{ color:'#64748b', fontSize:12.5 }}>{r.yapan}</td>
+                         <td style={{ color:'#94a3b8', fontSize:12, whiteSpace:'nowrap' }}>{r.kayit_tarihi}</td>
+                         <td>
+                           <span style={{ fontSize:11, fontWeight:700, padding:'2px 6px', borderRadius:6,
+                             background: r.kanal === 'MOBİL' ? '#fef9c3' : '#f0f9ff',
+                             color:      r.kanal === 'MOBİL' ? '#854d0e'  : '#075985' }}>
+                             {r.kanal}
+                           </span>
+                         </td>
                          <td>
                            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                              <div style={{ flex:1, height:6, background:'#e2e8f0', borderRadius:3, overflow:'hidden', minWidth:40 }}>
@@ -1059,7 +1067,7 @@ export default function ArsivClient({
                        </tr>
                        {acik && (
                          <tr>
-                           <td colSpan={8} style={{ padding:'4px 16px 16px 32px', background:'#fafcfa' }}>
+                           <td colSpan={9} style={{ padding:'4px 16px 16px 32px', background:'#fafcfa' }}>
                              <ChecklistTablo sonuclar={r.maddeler ?? []} />
                            </td>
                          </tr>
