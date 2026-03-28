@@ -131,7 +131,7 @@ export async function resolveScanContext(opts: {
     if (template) {
       const { data: items, error: itemsError } = await supabase
         .from('checklist_sablon_maddeleri')
-        .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli')
+        .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli,checklist_madde_secenekleri(id,deger,sira_no)')
         .eq('sablon_id', template.id)
         .order('sira_no', { ascending: true })
 
@@ -140,15 +140,20 @@ export async function resolveScanContext(opts: {
       checklistTemplate = {
         id: (template as any).id,
         isim: (template as any).baslik,
-        items: ((items as any[]) ?? []).map((item: any) => ({
-          id: item.id,
-          sira: item.sira_no,
-          madde: item.baslik,
-          zorunlu: item.zorunlu_cevap !== false,
-          aciklama_gerekli_yapilamadi: item.aciklama_gerekli_yapilamadi === true,
-          gorsel_gerekli: item.gorsel_gerekli === true,
-          secenekler: ['Yapıldı', 'Yapılamadı'],
-        })),
+        items: ((items as any[]) ?? []).map((item: any) => {
+          const secenekler = ((item.checklist_madde_secenekleri ?? []) as any[])
+            .sort((a: any, b: any) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
+            .map((s: any) => s.deger as string)
+          return {
+            id: item.id,
+            sira: item.sira_no,
+            madde: item.baslik,
+            zorunlu: item.zorunlu_cevap !== false,
+            aciklama_gerekli_yapilamadi: item.aciklama_gerekli_yapilamadi === true,
+            gorsel_gerekli: item.gorsel_gerekli === true,
+            secenekler: secenekler.length > 0 ? secenekler : ['EVET', 'HAYIR'],
+          }
+        }),
       }
     }
   }

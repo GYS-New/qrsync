@@ -90,7 +90,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
     }
     if (context.checklistTemplate?.items?.length) {
       const missingRequired = context.checklistTemplate.items.filter(
-        (item) => item.zorunlu && !checklistResults.some((r: any) => r?.itemId === item.id && r?.durum === true)
+        (item) => item.zorunlu && !checklistResults.some((r: any) => r?.itemId === item.id && r?.secenek)
       )
       if (missingRequired.length) {
         return NextResponse.json({ ok: false, error: 'Zorunlu checklist maddeleri tamamlanmalı' }, { status: 400 })
@@ -111,11 +111,11 @@ export async function POST(req: Request, { params }: { params: { token: string }
         .from('checklist_sonuc_basliklari').insert(baslikPayload).select('id').single()
       if (baslikError) throw new Error(baslikError.message)
       const maddePayload = checklistResults
-        .filter((r: any) => r?.itemId && r?.durum === true)
+        .filter((r: any) => r?.itemId && r?.secenek)
         .map((r: any) => ({
           sonuc_id: sonucBaslik.id,
           madde_id: r.itemId,
-          secenek_degeri: 'EVET',
+          secenek_degeri: r.secenek,
           aciklama: typeof r.not === 'string' && r.not.trim() ? r.not.trim() : null,
         }))
       if (maddePayload.length) {

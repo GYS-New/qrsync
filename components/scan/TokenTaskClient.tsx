@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 
-type ChecklistItem = { id: string; sira: number; madde: string; zorunlu: boolean }
+type ChecklistItem = { id: string; sira: number; madde: string; zorunlu: boolean; secenekler: string[] }
 type Task = { id: string; taskType: 'gorevler' | 'canli_gorevler'; tanim: string; durum: string }
 type ScanResponse = {
   ok: boolean
@@ -21,7 +21,7 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
   const autoSubmitted = useRef(false)
-  const [checks, setChecks] = useState<Record<string, { durum: boolean; not: string }>>({})
+  const [checks, setChecks] = useState<Record<string, { secenek: string | null; not: string }>>({})
 
   async function load() {
     setLoading(true)
@@ -64,10 +64,10 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
 
     if (hasChecklist) {
       const missingRequired = (data?.checklistTemplate?.items ?? []).filter(
-        (item) => item.zorunlu && !checks[item.id]?.durum
+        (item) => item.zorunlu && !checks[item.id]?.secenek
       )
       if (missingRequired.length) {
-        setMessage('Zorunlu checklist maddelerini işaretleyin.')
+        setMessage('Zorunlu checklist maddelerini doldurun.')
         return
       }
     }
@@ -79,7 +79,7 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
       taskType: task.taskType,
       checklistResults: (data?.checklistTemplate?.items ?? []).map((item) => ({
         itemId: item.id,
-        durum: !!checks[item.id]?.durum,
+        secenek: checks[item.id]?.secenek ?? null,
         not: checks[item.id]?.not ?? '',
       })),
     }
@@ -170,24 +170,37 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Checklist: {data.checklistTemplate?.isim}</div>
               <div style={{ display: 'grid', gap: 10 }}>
                 {data.checklistTemplate?.items.map((item) => {
-                  const entry = checks[item.id] ?? { durum: false, not: '' }
+                  const entry = checks[item.id] ?? { secenek: null, not: '' }
+                  const secenekler = item.secenekler?.length ? item.secenekler : ['EVET', 'HAYIR']
                   return (
-                    <div key={item.id} style={{ border: '1px solid #d6e4d6', borderRadius: 10, padding: 12 }}>
-                      <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={entry.durum}
-                          onChange={(e) => setChecks((prev) => ({ ...prev, [item.id]: { ...(prev[item.id] ?? { not: '' }), durum: e.target.checked } }))}
-                        />
-                        <span style={{ fontWeight: 600, color: '#0f1a0f' }}>{item.sira}. {item.madde}</span>
+                    <div key={item.id} style={{ border: `1px solid ${entry.secenek ? '#2e8b2e' : '#d6e4d6'}`, borderRadius: 10, padding: 12, background: entry.secenek ? '#f5fbf5' : '#fff' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                        <span style={{ fontWeight: 600, color: '#0f1a0f', flex: 1, minWidth: 120 }}>{item.sira}. {item.madde}</span>
                         {item.zorunlu ? <span className="verde-badge status-acik">Zorunlu</span> : null}
-                      </label>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {secenekler.map((sec) => (
+                          <button
+                            key={sec}
+                            type="button"
+                            onClick={() => setChecks((prev) => ({ ...prev, [item.id]: { ...(prev[item.id] ?? { not: '' }), secenek: prev[item.id]?.secenek === sec ? null : sec } }))}
+                            style={{
+                              padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                              border: `2px solid ${entry.secenek === sec ? '#2e8b2e' : '#d6e4d6'}`,
+                              background: entry.secenek === sec ? '#2e8b2e' : '#fff',
+                              color: entry.secenek === sec ? '#fff' : '#506050',
+                            }}
+                          >
+                            {sec}
+                          </button>
+                        ))}
+                      </div>
                       <input
                         className="verde-input"
                         style={{ marginTop: 10 }}
                         placeholder="Not (opsiyonel)"
                         value={entry.not}
-                        onChange={(e) => setChecks((prev) => ({ ...prev, [item.id]: { ...(prev[item.id] ?? { durum: false }), not: e.target.value } }))}
+                        onChange={(e) => setChecks((prev) => ({ ...prev, [item.id]: { ...(prev[item.id] ?? { secenek: null }), not: e.target.value } }))}
                       />
                     </div>
                   )
