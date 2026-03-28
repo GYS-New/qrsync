@@ -25,7 +25,7 @@ function withinRange(v: string | null | undefined, from?: string | null, to?: st
 }
 
 
-const TERMINAL_EXPORT = ['TAMAMLANDI','ZAMANINDA_YAPILAMAYAN','ZAMANI_GECMIS','IPTAL','SILINDI','KAPATILDI']
+const TERMINAL_EXP = ['TAMAMLANDI','ZAMANINDA_YAPILAMAYAN','ZAMANI_GECMIS','IPTAL','SILINDI','KAPATILDI']
 
 async function fetchData(firmaId: string, projeId: string | null, params: URLSearchParams, admin: any) {
   const baslangic = params.get('baslangic') ?? null
@@ -36,18 +36,18 @@ async function fetchData(firmaId: string, projeId: string | null, params: URLSea
   const kaynak    = params.get('kaynak')    ?? 'rapor'
   const sinir     = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  let lokQ = admin.from('lokasyonlar').select('id,tanim,parent_id,checklist_sablon_id').eq('firma_id', firmaId)
-  if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
-  if (lokId)   lokQ = (lokQ as any).eq('id', lokId)
-  const { data: loks } = await lokQ as any
+  let lokQ: any = admin.from('lokasyonlar').select('id,tanim,parent_id,checklist_sablon_id').eq('firma_id', firmaId).not('checklist_sablon_id','is',null)
+  if (projeId) lokQ = lokQ.eq('proje_id', projeId)
+  if (lokId)   lokQ = lokQ.eq('id', lokId)
+  const { data: loks } = await lokQ
   const lokIds = (loks ?? []).map((l: any) => l.id)
   if (!lokIds.length) return []
 
   const lokFullMap = new Map<string,any>((loks ?? []).map((l: any) => [l.id, l]))
   const pIds1 = [...new Set((loks ?? []).map((l: any) => l.parent_id).filter(Boolean))].filter((id: any) => !lokFullMap.has(id))
-  if (pIds1.length) { const { data } = await admin.from('lokasyonlar').select('id,tanim,parent_id').in('id', pIds1) as any; for (const l of (data ?? []) as any[]) lokFullMap.set(l.id, l) }
-  const pIds2 = [...new Set([...lokFullMap.values()].map(l => l.parent_id).filter(Boolean))].filter((id: any) => !lokFullMap.has(id))
-  if (pIds2.length) { const { data } = await admin.from('lokasyonlar').select('id,tanim,parent_id').in('id', pIds2) as any; for (const l of (data ?? []) as any[]) lokFullMap.set(l.id, l) }
+  if (pIds1.length) { const { data } = await admin.from('lokasyonlar').select('id,tanim,parent_id').in('id', pIds1); for (const l of (data ?? []) as any[]) lokFullMap.set(l.id, l) }
+  const pIds2 = [...new Set([...lokFullMap.values()].map((l: any) => l.parent_id).filter(Boolean))].filter((id: any) => !lokFullMap.has(id))
+  if (pIds2.length) { const { data } = await admin.from('lokasyonlar').select('id,tanim,parent_id').in('id', pIds2); for (const l of (data ?? []) as any[]) lokFullMap.set(l.id, l) }
   function lokYolu(id: string): string {
     const parts: string[] = []; let cur: string | null = id
     while (cur) { const l = lokFullMap.get(cur); if (!l) break; parts.unshift(l.tanim); cur = l.parent_id ?? null }
@@ -61,65 +61,62 @@ async function fetchData(firmaId: string, projeId: string | null, params: URLSea
   const sablonMaddeMap = new Map<string,any[]>()
   for (const m of (maddelerData ?? []) as any[]) { const arr = sablonMaddeMap.get(m.sablon_id) ?? []; arr.push(m); sablonMaddeMap.set(m.sablon_id, arr) }
 
-  let sbQ = admin.from('checklist_sonuc_basliklari')
-    .select('id,gorev_id,canli_gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
-    .in('lokasyon_id', lokIds).order('kayit_tarihi', { ascending: false })
-  if (baslangic) sbQ = (sbQ as any).gte('kayit_tarihi', `${baslangic}T00:00:00`)
-  if (bitis)     sbQ = (sbQ as any).lte('kayit_tarihi', `${bitis}T23:59:59.999`)
-  const { data: basliklari } = await sbQ as any
-  if (!(basliklari as any[])?.length) return []
-
-  const gorevIds = [...new Set((basliklari as any[]).map((b: any) => b.gorev_id).filter(Boolean))]
-  const canliIds = [...new Set((basliklari as any[]).map((b: any) => b.canli_gorev_id).filter(Boolean))]
   const gorevMap = new Map<string,any>(); const gorevTipMap = new Map<string,string>()
-  if (gorevIds.length) {
-    const { data } = await admin.from('gorevler').select('id,tanim,durum,tamamlanma_tarihi,islemi_yapan_id').in('id', gorevIds) as any
-    for (const g of (data ?? []) as any[]) { gorevMap.set(g.id, g); gorevTipMap.set(g.id, 'Spesifik') }
+  async function sorguGorevler(tablo: string, tip: string) {
+    let q: any = admin.from(tablo)
+      .select(tablo === 'gorevler'
+        ? 'id,tanim,durum,lokasyon_id,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id'
+        : 'id,tanim,durum,lokasyon_id,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id,tamamlayan_kullanici_id')
+      .eq('firma_id', firmaId).in('lokasyon_id', lokIds).in('durum', TERMINAL_EXP)
+    if (projeId)          q = q.eq('proje_id', projeId)
+    if (kaynak === 'rapor') q = q.gte('tamamlanma_tarihi', sinir)
+    if (kaynak === 'arsiv') q = q.lt('tamamlanma_tarihi', sinir)
+    if (baslangic)        q = q.gte('tamamlanma_tarihi', `${baslangic}T00:00:00`)
+    if (bitis)            q = q.lte('tamamlanma_tarihi', `${bitis}T23:59:59.999`)
+    const { data } = await q
+    for (const g of (data ?? []) as any[]) if (!gorevMap.has(g.id)) { gorevMap.set(g.id, g); gorevTipMap.set(g.id, tip) }
   }
-  if (canliIds.length) {
-    const { data: aktif } = await admin.from('canli_gorevler').select('id,tanim,durum,tamamlanma_tarihi,islemi_yapan_id,tamamlayan_kullanici_id').in('id', canliIds) as any
-    const bulunan = new Set<string>()
-    for (const g of (aktif ?? []) as any[]) { gorevMap.set(g.id, g); gorevTipMap.set(g.id, 'Frekansiyel'); bulunan.add(g.id) }
-    const kalan = (canliIds as string[]).filter(id => !bulunan.has(id))
-    if (kalan.length) {
-      const { data: arsiv } = await admin.from('canli_gorevler_arsiv').select('id,tanim,durum,tamamlanma_tarihi,islemi_yapan_id,tamamlayan_kullanici_id').in('id', kalan) as any
-      for (const g of (arsiv ?? []) as any[]) { gorevMap.set(g.id, g); gorevTipMap.set(g.id, 'Frekansiyel') }
-    }
-  }
+  if (kaynak === 'rapor') { await sorguGorevler('canli_gorevler', 'Frekansiyel') }
+  else if (kaynak === 'arsiv') { await sorguGorevler('canli_gorevler_arsiv', 'Frekansiyel'); await sorguGorevler('canli_gorevler', 'Frekansiyel') }
+  else { await sorguGorevler('canli_gorevler', 'Frekansiyel'); await sorguGorevler('canli_gorevler_arsiv', 'Frekansiyel') }
+  await sorguGorevler('gorevler', 'Spesifik')
+  if (!gorevMap.size) return []
 
-  const baslikIds = (basliklari as any[]).map((b: any) => b.id)
-  const { data: cevaplarData } = await admin.from('checklist_sonuc_maddeleri').select('sonuc_id,madde_id,secenek_degeri,aciklama,gorsel_url').in('sonuc_id', baslikIds) as any
+  const gorevIds = [...gorevMap.keys()]
+  const orFilter = gorevIds.map((id: string) => `gorev_id.eq.${id},canli_gorev_id.eq.${id}`).join(',')
+  const { data: basliklari } = await admin.from('checklist_sonuc_basliklari')
+    .select('id,gorev_id,canli_gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
+    .or(orFilter).order('kayit_tarihi', { ascending: false }) as any
+  const sbMap = new Map<string,any>()
+  for (const sb of (basliklari ?? []) as any[]) { const gid = sb.gorev_id ?? sb.canli_gorev_id; if (gid && !sbMap.has(gid)) sbMap.set(gid, sb) }
+
+  const sonucIds = [...sbMap.values()].map((sb: any) => sb.id)
+  const { data: cevaplarData } = (sonucIds.length
+    ? await admin.from('checklist_sonuc_maddeleri').select('sonuc_id,madde_id,secenek_degeri,aciklama,gorsel_url').in('sonuc_id', sonucIds)
+    : { data: [] }) as any
   const cevapMap = new Map<string,Map<string,any>>()
   for (const c of (cevaplarData ?? []) as any[]) { if (!cevapMap.has(c.sonuc_id)) cevapMap.set(c.sonuc_id, new Map()); cevapMap.get(c.sonuc_id)!.set(c.madde_id, c) }
 
-  const uids = [...new Set([...(basliklari as any[]).map((b: any) => b.kullanici_id).filter(Boolean), ...[...gorevMap.values()].flatMap((g: any) => [g.tamamlayan_kullanici_id, g.islemi_yapan_id].filter(Boolean))])]
+  const uids = [...new Set([...[...sbMap.values()].map((sb: any) => sb.kullanici_id).filter(Boolean), ...[...gorevMap.values()].flatMap((g: any) => [g.tamamlayan_kullanici_id, g.atanan_kullanici_id, g.islemi_yapan_id].filter(Boolean))])]
   const { data: usersData } = (uids.length ? await admin.from('users').select('id,isim_soyisim').in('id', uids) : { data: [] }) as any
   const userMap = new Map<string,string>(((usersData ?? []) as any[]).map((u: any) => [u.id, u.isim_soyisim ?? '']))
 
   const rows: any[] = []
-  for (const sb of (basliklari as any[])) {
-    const gorevId = sb.gorev_id ?? sb.canli_gorev_id
-    const g = gorevId ? gorevMap.get(gorevId) : null
-    if (!g || !TERMINAL_EXPORT.includes(g.durum)) continue
-
-    const tam = g.tamamlanma_tarihi
-    if (kaynak === 'rapor' && tam && tam < sinir) continue
-    if (kaynak === 'arsiv' && tam && tam >= sinir) continue
-
-    const lokasyon = (loks ?? []).find((l: any) => l.id === sb.lokasyon_id) ?? lokFullMap.get(sb.lokasyon_id)
-    const sablonId = sb.sablon_id ?? lokasyon?.checklist_sablon_id
-    const maddeler = sablonId ? (sablonMaddeMap.get(sablonId) ?? []) : []
-    const cevaplar = cevapMap.get(sb.id) ?? new Map()
-    const dolduruldu = maddeler.filter((m: any) => cevaplar.has(m.id)).length
-    const yapanId = sb.kullanici_id ?? g.tamamlayan_kullanici_id ?? g.islemi_yapan_id
-    const tamamlayan = yapanId ? (userMap.get(yapanId) ?? '—') : '—'
+  for (const [gorevId, g] of gorevMap) {
+    const lok = (loks ?? []).find((l: any) => l.id === g.lokasyon_id); if (!lok) continue
     if (tanimAra && !(g.tanim ?? '').toLowerCase().includes(tanimAra.toLowerCase())) continue
+    const sb = sbMap.get(gorevId) ?? null
+    const maddeler = lok.checklist_sablon_id ? (sablonMaddeMap.get(lok.checklist_sablon_id) ?? []) : []
+    const cevaplar = sb ? (cevapMap.get(sb.id) ?? new Map()) : new Map()
+    const dolduruldu = maddeler.filter((m: any) => cevaplar.has(m.id)).length
+    const yapanId = sb?.kullanici_id ?? g.tamamlayan_kullanici_id ?? g.islemi_yapan_id ?? g.atanan_kullanici_id
+    const tamamlayan = yapanId ? (userMap.get(yapanId) ?? '—') : '—'
     if (yapanAdi && !tamamlayan.toLowerCase().includes(yapanAdi.toLowerCase())) continue
     rows.push({
       tanim: g.tanim ?? '—', tip: gorevTipMap.get(gorevId) ?? '—', durum: g.durum,
-      lokasyon: lokYolu(sb.lokasyon_id), tamamlayan, kanal: sb.kanal ?? 'WEB',
-      kayit_tarihi: fmt(sb.kayit_tarihi), tamamlanma: fmt(g.tamamlanma_tarihi),
-      madde_toplam: maddeler.length, madde_dolduruldu: dolduruldu,
+      lokasyon: lokYolu(g.lokasyon_id), tamamlayan, kanal: sb?.kanal ?? '—',
+      kayit_tarihi: sb ? fmt(sb.kayit_tarihi) : '—', tamamlanma: fmt(g.tamamlanma_tarihi),
+      ceklist_dolu: !!sb, madde_toplam: maddeler.length, madde_dolduruldu: dolduruldu,
       basari_pct: maddeler.length > 0 ? Math.round(dolduruldu / maddeler.length * 100) : 0,
       maddeler: maddeler.map((m: any) => {
         const c = cevaplar.get(m.id)
