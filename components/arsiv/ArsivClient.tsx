@@ -9,10 +9,9 @@ import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 import {
   Trash2, RotateCcw, Download, FileSpreadsheet, Printer,
-  RefreshCw, Archive, Users, Star, ClipboardList, ClipboardCheck,
+  RefreshCw, Archive, Users, Star, ClipboardList,
   ChevronDown, ChevronRight,
 } from 'lucide-react'
-import { ChecklistTablo } from '@/components/checklist/ChecklistModal'
 
 const DURUM_RENK: Record<string, string> = {
   TAMAMLANDI: 'status-tamamlandi', ZAMANINDA_YAPILAMAYAN: 'status-zamaninda',
@@ -27,14 +26,13 @@ const ARSIV_NEDEN_LABEL: Record<string, string> = {
 
 const YILDIZ_ETIKET = ['', 'Çok Kötü', 'Kötü', 'Orta', 'İyi', 'Mükemmel']
 
-type Sekme = 'frekansiyel' | 'personel' | 'musteri' | 'spesifik' | 'ceklist'
+type Sekme = 'frekansiyel' | 'personel' | 'musteri' | 'spesifik'
 
 const SEKMELER: { id: Sekme; label: string; icon: React.ReactNode }[] = [
   { id: 'frekansiyel', label: 'Frekansiyel Görevler',      icon: <Archive size={14} /> },
   { id: 'personel',   label: 'Personel Takibi',            icon: <Users size={14} /> },
   { id: 'musteri',    label: 'Müşteri Değerlendirmeleri',  icon: <Star size={14} /> },
   { id: 'spesifik',  label: 'Spesifik Görevler',           icon: <ClipboardList size={14} /> },
-  { id: 'ceklist',   label: 'Çeklist Raporları',           icon: <ClipboardCheck size={14} /> },
 ]
 
 function csvIndir(baslik: string, headers: string[], rows: string[][]) {
@@ -108,14 +106,6 @@ export default function ArsivClient({
   const [spesifikQ,       setSpesifikQ]       = useState('')
   const [spesifikFrom,    setSpesifikFrom]    = useState('')
   const [spesifikTo,      setSpesifikTo]      = useState('')
-
-  // ── Çeklist state ────────────────────────────────────────────────────────
-  // Arşiv: varsayılan aralık → son 30 gün, dün bitiş (24 saatten eski görevler)
-  const [ceklistRows,     setCeklistRows]     = useState<any[]>([])
-  const [ceklistLoading,  setCeklistLoading]  = useState(false)
-  const [ceklistFrom,     setCeklistFrom]     = useState(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-  const [ceklistTo,       setCeklistTo]       = useState(() => new Date().toISOString().split('T')[0])
-  const [ceklistExpanded, setCeklistExpanded] = useState<Set<string>>(new Set())
 
   // ── Toplu sil modal ───────────────────────────────────────────────────────
   const [topluSilSekme,  setTopluSilSekme]  = useState<Sekme | null>(null)
@@ -225,32 +215,11 @@ export default function ArsivClient({
     } finally { setSpesifikLoading(false) }
   }, [firmaId, projeId])
 
-  const yukle_ceklist = useCallback(async () => {
-    if (!firmaId) { setCeklistRows([]); return }
-    setCeklistLoading(true)
-    try {
-      // Arşiv: 24 saatten eski görevler — tüm tablolar (canli + arsiv + gorevler)
-      const defaultTo   = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const from = ceklistFrom || defaultFrom
-      const to   = ceklistTo   || defaultTo
-      const p = new URLSearchParams({ firmaId, kaynak: 'arsiv', baslangic: from, bitis: to })
-      if (projeId) p.set('projeId', projeId)
-      const res  = await fetch(`/api/reports/ceklist-rapor?${p}`)
-      const json = await res.json()
-      if (!json.ok) throw new Error(json.error ?? 'Veri alınamadı')
-      setCeklistRows(json.rows ?? [])
-      setCeklistExpanded(new Set())
-    } catch (e: any) { toast({ type: 'error', title: 'Yüklenemedi', message: e.message })
-    } finally { setCeklistLoading(false) }
-  }, [firmaId, projeId, ceklistFrom, ceklistTo])
-
   useEffect(() => {
     if (aktifSekme === 'frekansiyel') yukle_frekansiyel()
     if (aktifSekme === 'personel')   yukle_personel()
     if (aktifSekme === 'musteri')    yukle_musteri()
     if (aktifSekme === 'spesifik')   yukle_spesifik()
-    if (aktifSekme === 'ceklist')    yukle_ceklist()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aktifSekme, firmaId, projeId, projeLoading])
 
@@ -382,20 +351,6 @@ export default function ArsivClient({
         if (error) throw error
         await yukle_spesifik()
 
-      } else if (topluSilSekme === 'ceklist') {
-        const res = await fetch('/api/checklist-results', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            firmaId,
-            projeId: projeId ?? null,
-            from: fromISO,
-            to:   toISO,
-          }),
-        })
-        const json = await res.json()
-        if (!res.ok || !json.ok) throw new Error(json.error ?? 'Silme işlemi başarısız')
-        await yukle_ceklist()
       }
 
       toast({ type: 'success', title: 'Tamamlandı', message: 'Seçilen kayıtlar kalıcı olarak silindi.' })
@@ -936,151 +891,6 @@ export default function ArsivClient({
         </>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════
-          5 — ÇEKLİST RAPORLARI
-      ═══════════════════════════════════════════════════════════ */}
-      {firmaId && aktifSekme === 'ceklist' && (
-        <>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
-            <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f6b1f' }}>{ceklistRows.length}</strong> kayıt</span>
-            <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => csvIndir('ceklist',
-                ['Görev','Tip','Durum','Lokasyon','Kaydeden','Kayıt Tarihi','Kanal','Madde Toplam','Dolduruldu','Başarı %'],
-                ceklistRows.map((r:any) => [r.tanim,r.gorev_tipi,r.durum,r.lokasyon,r.yapan,r.kayit_tarihi,r.kanal,String(r.madde_toplam),String(r.madde_dolduruldu),String(r.basari_pct)]))}
-                disabled={!ceklistRows.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
-                <Download size={13} /> CSV
-              </button>
-              <button onClick={async () => {
-                const ExcelJS = (await import('exceljs')).default
-                const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
-                const ws = wb.addWorksheet('Çeklist Raporları')
-                ws.columns = [
-                  { header: 'Görev', key: 'tanim', width: 32 }, { header: 'Tip', key: 'tip', width: 14 },
-                  { header: 'Durum', key: 'durum', width: 18 }, { header: 'Lokasyon', key: 'lokasyon', width: 28 },
-                  { header: 'Kaydeden', key: 'yapan', width: 22 }, { header: 'Kayıt Tarihi', key: 'kayit_tarihi', width: 20 },
-                  { header: 'Kanal', key: 'kanal', width: 10 },
-                  { header: 'Madde Toplam', key: 'toplam', width: 14 }, { header: 'Dolduruldu', key: 'dolduruldu', width: 12 },
-                  { header: 'Başarı %', key: 'basari', width: 10 },
-                ]
-                const hr = ws.getRow(1); hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }; hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }; hr.height = 20
-                ceklistRows.forEach((r:any) => ws.addRow({ tanim: r.tanim, tip: r.gorev_tipi, durum: r.durum, lokasyon: r.lokasyon, yapan: r.yapan, kayit_tarihi: r.kayit_tarihi, kanal: r.kanal, toplam: r.madde_toplam, dolduruldu: r.madde_dolduruldu, basari: r.basari_pct }))
-                const buf = await wb.xlsx.writeBuffer(); const a = document.createElement('a')
-                a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
-                a.download = `ceklist-arsiv-${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(a.href)
-              }} disabled={!ceklistRows.length}
-                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#1d6f42' }}>
-                <FileSpreadsheet size={13} /> Excel
-              </button>
-              <button onClick={() => {
-                const rows = ceklistRows.map((r:any) =>
-                  `<tr><td>${r.tanim??''}</td><td>${r.gorev_tipi??''}</td><td>${r.durum??''}</td><td>${r.lokasyon??'—'}</td><td>${r.yapan??'—'}</td><td>${r.kayit_tarihi??'—'}</td><td>${r.kanal??'—'}</td><td>${r.madde_dolduruldu}/${r.madde_toplam}</td><td>%${r.basari_pct}</td></tr>`).join('')
-                const w = window.open('','_blank','width=1100,height=700'); if (!w) return
-                w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Çeklist Raporları</title>
-                  <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
-                  th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
-                  td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
-                  </head><body><h2 style="color:#1f6b1f">Çeklist Raporları</h2>
-                  <table><thead><tr><th>Görev</th><th>Tip</th><th>Durum</th><th>Lokasyon</th><th>Kaydeden</th><th>Kayıt Tarihi</th><th>Kanal</th><th>İlerleme</th><th>Başarı</th></tr></thead>
-                  <tbody>${rows}</tbody></table></body></html>`)
-                w.document.close(); setTimeout(() => w.print(), 400)
-              }} disabled={!ceklistRows.length}
-                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
-                <Printer size={13} /> Yazdır
-              </button>
-            </div>
-          </div>
-
-          <div style={filterRow}>
-            <input type="date" value={ceklistFrom} onChange={e => setCeklistFrom(e.target.value)} style={inp} />
-            <span style={{ color:'#94a3b8' }}>—</span>
-            <input type="date" value={ceklistTo} onChange={e => setCeklistTo(e.target.value)} style={inp} />
-            <button onClick={yukle_ceklist} disabled={ceklistLoading} style={applyBtn}>
-              <RefreshCw size={12} style={ceklistLoading ? spinning : {}} /> Uygula
-            </button>
-            <button onClick={() => {
-              const defaultTo   = new Date().toISOString().split('T')[0]
-              const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-              setCeklistFrom(defaultFrom); setCeklistTo(defaultTo)
-              setCeklistRows([]); setCeklistExpanded(new Set())
-            }} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3]">
-              Temizle
-            </button>
-            <button onClick={() => { setTopluSilSekme('ceklist'); setTopluSilFrom(ceklistFrom); setTopluSilTo(ceklistTo) }}
-              className="border px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2" style={{ borderColor:'#fca5a5', background:'#fff1f2', color:'#dc2626', fontWeight:600 }}>
-              <Trash2 size={13} /> Kayıtları Sil
-            </button>
-          </div>
-
-          <div className="verde-table-wrap">
-            <table className="verde-table">
-              <thead><tr>
-                <th style={{ width:24 }}></th>
-                <th>Görev</th><th>Tip</th><th>Durum</th><th>Lokasyon</th>
-                <th>Kaydeden</th><th>Kayıt Tarihi</th><th>Kanal</th><th>İlerleme</th>
-              </tr></thead>
-              <tbody>
-                {ceklistLoading ? <YukleniyorSatir cols={8} /> :
-                 ceklistRows.length === 0 ? <BosKayit cols={8} mesaj="Arşivlenmiş çeklist kaydı bulunamadı." /> :
-                 ceklistRows.map((r: any) => {
-                   const acik = ceklistExpanded.has(r.sonuc_id)
-                   const basariColor = r.basari_pct === 100 ? '#1a5c2a' : r.basari_pct >= 50 ? '#d97706' : r.basari_pct > 0 ? '#dc2626' : '#94a3b8'
-                   return (
-                     <React.Fragment key={r.sonuc_id}>
-                       <tr
-                         onClick={() => setCeklistExpanded(prev => { const s = new Set(prev); acik ? s.delete(r.sonuc_id) : s.add(r.sonuc_id); return s })}
-                         style={{ cursor:'pointer', background: acik ? '#f0f9f0' : 'inherit', borderBottom:'1px solid #e8f0e8' }}>
-                         <td style={{ padding:'9px 8px', color:'#94a3b8' }}>{acik ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                         <td style={{ fontWeight:600, maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={r.tanim}>{r.tanim}</td>
-                         <td>
-                           <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:6,
-                             background: r.gorev_tipi === 'Frekansiyel' ? '#f0fdf4' : '#eff6ff',
-                             color:      r.gorev_tipi === 'Frekansiyel' ? '#1a5c2a'  : '#1d4ed8' }}>
-                             {r.gorev_tipi}
-                           </span>
-                         </td>
-                         <td>
-                           <span style={{ fontSize:11.5, fontWeight:700, padding:'2px 8px', borderRadius:6,
-                             background: r.durum==='TAMAMLANDI'?'#dcfce7':r.durum==='IPTAL'?'#fee2e2':'#f1f5f9',
-                             color:      r.durum==='TAMAMLANDI'?'#166534':r.durum==='IPTAL'?'#dc2626':'#475569' }}>
-                             {r.durum}
-                           </span>
-                         </td>
-                         <td style={{ color:'#64748b', fontSize:12.5 }}>{r.lokasyon}</td>
-                         <td style={{ color:'#64748b', fontSize:12.5 }}>{r.yapan}</td>
-                         <td style={{ color:'#94a3b8', fontSize:12, whiteSpace:'nowrap' }}>{r.kayit_tarihi}</td>
-                         <td>
-                           <span style={{ fontSize:11, fontWeight:700, padding:'2px 6px', borderRadius:6,
-                             background: r.kanal === 'MOBİL' ? '#fef9c3' : '#f0f9ff',
-                             color:      r.kanal === 'MOBİL' ? '#854d0e'  : '#075985' }}>
-                             {r.kanal}
-                           </span>
-                         </td>
-                         <td>
-                           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                             <div style={{ flex:1, height:6, background:'#e2e8f0', borderRadius:3, overflow:'hidden', minWidth:40 }}>
-                               <div style={{ height:'100%', width:`${r.basari_pct}%`, background:basariColor, borderRadius:3 }} />
-                             </div>
-                             <span style={{ fontSize:11.5, fontWeight:700, color:basariColor, flexShrink:0 }}>%{r.basari_pct}</span>
-                           </div>
-                           <div style={{ fontSize:10.5, color:'#94a3b8', marginTop:2 }}>{r.madde_dolduruldu}/{r.madde_toplam} madde</div>
-                         </td>
-                       </tr>
-                       {acik && (
-                         <tr>
-                           <td colSpan={9} style={{ padding:'4px 16px 16px 32px', background:'#fafcfa' }}>
-                             <ChecklistTablo sonuclar={r.maddeler ?? []} />
-                           </td>
-                         </tr>
-                       )}
-                     </React.Fragment>
-                   )
-                 })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
 
       {/* ── Toplu Sil Modalı ─────────────────────────────────────────────── */}
@@ -1095,7 +905,6 @@ export default function ArsivClient({
                   topluSilSekme === 'frekansiyel' ? 'Frekansiyel Görevler' :
                   topluSilSekme === 'personel'   ? 'Personel Takibi' :
                   topluSilSekme === 'musteri'    ? 'Müşteri Değerlendirmeleri' :
-                  topluSilSekme === 'ceklist'    ? 'Çeklist Raporları' :
                   'Spesifik Görevler'
                 }
               </div>
