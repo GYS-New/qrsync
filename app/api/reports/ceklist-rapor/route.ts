@@ -110,20 +110,11 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 3. Görevleri çek ─────────────────────────────────────────────────
-    // Sadece terminal durumlu görevler çeklist raporuna düşer
-    const TERMINAL = ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'IPTAL', 'ZAMANI_GECMIS', 'SILINDI']
     const SEL = 'id,firma_id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id,tamamlayan_kullanici_id'
     const buildQ = (table: string): Promise<any> => {
       let q = admin.from(table).select(SEL).eq('firma_id', firmaId).in('lokasyon_id', lokIds)
       if (projeId) q = (q as any).eq('proje_id', projeId)
-      if (table === 'canli_gorevler_arsiv') {
-        // Arşiv tablosunda tüm kayıtlar zaten terminal durumda — kullanıcı filtresi varsa uygula
-        if (durumFil && durumFil !== 'TUMU') q = (q as any).eq('durum', durumFil)
-      } else {
-        // Canlı tablolarda yalnızca terminal durumlar (içinde çeklist olan tamamlanmış/iptal görevler)
-        const durumlar = durumFil && durumFil !== 'TUMU' ? [durumFil] : TERMINAL
-        q = (q as any).in('durum', durumlar)
-      }
+      if (durumFil && durumFil !== 'TUMU') q = (q as any).eq('durum', durumFil)
       return Promise.resolve(q)
     }
 
