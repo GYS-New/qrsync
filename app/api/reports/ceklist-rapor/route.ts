@@ -121,11 +121,14 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 3. Görevleri çek ─────────────────────────────────────────────────
+    // gorevler tablosunda tamamlayan_kullanici_id kolonu YOK — ayrı SEL kullanılıyor
     const durumlar = (durumFil && durumFil !== 'TUMU') ? [durumFil] : TERMINAL
-    const SEL = 'id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id,tamamlayan_kullanici_id'
+    const SEL_CANLI  = 'id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id,tamamlayan_kullanici_id'
+    const SEL_SPESIFIK = 'id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id'
 
     async function queryTable(tbl: string): Promise<any[]> {
-      let q: any = admin.from(tbl).select(SEL)
+      const sel = tbl === 'gorevler' ? SEL_SPESIFIK : SEL_CANLI
+      let q: any = admin.from(tbl).select(sel)
         .eq('firma_id', firmaId)
         .in('lokasyon_id', lokIds)
         .in('durum', durumlar)

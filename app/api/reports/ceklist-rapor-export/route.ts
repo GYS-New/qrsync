@@ -53,9 +53,12 @@ async function fetchData(firmaId: string, projeId: string | null, params: URLSea
   }
 
   // Görevler
-  const SEL = 'id,firma_id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id,tamamlayan_kullanici_id'
+  // gorevler tablosunda tamamlayan_kullanici_id yok — ayrı SEL
+  const SEL_CANLI    = 'id,firma_id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id,tamamlayan_kullanici_id'
+  const SEL_SPESIFIK = 'id,firma_id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id'
   const buildQ = (table: string): Promise<any> => {
-    let q = admin.from(table).select(SEL).eq('firma_id', firmaId).in('lokasyon_id', lokIds)
+    const sel = table === 'gorevler' ? SEL_SPESIFIK : SEL_CANLI
+    let q = admin.from(table).select(sel).eq('firma_id', firmaId).in('lokasyon_id', lokIds)
     if (projeId) q = (q as any).eq('proje_id', projeId)
     if (durumFil && durumFil !== 'TUMU') q = (q as any).eq('durum', durumFil)
     return Promise.resolve(q)
