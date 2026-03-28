@@ -181,10 +181,28 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
     setData(null); setFiltreUygulandı(false)
   }
 
-  // Firma değişince listeyi sıfırla
+  // Firma değişince son 24 saati otomatik yükle
   useEffect(() => {
-    setData(null)
-    setFiltreUygulandı(false)
+    if (!currentFirmaId) { setData(null); setFiltreUygulandı(false); return }
+    const now  = new Date()
+    const prev = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const fmt  = (d: Date) => d.toISOString().split('T')[0]
+    const bas  = fmt(prev)
+    const bit  = fmt(now)
+    setBaslangic(bas)
+    setBitis(bit)
+    setFiltreUygulandı(true)
+    setLoading(true)
+    const p = new URLSearchParams({ firmaId: currentFirmaId })
+    if (projeId) p.set('projeId', projeId)
+    p.set('baslangic', bas)
+    p.set('bitis', bit)
+    fetch(`/api/reports/ceklist-rapor?${p}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(json => { if (!json.error) setData(json); else setData(null) })
+      .catch(() => setData(null))
+      .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFirmaId])
 
   const oz = data?.ozet
