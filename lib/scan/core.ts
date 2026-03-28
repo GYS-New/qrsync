@@ -131,7 +131,7 @@ export async function resolveScanContext(opts: {
     if (template) {
       const { data: items, error: itemsError } = await supabase
         .from('checklist_sablon_maddeleri')
-        .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli,secenekler')
+        .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli')
         .eq('sablon_id', template.id)
         .order('sira_no', { ascending: true })
 
@@ -147,7 +147,7 @@ export async function resolveScanContext(opts: {
           zorunlu: item.zorunlu_cevap !== false,
           aciklama_gerekli_yapilamadi: item.aciklama_gerekli_yapilamadi === true,
           gorsel_gerekli: item.gorsel_gerekli === true,
-          secenekler: Array.isArray(item.secenekler) ? item.secenekler : ['Yapıldı', 'Yapılamadı'],
+          secenekler: ['Yapıldı', 'Yapılamadı'],
         })),
       }
     }
