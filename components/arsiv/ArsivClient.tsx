@@ -234,7 +234,7 @@ export default function ArsivClient({
       const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       const from = ceklistFrom || defaultFrom
       const to   = ceklistTo   || defaultTo
-      const p = new URLSearchParams({ firmaId, kaynak: 'hepsi', baslangic: from, bitis: to })
+      const p = new URLSearchParams({ firmaId, mod: 'arsiv', kaynak: 'hepsi', baslangic: from, bitis: to })
       if (projeId) p.set('projeId', projeId)
       const res  = await fetch(`/api/reports/ceklist-rapor?${p}`)
       const json = await res.json()

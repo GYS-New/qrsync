@@ -25,10 +25,10 @@ type Row = {
   gorev_tipi: string
   durum: string
   lokasyon: string
-  atanan: string
   yapan: string
-  olusturma: string
+  kayit_tarihi: string
   tamamlanma: string
+  kanal: string
   ceklist_dolu: boolean
   madde_toplam: number
   madde_dolduruldu: number
@@ -197,7 +197,7 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
     setLokasyonId(''); setYapan(''); setTanim(''); setDurum('TUMU'); setGorevTipi('hepsi')
 
     setLoading(true)
-    const p = new URLSearchParams({ firmaId, kaynak: 'hepsi', baslangic: bas, bitis: bit })
+    const p = new URLSearchParams({ firmaId, mod: 'rapor', baslangic: bas, bitis: bit })
     if (projeId) p.set('projeId', projeId)
     fetch(`/api/reports/ceklist-rapor?${p}`, { cache: 'no-store' })
       .then(r => r.json())
@@ -208,17 +208,16 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
   }, [firmaId])
 
   const buildParams = useCallback(() => {
-    const p = new URLSearchParams({ firmaId, kaynak: 'hepsi' })
+    const p = new URLSearchParams({ firmaId, mod: 'rapor' })
     if (projeId)    p.set('projeId', projeId)
     if (baslangic)  p.set('baslangic', baslangic)
     if (bitis)      p.set('bitis', bitis)
     if (lokasyonId) p.set('lokasyonId', lokasyonId)
     if (yapan)      p.set('yapan', yapan)
     if (tanim)      p.set('tanim', tanim)
-    if (durum !== 'TUMU') p.set('durum', durum)
-    if (gorevTipi !== 'hepsi') p.set('gorevTipi', gorevTipi)
+    // durum ve gorevTipi client-side filtrelenir
     return p
-  }, [firmaId, projeId, baslangic, bitis, lokasyonId, yapan, tanim, durum, gorevTipi])
+  }, [firmaId, projeId, baslangic, bitis, lokasyonId, yapan, tanim])
 
   async function uygula() {
     if (!firmaId) return
@@ -241,7 +240,7 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
     setData(null)
     // Temizle sonrası son 24h'i yeniden yükle
     setLoading(true)
-    const p = new URLSearchParams({ firmaId, kaynak: 'hepsi', baslangic: bas, bitis: bit })
+    const p = new URLSearchParams({ firmaId, mod: 'rapor', baslangic: bas, bitis: bit })
     if (projeId) p.set('projeId', projeId)
     fetch(`/api/reports/ceklist-rapor?${p}`, { cache: 'no-store' })
       .then(r => r.json())
@@ -387,17 +386,25 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
                   </tr>
                 </thead>
                 <tbody>
-                  {data.rows.length === 0
-                    ? (
+                  {(() => {
+                    const filtreliRows = (data.rows ?? []).filter(row => {
+                      if (durum !== 'TUMU' && row.durum !== durum) return false
+                      if (gorevTipi !== 'hepsi') {
+                        const tip = row.gorev_tipi?.toLowerCase()
+                        if (gorevTipi === 'frekansiyel' && tip !== 'frekansiyel') return false
+                        if (gorevTipi === 'spesifik'    && tip !== 'spesifik')    return false
+                      }
+                      return true
+                    })
+                    return filtreliRows.length === 0 ? (
                       <tr>
                         <td colSpan={8} style={{ padding: 48, textAlign: 'center', color: C.soft }}>
                           <ClipboardList size={32} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }} />
                           Eşleşen çeklist kaydı bulunamadı.
                         </td>
                       </tr>
-                    )
-                    : data.rows.map(row => <GorevSatiri key={row.sonuc_id} row={row} />)
-                  }
+                    ) : filtreliRows.map(row => <GorevSatiri key={row.sonuc_id} row={row} />)
+                  })()}
                 </tbody>
               </table>
             </div>
