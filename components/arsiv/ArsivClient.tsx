@@ -228,7 +228,7 @@ export default function ArsivClient({
     if (!firmaId) { setCeklistRows([]); return }
     setCeklistLoading(true)
     try {
-      const p = new URLSearchParams({ firmaId, kaynak: 'arsiv' })
+      const p = new URLSearchParams({ firmaId, kaynak: 'hepsi' })
       if (projeId)     p.set('projeId', projeId)
       if (ceklistFrom) p.set('baslangic', ceklistFrom)
       if (ceklistTo)   p.set('bitis', ceklistTo)
