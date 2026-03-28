@@ -395,7 +395,7 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
                         </td>
                       </tr>
                     )
-                    : data.rows.map(row => <GorevSatiri key={row.gorev_id} row={row} />)
+                    : data.rows.map(row => <GorevSatiri key={row.sonuc_id} row={row} />)
                   }
                 </tbody>
               </table>

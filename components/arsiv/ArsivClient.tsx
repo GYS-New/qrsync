@@ -114,7 +114,7 @@ export default function ArsivClient({
   const [ceklistRows,     setCeklistRows]     = useState<any[]>([])
   const [ceklistLoading,  setCeklistLoading]  = useState(false)
   const [ceklistFrom,     setCeklistFrom]     = useState(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-  const [ceklistTo,       setCeklistTo]       = useState(() => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+  const [ceklistTo,       setCeklistTo]       = useState(() => new Date().toISOString().split('T')[0])
   const [ceklistExpanded, setCeklistExpanded] = useState<Set<string>>(new Set())
 
   // ── Toplu sil modal ───────────────────────────────────────────────────────
@@ -998,7 +998,7 @@ export default function ArsivClient({
               <RefreshCw size={12} style={ceklistLoading ? spinning : {}} /> Uygula
             </button>
             <button onClick={() => {
-              const defaultTo   = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+              const defaultTo   = new Date().toISOString().split('T')[0]
               const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
               setCeklistFrom(defaultFrom); setCeklistTo(defaultTo)
               setCeklistRows([]); setCeklistExpanded(new Set())

@@ -1,8 +1,9 @@
 /**
  * GET /api/reports/ceklist-rapor
  *
- * checklist_sonuc_basliklari birincil kaynak — bu kayıtlar silinince liste güncellenir.
- * Tarih filtresi kayit_tarihi üzerinden çalışır (silme ile tutarlı).
+ * checklist_sonuc_basliklari birincil kaynak.
+ * Her kayıt = 1 satır. Tarih filtresi kayit_tarihi üzerinden.
+ * CeklistRaporClient (Rapor Merkezi) ve ArsivClient (Arşiv) ortak kullanır.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
@@ -30,18 +31,19 @@ export async function GET(req: NextRequest) {
     const isSA      = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
     const sp        = new URL(req.url).searchParams
     const firmaId   = isSA ? sp.get('firmaId') : me.firma_id
-    const projeId   = sp.get('projeId')   ?? null
-    const baslangic = sp.get('baslangic') ?? null
-    const bitis     = sp.get('bitis')     ?? null
+    const projeId   = sp.get('projeId')    ?? null
+    const baslangic = sp.get('baslangic')  ?? null   // YYYY-MM-DD → kayit_tarihi başlangıcı
+    const bitis     = sp.get('bitis')      ?? null   // YYYY-MM-DD → kayit_tarihi bitişi
     const lokIdFil  = sp.get('lokasyonId') ?? null
-    const tanimAra  = sp.get('tanim')     ?? null
-    const yapanAra  = sp.get('yapan')     ?? null
+    const tanimAra  = sp.get('tanim')      ?? null
+    const yapanAra  = sp.get('yapan')      ?? null
+    // Geriye dönük uyumluluk parametreleri (kaynak, durum, gorevTipi) — artık kullanılmıyor
 
     if (!firmaId) return NextResponse.json({ error: 'firmaId gerekli' }, { status: 400 })
 
     const admin = createAdminClient()
 
-    // 1. Firmaya ait lokasyonlar
+    // ── 1. Lokasyonlar ────────────────────────────────────────────────────
     let lokQ = admin.from('lokasyonlar')
       .select('id,tanim,parent_id,checklist_sablon_id')
       .eq('firma_id', firmaId)
@@ -50,7 +52,7 @@ export async function GET(req: NextRequest) {
 
     const { data: loks } = await lokQ
     if (!loks?.length) {
-      return NextResponse.json({ ok: true, rows: [], ozet: { toplam: 0 }, lokasyonlar: [], kullanicilar: [] })
+      return NextResponse.json({ ok: true, rows: [], ozet: { toplam: 0, dolduruldu: 0, basari: 0 }, lokasyonlar: [], kullanicilar: [] })
     }
     const lokIds = loks.map((l: any) => l.id)
 
@@ -78,7 +80,7 @@ export async function GET(req: NextRequest) {
       return parts.join(' / ')
     }
 
-    // 2. Şablon maddeleri
+    // ── 2. Şablon maddeleri ───────────────────────────────────────────────
     const sablonIds = [...new Set(loks.map((l: any) => l.checklist_sablon_id).filter(Boolean) as string[])]
     const { data: maddelerData } = sablonIds.length
       ? await admin.from('checklist_sablon_maddeleri')
@@ -93,8 +95,8 @@ export async function GET(req: NextRequest) {
       sablonMaddeMap.set(m.sablon_id, arr)
     }
 
-    // 3. BİRİNCİL KAYNAK: checklist_sonuc_basliklari
-    //    Tarih filtresi kayit_tarihi üzerinden — silme ile aynı mantık
+    // ── 3. BİRİNCİL KAYNAK: checklist_sonuc_basliklari ───────────────────
+    //    Tarih filtresi kayit_tarihi → silme ile aynı mantık
     let sbQ = admin.from('checklist_sonuc_basliklari')
       .select('id,gorev_id,canli_gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
       .in('lokasyon_id', lokIds)
@@ -106,13 +108,13 @@ export async function GET(req: NextRequest) {
     if (sbErr) throw sbErr
     if (!basliklari?.length) {
       return NextResponse.json({
-        ok: true, rows: [], ozet: { toplam: 0 },
+        ok: true, rows: [], ozet: { toplam: 0, dolduruldu: 0, basari: 0 },
         lokasyonlar: loks.map((l: any) => ({ id: l.id, tanim: lokYolu(l.id) })),
         kullanicilar: [],
       })
     }
 
-    // 4. Madde cevapları
+    // ── 4. Madde cevapları ────────────────────────────────────────────────
     const baslikIds = basliklari.map((b: any) => b.id)
     const { data: cevaplarData } = await admin
       .from('checklist_sonuc_maddeleri')
@@ -125,7 +127,7 @@ export async function GET(req: NextRequest) {
       cevapMap.get(c.sonuc_id)!.set(c.madde_id, c)
     }
 
-    // 5. Görev metadata (tanim, durum, tamamlanma_tarihi)
+    // ── 5. Görev metadata ─────────────────────────────────────────────────
     const gorevIds = [...new Set(basliklari.map((b: any) => b.gorev_id).filter(Boolean) as string[])]
     const canliIds = [...new Set(basliklari.map((b: any) => b.canli_gorev_id).filter(Boolean) as string[])]
 
@@ -149,7 +151,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 6. Kullanıcı adları
+    // ── 6. Kullanıcı adları ───────────────────────────────────────────────
     const allUserIds = [...new Set([
       ...basliklari.map((b: any) => b.kullanici_id).filter(Boolean),
       ...[...gorevMap.values()].flatMap((g: any) =>
@@ -161,7 +163,7 @@ export async function GET(req: NextRequest) {
       : { data: [] }
     const userMap = new Map<string, string>((usersData ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
 
-    // 7. Satır oluştur — her checklist_sonuc_basliklari kaydı = 1 satır
+    // ── 7. Satır oluştur ──────────────────────────────────────────────────
     const rows: any[] = []
     for (const sb of basliklari) {
       const gorevId  = sb.gorev_id ?? sb.canli_gorev_id
@@ -180,16 +182,18 @@ export async function GET(req: NextRequest) {
       if (yapanAra && !yapan.toLowerCase().includes(yapanAra.toLowerCase())) continue
 
       rows.push({
-        sonuc_id:         sb.id,
-        gorev_id:         gorevId ?? null,
+        // Her iki istemci için ortak alanlar
+        sonuc_id:         sb.id,                          // Arşiv key + silme referansı
+        gorev_id:         gorevId ?? null,                // Rapor Merkezi key
         tanim:            g?.tanim ?? '—',
         gorev_tipi:       gorevId ? (gorevTipMap.get(gorevId) ?? '—') : '—',
         durum:            g?.durum ?? '—',
         lokasyon:         lokYolu(sb.lokasyon_id),
-        yapan,
-        kayit_tarihi:     fmt(sb.kayit_tarihi),
-        tamamlanma:       fmt(g?.tamamlanma_tarihi),
-        kanal:            sb.kanal ?? 'WEB',
+        yapan,                                            // Çeklisti kaydeden
+        kayit_tarihi:     fmt(sb.kayit_tarihi),           // Arşiv: çeklist doldurulma anı
+        tamamlanma:       fmt(g?.tamamlanma_tarihi),      // Rapor Merkezi: görev tamamlanma
+        kanal:            sb.kanal ?? 'WEB',              // Arşiv kanal göstergesi
+        ceklist_dolu:     true,                           // Bu API sadece dolu kayıtları döner
         madde_toplam:     maddeler.length,
         madde_dolduruldu: dolduruldu,
         basari_pct:       basari,
@@ -209,10 +213,19 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // ozet — CeklistRaporClient için dolduruldu ve basari zorunlu
+    const ozet = {
+      toplam:     rows.length,
+      dolduruldu: rows.length,  // Bu API sadece dolu kayıtları döndürdüğünden hepsi dolu
+      basari:     rows.length > 0
+        ? Math.round(rows.reduce((s, r) => s + r.basari_pct, 0) / rows.length)
+        : 0,
+    }
+
     return NextResponse.json({
       ok: true,
       rows,
-      ozet: { toplam: rows.length },
+      ozet,
       lokasyonlar: loks.map((l: any) => ({ id: l.id, tanim: lokYolu(l.id) })),
       kullanicilar: (usersData ?? []).map((u: any) => ({ id: u.id, isim_soyisim: u.isim_soyisim })),
     })
