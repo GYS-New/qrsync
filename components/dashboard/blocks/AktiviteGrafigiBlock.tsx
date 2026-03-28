@@ -8,42 +8,46 @@ import type { DashboardBlockProps } from '../types'
 
 type Mode = "gunluk" | "haftalik" | "aylik"
 
-function startOfHour(d: Date) {
+/** Türkiye saatiyle verilen UTC Date'in saat başını döndürür */
+function startOfHourTR(d: Date) {
   const x = new Date(d)
   x.setMinutes(0, 0, 0)
   return x
 }
 
-function startOfDay(d: Date) {
-  const x = new Date(d)
-  x.setHours(0, 0, 0, 0)
-  return x
+/** Verilen UTC Date'i Türkiye saatiyle gün başına çeker */
+function startOfDayTR(d: Date): Date {
+  const trOffset = 3 * 60 * 60 * 1000
+  const trTime = new Date(d.getTime() + trOffset)
+  trTime.setUTCHours(0, 0, 0, 0)
+  return new Date(trTime.getTime() - trOffset)
 }
 
-export default function AktiviteGrafigiBlock({ firmaId, projeId, basePath  }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
+/** Türkiye saatiyle şu anki saat (0-23) */
+function currentHourTR(): number {
+  return new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul', hour: 'numeric', hour12: false }) as unknown as number
+}
+
+export default function AktiviteGrafigiBlock({
+  firmaId, projeId, basePath,
+}: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
   const supabase = createClient()
   const [mode, setMode] = useState<Mode>("gunluk")
   const [data, setData] = useState<Array<{ label: string; value: number }>>([])
 
-  // Recharts can warn: "The width(-1) and height(-1) of chart should be greater than 0"
-  // when it measures a flex/overflow container while it's temporarily 0px.
-  // We measure the container explicitly and only render the chart when size is positive.
   const chartWrapRef = useRef<HTMLDivElement | null>(null)
   const [chartSize, setChartSize] = useState({ w: 0, h: 0 })
 
   useLayoutEffect(() => {
     const el = chartWrapRef.current
     if (!el) return
-
     const measure = () => {
       const rect = el.getBoundingClientRect()
       const w = Math.floor(rect.width)
       const h = Math.floor(rect.height)
       if (w > 0 && h > 0) setChartSize({ w, h })
     }
-
     measure()
-
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
@@ -51,66 +55,60 @@ export default function AktiviteGrafigiBlock({ firmaId, projeId, basePath  }: Da
 
   const rangeStart = useMemo(() => {
     const now = new Date()
-    if (mode === "gunluk") {
-      return new Date(now.getTime() - 24 * 60 * 60 * 1000)
-    }
-    if (mode === "haftalik") {
-      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    }
+    if (mode === "gunluk")   return new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    if (mode === "haftalik") return new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000)
     return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   }, [mode])
 
   async function fetchData() {
-    // NOTE: Supabase Postgres' timestamp columns are expected in ISO format.
     let q = supabase
       .from("canli_gorevler")
-      .select("olusturma_tarihi,firma_id")
+      .select("olusturma_tarihi")
       .gte("olusturma_tarihi", rangeStart.toISOString())
 
     if (firmaId) q = q.eq("firma_id", firmaId)
     if (projeId) q = (q as any).eq("proje_id", projeId)
 
     const { data: rows } = await q
-
     const grouped: Record<string, number> = {}
 
     if (mode === "gunluk") {
-      // 24h by hour
+      // Son 24 saati TR saatiyle saat saat grupla
       for (let i = 23; i >= 0; i--) {
         const d = new Date(Date.now() - i * 60 * 60 * 1000)
-        grouped[String(d.getHours()).padStart(2, "0")] = 0
+        // Saat etiketini TR saatiyle üret
+        const label = d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false })
+        grouped[label] = 0
       }
       rows?.forEach((r: any) => {
-        const d = startOfHour(new Date(r.olusturma_tarihi))
-        const key = String(d.getHours()).padStart(2, "0")
-        grouped[key] = (grouped[key] || 0) + 1
+        const d = startOfHourTR(new Date(r.olusturma_tarihi))
+        const label = d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false })
+        if (label in grouped) grouped[label] = (grouped[label] || 0) + 1
       })
     } else if (mode === "haftalik") {
-      // 7 days by weekday short
+      // Son 7 günü TR saatiyle gün gün grupla
       const days: Date[] = []
-      for (let i = 6; i >= 0; i--) days.push(startOfDay(new Date(Date.now() - i * 24 * 60 * 60 * 1000)))
+      for (let i = 6; i >= 0; i--) days.push(startOfDayTR(new Date(Date.now() - i * 24 * 60 * 60 * 1000)))
       days.forEach((d) => {
-        const key = d.toLocaleDateString("tr-TR", { weekday: "short" })
+        const key = d.toLocaleDateString("tr-TR", { weekday: "short", timeZone: "Europe/Istanbul" })
         grouped[key] = 0
       })
       rows?.forEach((r: any) => {
-        const d = startOfDay(new Date(r.olusturma_tarihi))
-        const key = d.toLocaleDateString("tr-TR", { weekday: "short" })
-        grouped[key] = (grouped[key] || 0) + 1
+        const d = startOfDayTR(new Date(r.olusturma_tarihi))
+        const key = d.toLocaleDateString("tr-TR", { weekday: "short", timeZone: "Europe/Istanbul" })
+        if (key in grouped) grouped[key] = (grouped[key] || 0) + 1
       })
     } else {
-      // 30 days by week bucket (1..5)
+      // 30 günü hafta kovalarına böl
       const now = new Date()
       const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
       const weeks = ["Hafta 1", "Hafta 2", "Hafta 3", "Hafta 4", "Hafta 5"]
       weeks.forEach((w) => (grouped[w] = 0))
-
       rows?.forEach((r: any) => {
         const d = new Date(r.olusturma_tarihi)
         const diffDays = Math.floor((d.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
         const bucket = Math.min(4, Math.max(0, Math.floor(diffDays / 7)))
-        const key = weeks[bucket]
-        grouped[key] = (grouped[key] || 0) + 1
+        grouped[weeks[bucket]] = (grouped[weeks[bucket]] || 0) + 1
       })
     }
 
@@ -119,20 +117,11 @@ export default function AktiviteGrafigiBlock({ firmaId, projeId, basePath  }: Da
 
   useEffect(() => {
     fetchData()
-
-    // Realtime: when live tasks are inserted/updated, refresh.
     const channel = supabase
       .channel("dashboard-aktivite")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "canli_gorevler" },
-        () => fetchData()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "canli_gorevler" }, () => fetchData())
       .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, firmaId, projeId])
 
@@ -140,9 +129,9 @@ export default function AktiviteGrafigiBlock({ firmaId, projeId, basePath  }: Da
     <BlockWrapper title="AKTİVİTE GRAFİĞİ" size="big" href={`${basePath}/dashboard/canli-islemler`}>
       <div className="flex gap-2 mb-2">
         {[
-          { key: "gunluk", label: "GÜNLÜK" },
+          { key: "gunluk",   label: "GÜNLÜK" },
           { key: "haftalik", label: "HAFTALIK" },
-          { key: "aylik", label: "AYLIK" },
+          { key: "aylik",    label: "AYLIK" },
         ].map((m) => (
           <button
             key={m.key}
@@ -164,10 +153,10 @@ export default function AktiviteGrafigiBlock({ firmaId, projeId, basePath  }: Da
             data={data}
             margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
           >
-            <XAxis dataKey="label" />
-            <YAxis allowDecimals={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
             <Tooltip />
-            <Area type="monotone" dataKey="value" stroke="#16a34a" fill="#bbf7d0" />
+            <Area type="monotone" dataKey="value" stroke="#16a34a" fill="#bbf7d0" name="Görev Sayısı" />
           </AreaChart>
         ) : null}
       </div>

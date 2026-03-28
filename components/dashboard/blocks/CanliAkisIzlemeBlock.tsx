@@ -17,7 +17,33 @@ type CanliGorevRow = {
   users?: { isim_soyisim?: string | null } | null
 }
 
-export default function CanliAkisIzlemeBlock({ firmaId, basePath, projeId }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
+const DURUM_CSS: Record<string, string> = {
+  TAMAMLANDI:            'status-tamamlandi',
+  ZAMANINDA_YAPILAMAYAN: 'status-zamaninda',
+  ZAMANI_GECMIS:         'status-zamaninda',
+  IPTAL:                 'status-iptal',
+  SILINDI:               'status-iptal',
+  KAPATILDI:             'status-iptal',
+  BEKLEMEDE:             'status-beklemede',
+  HAZIR:                 'status-hazir',
+}
+
+const DURUM_LABEL: Record<string, string> = {
+  TAMAMLANDI:            'Tamamlandı',
+  ZAMANINDA_YAPILAMAYAN: 'Gec. Tamam',
+  ZAMANI_GECMIS:         'Zamanı Geçti',
+  IPTAL:                 'İptal',
+  SILINDI:               'Silindi',
+  KAPATILDI:             'Kapatıldı',
+  BEKLEMEDE:             'Beklemede',
+  HAZIR:                 'Hazır',
+  ACIK:                  'Açık',
+  ISLEMDE:               'İşlemde',
+}
+
+export default function CanliAkisIzlemeBlock({
+  firmaId, basePath, projeId,
+}: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
   const supabase = createClient()
   const [rows, setRows] = useState<CanliGorevRow[]>([])
   const MAX_ROWS = 7
@@ -25,21 +51,17 @@ export default function CanliAkisIzlemeBlock({ firmaId, basePath, projeId }: Das
   const wrapRef = useRef<HTMLDivElement | null>(null)
 
   const selectCols = useMemo(
-    () =>
-      'id,tanim,durum,durum_degisim_tarihi,olusturma_tarihi,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)',
+    () => 'id,tanim,durum,durum_degisim_tarihi,olusturma_tarihi,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)',
     []
   )
 
-  // Fit-by-height: compute how many table rows can be displayed inside the card body.
+  // Yüksekliğe göre satır sayısını hesapla
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
     const ro = new ResizeObserver(() => {
       const h = el.getBoundingClientRect().height
-      // Rough row height (px) + header padding.
-      const header = 44
-      const rowH = 44
-      const computed = Math.max(3, Math.floor((h - header) / rowH))
+      const computed = Math.max(3, Math.floor((h - 44) / 44))
       setLimit(Math.min(MAX_ROWS, computed))
     })
     ro.observe(el)
@@ -47,53 +69,49 @@ export default function CanliAkisIzlemeBlock({ firmaId, basePath, projeId }: Das
   }, [])
 
   async function fetchLive() {
-    // Yalnızca kullanıcı tarafından işlem yapılmış görevler
+    // İşlem yapılmış VEYA durum değişmiş görevleri getir
+    // islemi_yapan_id null olanları da dahil et — son durum değişimine göre sırala
     let q = supabase
       .from('canli_gorevler')
       .select(selectCols)
-      .not('islemi_yapan_id', 'is', null)
-      .order('durum_degisim_tarihi', { ascending: false })
+      .not('durum', 'in', '("HAZIR")')          // HAZIR olanları gizle (henüz işlem yok)
+      .order('durum_degisim_tarihi', { ascending: false, nullsFirst: false })
       .limit(limit)
     if (firmaId) q = q.eq('firma_id', firmaId)
     if (projeId) q = (q as any).eq('proje_id', projeId)
 
-    let { data, error } = await q
-    // durum_degisim_tarihi yoksa fallback
+    const { data, error } = await q
+
+    // Sütun yoksa olusturma_tarihi ile fallback
     if (error) {
       let q2 = supabase
         .from('canli_gorevler')
         .select(selectCols)
-        .not('islemi_yapan_id', 'is', null)
         .order('olusturma_tarihi', { ascending: false })
         .limit(limit)
       if (firmaId) q2 = q2.eq('firma_id', firmaId)
       if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
-      const r2 = await q2
-      data = (r2.data as any) ?? []
-      error = r2.error as any
+      const { data: d2 } = await q2
+      if (d2) setRows(d2 as any)
+      return
     }
-    if (!error && data) setRows((data as any) ?? [])
+
+    if (data) setRows(data as any)
   }
 
   useEffect(() => {
     fetchLive()
-    const t = setInterval(fetchLive, 1000)
+    const t = setInterval(fetchLive, 5000)   // 5 saniyede bir — 1s çok agresif
     return () => clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firmaId, projeId, limit])
 
   return (
     <div className="verde-card h-[420px] flex flex-col">
-      <div
-        style={{
-          padding: '16px 18px 12px',
-          borderBottom: '1px solid #e8f0e8',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: 12,
-        }}
-      >
+      <div style={{
+        padding: '16px 18px 12px', borderBottom: '1px solid #e8f0e8',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12,
+      }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#0f1a0f' }}>FREKANSİYEL GÖREV AKIŞI</div>
           <div style={{ fontSize: 13, color: '#7a907a', marginTop: 1 }}>Son durum değişimleri</div>
@@ -103,12 +121,11 @@ export default function CanliAkisIzlemeBlock({ firmaId, basePath, projeId }: Das
         </Link>
       </div>
 
-      {/* Height is controlled by layout; we calculate row limit based on this block's body height. */}
       <div ref={wrapRef} className="flex-1 overflow-auto" style={{ padding: 14, minHeight: 0 }}>
         <table className="verde-table" style={{ marginTop: 0 }}>
           <thead>
             <tr>
-              <th style={{ width: 44 }}>NO</th>
+              <th style={{ width: 36 }}>NO</th>
               <th>Görev</th>
               <th>Lokasyon</th>
               <th>Atanan</th>
@@ -120,46 +137,46 @@ export default function CanliAkisIzlemeBlock({ firmaId, basePath, projeId }: Das
             {Array.from({ length: limit }).map((_, idx) => {
               const r = rows?.[idx]
               const isEmpty = !r
+              const durum = r?.durum ?? ''
+              const css = DURUM_CSS[durum] ?? 'status-islemde'
               return (
-                <tr key={r?.id ?? `placeholder-${idx}`}>
-                <td style={{ color: '#2e8b2e', fontWeight: 900, whiteSpace: 'nowrap' }}>{idx + 1}</td>
-                <td style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
-                    <ClipboardList size={14} />
-                    <span>{isEmpty ? '—' : (r?.tanim ?? '—')}</span>
-                  </span>
-                </td>
-                <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#506050' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <MapPin size={14} />
-                    <span>{isEmpty ? '—' : ((r as any).lokasyonlar?.tanim ?? '—')}</span>
-                  </span>
-                </td>
-                <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#506050' }}>
-                  <span>{isEmpty ? '—' : ((r as any).users?.isim_soyisim ?? '—')}</span>
-                </td>
-                <td>
-                  {(() => {
-                    if (isEmpty) return <span className="verde-badge">—</span>
-                    const d = r?.durum ?? '—'
-                    const cls =
-                      d === 'TAMAMLANDI'              ? 'status-tamamlandi' :
-                      d === 'IPTAL' || d === 'SILINDI' || d === 'KAPATILDI' ? 'status-iptal' :
-                      d === 'ZAMANI_GECMIS' || d === 'ZAMANINDA_YAPILAMAYAN' ? 'status-zamaninda' :
-                      d === 'BEKLEMEDE'               ? 'status-beklemede' :
-                      d === 'HAZIR'                   ? 'status-hazir' :
-                      'status-islemde'
-                    return <span className={`verde-badge ${cls}`}>{d}</span>
-                  })()}
-                </td>
-                <td style={{ color: '#7a907a', whiteSpace: 'nowrap' }}>
-                  {isEmpty ? '—' : formatDateTime((r?.durum_degisim_tarihi as any) ?? (r?.olusturma_tarihi as any))}
-                </td>
+                <tr key={r?.id ?? `ph-${idx}`}>
+                  <td style={{ color: '#2e8b2e', fontWeight: 900 }}>{idx + 1}</td>
+                  <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+                      <ClipboardList size={13} />
+                      {isEmpty ? '—' : (r?.tanim ?? '—')}
+                    </span>
+                  </td>
+                  <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#506050' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <MapPin size={13} />
+                      {isEmpty ? '—' : ((r as any).lokasyonlar?.tanim ?? '—')}
+                    </span>
+                  </td>
+                  <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#506050' }}>
+                    {isEmpty ? '—' : ((r as any).users?.isim_soyisim ?? '—')}
+                  </td>
+                  <td>
+                    {isEmpty
+                      ? <span className="verde-badge">—</span>
+                      : <span className={`verde-badge ${css}`}>{DURUM_LABEL[durum] ?? durum}</span>
+                    }
+                  </td>
+                  <td style={{ color: '#7a907a', whiteSpace: 'nowrap', fontSize: 12 }}>
+                    {isEmpty ? '—' : formatDateTime((r?.durum_degisim_tarihi ?? r?.olusturma_tarihi) as string)}
+                  </td>
                 </tr>
               )
             })}
           </tbody>
         </table>
+
+        {rows.length === 0 && (
+          <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, paddingTop: 32 }}>
+            Henüz işlem kaydı yok
+          </div>
+        )}
       </div>
     </div>
   )
