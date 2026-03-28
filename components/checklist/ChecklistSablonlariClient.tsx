@@ -38,6 +38,7 @@ type LokasyonRow = {
   id: string
   tanim: string
   parent_id: string | null
+  proje_id: string | null
   checklist_sablon_id: string | null
   aktif: boolean
 }
@@ -173,7 +174,27 @@ export default function ChecklistSablonlariClient({
     return m
   }, [baglaLokList])
 
-  const ustLokasyonlar = useMemo(() => baglaLokList.filter(l => !l.parent_id), [baglaLokList])
+  // Aktif projenin lokasyonlarından hangi üst lokasyonların altında kayıt var?
+  const projeUstIdSet = useMemo(() => {
+    if (!projeId) return null // projeId yoksa tüm üstler
+    const set = new Set<string>()
+    for (const l of baglaLokList) {
+      if (l.proje_id === projeId && l.parent_id) set.add(l.parent_id)
+    }
+    return set
+  }, [baglaLokList, projeId])
+
+  const ustLokasyonlar = useMemo(() =>
+    baglaLokList.filter(l => {
+      if (l.parent_id) return false // sadece kök (üst) lokasyonlar
+      if (projeUstIdSet === null) return true
+      // Bu üst lokasyonun altında proje lokasyonu ya da grup var mı?
+      const directChildren = childrenByParent[l.id] ?? []
+      return projeUstIdSet.has(l.id) ||
+        directChildren.some(c => projeUstIdSet.has(c.id))
+    }),
+    [baglaLokList, childrenByParent, projeUstIdSet]
+  )
 
   const gruplar = useMemo(() =>
     baglaLokList.filter(l => l.parent_id !== null && (childrenByParent[l.id]?.length ?? 0) > 0),
@@ -540,13 +561,12 @@ export default function ChecklistSablonlariClient({
     setLokArama('')
     setLokUstFiltre('')
     const fid = firmaId ?? sablon.firma_id
-    let q = supabase
+    const { data } = await supabase
       .from('lokasyonlar')
-      .select('id, tanim, parent_id, checklist_sablon_id, aktif')
+      .select('id, tanim, parent_id, proje_id, checklist_sablon_id, aktif')
       .eq('firma_id', fid)
       .eq('aktif', true)
       .order('tanim')
-    const { data } = await q
     setBaglaLokList((data ?? []) as LokasyonRow[])
     setBaglaLoading(false)
   }
