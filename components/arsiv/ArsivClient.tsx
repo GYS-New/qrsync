@@ -383,14 +383,18 @@ export default function ArsivClient({
         await yukle_spesifik()
 
       } else if (topluSilSekme === 'ceklist') {
-        const lokIds = lokasyonlarTum.map(l => l.id)
-        if (lokIds.length) {
-          let q = supabase.from('checklist_sonuc_basliklari').delete().in('lokasyon_id', lokIds)
-          if (fromISO) q = (q as any).gte('kayit_tarihi', fromISO)
-          if (toISO)   q = (q as any).lte('kayit_tarihi', toISO)
-          const { error } = await q
-          if (error) throw error
-        }
+        const res = await fetch('/api/checklist-results', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firmaId,
+            projeId: projeId ?? null,
+            from: fromISO,
+            to:   toISO,
+          }),
+        })
+        const json = await res.json()
+        if (!res.ok || !json.ok) throw new Error(json.error ?? 'Silme işlemi başarısız')
         await yukle_ceklist()
       }
 

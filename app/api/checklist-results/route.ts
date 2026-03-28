@@ -165,6 +165,73 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// DELETE /api/checklist-results — Toplu çeklist sonuçlarını kalıcı sil
+// Body: { firmaId, projeId?, from?, to? }
+export async function DELETE(req: NextRequest) {
+  try {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+
+    const { data: me } = await supabase
+      .from('users').select('id,rol,firma_id').eq('id', user.id).single()
+    if (!me) return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 401 })
+
+    const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
+    const isTA = me.rol === 'tenant_admin'
+    if (!isSA && !isTA) return NextResponse.json({ error: 'Bu işlem için yetkiniz yok' }, { status: 403 })
+
+    const body = await req.json()
+    const firmaId: string | null = isSA ? (body.firmaId ?? null) : me.firma_id
+    const projeId: string | null = body.projeId ?? null
+    const from:    string | null = body.from    ?? null  // ISO string
+    const to:      string | null = body.to      ?? null  // ISO string
+
+    if (!firmaId) return NextResponse.json({ error: 'firmaId gerekli' }, { status: 400 })
+
+    const admin = createAdminClient()
+
+    // 1. Firmaya (ve projeye) ait lokasyon ID'lerini al
+    let lokQ = admin.from('lokasyonlar').select('id').eq('firma_id', firmaId)
+    if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+    const { data: loks, error: lokErr } = await lokQ
+    if (lokErr) throw lokErr
+    const lokIds = (loks ?? []).map((l: any) => l.id)
+    if (!lokIds.length) return NextResponse.json({ ok: true, silinen: 0 })
+
+    // 2. Silinecek checklist_sonuc_basliklari ID'lerini bul
+    let sbQ = admin.from('checklist_sonuc_basliklari')
+      .select('id')
+      .in('lokasyon_id', lokIds)
+    if (from) sbQ = (sbQ as any).gte('kayit_tarihi', from)
+    if (to)   sbQ = (sbQ as any).lte('kayit_tarihi', to)
+
+    const { data: basliklar, error: sbErr } = await sbQ
+    if (sbErr) throw sbErr
+    const baslikIds = (basliklar ?? []).map((b: any) => b.id)
+    if (!baslikIds.length) return NextResponse.json({ ok: true, silinen: 0 })
+
+    // 3. Alt tablo checklist_sonuc_maddeleri'ni önce sil (foreign key)
+    const { error: maddeErr } = await admin
+      .from('checklist_sonuc_maddeleri')
+      .delete()
+      .in('sonuc_id', baslikIds)
+    if (maddeErr) throw maddeErr
+
+    // 4. Üst tablo checklist_sonuc_basliklari'nı sil
+    const { error: silErr } = await admin
+      .from('checklist_sonuc_basliklari')
+      .delete()
+      .in('id', baslikIds)
+    if (silErr) throw silErr
+
+    return NextResponse.json({ ok: true, silinen: baslikIds.length })
+  } catch (err: any) {
+    console.error('[checklist-results DELETE]', err)
+    return NextResponse.json({ error: err?.message ?? 'Sunucu hatası' }, { status: 500 })
+  }
+}
+
 // POST /api/checklist-results — Çeklist cevaplarını kaydet (web düzenleme)
 export async function POST(req: NextRequest) {
   try {
