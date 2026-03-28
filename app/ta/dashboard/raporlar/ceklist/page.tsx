@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
+import CeklistRaporlariClient from '@/components/raporlar/CeklistRaporlariClient'
 import { sayfaGorebilirMi } from '@/lib/yetki/sayfaYetkisi'
 
 export const dynamic = 'force-dynamic'
@@ -21,14 +22,13 @@ export default async function TACeklistRaporPage() {
       <Topbar
         title="Çeklist Raporları"
         base="/ta"
-        breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: '/ta/dashboard/raporlar' }, { label: 'Çeklist Raporları' }]}
+        breadcrumbs={[
+          { label: 'Yönetim' },
+          { label: 'Rapor Merkezi', href: '/ta/dashboard/raporlar' },
+          { label: 'Çeklist Raporları' },
+        ]}
       />
-      <div style={{ padding: 24 }}>
-        <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: '#7a907a' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#506050', marginBottom: 8 }}>Çeklist Raporları</div>
-          <div style={{ fontSize: 13 }}>Bu bölüm sonra düzenlenecek.</div>
-        </div>
-      </div>
+      <CeklistRaporlariClient base="/ta" tenantFirmaId={(me as any).firma_id ?? null} />
     </div>
   )
 }

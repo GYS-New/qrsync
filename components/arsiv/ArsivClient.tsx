@@ -7,10 +7,11 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
+import ChecklistModal from '@/components/checklist/ChecklistModal'
 import {
   Trash2, RotateCcw, Download, FileSpreadsheet, Printer,
   RefreshCw, Archive, Users, Star, ClipboardList, ClipboardCheck,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, ExternalLink,
 } from 'lucide-react'
 
 const DURUM_RENK: Record<string, string> = {
@@ -893,13 +894,14 @@ export default function ArsivClient({
       )}
 
       {/* ═══════════════════════════════════════════════════════════
-          5 — ÇEKLİST RAPORLARI
+          5 — ÇEKLİST RAPORLARI (ARŞİV)
       ═══════════════════════════════════════════════════════════ */}
-      {aktifSekme === 'ceklist' && (
-        <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: '#7a907a' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#506050', marginBottom: 8 }}>Çeklist Raporları</div>
-          <div style={{ fontSize: 13 }}>Bu bölüm sonra düzenlenecek.</div>
-        </div>
+      {firmaId && aktifSekme === 'ceklist' && (
+        <CeklistArsivSekme
+          firmaId={firmaId}
+          projeId={projeId}
+          getLocPath={getLocPath}
+        />
       )}
 
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
@@ -958,5 +960,340 @@ export default function ArsivClient({
         </div>
       )}
     </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CeklistArsivSekme — Arşiv içindeki Çeklist Raporları sekmesi
+// Yalnızca arşivlenmiş görevlere ait çeklist kayıtlarını listeler.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CEKLIST_DURUM_LABEL: Record<string, string> = {
+  TAMAMLANDI: 'Tamamlandı',
+  ZAMANINDA_YAPILAMAYAN: 'Gecikmeli Tamamlandı',
+}
+
+const CEKLIST_DURUM_RENK: Record<string, { bg: string; color: string }> = {
+  TAMAMLANDI:            { bg: '#dcfce7', color: '#166534' },
+  ZAMANINDA_YAPILAMAYAN: { bg: '#fef9c3', color: '#854d0e' },
+}
+
+const CEKLIST_KANAL_RENK: Record<string, { bg: string; color: string }> = {
+  WEB:   { bg: '#e0f2fe', color: '#0369a1' },
+  QR:    { bg: '#ede9fe', color: '#5b21b6' },
+  NFC:   { bg: '#fce7f3', color: '#9d174d' },
+  MOBİL: { bg: '#f0fdf4', color: '#166534' },
+}
+
+function ckPct(dol: number, top: number) {
+  if (!top) return 0
+  return Math.round((dol / top) * 100)
+}
+
+function CeklistArsivSekme({
+  firmaId,
+  projeId,
+  getLocPath,
+}: {
+  firmaId: string
+  projeId: string
+  getLocPath: (id: string | null | undefined) => string
+}) {
+  const { toast } = useToast()
+  const [data,    setData]    = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [aramaQ,  setAramaQ]  = useState('')
+  const [durumF,  setDurumF]  = useState('')
+  const [kanaliF, setKanaliF] = useState('')
+  const [fromD,   setFromD]   = useState('')
+  const [toD,     setToD]     = useState('')
+  const [modal,   setModal]   = useState<{ id: string } | null>(null)
+
+  const yukle = useCallback(async (baslangic?: string, bitis?: string) => {
+    setLoading(true)
+    try {
+      const p = new URLSearchParams({ firma_id: firmaId, arsiv: 'true' })
+      if (projeId)   p.set('proje_id', projeId)
+      if (baslangic) p.set('baslangic', baslangic)
+      if (bitis)     p.set('bitis', bitis)
+      const res  = await fetch(`/api/raporlar/ceklist?${p}`)
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error)
+      setData(json.data ?? [])
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Yüklenemedi', message: e.message })
+    } finally {
+      setLoading(false)
+    }
+  }, [firmaId, projeId])
+
+  useEffect(() => { yukle() }, [yukle])
+
+  const filtre = useMemo(() => {
+    const s = aramaQ.trim().toLowerCase()
+    return data.filter(r => {
+      if (s && ![r.gorev_tanim, r.lokasyon_tanim, r.kullanici_isim, r.sablon_baslik]
+        .join(' ').toLowerCase().includes(s)) return false
+      if (durumF  && r.gorev_durum !== durumF)  return false
+      if (kanaliF && r.kanal       !== kanaliF) return false
+      return true
+    })
+  }, [data, aramaQ, durumF, kanaliF])
+
+  const inp: React.CSSProperties = {
+    height: 34, padding: '0 10px', borderRadius: 8,
+    border: '1px solid #e2e8f0', fontSize: 13, background: '#fff',
+  }
+  const applyBtn: React.CSSProperties = {
+    ...inp, background: '#1f6b1f', color: '#fff', border: 'none',
+    fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+  }
+  const spinning: React.CSSProperties = { animation: 'spin 0.9s linear infinite' }
+
+  // Dışa aktar
+  function csvIndir2() {
+    const headers = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
+    const rows = filtre.map((r: any) => [
+      r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
+      r.gorev_tanim, r.lokasyon_tanim, r.sablon_baslik,
+      CEKLIST_DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
+      r.kanal, r.kullanici_isim,
+      `%${ckPct(r.doldurulan_madde, r.toplam_madde)}`,
+    ])
+    const csv = [headers, ...rows]
+      .map(row => row.map((c: string) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `ceklist-arsiv-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click(); URL.revokeObjectURL(a.href)
+  }
+
+  async function excelIndir2() {
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+    const ws = wb.addWorksheet('Çeklist Raporları Arşiv')
+    ws.columns = [
+      { header: 'Kayıt Tarihi',  key: 'kayit',     width: 20 },
+      { header: 'Görev',         key: 'gorev',     width: 32 },
+      { header: 'Lokasyon',      key: 'lokasyon',  width: 24 },
+      { header: 'Şablon',        key: 'sablon',    width: 24 },
+      { header: 'Durum',         key: 'durum',     width: 22 },
+      { header: 'Kanal',         key: 'kanal',     width: 10 },
+      { header: 'Dolduran',      key: 'kullanici', width: 20 },
+      { header: 'Doldurulma %',  key: 'oran',      width: 14 },
+    ]
+    const hr = ws.getRow(1)
+    hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }
+    hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }
+    hr.height = 20
+    filtre.forEach((r: any) => ws.addRow({
+      kayit:     r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
+      gorev:     r.gorev_tanim,
+      lokasyon:  r.lokasyon_tanim,
+      sablon:    r.sablon_baslik,
+      durum:     CEKLIST_DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
+      kanal:     r.kanal,
+      kullanici: r.kullanici_isim,
+      oran:      `%${ckPct(r.doldurulan_madde, r.toplam_madde)}`,
+    }))
+    const buf = await wb.xlsx.writeBuffer()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+    a.download = `ceklist-arsiv-${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.click(); URL.revokeObjectURL(a.href)
+  }
+
+  function yazdir2() {
+    const rows = filtre.map((r: any) =>
+      `<tr>
+        <td>${r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—'}</td>
+        <td>${r.gorev_tanim}</td>
+        <td>${r.lokasyon_tanim}</td>
+        <td>${r.sablon_baslik}</td>
+        <td>${CEKLIST_DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum}</td>
+        <td>${r.kanal}</td>
+        <td>${r.kullanici_isim}</td>
+        <td>%${ckPct(r.doldurulan_madde, r.toplam_madde)} (${r.doldurulan_madde}/${r.toplam_madde})</td>
+      </tr>`
+    ).join('')
+    const w = window.open('', '_blank', 'width=1100,height=700')
+    if (!w) return
+    w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/>
+      <title>Çeklist Raporları Arşivi</title>
+      <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}
+      table{width:100%;border-collapse:collapse}
+      th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
+      td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
+      </head><body><h2 style="color:#1f6b1f">Çeklist Raporları Arşivi</h2>
+      <table><thead><tr>
+        <th>Kayıt Tarihi</th><th>Görev</th><th>Lokasyon</th><th>Şablon</th>
+        <th>Durum</th><th>Kanal</th><th>Dolduran</th><th>Doldurulma</th>
+      </tr></thead><tbody>${rows}</tbody></table></body></html>`)
+    w.document.close(); setTimeout(() => w.print(), 400)
+  }
+
+  return (
+    <>
+      {/* Üst bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <span style={{ fontSize: 13, color: '#64748b' }}>
+          <strong style={{ color: '#1f6b1f' }}>{filtre.length}</strong> kayıt
+        </span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={csvIndir2} disabled={!filtre.length}
+            className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
+            <Download size={13} /> CSV
+          </button>
+          <button onClick={excelIndir2} disabled={!filtre.length}
+            className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40"
+            style={{ color: '#1d6f42' }}>
+            <FileSpreadsheet size={13} /> Excel
+          </button>
+          <button onClick={yazdir2} disabled={!filtre.length}
+            className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40"
+            style={{ color: '#185a9b' }}>
+            <Printer size={13} /> Yazdır
+          </button>
+        </div>
+      </div>
+
+      {/* Filtre satırı */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <input
+          className="verde-input"
+          placeholder="Görev / lokasyon / dolduran ara…"
+          value={aramaQ}
+          onChange={e => setAramaQ(e.target.value)}
+          style={{ ...inp, flex: '1 1 200px' }}
+        />
+        <select value={durumF} onChange={e => setDurumF(e.target.value)} style={{ ...inp, minWidth: 180 }}>
+          <option value="">Durum (Tümü)</option>
+          <option value="TAMAMLANDI">Tamamlandı</option>
+          <option value="ZAMANINDA_YAPILAMAYAN">Gecikmeli Tamamlandı</option>
+        </select>
+        <select value={kanaliF} onChange={e => setKanaliF(e.target.value)} style={{ ...inp, minWidth: 120 }}>
+          <option value="">Kanal (Tümü)</option>
+          <option value="WEB">WEB</option>
+          <option value="QR">QR</option>
+          <option value="NFC">NFC</option>
+          <option value="MOBİL">MOBİL</option>
+        </select>
+        <input type="date" value={fromD} onChange={e => setFromD(e.target.value)} style={inp} />
+        <span style={{ color: '#94a3b8' }}>—</span>
+        <input type="date" value={toD} onChange={e => setToD(e.target.value)} style={inp} />
+        <button onClick={() => yukle(fromD || undefined, toD || undefined)} disabled={loading} style={applyBtn}>
+          <RefreshCw size={12} style={loading ? spinning : {}} /> Uygula
+        </button>
+        <button
+          onClick={() => { setAramaQ(''); setDurumF(''); setKanaliF(''); setFromD(''); setToD(''); yukle() }}
+          className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3]">
+          Temizle
+        </button>
+      </div>
+
+      {/* Tablo */}
+      <div className="verde-table-wrap">
+        <table className="verde-table">
+          <thead>
+            <tr>
+              <th>Kayıt Tarihi</th>
+              <th>Görev</th>
+              <th>Lokasyon</th>
+              <th>Şablon</th>
+              <th>Durum</th>
+              <th>Kanal</th>
+              <th>Dolduran</th>
+              <th>Doldurulma</th>
+              <th style={{ textAlign: 'center' }}>Detay</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center' }}>
+                <RefreshCw size={20} style={{ ...spinning, color: '#1f6b1f', display: 'block', margin: '0 auto' }} />
+              </td></tr>
+            ) : filtre.length === 0 ? (
+              <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+                Çeklist arşiv kaydı bulunamadı.
+              </td></tr>
+            ) : (
+              filtre.map((r: any) => {
+                const durumS = CEKLIST_DURUM_RENK[r.gorev_durum] ?? { bg: '#f1f5f9', color: '#475569' }
+                const kanalS = CEKLIST_KANAL_RENK[r.kanal] ?? { bg: '#f1f5f9', color: '#475569' }
+                const oran   = ckPct(r.doldurulan_madde, r.toplam_madde)
+                const oranColor = oran === 100 ? '#166534' : oran >= 60 ? '#d97706' : '#dc2626'
+                return (
+                  <tr key={r.id}>
+                    <td style={{ whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 12 }}>
+                      {r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—'}
+                    </td>
+                    <td style={{ fontWeight: 600, fontSize: 13 }}>{r.gorev_tanim}</td>
+                    <td style={{ color: '#64748b', fontSize: 12.5 }}>{r.lokasyon_tanim}</td>
+                    <td style={{ color: '#64748b', fontSize: 12 }}>{r.sablon_baslik}</td>
+                    <td>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 700,
+                        background: durumS.bg, color: durumS.color,
+                      }}>
+                        {CEKLIST_DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 700,
+                        background: kanalS.bg, color: kanalS.color,
+                      }}>
+                        {r.kanal}
+                      </span>
+                    </td>
+                    <td style={{ color: '#475569', fontSize: 12.5 }}>{r.kullanici_isim}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 6, background: '#e2e8f0', borderRadius: 4, minWidth: 60 }}>
+                          <div style={{
+                            height: '100%', width: `${oran}%`, background: oranColor,
+                            borderRadius: 4, transition: 'width .3s',
+                          }} />
+                        </div>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: oranColor, whiteSpace: 'nowrap' }}>
+                          %{oran}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                          ({r.doldurulan_madde}/{r.toplam_madde})
+                        </span>
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        onClick={() => setModal({ id: r.gorev_id })}
+                        title="Çeklist Detayı"
+                        style={{
+                          width: 30, height: 30, border: 'none', borderRadius: 7,
+                          background: '#e8f4e8', color: '#2e8b2e',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer', margin: '0 auto',
+                        }}>
+                        <ExternalLink size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Çeklist Detay Modal */}
+      {modal && (
+        <ChecklistModal
+          taskId={modal.id}
+          taskType="canli_gorevler"
+          onKapat={() => setModal(null)}
+        />
+      )}
+    </>
   )
 }
