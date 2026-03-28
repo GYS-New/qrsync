@@ -41,7 +41,7 @@ export async function GET(req: Request) {
     .order('tamamlanma_tarihi', { ascending: false })
     .limit(50)
 
-  // 2. Tamamlanan canlı görevler (son 24 saat)
+  // 2. Tamamlanan canlı görevler (son 24 saat) — kişiye atanmış VEYA kişi tamamlamış
   const { data: canliGorevler } = await admin
     .from('canli_gorevler')
     .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
@@ -60,11 +60,12 @@ export async function GET(req: Request) {
     .order('olusturma_tarihi', { ascending: false })
     .limit(20)
 
-  // 4. Aktif/açık atanmış canlı görevler
+  // 4. Aktif/açık atanmış veya atanmamış canlı görevler
+  // Frekansiyel görevler kimseye atanmaz ama kullanıcı tamamlamışsa göster
   const { data: aktifCanliGorevler } = await admin
     .from('canli_gorevler')
     .select('id, tanim, durum, olusturma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .eq('atanan_kullanici_id', user.id)
+    .or(`atanan_kullanici_id.eq.${user.id},atanan_kullanici_id.is.null`)
     .in('durum', ['ACIK', 'ISLEMDE', 'BEKLEMEDE'])
     .order('olusturma_tarihi', { ascending: false })
     .limit(20)

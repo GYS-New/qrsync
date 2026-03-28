@@ -381,6 +381,17 @@ export default function ArsivClient({
         const { error } = await q
         if (error) throw error
         await yukle_spesifik()
+
+      } else if (topluSilSekme === 'ceklist') {
+        const lokIds = lokasyonlarTum.map(l => l.id)
+        if (lokIds.length) {
+          let q = supabase.from('checklist_sonuc_basliklari').delete().in('lokasyon_id', lokIds)
+          if (fromISO) q = (q as any).gte('kayit_tarihi', fromISO)
+          if (toISO)   q = (q as any).lte('kayit_tarihi', toISO)
+          const { error } = await q
+          if (error) throw error
+        }
+        await yukle_ceklist()
       }
 
       toast({ type: 'success', title: 'Tamamlandı', message: 'Seçilen kayıtlar kalıcı olarak silindi.' })
@@ -989,6 +1000,10 @@ export default function ArsivClient({
             }} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3]">
               Temizle
             </button>
+            <button onClick={() => { setTopluSilSekme('ceklist'); setTopluSilFrom(ceklistFrom); setTopluSilTo(ceklistTo) }}
+              className="border px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2" style={{ borderColor:'#fca5a5', background:'#fff1f2', color:'#dc2626', fontWeight:600 }}>
+              <Trash2 size={13} /> Kayıtları Sil
+            </button>
           </div>
 
           <div className="verde-table-wrap">
@@ -1068,6 +1083,7 @@ export default function ArsivClient({
                   topluSilSekme === 'frekansiyel' ? 'Frekansiyel Görevler' :
                   topluSilSekme === 'personel'   ? 'Personel Takibi' :
                   topluSilSekme === 'musteri'    ? 'Müşteri Değerlendirmeleri' :
+                  topluSilSekme === 'ceklist'    ? 'Çeklist Raporları' :
                   'Spesifik Görevler'
                 }
               </div>
