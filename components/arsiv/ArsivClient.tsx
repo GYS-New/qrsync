@@ -246,7 +246,7 @@ export default function ArsivClient({
     if (aktifSekme === 'personel')   yukle_personel()
     if (aktifSekme === 'musteri')    yukle_musteri()
     if (aktifSekme === 'spesifik')   yukle_spesifik()
-    if (aktifSekme === 'ceklist')    yukle_ceklist()
+    // ceklist: manuel Uygula gerektirir, otomatik yüklenmez
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aktifSekme, firmaId, projeId, projeLoading])
 
@@ -992,7 +992,7 @@ export default function ArsivClient({
               </tr></thead>
               <tbody>
                 {ceklistLoading ? <YukleniyorSatir cols={8} /> :
-                 ceklistRows.length === 0 ? <BosKayit cols={8} mesaj="Çeklist raporu bulunamadı. Tarih aralığı seçip Uygula'ya basın." /> :
+                 ceklistRows.length === 0 ? <BosKayit cols={8} mesaj="Tarih aralığı seçip ▶ Uygula'ya basın." /> :
                  ceklistRows.map((r: any) => {
                    const acik = ceklistExpanded.has(r.gorev_id)
                    const basariColor = r.basari_pct === 100 ? '#1a5c2a' : r.basari_pct >= 50 ? '#d97706' : r.basari_pct > 0 ? '#dc2626' : '#94a3b8'
