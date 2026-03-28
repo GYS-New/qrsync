@@ -30,6 +30,7 @@ const SAYFALAR = [
   // Raporlar
   { kod: 'ham-veri-raporlari',    label: 'Ham Veri Raporları',         grup: 'Raporlar' },
   { kod: 'grafiksel-raporlar',    label: 'Grafiksel Raporlar',         grup: 'Raporlar' },
+  { kod: 'ceklist-raporlari',     label: 'Çeklist Raporları',          grup: 'Raporlar' },
   { kod: 'rapor-ozellestir',      label: 'Rapor Özelleştir',           grup: 'Raporlar' },
   { kod: 'sure-analiz-raporlari', label: 'Süre Analiz Raporları',      grup: 'Raporlar' },
   { kod: 'hakedis-raporu',        label: 'Hakediş Raporu',             grup: 'Raporlar' },

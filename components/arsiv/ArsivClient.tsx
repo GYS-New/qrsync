@@ -9,7 +9,7 @@ import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 import {
   Trash2, RotateCcw, Download, FileSpreadsheet, Printer,
-  RefreshCw, Archive, Users, Star, ClipboardList,
+  RefreshCw, Archive, Users, Star, ClipboardList, ClipboardCheck,
   ChevronDown, ChevronRight,
 } from 'lucide-react'
 
@@ -26,13 +26,14 @@ const ARSIV_NEDEN_LABEL: Record<string, string> = {
 
 const YILDIZ_ETIKET = ['', 'Çok Kötü', 'Kötü', 'Orta', 'İyi', 'Mükemmel']
 
-type Sekme = 'frekansiyel' | 'personel' | 'musteri' | 'spesifik'
+type Sekme = 'frekansiyel' | 'personel' | 'musteri' | 'spesifik' | 'ceklist'
 
 const SEKMELER: { id: Sekme; label: string; icon: React.ReactNode }[] = [
   { id: 'frekansiyel', label: 'Frekansiyel Görevler',      icon: <Archive size={14} /> },
   { id: 'personel',   label: 'Personel Takibi',            icon: <Users size={14} /> },
   { id: 'musteri',    label: 'Müşteri Değerlendirmeleri',  icon: <Star size={14} /> },
   { id: 'spesifik',  label: 'Spesifik Görevler',           icon: <ClipboardList size={14} /> },
+  { id: 'ceklist',   label: 'Çeklist Raporları',           icon: <ClipboardCheck size={14} /> },
 ]
 
 function csvIndir(baslik: string, headers: string[], rows: string[][]) {
@@ -889,6 +890,16 @@ export default function ArsivClient({
             </table>
           </div>
         </>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          5 — ÇEKLİST RAPORLARI
+      ═══════════════════════════════════════════════════════════ */}
+      {aktifSekme === 'ceklist' && (
+        <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: '#7a907a' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#506050', marginBottom: 8 }}>Çeklist Raporları</div>
+          <div style={{ fontSize: 13 }}>Bu bölüm sonra düzenlenecek.</div>
+        </div>
       )}
 
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
