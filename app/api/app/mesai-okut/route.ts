@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
     const { data: tokenData, error: tokenErr } = await admin
       .from('device_tokens')
-      .select('user_id, firma_id, isim_soyisim')
+      .select('user_id, firma_id, isim_soyisim, proje_id')
       .eq('device_token', deviceToken)
       .single()
 
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const { user_id: userId, firma_id: firmaId, isim_soyisim: isim } = tokenData
+    const { user_id: userId, firma_id: firmaId, isim_soyisim: isim, proje_id: personelProjeId } = tokenData
 
     // ── 2. Body: mesai QR/NFC token ───────────────────────────────────────────
     let body: any
@@ -108,6 +108,15 @@ export async function POST(req: Request) {
       )
     }
 
+    // ── 4b. Proje eşleşmesi ───────────────────────────────────────────────────
+    // QR'ın proje_id'si varsa, personelin kayıtlı olduğu projeyle eşleşmeli
+    if (qr.proje_id && personelProjeId && qr.proje_id !== personelProjeId) {
+      return NextResponse.json(
+        { ok: false, error: 'Bu mesai kodu projenize ait değil', durum: 'proje_eslesmedi' },
+        { status: 403, headers: CORS }
+      )
+    }
+
     // Firma personel takibi aktif mi?
     const { data: firma } = await admin
       .from('firmalar')
@@ -143,17 +152,20 @@ export async function POST(req: Request) {
     const bugun  = trtNow.toISOString().split('T')[0]
     const simdi  = new Date().toISOString()
 
-    // ── 6. Bugünkü açık kayıt ─────────────────────────────────────────────────
+    // ── 6. Bugünkü en son açık kayıt ─────────────────────────────────────────
     let mevQ = admin
       .from('personel_mesai_kayitlari')
       .select('id, giris_saati, cikis_saati')
       .eq('user_id', userId)
       .eq('kayit_tarihi', bugun)
-      .eq('arsivlendi', false)
+      .is('cikis_saati', null)
+      .order('giris_saati', { ascending: false })
+      .limit(1)
 
     if (qr.proje_id) mevQ = (mevQ as any).eq('proje_id', qr.proje_id)
 
-    const { data: mevcut } = await mevQ.maybeSingle()
+    const { data: mevcutList } = await mevQ
+    const mevcut = mevcutList?.[0] ?? null
 
     // ── 7. Giriş ─────────────────────────────────────────────────────────────
     if (qr.tip === 'GIRIS') {

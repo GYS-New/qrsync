@@ -84,23 +84,18 @@ async function fetchData(firmaId: string, projeId: string | null, params: URLSea
 
   const gorevIds = gorevler.map(({ g }) => g.id)
 
-  // Kullanıcılar
-  const uids = [...new Set(gorevler.flatMap(({ g }) => [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id]).filter(Boolean))]
-  const { data: usersData } = uids.length ? await admin.from('users').select('id,isim_soyisim').in('id', uids) : { data: [] }
-  const userMap = new Map<string, string>((usersData ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
-
-  // Sonuç başlıkları
+  // Sonuç başlıkları (web/QR)
   const { data: sonucBasliklari } = await admin.from('checklist_sonuc_basliklari')
-    .select('id,gorev_id,canli_gorev_id,kullanici_id,kanal,created_at')
+    .select('id,gorev_id,canli_gorev_id,kullanici_id,kanal,kayit_tarihi')
     .or(gorevIds.map((id: string) => `gorev_id.eq.${id},canli_gorev_id.eq.${id}`).join(','))
-    .order('created_at', { ascending: false })
+    .order('kayit_tarihi', { ascending: false })
   const sbMap = new Map<string, any>()
   for (const sb of sonucBasliklari ?? []) {
     const gid = sb.gorev_id ?? sb.canli_gorev_id
     if (gid && !sbMap.has(gid)) sbMap.set(gid, sb)
   }
 
-  // Madde cevapları
+  // Madde cevapları (web/QR)
   const sonucIds = [...sbMap.values()].map((sb: any) => sb.id)
   const { data: sonucMaddeler } = sonucIds.length
     ? await admin.from('checklist_sonuc_maddeleri').select('id,sonuc_id,madde_id,secenek_degeri,aciklama,gorsel_url').in('sonuc_id', sonucIds)
@@ -111,23 +106,53 @@ async function fetchData(firmaId: string, projeId: string | null, params: URLSea
     cevapMap.get(sm.sonuc_id)!.set(sm.madde_id, sm)
   }
 
+  // Mobil çeklist cevapları (checklist_cevaplari)
+  const { data: mobileCevaplarData } = gorevIds.length
+    ? await admin.from('checklist_cevaplari')
+        .select('gorev_id,madde_id,secenek_degeri,aciklama,gorsel_url,yanitlayan_id')
+        .in('gorev_id', gorevIds)
+    : { data: [] }
+  const mobileCevapMap = new Map<string, Map<string, any>>()
+  for (const c of mobileCevaplarData ?? []) {
+    if (!mobileCevapMap.has(c.gorev_id)) mobileCevapMap.set(c.gorev_id, new Map())
+    mobileCevapMap.get(c.gorev_id)!.set(c.madde_id, c)
+  }
+
+  // Kullanıcılar
+  const mobileYanitlayanIds = [...new Set((mobileCevaplarData ?? []).map((c: any) => c.yanitlayan_id).filter(Boolean))]
+  const sbKullaniciIds = [...sbMap.values()].map((sb: any) => sb.kullanici_id).filter(Boolean)
+  const uids = [...new Set([
+    ...gorevler.flatMap(({ g }) => [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id]).filter(Boolean),
+    ...sbKullaniciIds,
+    ...mobileYanitlayanIds,
+  ])]
+  const { data: usersData } = uids.length ? await admin.from('users').select('id,isim_soyisim').in('id', uids) : { data: [] }
+  const userMap = new Map<string, string>((usersData ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
+
   // Satırları oluştur
   const rows: any[] = []
   for (const { g, tip } of gorevler) {
-    const lok    = lokMap.get(g.lokasyon_id); if (!lok) continue
-    const maddeler   = sablonMaddeMap.get(lok.checklist_sablon_id) ?? []
-    const sb         = sbMap.get(g.id)
-    const gorevCevap = sb ? cevapMap.get(sb.id) ?? new Map() : new Map()
+    const lok = lokMap.get(g.lokasyon_id); if (!lok) continue
+    const maddeler = sablonMaddeMap.get(lok.checklist_sablon_id) ?? []
+    const sb       = sbMap.get(g.id)
+    // Web/QR öncelikli, yoksa mobil
+    const gorevCevap = sb
+      ? cevapMap.get(sb.id) ?? new Map()
+      : mobileCevapMap.get(g.id) ?? new Map()
     const dolduruldu = maddeler.filter((m: any) => gorevCevap.has(m.id)).length
-    const tamamlayan = g.tamamlayan_kullanici_id ? userMap.get(g.tamamlayan_kullanici_id) : g.islemi_yapan_id ? userMap.get(g.islemi_yapan_id) : null
+    const mobileYanitlayan = mobileCevapMap.get(g.id)?.values().next().value?.yanitlayan_id ?? null
+    const yapanId  = sb?.kullanici_id ?? mobileYanitlayan ?? g.tamamlayan_kullanici_id ?? g.islemi_yapan_id
+    const tamamlayan = yapanId ? userMap.get(yapanId) ?? null : null
 
     if (tanimAra && !(g.tanim ?? '').toLowerCase().includes(tanimAra.toLowerCase())) continue
     if (yapanAdi && !(tamamlayan ?? '').toLowerCase().includes(yapanAdi.toLowerCase())) continue
 
+    const kanal = sb ? (sb.kanal ?? 'WEB') : mobileCevapMap.has(g.id) ? 'MOBİL' : '—'
     rows.push({
       tanim: g.tanim, tip, durum: g.durum, lokasyon: lok.tanim,
       atanan:    g.atanan_kullanici_id ? userMap.get(g.atanan_kullanici_id) ?? '—' : '—',
       tamamlayan: tamamlayan ?? '—',
+      kanal,
       olusturma: fmt(g.olusturma_tarihi), tamamlanma: fmt(g.tamamlanma_tarihi),
       madde_toplam: maddeler.length, madde_dolduruldu: dolduruldu,
       basari_pct: maddeler.length > 0 ? Math.round(dolduruldu / maddeler.length * 100) : 0,
@@ -242,7 +267,7 @@ export async function GET(req: NextRequest) {
     for (const r of rows) {
       for (const m of r.maddeler) {
         const row = ws2.getRow(rowIdx++)
-        row.values = [r.tanim, r.lokasyon, r.durum, m.sira, m.baslik, m.zorunlu ? 'Evet' : 'Hayır', m.secenek || '—', m.aciklama || '—', m.gorsel || '—', r.tamamlayan, '—', r.tamamlanma]
+        row.values = [r.tanim, r.lokasyon, r.durum, m.sira, m.baslik, m.zorunlu ? 'Evet' : 'Hayır', m.secenek || '—', m.aciklama || '—', m.gorsel || '—', r.tamamlayan, r.kanal, r.tamamlanma]
         row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: m.dolduruldu ? 'FFF0FDF4' : 'FFFFFFFF' } }
         if (!m.dolduruldu && m.zorunlu) {
           row.getCell(5).font = { color: { argb: 'FFDC2626' } }

@@ -14,7 +14,7 @@ export async function OPTIONS() {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { firma_token, device_id, user_id, isim_soyisim } = body
+    const { firma_token, device_id, user_id, isim_soyisim, proje_id } = body
 
     if (!firma_token || !device_id || !user_id || !isim_soyisim) {
       return NextResponse.json({ ok: false, error: 'Eksik parametreler' }, { status: 400, headers: CORS_HEADERS })
@@ -67,6 +67,7 @@ export async function POST(req: Request) {
           user_id,
           firma_id: linkData.firma_id,
           isim_soyisim: kullanici.isim_soyisim,
+          proje_id: proje_id || null,
           aktif: true,
           son_kullanim: new Date().toISOString(),
         })
@@ -79,6 +80,7 @@ export async function POST(req: Request) {
           user_id,
           firma_id: linkData.firma_id,
           isim_soyisim: kullanici.isim_soyisim,
+          proje_id: proje_id || null,
           aktif: true,
           kayit_tarihi: new Date().toISOString(),
         })
@@ -98,6 +100,7 @@ export async function POST(req: Request) {
       user_id,
       isim_soyisim: kullanici.isim_soyisim,
       firma_id: linkData.firma_id,
+      proje_id: proje_id || null,
       mod: linkData.mod || 'QR',
     }, { headers: CORS_HEADERS })
 
