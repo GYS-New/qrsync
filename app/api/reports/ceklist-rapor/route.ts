@@ -101,8 +101,8 @@ export async function GET(req: NextRequest) {
       if (projeId) q = (q as any).eq('proje_id', projeId)
       if (kaynak === 'rapor')  q = (q as any).gte('tamamlanma_tarihi', sinir)
       if (kaynak === 'arsiv')  q = (q as any).lt('tamamlanma_tarihi', sinir)
-      const { data } = await q
-      for (const g of data ?? []) {
+      const { data } = await (q as any)
+      for (const g of (data as any[]) ?? []) {
         if (!gorevMap.has(g.id)) { gorevMap.set(g.id, g); gorevTipMap.set(g.id, tip) }
       }
     }
