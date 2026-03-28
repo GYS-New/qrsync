@@ -43,6 +43,14 @@ type LokasyonRow = {
   aktif: boolean
 }
 
+type GrupRow = {
+  id: string
+  ad: string
+  ust_lokasyon_id: string | null
+  ust_lokasyon_tanim: string | null
+  lokasyon_ids: string[]
+}
+
 function emptyMadde(index: number): MaddeForm {
   return {
     localId: `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -87,6 +95,7 @@ export default function ChecklistSablonlariClient({
   // ── Bağla popup state ─────────────────────────────────────────────────────
   const [baglaInfo,    setBaglaInfo]    = useState<{ sablon: SablonOzet; asama: BaglaAsama } | null>(null)
   const [baglaLokList, setBaglaLokList] = useState<LokasyonRow[]>([])
+  const [baglaGrupList, setBaglaGrupList] = useState<GrupRow[]>([])
   const [baglaLoading, setBaglaLoading] = useState(false)
   const [secilenLok,   setSecilenLok]   = useState<Set<string>>(new Set())
   const [secilenGrup,  setSecilenGrup]  = useState<string>('')
@@ -164,7 +173,7 @@ export default function ChecklistSablonlariClient({
 
   // ── Bağla türev veriler ───────────────────────────────────────────────────
 
-  // parent_id → children haritası (tüm lista)
+  // parent_id → children haritası (lokasyon ekranı için)
   const childrenByParent = useMemo(() => {
     const m: Record<string, LokasyonRow[]> = {}
     for (const l of baglaLokList) {
@@ -177,9 +186,9 @@ export default function ChecklistSablonlariClient({
   }, [baglaLokList])
 
   // ── LOKASYON EKRANI türevleri ─────────────────────────────────────────────
-  // Seçilebilecek lokasyonlar: proje lokasyonları (proje_id eşleşenler veya leaf'ler)
+  // Seçilebilecek lokasyonlar: leaf nodelar (parent_id var, child yok)
   const lokasyonListe = useMemo(() =>
-    baglaLokList.filter(l => !l.parent_id ? false : (childrenByParent[l.id]?.length ?? 0) === 0),
+    baglaLokList.filter(l => l.parent_id !== null && (childrenByParent[l.id]?.length ?? 0) === 0),
     [baglaLokList, childrenByParent]
   )
 
@@ -195,22 +204,20 @@ export default function ChecklistSablonlariClient({
     return true
   }), [lokasyonListe, lokUstFiltre, lokArama])
 
-  // ── GRUP EKRANI türevleri ─────────────────────────────────────────────────
-  // Gruplar: parent_id'si olan VE child'ları bulunan lokasyonlar (veri zaten proje kapsamında)
-  const gruplar = useMemo(() =>
-    baglaLokList.filter(l => l.parent_id !== null && (childrenByParent[l.id]?.length ?? 0) > 0),
-    [baglaLokList, childrenByParent]
-  )
-
-  // Grup ekranı filtre seçenekleri: grupların kök (parent_id=null) parent'ları
+  // ── GRUP EKRANI türevleri (lokasyon_gruplari tablosundan) ──────────────────
   const grupUstFiltreler = useMemo(() => {
-    const parentIds = new Set(gruplar.map(g => g.parent_id).filter(Boolean) as string[])
-    return baglaLokList.filter(l => !l.parent_id && parentIds.has(l.id))
-  }, [baglaLokList, gruplar])
+    const map = new Map<string, string>()
+    for (const g of baglaGrupList) {
+      if (g.ust_lokasyon_id && g.ust_lokasyon_tanim) {
+        map.set(g.ust_lokasyon_id, g.ust_lokasyon_tanim)
+      }
+    }
+    return Array.from(map.entries()).map(([id, tanim]) => ({ id, tanim })).sort((a, b) => a.tanim.localeCompare(b.tanim))
+  }, [baglaGrupList])
 
   const filteredGruplar = useMemo(() =>
-    gruplar.filter(g => !lokUstFiltre || g.parent_id === lokUstFiltre),
-    [gruplar, lokUstFiltre]
+    baglaGrupList.filter(g => !lokUstFiltre || g.ust_lokasyon_id === lokUstFiltre),
+    [baglaGrupList, lokUstFiltre]
   )
 
   // ── Form yardımcıları ─────────────────────────────────────────────────────
@@ -561,43 +568,70 @@ export default function ChecklistSablonlariClient({
     setSecilenGrup('')
     setLokArama('')
     setLokUstFiltre('')
+    setBaglaLokList([])
+    setBaglaGrupList([])
     const fid = firmaId ?? sablon.firma_id
 
-    const SELECT = 'id, tanim, parent_id, proje_id, checklist_sablon_id, aktif'
-
-    // 1. Projeye ait lokasyonları çek (projeId varsa filtreli, yoksa tüm firma)
-    let leafQ = supabase.from('lokasyonlar').select(SELECT).eq('firma_id', fid).eq('aktif', true).order('tanim')
+    // ── Lokasyon ekranı verisi (projeye özgü, hiyerarşiyle) ─────────────────
+    const LOK_SELECT = 'id, tanim, parent_id, proje_id, checklist_sablon_id, aktif'
+    let leafQ = supabase.from('lokasyonlar').select(LOK_SELECT).eq('firma_id', fid).eq('aktif', true).order('tanim')
     if (projeId) leafQ = (leafQ as any).eq('proje_id', projeId)
     const { data: leafData } = await leafQ
     const leaves = (leafData ?? []) as LokasyonRow[]
 
-    if (!projeId || leaves.length === 0) {
-      setBaglaLokList(leaves)
-      setBaglaLoading(false)
-      return
-    }
-
-    // 2. Parent'ları çek (grup katmanı)
+    // Parent ve grandparent'ları çek (filtre için)
     const existingIds = new Set(leaves.map(l => l.id))
     const parentIds = [...new Set(leaves.map(l => l.parent_id).filter(Boolean) as string[])].filter(id => !existingIds.has(id))
-
     let parents: LokasyonRow[] = []
     if (parentIds.length > 0) {
-      const { data: pData } = await supabase.from('lokasyonlar').select(SELECT).in('id', parentIds)
+      const { data: pData } = await supabase.from('lokasyonlar').select(LOK_SELECT).in('id', parentIds)
       parents = (pData ?? []) as LokasyonRow[]
     }
-
-    // 3. Grandparent'ları çek (üst lokasyon katmanı)
     const parentIdSet = new Set(parents.map(l => l.id))
-    const grandParentIds = [...new Set(parents.map(l => l.parent_id).filter(Boolean) as string[])].filter(id => !existingIds.has(id) && !parentIdSet.has(id))
-
+    const gpIds = [...new Set(parents.map(l => l.parent_id).filter(Boolean) as string[])].filter(id => !existingIds.has(id) && !parentIdSet.has(id))
     let grandParents: LokasyonRow[] = []
-    if (grandParentIds.length > 0) {
-      const { data: gpData } = await supabase.from('lokasyonlar').select(SELECT).in('id', grandParentIds)
+    if (gpIds.length > 0) {
+      const { data: gpData } = await supabase.from('lokasyonlar').select(LOK_SELECT).in('id', gpIds)
       grandParents = (gpData ?? []) as LokasyonRow[]
     }
-
     setBaglaLokList([...grandParents, ...parents, ...leaves])
+
+    // ── Grup ekranı verisi (lokasyon_gruplari tablosundan) ───────────────────
+    let grupQ = supabase.from('lokasyon_gruplari').select('id, ad, ust_lokasyon_id').eq('firma_id', fid).eq('aktif', true).order('ad')
+    if (projeId) grupQ = (grupQ as any).eq('proje_id', projeId)
+    const { data: grupData } = await grupQ
+    const gruplar = (grupData ?? []) as { id: string; ad: string; ust_lokasyon_id: string | null }[]
+
+    // Üye lokasyonlar
+    const grupIds = gruplar.map(g => g.id)
+    let uyeler: { grup_id: string; lokasyon_id: string }[] = []
+    if (grupIds.length > 0) {
+      const { data: uyeData } = await supabase.from('lokasyon_grup_uyeleri').select('grup_id, lokasyon_id').in('grup_id', grupIds)
+      uyeler = (uyeData ?? []) as { grup_id: string; lokasyon_id: string }[]
+    }
+
+    // Üst lokasyon adlarını çek
+    const ustIds = [...new Set(gruplar.map(g => g.ust_lokasyon_id).filter(Boolean) as string[])]
+    let ustLokMap: Record<string, string> = {}
+    if (ustIds.length > 0) {
+      const { data: ustData } = await supabase.from('lokasyonlar').select('id, tanim').in('id', ustIds)
+      for (const u of ustData ?? []) ustLokMap[(u as any).id] = (u as any).tanim
+    }
+
+    // grup_id → lokasyon_ids map
+    const uyeMap: Record<string, string[]> = {}
+    for (const u of uyeler) {
+      if (!uyeMap[u.grup_id]) uyeMap[u.grup_id] = []
+      uyeMap[u.grup_id].push(u.lokasyon_id)
+    }
+
+    setBaglaGrupList(gruplar.map(g => ({
+      id:                g.id,
+      ad:                g.ad,
+      ust_lokasyon_id:   g.ust_lokasyon_id,
+      ust_lokasyon_tanim: g.ust_lokasyon_id ? (ustLokMap[g.ust_lokasyon_id] ?? null) : null,
+      lokasyon_ids:      uyeMap[g.id] ?? [],
+    })))
     setBaglaLoading(false)
   }
 
@@ -615,15 +649,15 @@ export default function ChecklistSablonlariClient({
       else showSuccess(`${ids.length} lokasyona bağlandı.`)
     } else if (baglaInfo.asama === 'grup') {
       if (!secilenGrup) return showError('Bir grup seçin')
-      const children = baglaLokList.filter(l => l.parent_id === secilenGrup)
-      if (children.length === 0) return showError('Bu grubun lokasyonu yok')
+      const grup = baglaGrupList.find(g => g.id === secilenGrup)
+      if (!grup || grup.lokasyon_ids.length === 0) return showError('Bu grubun lokasyonu yok')
       setLoading(true)
       const { error } = await supabase
         .from('lokasyonlar')
         .update({ checklist_sablon_id: baglaInfo.sablon.id })
-        .in('id', children.map(c => c.id))
+        .in('id', grup.lokasyon_ids)
       if (error) showError(error.message)
-      else showSuccess(`${children.length} lokasyona bağlandı.`)
+      else showSuccess(`${grup.lokasyon_ids.length} lokasyona bağlandı.`)
     }
     setBaglaInfo(null)
     setSecilenLok(new Set())
@@ -953,23 +987,20 @@ export default function ChecklistSablonlariClient({
                     <div style={{ overflowY: 'auto', flex: 1 }}>
                       {filteredGruplar.length === 0 ? (
                         <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Grup bulunamadı</div>
-                      ) : filteredGruplar.map(g => {
-                        const children = childrenByParent[g.id] ?? []
-                        return (
-                          <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', cursor: 'pointer', background: secilenGrup === g.id ? '#f0fdf4' : 'transparent', borderBottom: '1px solid #f1f5f1' }}>
-                            <input type="radio" name="grup" checked={secilenGrup === g.id} onChange={() => setSecilenGrup(g.id)} style={{ width: 16, height: 16, flexShrink: 0 }} />
-                            <div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: '#102110' }}>{g.tanim}</div>
-                              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{children.length} lokasyon</div>
-                            </div>
-                          </label>
-                        )
-                      })}
+                      ) : filteredGruplar.map(g => (
+                        <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', cursor: 'pointer', background: secilenGrup === g.id ? '#f0fdf4' : 'transparent', borderBottom: '1px solid #f1f5f1' }}>
+                          <input type="radio" name="grup" checked={secilenGrup === g.id} onChange={() => setSecilenGrup(g.id)} style={{ width: 16, height: 16, flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#102110' }}>{g.ad}</div>
+                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{g.lokasyon_ids.length} lokasyon</div>
+                          </div>
+                        </label>
+                      ))}
                     </div>
                     <div style={{ padding: '12px 18px', borderTop: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                       <span style={{ fontSize: 12, color: '#64748b' }}>
                         {secilenGrup
-                          ? `${childrenByParent[secilenGrup]?.length ?? 0} lokasyon bağlanacak`
+                          ? `${baglaGrupList.find(g => g.id === secilenGrup)?.lokasyon_ids.length ?? 0} lokasyon bağlanacak`
                           : 'Bir grup seçin'}
                       </span>
                       <div style={{ display: 'flex', gap: 8 }}>
