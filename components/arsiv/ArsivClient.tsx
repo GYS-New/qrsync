@@ -110,10 +110,11 @@ export default function ArsivClient({
   const [spesifikTo,      setSpesifikTo]      = useState('')
 
   // ── Çeklist state ────────────────────────────────────────────────────────
+  // Arşiv: varsayılan aralık → son 30 gün, dün bitiş (24 saatten eski görevler)
   const [ceklistRows,     setCeklistRows]     = useState<any[]>([])
   const [ceklistLoading,  setCeklistLoading]  = useState(false)
-  const [ceklistFrom,     setCeklistFrom]     = useState('')
-  const [ceklistTo,       setCeklistTo]       = useState('')
+  const [ceklistFrom,     setCeklistFrom]     = useState(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+  const [ceklistTo,       setCeklistTo]       = useState(() => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0])
   const [ceklistExpanded, setCeklistExpanded] = useState<Set<string>>(new Set())
 
   // ── Toplu sil modal ───────────────────────────────────────────────────────
@@ -228,10 +229,13 @@ export default function ArsivClient({
     if (!firmaId) { setCeklistRows([]); return }
     setCeklistLoading(true)
     try {
-      const p = new URLSearchParams({ firmaId, kaynak: 'arsiv' })
-      if (projeId)     p.set('projeId', projeId)
-      if (ceklistFrom) p.set('baslangic', ceklistFrom)
-      if (ceklistTo)   p.set('bitis', ceklistTo)
+      // Arşiv: 24 saatten eski görevler — tüm tablolar (canli + arsiv + gorevler)
+      const defaultTo   = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const from = ceklistFrom || defaultFrom
+      const to   = ceklistTo   || defaultTo
+      const p = new URLSearchParams({ firmaId, kaynak: 'hepsi', baslangic: from, bitis: to })
+      if (projeId) p.set('projeId', projeId)
       const res  = await fetch(`/api/reports/ceklist-rapor?${p}`)
       const json = await res.json()
       if (!json.ok) throw new Error(json.error ?? 'Veri alınamadı')
@@ -977,8 +981,12 @@ export default function ArsivClient({
             <button onClick={yukle_ceklist} disabled={ceklistLoading} style={applyBtn}>
               <RefreshCw size={12} style={ceklistLoading ? spinning : {}} /> Uygula
             </button>
-            <button onClick={() => { setCeklistFrom(''); setCeklistTo(''); setCeklistRows([]); setCeklistExpanded(new Set()) }}
-              className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3]">
+            <button onClick={() => {
+              const defaultTo   = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+              const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+              setCeklistFrom(defaultFrom); setCeklistTo(defaultTo)
+              setCeklistRows([]); setCeklistExpanded(new Set())
+            }} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3]">
               Temizle
             </button>
           </div>
