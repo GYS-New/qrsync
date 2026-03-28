@@ -3,16 +3,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 
-type ChecklistItem = { id: string; sira: number; madde: string; zorunlu: boolean; secenekler: string[] }
+type ChecklistItem = {
+  id: string
+  sira: number
+  madde: string
+  zorunlu: boolean
+  aciklama_gerekli_yapilamadi: boolean
+  gorsel_gerekli: boolean
+  secenekler: string[]
+}
 type Task = { id: string; taskType: 'gorevler' | 'canli_gorevler'; tanim: string; durum: string }
 type ScanResponse = {
   ok: boolean
   error?: string
   firma?: { ad: string }
-  lokasyon?: { tanim: string }
+  lokasyon?: { id: string; tanim: string }
   checklistTemplate?: { id: string; isim: string; items: ChecklistItem[] } | null
   tasks?: Task[]
 }
+type CheckEntry = { secenek: string | null; not: string; gorsel_url: string | null; gorsel_uploading: boolean }
 
 export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC'; token: string }) {
   const [data, setData] = useState<ScanResponse | null>(null)
@@ -21,7 +30,7 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
   const autoSubmitted = useRef(false)
-  const [checks, setChecks] = useState<Record<string, { secenek: string | null; not: string }>>({})
+  const [checks, setChecks] = useState<Record<string, CheckEntry>>({})
 
   async function load() {
     setLoading(true)
@@ -55,20 +64,51 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, data?.ok, hasChecklist, singleTask?.id])
 
+  function getEntry(id: string): CheckEntry {
+    return checks[id] ?? { secenek: null, not: '', gorsel_url: null, gorsel_uploading: false }
+  }
+
+  function setEntry(id: string, patch: Partial<CheckEntry>) {
+    setChecks(prev => ({ ...prev, [id]: { ...getEntry(id), ...patch } }))
+  }
+
+  async function uploadGorsel(item: ChecklistItem, file: File, taskId: string) {
+    setEntry(item.id, { gorsel_uploading: true })
+    const form = new FormData()
+    form.append('file', file)
+    form.append('taskId', taskId)
+    form.append('maddeId', item.id)
+    form.append('lokasyonId', data?.lokasyon?.id ?? '')
+    form.append('kanal', kanal)
+    try {
+      const res = await fetch('/api/upload/checklist', { method: 'POST', body: form })
+      const json = await res.json()
+      if (json.ok) setEntry(item.id, { gorsel_url: json.publicUrl, gorsel_uploading: false })
+      else setEntry(item.id, { gorsel_uploading: false })
+    } catch {
+      setEntry(item.id, { gorsel_uploading: false })
+    }
+  }
+
   async function submit(taskOverride?: Task | null) {
     const task = taskOverride ?? selectedTask
-    if (!task) {
-      setMessage('Önce görev seçin.')
-      return
-    }
+    if (!task) { setMessage('Önce görev seçin.'); return }
 
     if (hasChecklist) {
-      const missingRequired = (data?.checklistTemplate?.items ?? []).filter(
-        (item) => item.zorunlu && !checks[item.id]?.secenek
-      )
-      if (missingRequired.length) {
-        setMessage('Zorunlu checklist maddelerini doldurun.')
-        return
+      for (const item of data?.checklistTemplate?.items ?? []) {
+        const entry = getEntry(item.id)
+        if (item.zorunlu && !entry.secenek) {
+          setMessage(`"${item.madde}" zorunlu madde için seçenek seçin.`)
+          return
+        }
+        if (item.aciklama_gerekli_yapilamadi && entry.secenek && !entry.not.trim()) {
+          setMessage(`"${item.madde}" için açıklama zorunlu.`)
+          return
+        }
+        if (item.gorsel_gerekli && entry.secenek && !entry.gorsel_url) {
+          setMessage(`"${item.madde}" için fotoğraf zorunlu.`)
+          return
+        }
       }
     }
 
@@ -77,11 +117,15 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
     const payload = {
       taskId: task.id,
       taskType: task.taskType,
-      checklistResults: (data?.checklistTemplate?.items ?? []).map((item) => ({
-        itemId: item.id,
-        secenek: checks[item.id]?.secenek ?? null,
-        not: checks[item.id]?.not ?? '',
-      })),
+      checklistResults: (data?.checklistTemplate?.items ?? []).map((item) => {
+        const entry = getEntry(item.id)
+        return {
+          itemId:    item.id,
+          secenek:   entry.secenek ?? null,
+          not:       entry.not ?? '',
+          gorsel_url: entry.gorsel_url ?? null,
+        }
+      }),
     }
 
     const res = await fetch(`/api/${kanal.toLowerCase()}/${token}`, {
@@ -130,7 +174,7 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
       </div>
 
       {message ? (
-        <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 8, background: '#f7faf7', border: '1px solid #d6e4d6', color: message.includes('başarısız') || message.includes('değil') ? '#b91c1c' : '#1f6b1f' }}>
+        <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 8, background: '#f7faf7', border: '1px solid #d6e4d6', color: message.includes('başarısız') || message.includes('değil') || message.includes('zorunlu') ? '#b91c1c' : '#1f6b1f' }}>
           {message}
         </div>
       ) : null}
@@ -168,40 +212,78 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
           {hasChecklist ? (
             <div style={{ marginTop: 18 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Checklist: {data.checklistTemplate?.isim}</div>
-              <div style={{ display: 'grid', gap: 10 }}>
+              <div style={{ display: 'grid', gap: 12 }}>
                 {data.checklistTemplate?.items.map((item) => {
-                  const entry = checks[item.id] ?? { secenek: null, not: '' }
+                  const entry = getEntry(item.id)
                   const secenekler = item.secenekler?.length ? item.secenekler : ['EVET', 'HAYIR']
+                  const task = selectedTask ?? singleTask
                   return (
-                    <div key={item.id} style={{ border: `1px solid ${entry.secenek ? '#2e8b2e' : '#d6e4d6'}`, borderRadius: 10, padding: 12, background: entry.secenek ? '#f5fbf5' : '#fff' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                        <span style={{ fontWeight: 600, color: '#0f1a0f', flex: 1, minWidth: 120 }}>{item.sira}. {item.madde}</span>
-                        {item.zorunlu ? <span className="verde-badge status-acik">Zorunlu</span> : null}
+                    <div key={item.id} style={{ border: `1px solid ${entry.secenek ? '#2e8b2e' : '#d6e4d6'}`, borderRadius: 10, padding: 14, background: entry.secenek ? '#f5fbf5' : '#fff' }}>
+                      {/* Madde başlığı + etiketler */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                        <span style={{ fontWeight: 600, color: '#0f1a0f', flex: 1, minWidth: 120, lineHeight: 1.4 }}>{item.sira}. {item.madde}</span>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {item.zorunlu && <span className="verde-badge status-acik">Zorunlu</span>}
+                          {item.gorsel_gerekli && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>📷 Fotoğraf Zorunlu</span>}
+                          {item.aciklama_gerekli_yapilamadi && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>📝 Açıklama Zorunlu</span>}
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+
+                      {/* Seçenek butonları */}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                         {secenekler.map((sec) => (
                           <button
                             key={sec}
                             type="button"
-                            onClick={() => setChecks((prev) => ({ ...prev, [item.id]: { ...(prev[item.id] ?? { not: '' }), secenek: prev[item.id]?.secenek === sec ? null : sec } }))}
+                            onClick={() => setEntry(item.id, { secenek: entry.secenek === sec ? null : sec })}
                             style={{
-                              padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                              padding: '7px 18px', borderRadius: 20, fontSize: 13, fontWeight: 700, cursor: 'pointer',
                               border: `2px solid ${entry.secenek === sec ? '#2e8b2e' : '#d6e4d6'}`,
                               background: entry.secenek === sec ? '#2e8b2e' : '#fff',
                               color: entry.secenek === sec ? '#fff' : '#506050',
+                              transition: 'all 0.15s',
                             }}
                           >
                             {sec}
                           </button>
                         ))}
                       </div>
+
+                      {/* Not alanı */}
                       <input
                         className="verde-input"
-                        style={{ marginTop: 10 }}
-                        placeholder="Not (opsiyonel)"
+                        style={{ marginBottom: item.gorsel_gerekli ? 10 : 0 }}
+                        placeholder={item.aciklama_gerekli_yapilamadi ? 'Açıklama (zorunlu)' : 'Not (opsiyonel)'}
                         value={entry.not}
-                        onChange={(e) => setChecks((prev) => ({ ...prev, [item.id]: { ...(prev[item.id] ?? { secenek: null }), not: e.target.value } }))}
+                        onChange={(e) => setEntry(item.id, { not: e.target.value })}
                       />
+
+                      {/* Fotoğraf alanı */}
+                      {item.gorsel_gerekli && (
+                        <div style={{ marginTop: 4 }}>
+                          {entry.gorsel_url ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <img src={entry.gorsel_url} alt="gorsel" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid #d6e4d6' }} />
+                              <button type="button" onClick={() => setEntry(item.id, { gorsel_url: null })} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>Kaldır</button>
+                            </div>
+                          ) : (
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px dashed #93c5fd', background: '#eff6ff', cursor: 'pointer', fontSize: 12, color: '#1d4ed8', fontWeight: 700 }}>
+                              {entry.gorsel_uploading ? 'Yükleniyor…' : '📷 Fotoğraf Ekle'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                style={{ display: 'none' }}
+                                disabled={entry.gorsel_uploading}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0]
+                                  if (file && task) uploadGorsel(item, file, task.id)
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -210,7 +292,7 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
           ) : null}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-            <Button variant="primary" onClick={() => submit()} disabled={submitting || !selectedTask && !singleTask}>
+            <Button variant="primary" onClick={() => submit()} disabled={submitting || (!selectedTask && !singleTask)}>
               {submitting ? 'Gönderiliyor...' : hasChecklist ? 'Checklist ile Tamamla' : 'Görevi Tamamla'}
             </Button>
             <Button variant="ghost" onClick={load} disabled={submitting}>Yenile</Button>

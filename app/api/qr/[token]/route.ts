@@ -126,10 +126,11 @@ export async function POST(req: Request, { params }: { params: { token: string }
       const maddePayload = checklistResults
         .filter((r: any) => r?.itemId && r?.secenek)
         .map((r: any) => ({
-          sonuc_id: sonucBaslik.id,
-          madde_id: r.itemId,
+          sonuc_id:       sonucBaslik.id,
+          madde_id:       r.itemId,
           secenek_degeri: r.secenek,
-          aciklama: typeof r.not === 'string' && r.not.trim() ? r.not.trim() : null,
+          aciklama:       typeof r.not === 'string' && r.not.trim() ? r.not.trim() : null,
+          gorsel_url:     typeof r.gorsel_url === 'string' && r.gorsel_url ? r.gorsel_url : null,
         }))
       if (maddePayload.length) {
         const { error: maddeError } = await supabase.from('checklist_sonuc_maddeleri').insert(maddePayload)
