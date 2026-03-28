@@ -30,24 +30,27 @@ export async function GET(req: Request) {
 
   const admin = createAdminClient()
 
-  // Manuel görevler (gorevler tablosu)
-  // islemi_yapan_id VEYA atanan_kullanici_id eşleşenler
-  const { data: gorevler } = await admin
+  // Manuel görevler (gorevler tablosu) — sadece TAMAMLANDI
+  const { data: gorevler, error: gorevErr } = await admin
     .from('gorevler')
     .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim), islemi_yapan_id, atanan_kullanici_id')
     .or(`islemi_yapan_id.eq.${user.id},atanan_kullanici_id.eq.${user.id}`)
-    .in('durum', ['TAMAMLANDI', 'ZAMANI_GECMIS', 'ZAMANINDA_YAPILAMAYAN'])
+    .eq('durum', 'TAMAMLANDI')
     .order('durum_degisim_tarihi', { ascending: false })
     .limit(30)
 
   // Canlı görevler (canli_gorevler tablosu)
-  const { data: canliGorevler } = await admin
+  const { data: canliGorevler, error: canliErr } = await admin
     .from('canli_gorevler')
     .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim), islemi_yapan_id, atanan_kullanici_id')
     .or(`islemi_yapan_id.eq.${user.id},atanan_kullanici_id.eq.${user.id}`)
     .in('durum', ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANI_GECMIS', 'ZAMANINDA_YAPILAMAYAN'])
     .order('durum_degisim_tarihi', { ascending: false })
     .limit(30)
+
+  console.log('[gecmis] user_id:', user.id)
+  console.log('[gecmis] gorevler count:', gorevler?.length ?? 0, 'error:', gorevErr?.message)
+  console.log('[gecmis] canliGorevler count:', canliGorevler?.length ?? 0, 'error:', canliErr?.message)
 
   // İkisini birleştir ve tarihe göre sırala
   const tumGorevler = [

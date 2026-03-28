@@ -18,6 +18,9 @@ export type ScanChecklistItem = {
   sira: number
   madde: string
   zorunlu: boolean
+  aciklama_gerekli_yapilamadi: boolean
+  gorsel_gerekli: boolean
+  secenekler: string[]
 }
 
 export type ScanContext = {
@@ -99,7 +102,7 @@ export async function resolveScanContext(opts: {
       .from('canli_gorevler')
       .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi,baslatilma_tarihi')
       .eq('lokasyon_id', loc.id)
-      .in('durum', ['ACIK', 'BEKLEMEDE', 'ISLEMDE'])
+      .in('durum', ['ACIK', 'ISLEMDE'])
       .order('olusturma_tarihi', { ascending: true }),
   ])
 
@@ -128,7 +131,7 @@ export async function resolveScanContext(opts: {
     if (template) {
       const { data: items, error: itemsError } = await supabase
         .from('checklist_sablon_maddeleri')
-        .select('id,sira_no,baslik,zorunlu_cevap')
+        .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli,secenekler')
         .eq('sablon_id', template.id)
         .order('sira_no', { ascending: true })
 
@@ -142,6 +145,9 @@ export async function resolveScanContext(opts: {
           sira: item.sira_no,
           madde: item.baslik,
           zorunlu: item.zorunlu_cevap !== false,
+          aciklama_gerekli_yapilamadi: item.aciklama_gerekli_yapilamadi === true,
+          gorsel_gerekli: item.gorsel_gerekli === true,
+          secenekler: Array.isArray(item.secenekler) ? item.secenekler : ['Yapıldı', 'Yapılamadı'],
         })),
       }
     }
