@@ -172,6 +172,7 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
   const [tanim,      setTanim]      = useState('')
   const [durum,      setDurum]      = useState('TUMU')
   const [gorevTipi,  setGorevTipi]  = useState('hepsi')
+  const [kaynak,     setKaynak]     = useState('rapor')  // rapor | arsiv | hepsi
 
   const [data,    setData]    = useState<{ rows: Row[]; ozet: Ozet; lokasyonlar: any[]; kullanicilar: any[] } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -194,10 +195,10 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
     const { bas, bit } = son24h()
     setBaslangic(bas)
     setBitis(bit)
-    setLokasyonId(''); setYapan(''); setTanim(''); setDurum('TUMU'); setGorevTipi('hepsi')
+    setLokasyonId(''); setYapan(''); setTanim(''); setDurum('TUMU'); setGorevTipi('hepsi'); setKaynak('rapor')
 
     setLoading(true)
-    const p = new URLSearchParams({ firmaId, mod: 'rapor', baslangic: bas, bitis: bit })
+    const p = new URLSearchParams({ firmaId, kaynak: 'rapor', baslangic: bas, bitis: bit })
     if (projeId) p.set('projeId', projeId)
     fetch(`/api/reports/ceklist-rapor?${p}`, { cache: 'no-store' })
       .then(r => r.json())
@@ -208,7 +209,7 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
   }, [firmaId])
 
   const buildParams = useCallback(() => {
-    const p = new URLSearchParams({ firmaId, mod: 'rapor' })
+    const p = new URLSearchParams({ firmaId, kaynak })
     if (projeId)    p.set('projeId', projeId)
     if (baslangic)  p.set('baslangic', baslangic)
     if (bitis)      p.set('bitis', bitis)
@@ -217,7 +218,7 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
     if (tanim)      p.set('tanim', tanim)
     // durum ve gorevTipi client-side filtrelenir
     return p
-  }, [firmaId, projeId, baslangic, bitis, lokasyonId, yapan, tanim])
+  }, [firmaId, projeId, kaynak, baslangic, bitis, lokasyonId, yapan, tanim])
 
   async function uygula() {
     if (!firmaId) return
@@ -236,11 +237,10 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
   function temizle() {
     const { bas, bit } = son24h()
     setBaslangic(bas); setBitis(bit)
-    setLokasyonId(''); setYapan(''); setTanim(''); setDurum('TUMU'); setGorevTipi('hepsi')
+    setLokasyonId(''); setYapan(''); setTanim(''); setDurum('TUMU'); setGorevTipi('hepsi'); setKaynak('rapor')
     setData(null)
-    // Temizle sonrası son 24h'i yeniden yükle
     setLoading(true)
-    const p = new URLSearchParams({ firmaId, mod: 'rapor', baslangic: bas, bitis: bit })
+    const p = new URLSearchParams({ firmaId, kaynak: 'rapor', baslangic: bas, bitis: bit })
     if (projeId) p.set('projeId', projeId)
     fetch(`/api/reports/ceklist-rapor?${p}`, { cache: 'no-store' })
       .then(r => r.json())
@@ -328,6 +328,13 @@ export default function CeklistRaporClient({ base, isSA, tenantFirmaId, projeId 
                   <option value="hepsi">Tümü</option>
                   <option value="frekansiyel">Frekansiyel</option>
                   <option value="spesifik">Spesifik</option>
+                </select>
+              )},
+              { label: 'Kaynak',       node: (
+                <select value={kaynak} onChange={e => setKaynak(e.target.value)} style={inp}>
+                  <option value="rapor">Son 24 Saat</option>
+                  <option value="hepsi">Tümü (Rapor + Arşiv)</option>
+                  <option value="arsiv">Yalnız Arşiv</option>
                 </select>
               )},
             ] as { label: string; node: React.ReactNode }[]).map(({ label, node }) => (
