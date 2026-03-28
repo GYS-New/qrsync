@@ -52,12 +52,23 @@ export async function POST(req: Request) {
 
     const { data: gorev, error: gorevErr } = await admin
       .from(gorevTipi)
-      .select('id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi, checklist_sablon_id')
+      .select('id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi, lokasyon_id')
       .eq('id', gorevId)
       .single()
 
     if (gorevErr || !gorev) {
       return NextResponse.json({ ok: false, error: 'Görev bulunamadı' }, { status: 404, headers: CORS })
+    }
+
+    // checklist_sablon_id lokasyondan okunur
+    let checklistSablonId: string | null = null
+    if (gorev.lokasyon_id && maddeler?.length > 0) {
+      const { data: lok } = await admin
+        .from('lokasyonlar')
+        .select('checklist_sablon_id')
+        .eq('id', gorev.lokasyon_id)
+        .single()
+      checklistSablonId = lok?.checklist_sablon_id ?? null
     }
 
     if (gorev.firma_id !== firmaId) {
@@ -77,11 +88,11 @@ export async function POST(req: Request) {
     }
 
     // Checklist cevaplarını kaydet
-    if (maddeler && maddeler.length > 0 && gorev.checklist_sablon_id) {
+    if (maddeler && maddeler.length > 0 && checklistSablonId) {
       const cevaplar = maddeler.map((m: any) => ({
         gorev_id:        gorevId,
         gorev_tipi:      gorevTipi,
-        sablon_id:       gorev.checklist_sablon_id,
+        sablon_id:       checklistSablonId,
         madde_id:        m.madde_id,
         secenek_degeri:  m.secenek_degeri ?? null,
         aciklama:        m.aciklama ?? null,
