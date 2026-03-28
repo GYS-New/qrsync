@@ -19,7 +19,8 @@ interface Props {
 }
 
 type Row = {
-  gorev_id: string
+  sonuc_id: string
+  gorev_id: string | null
   tanim: string
   gorev_tipi: string
   durum: string
