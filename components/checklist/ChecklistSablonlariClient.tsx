@@ -177,10 +177,10 @@ export default function ChecklistSablonlariClient({
   }, [baglaLokList])
 
   // ── LOKASYON EKRANI türevleri ─────────────────────────────────────────────
-  // Seçilebilecek lokasyonlar: projeId varsa sadece o projenin lokasyonları
+  // Seçilebilecek lokasyonlar: proje lokasyonları (proje_id eşleşenler veya leaf'ler)
   const lokasyonListe = useMemo(() =>
-    baglaLokList.filter(l => !projeId || l.proje_id === projeId),
-    [baglaLokList, projeId]
+    baglaLokList.filter(l => !l.parent_id ? false : (childrenByParent[l.id]?.length ?? 0) === 0),
+    [baglaLokList, childrenByParent]
   )
 
   // Lokasyon ekranı filtre seçenekleri: lokasyonListe'nin benzersiz parent'ları
@@ -196,20 +196,13 @@ export default function ChecklistSablonlariClient({
   }), [lokasyonListe, lokUstFiltre, lokArama])
 
   // ── GRUP EKRANI türevleri ─────────────────────────────────────────────────
-  // Gruplar: parent_id'si olan ve kendisinin child'ları bulunan lokasyonlar
-  // projeId varsa: grubun proje_id'si eşleşmeli VEYA child'larından biri eşleşmeli
+  // Gruplar: parent_id'si olan VE child'ları bulunan lokasyonlar (veri zaten proje kapsamında)
   const gruplar = useMemo(() =>
-    baglaLokList.filter(l => {
-      if (!l.parent_id) return false
-      const children = childrenByParent[l.id] ?? []
-      if (children.length === 0) return false
-      if (!projeId) return true
-      return l.proje_id === projeId || children.some(c => c.proje_id === projeId)
-    }),
-    [baglaLokList, childrenByParent, projeId]
+    baglaLokList.filter(l => l.parent_id !== null && (childrenByParent[l.id]?.length ?? 0) > 0),
+    [baglaLokList, childrenByParent]
   )
 
-  // Grup ekranı filtre seçenekleri: grupların benzersiz kök (parent_id=null) parent'ları
+  // Grup ekranı filtre seçenekleri: grupların kök (parent_id=null) parent'ları
   const grupUstFiltreler = useMemo(() => {
     const parentIds = new Set(gruplar.map(g => g.parent_id).filter(Boolean) as string[])
     return baglaLokList.filter(l => !l.parent_id && parentIds.has(l.id))
@@ -569,13 +562,42 @@ export default function ChecklistSablonlariClient({
     setLokArama('')
     setLokUstFiltre('')
     const fid = firmaId ?? sablon.firma_id
-    const { data } = await supabase
-      .from('lokasyonlar')
-      .select('id, tanim, parent_id, proje_id, checklist_sablon_id, aktif')
-      .eq('firma_id', fid)
-      .eq('aktif', true)
-      .order('tanim')
-    setBaglaLokList((data ?? []) as LokasyonRow[])
+
+    const SELECT = 'id, tanim, parent_id, proje_id, checklist_sablon_id, aktif'
+
+    // 1. Projeye ait lokasyonları çek (projeId varsa filtreli, yoksa tüm firma)
+    let leafQ = supabase.from('lokasyonlar').select(SELECT).eq('firma_id', fid).eq('aktif', true).order('tanim')
+    if (projeId) leafQ = (leafQ as any).eq('proje_id', projeId)
+    const { data: leafData } = await leafQ
+    const leaves = (leafData ?? []) as LokasyonRow[]
+
+    if (!projeId || leaves.length === 0) {
+      setBaglaLokList(leaves)
+      setBaglaLoading(false)
+      return
+    }
+
+    // 2. Parent'ları çek (grup katmanı)
+    const existingIds = new Set(leaves.map(l => l.id))
+    const parentIds = [...new Set(leaves.map(l => l.parent_id).filter(Boolean) as string[])].filter(id => !existingIds.has(id))
+
+    let parents: LokasyonRow[] = []
+    if (parentIds.length > 0) {
+      const { data: pData } = await supabase.from('lokasyonlar').select(SELECT).in('id', parentIds)
+      parents = (pData ?? []) as LokasyonRow[]
+    }
+
+    // 3. Grandparent'ları çek (üst lokasyon katmanı)
+    const parentIdSet = new Set(parents.map(l => l.id))
+    const grandParentIds = [...new Set(parents.map(l => l.parent_id).filter(Boolean) as string[])].filter(id => !existingIds.has(id) && !parentIdSet.has(id))
+
+    let grandParents: LokasyonRow[] = []
+    if (grandParentIds.length > 0) {
+      const { data: gpData } = await supabase.from('lokasyonlar').select(SELECT).in('id', grandParentIds)
+      grandParents = (gpData ?? []) as LokasyonRow[]
+    }
+
+    setBaglaLokList([...grandParents, ...parents, ...leaves])
     setBaglaLoading(false)
   }
 
