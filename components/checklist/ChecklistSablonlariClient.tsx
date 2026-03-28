@@ -29,7 +29,7 @@ type MaddeForm = {
   zorunlu_cevap: boolean
   aciklama_gerekli_yapilamadi: boolean
   gorsel_gerekli: boolean
-  secenekler: string[]
+  secenekler: { deger: string; aciklama_gerekli: boolean }[]
 }
 
 type BaglaAsama = 'secim' | 'lokasyon' | 'grup'
@@ -59,7 +59,7 @@ function emptyMadde(index: number): MaddeForm {
     zorunlu_cevap: true,
     aciklama_gerekli_yapilamadi: true,
     gorsel_gerekli: false,
-    secenekler: ['Yapıldı', 'Yapılamadı'],
+    secenekler: [{ deger: 'Yapıldı', aciklama_gerekli: false }, { deger: 'Yapılamadı', aciklama_gerekli: true }],
   }
 }
 
@@ -270,8 +270,8 @@ export default function ChecklistSablonlariClient({
       gorsel_gerekli:              !!row.gorsel_gerekli,
       secenekler: ((row.checklist_madde_secenekleri ?? []) as any[])
         .sort((a, b) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
-        .map(opt => opt.deger)
-        .filter(Boolean),
+        .map(opt => ({ deger: opt.deger ?? '', aciklama_gerekli: opt.aciklama_gerekli ?? false }))
+        .filter(x => x.deger),
     })) as MaddeForm[])
     setMaddeler(mapped.length ? mapped : [emptyMadde(1)])
     setOpenForm(true)
@@ -303,7 +303,7 @@ export default function ChecklistSablonlariClient({
       ...item,
       sira_no:   index + 1,
       baslik:    item.baslik.trim(),
-      secenekler: item.secenekler.map(x => x.trim()).filter(Boolean),
+      secenekler: item.secenekler.map(x => ({ ...x, deger: x.deger.trim() })).filter(x => x.deger),
     }))
 
     if (!temizMaddeler[0]?.baslik) return showError('Madde 1 zorunludur')
@@ -415,7 +415,7 @@ export default function ChecklistSablonlariClient({
         maddeId = data.id
       }
 
-      const optionPayload = item.secenekler.map((deger, idx) => ({ madde_id: maddeId, sira_no: idx + 1, deger }))
+      const optionPayload = item.secenekler.map((opt, idx) => ({ madde_id: maddeId, sira_no: idx + 1, deger: opt.deger, aciklama_gerekli: opt.aciklama_gerekli }))
       const { error: oErr } = await supabase.from('checklist_madde_secenekleri').insert(optionPayload)
       if (oErr) {
         setLoading(false)
@@ -517,6 +517,7 @@ export default function ChecklistSablonlariClient({
         madde_id: newItem.id,
         sira_no:  index + 1,
         deger:    opt.deger,
+        aciklama_gerekli: opt.aciklama_gerekli,
       }))
       if (options.length) {
         const { error: oErr } = await supabase.from('checklist_madde_secenekleri').insert(options)
@@ -823,13 +824,6 @@ export default function ChecklistSablonlariClient({
                           </select>
                         </div>
                         <div>
-                          <label className="verde-label">"Yapılamadı" seçilince açıklama</label>
-                          <select className="verde-input" value={madde.aciklama_gerekli_yapilamadi ? 'zorunlu' : 'opsiyonel'} onChange={e => updateMadde(madde.localId, { aciklama_gerekli_yapilamadi: e.target.value === 'zorunlu' })}>
-                            <option value="zorunlu">Zorunlu</option>
-                            <option value="opsiyonel">İsteğe Bağlı</option>
-                          </select>
-                        </div>
-                        <div>
                           <label className="verde-label">Görüntü Ekle</label>
                           <select className="verde-input" value={madde.gorsel_gerekli ? 'zorunlu' : 'opsiyonel'} onChange={e => updateMadde(madde.localId, { gorsel_gerekli: e.target.value === 'zorunlu' })}>
                             <option value="opsiyonel">İsteğe Bağlı</option>
@@ -840,19 +834,35 @@ export default function ChecklistSablonlariClient({
                           <label className="verde-label">Dropdown Cevap Seçenekleri</label>
                           <div style={{ display: 'grid', gap: 8 }}>
                             {madde.secenekler.map((secenek, secenekIndex) => (
-                              <div key={`${madde.localId}-opt-${secenekIndex}`} style={{ display: 'flex', gap: 8 }}>
-                                <input className="verde-input" placeholder={`Seçenek ${secenekIndex + 1}`} value={secenek} onChange={e => {
-                                  const next = [...madde.secenekler]
-                                  next[secenekIndex] = e.target.value
-                                  updateMadde(madde.localId, { secenekler: next })
-                                }} />
+                              <div key={`${madde.localId}-opt-${secenekIndex}`} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <input
+                                  className="verde-input"
+                                  placeholder={`Seçenek ${secenekIndex + 1}`}
+                                  value={secenek.deger}
+                                  style={{ flex: 1 }}
+                                  onChange={e => {
+                                    const next = madde.secenekler.map((s, i) => i === secenekIndex ? { ...s, deger: e.target.value } : s)
+                                    updateMadde(madde.localId, { secenekler: next })
+                                  }}
+                                />
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#475569', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={secenek.aciklama_gerekli}
+                                    onChange={e => {
+                                      const next = madde.secenekler.map((s, i) => i === secenekIndex ? { ...s, aciklama_gerekli: e.target.checked } : s)
+                                      updateMadde(madde.localId, { secenekler: next })
+                                    }}
+                                  />
+                                  Açıklama zorunlu
+                                </label>
                                 <RowActionButton variant="danger" disabled={madde.secenekler.length === 1} onClick={() => {
                                   const next = madde.secenekler.filter((_, i) => i !== secenekIndex)
-                                  updateMadde(madde.localId, { secenekler: next.length ? next : ['Yapıldı'] })
+                                  updateMadde(madde.localId, { secenekler: next.length ? next : [{ deger: 'Yapıldı', aciklama_gerekli: false }] })
                                 }}>Sil</RowActionButton>
                               </div>
                             ))}
-                            <div><Button variant="ghost" size="sm" onClick={() => updateMadde(madde.localId, { secenekler: [...madde.secenekler, ''] })}>＋ Seçenek Ekle</Button></div>
+                            <div><Button variant="ghost" size="sm" onClick={() => updateMadde(madde.localId, { secenekler: [...madde.secenekler, { deger: '', aciklama_gerekli: false }] })}>＋ Seçenek Ekle</Button></div>
                           </div>
                         </div>
                       </div>

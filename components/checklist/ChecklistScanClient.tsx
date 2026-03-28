@@ -40,7 +40,7 @@ type Madde = {
   zorunlu_cevap: boolean
   aciklama_gerekli_yapilamadi: boolean
   gorsel_gerekli: boolean
-  secenekler: { id: string; deger: string; sira_no: number }[]
+  secenekler: { id: string; deger: string; sira_no: number; aciklama_gerekli: boolean }[]
 }
 
 type Sablon = {
@@ -60,10 +60,6 @@ type CevapState = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-function isYapilamadi(value: string) {
-  const v = value.trim().toLowerCase()
-  return v.includes('yapılamadı') || v.includes('yapilamadi') || v.includes('yapılmadı') || v.includes('yapilmadi')
-}
 
 export default function ChecklistScanClient({ token, kanal }: { token: string; kanal: Kanal }) {
   const supabase = createClient()
@@ -257,7 +253,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
 
     const { data: itemRows, error: iErr } = await supabase
       .from('checklist_sablon_maddeleri')
-      .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli, checklist_madde_secenekleri(id,deger,sira_no)')
+      .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli, checklist_madde_secenekleri(id,deger,sira_no,aciklama_gerekli)')
       .eq('sablon_id', sablonId)
       .order('sira_no', { ascending: true })
 
@@ -275,7 +271,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
       gorsel_gerekli: !!row.gorsel_gerekli,
       secenekler: ((row.checklist_madde_secenekleri ?? []) as any[])
         .sort((a, b) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
-        .map(opt => ({ id: opt.id, deger: opt.deger, sira_no: opt.sira_no ?? 0 })),
+        .map(opt => ({ id: opt.id, deger: opt.deger, sira_no: opt.sira_no ?? 0, aciklama_gerekli: opt.aciklama_gerekli === true })),
     }))
 
     return {
@@ -333,7 +329,8 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
         if (!ilkHata) ilkHata = `${madde.sira_no}. madde için cevap seçmelisiniz`
         maddeEksik = true
       }
-      if (cevap?.secenek && isYapilamadi(cevap.secenek) && madde.aciklama_gerekli_yapilamadi && !cevap.aciklama?.trim()) {
+      const secilenOpt = madde.secenekler.find(s => s.deger === cevap?.secenek)
+      if (cevap?.secenek && secilenOpt?.aciklama_gerekli && !cevap.aciklama?.trim()) {
         if (!ilkHata) ilkHata = `${madde.sira_no}. madde için açıklama zorunlu`
         maddeEksik = true
       }
@@ -551,8 +548,8 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                 <div style={{ display: 'grid', gap: 14 }}>
                   {sablon.maddeler.map(madde => {
                     const cevap = cevaplar[madde.id] ?? { secenek: '', aciklama: '', gorselUrl: '', uploading: false }
-                    const yapilamadi = isYapilamadi(cevap.secenek)
-                    const aciklamaZorunlu = yapilamadi && madde.aciklama_gerekli_yapilamadi
+                    const secilenOpt = madde.secenekler.find(s => s.deger === cevap.secenek)
+                    const aciklamaZorunlu = !!(cevap.secenek && secilenOpt?.aciklama_gerekli)
                     const eksik = eksikMaddeler.has(madde.id)
 
                     const labelStyle: React.CSSProperties = {
@@ -615,7 +612,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                               rows={2}
                               value={cevap.aciklama}
                               onChange={e => { updateCevap(madde.id, { aciklama: e.target.value }); temizleEksik(madde.id) }}
-                              placeholder={yapilamadi ? 'Neden yapılamadığını yazın…' : 'Not ekleyin (isteğe bağlı)…'}
+                              placeholder={aciklamaZorunlu ? 'Neden yapılamadığını yazın…' : 'Not ekleyin (isteğe bağlı)…'}
                               style={{
                                 width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 14,
                                 border: `2px solid ${eksik && aciklamaZorunlu && !cevap.aciklama?.trim() ? '#dc2626' : '#e2e8f0'}`,

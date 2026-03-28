@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
       if (sablonRow) {
         const { data: itemRows } = await admin
           .from('checklist_sablon_maddeleri')
-          .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli,checklist_madde_secenekleri(id,deger,sira_no)')
+          .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli,checklist_madde_secenekleri(id,deger,sira_no,aciklama_gerekli)')
           .eq('sablon_id', sablonId)
           .order('sira_no', { ascending: true })
 
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
             gorsel_gerekli:               !!row.gorsel_gerekli,
             secenekler: ((row.checklist_madde_secenekleri ?? []) as any[])
               .sort((a: any, b: any) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
-              .map((opt: any) => ({ id: opt.id, deger: opt.deger, sira_no: opt.sira_no ?? 0 })),
+              .map((opt: any) => ({ id: opt.id, deger: opt.deger, sira_no: opt.sira_no ?? 0, aciklama_gerekli: opt.aciklama_gerekli === true })),
           })),
         }
       }

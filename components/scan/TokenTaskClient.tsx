@@ -8,9 +8,8 @@ type ChecklistItem = {
   sira: number
   madde: string
   zorunlu: boolean
-  aciklama_gerekli_yapilamadi: boolean
   gorsel_gerekli: boolean
-  secenekler: string[]
+  secenekler: { deger: string; aciklama_gerekli: boolean }[]
 }
 type Task = { id: string; taskType: 'gorevler' | 'canli_gorevler'; tanim: string; durum: string }
 type ScanResponse = {
@@ -101,7 +100,8 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
           setMessage(`"${item.madde}" zorunlu madde için seçenek seçin.`)
           return
         }
-        if (item.aciklama_gerekli_yapilamadi && entry.secenek && !entry.not.trim()) {
+        const secilenOpt = item.secenekler.find(s => s.deger === entry.secenek)
+        if (secilenOpt?.aciklama_gerekli && !entry.not.trim()) {
           setMessage(`"${item.madde}" için açıklama zorunlu.`)
           return
         }
@@ -215,7 +215,7 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
               <div style={{ display: 'grid', gap: 12 }}>
                 {data.checklistTemplate?.items.map((item) => {
                   const entry = getEntry(item.id)
-                  const secenekler = item.secenekler?.length ? item.secenekler : ['EVET', 'HAYIR']
+                  const secenekler = item.secenekler?.length ? item.secenekler : [{ deger: 'EVET', aciklama_gerekli: false }, { deger: 'HAYIR', aciklama_gerekli: false }]
                   const task = selectedTask ?? singleTask
                   return (
                     <div key={item.id} style={{ border: `1px solid ${entry.secenek ? '#2e8b2e' : '#d6e4d6'}`, borderRadius: 10, padding: 14, background: entry.secenek ? '#f5fbf5' : '#fff' }}>
@@ -225,7 +225,6 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                           {item.zorunlu && <span className="verde-badge status-acik">Zorunlu</span>}
                           {item.gorsel_gerekli && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>📷 Fotoğraf Zorunlu</span>}
-                          {item.aciklama_gerekli_yapilamadi && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>📝 Açıklama Zorunlu</span>}
                         </div>
                       </div>
 
@@ -233,18 +232,18 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                         {secenekler.map((sec) => (
                           <button
-                            key={sec}
+                            key={sec.deger}
                             type="button"
-                            onClick={() => setEntry(item.id, { secenek: entry.secenek === sec ? null : sec })}
+                            onClick={() => setEntry(item.id, { secenek: entry.secenek === sec.deger ? null : sec.deger })}
                             style={{
                               padding: '7px 18px', borderRadius: 20, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                              border: `2px solid ${entry.secenek === sec ? '#2e8b2e' : '#d6e4d6'}`,
-                              background: entry.secenek === sec ? '#2e8b2e' : '#fff',
-                              color: entry.secenek === sec ? '#fff' : '#506050',
+                              border: `2px solid ${entry.secenek === sec.deger ? '#2e8b2e' : '#d6e4d6'}`,
+                              background: entry.secenek === sec.deger ? '#2e8b2e' : '#fff',
+                              color: entry.secenek === sec.deger ? '#fff' : '#506050',
                               transition: 'all 0.15s',
                             }}
                           >
-                            {sec}
+                            {sec.deger}
                           </button>
                         ))}
                       </div>
@@ -253,7 +252,7 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
                       <input
                         className="verde-input"
                         style={{ marginBottom: item.gorsel_gerekli ? 10 : 0 }}
-                        placeholder={item.aciklama_gerekli_yapilamadi ? 'Açıklama (zorunlu)' : 'Not (opsiyonel)'}
+                        placeholder={item.secenekler.find(s => s.deger === entry.secenek)?.aciklama_gerekli ? 'Açıklama (zorunlu)' : 'Not (opsiyonel)'}
                         value={entry.not}
                         onChange={(e) => setEntry(item.id, { not: e.target.value })}
                       />

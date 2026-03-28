@@ -18,9 +18,8 @@ export type ScanChecklistItem = {
   sira: number
   madde: string
   zorunlu: boolean
-  aciklama_gerekli_yapilamadi: boolean
   gorsel_gerekli: boolean
-  secenekler: string[]
+  secenekler: { deger: string; aciklama_gerekli: boolean }[]
 }
 
 export type ScanContext = {
@@ -131,7 +130,7 @@ export async function resolveScanContext(opts: {
     if (template) {
       const { data: items, error: itemsError } = await supabase
         .from('checklist_sablon_maddeleri')
-        .select('id,sira_no,baslik,zorunlu_cevap,aciklama_gerekli_yapilamadi,gorsel_gerekli,checklist_madde_secenekleri(id,deger,sira_no)')
+        .select('id,sira_no,baslik,zorunlu_cevap,gorsel_gerekli,checklist_madde_secenekleri(id,deger,sira_no,aciklama_gerekli)')
         .eq('sablon_id', template.id)
         .order('sira_no', { ascending: true })
 
@@ -143,15 +142,14 @@ export async function resolveScanContext(opts: {
         items: ((items as any[]) ?? []).map((item: any) => {
           const secenekler = ((item.checklist_madde_secenekleri ?? []) as any[])
             .sort((a: any, b: any) => (a.sira_no ?? 0) - (b.sira_no ?? 0))
-            .map((s: any) => s.deger as string)
+            .map((s: any) => ({ deger: s.deger as string, aciklama_gerekli: s.aciklama_gerekli === true }))
           return {
             id: item.id,
             sira: item.sira_no,
             madde: item.baslik,
             zorunlu: item.zorunlu_cevap !== false,
-            aciklama_gerekli_yapilamadi: item.aciklama_gerekli_yapilamadi === true,
             gorsel_gerekli: item.gorsel_gerekli === true,
-            secenekler: secenekler.length > 0 ? secenekler : ['EVET', 'HAYIR'],
+            secenekler: secenekler.length > 0 ? secenekler : [{ deger: 'EVET', aciklama_gerekli: false }, { deger: 'HAYIR', aciklama_gerekli: false }],
           }
         }),
       }
