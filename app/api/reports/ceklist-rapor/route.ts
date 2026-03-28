@@ -22,10 +22,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 
-const TERMINAL = [
-  'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS',
-  'IPTAL', 'SILINDI', 'KAPATILDI',
-]
+// canli_gorevler / canli_gorevler_arsiv enum değerleri
+const TERMINAL_CANLI = ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'SILINDI', 'KAPATILDI']
+// gorevler enum değerleri: sadece ACIK, ISLEMDE, IPTAL, TAMAMLANDI
+const TERMINAL_SPESIFIK = ['TAMAMLANDI', 'IPTAL']
 
 function fmt(v: string | null | undefined): string {
   if (!v) return '—'
@@ -121,13 +121,14 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 3. Görevleri çek ─────────────────────────────────────────────────
-    // gorevler tablosunda tamamlayan_kullanici_id kolonu YOK — ayrı SEL kullanılıyor
-    const durumlar = (durumFil && durumFil !== 'TUMU') ? [durumFil] : TERMINAL
-    const SEL_CANLI  = 'id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id,tamamlayan_kullanici_id'
+    // gorevler: tamamlayan_kullanici_id yok, enum sadece ACIK/ISLEMDE/IPTAL/TAMAMLANDI
+    const SEL_CANLI    = 'id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id,tamamlayan_kullanici_id'
     const SEL_SPESIFIK = 'id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id'
 
     async function queryTable(tbl: string): Promise<any[]> {
-      const sel = tbl === 'gorevler' ? SEL_SPESIFIK : SEL_CANLI
+      const sel      = tbl === 'gorevler' ? SEL_SPESIFIK : SEL_CANLI
+      const terminal = tbl === 'gorevler' ? TERMINAL_SPESIFIK : TERMINAL_CANLI
+      const durumlar = (durumFil && durumFil !== 'TUMU') ? [durumFil] : terminal
       let q: any = admin.from(tbl).select(sel)
         .eq('firma_id', firmaId)
         .in('lokasyon_id', lokIds)

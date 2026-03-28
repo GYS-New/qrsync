@@ -53,14 +53,17 @@ async function fetchData(firmaId: string, projeId: string | null, params: URLSea
   }
 
   // Görevler
-  // gorevler tablosunda tamamlayan_kullanici_id yok — ayrı SEL
+  // gorevler: tamamlayan_kullanici_id yok, enum sadece ACIK/ISLEMDE/IPTAL/TAMAMLANDI
+  const TERMINAL_CANLI    = ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'SILINDI', 'KAPATILDI']
+  const TERMINAL_SPESIFIK = ['TAMAMLANDI', 'IPTAL']
   const SEL_CANLI    = 'id,firma_id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id,tamamlayan_kullanici_id'
   const SEL_SPESIFIK = 'id,firma_id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id'
   const buildQ = (table: string): Promise<any> => {
-    const sel = table === 'gorevler' ? SEL_SPESIFIK : SEL_CANLI
-    let q = admin.from(table).select(sel).eq('firma_id', firmaId).in('lokasyon_id', lokIds)
+    const sel      = table === 'gorevler' ? SEL_SPESIFIK : SEL_CANLI
+    const terminal = table === 'gorevler' ? TERMINAL_SPESIFIK : TERMINAL_CANLI
+    const durumlar = (durumFil && durumFil !== 'TUMU') ? [durumFil] : terminal
+    let q = admin.from(table).select(sel).eq('firma_id', firmaId).in('lokasyon_id', lokIds).in('durum', durumlar)
     if (projeId) q = (q as any).eq('proje_id', projeId)
-    if (durumFil && durumFil !== 'TUMU') q = (q as any).eq('durum', durumFil)
     return Promise.resolve(q)
   }
   const queries: Promise<any>[] = []
