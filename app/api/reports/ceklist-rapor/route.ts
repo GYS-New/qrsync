@@ -194,7 +194,7 @@ export async function GET(req: NextRequest) {
     // ── 6. Mobil çeklist cevapları (checklist_cevaplari) ─────────────────
     const { data: mobileCevaplarData } = gorevIds.length
       ? await admin.from('checklist_cevaplari')
-          .select('gorev_id,madde_id,secenek_degeri,aciklama,gorsel_url,yanitlayan_id')
+          .select('gorev_id,madde_id,secenek_degeri,aciklama,gorsel_url,yanitlayan_id,created_at')
           .in('gorev_id', gorevIds)
       : { data: [] }
 
@@ -239,6 +239,11 @@ export async function GET(req: NextRequest) {
       const yapanId = sb?.kullanici_id ?? mobileYanitlayan ?? g.tamamlayan_kullanici_id ?? g.islemi_yapan_id
       const yapan   = yapanId ? (userMap.get(yapanId) ?? '—') : '—'
 
+      // Madde başına kanal / tarih / yapan bilgisi
+      const cevapKanal  = sb ? (sb.kanal ?? 'WEB') : mobileCevapMap.has(g.id) ? 'MOBİL' : null
+      const cevapTarih  = sb ? (sb.kayit_tarihi ?? null) : (mobileCevapMap.get(g.id)?.values().next().value?.created_at ?? null)
+      const cevapYapanAdi = yapanId ? (userMap.get(yapanId) ?? null) : null
+
       if (tanimAra && !(g.tanim ?? '').toLowerCase().includes(tanimAra.toLowerCase())) continue
       if (yapanAra && !yapan.toLowerCase().includes(yapanAra.toLowerCase())) continue
 
@@ -259,12 +264,17 @@ export async function GET(req: NextRequest) {
         maddeler: maddeler.map((m: any) => {
           const c = cevaplar.get(m.id)
           return {
+            madde_id:   m.id,
             sira:       m.sira_no,
             madde:      m.baslik,
             zorunlu:    m.zorunlu_cevap !== false,
+            durum:      c ? true : null,
             secenek:    c?.secenek_degeri ?? null,
             not:        c?.aciklama      ?? null,
             gorsel_url: c?.gorsel_url    ?? null,
+            yapan:      c ? cevapYapanAdi : null,
+            tarih:      c ? (cevapTarih ? fmt(cevapTarih) : null) : null,
+            kanal:      c ? cevapKanal : null,
             dolduruldu: !!c,
           }
         }),

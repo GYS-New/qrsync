@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
       .select('id,sira_no,baslik,zorunlu_cevap,gorsel_gerekli,checklist_madde_secenekleri(id,deger,sira_no)')
       .eq('sablon_id', sablonId).order('sira_no', { ascending: true })
 
-    // ── 4. Sonuç başlığını bul (bu göreve ait) ───────────────────────────
+    // ── 4. Sonuç başlığını bul (web/QR) ─────────────────────────────────
     const gorevIdKolonu = taskType === 'gorevler' ? 'gorev_id' : 'canli_gorev_id'
     const { data: sonuclar } = await admin.from('checklist_sonuc_basliklari')
       .select('id,kullanici_id,kanal,kayit_tarihi')
@@ -90,17 +90,35 @@ export async function GET(req: NextRequest) {
 
     const sonucBaslik = sonuclar?.[0] ?? null
 
-    // ── 5. Madde cevapları ───────────────────────────────────────────────
+    // ── 5. Madde cevapları (web/QR öncelikli, yoksa mobil) ───────────────
     let cevapMap = new Map<string, any>()
+    let cevapKanal: string | null = null
+    let cevapTarih: string | null = null
+    let cevapYapanId: string | null = null
+
     if (sonucBaslik) {
       const { data: cevaplar } = await admin.from('checklist_sonuc_maddeleri')
         .select('id,madde_id,secenek_degeri,aciklama,gorsel_url')
         .eq('sonuc_id', sonucBaslik.id)
       for (const c of cevaplar ?? []) cevapMap.set(c.madde_id, c)
+      cevapKanal  = sonucBaslik.kanal ?? 'WEB'
+      cevapTarih  = sonucBaslik.kayit_tarihi ?? null
+      cevapYapanId = sonucBaslik.kullanici_id ?? null
+    } else {
+      // Web cevabı yok → mobil cevaplarına bak
+      const { data: mobileCevaplar } = await admin.from('checklist_cevaplari')
+        .select('madde_id,secenek_degeri,aciklama,gorsel_url,yanitlayan_id,created_at')
+        .eq('gorev_id', taskId)
+      if (mobileCevaplar?.length) {
+        for (const c of mobileCevaplar) cevapMap.set(c.madde_id, c)
+        cevapKanal   = 'MOBİL'
+        cevapTarih   = mobileCevaplar[0].created_at ?? null
+        cevapYapanId = mobileCevaplar[0].yanitlayan_id ?? null
+      }
     }
 
     // ── 6. Yapan kullanıcı ───────────────────────────────────────────────
-    const yapanId  = sonucBaslik?.kullanici_id ?? gorev.islemi_yapan_id ?? gorev.atanan_kullanici_id
+    const yapanId  = cevapYapanId ?? gorev.islemi_yapan_id ?? gorev.atanan_kullanici_id
     let yapanAdi: string | null = null
     if (yapanId) {
       const { data: u } = await admin.from('users').select('isim_soyisim').eq('id', yapanId).maybeSingle()
@@ -123,9 +141,9 @@ export async function GET(req: NextRequest) {
         secenek:   c?.secenek_degeri ?? null,
         not:       c?.aciklama ?? null,
         gorsel_url: c?.gorsel_url ?? null,
-        yapan:     sonucBaslik ? yapanAdi : null,
-        tarih:     sonucBaslik?.kayit_tarihi ? fmt(sonucBaslik.kayit_tarihi) : null,
-        kanal:     sonucBaslik?.kanal ?? null,
+        yapan:     c ? yapanAdi : null,
+        tarih:     c ? (cevapTarih ? fmt(cevapTarih) : null) : null,
+        kanal:     c ? cevapKanal : null,
         dolduruldu: !!c,
       }
     })
