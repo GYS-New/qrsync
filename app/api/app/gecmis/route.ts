@@ -29,31 +29,48 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
 
   const admin = createAdminClient()
+  const sonYirmiDortSaat = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  // Manuel görevler (gorevler tablosu) — sadece TAMAMLANDI
-  const { data: gorevler, error: gorevErr } = await admin
+  // 1. Tamamlanan manuel görevler (son 24 saat)
+  const { data: gorevler } = await admin
     .from('gorevler')
-    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim), islemi_yapan_id, atanan_kullanici_id')
+    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
     .or(`islemi_yapan_id.eq.${user.id},atanan_kullanici_id.eq.${user.id}`)
     .eq('durum', 'TAMAMLANDI')
-    .order('durum_degisim_tarihi', { ascending: false })
-    .limit(30)
+    .gte('tamamlanma_tarihi', sonYirmiDortSaat)
+    .order('tamamlanma_tarihi', { ascending: false })
+    .limit(50)
 
-  // Canlı görevler (canli_gorevler tablosu)
-  const { data: canliGorevler, error: canliErr } = await admin
+  // 2. Tamamlanan canlı görevler (son 24 saat)
+  const { data: canliGorevler } = await admin
     .from('canli_gorevler')
-    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim), islemi_yapan_id, atanan_kullanici_id')
+    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
     .or(`islemi_yapan_id.eq.${user.id},atanan_kullanici_id.eq.${user.id}`)
     .in('durum', ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANI_GECMIS', 'ZAMANINDA_YAPILAMAYAN'])
+    .gte('durum_degisim_tarihi', sonYirmiDortSaat)
     .order('durum_degisim_tarihi', { ascending: false })
-    .limit(30)
+    .limit(50)
 
-  console.log('[gecmis] user_id:', user.id)
-  console.log('[gecmis] gorevler count:', gorevler?.length ?? 0, 'error:', gorevErr?.message)
-  console.log('[gecmis] canliGorevler count:', canliGorevler?.length ?? 0, 'error:', canliErr?.message)
+  // 3. Aktif/açık atanmış görevler (henüz tamamlanmamış)
+  const { data: aktifGorevler } = await admin
+    .from('gorevler')
+    .select('id, tanim, durum, olusturma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
+    .eq('atanan_kullanici_id', user.id)
+    .in('durum', ['ACIK', 'ISLEMDE'])
+    .order('olusturma_tarihi', { ascending: false })
+    .limit(20)
 
-  // İkisini birleştir ve tarihe göre sırala
-  const tumGorevler = [
+  // 4. Aktif/açık atanmış canlı görevler
+  const { data: aktifCanliGorevler } = await admin
+    .from('canli_gorevler')
+    .select('id, tanim, durum, olusturma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
+    .eq('atanan_kullanici_id', user.id)
+    .in('durum', ['ACIK', 'ISLEMDE', 'BEKLEMEDE'])
+    .order('olusturma_tarihi', { ascending: false })
+    .limit(20)
+
+  // Birleştir ve sırala
+  const tamamlananlar = [
     ...(gorevler ?? []).map((g: any) => ({
       id: g.id,
       tanim: g.tanim,
@@ -61,6 +78,7 @@ export async function GET(req: Request) {
       tarih: g.tamamlanma_tarihi || g.durum_degisim_tarihi,
       lokasyon: g.lokasyonlar?.tanim || '',
       tip: 'manuel',
+      kategori: 'tamamlanan',
     })),
     ...(canliGorevler ?? []).map((g: any) => ({
       id: g.id,
@@ -69,9 +87,33 @@ export async function GET(req: Request) {
       tarih: g.tamamlanma_tarihi || g.durum_degisim_tarihi,
       lokasyon: g.lokasyonlar?.tanim || '',
       tip: 'canli',
+      kategori: 'tamamlanan',
     })),
   ].sort((a, b) => new Date(b.tarih || 0).getTime() - new Date(a.tarih || 0).getTime())
-   .slice(0, 50)
 
-  return NextResponse.json({ ok: true, gorevler: tumGorevler }, { headers: CORS_HEADERS })
+  const bekleyenler = [
+    ...(aktifGorevler ?? []).map((g: any) => ({
+      id: g.id,
+      tanim: g.tanim,
+      durum: g.durum,
+      tarih: g.olusturma_tarihi || g.durum_degisim_tarihi,
+      lokasyon: g.lokasyonlar?.tanim || '',
+      tip: 'manuel',
+      kategori: 'bekleyen',
+    })),
+    ...(aktifCanliGorevler ?? []).map((g: any) => ({
+      id: g.id,
+      tanim: g.tanim,
+      durum: g.durum,
+      tarih: g.olusturma_tarihi || g.durum_degisim_tarihi,
+      lokasyon: g.lokasyonlar?.tanim || '',
+      tip: 'canli',
+      kategori: 'bekleyen',
+    })),
+  ].sort((a, b) => new Date(b.tarih || 0).getTime() - new Date(a.tarih || 0).getTime())
+
+  return NextResponse.json({
+    ok: true,
+    gorevler: [...bekleyenler, ...tamamlananlar],
+  }, { headers: CORS_HEADERS })
 }
