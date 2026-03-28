@@ -137,33 +137,42 @@ export async function GET(req: NextRequest) {
     const gorevMap    = new Map<string, any>()
     const gorevTipMap = new Map<string, string>()
 
-    // Spesifik görevler — her zaman tek tablo (gorevler)
+    const TERMINAL = ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'SILINDI', 'KAPATILDI']
+    const sinir24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+    // Spesifik görevler
     if (gorevIds.length) {
-      const { data } = await admin.from('gorevler')
+      let q = admin.from('gorevler')
         .select('id,tanim,durum,tamamlanma_tarihi,islemi_yapan_id')
         .in('id', gorevIds)
+        .in('durum', TERMINAL)
+      if (mod === 'rapor')       q = (q as any).gte('tamamlanma_tarihi', sinir24h)
+      else if (mod === 'arsiv')  q = (q as any).lt('tamamlanma_tarihi', sinir24h)
+      const { data } = await q
       for (const g of data ?? []) {
         gorevMap.set(g.id, { ...g, _tablo: 'gorevler' })
         gorevTipMap.set(g.id, 'Spesifik')
       }
     }
 
-    // Frekansiyel görevler — mod'a göre aktif mi arşiv mi?
+    // Frekansiyel görevler
     if (canliIds.length) {
       if (mod === 'rapor') {
-        // Sadece aktif tablo
         const { data } = await admin.from('canli_gorevler')
           .select('id,tanim,durum,tamamlanma_tarihi,islemi_yapan_id,tamamlayan_kullanici_id')
           .in('id', canliIds)
+          .in('durum', TERMINAL)
+          .gte('tamamlanma_tarihi', sinir24h)
         for (const g of data ?? []) {
           gorevMap.set(g.id, { ...g, _tablo: 'canli_gorevler' })
           gorevTipMap.set(g.id, 'Frekansiyel')
         }
       } else if (mod === 'arsiv') {
-        // Sadece arşiv tablo
         const { data } = await admin.from('canli_gorevler_arsiv')
           .select('id,tanim,durum,tamamlanma_tarihi,islemi_yapan_id,tamamlayan_kullanici_id')
           .in('id', canliIds)
+          .in('durum', TERMINAL)
+          .lt('tamamlanma_tarihi', sinir24h)
         for (const g of data ?? []) {
           gorevMap.set(g.id, { ...g, _tablo: 'canli_gorevler_arsiv' })
           gorevTipMap.set(g.id, 'Frekansiyel')
