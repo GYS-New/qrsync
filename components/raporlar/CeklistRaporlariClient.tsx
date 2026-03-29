@@ -102,6 +102,7 @@ export default function CeklistRaporlariClient({
   const [modalGorev, setModalGorev]   = useState<{ id: string; taskType: 'gorevler' | 'canli_gorevler' } | null>(null)
   const [deleting, setDeleting]       = useState(false)
   const [deletingId, setDeletingId]   = useState<string | null>(null)
+  const [yetkiler, setYetkiler]       = useState({ duzenleyebilir: false, silebilir: false })
 
   // ── Varsayılan: son 24 saat (durum değişimine göre, API cikti=rapor) ───
   const yukleRapor24h = useCallback(async () => {
@@ -117,6 +118,7 @@ export default function CeklistRaporlariClient({
       const json = await res.json()
       if (!json.ok) throw new Error(json.error)
       setSatirlar(json.data ?? [])
+      setYetkiler(json.yetkiler ?? { duzenleyebilir: false, silebilir: false })
     } catch (e: any) {
       toast({ type: 'error', title: 'Yüklenemedi', message: e.message })
     } finally {
@@ -144,6 +146,7 @@ export default function CeklistRaporlariClient({
       const json = await res.json()
       if (!json.ok) throw new Error(json.error)
       setSatirlar(json.data ?? [])
+      setYetkiler(json.yetkiler ?? { duzenleyebilir: false, silebilir: false })
       setFiltreMod(true)
     } catch (e: any) {
       toast({ type: 'error', title: 'Yüklenemedi', message: e.message })
@@ -978,13 +981,13 @@ export default function CeklistRaporlariClient({
                             taskType: r.gorev_task_type ?? 'canli_gorevler',
                           })}
                           title="Düzenle"
-                          disabled={deleting}
+                          disabled={deleting || !yetkiler.duzenleyebilir}
                           style={{
                             width: 30, height: 30, border: 'none', borderRadius: 7,
                             background: '#fef3c7', color: '#92400e',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: deleting ? 'not-allowed' : 'pointer',
-                            opacity: deleting ? 0.5 : 1,
+                            cursor: (!yetkiler.duzenleyebilir || deleting) ? 'not-allowed' : 'pointer',
+                            opacity: (!yetkiler.duzenleyebilir || deleting) ? 0.5 : 1,
                             fontSize: 13, fontWeight: 600,
                           }}>
                           ✎
@@ -992,13 +995,13 @@ export default function CeklistRaporlariClient({
                         <button
                           onClick={() => silKayit(r.id)}
                           title="Kaydı Sil"
-                          disabled={deleting || deletingId === r.id}
+                          disabled={deleting || deletingId === r.id || !yetkiler.silebilir}
                           style={{
                             width: 30, height: 30, border: 'none', borderRadius: 7,
                             background: '#fee2e2', color: '#dc2626',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: deleting || deletingId === r.id ? 'not-allowed' : 'pointer',
-                            opacity: deletingId === r.id ? 0.5 : 1,
+                            cursor: (deleting || deletingId === r.id || !yetkiler.silebilir) ? 'not-allowed' : 'pointer',
+                            opacity: (deletingId === r.id || !yetkiler.silebilir) ? 0.5 : 1,
                             fontSize: 13, fontWeight: 600,
                           }}>
                           {deletingId === r.id ? '⏳' : '✕'}

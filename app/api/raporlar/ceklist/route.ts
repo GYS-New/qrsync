@@ -29,7 +29,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { sayfaGorebilirMi } from '@/lib/yetki/sayfaYetkisi'
+import { sayfaGorebilirMi, sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 
 type MeCeklist = {
   id: string
@@ -371,11 +371,14 @@ export async function GET(req: NextRequest) {
       else cikti = 'birlesik'
     }
 
-    if (!firmaId) return NextResponse.json({ ok: true, data: [] })
+    if (!firmaId) return NextResponse.json({ ok: true, data: [], yetkiler: { duzenleyebilir: false, silebilir: false } })
 
     const data = await kayitlarGetir(admin, firmaId, projeId, baslangic, bitis, cikti)
+    
+    // Kullanıcı Grupları Yetkilerini ekle
+    const yetkiler = await sayfaYetkileri(me.rol, 'ceklist-raporlari', firmaId ?? undefined)
 
-    return NextResponse.json({ ok: true, data })
+    return NextResponse.json({ ok: true, data, yetkiler: { duzenleyebilir: yetkiler.duzenleyebilir, silebilir: yetkiler.silebilir } })
   } catch (err: any) {
     console.error('[raporlar/ceklist GET]', err)
     return NextResponse.json({ ok: false, error: err?.message ?? 'Sunucu hatası' }, { status: 500 })

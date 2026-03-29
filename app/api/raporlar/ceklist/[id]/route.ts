@@ -2,10 +2,12 @@
  * DELETE /api/raporlar/ceklist/{id}
  *
  * Çeklist sonuç kaydını siler.
+ * Kullanıcı Grupları Yetkilerine bağlıdır.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 
 export async function DELETE(
   req: NextRequest,
@@ -26,14 +28,14 @@ export async function DELETE(
       return NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 403 })
     }
 
-    const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
-    const isTA = me.rol === 'tenant_admin'
-
-    if (!isSA && !isTA) {
+    // Kullanıcı Grupları Yetkilerine bağla
+    const yetkiler = await sayfaYetkileri(me.rol, 'ceklist-raporlari', me.firma_id ?? undefined)
+    
+    if (!yetkiler.silebilir) {
       return NextResponse.json({ ok: false, error: 'Silme izni yok' }, { status: 403 })
     }
 
-    // Kaydı bul ve sil (ceklist_sonuclar tablosundan)
+    // Kaydı bul
     const { data: kayit, error: findErr } = await admin
       .from('ceklist_sonuclar')
       .select('id,firma_id')
@@ -44,8 +46,8 @@ export async function DELETE(
       return NextResponse.json({ ok: false, error: 'Kayıt bulunamadı' }, { status: 404 })
     }
 
-    // Firma kontrolü (SA herkesi silebilir, TA sadece kendi firmayı)
-    if (isTA && kayit.firma_id !== me.firma_id) {
+    // Firma kontrolü (SA herkesi silebilir, diğerleri sadece kendi firmayı)
+    if (me.rol !== 'super_admin' && me.rol !== 'alt_super_admin' && kayit.firma_id !== me.firma_id) {
       return NextResponse.json({ ok: false, error: 'Farklı firmaya ait kayıt silemezsiniz' }, { status: 403 })
     }
 
