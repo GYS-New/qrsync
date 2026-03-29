@@ -240,14 +240,14 @@ export default function CeklistRaporlariClient({
                 durum: '',
                 kanal: madde.kanal ? madde.kanal : '',
                 kullanici: '',
-                oran: madde.gorsel_url ? 'Görsel' : '',
+                oran: '',
               })
               maddeRow.font = { size: 10, color: { argb: madde.dolduruldu ? 'FF166534' : 'FFC2410C' } }
               
               // Görsel hücresine hyperlink ekle
               if (madde.gorsel_url) {
                 const gorselCell = maddeRow.getCell(8) // oran sütunu (8. kolon)
-                gorselCell.hyperlink = madde.gorsel_url
+                gorselCell.value = { text: 'Görsel', hyperlink: madde.gorsel_url }
                 gorselCell.font = { size: 10, color: { argb: 'FF0369a1' }, underline: 'single', bold: true }
               }
             }
