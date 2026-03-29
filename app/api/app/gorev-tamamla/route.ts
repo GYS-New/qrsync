@@ -146,14 +146,14 @@ export async function POST(req: Request) {
         yanitlayan_id:   userId,
       }))
 
+      // checklist_cevaplari eski/yardımcı tablo; raporlar checklist_sonuc_basliklari okur.
+      // Spesifik görevlerde FK kısıtı nedeniyle insert başarısız olabilir —
+      // bu durumda rapor tablosunu geri silme, sadece logla.
       const { error: cevapErr } = await admin
         .from('checklist_cevaplari')
         .insert(cevaplar)
-
       if (cevapErr) {
-        await admin.from('checklist_sonuc_maddeleri').delete().eq('sonuc_id', sonucRow.id)
-        await admin.from('checklist_sonuc_basliklari').delete().eq('id', sonucRow.id)
-        return NextResponse.json({ ok: false, error: 'Çeklist kaydedilemedi: ' + cevapErr.message }, { status: 500, headers: CORS })
+        console.warn('[gorev-tamamla] checklist_cevaplari insert başarısız (kritik değil):', cevapErr.message)
       }
     }
 
