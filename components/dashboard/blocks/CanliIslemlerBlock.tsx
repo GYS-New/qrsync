@@ -17,40 +17,59 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
 }) {
   const supabase = createClient()
   const today = bugunTR()
+  const todayISO = today.toISOString()
   const onlineSince = new Date(Date.now() - 120 * 1000).toISOString()
 
   // Görev sorguları: firma + proje filtresi
-  const gorevFilter = (q: any) => {
+  const gf = (q: any) => {
     let r = firmaId ? q.eq('firma_id', firmaId) : q
     if (projeId) r = r.eq('proje_id', projeId)
     return r
   }
-  // Kullanıcı/Lokasyon sorguları: SADECE firma filtresi
-  // (proje_id bu tablolarda farklı anlam taşır, count'u bozar)
-  const firmaOnly = (q: any) => firmaId ? q.eq('firma_id', firmaId) : q
+  // Kullanıcı/Lokasyon: sadece firma filtresi
+  const ff = (q: any) => firmaId ? q.eq('firma_id', firmaId) : q
 
   const results = await Promise.allSettled([
-    gorevFilter(supabase.from('gorevler').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', today.toISOString())),
-    gorevFilter(supabase.from('gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').gte('olusturma_tarihi', today.toISOString())),
-    gorevFilter(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', today.toISOString())),
-    gorevFilter(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').gte('olusturma_tarihi', today.toISOString())),
-    firmaOnly(supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true)),
-    firmaOnly(supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true).gte('last_seen_at', onlineSince)),
-    firmaOnly(supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true)),
-    firmaOnly(supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true).not('atanan_kullanici_id', 'is', null)),
+    // [0] Spesifik toplam bugün
+    gf(supabase.from('gorevler').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', todayISO)),
+    // [1] Spesifik tamamlanan bugün
+    gf(supabase.from('gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').gte('olusturma_tarihi', todayISO)),
+
+    // [2] Frekansiyel canlı toplam bugün
+    gf(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', todayISO)),
+    // [3] Frekansiyel canlı tamamlanan bugün
+    gf(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').gte('olusturma_tarihi', todayISO)),
+
+    // [4] Frekansiyel ARŞİV toplam bugün (arşive taşınanlar)
+    gf(supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', todayISO)),
+    // [5] Frekansiyel ARŞİV tamamlanan bugün
+    gf(supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true })
+      .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN']).gte('olusturma_tarihi', todayISO)),
+
+    // [6] Kullanıcılar toplam
+    ff(supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true)),
+    // [7] Online kullanıcılar
+    ff(supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true).gte('last_seen_at', onlineSince)),
+    // [8] Lokasyonlar toplam
+    ff(supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true)),
+    // [9] Görevli lokasyonlar
+    ff(supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true).not('atanan_kullanici_id', 'is', null)),
   ])
 
   const n = (r: PromiseSettledResult<any>): number =>
     r.status === 'fulfilled' ? (r.value?.count ?? 0) : 0
 
-  const anlikToplam     = n(results[0])
-  const anlikTamam      = n(results[1])
-  const canliToplam     = n(results[2])
-  const canliTamam      = n(results[3])
-  const kullaniciToplam = n(results[4])
-  const kullaniciOnline = n(results[5])
-  const lokasyonToplam  = n(results[6])
-  const lokasyonGorevli = n(results[7])
+  const anlikToplam = n(results[0])
+  const anlikTamam  = n(results[1])
+
+  // Frekansiyel = canlı + arşiv (aynı görev iki tabloda olmaz, doğrudan toplanır)
+  const canliToplam  = n(results[2]) + n(results[4])
+  const canliTamam   = n(results[3]) + n(results[5])
+
+  const kullaniciToplam = n(results[6])
+  const kullaniciOnline = n(results[7])
+  const lokasyonToplam  = n(results[8])
+  const lokasyonGorevli = n(results[9])
 
   const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 100) : 0)
 

@@ -8,24 +8,15 @@ import type { DashboardBlockProps } from '../types'
 
 type Mode = "gunluk" | "haftalik" | "aylik"
 
-/** Türkiye saatiyle verilen UTC Date'in saat başını döndürür */
 function startOfHourTR(d: Date) {
-  const x = new Date(d)
-  x.setMinutes(0, 0, 0)
-  return x
+  const x = new Date(d); x.setMinutes(0, 0, 0); return x
 }
 
-/** Verilen UTC Date'i Türkiye saatiyle gün başına çeker */
 function startOfDayTR(d: Date): Date {
   const trOffset = 3 * 60 * 60 * 1000
   const trTime = new Date(d.getTime() + trOffset)
   trTime.setUTCHours(0, 0, 0, 0)
   return new Date(trTime.getTime() - trOffset)
-}
-
-/** Türkiye saatiyle şu anki saat (0-23) */
-function currentHourTR(): number {
-  return new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul', hour: 'numeric', hour12: false }) as unknown as number
 }
 
 export default function AktiviteGrafigiBlock({
@@ -43,8 +34,7 @@ export default function AktiviteGrafigiBlock({
     if (!el) return
     const measure = () => {
       const rect = el.getBoundingClientRect()
-      const w = Math.floor(rect.width)
-      const h = Math.floor(rect.height)
+      const w = Math.floor(rect.width), h = Math.floor(rect.height)
       if (w > 0 && h > 0) setChartSize({ w, h })
     }
     measure()
@@ -56,55 +46,56 @@ export default function AktiviteGrafigiBlock({
   const rangeStart = useMemo(() => {
     const now = new Date()
     if (mode === "gunluk")   return new Date(now.getTime() - 24 * 60 * 60 * 1000)
-    if (mode === "haftalik") return new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000)
+    if (mode === "haftalik") return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   }, [mode])
 
   async function fetchData() {
-    let q = supabase
-      .from("canli_gorevler")
-      .select("olusturma_tarihi")
-      .gte("olusturma_tarihi", rangeStart.toISOString())
+    const rangeISO = rangeStart.toISOString()
 
-    if (firmaId) q = q.eq("firma_id", firmaId)
-    if (projeId) q = (q as any).eq("proje_id", projeId)
+    // Canlı görevler
+    let qCanli = supabase.from("canli_gorevler").select("olusturma_tarihi").gte("olusturma_tarihi", rangeISO)
+    if (firmaId) qCanli = qCanli.eq("firma_id", firmaId)
+    if (projeId) qCanli = (qCanli as any).eq("proje_id", projeId)
 
-    const { data: rows } = await q
+    // Arşiv görevler — aynı dönemde oluşturulup arşivlenenler
+    let qArsiv = supabase.from("canli_gorevler_arsiv").select("olusturma_tarihi").gte("olusturma_tarihi", rangeISO)
+    if (firmaId) qArsiv = qArsiv.eq("firma_id", firmaId)
+    if (projeId) qArsiv = (qArsiv as any).eq("proje_id", projeId)
+
+    const [{ data: canliRows }, { data: arsivRows }] = await Promise.all([qCanli, qArsiv])
+    const rows = [...(canliRows ?? []), ...(arsivRows ?? [])]
+
     const grouped: Record<string, number> = {}
 
     if (mode === "gunluk") {
-      // Son 24 saati TR saatiyle saat saat grupla
       for (let i = 23; i >= 0; i--) {
         const d = new Date(Date.now() - i * 60 * 60 * 1000)
-        // Saat etiketini TR saatiyle üret
         const label = d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false })
         grouped[label] = 0
       }
-      rows?.forEach((r: any) => {
+      rows.forEach((r: any) => {
         const d = startOfHourTR(new Date(r.olusturma_tarihi))
         const label = d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false })
         if (label in grouped) grouped[label] = (grouped[label] || 0) + 1
       })
     } else if (mode === "haftalik") {
-      // Son 7 günü TR saatiyle gün gün grupla
       const days: Date[] = []
       for (let i = 6; i >= 0; i--) days.push(startOfDayTR(new Date(Date.now() - i * 24 * 60 * 60 * 1000)))
       days.forEach((d) => {
         const key = d.toLocaleDateString("tr-TR", { weekday: "short", timeZone: "Europe/Istanbul" })
         grouped[key] = 0
       })
-      rows?.forEach((r: any) => {
+      rows.forEach((r: any) => {
         const d = startOfDayTR(new Date(r.olusturma_tarihi))
         const key = d.toLocaleDateString("tr-TR", { weekday: "short", timeZone: "Europe/Istanbul" })
         if (key in grouped) grouped[key] = (grouped[key] || 0) + 1
       })
     } else {
-      // 30 günü hafta kovalarına böl
-      const now = new Date()
-      const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       const weeks = ["Hafta 1", "Hafta 2", "Hafta 3", "Hafta 4", "Hafta 5"]
       weeks.forEach((w) => (grouped[w] = 0))
-      rows?.forEach((r: any) => {
+      rows.forEach((r: any) => {
         const d = new Date(r.olusturma_tarihi)
         const diffDays = Math.floor((d.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
         const bucket = Math.min(4, Math.max(0, Math.floor(diffDays / 7)))
@@ -120,6 +111,7 @@ export default function AktiviteGrafigiBlock({
     const channel = supabase
       .channel("dashboard-aktivite")
       .on("postgres_changes", { event: "*", schema: "public", table: "canli_gorevler" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "canli_gorevler_arsiv" }, () => fetchData())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,30 +121,19 @@ export default function AktiviteGrafigiBlock({
     <BlockWrapper title="AKTİVİTE GRAFİĞİ" size="big" href={`${basePath}/dashboard/canli-islemler`}>
       <div className="flex gap-2 mb-2">
         {[
-          { key: "gunluk",   label: "GÜNLÜK" },
+          { key: "gunluk", label: "GÜNLÜK" },
           { key: "haftalik", label: "HAFTALIK" },
-          { key: "aylik",    label: "AYLIK" },
+          { key: "aylik", label: "AYLIK" },
         ].map((m) => (
-          <button
-            key={m.key}
-            onClick={() => setMode(m.key as Mode)}
-            className={`text-xs px-2 py-1 rounded ${
-              mode === m.key ? "bg-[#2e8b2e] text-white" : "border border-[#d6e4d6] text-[#2d3f2d]"
-            }`}
-          >
+          <button key={m.key} onClick={() => setMode(m.key as Mode)}
+            className={`text-xs px-2 py-1 rounded ${mode === m.key ? "bg-[#2e8b2e] text-white" : "border border-[#d6e4d6] text-[#2d3f2d]"}`}>
             {m.label}
           </button>
         ))}
       </div>
-
       <div ref={chartWrapRef} style={{ height: 300, minHeight: 300, width: "100%", minWidth: 0 }}>
         {chartSize.w > 0 && chartSize.h > 0 ? (
-          <AreaChart
-            width={chartSize.w}
-            height={chartSize.h}
-            data={data}
-            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-          >
+          <AreaChart width={chartSize.w} height={chartSize.h} data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
             <Tooltip />
