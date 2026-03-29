@@ -558,7 +558,6 @@ export default function CeklistRaporlariClient({
 
       // AŞAMA 4: HTML2PDF ile PDF oluştur
       const tempDiv = document.createElement('div')
-      tempDiv.style.display = 'none'
       tempDiv.innerHTML = htmlContent
       document.body.appendChild(tempDiv)
 
@@ -567,27 +566,26 @@ export default function CeklistRaporlariClient({
         const module = await import('html2pdf.js')
         const html2pdf = module.default || module
         
-        const element = tempDiv.querySelector('table') || tempDiv.querySelector('h2')
-        if (element) {
-          const opt = {
-            margin: [10, 8, 10, 8],
-            filename: `ceklist-raporlari-${new Date().toISOString().slice(0, 10)}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { orientation: 'landscape' as const, unit: 'mm', format: 'a4' }
-          }
-          
-          // html2pdf chain API'sı
-          html2pdf()
-            .set(opt)
-            .from(tempDiv)
-            .save()
+        const opt = {
+          margin: [10, 8, 10, 8],
+          filename: `ceklist-raporlari-${new Date().toISOString().slice(0, 10)}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { orientation: 'landscape' as const, unit: 'mm', format: 'a4' }
         }
+        
+        // html2pdf chain API'sı - AWAIT et!
+        await html2pdf()
+          .set(opt)
+          .from(tempDiv)
+          .save()
       } catch (e) {
         // Hata durumunda toast'u çağır
         throw new Error(`PDF oluşturulamadı: ${e}`)
       } finally {
-        document.body.removeChild(tempDiv)
+        if (tempDiv.parentNode) {
+          document.body.removeChild(tempDiv)
+        }
       }
     } catch (e: any) {
       toast({ type: 'error', title: 'PDF İndirme Hatası', message: e.message })
