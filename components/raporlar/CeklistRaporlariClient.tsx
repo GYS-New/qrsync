@@ -229,21 +229,27 @@ export default function CeklistRaporlariClient({
             for (const madde of json.sonuclar) {
               const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
               const zorunluText = madde.zorunlu ? ' [ZORUNLU]' : ''
-              const gorselText = madde.gorsel_url ? ` [GÖRSEL: ${madde.gorsel_url}]` : ''
               const cevapText = madde.secenek ? ` → ${madde.secenek}` : ''
               const notText = madde.not ? `\nNot: ${madde.not}` : ''
               
               const maddeRow = ws.addRow({
-                kayit: `${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${gorselText}${cevapText}${notText}`,
+                kayit: `${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${cevapText}${notText}`,
                 gorev: '',
                 lokasyon: madde.tarih ? formatDateTime(madde.tarih) : '',
-                sablon: madde.kanal ? madde.kanal : '',
-                durum: madde.yapan ? madde.yapan : '',
-                kanal: '',
+                sablon: madde.yapan ? madde.yapan : '',
+                durum: '',
+                kanal: madde.kanal ? madde.kanal : '',
                 kullanici: '',
-                oran: '',
+                oran: madde.gorsel_url ? 'Görsel' : '',
               })
               maddeRow.font = { size: 10, color: { argb: madde.dolduruldu ? 'FF166534' : 'FFC2410C' } }
+              
+              // Görsel hücresine hyperlink ekle
+              if (madde.gorsel_url) {
+                const gorselCell = maddeRow.getCell(8) // oran sütunu (8. kolon)
+                gorselCell.hyperlink = madde.gorsel_url
+                gorselCell.font = { size: 10, color: { argb: 'FF0369a1' }, underline: 'single', bold: true }
+              }
             }
             
             // Boş satır (ayrım)
@@ -404,18 +410,17 @@ export default function CeklistRaporlariClient({
                       for (const madde of json.sonuclar) {
                         const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
                         const zorunluText = madde.zorunlu ? ' [ZORUNLU]' : ''
-                        const gorselText = madde.gorsel_url ? ` [GÖRSEL: ${madde.gorsel_url}]` : ''
                         const cevapText = madde.secenek ? ` → ${madde.secenek}` : ''
                         const notText = madde.not ? ` | Not: ${madde.not}` : ''
                         rows.push([
-                          `${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${gorselText}${cevapText}${notText}`,
+                          `${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${cevapText}${notText}`,
                           '',
                           madde.tarih ? formatDateTime(madde.tarih) : '',
-                          madde.kanal ?? '',
                           madde.yapan ?? '',
                           '',
+                          madde.kanal ?? '',
                           '',
-                          '',
+                          madde.gorsel_url ? `Görsel: ${madde.gorsel_url}` : '',
                         ])
                     }
                     // Boş satır (ayrım)
