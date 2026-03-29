@@ -177,23 +177,28 @@ export default function CeklistRaporlariClient({
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
     const ws = wb.addWorksheet('Çeklist Raporları')
+    
+    // Ana tablo kolonları
     const cols = [
       { header: 'Kayıt Tarihi',   key: 'kayit',      width: 20 },
       { header: 'Görev',          key: 'gorev',      width: 32 },
-      { header: 'Lokasyon',     key: 'lokasyon',   width: 24 },
-      { header: 'Şablon',       key: 'sablon',     width: 24 },
-      { header: 'Durum',        key: 'durum',      width: 22 },
-      { header: 'Kanal',        key: 'kanal',      width: 10 },
-      { header: 'Dolduran',     key: 'kullanici',  width: 20 },
-      { header: 'Doldurulma %', key: 'oran',       width: 14 },
+      { header: 'Lokasyon',       key: 'lokasyon',   width: 24 },
+      { header: 'Şablon',         key: 'sablon',     width: 24 },
+      { header: 'Durum',          key: 'durum',      width: 22 },
+      { header: 'Kanal',          key: 'kanal',      width: 10 },
+      { header: 'Dolduran',       key: 'kullanici',  width: 20 },
+      { header: 'Doldurulma %',   key: 'oran',       width: 14 },
     ] as { header: string; key: string; width: number }[]
     if (filtreMod) cols.push({ header: 'Segment', key: 'segment', width: 12 })
     ws.columns = cols
+    
     const hr = ws.getRow(1)
     hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }
     hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }
     hr.height = 20
-    filtreData.forEach(r => {
+    
+    // Her kayıt için çeklist verilerini fetch et ve ekle
+    for (const r of filtreData) {
       const base: Record<string, string> = {
         kayit:     r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
         gorev:     r.gorev_tanim,
@@ -206,7 +211,46 @@ export default function CeklistRaporlariClient({
       }
       if (filtreMod) base.segment = segmentEtiket(r)
       ws.addRow(base)
-    })
+      
+      // Çeklist maddelerini fetch et
+      try {
+        const res = await fetch(`/api/checklist-results?task_id=${r.gorev_id}&task_type=${r.gorev_task_type ?? 'canli_gorevler'}`)
+        const json = await res.json()
+        if (json.ok && json.sonuclar?.length) {
+          // Maddeler başlığı
+          const maddeBaslık = ws.addRow({ kayit: '📋 ÇEKLİST MADDELERİ', gorev: '', lokasyon: '', sablon: '', durum: '', kanal: '', kullanici: '', oran: '' })
+          maddeBaslık.font = { bold: true, color: { argb: 'FF475569' }, size: 11 }
+          maddeBaslık.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }
+          
+          // Her madde satırı
+          for (const madde of json.sonuclar) {
+            const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
+            const zorunluText = madde.zorunlu ? ' [ZORUNLU]' : ''
+            const gorselText = madde.gorsel_url ? ' [GÖRSEL: ✓]' : ''
+            const cevapText = madde.secenek ? ` → ${madde.secenek}` : ''
+            const notText = madde.not ? `\nNot: ${madde.not}` : ''
+            
+            const maddeRow = ws.addRow({
+              kayit: `${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${gorselText}${cevapText}${notText}`,
+              gorev: '',
+              lokasyon: madde.tarih ? formatDateTime(madde.tarih) : '',
+              sablon: madde.kanal ? madde.kanal : '',
+              durum: madde.yapan ? madde.yapan : '',
+              kanal: '',
+              kullanici: '',
+              oran: '',
+            })
+            maddeRow.font = { size: 10, color: { argb: madde.dolduruldu ? 'FF166534' : 'FFC2410C' } }
+          }
+          
+          // Boş satır (ayrım)
+          ws.addRow({})
+        }
+      } catch (e) {
+        // Hata durumunda devam et
+      }
+    }
+    
     const buf = await wb.xlsx.writeBuffer()
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
@@ -215,10 +259,13 @@ export default function CeklistRaporlariClient({
   }
 
   // ── Yazdır ────────────────────────────────────────────────────────────
-  function yazdir() {
+  async function yazdir() {
     const segTh = filtreMod ? '<th>Segment</th>' : ''
-    const rows = filtreData.map(r =>
-      `<tr>
+    
+    // Görev satırlarını HTML'e dönüştür
+    let tableHtml = ''
+    for (const r of filtreData) {
+      tableHtml += `<tr>
         <td>${r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—'}</td>
         <td>${r.gorev_tanim}</td>
         <td>${r.lokasyon_tanim}</td>
@@ -229,24 +276,56 @@ export default function CeklistRaporlariClient({
         <td>%${pct(r.doldurulan_madde, r.toplam_madde)} (${r.doldurulan_madde}/${r.toplam_madde})</td>
         ${filtreMod ? `<td>${segmentEtiket(r)}</td>` : ''}
       </tr>`
-    ).join('')
+      
+      // Çeklist maddelerini fetch et
+      try {
+        const res = await fetch(`/api/checklist-results?task_id=${r.gorev_id}&task_type=${r.gorev_task_type ?? 'canli_gorevler'}`)
+        const json = await res.json()
+        if (json.ok && json.sonuclar?.length) {
+          // Maddeler başlığı satırı
+          tableHtml += `<tr style="background:#f1f5f9">
+            <td colspan="9" style="font-weight:700;color:#475569;padding:10px 8px">📋 ÇEKLİST MADDELERİ</td>
+          </tr>`
+          // Her madde satırı
+          for (const madde of json.sonuclar) {
+            const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
+            const zorunluText = madde.zorunlu ? ' <span style="color:#dc2626;font-weight:700">[ZORUNLU]</span>' : ''
+            const gorselText = madde.gorsel_url ? ` <a href="${madde.gorsel_url}" target="_blank" style="color:#0369a1;text-decoration:underline;font-weight:700">[GÖRSEL]</a>` : ''
+            const cevapText = madde.secenek ? ` → <strong>${madde.secenek}</strong>` : ''
+            const notText = madde.not ? `<br/><small>Not: ${madde.not}</small>` : ''
+            tableHtml += `<tr style="background:#f8fafb;font-size:11px">
+              <td colspan="9" style="padding:8px 12px;color:${madde.dolduruldu ? '#166534' : '#c2410c'}">
+                ${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${gorselText}${cevapText}${notText}
+              </td>
+            </tr>`
+          }
+          // Boş satır (ayrım)
+          tableHtml += '<tr style="height:8px;background:none"><td colspan="9"></td></tr>'
+        }
+      } catch (e) {
+        // Hata durumunda devam et
+      }
+    }
+    
     const w = window.open('', '_blank', 'width=1100,height=700')
     if (!w) return
     w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/>
       <title>Çeklist Raporları</title>
-      <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}
-      table{width:100%;border-collapse:collapse}
-      th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
-      td{padding:5px 8px;border:1px solid #d6e4d6}
-      tr:nth-child(even)td{background:#f3faf3}
-      .arsiv-row td{background:#f8f4ff!important}</style>
+      <style>
+        body{font-family:Arial,sans-serif;font-size:11px;padding:20px}
+        table{width:100%;border-collapse:collapse}
+        th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
+        td{padding:5px 8px;border:1px solid #d6e4d6}
+        tr:nth-child(even) td{background:#f3faf3}
+        img{max-width:100px;max-height:100px;margin:4px 0}
+      </style>
       </head><body>
       <h2 style="color:#1f6b1f">Çeklist Raporları</h2>
       <table><thead><tr>
         <th>Kayıt Tarihi</th><th>Görev</th><th>Lokasyon</th><th>Şablon</th>
         <th>Durum</th><th>Kanal</th><th>Dolduran</th><th>Doldurulma</th>${segTh}
-      </tr></thead><tbody>${rows}</tbody></table></body></html>`)
-    w.document.close(); setTimeout(() => w.print(), 400)
+      </tr></thead><tbody>${tableHtml}</tbody></table></body></html>`)
+    w.document.close(); setTimeout(() => w.print(), 600)
   }
 
   // ── Stil yardımcıları ─────────────────────────────────────────────────
@@ -279,10 +358,14 @@ export default function CeklistRaporlariClient({
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => {
+            <button onClick={async () => {
+              // CSV: Her görev + maddeleri
+              const rows: string[][] = []
               const headers = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
               if (filtreMod) headers.push('Segment')
-              csvIndir('ceklist-raporlari', headers, filtreData.map(r => {
+              
+              for (const r of filtreData) {
+                // Görev satırı
                 const row = [
                   r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
                   r.gorev_tanim, r.lokasyon_tanim, r.sablon_baslik,
@@ -291,8 +374,42 @@ export default function CeklistRaporlariClient({
                   `%${pct(r.doldurulan_madde, r.toplam_madde)}`,
                 ]
                 if (filtreMod) row.push(segmentEtiket(r))
-                return row
-              }))
+                rows.push(row)
+                
+                // Çeklist maddelerini fetch et
+                try {
+                  const res = await fetch(`/api/checklist-results?task_id=${r.gorev_id}&task_type=${r.gorev_task_type ?? 'canli_gorevler'}`)
+                  const json = await res.json()
+                  if (json.ok && json.sonuclar?.length) {
+                    // Maddeler başlığı satırı
+                    rows.push(['📋 ÇEKLİST MADDELERİ', '', '', '', '', '', '', ''])
+                    // Her madde satırı
+                    for (const madde of json.sonuclar) {
+                      const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
+                      const zorunluText = madde.zorunlu ? ' [ZORUNLU]' : ''
+                      const gorselText = madde.gorsel_url ? ' [GÖRSEL: ✓]' : ''
+                      const cevapText = madde.secenek ? ` → ${madde.secenek}` : ''
+                      const notText = madde.not ? ` | Not: ${madde.not}` : ''
+                      rows.push([
+                        `${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${gorselText}${cevapText}${notText}`,
+                        '',
+                        madde.tarih ? formatDateTime(madde.tarih) : '',
+                        madde.kanal ?? '',
+                        madde.yapan ?? '',
+                        '',
+                        '',
+                        '',
+                      ])
+                    }
+                    // Boş satır (ayrım)
+                    rows.push([])
+                  }
+                } catch (e) {
+                  // Hata durumunda devam et
+                }
+              }
+              
+              csvIndir('ceklist-raporlari', headers, rows)
             }}
               disabled={!filtreData.length}
               className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
