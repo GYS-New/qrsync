@@ -100,20 +100,49 @@ async function kayitlarGetir(
   cikti: 'rapor' | 'arsiv' | 'birlesik',
 ): Promise<any[]> {
   // 1. Firmaya ait lokasyonlar
+  // Proje seçiliyken yalnızca proje_id = X demek, lokasyon kaydında proje_id NULL/yanlış
+  // kalan (özellikle spesifik görev lokasyonları) çeklist raporuna hiç düşmez.
+  // Çözüm: seçili projeye bağlı lokasyonlar + projesi atanmamış lokasyonlar;
+  // ayrıca bu firmada bu projeye bağlı spesifik görevlerin lokasyon_id'lerini ekle.
   let lokQ = admin.from('lokasyonlar')
-    .select('id,tanim,checklist_sablon_id')
+    .select('id,tanim,checklist_sablon_id,proje_id')
     .eq('firma_id', firmaId)
-  if (projeId) lokQ = lokQ.eq('proje_id', projeId)
+  if (projeId) {
+    lokQ = lokQ.or(`proje_id.eq.${projeId},proje_id.is.null`)
+  }
   const { data: lokasyonlar } = await lokQ
-  if (!lokasyonlar?.length) return []
 
   const lokMap: Record<string, { tanim: string; checklist_sablon_id: string | null }> = {}
   const sablonIds = new Set<string>()
-  for (const l of lokasyonlar) {
+  for (const l of lokasyonlar ?? []) {
     lokMap[l.id] = { tanim: l.tanim, checklist_sablon_id: l.checklist_sablon_id ?? null }
     if (l.checklist_sablon_id) sablonIds.add(l.checklist_sablon_id)
   }
+
+  if (projeId) {
+    const { data: specLokRows } = await admin
+      .from('gorevler')
+      .select('lokasyon_id')
+      .eq('firma_id', firmaId)
+      .eq('proje_id', projeId)
+      .not('lokasyon_id', 'is', null)
+    const ekLokIds = [...new Set((specLokRows ?? []).map((r: { lokasyon_id: string }) => r.lokasyon_id).filter(Boolean))]
+    const eksik = ekLokIds.filter(id => !lokMap[id])
+    if (eksik.length) {
+      const { data: ekLoklar } = await admin
+        .from('lokasyonlar')
+        .select('id,tanim,checklist_sablon_id,proje_id')
+        .eq('firma_id', firmaId)
+        .in('id', eksik)
+      for (const l of ekLoklar ?? []) {
+        lokMap[l.id] = { tanim: l.tanim, checklist_sablon_id: l.checklist_sablon_id ?? null }
+        if (l.checklist_sablon_id) sablonIds.add(l.checklist_sablon_id)
+      }
+    }
+  }
+
   const lokIds = Object.keys(lokMap)
+  if (!lokIds.length) return []
 
   // 2. Şablon başlıkları
   const sablonMap: Record<string, string> = {}
