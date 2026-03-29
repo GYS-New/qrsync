@@ -168,6 +168,7 @@ async function kayitlarGetir(
   if (bitis)     sbQ = sbQ.lte('kayit_tarihi', bitis + 'T23:59:59')
 
   const { data: basliklar, error: sbErr } = await sbQ
+  console.log('[ceklist-rapor] sbErr:', sbErr?.message ?? null, '| basliklar:', basliklar?.length ?? 0, '| lokIds:', lokIds.length)
   if (sbErr || !basliklar?.length) return []
 
   const canliGorevIds = [...new Set(
@@ -176,6 +177,7 @@ async function kayitlarGetir(
   const specGorevIds = [...new Set(
     basliklar.filter((b: any) => !b.canli_gorev_id && b.gorev_id).map((b: any) => String(b.gorev_id)),
   )] as string[]
+  console.log('[ceklist-rapor] canliGorevIds:', canliGorevIds.length, '| specGorevIds:', specGorevIds.length)
 
   const gorevMap: Record<string, GorevRow> = {}
 
@@ -220,10 +222,11 @@ async function kayitlarGetir(
 
   // 4b. Spesifik: gorevler
   if (specGorevIds.length) {
-    const { data: specGorevler } = await admin.from('gorevler')
+    const { data: specGorevler, error: specErr } = await admin.from('gorevler')
       .select('id,tanim,durum,tamamlanma_tarihi,lokasyon_id,durum_degisim_tarihi')
       .in('id', specGorevIds)
       .in('durum', GECERLI_DURUMLAR)
+    console.log('[ceklist-rapor] specGorevIds:', specGorevIds, '| specGorevler bulunan:', specGorevler?.length ?? 0, '| specErr:', specErr?.message ?? null)
     for (const g of specGorevler ?? []) {
       gorevMap[g.id] = {
         id: g.id,
