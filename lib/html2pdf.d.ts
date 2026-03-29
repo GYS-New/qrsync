@@ -8,6 +8,7 @@ declare module 'html2pdf.js' {
     }
     html2canvas?: {
       scale?: number
+      useCORS?: boolean
     }
     jsPDF?: {
       orientation?: 'portrait' | 'landscape'
@@ -18,10 +19,11 @@ declare module 'html2pdf.js' {
 
   interface Html2PdfInstance {
     set(options: Html2PdfOptions): Html2PdfInstance
+    from(element: HTMLElement | string): Html2PdfInstance
     fromElement(element: HTMLElement): Html2PdfInstance
     fromHtml(html: string | HTMLElement): Html2PdfInstance
-    download(filename?: string): Promise<void>
-    save(filename?: string): Promise<void>
+    download(filename?: string): Html2PdfInstance
+    save(filename?: string): Html2PdfInstance
   }
 
   function html2pdf(): Html2PdfInstance

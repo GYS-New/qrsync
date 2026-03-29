@@ -181,14 +181,15 @@ export default function CeklistRaporlariClient({
       const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
       const ws = wb.addWorksheet('Çeklist Raporları')
       
-      // AŞAMA 1: Tüm görevler için çeklist verilerini al
+      // AŞAMA 1: Tüm görevler için çeklist verilerini al (PARALEL)
       const raporVerileri: any[] = []
       let maxMadde = 0
       const gorselListesi: { [key: string]: string[] } = {}
 
-      for (const r of filtreData) {
+      // Tüm görevler için paralel fetch
+      const fetchPromises = filtreData.map(async (r) => {
         const gorevVerisi: any = {
-          gorevId: r.gorev_id, // Görsel listesinde kullanmak için
+          gorevId: r.gorev_id,
           kayit: r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
           gorev: r.gorev_tanim,
           lokasyon: r.lokasyon_tanim,
@@ -204,7 +205,6 @@ export default function CeklistRaporlariClient({
           const res = await fetch(`/api/checklist-results?task_id=${r.gorev_id}&task_type=${r.gorev_task_type ?? 'canli_gorevler'}`)
           const json = await res.json()
           if (json.ok && json.sonuclar?.length) {
-            // Madde tanımlarını koy
             json.sonuclar.forEach((madde: any, idx: number) => {
               gorevVerisi[`madde_${idx}`] = madde.madde
               if (madde.gorsel_url) {
@@ -218,8 +218,11 @@ export default function CeklistRaporlariClient({
           // Hata durumunda devam et
         }
 
-        raporVerileri.push(gorevVerisi)
-      }
+        return gorevVerisi
+      })
+
+      const results = await Promise.all(fetchPromises)
+      raporVerileri.push(...results)
 
       // AŞAMA 2: Dinamik kolonlar oluştur
       const cols = [
@@ -250,38 +253,29 @@ export default function CeklistRaporlariClient({
       hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }
       hr.height = 22
 
-      // AŞAMA 4: Veri satırlarını ekle
+      // AŞAMA 4: Veri satırlarını ekle (görsel URL'si hariç)
       for (const veri of raporVerileri) {
-        // Görseller listesini ekle
-        if (gorselListesi[veri.gorevId]) {
-          veri.gorseller = gorselListesi[veri.gorevId]
-            .map((url: string) => `Görsel\n${url}`)
-            .join('\n---\n')
-        } else {
-          veri.gorseller = ''
-        }
-
         const row = ws.addRow(veri)
         row.font = { size: 10 }
         row.alignment = { wrapText: true, vertical: 'top' }
       }
 
-      // Görseller sütununda hyperlink ekle
+      // Görseller sütununda hyperlink'leri ekle (sonradan)
       let rowIdx = 2
       for (const veri of raporVerileri) {
-        const goalrId = veri.gorev
-        if (gorselListesi[goalrId]) {
+        if (gorselListesi[veri.gorevId] && gorselListesi[veri.gorevId].length > 0) {
           const cell = ws.getRow(rowIdx).getCell(cols.length) // Son sütun (Görseller)
-          let displayText = ''
-          let isFirst = true
-          for (const url of gorselListesi[goalrId]) {
-            if (!isFirst) displayText += '\n'
-            displayText += 'Görsel'
-            isFirst = false
-          }
-          cell.value = { text: displayText, hyperlink: gorselListesi[goalrId][0] }
+          // Birden fazla görsel varsa sadece ilki hyperlink, diğerleri açıklamada
+          const firstUrl = gorselListesi[veri.gorevId][0]
+          const displayText = gorselListesi[veri.gorevId].length > 1 
+            ? `Görsel (${gorselListesi[veri.gorevId].length})` 
+            : 'Görsel'
+          cell.value = { text: displayText, hyperlink: firstUrl }
           cell.font = { size: 10, color: { argb: 'FF0369a1' }, underline: 'single' }
           cell.alignment = { wrapText: true, vertical: 'top' }
+        } else {
+          const cell = ws.getRow(rowIdx).getCell(cols.length)
+          cell.value = '—'
         }
         rowIdx++
       }
@@ -302,12 +296,12 @@ export default function CeklistRaporlariClient({
   async function yazdir() {
     setIsDownloading(true)
     try {
-      // AŞAMA 1: Tüm görevler için veri topla
+      // AŞAMA 1: Tüm görevler için veri topla (PARALEL)
       const raporVerileri: Record<string, any>[] = []
       const gorselListesi: Record<string, string[]> = {}
       let maxMadde = 0
 
-      for (const r of filtreData) {
+      const fetchPromises = filtreData.map(async (r) => {
         const gorevVerisi: Record<string, any> = {
           gorevId: r.gorev_id,
           kayit_tarihi: r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—',
@@ -347,8 +341,11 @@ export default function CeklistRaporlariClient({
           // Hata durumunda devam et
         }
 
-        raporVerileri.push(gorevVerisi)
-      }
+        return gorevVerisi
+      })
+
+      const results = await Promise.all(fetchPromises)
+      raporVerileri.push(...results)
 
       // AŞAMA 2: Dinamik tablo headers
       const baseHeaders = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
@@ -421,12 +418,12 @@ export default function CeklistRaporlariClient({
   async function pdfIndir() {
     setIsDownloading(true)
     try {
-      // AŞAMA 1: Tüm görevler için veri topla
+      // AŞAMA 1: Tüm görevler için veri topla (PARALEL)
       const raporVerileri: Record<string, any>[] = []
       const gorselListesi: Record<string, string[]> = {}
       let maxMadde = 0
 
-      for (const r of filtreData) {
+      const fetchPromises = filtreData.map(async (r) => {
         const gorevVerisi: Record<string, any> = {
           gorevId: r.gorev_id,
           kayit_tarihi: r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—',
@@ -447,7 +444,7 @@ export default function CeklistRaporlariClient({
           const json = await res.json()
           if (json.ok && json.sonuclar?.length) {
             const sonuclar = json.sonuclar
-            if (sonuclar.length > maxMadde) maxMadde = sonuclar.length
+            if (sonuclar.length > maxMadde) maxMadde = Math.max(maxMadde, sonuclar.length)
 
             sonuclar.forEach((madde: any, idx: number) => {
               const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
@@ -466,8 +463,11 @@ export default function CeklistRaporlariClient({
           // Hata durumunda devam et
         }
 
-        raporVerileri.push(gorevVerisi)
-      }
+        return gorevVerisi
+      })
+
+      const results = await Promise.all(fetchPromises)
+      raporVerileri.push(...results)
 
       // AŞAMA 2: Dinamik tablo headers
       const baseHeaders = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
@@ -530,23 +530,34 @@ export default function CeklistRaporlariClient({
 
       // AŞAMA 4: HTML2PDF ile PDF oluştur
       const tempDiv = document.createElement('div')
-      tempDiv.innerHTML = htmlContent
       tempDiv.style.display = 'none'
+      tempDiv.innerHTML = htmlContent
       document.body.appendChild(tempDiv)
 
       try {
-        const html2pdf = await import('html2pdf.js')
-        const opt = {
-          margin: 8,
-          filename: `ceklist-raporlari-${new Date().toISOString().slice(0, 10)}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 1.5 },
-          jsPDF: { orientation: 'landscape' as const, unit: 'mm', format: 'a4' }
+        // html2pdf.js dinamik import
+        const module = await import('html2pdf.js')
+        const html2pdf = module.default || module
+        
+        const element = tempDiv.querySelector('table') || tempDiv.querySelector('h2')
+        if (element) {
+          const opt = {
+            margin: [10, 8, 10, 8],
+            filename: `ceklist-raporlari-${new Date().toISOString().slice(0, 10)}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { orientation: 'landscape' as const, unit: 'mm', format: 'a4' }
+          }
+          
+          // html2pdf chain API'sı
+          html2pdf()
+            .set(opt)
+            .from(tempDiv)
+            .save()
         }
-        const htmlElement = tempDiv.querySelector('html')
-        if (htmlElement) {
-          await html2pdf.default().set(opt).fromElement(htmlElement).download()
-        }
+      } catch (e) {
+        // Hata durumunda toast'u çağır
+        throw new Error(`PDF oluşturulamadı: ${e}`)
       } finally {
         document.body.removeChild(tempDiv)
       }
@@ -588,15 +599,15 @@ export default function CeklistRaporlariClient({
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={async () => {
-              // CSV: Her görev satırı + maddeler ayrı kolonlar
+              // CSV: Her görev satırı + maddeler ayrı kolonlar (PARALEL FETCH)
               setIsDownloading(true)
               try {
-                // AŞAMA 1: Tüm görevler için veri topla
+                // AŞAMA 1: Tüm görevler için veri topla (PARALEL)
                 const raporVerileri: Record<string, any>[] = []
                 const gorselListesi: Record<string, string[]> = {}
                 let maxMadde = 0
 
-                for (const r of filtreData) {
+                const fetchPromises = filtreData.map(async (r) => {
                   const gorevVerisi: Record<string, any> = {
                     gorevId: r.gorev_id,
                     kayit_tarihi: r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
@@ -636,8 +647,11 @@ export default function CeklistRaporlariClient({
                     // Hata durumunda devam et
                   }
 
-                  raporVerileri.push(gorevVerisi)
-                }
+                  return gorevVerisi
+                })
+
+                const results = await Promise.all(fetchPromises)
+                raporVerileri.push(...results)
 
                 // AŞAMA 2: Dinamik headers oluştur
                 const baseHeaders = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
