@@ -65,17 +65,21 @@ type Kayit = {
 export default function CeklistRaporlariClient({
   base,
   tenantFirmaId,
+  lockedProjeId,
 }: {
   base: string
   tenantFirmaId?: string | null
+  /** /u layout’ta ProjeContext yok; kullanıcının proje_id’si sunucudan gelir */
+  lockedProjeId?: string | null
 }) {
   const { toast }                    = useToast()
   const { firmaId: saFirmaId }       = useFirma()
   const { aktifProje, loading: projeLoading } = useProje()
 
-  const firmaId = base.startsWith('/ta') ? (tenantFirmaId ?? null) : saFirmaId
-  const projeId = aktifProje?.id ?? null
-  const isTA    = base.startsWith('/ta')
+  const isU  = base.startsWith('/u')
+  const isTA = base.startsWith('/ta')
+  const firmaId = (isTA || isU) ? (tenantFirmaId ?? null) : saFirmaId
+  const projeId = isU ? (lockedProjeId ?? null) : (aktifProje?.id ?? null)
 
   // ── State ──────────────────────────────────────────────────────────────
   const [canliData,   setCanliData]   = useState<Kayit[]>([])
@@ -97,6 +101,7 @@ export default function CeklistRaporlariClient({
   const yukleCanli = useCallback(async () => {
     if (!firmaId) return
     if (isTA && (projeLoading || !projeId)) return
+    if (isU && !projeId) return
     setLoading(true)
     try {
       const p = new URLSearchParams({ arsiv: 'false' })
@@ -111,14 +116,14 @@ export default function CeklistRaporlariClient({
     } finally {
       setLoading(false)
     }
-  }, [firmaId, projeId, projeLoading, isTA])
+  }, [firmaId, projeId, projeLoading, isTA, isU])
 
   useEffect(() => {
     setCanliData([])
     setArsivData([])
     setFiltreMod(false)
     yukleCanli()
-  }, [firmaId, projeId, projeLoading])
+  }, [firmaId, projeId, projeLoading, yukleCanli])
 
   // ── Filtre uygula: canlı + arşiv birlikte ─────────────────────────────
   async function filtreUygula() {
@@ -374,6 +379,10 @@ export default function CeklistRaporlariClient({
               {loading ? (
                 <tr><td colSpan={filtreMod ? 10 : 9} style={{ padding: 32, textAlign: 'center' }}>
                   <RefreshCw size={20} style={{ ...spinning, color: '#1f6b1f', display: 'block', margin: '0 auto' }} />
+                </td></tr>
+              ) : isU && !projeId ? (
+                <tr><td colSpan={filtreMod ? 10 : 9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+                  Bu hesap bir projeye bağlı değil.
                 </td></tr>
               ) : !firmaId ? (
                 <tr><td colSpan={filtreMod ? 10 : 9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>

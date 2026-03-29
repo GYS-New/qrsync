@@ -25,16 +25,42 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { sayfaGorebilirMi } from '@/lib/yetki/sayfaYetkisi'
 
-async function yetkiKontrol(supabase: any) {
+type MeCeklist = {
+  id: string
+  rol: string
+  firma_id: string | null
+  proje_id: string | null
+  isSA: boolean
+  isTA: boolean
+  isU: boolean
+}
+
+async function yetkiKontrol(supabase: any): Promise<{ ok: true; me: MeCeklist } | { ok: false; me: null; status: number }> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, me: null, status: 401 }
-  const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
+  const { data: me } = await supabase.from('users').select('id,rol,firma_id,proje_id').eq('id', user.id).single()
   if (!me) return { ok: false, me: null, status: 403 }
   const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
   const isTA = me.rol === 'tenant_admin'
-  if (!isSA && !isTA) return { ok: false, me: null, status: 403 }
-  return { ok: true, me: { ...me, isSA, isTA } }
+  const isU  = me.rol === 'tenant_user' || me.rol === 'musteri'
+  if (!isSA && !isTA && !isU) return { ok: false, me: null, status: 403 }
+
+  if (isU) {
+    const okPage = await sayfaGorebilirMi(me.rol, 'ceklist-raporlari', me.firma_id ?? null)
+    if (!okPage) return { ok: false, me: null, status: 403 }
+  }
+
+  return {
+    ok: true,
+    me: {
+      ...me,
+      isSA,
+      isTA,
+      isU,
+    } as MeCeklist,
+  }
 }
 
 const GECERLI_DURUMLAR = ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN']
@@ -180,12 +206,18 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createClient()
     const admin    = createAdminClient()
-    const { ok, me, status } = await yetkiKontrol(supabase)
-    if (!ok || !me) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status })
+    const yk = await yetkiKontrol(supabase)
+    if (!yk.ok) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: yk.status })
+    const { me } = yk
 
     const p        = new URL(req.url).searchParams
     const firmaId  = me.isSA ? (p.get('firma_id') ?? null) : me.firma_id
-    const projeId  = p.get('proje_id')
+    /** Tenant kullanıcıları yalnızca hesabın bağlı olduğu projeyi görür; parametreyi yok say */
+    let projeId: string | null = p.get('proje_id')
+    if (me.isU) {
+      if (!me.proje_id) return NextResponse.json({ ok: true, data: [] })
+      projeId = me.proje_id
+    }
     const baslangic = p.get('baslangic')
     const bitis    = p.get('bitis')
     const arsivParam = p.get('arsiv') // 'true' | 'false' | null

@@ -29,7 +29,7 @@ const RAPOR_KARTLARI = [
     id: 'ceklist',
     title: 'Çeklist Raporları',
     description: 'Tüm görev türleri için çeklist tamamlanma verileri, madde bazlı analiz ve filtrelenebilir raporlar.',
-    eyebrow: 'ÇEKLİST', badge: 'Sonra Düzenlenecek', tone: 'amber' as const,
+    eyebrow: 'ÇEKLİST', badge: 'Excel + CSV', tone: 'amber' as const,
     icon: 'checklist', path: '/raporlar/ceklist', disabled: false,
   },
   {
