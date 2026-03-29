@@ -184,7 +184,7 @@ export default function CeklistRaporlariClient({
       // AŞAMA 1: Tüm görevler için çeklist verilerini al (PARALEL)
       const raporVerileri: any[] = []
       let maxMadde = 0
-      const gorselListesi: { [key: string]: string[] } = {}
+      const gorselListesi: { [key: string]: { url: string; idx: number }[] } = {}
 
       // Tüm görevler için paralel fetch
       const fetchPromises = filtreData.map(async (r) => {
@@ -206,10 +206,18 @@ export default function CeklistRaporlariClient({
           const json = await res.json()
           if (json.ok && json.sonuclar?.length) {
             json.sonuclar.forEach((madde: any, idx: number) => {
-              gorevVerisi[`madde_${idx}`] = madde.madde
+              // Madde tanımını header için saklayalım
+              gorevVerisi[`madde_tanim_${idx}`] = madde.madde
+              
+              // Cevabı/statusu cell'de gösterelim
+              const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
+              const cevap = madde.secenek ? `Cevap: ${madde.secenek}` : madde.not ? `Not: ${madde.not}` : '-'
+              gorevVerisi[`madde_${idx}`] = `${durumEmoji}\n${cevap}`
+              
+              // Görselleri idx ile beraber saklayalım
               if (madde.gorsel_url) {
                 if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
-                gorselListesi[r.gorev_id].push(madde.gorsel_url)
+                gorselListesi[r.gorev_id].push({ url: madde.gorsel_url, idx: idx })
               }
             })
             maxMadde = Math.max(maxMadde, json.sonuclar.length)
@@ -237,9 +245,23 @@ export default function CeklistRaporlariClient({
 
       if (filtreMod) cols.push({ header: 'Segment', key: 'segment', width: 12 })
 
-      // Madde kolonlarını ekle
+      // Madde tanımlarını header'larda kullanmak için topla
+      const maddeTanimMap: { [key: number]: string } = {}
+      for (const veri of raporVerileri) {
+        for (let i = 0; i < maxMadde; i++) {
+          if (veri[`madde_tanim_${i}`] && !maddeTanimMap[i]) {
+            maddeTanimMap[i] = veri[`madde_tanim_${i}`]
+          }
+        }
+      }
+
+      // Madde kolonlarını ekle (tanımları header olarak)
       for (let i = 0; i < maxMadde; i++) {
-        cols.push({ header: `Madde ${i + 1}`, key: `madde_${i}`, width: 28 })
+        cols.push({ 
+          header: maddeTanimMap[i] || `Madde ${i + 1}`, 
+          key: `madde_${i}`, 
+          width: 28 
+        })
       }
 
       // Görseller sütunu
@@ -265,14 +287,20 @@ export default function CeklistRaporlariClient({
       for (const veri of raporVerileri) {
         if (gorselListesi[veri.gorevId] && gorselListesi[veri.gorevId].length > 0) {
           const cell = ws.getRow(rowIdx).getCell(cols.length) // Son sütun (Görseller)
-          // Birden fazla görsel varsa sadece ilki hyperlink, diğerleri açıklamada
-          const firstUrl = gorselListesi[veri.gorevId][0]
-          const displayText = gorselListesi[veri.gorevId].length > 1 
-            ? `Görsel (${gorselListesi[veri.gorevId].length})` 
-            : 'Görsel'
-          cell.value = { text: displayText, hyperlink: firstUrl }
+          const gorseller = gorselListesi[veri.gorevId]
+          
+          // Display text: "Görsel 1\nGörsel 2\n..." şeklinde
+          const displayText = gorseller.map((_, i) => `Görsel ${i + 1}`).join('\n')
+          
+          // Hyperlink: ilk görsele
+          cell.value = { text: displayText, hyperlink: gorseller[0].url }
           cell.font = { size: 10, color: { argb: 'FF0369a1' }, underline: 'single' }
           cell.alignment = { wrapText: true, vertical: 'top' }
+          
+          // Üstündeki görseller için note ekle
+          if (gorseller.length > 1) {
+            cell.note = gorseller.map((g, i) => `Görsel ${i + 1}: ${g.url}`).join('\n')
+          }
         } else {
           const cell = ws.getRow(rowIdx).getCell(cols.length)
           cell.value = '—'
@@ -298,7 +326,7 @@ export default function CeklistRaporlariClient({
     try {
       // AŞAMA 1: Tüm görevler için veri topla (PARALEL)
       const raporVerileri: Record<string, any>[] = []
-      const gorselListesi: Record<string, string[]> = {}
+      const gorselListesi: Record<string, { url: string; idx: number }[]> = {}
       let maxMadde = 0
 
       const fetchPromises = filtreData.map(async (r) => {
@@ -333,7 +361,7 @@ export default function CeklistRaporlariClient({
 
               if (madde.gorsel_url) {
                 if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
-                gorselListesi[r.gorev_id].push(madde.gorsel_url)
+                gorselListesi[r.gorev_id].push({ url: madde.gorsel_url, idx: idx })
               }
             })
           }
@@ -380,7 +408,7 @@ export default function CeklistRaporlariClient({
         // Görseller
         const gorseller = gorselListesi[veri.gorevId] ?? []
         const gorselHtml = gorseller.length > 0 
-          ? gorseller.map(url => `<a href="${url}" target="_blank" style="color:#0369a1;text-decoration:underline">Görsel</a>`).join(' | ')
+          ? gorseller.map((g, i) => `<a href="${g.url}" target="_blank" style="color:#0369a1;text-decoration:underline">Görsel ${i + 1}</a>`).join(' | ')
           : '—'
         rowHtml += `<td>${gorselHtml}</td>`
         rowHtml += '</tr>'
@@ -420,7 +448,7 @@ export default function CeklistRaporlariClient({
     try {
       // AŞAMA 1: Tüm görevler için veri topla (PARALEL)
       const raporVerileri: Record<string, any>[] = []
-      const gorselListesi: Record<string, string[]> = {}
+      const gorselListesi: Record<string, { url: string; idx: number }[]> = {}
       let maxMadde = 0
 
       const fetchPromises = filtreData.map(async (r) => {
@@ -455,7 +483,7 @@ export default function CeklistRaporlariClient({
 
               if (madde.gorsel_url) {
                 if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
-                gorselListesi[r.gorev_id].push(madde.gorsel_url)
+                gorselListesi[r.gorev_id].push({ url: madde.gorsel_url, idx: idx })
               }
             })
           }
@@ -502,7 +530,7 @@ export default function CeklistRaporlariClient({
         // Görseller
         const gorseller = gorselListesi[veri.gorevId] ?? []
         const gorselHtml = gorseller.length > 0 
-          ? gorseller.map(url => `<a href="${url}" target="_blank" style="color:#0369a1;text-decoration:underline;font-size:9px">Görsel</a>`).join(' | ')
+          ? gorseller.map((g, i) => `<a href="${g.url}" target="_blank" style="color:#0369a1;text-decoration:underline;font-size:9px">Görsel ${i + 1}</a>`).join(' | ')
           : '—'
         rowHtml += `<td>${gorselHtml}</td>`
         rowHtml += '</tr>'
@@ -604,7 +632,7 @@ export default function CeklistRaporlariClient({
               try {
                 // AŞAMA 1: Tüm görevler için veri topla (PARALEL)
                 const raporVerileri: Record<string, any>[] = []
-                const gorselListesi: Record<string, string[]> = {}
+                const gorselListesi: Record<string, { url: string; idx: number }[]> = {}
                 let maxMadde = 0
 
                 const fetchPromises = filtreData.map(async (r) => {
@@ -639,7 +667,7 @@ export default function CeklistRaporlariClient({
 
                         if (madde.gorsel_url) {
                           if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
-                          gorselListesi[r.gorev_id].push(madde.gorsel_url)
+                          gorselListesi[r.gorev_id].push({ url: madde.gorsel_url, idx: idx })
                         }
                       })
                     }
