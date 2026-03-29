@@ -31,85 +31,56 @@ export async function GET(req: Request) {
   const admin = createAdminClient()
   const sonYirmiDortSaat = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  // 1. Tamamlanan manuel görevler (son 24 saat)
+  // 1. Spesifik görevler — kullanıcıya atanmış TÜM durumlar
   const { data: gorevler } = await admin
     .from('gorevler')
+    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, olusturma_tarihi, lokasyon_id, lokasyonlar(tanim)')
+    .eq('atanan_kullanici_id', user.id)
+    .order('olusturma_tarihi', { ascending: false })
+    .limit(50)
+
+  // 2. Frekansiyel görevler — sadece TAMAMLANAN durumlar (son 24 saat)
+  const { data: canliGorevler } = await admin
+    .from('canli_gorevler')
     .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .or(`islemi_yapan_id.eq.${user.id},atanan_kullanici_id.eq.${user.id}`)
-    .eq('durum', 'TAMAMLANDI')
+    .eq('islemi_yapan_id', user.id)
+    .in('durum', ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI'])
     .gte('tamamlanma_tarihi', sonYirmiDortSaat)
     .order('tamamlanma_tarihi', { ascending: false })
     .limit(50)
 
-  // 2. Tamamlanan canlı görevler (son 24 saat) — kişiye atanmış VEYA kişi tamamlamış
-  const { data: canliGorevler } = await admin
-    .from('canli_gorevler')
-    .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .or(`islemi_yapan_id.eq.${user.id},atanan_kullanici_id.eq.${user.id}`)
-    .in('durum', ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANI_GECMIS', 'ZAMANINDA_YAPILAMAYAN'])
-    .gte('durum_degisim_tarihi', sonYirmiDortSaat)
-    .order('durum_degisim_tarihi', { ascending: false })
-    .limit(50)
+  // 3. Aktif bekleyen frekansiyel görevler yok — sadece spesifik görevler bekleyende görünür
+  const aktifGorevler: any[] = []
+  const aktifCanliGorevler: any[] = []
 
-  // 3. Aktif/açık atanmış görevler (henüz tamamlanmamış)
-  const { data: aktifGorevler } = await admin
-    .from('gorevler')
-    .select('id, tanim, durum, olusturma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .eq('atanan_kullanici_id', user.id)
-    .in('durum', ['ACIK', 'ISLEMDE'])
-    .order('olusturma_tarihi', { ascending: false })
-    .limit(20)
+  // Spesifik görevleri kategorize et
+  const spesifikTamamlanan = (gorevler ?? []).filter((g: any) => g.durum === 'TAMAMLANDI')
+  const spesifikBekleyen = (gorevler ?? []).filter((g: any) => ['ACIK', 'ISLEMDE'].includes(g.durum))
+  const spesifikDiger = (gorevler ?? []).filter((g: any) => !['TAMAMLANDI', 'ACIK', 'ISLEMDE'].includes(g.durum))
 
-  // 4. Aktif/açık atanmış veya atanmamış canlı görevler
-  // Frekansiyel görevler kimseye atanmaz ama kullanıcı tamamlamışsa göster
-  const { data: aktifCanliGorevler } = await admin
-    .from('canli_gorevler')
-    .select('id, tanim, durum, olusturma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .or(`atanan_kullanici_id.eq.${user.id},atanan_kullanici_id.is.null`)
-    .in('durum', ['ACIK', 'ISLEMDE', 'BEKLEMEDE'])
-    .order('olusturma_tarihi', { ascending: false })
-    .limit(20)
-
-  // Birleştir ve sırala
   const tamamlananlar = [
-    ...(gorevler ?? []).map((g: any) => ({
-      id: g.id,
-      tanim: g.tanim,
-      durum: g.durum,
+    ...spesifikTamamlanan.map((g: any) => ({
+      id: g.id, tanim: g.tanim, durum: g.durum,
       tarih: g.tamamlanma_tarihi || g.durum_degisim_tarihi,
-      lokasyon: g.lokasyonlar?.tanim || '',
-      tip: 'manuel',
-      kategori: 'tamamlanan',
+      lokasyon: g.lokasyonlar?.tanim || '', tip: 'manuel', kategori: 'tamamlanan',
     })),
     ...(canliGorevler ?? []).map((g: any) => ({
-      id: g.id,
-      tanim: g.tanim,
-      durum: g.durum,
+      id: g.id, tanim: g.tanim, durum: g.durum,
       tarih: g.tamamlanma_tarihi || g.durum_degisim_tarihi,
-      lokasyon: g.lokasyonlar?.tanim || '',
-      tip: 'canli',
-      kategori: 'tamamlanan',
+      lokasyon: g.lokasyonlar?.tanim || '', tip: 'canli', kategori: 'tamamlanan',
     })),
   ].sort((a, b) => new Date(b.tarih || 0).getTime() - new Date(a.tarih || 0).getTime())
 
   const bekleyenler = [
-    ...(aktifGorevler ?? []).map((g: any) => ({
-      id: g.id,
-      tanim: g.tanim,
-      durum: g.durum,
+    ...spesifikBekleyen.map((g: any) => ({
+      id: g.id, tanim: g.tanim, durum: g.durum,
       tarih: g.olusturma_tarihi || g.durum_degisim_tarihi,
-      lokasyon: g.lokasyonlar?.tanim || '',
-      tip: 'manuel',
-      kategori: 'bekleyen',
+      lokasyon: g.lokasyonlar?.tanim || '', tip: 'manuel', kategori: 'bekleyen',
     })),
-    ...(aktifCanliGorevler ?? []).map((g: any) => ({
-      id: g.id,
-      tanim: g.tanim,
-      durum: g.durum,
+    ...spesifikDiger.map((g: any) => ({
+      id: g.id, tanim: g.tanim, durum: g.durum,
       tarih: g.olusturma_tarihi || g.durum_degisim_tarihi,
-      lokasyon: g.lokasyonlar?.tanim || '',
-      tip: 'canli',
-      kategori: 'bekleyen',
+      lokasyon: g.lokasyonlar?.tanim || '', tip: 'manuel', kategori: 'tamamlanan',
     })),
   ].sort((a, b) => new Date(b.tarih || 0).getTime() - new Date(a.tarih || 0).getTime())
 
