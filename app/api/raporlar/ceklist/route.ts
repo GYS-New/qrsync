@@ -126,7 +126,12 @@ async function kayitlarGetir(
       .eq('firma_id', firmaId)
       .eq('proje_id', projeId)
       .not('lokasyon_id', 'is', null)
-    const ekLokIds = [...new Set((specLokRows ?? []).map((r: { lokasyon_id: string }) => r.lokasyon_id).filter(Boolean))]
+    const specRows = (specLokRows ?? []) as { lokasyon_id: string | null }[]
+    const ekLokIds: string[] = [...new Set(
+      specRows
+        .map(r => r.lokasyon_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    )]
     const eksik = ekLokIds.filter(id => !lokMap[id])
     if (eksik.length) {
       const { data: ekLoklar } = await admin
