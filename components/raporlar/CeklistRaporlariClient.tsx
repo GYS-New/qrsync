@@ -181,85 +181,111 @@ export default function CeklistRaporlariClient({
       const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
       const ws = wb.addWorksheet('Çeklist Raporları')
       
-      // Ana tablo kolonları
-      const cols = [
-        { header: 'Kayıt Tarihi',   key: 'kayit',      width: 20 },
-        { header: 'Görev',          key: 'gorev',      width: 32 },
-        { header: 'Lokasyon',       key: 'lokasyon',   width: 24 },
-        { header: 'Şablon',         key: 'sablon',     width: 24 },
-        { header: 'Durum',          key: 'durum',      width: 22 },
-        { header: 'Kanal',          key: 'kanal',      width: 10 },
-        { header: 'Dolduran',       key: 'kullanici',  width: 20 },
-        { header: 'Doldurulma %',   key: 'oran',       width: 14 },
-      ] as { header: string; key: string; width: number }[]
-      if (filtreMod) cols.push({ header: 'Segment', key: 'segment', width: 12 })
-      ws.columns = cols
-      
-      const hr = ws.getRow(1)
-      hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }
-      hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }
-      hr.height = 20
-      
-      // Her kayıt için çeklist verilerini fetch et ve ekle
+      // AŞAMA 1: Tüm görevler için çeklist verilerini al
+      const raporVerileri: any[] = []
+      let maxMadde = 0
+      const gorselListesi: { [key: string]: string[] } = {}
+
       for (const r of filtreData) {
-        const base: Record<string, string> = {
-          kayit:     r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
-          gorev:     r.gorev_tanim,
-          lokasyon:  r.lokasyon_tanim,
-          sablon:    r.sablon_baslik,
-          durum:     DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
-          kanal:     r.kanal,
+        const gorevVerisi: any = {
+          gorevId: r.gorev_id, // Görsel listesinde kullanmak için
+          kayit: r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
+          gorev: r.gorev_tanim,
+          lokasyon: r.lokasyon_tanim,
+          durum: DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
+          kanal: r.kanal,
           kullanici: r.kullanici_isim,
-          oran:      `%${pct(r.doldurulan_madde, r.toplam_madde)}`,
+          oran: `%${pct(r.doldurulan_madde, r.toplam_madde)}`,
         }
-        if (filtreMod) base.segment = segmentEtiket(r)
-        ws.addRow(base)
-        
+        if (filtreMod) gorevVerisi.segment = segmentEtiket(r)
+
         // Çeklist maddelerini fetch et
         try {
           const res = await fetch(`/api/checklist-results?task_id=${r.gorev_id}&task_type=${r.gorev_task_type ?? 'canli_gorevler'}`)
           const json = await res.json()
           if (json.ok && json.sonuclar?.length) {
-            // Maddeler başlığı
-            const maddeBaslık = ws.addRow({ kayit: '📋 ÇEKLİST MADDELERİ', gorev: '', lokasyon: '', sablon: '', durum: '', kanal: '', kullanici: '', oran: '' })
-            maddeBaslık.font = { bold: true, color: { argb: 'FF475569' }, size: 11 }
-            maddeBaslık.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }
-            
-            // Her madde satırı
-            for (const madde of json.sonuclar) {
-              const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
-              const zorunluText = madde.zorunlu ? ' [ZORUNLU]' : ''
-              const cevapText = madde.secenek ? ` → ${madde.secenek}` : ''
-              const notText = madde.not ? `\nNot: ${madde.not}` : ''
-              
-              const maddeRow = ws.addRow({
-                kayit: `${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${cevapText}${notText}`,
-                gorev: '',
-                lokasyon: madde.tarih ? formatDateTime(madde.tarih) : '',
-                sablon: madde.yapan ? madde.yapan : '',
-                durum: '',
-                kanal: madde.kanal ? madde.kanal : '',
-                kullanici: '',
-                oran: '',
-              })
-              maddeRow.font = { size: 10, color: { argb: madde.dolduruldu ? 'FF166534' : 'FFC2410C' } }
-              
-              // Görsel hücresine hyperlink ekle
+            // Madde tanımlarını koy
+            json.sonuclar.forEach((madde: any, idx: number) => {
+              gorevVerisi[`madde_${idx}`] = madde.madde
               if (madde.gorsel_url) {
-                const gorselCell = maddeRow.getCell(8) // oran sütunu (8. kolon)
-                gorselCell.value = { text: 'Görsel', hyperlink: madde.gorsel_url }
-                gorselCell.font = { size: 10, color: { argb: 'FF0369a1' }, underline: 'single', bold: true }
+                if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
+                gorselListesi[r.gorev_id].push(madde.gorsel_url)
               }
-            }
-            
-            // Boş satır (ayrım)
-            ws.addRow({})
+            })
+            maxMadde = Math.max(maxMadde, json.sonuclar.length)
           }
         } catch (e) {
           // Hata durumunda devam et
         }
+
+        raporVerileri.push(gorevVerisi)
       }
-      
+
+      // AŞAMA 2: Dinamik kolonlar oluştur
+      const cols = [
+        { header: 'Kayıt Tarihi', key: 'kayit', width: 18 },
+        { header: 'Görev', key: 'gorev', width: 30 },
+        { header: 'Lokasyon', key: 'lokasyon', width: 20 },
+        { header: 'Durum', key: 'durum', width: 18 },
+        { header: 'Kanal', key: 'kanal', width: 10 },
+        { header: 'Dolduran', key: 'kullanici', width: 18 },
+        { header: 'Doldurulma %', key: 'oran', width: 14 },
+      ] as { header: string; key: string; width: number }[]
+
+      if (filtreMod) cols.push({ header: 'Segment', key: 'segment', width: 12 })
+
+      // Madde kolonlarını ekle
+      for (let i = 0; i < maxMadde; i++) {
+        cols.push({ header: `Madde ${i + 1}`, key: `madde_${i}`, width: 28 })
+      }
+
+      // Görseller sütunu
+      cols.push({ header: 'Görseller', key: 'gorseller', width: 30 })
+
+      ws.columns = cols
+
+      // AŞAMA 3: Header şekillendirme
+      const hr = ws.getRow(1)
+      hr.font = { bold: true, color: { argb: 'FF1F6B1F' }, size: 11 }
+      hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }
+      hr.height = 22
+
+      // AŞAMA 4: Veri satırlarını ekle
+      for (const veri of raporVerileri) {
+        // Görseller listesini ekle
+        if (gorselListesi[veri.gorevId]) {
+          veri.gorseller = gorselListesi[veri.gorevId]
+            .map((url: string) => `Görsel\n${url}`)
+            .join('\n---\n')
+        } else {
+          veri.gorseller = ''
+        }
+
+        const row = ws.addRow(veri)
+        row.font = { size: 10 }
+        row.alignment = { wrapText: true, vertical: 'top' }
+      }
+
+      // Görseller sütununda hyperlink ekle
+      let rowIdx = 2
+      for (const veri of raporVerileri) {
+        const goalrId = veri.gorev
+        if (gorselListesi[goalrId]) {
+          const cell = ws.getRow(rowIdx).getCell(cols.length) // Son sütun (Görseller)
+          let displayText = ''
+          let isFirst = true
+          for (const url of gorselListesi[goalrId]) {
+            if (!isFirst) displayText += '\n'
+            displayText += 'Görsel'
+            isFirst = false
+          }
+          cell.value = { text: displayText, hyperlink: gorselListesi[goalrId][0] }
+          cell.font = { size: 10, color: { argb: 'FF0369a1' }, underline: 'single' }
+          cell.alignment = { wrapText: true, vertical: 'top' }
+        }
+        rowIdx++
+      }
+
       const buf = await wb.xlsx.writeBuffer()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
@@ -276,54 +302,97 @@ export default function CeklistRaporlariClient({
   async function yazdir() {
     setIsDownloading(true)
     try {
-      const segTh = filtreMod ? '<th>Segment</th>' : ''
-      
-      // Görev satırlarını HTML'e dönüştür
-      let tableHtml = ''
+      // AŞAMA 1: Tüm görevler için veri topla
+      const raporVerileri: Record<string, any>[] = []
+      const gorselListesi: Record<string, string[]> = {}
+      let maxMadde = 0
+
       for (const r of filtreData) {
-        tableHtml += `<tr>
-          <td>${r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—'}</td>
-          <td>${r.gorev_tanim}</td>
-          <td>${r.lokasyon_tanim}</td>
-          <td>${r.sablon_baslik}</td>
-          <td>${DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum}</td>
-          <td>${r.kanal}</td>
-          <td>${r.kullanici_isim}</td>
-          <td>%${pct(r.doldurulan_madde, r.toplam_madde)} (${r.doldurulan_madde}/${r.toplam_madde})</td>
-          ${filtreMod ? `<td>${segmentEtiket(r)}</td>` : ''}
-        </tr>`
-        
+        const gorevVerisi: Record<string, any> = {
+          gorevId: r.gorev_id,
+          kayit_tarihi: r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—',
+          gorev_tanim: r.gorev_tanim,
+          lokasyon_tanim: r.lokasyon_tanim,
+          sablon_baslik: r.sablon_baslik,
+          gorev_durum: DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
+          kanal: r.kanal,
+          kullanici_isim: r.kullanici_isim,
+          doldurulan_oran: `%${pct(r.doldurulan_madde, r.toplam_madde)} (${r.doldurulan_madde}/${r.toplam_madde})`,
+        }
+
+        if (filtreMod) gorevVerisi.segment = segmentEtiket(r)
+
         // Çeklist maddelerini fetch et
         try {
           const res = await fetch(`/api/checklist-results?task_id=${r.gorev_id}&task_type=${r.gorev_task_type ?? 'canli_gorevler'}`)
           const json = await res.json()
           if (json.ok && json.sonuclar?.length) {
-            // Maddeler başlığı satırı
-            tableHtml += `<tr style="background:#f1f5f9">
-              <td colspan="9" style="font-weight:700;color:#475569;padding:10px 8px">📋 ÇEKLİST MADDELERİ</td>
-            </tr>`
-            // Her madde satırı
-            for (const madde of json.sonuclar) {
+            const sonuclar = json.sonuclar
+            if (sonuclar.length > maxMadde) maxMadde = sonuclar.length
+
+            sonuclar.forEach((madde: any, idx: number) => {
               const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
               const zorunluText = madde.zorunlu ? ' <span style="color:#dc2626;font-weight:700">[ZORUNLU]</span>' : ''
-              const gorselText = madde.gorsel_url ? ` <a href="${madde.gorsel_url}" target="_blank" style="color:#0369a1;text-decoration:underline;font-weight:700">[GÖRSEL]</a>` : ''
               const cevapText = madde.secenek ? ` → <strong>${madde.secenek}</strong>` : ''
               const notText = madde.not ? `<br/><small>Not: ${madde.not}</small>` : ''
-              tableHtml += `<tr style="background:#f8fafb;font-size:11px">
-                <td colspan="9" style="padding:8px 12px;color:${madde.dolduruldu ? '#166534' : '#c2410c'}">
-                  ${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${gorselText}${cevapText}${notText}
-                </td>
-              </tr>`
-            }
-            // Boş satır (ayrım)
-            tableHtml += '<tr style="height:8px;background:none"><td colspan="9"></td></tr>'
+              gorevVerisi[`madde_${idx}`] = `<div style="font-size:10px">${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${cevapText}${notText}</div>`
+
+              if (madde.gorsel_url) {
+                if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
+                gorselListesi[r.gorev_id].push(madde.gorsel_url)
+              }
+            })
           }
         } catch (e) {
           // Hata durumunda devam et
         }
+
+        raporVerileri.push(gorevVerisi)
       }
-      
-      const w = window.open('', '_blank', 'width=1100,height=700')
+
+      // AŞAMA 2: Dinamik tablo headers
+      const baseHeaders = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
+      if (filtreMod) baseHeaders.push('Segment')
+
+      let maddeSutunlari = ''
+      for (let i = 0; i < maxMadde; i++) {
+        maddeSutunlari += `<th>Madde ${i + 1}</th>`
+      }
+
+      // AŞAMA 3: Tablo HTML'ini oluştur
+      let tableHtml = ''
+      for (const veri of raporVerileri) {
+        let rowHtml = `<tr>
+          <td>${veri.kayit_tarihi}</td>
+          <td>${veri.gorev_tanim}</td>
+          <td>${veri.lokasyon_tanim}</td>
+          <td>${veri.sablon_baslik}</td>
+          <td>${veri.gorev_durum}</td>
+          <td>${veri.kanal}</td>
+          <td>${veri.kullanici_isim}</td>
+          <td>${veri.doldurulan_oran}</td>`
+
+        if (filtreMod) rowHtml += `<td>${veri.segment}</td>`
+
+        // Maddeler
+        for (let i = 0; i < maxMadde; i++) {
+          const maddeHtml = veri[`madde_${i}`] ?? '—'
+          rowHtml += `<td>${maddeHtml}</td>`
+        }
+
+        // Görseller
+        const gorseller = gorselListesi[veri.gorevId] ?? []
+        const gorselHtml = gorseller.length > 0 
+          ? gorseller.map(url => `<a href="${url}" target="_blank" style="color:#0369a1;text-decoration:underline">Görsel</a>`).join(' | ')
+          : '—'
+        rowHtml += `<td>${gorselHtml}</td>`
+        rowHtml += '</tr>'
+
+        tableHtml += rowHtml
+      }
+
+      const segTh = filtreMod ? '<th>Segment</th>' : ''
+      const w = window.open('', '_blank', 'width=1400,height=700')
       if (!w) return
       w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/>
         <title>Çeklist Raporları</title>
@@ -331,19 +400,158 @@ export default function CeklistRaporlariClient({
           body{font-family:Arial,sans-serif;font-size:11px;padding:20px}
           table{width:100%;border-collapse:collapse}
           th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
-          td{padding:5px 8px;border:1px solid #d6e4d6}
+          td{padding:5px 8px;border:1px solid #d6e4d6;font-size:10px}
           tr:nth-child(even) td{background:#f3faf3}
-          img{max-width:100px;max-height:100px;margin:4px 0}
         </style>
         </head><body>
         <h2 style="color:#1f6b1f">Çeklist Raporları</h2>
         <table><thead><tr>
           <th>Kayıt Tarihi</th><th>Görev</th><th>Lokasyon</th><th>Şablon</th>
-          <th>Durum</th><th>Kanal</th><th>Dolduran</th><th>Doldurulma</th>${segTh}
+          <th>Durum</th><th>Kanal</th><th>Dolduran</th><th>Doldurulma</th>${segTh}${maddeSutunlari}<th>Görseller</th>
         </tr></thead><tbody>${tableHtml}</tbody></table></body></html>`)
       w.document.close(); setTimeout(() => w.print(), 600)
     } catch (e: any) {
       toast({ type: 'error', title: 'Yazdırma Hatası', message: e.message })
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
+  // ── PDF İndir ──────────────────────────────────────────────────────────
+  async function pdfIndir() {
+    setIsDownloading(true)
+    try {
+      // AŞAMA 1: Tüm görevler için veri topla
+      const raporVerileri: Record<string, any>[] = []
+      const gorselListesi: Record<string, string[]> = {}
+      let maxMadde = 0
+
+      for (const r of filtreData) {
+        const gorevVerisi: Record<string, any> = {
+          gorevId: r.gorev_id,
+          kayit_tarihi: r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—',
+          gorev_tanim: r.gorev_tanim,
+          lokasyon_tanim: r.lokasyon_tanim,
+          sablon_baslik: r.sablon_baslik,
+          gorev_durum: DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
+          kanal: r.kanal,
+          kullanici_isim: r.kullanici_isim,
+          doldurulan_oran: `%${pct(r.doldurulan_madde, r.toplam_madde)} (${r.doldurulan_madde}/${r.toplam_madde})`,
+        }
+
+        if (filtreMod) gorevVerisi.segment = segmentEtiket(r)
+
+        // Çeklist maddelerini fetch et
+        try {
+          const res = await fetch(`/api/checklist-results?task_id=${r.gorev_id}&task_type=${r.gorev_task_type ?? 'canli_gorevler'}`)
+          const json = await res.json()
+          if (json.ok && json.sonuclar?.length) {
+            const sonuclar = json.sonuclar
+            if (sonuclar.length > maxMadde) maxMadde = sonuclar.length
+
+            sonuclar.forEach((madde: any, idx: number) => {
+              const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
+              const zorunluText = madde.zorunlu ? ' <span style="color:#dc2626;font-weight:700">[ZORUNLU]</span>' : ''
+              const cevapText = madde.secenek ? ` → <strong>${madde.secenek}</strong>` : ''
+              const notText = madde.not ? `<br/><small>Not: ${madde.not}</small>` : ''
+              gorevVerisi[`madde_${idx}`] = `<div style="font-size:9px">${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${cevapText}${notText}</div>`
+
+              if (madde.gorsel_url) {
+                if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
+                gorselListesi[r.gorev_id].push(madde.gorsel_url)
+              }
+            })
+          }
+        } catch (e) {
+          // Hata durumunda devam et
+        }
+
+        raporVerileri.push(gorevVerisi)
+      }
+
+      // AŞAMA 2: Dinamik tablo headers
+      const baseHeaders = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
+      if (filtreMod) baseHeaders.push('Segment')
+
+      let maddeSutunlari = ''
+      for (let i = 0; i < maxMadde; i++) {
+        maddeSutunlari += `<th>Madde ${i + 1}</th>`
+      }
+
+      // AŞAMA 3: Tablo HTML'ini oluştur
+      let tableHtml = ''
+      for (const veri of raporVerileri) {
+        let rowHtml = `<tr>
+          <td>${veri.kayit_tarihi}</td>
+          <td>${veri.gorev_tanim}</td>
+          <td>${veri.lokasyon_tanim}</td>
+          <td>${veri.sablon_baslik}</td>
+          <td>${veri.gorev_durum}</td>
+          <td>${veri.kanal}</td>
+          <td>${veri.kullanici_isim}</td>
+          <td>${veri.doldurulan_oran}</td>`
+
+        if (filtreMod) rowHtml += `<td>${veri.segment}</td>`
+
+        // Maddeler
+        for (let i = 0; i < maxMadde; i++) {
+          const maddeHtml = veri[`madde_${i}`] ?? '—'
+          rowHtml += `<td>${maddeHtml}</td>`
+        }
+
+        // Görseller
+        const gorseller = gorselListesi[veri.gorevId] ?? []
+        const gorselHtml = gorseller.length > 0 
+          ? gorseller.map(url => `<a href="${url}" target="_blank" style="color:#0369a1;text-decoration:underline;font-size:9px">Görsel</a>`).join(' | ')
+          : '—'
+        rowHtml += `<td>${gorselHtml}</td>`
+        rowHtml += '</tr>'
+
+        tableHtml += rowHtml
+      }
+
+      const segTh = filtreMod ? '<th>Segment</th>' : ''
+      const htmlContent = `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/>
+        <title>Çeklist Raporları</title>
+        <style>
+          body{font-family:Arial,sans-serif;font-size:10px;padding:20px}
+          table{width:100%;border-collapse:collapse}
+          th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:5px 6px;border:1px solid #b8e0b8;text-align:left;font-size:9px}
+          td{padding:4px 6px;border:1px solid #d6e4d6;font-size:8px;word-wrap:break-word}
+          tr:nth-child(even) td{background:#f3faf3}
+          h2{color:#1f6b1f;margin-bottom:15px;font-size:16px}
+        </style>
+        </head><body>
+        <h2>Çeklist Raporları</h2>
+        <table><thead><tr>
+          <th>Kayıt Tarihi</th><th>Görev</th><th>Lokasyon</th><th>Şablon</th>
+          <th>Durum</th><th>Kanal</th><th>Dolduran</th><th>%</th>${segTh}${maddeSutunlari}<th>Görseller</th>
+        </tr></thead><tbody>${tableHtml}</tbody></table></body></html>`
+
+      // AŞAMA 4: HTML2PDF ile PDF oluştur
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = htmlContent
+      tempDiv.style.display = 'none'
+      document.body.appendChild(tempDiv)
+
+      try {
+        const html2pdf = await import('html2pdf.js')
+        const opt = {
+          margin: 8,
+          filename: `ceklist-raporlari-${new Date().toISOString().slice(0, 10)}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 1.5 },
+          jsPDF: { orientation: 'landscape' as const, unit: 'mm', format: 'a4' }
+        }
+        const htmlElement = tempDiv.querySelector('html')
+        if (htmlElement) {
+          await html2pdf.default().set(opt).fromElement(htmlElement).download()
+        }
+      } finally {
+        document.body.removeChild(tempDiv)
+      }
+    } catch (e: any) {
+      toast({ type: 'error', title: 'PDF İndirme Hatası', message: e.message })
     } finally {
       setIsDownloading(false)
     }
@@ -380,58 +588,96 @@ export default function CeklistRaporlariClient({
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={async () => {
-              // CSV: Her görev + maddeleri
+              // CSV: Her görev satırı + maddeler ayrı kolonlar
               setIsDownloading(true)
               try {
-                const rows: string[][] = []
-                const headers = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
-                if (filtreMod) headers.push('Segment')
-                
+                // AŞAMA 1: Tüm görevler için veri topla
+                const raporVerileri: Record<string, any>[] = []
+                const gorselListesi: Record<string, string[]> = {}
+                let maxMadde = 0
+
                 for (const r of filtreData) {
-                  // Görev satırı
-                  const row = [
-                    r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
-                    r.gorev_tanim, r.lokasyon_tanim, r.sablon_baslik,
-                    DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
-                    r.kanal, r.kullanici_isim,
-                    `%${pct(r.doldurulan_madde, r.toplam_madde)}`,
-                  ]
-                  if (filtreMod) row.push(segmentEtiket(r))
-                  rows.push(row)
-                  
+                  const gorevVerisi: Record<string, any> = {
+                    gorevId: r.gorev_id,
+                    kayit_tarihi: r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
+                    gorev_tanim: r.gorev_tanim,
+                    lokasyon_tanim: r.lokasyon_tanim,
+                    sablon_baslik: r.sablon_baslik,
+                    gorev_durum: DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
+                    kanal: r.kanal,
+                    kullanici_isim: r.kullanici_isim,
+                    doldurulan_oran: `%${pct(r.doldurulan_madde, r.toplam_madde)}`,
+                  }
+
+                  if (filtreMod) gorevVerisi.segment = segmentEtiket(r)
+
                   // Çeklist maddelerini fetch et
                   try {
                     const res = await fetch(`/api/checklist-results?task_id=${r.gorev_id}&task_type=${r.gorev_task_type ?? 'canli_gorevler'}`)
                     const json = await res.json()
                     if (json.ok && json.sonuclar?.length) {
-                      // Maddeler başlığı satırı
-                      rows.push(['📋 ÇEKLİST MADDELERİ', '', '', '', '', '', '', ''])
-                      // Her madde satırı
-                      for (const madde of json.sonuclar) {
+                      const sonuclar = json.sonuclar
+                      if (sonuclar.length > maxMadde) maxMadde = sonuclar.length
+
+                      sonuclar.forEach((madde: any, idx: number) => {
                         const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
                         const zorunluText = madde.zorunlu ? ' [ZORUNLU]' : ''
                         const cevapText = madde.secenek ? ` → ${madde.secenek}` : ''
                         const notText = madde.not ? ` | Not: ${madde.not}` : ''
-                        rows.push([
-                          `${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${cevapText}${notText}`,
-                          '',
-                          madde.tarih ? formatDateTime(madde.tarih) : '',
-                          madde.yapan ?? '',
-                          '',
-                          madde.kanal ?? '',
-                          '',
-                          madde.gorsel_url ? `Görsel: ${madde.gorsel_url}` : '',
-                        ])
+                        gorevVerisi[`madde_${idx}`] = `${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${cevapText}${notText}`
+
+                        if (madde.gorsel_url) {
+                          if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
+                          gorselListesi[r.gorev_id].push(madde.gorsel_url)
+                        }
+                      })
                     }
-                    // Boş satır (ayrım)
-                    rows.push([])
+                  } catch (e) {
+                    // Hata durumunda devam et
                   }
-                } catch (e) {
-                  // Hata durumunda devam et
+
+                  raporVerileri.push(gorevVerisi)
                 }
-              }
-              
-              csvIndir('ceklist-raporlari', headers, rows)
+
+                // AŞAMA 2: Dinamik headers oluştur
+                const baseHeaders = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
+                if (filtreMod) baseHeaders.push('Segment')
+
+                const headers: string[] = [...baseHeaders]
+                for (let i = 0; i < maxMadde; i++) {
+                  headers.push(`Madde ${i + 1}`)
+                }
+                headers.push('Görseller')
+
+                // AŞAMA 3: CSV satırları oluştur
+                const rows: string[][] = []
+                for (const veri of raporVerileri) {
+                  const row: string[] = [
+                    veri.kayit_tarihi,
+                    veri.gorev_tanim,
+                    veri.lokasyon_tanim,
+                    veri.sablon_baslik,
+                    veri.gorev_durum,
+                    veri.kanal,
+                    veri.kullanici_isim,
+                    veri.doldurulan_oran,
+                  ]
+
+                  if (filtreMod) row.push(veri.segment)
+
+                  // Maddeler
+                  for (let i = 0; i < maxMadde; i++) {
+                    row.push(veri[`madde_${i}`] ?? '')
+                  }
+
+                  // Görseller
+                  const gorseller = gorselListesi[veri.gorevId] ?? []
+                  row.push(gorseller.join('; '))
+
+                  rows.push(row)
+                }
+
+                csvIndir('ceklist-raporlari', headers, rows)
               } catch (e: any) {
                 toast({ type: 'error', title: 'İndirme Hatası', message: e.message })
               } finally {
@@ -451,6 +697,11 @@ export default function CeklistRaporlariClient({
               className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40"
               style={{ color: '#185a9b' }}>
               {isDownloading ? <RefreshCw size={13} style={spinning} /> : <Printer size={13} />} {isDownloading ? 'Hazırlanıyor...' : 'Yazdır'}
+            </button>
+            <button onClick={pdfIndir} disabled={!filtreData.length || isDownloading}
+              className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40"
+              style={{ color: '#9d174d' }}>
+              {isDownloading ? <RefreshCw size={13} style={spinning} /> : <Download size={13} />} {isDownloading ? 'Hazırlanıyor...' : 'PDF'}
             </button>
           </div>
         </div>
