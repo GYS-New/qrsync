@@ -54,12 +54,16 @@ type Kayit = {
   gorev_durum: string
   tamamlanma_tarihi: string | null
   arsiv_tarihi: string | null
+  durum_degisim_tarihi?: string | null
   lokasyon_tanim: string
   sablon_baslik: string
   kullanici_isim: string
   doldurulan_madde: number
   toplam_madde: number
-  kaynak: 'canli' | 'arsiv'
+  kaynak: 'canli' | 'arsiv' | 'spesifik'
+  /** cikti=birlesik: son 24 saat penceresine göre */
+  segment?: 'tablo' | 'arsiv'
+  gorev_task_type?: 'canli_gorevler' | 'gorevler'
 }
 
 export default function CeklistRaporlariClient({
@@ -82,10 +86,10 @@ export default function CeklistRaporlariClient({
   const projeId = isU ? (lockedProjeId ?? null) : (aktifProje?.id ?? null)
 
   // ── State ──────────────────────────────────────────────────────────────
-  const [canliData,   setCanliData]   = useState<Kayit[]>([])
-  const [arsivData,   setArsivData]   = useState<Kayit[]>([])
-  const [loading,     setLoading]     = useState(false)
-  const [filtreMod,   setFiltreMod]   = useState(false)   // filtre uygulanınca ikisi birleşik
+  const [satirlar, setSatirlar]       = useState<Kayit[]>([])
+  const [loading, setLoading]         = useState(false)
+  /** true: birleşik veri + segment (Tablo/Arşiv); false: yalnızca son 24 saat (rapor penceresi) */
+  const [filtreMod, setFiltreMod]     = useState(false)
 
   // Filtre alanları
   const [aramaQ,      setAramaQ]      = useState('')
@@ -94,23 +98,22 @@ export default function CeklistRaporlariClient({
   const [baslangic,   setBaslangic]   = useState('')
   const [bitis,       setBitis]       = useState('')
 
-  // Checklist modal
-  const [modalGorev, setModalGorev]   = useState<{ id: string } | null>(null)
+  const [modalGorev, setModalGorev]   = useState<{ id: string; taskType: 'gorevler' | 'canli_gorevler' } | null>(null)
 
-  // ── Yükle: sadece canlı kayıtlar (normal görünüm) ─────────────────────
-  const yukleCanli = useCallback(async () => {
+  // ── Varsayılan: son 24 saat (durum değişimine göre, API cikti=rapor) ───
+  const yukleRapor24h = useCallback(async () => {
     if (!firmaId) return
     if (isTA && (projeLoading || !projeId)) return
     if (isU && !projeId) return
     setLoading(true)
     try {
-      const p = new URLSearchParams({ arsiv: 'false' })
+      const p = new URLSearchParams({ cikti: 'rapor' })
       p.set('firma_id', firmaId)
       if (projeId) p.set('proje_id', projeId)
       const res  = await fetch(`/api/raporlar/ceklist?${p}`)
       const json = await res.json()
       if (!json.ok) throw new Error(json.error)
-      setCanliData(json.data ?? [])
+      setSatirlar(json.data ?? [])
     } catch (e: any) {
       toast({ type: 'error', title: 'Yüklenemedi', message: e.message })
     } finally {
@@ -119,29 +122,25 @@ export default function CeklistRaporlariClient({
   }, [firmaId, projeId, projeLoading, isTA, isU])
 
   useEffect(() => {
-    setCanliData([])
-    setArsivData([])
+    setSatirlar([])
     setFiltreMod(false)
-    yukleCanli()
-  }, [firmaId, projeId, projeLoading, yukleCanli])
+    yukleRapor24h()
+  }, [firmaId, projeId, projeLoading, yukleRapor24h])
 
-  // ── Filtre uygula: canlı + arşiv birlikte ─────────────────────────────
+  // ── Filtrele: tablo + arşiv birleşik, segment ile ─────────────────────
   async function filtreUygula() {
     if (!firmaId) return
     setLoading(true)
     try {
-      const p = new URLSearchParams()
+      const p = new URLSearchParams({ cikti: 'birlesik' })
       p.set('firma_id', firmaId)
       if (projeId)   p.set('proje_id', projeId)
       if (baslangic) p.set('baslangic', baslangic)
       if (bitis)     p.set('bitis', bitis)
-      // Tümünü çek (canlı+arşiv) — istemci tarafında ayır
       const res  = await fetch(`/api/raporlar/ceklist?${p}`)
       const json = await res.json()
       if (!json.ok) throw new Error(json.error)
-      const tum: Kayit[] = json.data ?? []
-      setCanliData(tum.filter(r => r.kaynak === 'canli'))
-      setArsivData(tum.filter(r => r.kaynak === 'arsiv'))
+      setSatirlar(json.data ?? [])
       setFiltreMod(true)
     } catch (e: any) {
       toast({ type: 'error', title: 'Yüklenemedi', message: e.message })
@@ -152,62 +151,62 @@ export default function CeklistRaporlariClient({
 
   function filtreTemizle() {
     setAramaQ(''); setDurumF(''); setKanaliF(''); setBaslangic(''); setBitis('')
-    setArsivData([]); setFiltreMod(false)
-    yukleCanli()
+    setFiltreMod(false)
+    yukleRapor24h()
   }
 
-  // ── Birleşik liste ─────────────────────────────────────────────────────
-  const birlesikData: (Kayit & { gosterimKaynak: 'canli' | 'arsiv' })[] = useMemo(() => {
-    const canli = canliData.map(r => ({ ...r, gosterimKaynak: 'canli' as const }))
-    const arsiv = arsivData.map(r => ({ ...r, gosterimKaynak: 'arsiv' as const }))
-    return [...canli, ...arsiv].sort(
-      (a, b) => new Date(b.kayit_tarihi ?? 0).getTime() - new Date(a.kayit_tarihi ?? 0).getTime()
-    )
-  }, [canliData, arsivData])
-
-  // ── İstemci tarafı filtreler ───────────────────────────────────────────
   const filtreData = useMemo(() => {
     const s = aramaQ.trim().toLowerCase()
-    return birlesikData.filter(r => {
+    return satirlar.filter(r => {
       if (s && ![r.gorev_tanim, r.lokasyon_tanim, r.kullanici_isim, r.sablon_baslik]
         .join(' ').toLowerCase().includes(s)) return false
       if (durumF && r.gorev_durum !== durumF) return false
       if (kanaliF && r.kanal !== kanaliF) return false
       return true
     })
-  }, [birlesikData, aramaQ, durumF, kanaliF])
+  }, [satirlar, aramaQ, durumF, kanaliF])
+
+  function segmentEtiket(r: Kayit): string {
+    if (filtreMod && r.segment) return r.segment === 'tablo' ? 'Tablo' : 'Arşiv'
+    if (r.kaynak === 'spesifik') return 'Spesifik'
+    return r.kaynak === 'arsiv' ? 'Arşiv (DB)' : 'Canlı'
+  }
 
   // ── Excel ─────────────────────────────────────────────────────────────
   async function excelIndir() {
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
     const ws = wb.addWorksheet('Çeklist Raporları')
-    ws.columns = [
+    const cols = [
       { header: 'Kayıt Tarihi',   key: 'kayit',      width: 20 },
       { header: 'Görev',          key: 'gorev',      width: 32 },
-      { header: 'Lokasyon',       key: 'lokasyon',   width: 24 },
-      { header: 'Şablon',         key: 'sablon',     width: 24 },
-      { header: 'Durum',          key: 'durum',      width: 22 },
-      { header: 'Kanal',          key: 'kanal',      width: 10 },
-      { header: 'Dolduran',       key: 'kullanici',  width: 20 },
-      { header: 'Doldurulma %',   key: 'oran',       width: 14 },
-      { header: 'Kaynak',         key: 'kaynak',     width: 10 },
-    ]
+      { header: 'Lokasyon',     key: 'lokasyon',   width: 24 },
+      { header: 'Şablon',       key: 'sablon',     width: 24 },
+      { header: 'Durum',        key: 'durum',      width: 22 },
+      { header: 'Kanal',        key: 'kanal',      width: 10 },
+      { header: 'Dolduran',     key: 'kullanici',  width: 20 },
+      { header: 'Doldurulma %', key: 'oran',       width: 14 },
+    ] as { header: string; key: string; width: number }[]
+    if (filtreMod) cols.push({ header: 'Segment', key: 'segment', width: 12 })
+    ws.columns = cols
     const hr = ws.getRow(1)
     hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }
     hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }
     hr.height = 20
-    filtreData.forEach(r => ws.addRow({
-      kayit:     r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
-      gorev:     r.gorev_tanim,
-      lokasyon:  r.lokasyon_tanim,
-      sablon:    r.sablon_baslik,
-      durum:     DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
-      kanal:     r.kanal,
-      kullanici: r.kullanici_isim,
-      oran:      `%${pct(r.doldurulan_madde, r.toplam_madde)}`,
-      kaynak:    r.kaynak === 'arsiv' ? 'Arşiv' : 'Canlı',
-    }))
+    filtreData.forEach(r => {
+      const base: Record<string, string> = {
+        kayit:     r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
+        gorev:     r.gorev_tanim,
+        lokasyon:  r.lokasyon_tanim,
+        sablon:    r.sablon_baslik,
+        durum:     DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
+        kanal:     r.kanal,
+        kullanici: r.kullanici_isim,
+        oran:      `%${pct(r.doldurulan_madde, r.toplam_madde)}`,
+      }
+      if (filtreMod) base.segment = segmentEtiket(r)
+      ws.addRow(base)
+    })
     const buf = await wb.xlsx.writeBuffer()
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
@@ -217,6 +216,7 @@ export default function CeklistRaporlariClient({
 
   // ── Yazdır ────────────────────────────────────────────────────────────
   function yazdir() {
+    const segTh = filtreMod ? '<th>Segment</th>' : ''
     const rows = filtreData.map(r =>
       `<tr>
         <td>${r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—'}</td>
@@ -227,7 +227,7 @@ export default function CeklistRaporlariClient({
         <td>${r.kanal}</td>
         <td>${r.kullanici_isim}</td>
         <td>%${pct(r.doldurulan_madde, r.toplam_madde)} (${r.doldurulan_madde}/${r.toplam_madde})</td>
-        <td>${r.kaynak === 'arsiv' ? 'Arşiv' : 'Canlı'}</td>
+        ${filtreMod ? `<td>${segmentEtiket(r)}</td>` : ''}
       </tr>`
     ).join('')
     const w = window.open('', '_blank', 'width=1100,height=700')
@@ -244,7 +244,7 @@ export default function CeklistRaporlariClient({
       <h2 style="color:#1f6b1f">Çeklist Raporları</h2>
       <table><thead><tr>
         <th>Kayıt Tarihi</th><th>Görev</th><th>Lokasyon</th><th>Şablon</th>
-        <th>Durum</th><th>Kanal</th><th>Dolduran</th><th>Doldurulma</th><th>Kaynak</th>
+        <th>Durum</th><th>Kanal</th><th>Dolduran</th><th>Doldurulma</th>${segTh}
       </tr></thead><tbody>${rows}</tbody></table></body></html>`)
     w.document.close(); setTimeout(() => w.print(), 400)
   }
@@ -279,16 +279,21 @@ export default function CeklistRaporlariClient({
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => csvIndir('ceklist-raporlari',
-              ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %', 'Kaynak'],
-              filtreData.map(r => [
-                r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
-                r.gorev_tanim, r.lokasyon_tanim, r.sablon_baslik,
-                DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
-                r.kanal, r.kullanici_isim,
-                `%${pct(r.doldurulan_madde, r.toplam_madde)}`,
-                r.kaynak === 'arsiv' ? 'Arşiv' : 'Canlı',
-              ]))}
+            <button onClick={() => {
+              const headers = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
+              if (filtreMod) headers.push('Segment')
+              csvIndir('ceklist-raporlari', headers, filtreData.map(r => {
+                const row = [
+                  r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
+                  r.gorev_tanim, r.lokasyon_tanim, r.sablon_baslik,
+                  DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
+                  r.kanal, r.kullanici_isim,
+                  `%${pct(r.doldurulan_madde, r.toplam_madde)}`,
+                ]
+                if (filtreMod) row.push(segmentEtiket(r))
+                return row
+              }))
+            }}
               disabled={!filtreData.length}
               className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
               <Download size={13} /> CSV
@@ -349,10 +354,10 @@ export default function CeklistRaporlariClient({
           {filtreMod && (
             <>
               <span style={{ color: '#6d28d9' }}>
-                Canlı: <strong>{filtreData.filter(r => r.kaynak === 'canli').length}</strong>
+                Tablo: <strong>{filtreData.filter(r => r.segment === 'tablo').length}</strong>
               </span>
               <span style={{ color: '#0369a1' }}>
-                Arşiv: <strong>{filtreData.filter(r => r.kaynak === 'arsiv').length}</strong>
+                Arşiv: <strong>{filtreData.filter(r => r.segment === 'arsiv').length}</strong>
               </span>
             </>
           )}
@@ -371,7 +376,7 @@ export default function CeklistRaporlariClient({
                 <th>Kanal</th>
                 <th>Dolduran</th>
                 <th>Doldurulma</th>
-                {filtreMod && <th>Kaynak</th>}
+                {filtreMod && <th>Segment</th>}
                 <th style={{ textAlign: 'center' }}>Detay</th>
               </tr>
             </thead>
@@ -398,10 +403,10 @@ export default function CeklistRaporlariClient({
                   const kanalStil = KANAL_RENK[r.kanal] ?? { bg: '#f1f5f9', color: '#475569' }
                   const oran = pct(r.doldurulan_madde, r.toplam_madde)
                   const oranColor = oran === 100 ? '#166534' : oran >= 60 ? '#d97706' : '#dc2626'
-                  const isArsiv = r.kaynak === 'arsiv'
+                  const isArsivSatir = filtreMod ? r.segment === 'arsiv' : r.kaynak === 'arsiv'
 
                   return (
-                    <tr key={r.id} style={isArsiv ? { background: '#faf8ff' } : undefined}>
+                    <tr key={r.id} style={isArsivSatir ? { background: '#faf8ff' } : undefined}>
                       <td style={{ whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 12 }}>
                         {r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—'}
                       </td>
@@ -442,16 +447,19 @@ export default function CeklistRaporlariClient({
                         <td>
                           <span style={{
                             padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700,
-                            background: isArsiv ? '#ede9fe' : '#dcfce7',
-                            color: isArsiv ? '#5b21b6' : '#166534',
+                            background: isArsivSatir ? '#ede9fe' : '#dcfce7',
+                            color: isArsivSatir ? '#5b21b6' : '#166534',
                           }}>
-                            {isArsiv ? 'Arşiv' : 'Canlı'}
+                            {segmentEtiket(r)}
                           </span>
                         </td>
                       )}
                       <td style={{ textAlign: 'center' }}>
                         <button
-                          onClick={() => setModalGorev({ id: r.gorev_id })}
+                          onClick={() => setModalGorev({
+                            id: r.gorev_id,
+                            taskType: r.gorev_task_type ?? 'canli_gorevler',
+                          })}
                           title="Çeklist Detayı"
                           style={{
                             width: 30, height: 30, border: 'none', borderRadius: 7,
@@ -475,8 +483,10 @@ export default function CeklistRaporlariClient({
             marginTop: 12, padding: '10px 14px', background: '#f8fafc',
             borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12.5, color: '#64748b',
           }}>
-            💡 Tablodaki veriler son <strong>24 saat</strong> içinde oluşturulan (canlı) çeklist kayıtlarıdır.
-            Tarih filtresi uygulandığında arşiv kayıtları da listelenir.
+            💡 Liste, görev durumunun <strong>Tamamlandı / Gecikmeli Tamamlandı</strong> olmasına ilişkin
+            <strong> durum değişim zamanına</strong> göre son <strong>24 saat</strong> içinde kalan kayıtları gösterir.
+            Bu süreyi aşan kayıtlar <strong>Arşiv → Çeklist Raporları</strong> sekmesindedir.
+            Tüm kayıtları (Tablo + Arşiv segmenti ile) görmek için tarih aralığı seçip <strong>Filtrele</strong>ye basın.
           </div>
         )}
       </div>
@@ -485,7 +495,7 @@ export default function CeklistRaporlariClient({
       {modalGorev && (
         <ChecklistModal
           taskId={modalGorev.id}
-          taskType="canli_gorevler"
+          taskType={modalGorev.taskType}
           onKapat={() => setModalGorev(null)}
         />
       )}

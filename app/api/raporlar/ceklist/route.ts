@@ -4,23 +4,27 @@
  * Çeklist sonuç başlıklarını listeler.
  * Yalnızca TAMAMLANDI veya ZAMANINDA_YAPILAMAYAN durumundaki görevlere ait kayıtlar döner.
  *
- * Query params:
- *   firma_id     (SA zorunlu, TA kendi firması)
- *   proje_id     (isteğe bağlı)
- *   baslangic    (ISO tarih, isteğe bağlı)
- *   bitis        (ISO tarih, isteğe bağlı)
- *   arama        (görev adı / lokasyon / kullanıcı, isteğe bağlı)
- *   arsiv        "true" → sadece arşiv (canli_gorevler_arsiv), "false" / boş → sadece canlı
+ * Görünüm (cikti):
+ *   rapor    — Raporlar > Çeklist: son 24 saat içinde durumu tamamlanan (durum_degisim_tarihi) kayıtlar
+ *   arsiv    — Arşiv > Çeklist sekmesi: 24 saati aşmış kayıtlar
+ *   birlesik — Tarih vb. filtre ile tablo + arşiv birleşik; segment alanı Tablo / Arşiv
  *
- * Dönen kayıt yapısı:
- *   id, kayit_tarihi, kanal,
- *   gorev_id, gorev_tanim, gorev_durum,
- *   tamamlanma_tarihi, arsiv_tarihi,
- *   lokasyon_tanim,
- *   sablon_baslik,
- *   kullanici_isim,
+ * Query params:
+ *   cikti        rapor | arsiv | birlesik (önerilen)
+ *   arsiv        geriye dönük: "false"→rapor, "true"→arsiv, yok→birlesik
+ *   firma_id     (SA zorunlu, TA/U kendi firması)
+ *   proje_id     (isteğe bağlı)
+ *   baslangic    (ISO tarih, checklist kayıt tarihi — isteğe bağlı)
+ *   bitis        (ISO tarih)
+ *
+ * Dönen kayıt:
+ *   id, kayit_tarihi, kanal, gorev_id, gorev_tanim, gorev_durum,
+ *   tamamlanma_tarihi, arsiv_tarihi, durum_degisim_tarihi,
+ *   lokasyon_tanim, sablon_baslik, kullanici_isim,
  *   doldurulan_madde, toplam_madde,
- *   kaynak: 'canli' | 'arsiv'
+ *   kaynak: canli | arsiv | spesifik (fiziksel tablo)
+ *   segment?: tablo | arsiv (yalnızca cikti=birlesik)
+ *   gorev_task_type: canli_gorevler | gorevler (modal için)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -65,15 +69,37 @@ async function yetkiKontrol(supabase: any): Promise<{ ok: true; me: MeCeklist } 
 
 const GECERLI_DURUMLAR = ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN']
 
+const MS24H = 24 * 60 * 60 * 1000
+
+function refMs(
+  durumDegisim: string | null | undefined,
+  tamamlanma: string | null | undefined,
+  kayit: string | null | undefined,
+): number {
+  const t = (s: string | null | undefined) => (s ? new Date(s).getTime() : 0)
+  return Math.max(t(durumDegisim), t(tamamlanma), t(kayit))
+}
+
+type GorevRow = {
+  id: string
+  tanim: string | null
+  durum: string
+  tamamlanma_tarihi: string | null
+  arsiv_tarihi?: string | null
+  lokasyon_id?: string | null
+  durum_degisim_tarihi: string | null
+  dbKaynak: 'canli' | 'arsiv' | 'spesifik'
+}
+
 async function kayitlarGetir(
   admin: any,
   firmaId: string,
   projeId: string | null,
   baslangic: string | null,
   bitis: string | null,
-  arsiv: boolean,
+  cikti: 'rapor' | 'arsiv' | 'birlesik',
 ): Promise<any[]> {
-  // 1. Firmaya ait lokasyonlar (sablon ve tanim için)
+  // 1. Firmaya ait lokasyonlar
   let lokQ = admin.from('lokasyonlar')
     .select('id,tanim,checklist_sablon_id')
     .eq('firma_id', firmaId)
@@ -98,8 +124,7 @@ async function kayitlarGetir(
     for (const s of sablonlar ?? []) sablonMap[s.id] = s.baslik
   }
 
-  // 3. Çeklist sonuç başlıklarını getir (lokasyon_id üzerinden)
-  const gorevIdKol = arsiv ? 'canli_gorev_id' : 'canli_gorev_id'
+  // 3. Çeklist başlıkları
   let sbQ = admin.from('checklist_sonuc_basliklari')
     .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
     .in('lokasyon_id', lokIds)
@@ -111,28 +136,71 @@ async function kayitlarGetir(
   const { data: basliklar, error: sbErr } = await sbQ
   if (sbErr || !basliklar?.length) return []
 
-  // 4. İlgili görevleri getir — sadece TAMAMLANDI veya ZAMANINDA_YAPILAMAYAN
-  const canliGorevIds = [...new Set(basliklar.filter((b: any) => b.canli_gorev_id).map((b: any) => b.canli_gorev_id))]
+  const canliGorevIds = [...new Set(
+    basliklar.filter((b: any) => b.canli_gorev_id).map((b: any) => String(b.canli_gorev_id)),
+  )] as string[]
+  const specGorevIds = [...new Set(
+    basliklar.filter((b: any) => !b.canli_gorev_id && b.gorev_id).map((b: any) => String(b.gorev_id)),
+  )] as string[]
 
-  const gorevMap: Record<string, any> = {}
+  const gorevMap: Record<string, GorevRow> = {}
 
-  if (!arsiv) {
-    // Canlı görevler
-    if (canliGorevIds.length) {
-      const { data: canliGorevler } = await admin.from('canli_gorevler')
-        .select('id,tanim,durum,tamamlanma_tarihi,lokasyon_id')
-        .in('id', canliGorevIds)
-        .in('durum', GECERLI_DURUMLAR)
-      for (const g of canliGorevler ?? []) gorevMap[g.id] = { ...g, arsiv_tarihi: null, kaynak: 'canli' }
+  // 4a. Frekansiyel: canli_gorevler → canli_gorevler_arsiv
+  if (canliGorevIds.length) {
+    const { data: canliGorevler } = await admin.from('canli_gorevler')
+      .select('id,tanim,durum,tamamlanma_tarihi,lokasyon_id,durum_degisim_tarihi')
+      .in('id', canliGorevIds)
+      .in('durum', GECERLI_DURUMLAR)
+    for (const g of canliGorevler ?? []) {
+      gorevMap[g.id] = {
+        id: g.id,
+        tanim: g.tanim,
+        durum: g.durum,
+        tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
+        arsiv_tarihi: null,
+        lokasyon_id: g.lokasyon_id,
+        durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
+        dbKaynak: 'canli',
+      }
     }
-  } else {
-    // Arşiv görevler
-    if (canliGorevIds.length) {
+    const eksik = canliGorevIds.filter(id => !gorevMap[id])
+    if (eksik.length) {
       const { data: arsivGorevler } = await admin.from('canli_gorevler_arsiv')
-        .select('id,tanim,durum,tamamlanma_tarihi,arsiv_tarihi,lokasyon_id')
-        .in('id', canliGorevIds)
+        .select('id,tanim,durum,tamamlanma_tarihi,arsiv_tarihi,lokasyon_id,durum_degisim_tarihi')
+        .in('id', eksik)
         .in('durum', GECERLI_DURUMLAR)
-      for (const g of arsivGorevler ?? []) gorevMap[g.id] = { ...g, kaynak: 'arsiv' }
+      for (const g of arsivGorevler ?? []) {
+        gorevMap[g.id] = {
+          id: g.id,
+          tanim: g.tanim,
+          durum: g.durum,
+          tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
+          arsiv_tarihi: g.arsiv_tarihi ?? null,
+          lokasyon_id: g.lokasyon_id,
+          durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
+          dbKaynak: 'arsiv',
+        }
+      }
+    }
+  }
+
+  // 4b. Spesifik: gorevler
+  if (specGorevIds.length) {
+    const { data: specGorevler } = await admin.from('gorevler')
+      .select('id,tanim,durum,tamamlanma_tarihi,lokasyon_id,durum_degisim_tarihi')
+      .in('id', specGorevIds)
+      .in('durum', GECERLI_DURUMLAR)
+    for (const g of specGorevler ?? []) {
+      gorevMap[g.id] = {
+        id: g.id,
+        tanim: g.tanim,
+        durum: g.durum,
+        tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
+        arsiv_tarihi: null,
+        lokasyon_id: g.lokasyon_id,
+        durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
+        dbKaynak: 'spesifik',
+      }
     }
   }
 
@@ -146,7 +214,7 @@ async function kayitlarGetir(
     for (const u of users ?? []) kullaniciMap[u.id] = u.isim_soyisim
   }
 
-  // 6. Madde sayıları (doldurulma oranı)
+  // 6. Madde sayıları
   const baslikIds = basliklar.map((b: any) => b.id)
   const { data: maddeSayilari } = await admin.from('checklist_sonuc_maddeleri')
     .select('sonuc_id')
@@ -157,7 +225,6 @@ async function kayitlarGetir(
     doldurulanMap[m.sonuc_id] = (doldurulanMap[m.sonuc_id] ?? 0) + 1
   }
 
-  // Şablon madde sayıları
   const sablonMaddeMap: Record<string, number> = {}
   if (sablonIds.size > 0) {
     const { data: sablonMaddeler } = await admin.from('checklist_sablon_maddeleri')
@@ -168,20 +235,32 @@ async function kayitlarGetir(
     }
   }
 
-  // 7. Birleştir
+  const now = Date.now()
+  const cutoff = now - MS24H
+
   const sonuclar: any[] = []
   for (const b of basliklar) {
     const gorevId = b.canli_gorev_id || b.gorev_id
     if (!gorevId) continue
     const gorev = gorevMap[gorevId]
-    if (!gorev) continue // Geçerli durumda değil, atla
+    if (!gorev) continue
 
     const lok = lokMap[b.lokasyon_id]
     const sablonId = b.sablon_id ?? lok?.checklist_sablon_id
     const toplam = sablonId ? (sablonMaddeMap[sablonId] ?? 0) : 0
     const doldurulan = doldurulanMap[b.id] ?? 0
 
-    sonuclar.push({
+    const rref = refMs(gorev.durum_degisim_tarihi, gorev.tamamlanma_tarihi, b.kayit_tarihi)
+
+    let kaynakUi: 'canli' | 'arsiv' | 'spesifik'
+    if (gorev.dbKaynak === 'spesifik') kaynakUi = 'spesifik'
+    else if (gorev.dbKaynak === 'arsiv') kaynakUi = 'arsiv'
+    else kaynakUi = 'canli'
+
+    const gorev_task_type: 'canli_gorevler' | 'gorevler' =
+      gorev.dbKaynak === 'spesifik' ? 'gorevler' : 'canli_gorevler'
+
+    const row: any = {
       id:                  b.id,
       kayit_tarihi:        b.kayit_tarihi,
       kanal:               b.kanal ?? 'WEB',
@@ -190,16 +269,39 @@ async function kayitlarGetir(
       gorev_durum:         gorev.durum,
       tamamlanma_tarihi:   gorev.tamamlanma_tarihi ?? null,
       arsiv_tarihi:        gorev.arsiv_tarihi ?? null,
+      durum_degisim_tarihi: gorev.durum_degisim_tarihi ?? null,
       lokasyon_tanim:      lok?.tanim ?? '—',
       sablon_baslik:       sablonId ? (sablonMap[sablonId] ?? '—') : '—',
       kullanici_isim:      b.kullanici_id ? (kullaniciMap[b.kullanici_id] ?? '—') : '—',
       doldurulan_madde:    doldurulan,
       toplam_madde:        toplam,
-      kaynak:              gorev.kaynak as 'canli' | 'arsiv',
-    })
+      kaynak:              kaynakUi,
+      gorev_task_type,
+      _refMs:              rref,
+    }
+    sonuclar.push(row)
   }
 
-  return sonuclar
+  // 7. 24 saat penceresi veya birleşik segment
+  const filtered = sonuclar.filter((row) => {
+    const r = row._refMs as number
+    if (!r) return cikti !== 'rapor'
+    if (cikti === 'rapor') return r >= cutoff
+    if (cikti === 'arsiv') return r < cutoff
+    return true
+  })
+
+  for (const row of filtered) {
+    const r = row._refMs as number
+    if (cikti === 'birlesik') {
+      row.segment = r >= cutoff ? 'tablo' : 'arsiv'
+    }
+    delete row._refMs
+  }
+
+  return filtered.sort(
+    (a, b) => new Date(b.kayit_tarihi ?? 0).getTime() - new Date(a.kayit_tarihi ?? 0).getTime(),
+  )
 }
 
 export async function GET(req: NextRequest) {
@@ -212,7 +314,6 @@ export async function GET(req: NextRequest) {
 
     const p        = new URL(req.url).searchParams
     const firmaId  = me.isSA ? (p.get('firma_id') ?? null) : me.firma_id
-    /** Tenant kullanıcıları yalnızca hesabın bağlı olduğu projeyi görür; parametreyi yok say */
     let projeId: string | null = p.get('proje_id')
     if (me.isU) {
       if (!me.proje_id) return NextResponse.json({ ok: true, data: [] })
@@ -220,28 +321,21 @@ export async function GET(req: NextRequest) {
     }
     const baslangic = p.get('baslangic')
     const bitis    = p.get('bitis')
-    const arsivParam = p.get('arsiv') // 'true' | 'false' | null
+
+    let cikti: 'rapor' | 'arsiv' | 'birlesik' = 'birlesik'
+    const rawCikti = p.get('cikti') as 'rapor' | 'arsiv' | 'birlesik' | null
+    if (rawCikti === 'rapor' || rawCikti === 'arsiv' || rawCikti === 'birlesik') {
+      cikti = rawCikti
+    } else {
+      const arsivLegacy = p.get('arsiv')
+      if (arsivLegacy === 'false') cikti = 'rapor'
+      else if (arsivLegacy === 'true') cikti = 'arsiv'
+      else cikti = 'birlesik'
+    }
 
     if (!firmaId) return NextResponse.json({ ok: true, data: [] })
 
-    let data: any[] = []
-
-    if (arsivParam === 'true') {
-      // Sadece arşiv
-      data = await kayitlarGetir(admin, firmaId, projeId, baslangic, bitis, true)
-    } else if (arsivParam === 'false') {
-      // Sadece canlı
-      data = await kayitlarGetir(admin, firmaId, projeId, baslangic, bitis, false)
-    } else {
-      // İkisi birden (filtre uygulandığında)
-      const [canli, arsiv] = await Promise.all([
-        kayitlarGetir(admin, firmaId, projeId, baslangic, bitis, false),
-        kayitlarGetir(admin, firmaId, projeId, baslangic, bitis, true),
-      ])
-      data = [...canli, ...arsiv].sort(
-        (a, b) => new Date(b.kayit_tarihi ?? 0).getTime() - new Date(a.kayit_tarihi ?? 0).getTime()
-      )
-    }
+    const data = await kayitlarGetir(admin, firmaId, projeId, baslangic, bitis, cikti)
 
     return NextResponse.json({ ok: true, data })
   } catch (err: any) {

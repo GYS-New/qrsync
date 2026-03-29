@@ -965,7 +965,7 @@ export default function ArsivClient({
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CeklistArsivSekme — Arşiv içindeki Çeklist Raporları sekmesi
-// Yalnızca arşivlenmiş görevlere ait çeklist kayıtlarını listeler.
+// Raporlar sayfasındaki 24 saat penceresini aşan (durum değişimine göre) çeklist kayıtları.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const CEKLIST_DURUM_LABEL: Record<string, string> = {
@@ -1012,7 +1012,7 @@ function CeklistArsivSekme({
   const yukle = useCallback(async (baslangic?: string, bitis?: string) => {
     setLoading(true)
     try {
-      const p = new URLSearchParams({ firma_id: firmaId, arsiv: 'true' })
+      const p = new URLSearchParams({ firma_id: firmaId, cikti: 'arsiv' })
       if (projeId)   p.set('proje_id', projeId)
       if (baslangic) p.set('baslangic', baslangic)
       if (bitis)     p.set('bitis', bitis)
