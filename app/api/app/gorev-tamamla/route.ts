@@ -87,8 +87,52 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: `Görev zaten ${gorev.durum} durumunda` }, { status: 409, headers: CORS })
     }
 
-    // Checklist cevaplarını kaydet
+    // Çeklist: mobil uygulama checklist_cevaplari yazar; raporlar ise checklist_sonuc_basliklari okur
+    // (QR/Web = scan/tamamla bu tablolara yazar). Her iki tabloyu da doldur ki Çeklist Raporu görünsün.
     if (maddeler && maddeler.length > 0 && checklistSablonId) {
+      let templateVersion = 1
+      const { data: sablonMeta } = await admin
+        .from('checklist_sablonlari')
+        .select('versiyon')
+        .eq('id', checklistSablonId)
+        .maybeSingle()
+      templateVersion = sablonMeta?.versiyon ?? 1
+
+      const sonucPayload: any = {
+        lokasyon_id:      gorev.lokasyon_id,
+        sablon_id:        checklistSablonId,
+        template_version: templateVersion,
+        kanal:            'MOBİL',
+        kullanici_id:     userId,
+      }
+      if (gorevTipi === 'gorevler') sonucPayload.gorev_id = gorevId
+      else sonucPayload.canli_gorev_id = gorevId
+
+      const { data: sonucRow, error: sonucErr } = await admin
+        .from('checklist_sonuc_basliklari')
+        .insert(sonucPayload)
+        .select('id')
+        .single()
+
+      if (sonucErr || !sonucRow) {
+        console.error('[gorev-tamamla] checklist_sonuc_basliklari:', sonucErr)
+        return NextResponse.json({ ok: false, error: 'Çeklist rapor kaydı oluşturulamadı: ' + (sonucErr?.message ?? '') }, { status: 500, headers: CORS })
+      }
+
+      const maddeRows = maddeler.map((m: any) => ({
+        sonuc_id:       sonucRow.id,
+        madde_id:       m.madde_id,
+        secenek_degeri: m.secenek_degeri ?? null,
+        aciklama:       typeof m.aciklama === 'string' ? m.aciklama.trim() || null : m.aciklama ?? null,
+        gorsel_url:     m.gorsel_url ?? null,
+      }))
+      const { error: maddeErr } = await admin.from('checklist_sonuc_maddeleri').insert(maddeRows)
+      if (maddeErr) {
+        console.error('[gorev-tamamla] checklist_sonuc_maddeleri:', maddeErr)
+        await admin.from('checklist_sonuc_basliklari').delete().eq('id', sonucRow.id)
+        return NextResponse.json({ ok: false, error: 'Çeklist maddeleri kaydedilemedi: ' + maddeErr.message }, { status: 500, headers: CORS })
+      }
+
       const cevaplar = maddeler.map((m: any) => ({
         gorev_id:        gorevId,
         gorev_tipi:      gorevTipi,
@@ -107,6 +151,8 @@ export async function POST(req: Request) {
         .insert(cevaplar)
 
       if (cevapErr) {
+        await admin.from('checklist_sonuc_maddeleri').delete().eq('sonuc_id', sonucRow.id)
+        await admin.from('checklist_sonuc_basliklari').delete().eq('id', sonucRow.id)
         return NextResponse.json({ ok: false, error: 'Çeklist kaydedilemedi: ' + cevapErr.message }, { status: 500, headers: CORS })
       }
     }
