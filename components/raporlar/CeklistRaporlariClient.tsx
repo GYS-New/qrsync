@@ -100,6 +100,8 @@ export default function CeklistRaporlariClient({
   const [bitis,       setBitis]       = useState('')
 
   const [modalGorev, setModalGorev]   = useState<{ id: string; taskType: 'gorevler' | 'canli_gorevler' } | null>(null)
+  const [deleting, setDeleting]       = useState(false)
+  const [deletingId, setDeletingId]   = useState<string | null>(null)
 
   // ── Varsayılan: son 24 saat (durum değişimine göre, API cikti=rapor) ───
   const yukleRapor24h = useCallback(async () => {
@@ -171,6 +173,29 @@ export default function CeklistRaporlariClient({
     if (filtreMod && r.segment) return r.segment === 'tablo' ? 'Tablo' : 'Arşiv'
     if (r.kaynak === 'spesifik') return 'Spesifik'
     return r.kaynak === 'arsiv' ? 'Arşiv (DB)' : 'Canlı'
+  }
+
+  async function silKayit(kayitId: string) {
+    if (!window.confirm('Bu kaydı tamamen silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
+      return
+    }
+
+    setDeleting(true)
+    setDeletingId(kayitId)
+    try {
+      const res = await fetch(`/api/raporlar/ceklist/${kayitId}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error)
+      
+      // Listeden sil
+      setSatirlar(prev => prev.filter(r => r.id !== kayitId))
+      toast({ type: 'success', title: 'Silindi', message: 'Kayıt başarıyla silindi.' })
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Silme Hatası', message: e.message })
+    } finally {
+      setDeleting(false)
+      setDeletingId(null)
+    }
   }
 
   // ── Excel ─────────────────────────────────────────────────────────────
@@ -353,11 +378,15 @@ export default function CeklistRaporlariClient({
             if (sonuclar.length > maxMadde) maxMadde = sonuclar.length
 
             sonuclar.forEach((madde: any, idx: number) => {
+              // Madde tanımını header için saklayalım
+              gorevVerisi[`madde_tanim_${idx}`] = madde.madde
+              
+              // Cevabı/statusu cell'de gösterelim
               const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
               const zorunluText = madde.zorunlu ? ' <span style="color:#dc2626;font-weight:700">[ZORUNLU]</span>' : ''
               const cevapText = madde.secenek ? ` → <strong>${madde.secenek}</strong>` : ''
               const notText = madde.not ? `<br/><small>Not: ${madde.not}</small>` : ''
-              gorevVerisi[`madde_${idx}`] = `<div style="font-size:10px">${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${cevapText}${notText}</div>`
+              gorevVerisi[`madde_${idx}`] = `<span style="font-size:10px">${durumEmoji}${zorunluText}${cevapText}${notText}</span>`
 
               if (madde.gorsel_url) {
                 if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
@@ -375,16 +404,27 @@ export default function CeklistRaporlariClient({
       const results = await Promise.all(fetchPromises)
       raporVerileri.push(...results)
 
-      // AŞAMA 2: Dinamik tablo headers
+      // AŞAMA 2: Madde tanımlarını header'larda kullanmak için topla
+      const maddeTanimMap: { [key: number]: string } = {}
+      for (const veri of raporVerileri) {
+        for (let i = 0; i < maxMadde; i++) {
+          if (veri[`madde_tanim_${i}`] && !maddeTanimMap[i]) {
+            maddeTanimMap[i] = veri[`madde_tanim_${i}`]
+          }
+        }
+      }
+
+      // AŞAMA 3: Dinamik tablo headers
       const baseHeaders = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
       if (filtreMod) baseHeaders.push('Segment')
 
       let maddeSutunlari = ''
       for (let i = 0; i < maxMadde; i++) {
-        maddeSutunlari += `<th>Madde ${i + 1}</th>`
+        const maddeBaslik = maddeTanimMap[i] || `Madde ${i + 1}`
+        maddeSutunlari += `<th>${maddeBaslik}</th>`
       }
 
-      // AŞAMA 3: Tablo HTML'ini oluştur
+      // AŞAMA 4: Tablo HTML'ini oluştur
       let tableHtml = ''
       for (const veri of raporVerileri) {
         let rowHtml = `<tr>
@@ -424,7 +464,7 @@ export default function CeklistRaporlariClient({
         <style>
           body{font-family:Arial,sans-serif;font-size:11px;padding:20px}
           table{width:100%;border-collapse:collapse}
-          th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
+          th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left;font-size:10px}
           td{padding:5px 8px;border:1px solid #d6e4d6;font-size:10px}
           tr:nth-child(even) td{background:#f3faf3}
         </style>
@@ -472,14 +512,16 @@ export default function CeklistRaporlariClient({
           const json = await res.json()
           if (json.ok && json.sonuclar?.length) {
             const sonuclar = json.sonuclar
-            if (sonuclar.length > maxMadde) maxMadde = Math.max(maxMadde, sonuclar.length)
+            if (sonuclar.length > maxMadde) maxMadde = sonuclar.length
 
             sonuclar.forEach((madde: any, idx: number) => {
+              // Madde tanımını header için saklayalım
+              gorevVerisi[`madde_tanim_${idx}`] = madde.madde
+              
+              // Cevabı/statusu cell'de gösterelim
               const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
-              const zorunluText = madde.zorunlu ? ' <span style="color:#dc2626;font-weight:700">[ZORUNLU]</span>' : ''
-              const cevapText = madde.secenek ? ` → <strong>${madde.secenek}</strong>` : ''
-              const notText = madde.not ? `<br/><small>Not: ${madde.not}</small>` : ''
-              gorevVerisi[`madde_${idx}`] = `<div style="font-size:9px">${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${cevapText}${notText}</div>`
+              const cevapText = madde.secenek ? `Cevap: ${madde.secenek}` : madde.not ? `Not: ${madde.not}` : '-'
+              gorevVerisi[`madde_${idx}`] = `${durumEmoji} ${cevapText}`
 
               if (madde.gorsel_url) {
                 if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
@@ -497,16 +539,27 @@ export default function CeklistRaporlariClient({
       const results = await Promise.all(fetchPromises)
       raporVerileri.push(...results)
 
-      // AŞAMA 2: Dinamik tablo headers
+      // AŞAMA 2: Madde tanımlarını header'larda kullanmak için topla
+      const maddeTanimMap: { [key: number]: string } = {}
+      for (const veri of raporVerileri) {
+        for (let i = 0; i < maxMadde; i++) {
+          if (veri[`madde_tanim_${i}`] && !maddeTanimMap[i]) {
+            maddeTanimMap[i] = veri[`madde_tanim_${i}`]
+          }
+        }
+      }
+
+      // AŞAMA 3: Dinamik tablo headers
       const baseHeaders = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
       if (filtreMod) baseHeaders.push('Segment')
 
       let maddeSutunlari = ''
       for (let i = 0; i < maxMadde; i++) {
-        maddeSutunlari += `<th>Madde ${i + 1}</th>`
+        const maddeBaslik = maddeTanimMap[i] || `Madde ${i + 1}`
+        maddeSutunlari += `<th>${maddeBaslik}</th>`
       }
 
-      // AŞAMA 3: Tablo HTML'ini oluştur
+      // AŞAMA 4: Tablo HTML'ini oluştur
       let tableHtml = ''
       for (const veri of raporVerileri) {
         let rowHtml = `<tr>
@@ -556,7 +609,7 @@ export default function CeklistRaporlariClient({
           <th>Durum</th><th>Kanal</th><th>Dolduran</th><th>%</th>${segTh}${maddeSutunlari}<th>Görseller</th>
         </tr></thead><tbody>${tableHtml}</tbody></table></body></html>`
 
-      // AŞAMA 4: HTML2PDF ile PDF oluştur
+      // AŞAMA 5: HTML2PDF ile PDF oluştur
       const tempDiv = document.createElement('div')
       tempDiv.innerHTML = htmlContent
       document.body.appendChild(tempDiv)
@@ -625,7 +678,7 @@ export default function CeklistRaporlariClient({
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={async () => {
-              // CSV: Her görev satırı + maddeler ayrı kolonlar (PARALEL FETCH)
+              // CSV: Excel formatında (PARALEL FETCH)
               setIsDownloading(true)
               try {
                 // AŞAMA 1: Tüm görevler için veri topla (PARALEL)
@@ -657,11 +710,13 @@ export default function CeklistRaporlariClient({
                       if (sonuclar.length > maxMadde) maxMadde = sonuclar.length
 
                       sonuclar.forEach((madde: any, idx: number) => {
+                        // Madde tanımını header için saklayalım
+                        gorevVerisi[`madde_tanim_${idx}`] = madde.madde
+                        
+                        // Cevabı/statusu cell'de gösterelim
                         const durumEmoji = madde.dolduruldu ? '✅' : '⭕'
-                        const zorunluText = madde.zorunlu ? ' [ZORUNLU]' : ''
-                        const cevapText = madde.secenek ? ` → ${madde.secenek}` : ''
-                        const notText = madde.not ? ` | Not: ${madde.not}` : ''
-                        gorevVerisi[`madde_${idx}`] = `${durumEmoji} ${madde.sira}. ${madde.madde}${zorunluText}${cevapText}${notText}`
+                        const cevapText = madde.secenek ? `Cevap: ${madde.secenek}` : madde.not ? `Not: ${madde.not}` : '-'
+                        gorevVerisi[`madde_${idx}`] = `${durumEmoji} ${cevapText}`
 
                         if (madde.gorsel_url) {
                           if (!gorselListesi[r.gorev_id]) gorselListesi[r.gorev_id] = []
@@ -679,17 +734,27 @@ export default function CeklistRaporlariClient({
                 const results = await Promise.all(fetchPromises)
                 raporVerileri.push(...results)
 
-                // AŞAMA 2: Dinamik headers oluştur
+                // AŞAMA 2: Madde tanımlarını header'larda kullanmak için topla
+                const maddeTanimMap: { [key: number]: string } = {}
+                for (const veri of raporVerileri) {
+                  for (let i = 0; i < maxMadde; i++) {
+                    if (veri[`madde_tanim_${i}`] && !maddeTanimMap[i]) {
+                      maddeTanimMap[i] = veri[`madde_tanim_${i}`]
+                    }
+                  }
+                }
+
+                // AŞAMA 3: CSV headers oluştur
                 const baseHeaders = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
                 if (filtreMod) baseHeaders.push('Segment')
 
                 const headers: string[] = [...baseHeaders]
                 for (let i = 0; i < maxMadde; i++) {
-                  headers.push(`Madde ${i + 1}`)
+                  headers.push(maddeTanimMap[i] || `Madde ${i + 1}`)
                 }
                 headers.push('Görseller')
 
-                // AŞAMA 3: CSV satırları oluştur
+                // AŞAMA 4: CSV satırları oluştur
                 const rows: string[][] = []
                 for (const veri of raporVerileri) {
                   const row: string[] = [
@@ -710,9 +775,12 @@ export default function CeklistRaporlariClient({
                     row.push(veri[`madde_${i}`] ?? '')
                   }
 
-                  // Görseller
+                  // Görseller: "Görsel 1 | Görsel 2" formatında
                   const gorseller = gorselListesi[veri.gorevId] ?? []
-                  row.push(gorseller.join('; '))
+                  const gorselText = gorseller.length > 0 
+                    ? gorseller.map((_, i) => `Görsel ${i + 1}`).join(' | ')
+                    : ''
+                  row.push(gorselText)
 
                   rows.push(row)
                 }
@@ -812,24 +880,24 @@ export default function CeklistRaporlariClient({
                 <th>Dolduran</th>
                 <th>Doldurulma</th>
                 {filtreMod && <th>Segment</th>}
-                <th style={{ textAlign: 'center' }}>Detay</th>
+                <th style={{ textAlign: 'center' }}>İşlemler</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={filtreMod ? 10 : 9} style={{ padding: 32, textAlign: 'center' }}>
+                <tr><td colSpan={filtreMod ? 11 : 10} style={{ padding: 32, textAlign: 'center' }}>
                   <RefreshCw size={20} style={{ ...spinning, color: '#1f6b1f', display: 'block', margin: '0 auto' }} />
                 </td></tr>
               ) : isU && !projeId ? (
-                <tr><td colSpan={filtreMod ? 10 : 9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+                <tr><td colSpan={filtreMod ? 11 : 10} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
                   Bu hesap bir projeye bağlı değil.
                 </td></tr>
               ) : !firmaId ? (
-                <tr><td colSpan={filtreMod ? 10 : 9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+                <tr><td colSpan={filtreMod ? 11 : 10} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
                   Veri görüntülemek için firma seçin.
                 </td></tr>
               ) : filtreData.length === 0 ? (
-                <tr><td colSpan={filtreMod ? 10 : 9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+                <tr><td colSpan={filtreMod ? 11 : 10} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
                   Çeklist raporu bulunamadı.
                 </td></tr>
               ) : (
@@ -889,7 +957,7 @@ export default function CeklistRaporlariClient({
                           </span>
                         </td>
                       )}
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center', display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                         <button
                           onClick={() => setModalGorev({
                             id: r.gorev_id,
@@ -900,9 +968,40 @@ export default function CeklistRaporlariClient({
                             width: 30, height: 30, border: 'none', borderRadius: 7,
                             background: '#e8f4e8', color: '#2e8b2e',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: 'pointer', margin: '0 auto',
+                            cursor: 'pointer',
                           }}>
                           <ExternalLink size={13} />
+                        </button>
+                        <button
+                          onClick={() => setModalGorev({
+                            id: r.gorev_id,
+                            taskType: r.gorev_task_type ?? 'canli_gorevler',
+                          })}
+                          title="Düzenle"
+                          disabled={deleting}
+                          style={{
+                            width: 30, height: 30, border: 'none', borderRadius: 7,
+                            background: '#fef3c7', color: '#92400e',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: deleting ? 'not-allowed' : 'pointer',
+                            opacity: deleting ? 0.5 : 1,
+                            fontSize: 13, fontWeight: 600,
+                          }}>
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => silKayit(r.id)}
+                          title="Kaydı Sil"
+                          disabled={deleting || deletingId === r.id}
+                          style={{
+                            width: 30, height: 30, border: 'none', borderRadius: 7,
+                            background: '#fee2e2', color: '#dc2626',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: deleting || deletingId === r.id ? 'not-allowed' : 'pointer',
+                            opacity: deletingId === r.id ? 0.5 : 1,
+                            fontSize: 13, fontWeight: 600,
+                          }}>
+                          {deletingId === r.id ? '⏳' : '✕'}
                         </button>
                       </td>
                     </tr>
