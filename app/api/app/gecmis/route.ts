@@ -31,19 +31,20 @@ export async function GET(req: Request) {
   const admin = createAdminClient()
   const sonYirmiDortSaat = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  // 1. Spesifik görevler — kullanıcıya atanmış TÜM durumlar
+  // 1. Spesifik görevler — kullanıcıya atanmış, son 24 saat
   const { data: gorevler } = await admin
     .from('gorevler')
     .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, olusturma_tarihi, lokasyon_id, lokasyonlar(tanim)')
     .eq('atanan_kullanici_id', user.id)
+    .gte('olusturma_tarihi', sonYirmiDortSaat)
     .order('olusturma_tarihi', { ascending: false })
     .limit(50)
 
-  // 2. Frekansiyel görevler — sadece TAMAMLANAN durumlar (son 24 saat)
+  // 2. Frekansiyel görevler — tamamlayan_kullanici_id ile sorgula, son 24 saat
   const { data: canliGorevler } = await admin
     .from('canli_gorevler')
     .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .eq('islemi_yapan_id', user.id)
+    .eq('tamamlayan_kullanici_id', user.id)
     .in('durum', ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI'])
     .gte('tamamlanma_tarihi', sonYirmiDortSaat)
     .order('tamamlanma_tarihi', { ascending: false })
