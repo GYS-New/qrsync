@@ -158,7 +158,7 @@ async function kayitlarGetir(
     for (const s of sablonlar ?? []) sablonMap[s.id] = s.baslik
   }
 
-  // 3. Çeklist başlıkları
+  // 3. Çeklist başlıkları (BOTH cikti modes from archive table too)
   let sbQ = admin.from('checklist_sonuc_basliklari')
     .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
     .in('lokasyon_id', lokIds)
@@ -169,13 +169,31 @@ async function kayitlarGetir(
 
   const { data: basliklar, error: sbErr } = await sbQ
   console.log('[ceklist-rapor] sbErr:', sbErr?.message ?? null, '| basliklar:', basliklar?.length ?? 0, '| lokIds:', lokIds.length)
-  if (sbErr || !basliklar?.length) return []
+
+  // Arşiv tablosundan da oku - cikti=arsiv veya birlesik için
+  let arBasliklar: any[] = []
+  if (cikti === 'arsiv' || cikti === 'birlesik') {
+    let arSbQ = admin.from('checklist_sonuc_basliklari_arsiv')
+      .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
+      .in('lokasyon_id', lokIds)
+      .order('kayit_tarihi', { ascending: false })
+      .limit(2000)
+    if (baslangic) arSbQ = arSbQ.gte('kayit_tarihi', baslangic)
+    if (bitis)     arSbQ = arSbQ.lte('kayit_tarihi', bitis + 'T23:59:59')
+
+    const { data: arData, error: arErr } = await arSbQ
+    if (!arErr && arData) arBasliklar = arData
+  }
+
+  // Birleştir
+  const allBasliklar = [...(basliklar ?? []), ...arBasliklar]
+  if (!allBasliklar?.length) return []
 
   const canliGorevIds = [...new Set(
-    basliklar.filter((b: any) => b.canli_gorev_id).map((b: any) => String(b.canli_gorev_id)),
+    allBasliklar.filter((b: any) => b.canli_gorev_id).map((b: any) => String(b.canli_gorev_id)),
   )] as string[]
   const specGorevIds = [...new Set(
-    basliklar.filter((b: any) => !b.canli_gorev_id && b.gorev_id).map((b: any) => String(b.gorev_id)),
+    allBasliklar.filter((b: any) => !b.canli_gorev_id && b.gorev_id).map((b: any) => String(b.gorev_id)),
   )] as string[]
   console.log('[ceklist-rapor] canliGorevIds:', canliGorevIds.length, '| specGorevIds:', specGorevIds.length)
 
@@ -220,7 +238,7 @@ async function kayitlarGetir(
     }
   }
 
-  // 4b. Spesifik: gorevler
+  // 4b. Spesifik: gorevler (both main and archive)
   if (specGorevIds.length) {
     // gorevler tablosu sadece 'TAMAMLANDI' durumunu destekler; ZAMANINDA_YAPILAMAYAN enum'da yok
     const { data: specGorevler, error: specErr } = await admin.from('gorevler')
@@ -240,26 +258,52 @@ async function kayitlarGetir(
         dbKaynak: 'spesifik',
       }
     }
+
+    // Arşiv tablosundan eksik olanları bul
+    const eksik = specGorevIds.filter(id => !gorevMap[id])
+    if (eksik.length) {
+      const { data: specGorevlerArsiv } = await admin.from('gorevler_arsiv')
+        .select('id,tanim,durum,tamamlanma_tarihi,lokasyon_id,durum_degisim_tarihi,arsivleme_tarihi')
+        .in('id', eksik)
+        .eq('durum', 'TAMAMLANDI')
+      for (const g of specGorevlerArsiv ?? []) {
+        gorevMap[g.id] = {
+          id: g.id,
+          tanim: g.tanim,
+          durum: g.durum,
+          tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
+          arsiv_tarihi: g.arsivleme_tarihi ?? null,
+          lokasyon_id: g.lokasyon_id,
+          durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
+          dbKaynak: 'spesifik',
+        }
+      }
+    }
   }
 
   if (!Object.keys(gorevMap).length) return []
 
   // 5. Kullanıcı isimleri
-  const kullaniciIds = [...new Set(basliklar.filter((b: any) => b.kullanici_id).map((b: any) => b.kullanici_id))]
+  const kullaniciIds = [...new Set(allBasliklar.filter((b: any) => b.kullanici_id).map((b: any) => b.kullanici_id))]
   const kullaniciMap: Record<string, string> = {}
   if (kullaniciIds.length) {
     const { data: users } = await admin.from('users').select('id,isim_soyisim').in('id', kullaniciIds)
     for (const u of users ?? []) kullaniciMap[u.id] = u.isim_soyisim
   }
 
-  // 6. Madde sayıları
-  const baslikIds = basliklar.map((b: any) => b.id)
+  // 6. Madde sayıları (from both tables)
+  const baslikIds = allBasliklar.map((b: any) => b.id)
   const { data: maddeSayilari } = await admin.from('checklist_sonuc_maddeleri')
     .select('sonuc_id')
     .in('sonuc_id', baslikIds)
 
+  // Arşiv maddeleri
+  const { data: arMaddeSayilari } = await admin.from('checklist_sonuc_maddeleri_arsiv')
+    .select('sonuc_id')
+    .in('sonuc_id', baslikIds)
+
   const doldurulanMap: Record<string, number> = {}
-  for (const m of maddeSayilari ?? []) {
+  for (const m of [...(maddeSayilari ?? []), ...(arMaddeSayilari ?? [])]) {
     doldurulanMap[m.sonuc_id] = (doldurulanMap[m.sonuc_id] ?? 0) + 1
   }
 
@@ -277,7 +321,7 @@ async function kayitlarGetir(
   const cutoff = now - MS24H
 
   const sonuclar: any[] = []
-  for (const b of basliklar) {
+  for (const b of allBasliklar) {
     const gorevId = b.canli_gorev_id || b.gorev_id
     if (!gorevId) continue
     const gorev = gorevMap[gorevId]

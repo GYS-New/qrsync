@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   if (!firmaId) return NextResponse.json({ ok: true, data: [] })
 
   let q = admin
-    .from('personel_mesai_kayitlari')
+    .from('personel_mesai_kayitlari_arsiv')
     .select(`
       id, user_id, firma_id, proje_id, kayit_tarihi,
       giris_saati, cikis_saati, giris_tipi, cikis_tipi,
@@ -35,7 +35,6 @@ export async function GET(req: NextRequest) {
       users!user_id ( isim_soyisim, email )
     `)
     .eq('firma_id', firmaId)
-    .eq('arsivlendi', true)
     .order('kayit_tarihi', { ascending: false })
     .limit(1000)
 

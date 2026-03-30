@@ -36,15 +36,21 @@ export async function GET(req: NextRequest) {
   if (me.isTA && p.get('firma_id') && p.get('firma_id') !== me.firma_id)
     return NextResponse.json({ ok: false, error: 'Yetkisiz firma' }, { status: 403 })
 
+  // arsivlendi parametresine göre doğru tabloyu seç
+  const tableName = arsivlendi ? 'musteri_degerlendirmeleri_arsiv' : 'musteri_degerlendirmeleri'
+  const joinTable = arsivlendi ? null : 'lokasyonlar'
+
   let q = admin
-    .from('musteri_degerlendirmeleri')
-    .select(`
-      id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gorsel_url,
-      olusturma_tarihi, arsivlendi, arsivleme_tarihi,
-      lokasyonlar ( tanim )
-    `)
+    .from(tableName)
+    .select(
+      arsivlendi
+        ? `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gorsel_url,
+           olusturma_tarihi, arsivleme_tarihi`
+        : `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gorsel_url,
+           olusturma_tarihi, arsivlendi, arsivleme_tarihi,
+           lokasyonlar ( tanim )`
+    )
     .eq('firma_id', firmaId)
-    .eq('arsivlendi', arsivlendi)
     .order('olusturma_tarihi', { ascending: false })
 
   if (projeId)   q = (q as any).eq('proje_id', projeId)
@@ -57,14 +63,14 @@ export async function GET(req: NextRequest) {
   const kayitlar = (data ?? []).map((r: any) => ({
     id:                r.id,
     lokasyon_id:       r.lokasyon_id,
-    lokasyon_tanim:    r.lokasyonlar?.tanim ?? '—',
+    lokasyon_tanim:    arsivlendi ? '—' : (r.lokasyonlar?.tanim ?? '—'),
     kanal:             r.kanal,
     yildiz:            r.yildiz,
     yorum:             r.yorum,
     ad_soyad:          r.ad_soyad,
     gorsel_url:        r.gorsel_url,
     olusturma_tarihi:  r.olusturma_tarihi,
-    arsivlendi:        r.arsivlendi,
+    arsivlendi:        arsivlendi,
     arsivleme_tarihi:  r.arsivleme_tarihi,
   }))
 
@@ -87,29 +93,90 @@ export async function PATCH(req: NextRequest) {
   const { id, yildiz, yorum, ad_soyad, arsivlendi } = body
   if (!id) return NextResponse.json({ ok: false, error: 'id gerekli' }, { status: 400 })
 
-  const { data: kayit } = await admin
+  // Kayıt asıl tablodan mı arsiv tablosundan mı check et
+  const { data: mainRecord } = await admin
     .from('musteri_degerlendirmeleri')
-    .select('firma_id')
+    .select('*')
     .eq('id', id)
     .single()
 
-  if (!kayit) return NextResponse.json({ ok: false, error: 'Kayıt bulunamadı' }, { status: 404 })
-  if (me.isTA && kayit.firma_id !== me.firma_id)
+  const { data: archiveRecord } = await admin
+    .from('musteri_degerlendirmeleri_arsiv')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  const currentRecord = mainRecord || archiveRecord
+  if (!currentRecord) return NextResponse.json({ ok: false, error: 'Kayıt bulunamadı' }, { status: 404 })
+  if (me.isTA && currentRecord.firma_id !== me.firma_id)
     return NextResponse.json({ ok: false, error: 'Yetkisiz firma' }, { status: 403 })
 
-  const guncelleme: Record<string, any> = {}
-
+  // arsivlendi parametresi varsa → TRANSFER işlemi
   if (arsivlendi !== undefined) {
-    guncelleme.arsivlendi       = arsivlendi
-    guncelleme.arsivleme_tarihi = arsivlendi ? new Date().toISOString() : null
-  } else {
-    if (yildiz !== undefined) {
-      if (yildiz < 1 || yildiz > 5) return NextResponse.json({ ok: false, error: 'Geçersiz puan' }, { status: 400 })
-      guncelleme.yildiz = yildiz
+    if (arsivlendi === true) {
+      // ARŞIVLE: asıl → arsiv (sadece asıl tablodan alınr)
+      if (!mainRecord) {
+        return NextResponse.json({ ok: false, error: 'Sadece aktif kayıtlar arşivlenebilir' }, { status: 400 })
+      }
+
+      const arsivRecordData = {
+        ...mainRecord,
+        arsivleme_tarihi: new Date().toISOString(),
+      }
+      // arsivlendi alanını kaldır eğer varsa
+      delete (arsivRecordData as any).arsivlendi
+
+      const { error: insertErr } = await admin
+        .from('musteri_degerlendirmeleri_arsiv')
+        .insert(arsivRecordData)
+      if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 })
+
+      const { error: deleteErr } = await admin
+        .from('musteri_degerlendirmeleri')
+        .delete()
+        .eq('id', id)
+      if (deleteErr) return NextResponse.json({ ok: false, error: deleteErr.message }, { status: 500 })
+    } else {
+      // ARŞIVDEN ÇIKAR: arsiv → asıl (sadece arsiv tablosundan alınır)
+      if (!archiveRecord) {
+        return NextResponse.json({ ok: false, error: 'Sadece arşivlenmiş kayıtlar geri yüklenebilir' }, { status: 400 })
+      }
+
+      const mainRecordData = {
+        ...archiveRecord,
+        arsivlendi: false,
+        arsivleme_tarihi: null,
+      }
+      // arsivleme_tarihi alanını kaldır
+      delete (mainRecordData as any).arsivleme_tarihi
+
+      const { error: insertErr } = await admin
+        .from('musteri_degerlendirmeleri')
+        .insert(mainRecordData)
+      if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 })
+
+      const { error: deleteErr } = await admin
+        .from('musteri_degerlendirmeleri_arsiv')
+        .delete()
+        .eq('id', id)
+      if (deleteErr) return NextResponse.json({ ok: false, error: deleteErr.message }, { status: 500 })
     }
-    if (yorum    !== undefined) guncelleme.yorum    = yorum?.trim()    || null
-    if (ad_soyad !== undefined) guncelleme.ad_soyad = ad_soyad?.trim() || null
+
+    return NextResponse.json({ ok: true })
   }
+
+  // arsivlendi YOK ise → EDIT işlemi (sadece asıl tabloda)
+  if (!mainRecord) {
+    return NextResponse.json({ ok: false, error: 'Arşivlenmiş kayıtlar düzenlenemez' }, { status: 400 })
+  }
+
+  const guncelleme: Record<string, any> = {}
+  if (yildiz !== undefined) {
+    if (yildiz < 1 || yildiz > 5) return NextResponse.json({ ok: false, error: 'Geçersiz puan' }, { status: 400 })
+    guncelleme.yildiz = yildiz
+  }
+  if (yorum    !== undefined) guncelleme.yorum    = yorum?.trim()    || null
+  if (ad_soyad !== undefined) guncelleme.ad_soyad = ad_soyad?.trim() || null
 
   if (Object.keys(guncelleme).length === 0)
     return NextResponse.json({ ok: false, error: 'Güncellenecek alan yok' }, { status: 400 })
@@ -135,18 +202,36 @@ export async function DELETE(req: NextRequest) {
   const id = new URL(req.url).searchParams.get('id')
   if (!id) return NextResponse.json({ ok: false, error: 'id gerekli' }, { status: 400 })
 
-  const { data: kayit } = await admin
+  // Kayıt asıl tablodan mı arsiv tablosundan mı check et
+  const { data: mainRecord } = await admin
     .from('musteri_degerlendirmeleri')
     .select('firma_id')
     .eq('id', id)
     .single()
 
+  let kayit = mainRecord
+  let fromArchive = false
+
+  if (!kayit) {
+    // Arsiv tablosundan kontrol et
+    const { data: archiveRecord } = await admin
+      .from('musteri_degerlendirmeleri_arsiv')
+      .select('firma_id')
+      .eq('id', id)
+      .single()
+
+    kayit = archiveRecord
+    fromArchive = true
+  }
+
   if (!kayit) return NextResponse.json({ ok: false, error: 'Kayıt bulunamadı' }, { status: 404 })
   if (me.isTA && kayit.firma_id !== me.firma_id)
     return NextResponse.json({ ok: false, error: 'Yetkisiz firma' }, { status: 403 })
 
+  // Doğru tablodan sil
+  const tableName = fromArchive ? 'musteri_degerlendirmeleri_arsiv' : 'musteri_degerlendirmeleri'
   const { error } = await admin
-    .from('musteri_degerlendirmeleri')
+    .from(tableName)
     .delete()
     .eq('id', id)
 
