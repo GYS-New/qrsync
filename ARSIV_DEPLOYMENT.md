@@ -1,4 +1,4 @@
-# ARŞIV SİSTEMİ - DEPLOYMENT GUIDE
+# ARŞIV SİSTEMİ - DEPLOYMENT GUIDE (RAILWAY)
 
 ## 1️⃣ VERITABANI TABLOSU OLUŞTUR
 
@@ -15,109 +15,38 @@ WHERE table_name LIKE '%arsiv%' AND table_schema = 'public';
 
 ---
 
-## 2️⃣ ENVIRONMENT VARIABLE KONTROL
+## 2️⃣ RAILWAY ENVIRONMENT VARIABLE EKLE
 
-`.env.local` dosyasında zaten var:
+Railway Dashboard > Services > Your App > Variables:
 
-```bash
-CRON_SECRET=14tGrTju6KTA3cQntEvlJrEUI72GhVTVAxyOAbMA0T4
-```
-
-✅ Bu token kullanılacak. Vercel production ortamında da ekle:
-
-**Vercel > Settings > Environment Variables:**
 ```
 CRON_SECRET = 14tGrTju6KTA3cQntEvlJrEUI72GhVTVAxyOAbMA0T4
 ```
 
-💡 Kalıp: `x-cron-token` header'ına bu değeri gönder
+---
+
+## 3️⃣ CRON JOB SETUP (Railway'de Otomatik)
+
+### A) NODE-CRON KÜTÜPHANESİ (Entegre)
+
+`lib/cron/job.ts` → Node.js cron kütüphanesi
+`server.js` → Custom Next.js server avec cron başlatma
+
+**Railway Başlangıç:**
+```
+npm install
+npm run build
+npm start
+```
+
+Server başlarken cron otomatik aktif olur. ✅
 
 ---
 
-## 3️⃣ CRON JOB SCHEDULE (Vercel üzerindeyse)
-
-### A) VERCEL CRON (Önerilen)
-
-`vercel.json` dosyasına:
-```json
-{
-  "crons": [
-    {
-      "path": "/api/tasks/arsivle",
-      "schedule": "0 */6 * * *"
-    }
-  ]
-}
-```
-
-Redeploy et:
-```bash
-git add .
-git commit -m "feat: setup real archiving system with 6-hour cron"
-git push
-```
-
----
-
-### B) DIŞ CRON SERVICE (Eğer Vercel cron yoksa)
-
-1. **cron-job.org** → https://cron-job.org/en/
-2. URL: `https://senin-site.com/api/tasks/arsivle`
-3. Method: `POST`
-4. Headers:
-   ```
-   x-cron-token: [environment'daki CRON_SECRET_TOKEN]
-   ```
-5. Schedule: `0 */6 * * *` (Her 6 saat)
-
----
-
-### C) SELF-HOSTED (Node.js)
-
-`lib/cron/job.ts` veya `scripts/cron-setup.js` ekle:
-
-```typescript
-// lib/cron/job.ts
-import cron from 'node-cron'
-import fetch from 'node-fetch'
-
-export function setupArsivCron() {
-  // Her 6 saatte: 00:00, 06:00, 12:00, 18:00
-  cron.schedule('0 */6 * * *', async () => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/tasks/arsivle`,
-        {
-          method: 'POST',
-          headers: {
-            'x-cron-token': process.env.CRON_SECRET_TOKEN!,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
-      const json = await res.json()
-      console.log('[CRON-ARSIVLE]', json)
-    } catch (e) {
-      console.error('[CRON-ARSIVLE] Hata:', e)
-    }
-  })
-}
-```
-
-`app.ts` veya Next.js server startup'ta:
-```typescript
-import { setupArsivCron } from '@/lib/cron/job'
-setupArsivCron()
-```
-
----
-
-## 4️⃣ TEST ET
-
-### A) Manuel Test (Postman / cURL)
+### B) MANUEL TEST
 
 ```bash
-curl -X POST https://senin-site.com/api/tasks/arsivle \
+curl -X POST https://senin-railway-url/api/tasks/arsivle \
   -H "x-cron-token: 14tGrTju6KTA3cQntEvlJrEUI72GhVTVAxyOAbMA0T4" \
   -H "Content-Type: application/json"
 ```
@@ -128,113 +57,110 @@ curl -X POST https://senin-site.com/api/tasks/arsivle \
   "ok": true,
   "message": "24+ saatlik veriler başarıyla arşivlendi",
   "results": {
-    "personel": { "moved": 5, "ok": true },
-    "musteri": { "moved": 3, "ok": true },
-    "spesifik": { "moved": 0, "ok": true },
-    "ceklist": { "moved": 2, "madde_count": 8, "ok": true }
+    "personel": { "moved": X, "ok": true },
+    "musteri": { "moved": X, "ok": true },
+    "spesifik": { "moved": X, "ok": true },
+    "ceklist": { "moved": X, "madde_count": Y, "ok": true }
   }
 }
 ```
 
-### B) Sayfaları Kontrol Et
-
-Şu adreslerde **hiçbir değişiklik olmayacak:**
-
-- `/ta/dashboard/arsiv` → Tüm sekmeler aynı çalışacak
-- `/sa/dashboard/arsiv` → Tüm sekmeler aynı çalışacak
-- `/raporlar/ceklist` → Rapor Merkezi aynı
-- Arşiv sayfalarında çeklist verileri görünecek
-
-**Veriler fiziksel olarak taşındığı için:**
-- Rapor sayfaları asıl tablolardan (son 24 saat) çekecek ✅
-- Arşiv sayfaları arşiv tablolarından çekecek ✅
-- **Tabloların boyutu kontrol altında kalacak** ✅
-
 ---
 
-## 5️⃣ DEPLOYMENT ADIMLAR
+## 4️⃣ DEPLOYMENT ADIMLAR
 
 ```bash
-# 1. Feature branch
-git checkout -b feat/real-archiving-system
+# 1. Dependency ekle
+npm install
 
-# 2. SQL + Code commit
-git add scripts/arsiv-tabloları-olustur.sql
-git add app/api/tasks/arsivle/route.ts
-git add .env.local  # (CRON_SECRET_TOKEN)
-git commit -m "feat: Implement real archiving system - physical data migration every 6h"
+# 2. Build et
+npm run build
 
-# 3. Push
-git push origin feat/real-archiving-system
+# 3. Railway push (git push otomatik deploy eder)
+git add .
+git commit -m "feat: Add Railway cron job for archiving + update APIs"
+git push origin main
 
-# 4. PR açıp merge et
-# 5. Vercel'de otomatik deploy
-
-# 6. SQL çalıştır (Supabase SQL Editor)
-# 7. Vercel cron aktif oldu ✅
+# Railway otomatik build & deploy eder
 ```
 
 ---
 
-## 6️⃣ MONİTORİNG
+## 5️⃣ LOG KONTROL (Railway)
 
-Cron çalıştıktan sonra kontrol et:
+Railway Dashboard > Logs:
 
-**Personel mesai:**
-```sql
-SELECT COUNT(*) as asil FROM personel_mesai_kayitlari WHERE arsivlendi = false;
-SELECT COUNT(*) as arsiv FROM personel_mesai_kayitlari_arsiv;
 ```
-
-**Müşteri:**
-```sql
-SELECT COUNT(*) as asil FROM musteri_degerlendirmeleri WHERE arsivlendi = false;
-SELECT COUNT(*) as arsiv FROM musteri_degerlendirmeleri_arsiv;
-```
-
-**Çeklist:**
-```sql
-SELECT COUNT(*) as asil FROM checklist_sonuc_basliklari;
-SELECT COUNT(*) as arsiv FROM checklist_sonuc_basliklari_arsiv;
+[CRON] Arşiv cron job başlatıldı (her 6 saat)
+[CRON-ARSIVLE] 2026-03-31T... { ok: true, results: {...} }
 ```
 
 ---
 
-## 7️⃣ ARŞIV RETENSİYON POLİTİKASI
+## 6️⃣ DATABASE SOL KONTROL
 
-İleridge ayar formuyla:
+Her 6 saat sonra:
 
+```sql
+-- Çeklist taşındı mı?
+SELECT COUNT(*) FROM checklist_sonuc_basliklari;
+SELECT COUNT(*) FROM checklist_sonuc_basliklari_arsiv;
+
+-- Personel taşındı mı?
+SELECT COUNT(*) FROM personel_mesai_kayitlari WHERE arsivlendi = false;
+SELECT COUNT(*) FROM personel_mesai_kayitlari_arsiv;
+
+-- Müşteri taşındı mı?
+SELECT COUNT(*) FROM musteri_degerlendirmeleri WHERE arsivlendi = false;
+SELECT COUNT(*) FROM musteri_degerlendirmeleri_arsiv;
+
+-- Spesifik taşındı mı?
+SELECT COUNT(*) FROM gorevler WHERE durum IN ('IPTAL', 'TAMAMLANDI');
+SELECT COUNT(*) FROM gorevler_arsiv;
 ```
-Çeklist arşiv veri tutma: 30 gün (varsayılan)
-Personel arşiv veri tutma: 90 gün
-Müşteri arşiv veri tutma: 1 yıl
-Görev arşiv veri tutma: 2 yıl
+
+---
+
+## 7️⃣ CRON SCHEDULE DEĞIŞTİRMEK
+
+`lib/cron/job.ts` satır 11:
+
+```typescript
+cron.schedule('0 */6 * * *', async () => { // Her 6 saat
 ```
 
-Bu opsiyonel ve sonradan yapılabilir.
+Cron formatı:
+- `0 */12 * * *` → Her 12 saat
+- `0 0,6,12,18 * * *` → 00:00, 06:00, 12:00, 18:00
+- `0 9 * * MON` → Pazartesi 09:00
 
 ---
 
 ## ⚠️ NOTLAR
 
 - ✅ Mevcut sayfalar **DOKUNULMADI** - UI/UX aynı
-- ✅ `cikti=rapor` mode çeklist raporunu asıl tablodan çekeriz
-- ✅ `cikti=arsiv` mode çeklist arşivini arşiv tablosundan çekeriz
-- ✅ Cron **idempotent** - aynı datayı ikinci kez taşımayacak
-- ⚠️ Token gizli tutulmalı - `.env` veya Vercel secrets'da
+- ✅ Cron Node.js'de çalışır (Railway'de otomatik)
+- ✅ `cikti=rapor` mode asıl tablodan çekeriz
+- ✅ `cikti=arsiv` mode arşiv tablosundan çekeriz
+- ⚠️ Cron 6 saatte bir çalışır (Railway reboot'a dayanıklıdır)
+- ⚠️ Token gizli tutulmalı - Railroad env variables'a sahip
 
 ---
 
 ## 📞 SORUNLAR
 
 **Cron çalışmıyor?**
-- `.env` dosyasını check et
-- Vercel cron log'larına bak
+- Railway logs'ı kontrol et
+- `CRON_SECRET` env var'ı var mı?
+- `/api/tasks/arsivle` endpoint'i erişilebilir mi?
 
 **Veri taşınmıyor?**
 - SQL tabloları oluştun mu?
 - İzinler (RLS) ayarlı mı?
+- Verileri manuel test: POST request yolla
 
-**API hata dönüyor?**
-- POST request'i test et
-- x-cron-token header'ını check et
+**Server başlamıyor?**
+- `npm install` çalıştır
+- `npm run build` kontrol et
+- Logs'ı oku
+

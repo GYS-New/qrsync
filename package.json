@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node server.js",
+    "next-start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
@@ -33,6 +34,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.330.0",
     "next": "14.1.0",
+    "node-cron": "^3.0.3",
     "nodemailer": "^6.10.1",
     "playwright": "^1.58.2",
     "puppeteer": "^24.39.1",
@@ -49,6 +51,7 @@
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/node-cron": "^3.0.11",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18",
     "@types/react-dom": "^18",
