@@ -483,18 +483,18 @@ export default function GorevlerClient({
               )}
 
             </div>
-            <table className="verde-table" style={{ tableLayout: 'fixed' }}>
+            <table className="verde-table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <thead>
                 <tr>
-                  <th style={{ width: 80 }}>Kayıt Türü</th>
-                  <th style={{ width: 240 }}>Görev</th>
-                  <th style={{ width: 220 }}>Lokasyon</th>
-                  <th style={{ width: 170 }}>Atanan</th>
-                  <th style={{ width: 120 }}>Durum</th>
-                  <th style={{ width: 170 }}>Oluşturma Tarihi</th>
-                  <th style={{ width: 160 }}>İşlemi Yapan</th>
-                  <th style={{ width: 170 }}>İşlem Tarihi</th>
-                  {canManage && <th style={{ width: 320, textAlign: 'right' }}>Aksiyon</th>}
+                  {arsivAktif && <th style={{ width: 72 }}>Kayıt Türü</th>}
+                  <th style={{ width: 200 }}>Görev</th>
+                  <th style={{ width: 180 }}>Lokasyon</th>
+                  <th style={{ width: 140 }}>Atanan</th>
+                  <th style={{ width: 110 }}>Durum</th>
+                  <th style={{ width: 140 }}>Oluşturma</th>
+                  <th style={{ width: 140 }}>İşlemi Yapan</th>
+                  <th style={{ width: 140 }}>İşlem Tarihi</th>
+                  {canManage && <th style={{ width: 180, textAlign: 'right' }}>Aksiyon</th>}
                 </tr>
               </thead>
               <tbody>
@@ -502,17 +502,19 @@ export default function GorevlerClient({
                   const isArsiv = g._source === 'arsiv'
                   return (
                     <tr key={g.id + (isArsiv ? '-arsiv' : '')} style={isArsiv ? { background: '#f8fafc' } : undefined}>
-                      <td>
-                        <span style={{
-                          display: 'inline-block', padding: '2px 8px', borderRadius: 6,
-                          fontSize: 11, fontWeight: 700,
-                          background: isArsiv ? '#f1f5f9' : '#e7f9e7',
-                          color: isArsiv ? '#64748b' : '#1f6b1f',
-                          border: `1px solid ${isArsiv ? '#cbd5e1' : '#bbf7d0'}`,
-                        }}>
-                          {isArsiv ? 'Arşiv' : 'Tablo'}
-                        </span>
-                      </td>
+                      {arsivAktif && (
+                        <td>
+                          <span style={{
+                            display: 'inline-block', padding: '2px 8px', borderRadius: 6,
+                            fontSize: 11, fontWeight: 700,
+                            background: isArsiv ? '#f1f5f9' : '#e7f9e7',
+                            color: isArsiv ? '#64748b' : '#1f6b1f',
+                            border: `1px solid ${isArsiv ? '#cbd5e1' : '#bbf7d0'}`,
+                          }}>
+                            {isArsiv ? 'Arşiv' : 'Tablo'}
+                          </span>
+                        </td>
+                      )}
                       <td style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isArsiv ? '#475569' : undefined }} title={g.tanim ?? ''}>{g.tanim}</td>
                       <td style={{ color: isArsiv ? '#64748b' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
                       <td style={{ color: isArsiv ? '#64748b' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.atanan?.isim_soyisim ?? ''}>{g.atanan?.isim_soyisim ?? '—'}</td>
@@ -527,12 +529,12 @@ export default function GorevlerClient({
                           : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
                       </td>
                       {canManage && (
-                        <td style={{ whiteSpace: 'nowrap', paddingRight: 12 }}>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
+                        <td style={{ whiteSpace: 'nowrap', paddingRight: 8 }}>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-end' }}>
                             {/* Çeklist butonu — sadece çeklist bağlı görevlerde */}
                             {g.lokasyonlar?.checklist_sablon_id && (
                               <button onClick={() => setChecklistGorev({ id: g.id, type: 'gorevler' })}
-                                style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                 📋
                               </button>
                             )}
@@ -540,11 +542,11 @@ export default function GorevlerClient({
                             {!isArsiv && (
                               <>
                                 <button onClick={() => openEdit(g)}
-                                  style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1a5c2a', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1a5c2a', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                   ✏️ Düzenle
                                 </button>
                                 <details style={{ position: 'relative', display: 'inline-block' }}>
-                                  <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '5px 12px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1a5c2a', fontSize: 12.5, fontWeight: 600 }}>
+                                  <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '4px 10px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1a5c2a', fontSize: 12, fontWeight: 600 }}>
                                     İşlemler ▾
                                   </summary>
                                   <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 200, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '4px 0', minWidth: 155 }}
@@ -565,7 +567,7 @@ export default function GorevlerClient({
                   )
                 })}
                 {!combinedRows.length && (
-                  <tr><td colSpan={canManage ? 9 : 8} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>
+                  <tr><td colSpan={canManage ? (arsivAktif ? 9 : 8) : (arsivAktif ? 8 : 7)} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>
                     Kriterlere uygun görev bulunamadı.
                   </td></tr>
                 )}
