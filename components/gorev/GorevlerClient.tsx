@@ -63,7 +63,6 @@ export default function GorevlerClient({
   const [filtreOlusTo,   setFiltreOlusTo]   = useState('')
   const [filtreIslemFrom,setFiltreIslemFrom]= useState('')
   const [filtreIslemTo,  setFiltreIslemTo]  = useState('')
-  const [arsivDahil,     setArsivDahil]     = useState(false)
   const [arsivRows,    setArsivRows]    = useState<any[]>([])
   const [arsivLoading, setArsivLoading] = useState(false)
   const [arsivAktif,   setArsivAktif]   = useState(false)
@@ -188,8 +187,6 @@ export default function GorevlerClient({
 
     if (filtreDurum) {
       query = (query as any).eq('durum', filtreDurum)
-    } else if (!arsivDahil) {
-      query = (query as any).or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
     }
 
     if (filtreSelectedLok) query = (query as any).eq('lokasyon_id', filtreSelectedLok)
@@ -206,30 +203,24 @@ export default function GorevlerClient({
     else setGorevler(data ?? [])
     setLoading(false)
 
-    // ── Arşiv tablosu: gorevler_arsiv ────────────────────────────────────────
-    if (arsivDahil) {
-      try {
-        let aq = supabase.from('gorevler_arsiv').select(SEL_ARSIV + ',arsivleme_tarihi,arsiv_nedeni')
-          .eq('firma_id', firmaId)
-          .order('arsivleme_tarihi', { ascending: false })
-          .limit(500)
-        if (projeId)         aq = (aq as any).eq('proje_id', projeId)
-        if (filtreDurum)     aq = (aq as any).eq('durum', filtreDurum)
-        if (filtreSelectedLok) aq = (aq as any).eq('lokasyon_id', filtreSelectedLok)
-        if (filtreAtananId)  aq = (aq as any).eq('atanan_kullanici_id', filtreAtananId)
-        if (filtreOlusFrom)  aq = (aq as any).gte('olusturma_tarihi', filtreOlusFrom)
-        if (filtreOlusTo)    aq = (aq as any).lte('olusturma_tarihi', filtreOlusTo + 'T23:59:59')
-        if (filtreIslemFrom) aq = (aq as any).gte('durum_degisim_tarihi', filtreIslemFrom)
-        if (filtreIslemTo)   aq = (aq as any).lte('durum_degisim_tarihi', filtreIslemTo + 'T23:59:59')
-        const { data: arData } = await aq
-        setArsivRows(arData ?? [])
-        setArsivAktif(true)
-      } finally {
-        setArsivLoading(false)
-      }
-    } else {
-      setArsivRows([])
-      setArsivAktif(false)
+    // ── Arşiv tablosu: gorevler_arsiv (her zaman çekiliyor) ──────────────────
+    try {
+      let aq = supabase.from('gorevler_arsiv').select(SEL_ARSIV + ',arsivleme_tarihi,arsiv_nedeni')
+        .eq('firma_id', firmaId)
+        .order('arsivleme_tarihi', { ascending: false })
+        .limit(500)
+      if (projeId)           aq = (aq as any).eq('proje_id', projeId)
+      if (filtreDurum)       aq = (aq as any).eq('durum', filtreDurum)
+      if (filtreSelectedLok) aq = (aq as any).eq('lokasyon_id', filtreSelectedLok)
+      if (filtreAtananId)    aq = (aq as any).eq('atanan_kullanici_id', filtreAtananId)
+      if (filtreOlusFrom)    aq = (aq as any).gte('olusturma_tarihi', filtreOlusFrom)
+      if (filtreOlusTo)      aq = (aq as any).lte('olusturma_tarihi', filtreOlusTo + 'T23:59:59')
+      if (filtreIslemFrom)   aq = (aq as any).gte('durum_degisim_tarihi', filtreIslemFrom)
+      if (filtreIslemTo)     aq = (aq as any).lte('durum_degisim_tarihi', filtreIslemTo + 'T23:59:59')
+      const { data: arData } = await aq
+      setArsivRows(arData ?? [])
+      setArsivAktif(true)
+    } finally {
       setArsivLoading(false)
     }
   }
@@ -239,7 +230,7 @@ export default function GorevlerClient({
     setFloc1(''); setFloc2(''); setFloc3('')
     setFiltreOlusFrom(''); setFiltreOlusTo('')
     setFiltreIslemFrom(''); setFiltreIslemTo('')
-    setArsivDahil(false); setFiltreArama('')
+    setFiltreArama('')
     setArsivRows([]); setArsivAktif(false)
     if (firmaId) refreshAll(firmaId)
   }
@@ -460,13 +451,6 @@ export default function GorevlerClient({
             <input type="date" className="verde-input" style={{ width: 140 }} value={filtreIslemTo} onChange={e => setFiltreIslemTo(e.target.value)} />
           </div>
 
-          {/* Arşiv toggle */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: arsivDahil ? '#1f6b1f' : '#475569', whiteSpace: 'nowrap' }}>
-            <input type="checkbox" checked={arsivDahil} onChange={e => setArsivDahil(e.target.checked)}
-              style={{ width: 14, height: 14, accentColor: '#1f6b1f', cursor: 'pointer' }} />
-            Arşiv dahil
-          </label>
-
           {/* Uygula */}
           <button type="button" onClick={filtrele} disabled={loading || !firmaId}
             style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: '#1f6b1f', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: loading || !firmaId ? 0.7 : 1, whiteSpace: 'nowrap' }}>
@@ -502,6 +486,7 @@ export default function GorevlerClient({
             <table className="verde-table" style={{ tableLayout: 'fixed' }}>
               <thead>
                 <tr>
+                  <th style={{ width: 80 }}>Kayıt Türü</th>
                   <th style={{ width: 240 }}>Görev</th>
                   <th style={{ width: 220 }}>Lokasyon</th>
                   <th style={{ width: 170 }}>Atanan</th>
@@ -509,7 +494,6 @@ export default function GorevlerClient({
                   <th style={{ width: 170 }}>Oluşturma Tarihi</th>
                   <th style={{ width: 160 }}>İşlemi Yapan</th>
                   <th style={{ width: 170 }}>İşlem Tarihi</th>
-                  {arsivAktif && <th style={{ width: 100 }}>Kayıt Türü</th>}
                   {canManage && <th style={{ width: 320, textAlign: 'right' }}>Aksiyon</th>}
                 </tr>
               </thead>
@@ -517,27 +501,31 @@ export default function GorevlerClient({
                 {combinedRows.map((g: any) => {
                   const isArsiv = g._source === 'arsiv'
                   return (
-                    <tr key={g.id + (isArsiv ? '-arsiv' : '')} style={isArsiv ? { background: '#faf8ff' } : undefined}>
-                      <td style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.tanim ?? ''}>{g.tanim}</td>
-                      <td style={{ color: '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-                      <td style={{ color: '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.atanan?.isim_soyisim ?? ''}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                    <tr key={g.id + (isArsiv ? '-arsiv' : '')} style={isArsiv ? { background: '#f8fafc' } : undefined}>
+                      <td>
+                        <span style={{
+                          display: 'inline-block', padding: '2px 8px', borderRadius: 6,
+                          fontSize: 11, fontWeight: 700,
+                          background: isArsiv ? '#f1f5f9' : '#e7f9e7',
+                          color: isArsiv ? '#64748b' : '#1f6b1f',
+                          border: `1px solid ${isArsiv ? '#cbd5e1' : '#bbf7d0'}`,
+                        }}>
+                          {isArsiv ? 'Arşiv' : 'Tablo'}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isArsiv ? '#475569' : undefined }} title={g.tanim ?? ''}>{g.tanim}</td>
+                      <td style={{ color: isArsiv ? '#64748b' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
+                      <td style={{ color: isArsiv ? '#64748b' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.atanan?.isim_soyisim ?? ''}>{g.atanan?.isim_soyisim ?? '—'}</td>
                       <td>
                         <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>{GOREV_DURUM_LABEL[g.durum] ?? g.durum}</span>
                       </td>
-                      <td style={{ color: '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>{g.olusturma_tarihi ? formatDateTime(g.olusturma_tarihi) : '—'}</td>
-                      <td style={{ color: '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.islemi_yapan?.isim_soyisim ?? ''}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
-                      <td style={{ color: '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>{g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—'}</td>
-                      {arsivAktif && (
-                        <td>
-                          <span style={{
-                            padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700,
-                            background: isArsiv ? '#ede9fe' : '#dcfce7',
-                            color: isArsiv ? '#5b21b6' : '#166534',
-                          }}>
-                            {isArsiv ? 'Arşiv' : 'Tablo'}
-                          </span>
-                        </td>
-                      )}
+                      <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>{g.olusturma_tarihi ? formatDateTime(g.olusturma_tarihi) : '—'}</td>
+                      <td style={{ color: isArsiv ? '#94a3b8' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.islemi_yapan?.isim_soyisim ?? ''}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
+                      <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>
+                        {isArsiv
+                          ? (g.arsivleme_tarihi ? formatDateTime(g.arsivleme_tarihi) : '—')
+                          : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
+                      </td>
                       {canManage && (
                         <td style={{ whiteSpace: 'nowrap', paddingRight: 12 }}>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -577,7 +565,7 @@ export default function GorevlerClient({
                   )
                 })}
                 {!combinedRows.length && (
-                  <tr><td colSpan={canManage ? (arsivAktif ? 9 : 8) : (arsivAktif ? 8 : 7)} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>
+                  <tr><td colSpan={canManage ? 9 : 8} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>
                     Kriterlere uygun görev bulunamadı.
                   </td></tr>
                 )}
