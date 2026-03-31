@@ -185,7 +185,6 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       if (effectiveProjeId) p.set('proje_id', effectiveProjeId)
       if (baslangic) p.set('baslangic', baslangic)
       if (bitis)     p.set('bitis', bitis)
-      // arsivlendi parametresi yok → aktif kayıtlar gelir (default false)
       const res  = await fetch(`/api/raporlar/musteri-degerlendirme?${p}`, { cache: 'no-store' })
       const json = await res.json()
       if (json.ok) setKayitlar(json.data)

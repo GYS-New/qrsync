@@ -56,7 +56,6 @@ export default function GorevlerClient({
   const [checklistGorev, setChecklistGorev]   = useState<{ id: string; type: 'gorevler' | 'canli_gorevler' } | null>(null)
 
   // ── Filtre state ──────────────────────────────────────────────────────────
-  const [filtreAcik,     setFiltreAcik]     = useState(false)
   const [filtreArama,    setFiltreArama]    = useState('')
   const [filtreDurum,    setFiltreDurum]    = useState('')
   const [filtreAtananId, setFiltreAtananId] = useState('')
@@ -134,13 +133,6 @@ export default function GorevlerClient({
   const floc2Options        = useMemo(() => floc1 ? (childrenOf[floc1] ?? []) : [], [childrenOf, floc1])
   const floc3Options        = useMemo(() => floc2 ? (childrenOf[floc2] ?? []) : [], [childrenOf, floc2])
   const filtreSelectedLok   = useMemo(() => floc3 || floc2 || floc1, [floc1, floc2, floc3])
-
-  // Aktif filtre sayacı (badge)
-  const aktifFiltreSayisi = useMemo(() => [
-    filtreDurum, filtreSelectedLok, filtreAtananId,
-    filtreOlusFrom, filtreOlusTo, filtreIslemFrom, filtreIslemTo,
-    arsivDahil ? '1' : '',
-  ].filter(Boolean).length, [filtreDurum, filtreSelectedLok, filtreAtananId, filtreOlusFrom, filtreOlusTo, filtreIslemFrom, filtreIslemTo, arsivDahil])
 
   // ── Realtime + init ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -393,39 +385,20 @@ export default function GorevlerClient({
 
   const canManage = !readonly
 
-  // ── Stil yardımcıları ─────────────────────────────────────────────────────
-  const inpS: React.CSSProperties = { height: 32, padding: '0 8px', borderRadius: 7, border: '1px solid #d6e4d6', fontSize: 12.5, background: '#fff', width: '100%', boxSizing: 'border-box' }
-  const labelS: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 3 }
-
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div style={{ padding: '24px 28px' }}>
       <div className="verde-card">
 
-        {/* ── Araç çubuğu ── */}
-        <div style={{ padding: '12px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input className="verde-input" placeholder="Görev, lokasyon, kullanıcı ara…" value={filtreArama} onChange={e => setFiltreArama(e.target.value)}
-            style={{ maxWidth: 240, height: 34 }} />
-
-          {/* Filtre toggle butonu */}
-          <button
-            onClick={() => setFiltreAcik(v => !v)}
-            style={{
-              height: 34, padding: '0 14px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700,
-              border: `1px solid ${aktifFiltreSayisi > 0 ? '#1f6b1f' : '#d6e4d6'}`,
-              background: aktifFiltreSayisi > 0 ? '#1f6b1f' : '#f0f9f0',
-              color: aktifFiltreSayisi > 0 ? '#fff' : '#1f6b1f',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            ⚙ Filtreler
-            {aktifFiltreSayisi > 0 && (
-              <span style={{ background: '#fff', color: '#1f6b1f', borderRadius: 10, padding: '0 6px', fontSize: 11, fontWeight: 800 }}>
-                {aktifFiltreSayisi}
-              </span>
-            )}
-          </button>
-
+        {/* ── Satır 1: Arama + Yenile + Görev Ekle ── */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            className="verde-input"
+            placeholder="Ara (görev, lokasyon, kişi…)"
+            value={filtreArama}
+            onChange={e => setFiltreArama(e.target.value)}
+            style={{ width: 240, flexShrink: 0 }}
+          />
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <Button variant="ghost" size="sm" onClick={() => firmaId && refreshAll(firmaId)} disabled={loading || !firmaId}>
               {loading ? 'Yükleniyor…' : '↻ Yenile'}
@@ -436,94 +409,76 @@ export default function GorevlerClient({
           </div>
         </div>
 
-        {/* ── Filtre paneli ── */}
-        {filtreAcik && (
-          <div style={{ padding: '14px 18px', background: '#f8fcf8', borderBottom: '1px solid #e8f0e8' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10, marginBottom: 10 }}>
+        {/* ── Satır 2: Yatay Filtre Çubuğu ── */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 16px 0', alignItems: 'center', padding: '10px 12px', background: '#f8fbf8', borderRadius: 8, border: '1px solid #e8f0e8' }}>
 
-              {/* Durum */}
-              <div>
-                <label style={labelS}>Durum</label>
-                <select value={filtreDurum} onChange={e => setFiltreDurum(e.target.value)} style={inpS}>
-                  <option value="">Tüm Durumlar</option>
-                  {DURUM_SECENEKLER.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-                </select>
-              </div>
+          {/* Lokasyon — 3 kademe */}
+          <select className="verde-select" value={floc1} onChange={e => { setFloc1(e.target.value); setFloc2(''); setFloc3('') }} style={{ width: 148 }}>
+            <option value="">Lokasyon (Tümü)</option>
+            {roots.map((l: any) => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+          </select>
+          {floc2Options.length > 0 && (
+            <select className="verde-select" value={floc2} onChange={e => { setFloc2(e.target.value); setFloc3('') }} style={{ width: 148 }}>
+              <option value="">Alt Lokasyon</option>
+              {floc2Options.map((l: any) => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+            </select>
+          )}
+          {floc3Options.length > 0 && (
+            <select className="verde-select" value={floc3} onChange={e => setFloc3(e.target.value)} style={{ width: 148 }}>
+              <option value="">Alt-Alt Lokasyon</option>
+              {floc3Options.map((l: any) => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+            </select>
+          )}
 
-              {/* Lokasyon — 3 kademe */}
-              <div>
-                <label style={labelS}>Lokasyon (1. Kademe)</label>
-                <select value={floc1} onChange={e => { setFloc1(e.target.value); setFloc2(''); setFloc3('') }} style={inpS}>
-                  <option value="">Tümü</option>
-                  {roots.map((l: any) => <option key={l.id} value={l.id}>{l.tanim}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={labelS}>Lokasyon (2. Kademe)</label>
-                <select value={floc2} onChange={e => { setFloc2(e.target.value); setFloc3('') }} style={inpS} disabled={!floc1 || floc2Options.length === 0}>
-                  <option value="">{floc1 && floc2Options.length === 0 ? 'Alt yok' : 'Tümü'}</option>
-                  {floc2Options.map((l: any) => <option key={l.id} value={l.id}>{l.tanim}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={labelS}>Lokasyon (3. Kademe)</label>
-                <select value={floc3} onChange={e => setFloc3(e.target.value)} style={inpS} disabled={!floc2 || floc3Options.length === 0}>
-                  <option value="">{floc2 && floc3Options.length === 0 ? 'Alt yok' : 'Tümü'}</option>
-                  {floc3Options.map((l: any) => <option key={l.id} value={l.id}>{l.tanim}</option>)}
-                </select>
-              </div>
+          {/* Atanan */}
+          <select className="verde-select" value={filtreAtananId} onChange={e => setFiltreAtananId(e.target.value)} style={{ width: 148 }}>
+            <option value="">Atanan (Tümü)</option>
+            {kullanicilar.map((u: any) => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
+          </select>
 
-              {/* Atanan kullanıcı */}
-              <div>
-                <label style={labelS}>Atanan Kullanıcı</label>
-                <select value={filtreAtananId} onChange={e => setFiltreAtananId(e.target.value)} style={inpS}>
-                  <option value="">Tümü</option>
-                  {kullanicilar.map((u: any) => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
-                </select>
-              </div>
+          {/* Durum */}
+          <select className="verde-select" value={filtreDurum} onChange={e => setFiltreDurum(e.target.value)} style={{ width: 148 }}>
+            <option value="">Durum (Tümü)</option>
+            {DURUM_SECENEKLER.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+          </select>
 
-              {/* Oluşturma tarihi */}
-              <div>
-                <label style={labelS}>Oluşturma — Başlangıç</label>
-                <input type="date" value={filtreOlusFrom} onChange={e => setFiltreOlusFrom(e.target.value)} style={inpS} />
-              </div>
-              <div>
-                <label style={labelS}>Oluşturma — Bitiş</label>
-                <input type="date" value={filtreOlusTo} onChange={e => setFiltreOlusTo(e.target.value)} style={inpS} />
-              </div>
+          <div style={{ width: 1, height: 24, background: '#d6e4d6', flexShrink: 0 }} />
 
-              {/* İşlem tarihi */}
-              <div>
-                <label style={labelS}>İşlem Tarihi — Başlangıç</label>
-                <input type="date" value={filtreIslemFrom} onChange={e => setFiltreIslemFrom(e.target.value)} style={inpS} />
-              </div>
-              <div>
-                <label style={labelS}>İşlem Tarihi — Bitiş</label>
-                <input type="date" value={filtreIslemTo} onChange={e => setFiltreIslemTo(e.target.value)} style={inpS} />
-              </div>
-
-            </div>
-
-            {/* Arşiv toggle + butonlar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: arsivDahil ? '#1f6b1f' : '#475569' }}>
-                <input type="checkbox" checked={arsivDahil} onChange={e => setArsivDahil(e.target.checked)}
-                  style={{ width: 15, height: 15, accentColor: '#1f6b1f', cursor: 'pointer' }} />
-                Arşivden de getir (İptal + Tamamlanan eski kayıtlar)
-              </label>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                <button onClick={temizleFiltreler}
-                  style={{ height: 32, padding: '0 14px', borderRadius: 7, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-                  Temizle
-                </button>
-                <button onClick={filtrele} disabled={loading || !firmaId}
-                  style={{ height: 32, padding: '0 18px', borderRadius: 7, border: 'none', background: '#1f6b1f', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: loading || !firmaId ? 0.6 : 1 }}>
-                  Uygula
-                </button>
-              </div>
-            </div>
+          {/* Oluşturma tarihi aralığı */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: '#7a907a', whiteSpace: 'nowrap' }}>Oluşturma:</span>
+            <input type="date" className="verde-input" style={{ width: 140 }} value={filtreOlusFrom} onChange={e => setFiltreOlusFrom(e.target.value)} />
+            <span style={{ fontSize: 12, color: '#9a9a9a' }}>—</span>
+            <input type="date" className="verde-input" style={{ width: 140 }} value={filtreOlusTo} onChange={e => setFiltreOlusTo(e.target.value)} />
           </div>
-        )}
+
+          {/* İşlem tarihi aralığı */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: '#7a907a', whiteSpace: 'nowrap' }}>İşlem:</span>
+            <input type="date" className="verde-input" style={{ width: 140 }} value={filtreIslemFrom} onChange={e => setFiltreIslemFrom(e.target.value)} />
+            <span style={{ fontSize: 12, color: '#9a9a9a' }}>—</span>
+            <input type="date" className="verde-input" style={{ width: 140 }} value={filtreIslemTo} onChange={e => setFiltreIslemTo(e.target.value)} />
+          </div>
+
+          {/* Arşiv toggle */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: arsivDahil ? '#1f6b1f' : '#475569', whiteSpace: 'nowrap' }}>
+            <input type="checkbox" checked={arsivDahil} onChange={e => setArsivDahil(e.target.checked)}
+              style={{ width: 14, height: 14, accentColor: '#1f6b1f', cursor: 'pointer' }} />
+            Arşiv dahil
+          </label>
+
+          {/* Uygula */}
+          <button type="button" onClick={filtrele} disabled={loading || !firmaId}
+            style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: '#1f6b1f', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: loading || !firmaId ? 0.7 : 1, whiteSpace: 'nowrap' }}>
+            {loading ? 'Yükleniyor…' : '▶ Uygula'}
+          </button>
+
+          {/* Temizle */}
+          <button type="button" onClick={temizleFiltreler}
+            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#fff', fontSize: 13, color: '#506050', cursor: 'pointer' }}>
+            Temizle
+          </button>
+        </div>
 
         {/* ── Tablo ── */}
         {!firmaId && base === '/sa' ? (
@@ -542,7 +497,7 @@ export default function GorevlerClient({
                   {arsivLoading && <span style={{ color: '#d97706', fontSize: 11 }}>⏳ Arşiv yükleniyor…</span>}
                 </>
               )}
-              {aktifFiltreSayisi > 0 && <span style={{ marginLeft: 'auto', color: '#1f6b1f', fontWeight: 700 }}>· {aktifFiltreSayisi} filtre aktif</span>}
+
             </div>
             <table className="verde-table" style={{ tableLayout: 'fixed' }}>
               <thead>
@@ -623,7 +578,7 @@ export default function GorevlerClient({
                 })}
                 {!combinedRows.length && (
                   <tr><td colSpan={canManage ? (arsivAktif ? 9 : 8) : (arsivAktif ? 8 : 7)} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>
-                    {aktifFiltreSayisi > 0 ? 'Filtreyle eşleşen görev bulunamadı.' : 'Görev bulunamadı.'}
+                    Kriterlere uygun görev bulunamadı.
                   </td></tr>
                 )}
               </tbody>

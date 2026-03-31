@@ -38,7 +38,32 @@ export async function GET(req: NextRequest) {
 
   // arsivlendi parametresine göre doğru tabloyu seç
   const tableName = arsivlendi ? 'musteri_degerlendirmeleri_arsiv' : 'musteri_degerlendirmeleri'
-  const joinTable = arsivlendi ? null : 'lokasyonlar'
+
+  // Lokasyon yolu oluşturmak için tüm lokasyonları çek
+  const { data: lokasyonlar } = await admin
+    .from('lokasyonlar')
+    .select('id, tanim, parent_id')
+    .eq('firma_id', firmaId)
+
+  const locMap: Record<string, { tanim: string; parent_id: string | null }> = {}
+  ;(lokasyonlar ?? []).forEach((l: any) => {
+    locMap[l.id] = { tanim: l.tanim, parent_id: l.parent_id ?? null }
+  })
+
+  function getLocPath(lokasyonId: string | null | undefined): string {
+    if (!lokasyonId) return '—'
+    const parts: string[] = []
+    let cur: string | null = lokasyonId
+    let guard = 0
+    while (cur && guard < 8) {
+      const node = locMap[cur]
+      if (!node) break
+      parts.push(node.tanim)
+      cur = node.parent_id
+      guard++
+    }
+    return parts.reverse().join(' > ') || '—'
+  }
 
   let q = admin
     .from(tableName)
@@ -47,8 +72,7 @@ export async function GET(req: NextRequest) {
         ? `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gorsel_url,
            olusturma_tarihi, arsivleme_tarihi`
         : `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gorsel_url,
-           olusturma_tarihi, arsivlendi, arsivleme_tarihi,
-           lokasyonlar ( tanim )`
+           olusturma_tarihi, arsivlendi, arsivleme_tarihi`
     )
     .eq('firma_id', firmaId)
     .order('olusturma_tarihi', { ascending: false })
@@ -63,7 +87,7 @@ export async function GET(req: NextRequest) {
   const kayitlar = (data ?? []).map((r: any) => ({
     id:                r.id,
     lokasyon_id:       r.lokasyon_id,
-    lokasyon_tanim:    arsivlendi ? '—' : (r.lokasyonlar?.tanim ?? '—'),
+    lokasyon_tanim:    getLocPath(r.lokasyon_id),
     kanal:             r.kanal,
     yildiz:            r.yildiz,
     yorum:             r.yorum,
