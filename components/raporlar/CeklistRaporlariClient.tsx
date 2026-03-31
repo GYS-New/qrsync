@@ -178,19 +178,16 @@ export default function CeklistRaporlariClient({
     return r.kaynak === 'arsiv' ? 'Arşiv (DB)' : 'Canlı'
   }
 
-  async function silKayit(kayitId: string) {
-    if (!window.confirm('Bu kaydı tamamen silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
-      return
-    }
+  const [silOnayId, setSilOnayId]     = useState<string | null>(null)
 
+  async function silKayitOnayli(kayitId: string) {
+    setSilOnayId(null)
     setDeleting(true)
     setDeletingId(kayitId)
     try {
       const res = await fetch(`/api/raporlar/ceklist/${kayitId}`, { method: 'DELETE' })
       const json = await res.json()
       if (!json.ok) throw new Error(json.error)
-      
-      // Listeden sil
       setSatirlar(prev => prev.filter(r => r.id !== kayitId))
       toast({ type: 'success', title: 'Silindi', message: 'Kayıt başarıyla silindi.' })
     } catch (e: any) {
@@ -961,6 +958,7 @@ export default function CeklistRaporlariClient({
                         </td>
                       )}
                       <td style={{ textAlign: 'center', display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {/* Görüntüle — her zaman görünür */}
                         <button
                           onClick={() => setModalGorev({
                             id: r.gorev_id,
@@ -975,37 +973,43 @@ export default function CeklistRaporlariClient({
                           }}>
                           <ExternalLink size={13} />
                         </button>
-                        <button
-                          onClick={() => setModalGorev({
-                            id: r.gorev_id,
-                            taskType: r.gorev_task_type ?? 'canli_gorevler',
-                          })}
-                          title="Düzenle"
-                          disabled={deleting || !yetkiler.duzenleyebilir}
-                          style={{
-                            width: 30, height: 30, border: 'none', borderRadius: 7,
-                            background: '#fef3c7', color: '#92400e',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: (!yetkiler.duzenleyebilir || deleting) ? 'not-allowed' : 'pointer',
-                            opacity: (!yetkiler.duzenleyebilir || deleting) ? 0.5 : 1,
-                            fontSize: 13, fontWeight: 600,
-                          }}>
-                          ✎
-                        </button>
-                        <button
-                          onClick={() => silKayit(r.id)}
-                          title="Kaydı Sil"
-                          disabled={deleting || deletingId === r.id || !yetkiler.silebilir}
-                          style={{
-                            width: 30, height: 30, border: 'none', borderRadius: 7,
-                            background: '#fee2e2', color: '#dc2626',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: (deleting || deletingId === r.id || !yetkiler.silebilir) ? 'not-allowed' : 'pointer',
-                            opacity: (deletingId === r.id || !yetkiler.silebilir) ? 0.5 : 1,
-                            fontSize: 13, fontWeight: 600,
-                          }}>
-                          {deletingId === r.id ? '⏳' : '✕'}
-                        </button>
+                        {/* Düzenle — yetki yoksa gizle */}
+                        {yetkiler.duzenleyebilir && (
+                          <button
+                            onClick={() => setModalGorev({
+                              id: r.gorev_id,
+                              taskType: r.gorev_task_type ?? 'canli_gorevler',
+                            })}
+                            title="Düzenle"
+                            disabled={deleting}
+                            style={{
+                              width: 30, height: 30, border: 'none', borderRadius: 7,
+                              background: '#fef3c7', color: '#92400e',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: deleting ? 'not-allowed' : 'pointer',
+                              opacity: deleting ? 0.5 : 1,
+                              fontSize: 13, fontWeight: 600,
+                            }}>
+                            ✎
+                          </button>
+                        )}
+                        {/* Sil — yetki yoksa gizle */}
+                        {yetkiler.silebilir && (
+                          <button
+                            onClick={() => setSilOnayId(r.id)}
+                            title="Kaydı Sil"
+                            disabled={deleting || deletingId === r.id}
+                            style={{
+                              width: 30, height: 30, border: 'none', borderRadius: 7,
+                              background: '#fee2e2', color: '#dc2626',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: (deleting || deletingId === r.id) ? 'not-allowed' : 'pointer',
+                              opacity: deletingId === r.id ? 0.5 : 1,
+                              fontSize: 13, fontWeight: 600,
+                            }}>
+                            {deletingId === r.id ? '⏳' : '✕'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )
@@ -1027,6 +1031,47 @@ export default function CeklistRaporlariClient({
           </div>
         )}
       </div>
+
+      {/* Sil Onay Popup */}
+      {silOnayId && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+          zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 14, padding: 28, width: 360,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.18)', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🗑️</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f1a0f', marginBottom: 8 }}>
+              Kaydı Sil
+            </div>
+            <div style={{ fontSize: 13.5, color: '#64748b', marginBottom: 24 }}>
+              Bu çeklist kaydını kalıcı olarak silmek istediğinizden emin misiniz?
+              <br /><strong style={{ color: '#dc2626' }}>Bu işlem geri alınamaz.</strong>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button
+                onClick={() => setSilOnayId(null)}
+                style={{
+                  padding: '9px 20px', borderRadius: 8, border: '1px solid #e2e8f0',
+                  background: '#f8fafc', fontSize: 13.5, cursor: 'pointer', fontWeight: 600,
+                }}>
+                İptal
+              </button>
+              <button
+                onClick={() => silKayitOnayli(silOnayId)}
+                style={{
+                  padding: '9px 20px', borderRadius: 8, border: 'none',
+                  background: '#dc2626', color: '#fff', fontSize: 13.5,
+                  cursor: 'pointer', fontWeight: 700,
+                }}>
+                Evet, Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Çeklist Detay Modal */}
       {modalGorev && (
