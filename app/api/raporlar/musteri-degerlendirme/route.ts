@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     let cur: string | null = lokasyonId
     let guard = 0
     while (cur && guard < 8) {
-      const node = locMap[cur]
+      const node: { tanim: string; parent_id: string | null } | undefined = locMap[cur]
       if (!node) break
       parts.push(node.tanim)
       cur = node.parent_id
