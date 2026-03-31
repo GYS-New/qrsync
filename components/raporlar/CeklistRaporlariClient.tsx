@@ -99,7 +99,7 @@ export default function CeklistRaporlariClient({
   const [baslangic,   setBaslangic]   = useState('')
   const [bitis,       setBitis]       = useState('')
 
-  const [modalGorev, setModalGorev]   = useState<{ id: string; taskType: 'gorevler' | 'canli_gorevler' } | null>(null)
+  const [modalGorev, setModalGorev]   = useState<{ id: string; taskType: 'gorevler' | 'canli_gorevler'; duzenleme?: boolean } | null>(null)
   const [deleting, setDeleting]       = useState(false)
   const [deletingId, setDeletingId]   = useState<string | null>(null)
   const [yetkiler, setYetkiler]       = useState({ duzenleyebilir: false, silebilir: false })
@@ -963,6 +963,7 @@ export default function CeklistRaporlariClient({
                           onClick={() => setModalGorev({
                             id: r.gorev_id,
                             taskType: r.gorev_task_type ?? 'canli_gorevler',
+                            duzenleme: false,
                           })}
                           title="Çeklist Detayı"
                           style={{
@@ -979,6 +980,7 @@ export default function CeklistRaporlariClient({
                             onClick={() => setModalGorev({
                               id: r.gorev_id,
                               taskType: r.gorev_task_type ?? 'canli_gorevler',
+                              duzenleme: true,
                             })}
                             title="Düzenle"
                             disabled={deleting}
@@ -1078,7 +1080,9 @@ export default function CeklistRaporlariClient({
         <ChecklistModal
           taskId={modalGorev.id}
           taskType={modalGorev.taskType}
+          duzenleme={modalGorev.duzenleme ?? false}
           onKapat={() => setModalGorev(null)}
+          onKaydet={() => { setModalGorev(null); yukleRapor24h() }}
         />
       )}
 
