@@ -205,9 +205,9 @@ export default function GorevlerClient({
 
     // ── Arşiv tablosu: gorevler_arsiv (her zaman çekiliyor) ──────────────────
     try {
-      let aq = supabase.from('gorevler_arsiv').select(SEL_ARSIV + ',arsivleme_tarihi,arsiv_nedeni')
+      let aq = supabase.from('gorevler_arsiv').select(SEL_ARSIV + ',arsiv_tarihi,arsiv_nedeni')
         .eq('firma_id', firmaId)
-        .order('arsivleme_tarihi', { ascending: false })
+        .order('arsiv_tarihi', { ascending: false })
         .limit(500)
       if (projeId)           aq = (aq as any).eq('proje_id', projeId)
       if (filtreDurum)       aq = (aq as any).eq('durum', filtreDurum)
@@ -269,8 +269,8 @@ export default function GorevlerClient({
     const arsiv = filteredArsiv.map(r => ({ ...r, _source: 'arsiv' as const }))
     const all = [...tablo, ...arsiv]
     all.sort((a, b) => {
-      const da = a._source === 'arsiv' ? (a.arsivleme_tarihi ?? a.olusturma_tarihi) : a.olusturma_tarihi
-      const db = b._source === 'arsiv' ? (b.arsivleme_tarihi ?? b.olusturma_tarihi) : b.olusturma_tarihi
+      const da = a._source === 'arsiv' ? (a.arsiv_tarihi ?? a.olusturma_tarihi) : a.olusturma_tarihi
+      const db = b._source === 'arsiv' ? (b.arsiv_tarihi ?? b.olusturma_tarihi) : b.olusturma_tarihi
       return new Date(db ?? 0).getTime() - new Date(da ?? 0).getTime()
     })
     return all
@@ -525,7 +525,7 @@ export default function GorevlerClient({
                       <td style={{ color: isArsiv ? '#94a3b8' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.islemi_yapan?.isim_soyisim ?? ''}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
                       <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>
                         {isArsiv
-                          ? (g.arsivleme_tarihi ? formatDateTime(g.arsivleme_tarihi) : '—')
+                          ? (g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—')
                           : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
                       </td>
                       {canManage && (
