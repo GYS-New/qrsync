@@ -26,13 +26,15 @@ export async function GET(req: NextRequest) {
 
   if (!firmaId) return NextResponse.json({ ok: true, data: [] })
 
+  // NOT: personel_mesai_kayitlari_arsiv tablosunda users FK ilişkisi yoktur
+  // (arşiv tabloları FK constraint olmadan tutulur). Bu nedenle
+  // users join'i için personel_mesai_kayitlari_arsiv_detay view'ı kullanılır.
   let q = admin
-    .from('personel_mesai_kayitlari_arsiv')
+    .from('personel_mesai_kayitlari_arsiv_detay')
     .select(`
       id, user_id, firma_id, proje_id, kayit_tarihi,
       giris_saati, cikis_saati, giris_tipi, cikis_tipi,
-      arsivleme_tarihi,
-      users!user_id ( isim_soyisim, email )
+      arsivleme_tarihi, isim_soyisim, email
     `)
     .eq('firma_id', firmaId)
     .order('kayit_tarihi', { ascending: false })
@@ -48,8 +50,8 @@ export async function GET(req: NextRequest) {
   const liste = (data ?? []).map((r: any) => ({
     id:               r.id,
     user_id:          r.user_id,
-    isim_soyisim:     (r.users as any)?.isim_soyisim ?? '—',
-    email:            (r.users as any)?.email ?? '—',
+    isim_soyisim:     r.isim_soyisim ?? '—',
+    email:            r.email ?? '—',
     kayit_tarihi:     r.kayit_tarihi,
     giris_saati:      r.giris_saati,
     cikis_saati:      r.cikis_saati,

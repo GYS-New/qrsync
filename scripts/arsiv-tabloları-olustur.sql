@@ -1,115 +1,72 @@
--- ====================================================================
--- ARŞIV TABLOLARI OLUŞTUR - Gerçek Arşivleme Sistemi
--- ====================================================================
+-- ============================================
+-- QR-SYNC ARŞİV TABLOLARI OLUŞTUR (DDL)
+-- Çalıştır: Supabase SQL Editor
+-- ============================================
 
--- 1. PERSONEL MESAI ARŞIV
-CREATE TABLE IF NOT EXISTS personel_mesai_kayitlari_arsiv (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  firma_id UUID NOT NULL,
-  proje_id UUID,
-  kayit_tarihi TIMESTAMPTZ NOT NULL,
-  giris_saati TIMESTAMPTZ,
-  cikis_saati TIMESTAMPTZ,
-  giris_tipi TEXT,
-  cikis_tipi TEXT,
-  arsivleme_tarihi TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
-  FOREIGN KEY (firma_id) REFERENCES public.firmalar(id) ON DELETE CASCADE
-);
+-- 1. PERSONEL MESAI KAYITLARI ARŞİV
+CREATE TABLE IF NOT EXISTS public.personel_mesai_kayitlari_arsiv AS
+SELECT * FROM public.personel_mesai_kayitlari WHERE FALSE;
 
-CREATE INDEX IF NOT EXISTS idx_personel_mesai_arsiv_firma ON personel_mesai_kayitlari_arsiv(firma_id);
-CREATE INDEX IF NOT EXISTS idx_personel_mesai_arsiv_tarihi ON personel_mesai_kayitlari_arsiv(arsivleme_tarihi);
+ALTER TABLE public.personel_mesai_kayitlari_arsiv
+ADD COLUMN IF NOT EXISTS arsiv_tarihi TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
--- 2. MÜŞTERI DEĞERLENDİRMELERİ ARŞIV
-CREATE TABLE IF NOT EXISTS musteri_degerlendirmeleri_arsiv (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  firma_id UUID NOT NULL,
-  proje_id UUID,
-  lokasyon_id UUID,
-  kanal TEXT,
-  yildiz INTEGER,
-  yorum TEXT,
-  ad_soyad TEXT,
-  gorsel_url TEXT,
-  olusturma_tarihi TIMESTAMPTZ NOT NULL,
-  arsivleme_tarihi TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (firma_id) REFERENCES public.firmalar(id) ON DELETE CASCADE
-);
+CREATE INDEX IF NOT EXISTS idx_personel_arsiv_firma ON personel_mesai_kayitlari_arsiv(firma_id);
+CREATE INDEX IF NOT EXISTS idx_personel_arsiv_proje ON personel_mesai_kayitlari_arsiv(proje_id);
+CREATE INDEX IF NOT EXISTS idx_personel_arsiv_tarih ON personel_mesai_kayitlari_arsiv(arsiv_tarihi);
 
-CREATE INDEX IF NOT EXISTS idx_musteri_deg_arsiv_firma ON musteri_degerlendirmeleri_arsiv(firma_id);
-CREATE INDEX IF NOT EXISTS idx_musteri_deg_arsiv_tarihi ON musteri_degerlendirmeleri_arsiv(arsivleme_tarihi);
+---
 
--- 3. SPESİFİK GÖREVLER ARŞIV
-CREATE TABLE IF NOT EXISTS gorevler_arsiv (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  firma_id UUID NOT NULL,
-  proje_id UUID NOT NULL,
-  tanim TEXT,
-  durum TEXT,
-  lokasyon_id UUID,
-  olusturma_tarihi TIMESTAMPTZ NOT NULL,
-  tamamlanma_tarihi TIMESTAMPTZ,
-  durum_degisim_tarihi TIMESTAMPTZ,
-  atanan_kullanici_id UUID,
-  olusturan_id UUID,
-  arsivleme_tarihi TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (firma_id) REFERENCES public.firmalar(id) ON DELETE CASCADE,
-  FOREIGN KEY (proje_id) REFERENCES public.projeler(id) ON DELETE CASCADE
-);
+-- 2. MÜŞTERI DEĞERLENDİRMELERİ ARŞİV
+CREATE TABLE IF NOT EXISTS public.musteri_degerlendirmeleri_arsiv AS
+SELECT * FROM public.musteri_degerlendirmeleri WHERE FALSE;
+
+ALTER TABLE public.musteri_degerlendirmeleri_arsiv
+ADD COLUMN IF NOT EXISTS arsiv_tarihi TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_musteri_arsiv_firma ON musteri_degerlendirmeleri_arsiv(firma_id);
+CREATE INDEX IF NOT EXISTS idx_musteri_arsiv_proje ON musteri_degerlendirmeleri_arsiv(proje_id);
+CREATE INDEX IF NOT EXISTS idx_musteri_arsiv_tarih ON musteri_degerlendirmeleri_arsiv(arsiv_tarihi);
+
+---
+
+-- 3. GÖREVLER ARŞİV (Spesifik görevler)
+CREATE TABLE IF NOT EXISTS public.gorevler_arsiv AS
+SELECT * FROM public.gorevler WHERE FALSE;
+
+ALTER TABLE public.gorevler_arsiv
+ADD COLUMN IF NOT EXISTS arsiv_tarihi TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+ADD COLUMN IF NOT EXISTS arsiv_nedeni VARCHAR(50) DEFAULT 'otomatik';
 
 CREATE INDEX IF NOT EXISTS idx_gorevler_arsiv_firma ON gorevler_arsiv(firma_id);
-CREATE INDEX IF NOT EXISTS idx_gorevler_arsiv_tarihi ON gorevler_arsiv(arsivleme_tarihi);
+CREATE INDEX IF NOT EXISTS idx_gorevler_arsiv_proje ON gorevler_arsiv(proje_id);
+CREATE INDEX IF NOT EXISTS idx_gorevler_arsiv_tarih ON gorevler_arsiv(arsiv_tarihi);
 
--- 4. ÇEKLIST SONUÇ BAŞLIKLARI ARŞIV
-CREATE TABLE IF NOT EXISTS checklist_sonuc_basliklari_arsiv (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  canli_gorev_id UUID,
-  gorev_id UUID,
-  lokasyon_id UUID NOT NULL,
-  sablon_id UUID,
-  template_version INTEGER DEFAULT 1,
-  kanal TEXT NOT NULL DEFAULT 'MOBİL',
-  kullanici_id UUID,
-  kayit_tarihi TIMESTAMPTZ NOT NULL,
-  arsivleme_tarihi TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (lokasyon_id) REFERENCES public.lokasyonlar(id) ON DELETE CASCADE,
-  FOREIGN KEY (sablon_id) REFERENCES public.checklist_sablonlari(id)
-);
+---
 
-CREATE INDEX IF NOT EXISTS idx_ck_sonuc_bas_arsiv_lokasyon ON checklist_sonuc_basliklari_arsiv(lokasyon_id);
-CREATE INDEX IF NOT EXISTS idx_ck_sonuc_bas_arsiv_kayit ON checklist_sonuc_basliklari_arsiv(kayit_tarihi);
-CREATE INDEX IF NOT EXISTS idx_ck_sonuc_bas_arsiv_arsivleme ON checklist_sonuc_basliklari_arsiv(arsivleme_tarihi);
+-- 4. ÇEKLIST SONUÇ BAŞLIKLARI ARŞİV
+CREATE TABLE IF NOT EXISTS public.checklist_sonuc_basliklari_arsiv AS
+SELECT * FROM public.checklist_sonuc_basliklari WHERE FALSE;
 
--- 5. ÇEKLIST SONUÇ MADDELERİ ARŞIV
-CREATE TABLE IF NOT EXISTS checklist_sonuc_maddeleri_arsiv (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sonuc_id UUID NOT NULL,
-  madde_id UUID NOT NULL,
-  secenek_degeri TEXT,
-  aciklama TEXT,
-  gorsel_url TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (sonuc_id) REFERENCES public.checklist_sonuc_basliklari_arsiv(id) ON DELETE CASCADE,
-  FOREIGN KEY (madde_id) REFERENCES public.checklist_sablon_maddeleri(id)
-);
+ALTER TABLE public.checklist_sonuc_basliklari_arsiv
+ADD COLUMN IF NOT EXISTS arsiv_tarihi TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
-CREATE INDEX IF NOT EXISTS idx_ck_sonuc_madde_arsiv_sonuc ON checklist_sonuc_maddeleri_arsiv(sonuc_id);
+CREATE INDEX IF NOT EXISTS idx_ceklist_basliklari_arsiv_firma ON checklist_sonuc_basliklari_arsiv(firma_id);
+CREATE INDEX IF NOT EXISTS idx_ceklist_basliklari_arsiv_sablon ON checklist_sonuc_basliklari_arsiv(sablon_id);
+CREATE INDEX IF NOT EXISTS idx_ceklist_basliklari_arsiv_tarih ON checklist_sonuc_basliklari_arsiv(arsiv_tarihi);
 
--- ====================================================================
--- İZİN VERİLER
--- ====================================================================
+---
 
-ALTER TABLE personel_mesai_kayitlari_arsiv ENABLE ROW LEVEL SECURITY;
-ALTER TABLE musteri_degerlendirmeleri_arsiv ENABLE ROW LEVEL SECURITY;
-ALTER TABLE gorevler_arsiv ENABLE ROW LEVEL SECURITY;
-ALTER TABLE checklist_sonuc_basliklari_arsiv ENABLE ROW LEVEL SECURITY;
-ALTER TABLE checklist_sonuc_maddeleri_arsiv ENABLE ROW LEVEL SECURITY;
+-- 5. ÇEKLIST SONUÇ MADDELERİ ARŞİV
+CREATE TABLE IF NOT EXISTS public.checklist_sonuc_maddeleri_arsiv AS
+SELECT * FROM public.checklist_sonuc_maddeleri WHERE FALSE;
 
--- Tüm tablolar için admin erişim
-CREATE POLICY admin_all ON personel_mesai_kayitlari_arsiv FOR ALL USING (true);
-CREATE POLICY admin_all ON musteri_degerlendirmeleri_arsiv FOR ALL USING (true);
-CREATE POLICY admin_all ON gorevler_arsiv FOR ALL USING (true);
-CREATE POLICY admin_all ON checklist_sonuc_basliklari_arsiv FOR ALL USING (true);
-CREATE POLICY admin_all ON checklist_sonuc_maddeleri_arsiv FOR ALL USING (true);
+ALTER TABLE public.checklist_sonuc_maddeleri_arsiv
+ADD COLUMN IF NOT EXISTS arsiv_tarihi TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_ceklist_maddeleri_arsiv_sonuc ON checklist_sonuc_maddeleri_arsiv(sonuc_id);
+CREATE INDEX IF NOT EXISTS idx_ceklist_maddeleri_arsiv_tarih ON checklist_sonuc_maddeleri_arsiv(arsiv_tarihi);
+
+---
+
+-- TAMAMLANDI
+SELECT 'ARŞİV TABLOLARI OLUŞTURULDU' as status;
