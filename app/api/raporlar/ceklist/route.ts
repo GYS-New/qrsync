@@ -104,6 +104,33 @@ async function kayitlarGetir(
   // kalan (özellikle spesifik görev lokasyonları) çeklist raporuna hiç düşmez.
   // Çözüm: seçili projeye bağlı lokasyonlar + projesi atanmamış lokasyonlar;
   // ayrıca bu firmada bu projeye bağlı spesifik görevlerin lokasyon_id'lerini ekle.
+  // Tüm firma lokasyonlarını çek (parent_id dahil — yol oluşturmak için)
+  const { data: tumLokasyonlar } = await admin.from('lokasyonlar')
+    .select('id,tanim,parent_id,checklist_sablon_id,proje_id')
+    .eq('firma_id', firmaId)
+
+  // Tam lokasyon haritası (yol traversal için)
+  const tumLocMap: Record<string, { tanim: string; parent_id: string | null; checklist_sablon_id: string | null }> = {}
+  for (const l of tumLokasyonlar ?? []) {
+    tumLocMap[l.id] = { tanim: l.tanim, parent_id: l.parent_id ?? null, checklist_sablon_id: l.checklist_sablon_id ?? null }
+  }
+
+  function getLocPath(lokasyonId: string | null | undefined): string {
+    if (!lokasyonId) return '—'
+    const parts: string[] = []
+    let cur: string | null = lokasyonId
+    let guard = 0
+    while (cur && guard < 8) {
+      const node: { tanim: string; parent_id: string | null; checklist_sablon_id: string | null } | undefined = tumLocMap[cur]
+      if (!node) break
+      parts.push(node.tanim)
+      cur = node.parent_id
+      guard++
+    }
+    return parts.reverse().join(' > ') || '—'
+  }
+
+  // Proje filtresi için lokasyon seti
   let lokQ = admin.from('lokasyonlar')
     .select('id,tanim,checklist_sablon_id,proje_id')
     .eq('firma_id', firmaId)
@@ -352,7 +379,7 @@ async function kayitlarGetir(
       tamamlanma_tarihi:   gorev.tamamlanma_tarihi ?? null,
       arsiv_tarihi:        gorev.arsiv_tarihi ?? null,
       durum_degisim_tarihi: gorev.durum_degisim_tarihi ?? null,
-      lokasyon_tanim:      lok?.tanim ?? '—',
+      lokasyon_tanim:      getLocPath(b.lokasyon_id),
       sablon_baslik:       sablonId ? (sablonMap[sablonId] ?? '—') : '—',
       kullanici_isim:      b.kullanici_id ? (kullaniciMap[b.kullanici_id] ?? '—') : '—',
       doldurulan_madde:    doldurulan,
