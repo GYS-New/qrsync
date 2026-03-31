@@ -27,6 +27,7 @@ const DURUM_SECENEKLER = [
 ]
 
 const SEL = '*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)'
+const SEL_ARSIV = '*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim)'
 
 export default function GorevlerClient({
   base, meId, readonly, initialFirmaId, initialGorevler, initialLokasyonlar, initialKullanicilar, projeId,
@@ -64,6 +65,9 @@ export default function GorevlerClient({
   const [filtreIslemFrom,setFiltreIslemFrom]= useState('')
   const [filtreIslemTo,  setFiltreIslemTo]  = useState('')
   const [arsivDahil,     setArsivDahil]     = useState(false)
+  const [arsivRows,    setArsivRows]    = useState<any[]>([])
+  const [arsivLoading, setArsivLoading] = useState(false)
+  const [arsivAktif,   setArsivAktif]   = useState(false)
   // Filtre için ayrı 3-kademeli lokasyon seçimi
   const [floc1, setFloc1] = useState('')
   const [floc2, setFloc2] = useState('')
@@ -183,20 +187,18 @@ export default function GorevlerClient({
 
   async function filtrele() {
     if (!firmaId) return
-    setLoading(true); setError('')
+    setLoading(true); setArsivLoading(true); setError('')
     const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
+    // ── Ana tablo: gorevler ───────────────────────────────────────────────────
     let query = supabase.from('gorevler').select(SEL).eq('firma_id', firmaId)
     if (projeId) query = (query as any).eq('proje_id', projeId)
 
-    // Durum filtresi
     if (filtreDurum) {
       query = (query as any).eq('durum', filtreDurum)
     } else if (!arsivDahil) {
-      // Varsayılan: aktif + son 24s tamamlananlar
       query = (query as any).or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
     }
-    // arsivDahil=true + filtreDurum='' → tüm durumlar gösterilir (arşiv dahil)
 
     if (filtreSelectedLok) query = (query as any).eq('lokasyon_id', filtreSelectedLok)
     if (filtreAtananId)    query = (query as any).eq('atanan_kullanici_id', filtreAtananId)
@@ -211,6 +213,33 @@ export default function GorevlerClient({
     if (qErr) showError(qErr.message)
     else setGorevler(data ?? [])
     setLoading(false)
+
+    // ── Arşiv tablosu: gorevler_arsiv ────────────────────────────────────────
+    if (arsivDahil) {
+      try {
+        let aq = supabase.from('gorevler_arsiv').select(SEL_ARSIV + ',arsivleme_tarihi,arsiv_nedeni')
+          .eq('firma_id', firmaId)
+          .order('arsivleme_tarihi', { ascending: false })
+          .limit(500)
+        if (projeId)         aq = (aq as any).eq('proje_id', projeId)
+        if (filtreDurum)     aq = (aq as any).eq('durum', filtreDurum)
+        if (filtreSelectedLok) aq = (aq as any).eq('lokasyon_id', filtreSelectedLok)
+        if (filtreAtananId)  aq = (aq as any).eq('atanan_kullanici_id', filtreAtananId)
+        if (filtreOlusFrom)  aq = (aq as any).gte('olusturma_tarihi', filtreOlusFrom)
+        if (filtreOlusTo)    aq = (aq as any).lte('olusturma_tarihi', filtreOlusTo + 'T23:59:59')
+        if (filtreIslemFrom) aq = (aq as any).gte('durum_degisim_tarihi', filtreIslemFrom)
+        if (filtreIslemTo)   aq = (aq as any).lte('durum_degisim_tarihi', filtreIslemTo + 'T23:59:59')
+        const { data: arData } = await aq
+        setArsivRows(arData ?? [])
+        setArsivAktif(true)
+      } finally {
+        setArsivLoading(false)
+      }
+    } else {
+      setArsivRows([])
+      setArsivAktif(false)
+      setArsivLoading(false)
+    }
   }
 
   function temizleFiltreler() {
@@ -219,6 +248,7 @@ export default function GorevlerClient({
     setFiltreOlusFrom(''); setFiltreOlusTo('')
     setFiltreIslemFrom(''); setFiltreIslemTo('')
     setArsivDahil(false); setFiltreArama('')
+    setArsivRows([]); setArsivAktif(false)
     if (firmaId) refreshAll(firmaId)
   }
 
@@ -233,6 +263,35 @@ export default function GorevlerClient({
       (g.islemi_yapan?.isim_soyisim ?? '').toLowerCase().includes(s)
     )
   }, [filtreArama, gorevler, getLocPath])
+
+  // ── Tablo + arşiv birleşik ─────────────────────────────────────────────────
+  const combinedRows = useMemo(() => {
+    const tablo = filtered.map(r => ({ ...r, _source: 'tablo' as const }))
+    if (!arsivAktif || arsivRows.length === 0) return tablo
+
+    const s = filtreArama.trim().toLowerCase()
+    const filteredArsiv = arsivRows.filter((g: any) => {
+      if (s) {
+        const hay = [
+          g.tanim ?? '',
+          getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim) ?? '',
+          g.atanan?.isim_soyisim ?? '',
+          g.islemi_yapan?.isim_soyisim ?? '',
+        ].join(' ').toLowerCase()
+        if (!hay.includes(s)) return false
+      }
+      return true
+    })
+
+    const arsiv = filteredArsiv.map(r => ({ ...r, _source: 'arsiv' as const }))
+    const all = [...tablo, ...arsiv]
+    all.sort((a, b) => {
+      const da = a._source === 'arsiv' ? (a.arsivleme_tarihi ?? a.olusturma_tarihi) : a.olusturma_tarihi
+      const db = b._source === 'arsiv' ? (b.arsivleme_tarihi ?? b.olusturma_tarihi) : b.olusturma_tarihi
+      return new Date(db ?? 0).getTime() - new Date(da ?? 0).getTime()
+    })
+    return all
+  }, [arsivAktif, filtered, arsivRows, filtreArama, getLocPath])
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
   function openCreate() {
@@ -474,9 +533,16 @@ export default function GorevlerClient({
           </div>
         ) : (
           <>
-            <div style={{ padding: '6px 18px', fontSize: 12, color: '#94a3b8', borderBottom: '1px solid #f1f5f9' }}>
-              {filtered.length} kayıt {arsivDahil && !filtreDurum ? '(arşiv dahil)' : ''}
-              {aktifFiltreSayisi > 0 && <span style={{ marginLeft: 8, color: '#1f6b1f', fontWeight: 700 }}>· {aktifFiltreSayisi} filtre aktif</span>}
+            <div style={{ padding: '6px 18px', fontSize: 12, color: '#94a3b8', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span><strong style={{ color: '#1f6b1f' }}>{combinedRows.length}</strong> kayıt</span>
+              {arsivAktif && (
+                <>
+                  <span style={{ color: '#475569' }}>Tablo: <strong>{filtered.length}</strong></span>
+                  <span style={{ color: '#6d28d9' }}>Arşiv: <strong>{arsivRows.length}</strong></span>
+                  {arsivLoading && <span style={{ color: '#d97706', fontSize: 11 }}>⏳ Arşiv yükleniyor…</span>}
+                </>
+              )}
+              {aktifFiltreSayisi > 0 && <span style={{ marginLeft: 'auto', color: '#1f6b1f', fontWeight: 700 }}>· {aktifFiltreSayisi} filtre aktif</span>}
             </div>
             <table className="verde-table" style={{ tableLayout: 'fixed' }}>
               <thead>
@@ -488,55 +554,75 @@ export default function GorevlerClient({
                   <th style={{ width: 170 }}>Oluşturma Tarihi</th>
                   <th style={{ width: 160 }}>İşlemi Yapan</th>
                   <th style={{ width: 170 }}>İşlem Tarihi</th>
+                  {arsivAktif && <th style={{ width: 100 }}>Kayıt Türü</th>}
                   {canManage && <th style={{ width: 320, textAlign: 'right' }}>Aksiyon</th>}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((g: any) => (
-                  <tr key={g.id}>
-                    <td style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.tanim ?? ''}>{g.tanim}</td>
-                    <td style={{ color: '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-                    <td style={{ color: '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.atanan?.isim_soyisim ?? ''}>{g.atanan?.isim_soyisim ?? '—'}</td>
-                    <td>
-                      <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>{GOREV_DURUM_LABEL[g.durum] ?? g.durum}</span>
-                    </td>
-                    <td style={{ color: '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>{g.olusturma_tarihi ? formatDateTime(g.olusturma_tarihi) : '—'}</td>
-                    <td style={{ color: '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.islemi_yapan?.isim_soyisim ?? ''}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
-                    <td style={{ color: '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>{g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—'}</td>
-                    {canManage && (
-                      <td style={{ whiteSpace: 'nowrap', paddingRight: 12 }}>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
-                          {/* Çeklist butonu — sadece çeklist bağlı görevlerde */}
-                          {g.lokasyonlar?.checklist_sablon_id && (
-                            <button onClick={() => setChecklistGorev({ id: g.id, type: 'gorevler' })}
-                              style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                              📋
-                            </button>
-                          )}
-                          <button onClick={() => openEdit(g)}
-                            style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1a5c2a', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-                            ✏️ Düzenle
-                          </button>
-                          <details style={{ position: 'relative', display: 'inline-block' }}>
-                            <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '5px 12px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1a5c2a', fontSize: 12.5, fontWeight: 600 }}>
-                              İşlemler ▾
-                            </summary>
-                            <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 200, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '4px 0', minWidth: 155 }}
-                              onClick={e => (e.currentTarget.closest('details') as HTMLDetailsElement)?.removeAttribute('open')}>
-                              <button onClick={() => setDurum(g, 'ISLEMDE')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#334155' }}>🔄 İşlemde</button>
-                              <button onClick={() => setDurum(g, 'TAMAMLANDI')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#15803d' }}>✅ Tamamla</button>
-                              <button onClick={() => setDurum(g, 'IPTAL')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#d97706' }}>⛔ İptal</button>
-                              <div style={{ borderTop: '1px solid #f1f5f9', margin: '4px 0' }} />
-                              <button onClick={() => del(g.id)} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#dc2626' }}>🗑️ Sil</button>
-                            </div>
-                          </details>
-                        </div>
+                {combinedRows.map((g: any) => {
+                  const isArsiv = g._source === 'arsiv'
+                  return (
+                    <tr key={g.id + (isArsiv ? '-arsiv' : '')} style={isArsiv ? { background: '#faf8ff' } : undefined}>
+                      <td style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.tanim ?? ''}>{g.tanim}</td>
+                      <td style={{ color: '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
+                      <td style={{ color: '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.atanan?.isim_soyisim ?? ''}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                      <td>
+                        <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>{GOREV_DURUM_LABEL[g.durum] ?? g.durum}</span>
                       </td>
-                    )}
-                  </tr>
-                ))}
-                {!filtered.length && (
-                  <tr><td colSpan={canManage ? 8 : 7} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>
+                      <td style={{ color: '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>{g.olusturma_tarihi ? formatDateTime(g.olusturma_tarihi) : '—'}</td>
+                      <td style={{ color: '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.islemi_yapan?.isim_soyisim ?? ''}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
+                      <td style={{ color: '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>{g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—'}</td>
+                      {arsivAktif && (
+                        <td>
+                          <span style={{
+                            padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+                            background: isArsiv ? '#ede9fe' : '#dcfce7',
+                            color: isArsiv ? '#5b21b6' : '#166534',
+                          }}>
+                            {isArsiv ? 'Arşiv' : 'Tablo'}
+                          </span>
+                        </td>
+                      )}
+                      {canManage && (
+                        <td style={{ whiteSpace: 'nowrap', paddingRight: 12 }}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
+                            {/* Çeklist butonu — sadece çeklist bağlı görevlerde */}
+                            {g.lokasyonlar?.checklist_sablon_id && (
+                              <button onClick={() => setChecklistGorev({ id: g.id, type: 'gorevler' })}
+                                style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                📋
+                              </button>
+                            )}
+                            {/* Arşiv satırlarında düzenle/sil işlemleri gösterilmez */}
+                            {!isArsiv && (
+                              <>
+                                <button onClick={() => openEdit(g)}
+                                  style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1a5c2a', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                                  ✏️ Düzenle
+                                </button>
+                                <details style={{ position: 'relative', display: 'inline-block' }}>
+                                  <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '5px 12px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1a5c2a', fontSize: 12.5, fontWeight: 600 }}>
+                                    İşlemler ▾
+                                  </summary>
+                                  <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 200, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '4px 0', minWidth: 155 }}
+                                    onClick={e => (e.currentTarget.closest('details') as HTMLDetailsElement)?.removeAttribute('open')}>
+                                    <button onClick={() => setDurum(g, 'ISLEMDE')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#334155' }}>🔄 İşlemde</button>
+                                    <button onClick={() => setDurum(g, 'TAMAMLANDI')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#15803d' }}>✅ Tamamla</button>
+                                    <button onClick={() => setDurum(g, 'IPTAL')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#d97706' }}>⛔ İptal</button>
+                                    <div style={{ borderTop: '1px solid #f1f5f9', margin: '4px 0' }} />
+                                    <button onClick={() => del(g.id)} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#dc2626' }}>🗑️ Sil</button>
+                                  </div>
+                                </details>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+                {!combinedRows.length && (
+                  <tr><td colSpan={canManage ? (arsivAktif ? 9 : 8) : (arsivAktif ? 8 : 7)} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>
                     {aktifFiltreSayisi > 0 ? 'Filtreyle eşleşen görev bulunamadı.' : 'Görev bulunamadı.'}
                   </td></tr>
                 )}
@@ -601,5 +687,6 @@ export default function GorevlerClient({
         <ChecklistModal taskId={checklistGorev.id} taskType={checklistGorev.type} onKapat={() => setChecklistGorev(null)} />
       )}
     </div>
+    
   )
 }
