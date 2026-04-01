@@ -27,8 +27,6 @@ const DURUM_SECENEKLER = [
 ]
 
 const SEL = '*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)'
-// gorevler_arsiv FK ilişkisi yok — plain * select, isimler client-side çözülür
-const SEL_ARSIV = '*'
 
 export default function GorevlerClient({
   base, meId, readonly, initialFirmaId, initialGorevler, initialLokasyonlar, initialKullanicilar, projeId,
@@ -204,23 +202,27 @@ export default function GorevlerClient({
     else setGorevler(data ?? [])
     setLoading(false)
 
-    // ── Arşiv tablosu: gorevler_arsiv (her zaman çekiliyor) ──────────────────
+    // ── Arşiv tablosu: API route üzerinden admin client ile çekiliyor ─────────
     try {
-      let aq = supabase.from('gorevler_arsiv').select(SEL_ARSIV)
-        .eq('firma_id', firmaId)
-        .order('arsivleme_tarihi', { ascending: false })
-        .limit(500)
-      if (projeId)           aq = (aq as any).eq('proje_id', projeId)
-      if (filtreDurum)       aq = (aq as any).eq('durum', filtreDurum)
-      if (filtreSelectedLok) aq = (aq as any).eq('lokasyon_id', filtreSelectedLok)
-      if (filtreAtananId)    aq = (aq as any).eq('atanan_kullanici_id', filtreAtananId)
-      if (filtreOlusFrom)    aq = (aq as any).gte('olusturma_tarihi', filtreOlusFrom)
-      if (filtreOlusTo)      aq = (aq as any).lte('olusturma_tarihi', filtreOlusTo + 'T23:59:59')
-      if (filtreIslemFrom)   aq = (aq as any).gte('durum_degisim_tarihi', filtreIslemFrom)
-      if (filtreIslemTo)     aq = (aq as any).lte('durum_degisim_tarihi', filtreIslemTo + 'T23:59:59')
-      const { data: arData } = await aq
-      setArsivRows(arData ?? [])
+      const params = new URLSearchParams({ firmaId })
+      if (projeId)           params.set('projeId', projeId)
+      if (filtreDurum)       params.set('durum', filtreDurum)
+      if (filtreSelectedLok) params.set('lokasyonId', filtreSelectedLok)
+      if (filtreAtananId)    params.set('atananId', filtreAtananId)
+      if (filtreOlusFrom)    params.set('olusFrom', filtreOlusFrom)
+      if (filtreOlusTo)      params.set('olusTo', filtreOlusTo)
+      if (filtreIslemFrom)   params.set('islemFrom', filtreIslemFrom)
+      if (filtreIslemTo)     params.set('islemTo', filtreIslemTo)
+
+      const res = await fetch(`/api/tasks/arsiv-listesi?${params}`, { cache: 'no-store' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Arşiv yüklenemedi')
+      setArsivRows(json.data ?? [])
       setArsivAktif(true)
+    } catch (e: any) {
+      console.error('[arsiv-listesi]', e.message)
+      setArsivRows([])
+      setArsivAktif(true) // yine de true — sayaç 0 gösterir ama UI kırılmaz
     } finally {
       setArsivLoading(false)
     }
@@ -274,8 +276,8 @@ export default function GorevlerClient({
     const arsiv = filteredArsiv.map(r => ({ ...r, _source: 'arsiv' as const }))
     const all = [...tablo, ...arsiv]
     all.sort((a, b) => {
-      const da = a._source === 'arsiv' ? (a.arsivleme_tarihi ?? a.olusturma_tarihi) : a.olusturma_tarihi
-      const db = b._source === 'arsiv' ? (b.arsivleme_tarihi ?? b.olusturma_tarihi) : b.olusturma_tarihi
+      const da = a.olusturma_tarihi
+      const db = b.olusturma_tarihi
       return new Date(db ?? 0).getTime() - new Date(da ?? 0).getTime()
     })
     return all
@@ -536,9 +538,7 @@ export default function GorevlerClient({
                       <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>{g.olusturma_tarihi ? formatDateTime(g.olusturma_tarihi) : '—'}</td>
                       <td style={{ color: isArsiv ? '#94a3b8' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={islemiYapanAd}>{islemiYapanAd}</td>
                       <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>
-                        {isArsiv
-                          ? (g.arsivleme_tarihi ? formatDateTime(g.arsivleme_tarihi) : '—')
-                          : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
+                        {g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—'}
                       </td>
                       {canManage && (
                         <td style={{ whiteSpace: 'nowrap', paddingRight: 8 }}>
@@ -644,6 +644,5 @@ export default function GorevlerClient({
         <ChecklistModal taskId={checklistGorev.id} taskType={checklistGorev.type} onKapat={() => setChecklistGorev(null)} />
       )}
     </div>
-    
   )
 }
