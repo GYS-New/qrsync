@@ -501,6 +501,7 @@
        RESPONSIVE
     ══════════════════════════════ */
     @media (max-width: 900px) {
+      .desktop-only { display: none !important; }
       nav { padding: 14px 20px; }
 
       .nav-actions-desktop { display: none; }
@@ -911,7 +912,7 @@
     <nav class="footer-links">
       <a href="#features">Özellikler</a>
       <a href="#app">Mobil Uygulama</a>
-      <a href="/login">Dashboard Girişi</a>
+      <a href="/login" class="desktop-only">Dashboard Girişi</a>
     </nav>
   </footer>
 
