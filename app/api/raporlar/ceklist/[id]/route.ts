@@ -37,7 +37,7 @@ export async function DELETE(
 
     // Kaydı bul
     const { data: kayit, error: findErr } = await admin
-      .from('ceklist_sonuclar')
+      .from('checklist_sonuc_basliklari')
       .select('id,firma_id')
       .eq('id', params.id)
       .single()
@@ -51,9 +51,11 @@ export async function DELETE(
       return NextResponse.json({ ok: false, error: 'Farklı firmaya ait kayıt silemezsiniz' }, { status: 403 })
     }
 
-    // Sil
+    // Önce maddeleri sil, sonra başlığı sil
+    await admin.from('checklist_sonuc_maddeleri').delete().eq('sonuc_id', params.id)
+
     const { error: delErr } = await admin
-      .from('ceklist_sonuclar')
+      .from('checklist_sonuc_basliklari')
       .delete()
       .eq('id', params.id)
 
