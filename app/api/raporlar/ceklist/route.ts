@@ -353,35 +353,39 @@ async function kayitlarGetir(
   const sonuclar: any[] = []
   for (const b of allBasliklar) {
     const gorevId = b.canli_gorev_id || b.gorev_id
-    if (!gorevId) continue
-    const gorev = gorevMap[gorevId]
-    if (!gorev) continue
+    const gorev = gorevId ? gorevMap[gorevId] : null
+
+    // gorev_id olan ama gorevMap'te bulunamayan kayıtları atla
+    if (gorevId && !gorev) continue
 
     const lok = lokMap[b.lokasyon_id]
     const sablonId = b.sablon_id ?? lok?.checklist_sablon_id
     const toplam = sablonId ? (sablonMaddeMap[sablonId] ?? 0) : 0
     const doldurulan = doldurulanMap[b.id] ?? 0
 
-    const rref = refMs(gorev.durum_degisim_tarihi, gorev.tamamlanma_tarihi, b.kayit_tarihi)
+    // gorev_id null olan kayıtlar için kayit_tarihi referans alınır
+    const rref = gorev
+      ? refMs(gorev.durum_degisim_tarihi, gorev.tamamlanma_tarihi, b.kayit_tarihi)
+      : (b.kayit_tarihi ? new Date(b.kayit_tarihi).getTime() : 0)
 
-    let kaynakUi: 'canli' | 'arsiv' | 'spesifik'
-    if (gorev.dbKaynak === 'spesifik') kaynakUi = 'spesifik'
-    else if (gorev.dbKaynak === 'arsiv') kaynakUi = 'arsiv'
-    else kaynakUi = 'canli'
+    const kaynakUi: 'canli' | 'arsiv' | 'spesifik' =
+      !gorev ? 'canli' :
+      gorev.dbKaynak === 'spesifik' ? 'spesifik' :
+      gorev.dbKaynak === 'arsiv' ? 'arsiv' : 'canli'
 
     const gorev_task_type: 'canli_gorevler' | 'gorevler' =
-      gorev.dbKaynak === 'spesifik' ? 'gorevler' : 'canli_gorevler'
+      gorev?.dbKaynak === 'spesifik' ? 'gorevler' : 'canli_gorevler'
 
     const row: any = {
       id:                  b.id,
       kayit_tarihi:        b.kayit_tarihi,
       kanal:               b.kanal ?? 'WEB',
-      gorev_id:            gorevId,
-      gorev_tanim:         gorev.tanim ?? '—',
-      gorev_durum:         gorev.durum,
-      tamamlanma_tarihi:   gorev.tamamlanma_tarihi ?? null,
-      arsiv_tarihi:        gorev.arsiv_tarihi ?? null,
-      durum_degisim_tarihi: gorev.durum_degisim_tarihi ?? null,
+      gorev_id:            gorevId ?? null,
+      gorev_tanim:         gorev?.tanim ?? '—',
+      gorev_durum:         gorev?.durum ?? null,
+      tamamlanma_tarihi:   gorev?.tamamlanma_tarihi ?? null,
+      arsiv_tarihi:        gorev?.arsiv_tarihi ?? null,
+      durum_degisim_tarihi: gorev?.durum_degisim_tarihi ?? null,
       lokasyon_tanim:      getLocPath(b.lokasyon_id),
       sablon_baslik:       sablonId ? (sablonMap[sablonId] ?? '—') : '—',
       kullanici_isim:      b.kullanici_id ? (kullaniciMap[b.kullanici_id] ?? '—') : '—',
