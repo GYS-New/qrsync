@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     // ── 1. Görevi çek (aktif + arşiv fallback) ──────────────────────────
     const tables = taskType === 'canli_gorevler'
       ? ['canli_gorevler', 'canli_gorevler_arsiv']
-      : ['gorevler']
+      : ['gorevler', 'gorevler_arsiv']
 
     let gorev: any = null
     for (const tbl of tables) {
@@ -82,13 +82,24 @@ export async function GET(req: NextRequest) {
 
     // ── 4. Sonuç başlığını bul (web/QR) ─────────────────────────────────
     const gorevIdKolonu = taskType === 'gorevler' ? 'gorev_id' : 'canli_gorev_id'
+    let sonucBaslik: any = null
+
+    // Aktif sonuçlara bak, yoksa arşivdeki sonuçlara bak
     const { data: sonuclar } = await admin.from('checklist_sonuc_basliklari')
       .select('id,kullanici_id,kanal,kayit_tarihi')
       .eq(gorevIdKolonu, taskId)
       .order('kayit_tarihi', { ascending: false })
       .limit(1)
+    sonucBaslik = sonuclar?.[0] ?? null
 
-    const sonucBaslik = sonuclar?.[0] ?? null
+    if (!sonucBaslik) {
+      const { data: arsivSonuclar } = await admin.from('checklist_sonuc_basliklari_arsiv')
+        .select('id,kullanici_id,kanal,kayit_tarihi')
+        .eq(gorevIdKolonu, taskId)
+        .order('kayit_tarihi', { ascending: false })
+        .limit(1)
+      sonucBaslik = arsivSonuclar?.[0] ?? null
+    }
 
     // ── 5. Madde cevapları (web/QR öncelikli, yoksa mobil) ───────────────
     let cevapMap = new Map<string, any>()
@@ -97,9 +108,20 @@ export async function GET(req: NextRequest) {
     let cevapYapanId: string | null = null
 
     if (sonucBaslik) {
-      const { data: cevaplar } = await admin.from('checklist_sonuc_maddeleri')
+      // Aktif maddeler tablosunda ara, yoksa arşivde
+      let cevaplar: any[] | null = null
+      const { data: aktifCevaplar } = await admin.from('checklist_sonuc_maddeleri')
         .select('id,madde_id,secenek_degeri,aciklama,gorsel_url')
         .eq('sonuc_id', sonucBaslik.id)
+      cevaplar = aktifCevaplar
+
+      if (!cevaplar?.length) {
+        const { data: arsivCevaplar } = await admin.from('checklist_sonuc_maddeleri_arsiv')
+          .select('id,madde_id,secenek_degeri,aciklama,gorsel_url')
+          .eq('sonuc_id', sonucBaslik.id)
+        cevaplar = arsivCevaplar
+      }
+
       for (const c of cevaplar ?? []) cevapMap.set(c.madde_id, c)
       cevapKanal  = sonucBaslik.kanal ?? 'WEB'
       cevapTarih  = sonucBaslik.kayit_tarihi ?? null
@@ -255,7 +277,7 @@ export async function POST(req: NextRequest) {
     const isSA  = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
 
     // Firma kontrolü
-    const tables = task_type === 'canli_gorevler' ? ['canli_gorevler', 'canli_gorevler_arsiv'] : ['gorevler']
+    const tables = task_type === 'canli_gorevler' ? ['canli_gorevler', 'canli_gorevler_arsiv'] : ['gorevler', 'gorevler_arsiv']
     let gorev: any = null
     for (const tbl of tables) {
       const { data } = await admin.from(tbl).select('id,firma_id,lokasyon_id').eq('id', task_id).maybeSingle()
