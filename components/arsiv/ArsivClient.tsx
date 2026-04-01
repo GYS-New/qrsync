@@ -1000,14 +1000,17 @@ function CeklistArsivSekme({
   getLocPath: (id: string | null | undefined) => string
 }) {
   const { toast } = useToast()
-  const [data,    setData]    = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [aramaQ,  setAramaQ]  = useState('')
-  const [durumF,  setDurumF]  = useState('')
-  const [kanaliF, setKanaliF] = useState('')
-  const [fromD,   setFromD]   = useState('')
-  const [toD,     setToD]     = useState('')
-  const [modal,   setModal]   = useState<{ id: string } | null>(null)
+  const { confirm } = useConfirm()
+  const [data,       setData]       = useState<any[]>([])
+  const [loading,    setLoading]    = useState(false)
+  const [islemId,    setIslemId]    = useState<string | null>(null) // satır bazı işlem yükleniyor
+  const [topluSilYuk, setTopluSilYuk] = useState(false)
+  const [aramaQ,     setAramaQ]     = useState('')
+  const [durumF,     setDurumF]     = useState('')
+  const [kanaliF,    setKanaliF]    = useState('')
+  const [fromD,      setFromD]      = useState('')
+  const [toD,        setToD]        = useState('')
+  const [modal,      setModal]      = useState<{ id: string } | null>(null)
 
   const yukle = useCallback(async (baslangic?: string, bitis?: string) => {
     setLoading(true)
@@ -1050,7 +1053,96 @@ function CeklistArsivSekme({
   }
   const spinning: React.CSSProperties = { animation: 'spin 0.9s linear infinite' }
 
-  // Dışa aktar
+  // ── Toplu Sil ────────────────────────────────────────────────────────────
+  async function topluSil() {
+    const ok = await confirm({
+      title: 'Tüm Çeklist Kayıtlarını Sil',
+      message: 'Arşivdeki tüm çeklist kayıtları kalıcı olarak silinecek. Bu işlem geri alınamaz. Onaylıyor musunuz?',
+      confirmText: 'Evet, Kalıcı Sil',
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setTopluSilYuk(true)
+    try {
+      const res  = await fetch('/api/raporlar/ceklist-arsiv-islem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toplu-sil', firma_id: firmaId, proje_id: projeId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      toast({ type: 'success', title: 'Silindi', message: `${json.silinen} kayıt silindi.` })
+      await yukle(fromD || undefined, toD || undefined)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    } finally {
+      setTopluSilYuk(false)
+    }
+  }
+
+  // ── Tekil Sil ────────────────────────────────────────────────────────────
+  async function tekSil(r: any) {
+    const ok = await confirm({
+      title: 'Çeklist Kaydını Sil',
+      message: `"${r.gorev_tanim}" görevine ait çeklist kaydı kalıcı olarak silinecek. Onaylıyor musunuz?`,
+      confirmText: 'Evet, Sil',
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setIslemId(r.id)
+    try {
+      const res  = await fetch('/api/raporlar/ceklist-arsiv-islem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sil', id: r.id, firma_id: firmaId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      toast({ type: 'success', title: 'Silindi', message: 'Çeklist kaydı silindi.' })
+      await yukle(fromD || undefined, toD || undefined)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    } finally {
+      setIslemId(null)
+    }
+  }
+
+  // ── Geri Yükle ───────────────────────────────────────────────────────────
+  async function geriYukle(r: any) {
+    const ok = await confirm({
+      title: 'Görevi Geri Yükle',
+      message: `"${r.gorev_tanim}" görevi ve çeklist kaydı arşivden ilgili tabloya geri taşınacak. Onaylıyor musunuz?`,
+      confirmText: 'Evet, Geri Yükle',
+      cancelText: 'İptal',
+    })
+    if (!ok) return
+    setIslemId(r.id)
+    try {
+      const res  = await fetch('/api/raporlar/ceklist-arsiv-islem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'geri-yukle',
+          id: r.id,
+          gorev_id: r.gorev_id,
+          gorev_task_type: r.gorev_task_type ?? 'canli_gorevler',
+          firma_id: firmaId,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      toast({ type: 'success', title: 'Geri Yüklendi', message: 'Görev ve çeklist başarıyla geri yüklendi.' })
+      await yukle(fromD || undefined, toD || undefined)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    } finally {
+      setIslemId(null)
+    }
+  }
+
+  // ── Dışa aktar ───────────────────────────────────────────────────────────
   function csvIndir2() {
     const headers = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
     const rows = filtre.map((r: any) => [
@@ -1109,12 +1201,10 @@ function CeklistArsivSekme({
     const rows = filtre.map((r: any) =>
       `<tr>
         <td>${r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—'}</td>
-        <td>${r.gorev_tanim}</td>
-        <td>${r.lokasyon_tanim}</td>
+        <td>${r.gorev_tanim}</td><td>${r.lokasyon_tanim}</td>
         <td>${r.sablon_baslik}</td>
         <td>${CEKLIST_DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum}</td>
-        <td>${r.kanal}</td>
-        <td>${r.kullanici_isim}</td>
+        <td>${r.kanal}</td><td>${r.kullanici_isim}</td>
         <td>%${ckPct(r.doldurulan_madde, r.toplam_madde)} (${r.doldurulan_madde}/${r.toplam_madde})</td>
       </tr>`
     ).join('')
@@ -1155,6 +1245,21 @@ function CeklistArsivSekme({
             className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40"
             style={{ color: '#185a9b' }}>
             <Printer size={13} /> Yazdır
+          </button>
+          {/* Kayıtları Sil */}
+          <button
+            onClick={topluSil}
+            disabled={topluSilYuk || data.length === 0}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '0 14px', height: 36, borderRadius: 10,
+              border: '1px solid #fca5a5', background: '#fff1f2',
+              color: '#dc2626', fontWeight: 700, fontSize: 13,
+              cursor: 'pointer', opacity: (topluSilYuk || data.length === 0) ? 0.5 : 1,
+            }}>
+            {topluSilYuk
+              ? <><RefreshCw size={13} style={spinning} /> Siliniyor…</>
+              : <><Trash2 size={13} /> Kayıtları Sil</>}
           </button>
         </div>
       </div>
@@ -1206,7 +1311,7 @@ function CeklistArsivSekme({
               <th>Kanal</th>
               <th>Dolduran</th>
               <th>Doldurulma</th>
-              <th style={{ textAlign: 'center' }}>Detay</th>
+              <th style={{ textAlign: 'center' }}>İşlem</th>
             </tr>
           </thead>
           <tbody>
@@ -1220,10 +1325,11 @@ function CeklistArsivSekme({
               </td></tr>
             ) : (
               filtre.map((r: any) => {
-                const durumS = CEKLIST_DURUM_RENK[r.gorev_durum] ?? { bg: '#f1f5f9', color: '#475569' }
-                const kanalS = CEKLIST_KANAL_RENK[r.kanal] ?? { bg: '#f1f5f9', color: '#475569' }
-                const oran   = ckPct(r.doldurulan_madde, r.toplam_madde)
+                const durumS   = CEKLIST_DURUM_RENK[r.gorev_durum] ?? { bg: '#f1f5f9', color: '#475569' }
+                const kanalS   = CEKLIST_KANAL_RENK[r.kanal] ?? { bg: '#f1f5f9', color: '#475569' }
+                const oran     = ckPct(r.doldurulan_madde, r.toplam_madde)
                 const oranColor = oran === 100 ? '#166534' : oran >= 60 ? '#d97706' : '#dc2626'
+                const busy     = islemId === r.id
                 return (
                   <tr key={r.id}>
                     <td style={{ whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 12 }}>
@@ -1266,17 +1372,47 @@ function CeklistArsivSekme({
                       </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <button
-                        onClick={() => setModal({ id: r.gorev_id })}
-                        title="Çeklist Detayı"
-                        style={{
-                          width: 30, height: 30, border: 'none', borderRadius: 7,
-                          background: '#e8f4e8', color: '#2e8b2e',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer', margin: '0 auto',
-                        }}>
-                        <ExternalLink size={13} />
-                      </button>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
+                        {/* Çeklist Detayı */}
+                        <button
+                          onClick={() => setModal({ id: r.gorev_id })}
+                          title="Çeklist Detayı"
+                          disabled={busy}
+                          style={{
+                            width: 30, height: 30, border: 'none', borderRadius: 7,
+                            background: '#e8f4e8', color: '#2e8b2e',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer',
+                          }}>
+                          <ExternalLink size={13} />
+                        </button>
+                        {/* Geri Yükle */}
+                        <button
+                          onClick={() => geriYukle(r)}
+                          title="Geri Yükle"
+                          disabled={busy}
+                          style={{
+                            width: 30, height: 30, border: 'none', borderRadius: 7,
+                            background: busy ? '#f1f5f9' : '#eff6ff', color: busy ? '#94a3b8' : '#1d4ed8',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: busy ? 'not-allowed' : 'pointer',
+                          }}>
+                          {busy ? <RefreshCw size={12} style={spinning} /> : <RotateCcw size={13} />}
+                        </button>
+                        {/* Sil */}
+                        <button
+                          onClick={() => tekSil(r)}
+                          title="Sil"
+                          disabled={busy}
+                          style={{
+                            width: 30, height: 30, border: 'none', borderRadius: 7,
+                            background: busy ? '#f1f5f9' : '#fef2f2', color: busy ? '#94a3b8' : '#dc2626',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: busy ? 'not-allowed' : 'pointer',
+                          }}>
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
