@@ -35,20 +35,16 @@ export async function DELETE(
       return NextResponse.json({ ok: false, error: 'Silme izni yok' }, { status: 403 })
     }
 
-    // Kaydı bul
+    // Kaydı bul ve sil — checklist_sonuc_basliklari'nda firma_id yok,
+    // yetki kontrolü sayfaYetkileri üzerinden zaten yapıldı
     const { data: kayit, error: findErr } = await admin
       .from('checklist_sonuc_basliklari')
-      .select('id,firma_id')
+      .select('id,lokasyon_id')
       .eq('id', params.id)
       .single()
 
     if (findErr || !kayit) {
       return NextResponse.json({ ok: false, error: 'Kayıt bulunamadı' }, { status: 404 })
-    }
-
-    // Firma kontrolü (SA herkesi silebilir, diğerleri sadece kendi firmayı)
-    if (me.rol !== 'super_admin' && me.rol !== 'alt_super_admin' && kayit.firma_id !== me.firma_id) {
-      return NextResponse.json({ ok: false, error: 'Farklı firmaya ait kayıt silemezsiniz' }, { status: 403 })
     }
 
     // Önce maddeleri sil, sonra başlığı sil
