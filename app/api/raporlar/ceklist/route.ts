@@ -212,8 +212,11 @@ async function kayitlarGetir(
     if (!arErr && arData) arBasliklar = arData
   }
 
-  // Birleştir
-  const allBasliklar = [...(basliklar ?? []), ...arBasliklar]
+  // Birleştir — fiziksel tabloyu etiketle
+  const allBasliklar = [
+    ...(basliklar ?? []).map((b: any) => ({ ...b, _fromArsiv: false })),
+    ...arBasliklar.map((b: any) => ({ ...b, _fromArsiv: true })),
+  ]
   if (!allBasliklar?.length) return []
 
   const canliGorevIds = [...new Set(
@@ -344,9 +347,6 @@ async function kayitlarGetir(
     }
   }
 
-  const now = Date.now()
-  const cutoff = now - MS24H
-
   const sonuclar: any[] = []
   for (const b of allBasliklar) {
     const gorevId = b.canli_gorev_id || b.gorev_id
@@ -387,25 +387,24 @@ async function kayitlarGetir(
       kaynak:              kaynakUi,
       gorev_task_type,
       _refMs:              rref,
+      _fromArsiv:          b._fromArsiv,
     }
     sonuclar.push(row)
   }
 
-  // 7. 24 saat penceresi veya birleşik segment
+  // 7. Fiziksel tabloya göre filtrele (geri yüklenmiş eski kayıtlar da doğru görünür)
   const filtered = sonuclar.filter((row) => {
-    const r = row._refMs as number
-    if (!r) return cikti !== 'rapor'
-    if (cikti === 'rapor') return r >= cutoff
-    if (cikti === 'arsiv') return r < cutoff
+    if (cikti === 'rapor')  return !row._fromArsiv
+    if (cikti === 'arsiv')  return !!row._fromArsiv
     return true
   })
 
   for (const row of filtered) {
-    const r = row._refMs as number
     if (cikti === 'birlesik') {
-      row.segment = r >= cutoff ? 'tablo' : 'arsiv'
+      row.segment = row._fromArsiv ? 'arsiv' : 'tablo'
     }
     delete row._refMs
+    delete row._fromArsiv
   }
 
   return filtered.sort(
