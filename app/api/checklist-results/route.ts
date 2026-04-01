@@ -73,11 +73,35 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Bu göreve erişim yetkiniz yok' }, { status: 403 })
     }
 
-    // ── 2. Lokasyon → şablon ID ──────────────────────────────────────────
+    // ── 2. Lokasyon bilgisi ───────────────────────────────────────────────
     const { data: lok } = await admin.from('lokasyonlar')
       .select('id,tanim,checklist_sablon_id').eq('id', gorev.lokasyon_id).maybeSingle()
 
-    const sablonId = lok?.checklist_sablon_id ?? null
+    // ── 3. Sonuç başlığını bul (web/QR + arşiv fallback) ─────────────────
+    const gorevIdKolonu = taskType === 'gorevler' ? 'gorev_id' : 'canli_gorev_id'
+    let sonucBaslik: any = null
+
+    const { data: sonuclar } = await admin.from('checklist_sonuc_basliklari')
+      .select('id,kullanici_id,kanal,kayit_tarihi,sablon_id')
+      .eq(gorevIdKolonu, taskId)
+      .order('kayit_tarihi', { ascending: false })
+      .limit(1)
+    sonucBaslik = sonuclar?.[0] ?? null
+
+    if (!sonucBaslik) {
+      const { data: arsivSonuclar } = await admin.from('checklist_sonuc_basliklari_arsiv')
+        .select('id,kullanici_id,kanal,kayit_tarihi,sablon_id')
+        .eq(gorevIdKolonu, taskId)
+        .order('kayit_tarihi', { ascending: false })
+        .limit(1)
+      sonucBaslik = arsivSonuclar?.[0] ?? null
+    }
+
+    // Şablon ID: önce kaydedilmiş sonuçtan al (lokasyondan şablon kaldırılmış olabilir),
+    // yoksa lokasyonun güncel şablonuna bak, o da yoksa çeklist yok döndür
+    const sablonId: string | null =
+      sonucBaslik?.sablon_id ?? lok?.checklist_sablon_id ?? null
+
     if (!sablonId) {
       return NextResponse.json({
         ok: true,
@@ -90,34 +114,13 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // ── 3. Şablon + maddeler ─────────────────────────────────────────────
+    // ── 4. Şablon + maddeler ─────────────────────────────────────────────
     const { data: sablonRow } = await admin.from('checklist_sablonlari')
       .select('id,baslik,tanim,versiyon').eq('id', sablonId).maybeSingle()
 
     const { data: maddeler } = await admin.from('checklist_sablon_maddeleri')
       .select('id,sira_no,baslik,zorunlu_cevap,gorsel_gerekli,checklist_madde_secenekleri(id,deger,sira_no)')
       .eq('sablon_id', sablonId).order('sira_no', { ascending: true })
-
-    // ── 4. Sonuç başlığını bul (web/QR) ─────────────────────────────────
-    const gorevIdKolonu = taskType === 'gorevler' ? 'gorev_id' : 'canli_gorev_id'
-    let sonucBaslik: any = null
-
-    // Aktif sonuçlara bak, yoksa arşivdeki sonuçlara bak
-    const { data: sonuclar } = await admin.from('checklist_sonuc_basliklari')
-      .select('id,kullanici_id,kanal,kayit_tarihi')
-      .eq(gorevIdKolonu, taskId)
-      .order('kayit_tarihi', { ascending: false })
-      .limit(1)
-    sonucBaslik = sonuclar?.[0] ?? null
-
-    if (!sonucBaslik) {
-      const { data: arsivSonuclar } = await admin.from('checklist_sonuc_basliklari_arsiv')
-        .select('id,kullanici_id,kanal,kayit_tarihi')
-        .eq(gorevIdKolonu, taskId)
-        .order('kayit_tarihi', { ascending: false })
-        .limit(1)
-      sonucBaslik = arsivSonuclar?.[0] ?? null
-    }
 
     // ── 5. Madde cevapları (web/QR öncelikli, yoksa mobil) ───────────────
     let cevapMap = new Map<string, any>()
