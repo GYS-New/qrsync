@@ -117,6 +117,8 @@ export async function POST(req: NextRequest) {
           .from('checklist_sonuc_basliklari_arsiv').select('*').eq('id', id).maybeSingle()
         if (baslik) {
           const { arsiv_tarihi: _, ...baslikPayload } = baslik
+          // kayit_tarihi'ni şimdiye al — rapor görünümünde "taze" göstermek için
+          baslikPayload.kayit_tarihi = new Date().toISOString()
           await admin.from('checklist_sonuc_basliklari').insert(baslikPayload)
           await admin.from('checklist_sonuc_basliklari_arsiv').delete().eq('id', id)
 

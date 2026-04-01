@@ -400,12 +400,12 @@ async function kayitlarGetir(
   }
 
   // 7. Filtrele:
-  //   rapor  → aktif tablosundaki tüm kayıtlar (restore edilenler dahil)
-  //   arsiv  → fiziksel arşiv tablosu + henüz taşınmamış eski aktif kayıtlar
-  //   birlesik → tümü
+  //   rapor    → aktif tablo, son 24 saat (cron tarafından arşive taşınmamış taze kayıtlar)
+  //   arsiv    → fiziksel arşiv tablosu + henüz taşınmamış eski aktif kayıtlar
+  //   birlesik → tümü (tarih filtresiyle eski kayıtlara ulaşmak için)
   const filtered = sonuclar.filter((row) => {
     const r = row._refMs as number
-    if (cikti === 'rapor') return !row._fromArsiv
+    if (cikti === 'rapor') return !row._fromArsiv && !!r && r >= cutoff
     if (cikti === 'arsiv') return !!row._fromArsiv || (!row._fromArsiv && !!r && r < cutoff)
     return true
   })
