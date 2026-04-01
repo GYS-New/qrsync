@@ -347,6 +347,9 @@ async function kayitlarGetir(
     }
   }
 
+  const now = Date.now()
+  const cutoff = now - MS24H
+
   const sonuclar: any[] = []
   for (const b of allBasliklar) {
     const gorevId = b.canli_gorev_id || b.gorev_id
@@ -392,16 +395,21 @@ async function kayitlarGetir(
     sonuclar.push(row)
   }
 
-  // 7. Fiziksel tabloya göre filtrele (geri yüklenmiş eski kayıtlar da doğru görünür)
+  // 7. Filtrele:
+  //   rapor  → aktif tablosundaki tüm kayıtlar (restore edilenler dahil)
+  //   arsiv  → fiziksel arşiv tablosu + henüz taşınmamış eski aktif kayıtlar
+  //   birlesik → tümü
   const filtered = sonuclar.filter((row) => {
-    if (cikti === 'rapor')  return !row._fromArsiv
-    if (cikti === 'arsiv')  return !!row._fromArsiv
+    const r = row._refMs as number
+    if (cikti === 'rapor') return !row._fromArsiv
+    if (cikti === 'arsiv') return !!row._fromArsiv || (!row._fromArsiv && !!r && r < cutoff)
     return true
   })
 
   for (const row of filtered) {
     if (cikti === 'birlesik') {
-      row.segment = row._fromArsiv ? 'arsiv' : 'tablo'
+      const r = row._refMs as number
+      row.segment = (row._fromArsiv || (r && r < cutoff)) ? 'arsiv' : 'tablo'
     }
     delete row._refMs
     delete row._fromArsiv
