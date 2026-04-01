@@ -78,24 +78,38 @@ export async function POST(req: NextRequest) {
       const arsivTablo = isCanli ? 'canli_gorevler_arsiv' : 'gorevler_arsiv'
       const aktifTablo = isCanli ? 'canli_gorevler'       : 'gorevler'
 
-      // 1. Görevi arşivden bul
+      // 1. Görevi önce arşivde ara
       const { data: gorev, error: gErr } = await admin
         .from(arsivTablo).select('*').eq('id', gorev_id).maybeSingle()
       if (gErr) throw gErr
-      if (!gorev) return NextResponse.json({ error: 'Arşivde görev bulunamadı' }, { status: 404 })
 
-      // Firma güvenliği
-      if (!isSA && gorev.firma_id !== hedefFirmaId) {
-        return NextResponse.json({ error: 'Bu göreve erişim yetkiniz yok' }, { status: 403 })
+      if (gorev) {
+        // Firma güvenliği
+        if (!isSA && gorev.firma_id !== hedefFirmaId) {
+          return NextResponse.json({ error: 'Bu göreve erişim yetkiniz yok' }, { status: 403 })
+        }
+
+        // 2a. Görevi aktif tabloya taşı (arsiv kolonlarını çıkar)
+        const { arsiv_tarihi, arsivleme_tarihi, arsiv_nedeni, ...gorevPayload } = gorev
+        const { error: insErr } = await admin.from(aktifTablo).insert(gorevPayload)
+        if (insErr) throw insErr
+
+        // 3a. Görevi arşivden sil
+        await admin.from(arsivTablo).delete().eq('id', gorev_id)
+      } else {
+        // 2b. Görev zaten aktif tabloda olabilir — kontrol et
+        const { data: aktifGorev, error: aErr } = await admin
+          .from(aktifTablo).select('id,firma_id').eq('id', gorev_id).maybeSingle()
+        if (aErr) throw aErr
+        if (!aktifGorev) {
+          return NextResponse.json({ error: 'Görev arşivde veya aktif tabloda bulunamadı' }, { status: 404 })
+        }
+        // Firma güvenliği
+        if (!isSA && aktifGorev.firma_id !== hedefFirmaId) {
+          return NextResponse.json({ error: 'Bu göreve erişim yetkiniz yok' }, { status: 403 })
+        }
+        // Görev zaten aktif — sadece çeklisti geri taşımak yeterli
       }
-
-      // 2. Görevi aktif tabloya taşı (arsiv_tarihi / arsivleme_tarihi kolonunu çıkar)
-      const { arsiv_tarihi, arsivleme_tarihi, arsiv_nedeni, ...gorevPayload } = gorev
-      const { error: insErr } = await admin.from(aktifTablo).insert(gorevPayload)
-      if (insErr) throw insErr
-
-      // 3. Görevi arşivden sil
-      await admin.from(arsivTablo).delete().eq('id', gorev_id)
 
       // 4. Çeklist başlığını arşivden aktif tabloya taşı (varsa)
       if (id) {
