@@ -97,10 +97,51 @@ export async function GET(req: NextRequest) {
       sonucBaslik = arsivSonuclar?.[0] ?? null
     }
 
-    // Şablon ID: önce kaydedilmiş sonuçtan al (lokasyondan şablon kaldırılmış olabilir),
-    // yoksa lokasyonun güncel şablonuna bak, o da yoksa çeklist yok döndür
-    const sablonId: string | null =
+    // ── 4. Şablon ID çözümleme (3 katmanlı fallback) ─────────────────────
+    // Katman 1: sonuç başlığındaki sablon_id (yeni kayıtlarda dolu)
+    // Katman 2: lokasyonun güncel şablonu (lokasyonda hâlâ şablon varsa)
+    // Katman 3: kaydedilmiş cevaplardaki madde_id → sablon tersine türetme
+    //           (eski kayıtlar + lokasyondan şablon kaldırılmış durumlar için)
+    let sablonId: string | null =
       sonucBaslik?.sablon_id ?? lok?.checklist_sablon_id ?? null
+
+    if (!sablonId && sonucBaslik) {
+      // Katman 3: aktif veya arşiv cevap tablosundan bir madde_id al,
+      // o maddeye ait sablon_id'yi checklist_sablon_maddeleri'nden bul
+      const { data: birMadde } = await admin
+        .from('checklist_sonuc_maddeleri')
+        .select('madde_id')
+        .eq('sonuc_id', sonucBaslik.id)
+        .limit(1)
+        .maybeSingle()
+
+      const maddeId = birMadde?.madde_id ?? null
+
+      if (!maddeId) {
+        // Arşiv madde tablosuna bak
+        const { data: arsivMadde } = await admin
+          .from('checklist_sonuc_maddeleri_arsiv')
+          .select('madde_id')
+          .eq('sonuc_id', sonucBaslik.id)
+          .limit(1)
+          .maybeSingle()
+        if (arsivMadde?.madde_id) {
+          const { data: sablonMadde } = await admin
+            .from('checklist_sablon_maddeleri')
+            .select('sablon_id')
+            .eq('id', arsivMadde.madde_id)
+            .maybeSingle()
+          sablonId = sablonMadde?.sablon_id ?? null
+        }
+      } else {
+        const { data: sablonMadde } = await admin
+          .from('checklist_sablon_maddeleri')
+          .select('sablon_id')
+          .eq('id', maddeId)
+          .maybeSingle()
+        sablonId = sablonMadde?.sablon_id ?? null
+      }
+    }
 
     if (!sablonId) {
       return NextResponse.json({
@@ -114,7 +155,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // ── 4. Şablon + maddeler ─────────────────────────────────────────────
+    // ── 5. Şablon + maddeler ─────────────────────────────────────────────
     const { data: sablonRow } = await admin.from('checklist_sablonlari')
       .select('id,baslik,tanim,versiyon').eq('id', sablonId).maybeSingle()
 
