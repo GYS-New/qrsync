@@ -39,16 +39,34 @@ export async function GET(req: NextRequest) {
     const isSA  = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
 
     // ── 1. Görevi çek (aktif + arşiv fallback) ──────────────────────────
-    const tables = taskType === 'canli_gorevler'
-      ? ['canli_gorevler', 'canli_gorevler_arsiv']
-      : ['gorevler', 'gorevler_arsiv']
 
     let gorev: any = null
-    for (const tbl of tables) {
-      const { data } = await admin.from(tbl)
+
+    // gorevler'de ara
+    { const { data } = await admin.from('gorevler')
+      .select('id,firma_id,tanim,durum,lokasyon_id,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id')
+      .eq('id', taskId).maybeSingle()
+      if (data) gorev = data
+    }
+    // bulunamadıysa gorevler_arsiv'de ara (islemi_yapan_id yok)
+    if (!gorev && (taskType === 'gorevler')) {
+      const { data } = await admin.from('gorevler_arsiv')
+        .select('id,firma_id,tanim,durum,lokasyon_id,tamamlanma_tarihi,atanan_kullanici_id')
+        .eq('id', taskId).maybeSingle()
+      if (data) gorev = data
+    }
+    // canli_gorevler için aktif + arşiv
+    if (!gorev && taskType === 'canli_gorevler') {
+      const { data } = await admin.from('canli_gorevler')
         .select('id,firma_id,tanim,durum,lokasyon_id,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id')
         .eq('id', taskId).maybeSingle()
-      if (data) { gorev = data; break }
+      if (data) gorev = data
+    }
+    if (!gorev && taskType === 'canli_gorevler') {
+      const { data } = await admin.from('canli_gorevler_arsiv')
+        .select('id,firma_id,tanim,durum,lokasyon_id,tamamlanma_tarihi,atanan_kullanici_id,islemi_yapan_id')
+        .eq('id', taskId).maybeSingle()
+      if (data) gorev = data
     }
     if (!gorev) return NextResponse.json({ error: 'Görev bulunamadı' }, { status: 404 })
     if (!isSA && gorev.firma_id !== me.firma_id) {
