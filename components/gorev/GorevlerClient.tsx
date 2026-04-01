@@ -27,7 +27,8 @@ const DURUM_SECENEKLER = [
 ]
 
 const SEL = '*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)'
-const SEL_ARSIV = '*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim)'
+// gorevler_arsiv FK ilişkisi yok — plain * select, isimler client-side çözülür
+const SEL_ARSIV = '*'
 
 export default function GorevlerClient({
   base, meId, readonly, initialFirmaId, initialGorevler, initialLokasyonlar, initialKullanicilar, projeId,
@@ -205,9 +206,9 @@ export default function GorevlerClient({
 
     // ── Arşiv tablosu: gorevler_arsiv (her zaman çekiliyor) ──────────────────
     try {
-      let aq = supabase.from('gorevler_arsiv').select(SEL_ARSIV + ',arsiv_tarihi,arsiv_nedeni')
+      let aq = supabase.from('gorevler_arsiv').select(SEL_ARSIV)
         .eq('firma_id', firmaId)
-        .order('arsiv_tarihi', { ascending: false })
+        .order('arsivleme_tarihi', { ascending: false })
         .limit(500)
       if (projeId)           aq = (aq as any).eq('proje_id', projeId)
       if (filtreDurum)       aq = (aq as any).eq('durum', filtreDurum)
@@ -255,11 +256,15 @@ export default function GorevlerClient({
     const s = filtreArama.trim().toLowerCase()
     const filteredArsiv = arsivRows.filter((g: any) => {
       if (s) {
+        const atananAd = g.atanan?.isim_soyisim
+          ?? kullanicilar.find((u: any) => u.id === g.atanan_kullanici_id)?.isim_soyisim ?? ''
+        const islemiYapanAd = g.islemi_yapan?.isim_soyisim
+          ?? kullanicilar.find((u: any) => u.id === g.islemi_yapan_id)?.isim_soyisim ?? ''
         const hay = [
           g.tanim ?? '',
           getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim) ?? '',
-          g.atanan?.isim_soyisim ?? '',
-          g.islemi_yapan?.isim_soyisim ?? '',
+          atananAd,
+          islemiYapanAd,
         ].join(' ').toLowerCase()
         if (!hay.includes(s)) return false
       }
@@ -269,12 +274,12 @@ export default function GorevlerClient({
     const arsiv = filteredArsiv.map(r => ({ ...r, _source: 'arsiv' as const }))
     const all = [...tablo, ...arsiv]
     all.sort((a, b) => {
-      const da = a._source === 'arsiv' ? (a.arsiv_tarihi ?? a.olusturma_tarihi) : a.olusturma_tarihi
-      const db = b._source === 'arsiv' ? (b.arsiv_tarihi ?? b.olusturma_tarihi) : b.olusturma_tarihi
+      const da = a._source === 'arsiv' ? (a.arsivleme_tarihi ?? a.olusturma_tarihi) : a.olusturma_tarihi
+      const db = b._source === 'arsiv' ? (b.arsivleme_tarihi ?? b.olusturma_tarihi) : b.olusturma_tarihi
       return new Date(db ?? 0).getTime() - new Date(da ?? 0).getTime()
     })
     return all
-  }, [arsivAktif, filtered, arsivRows, filtreArama, getLocPath])
+  }, [arsivAktif, filtered, arsivRows, filtreArama, getLocPath, kullanicilar])
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
   function openCreate() {
@@ -500,6 +505,13 @@ export default function GorevlerClient({
               <tbody>
                 {combinedRows.map((g: any) => {
                   const isArsiv = g._source === 'arsiv'
+                  // Arşiv satırlarında FK join yok — ID'den client-side çöz
+                  const atananAd = isArsiv
+                    ? (kullanicilar.find((u: any) => u.id === g.atanan_kullanici_id)?.isim_soyisim ?? '—')
+                    : (g.atanan?.isim_soyisim ?? '—')
+                  const islemiYapanAd = isArsiv
+                    ? (kullanicilar.find((u: any) => u.id === g.islemi_yapan_id)?.isim_soyisim ?? '—')
+                    : (g.islemi_yapan?.isim_soyisim ?? '—')
                   return (
                     <tr key={g.id + (isArsiv ? '-arsiv' : '')} style={isArsiv ? { background: '#f8fafc' } : undefined}>
                       {arsivAktif && (
@@ -516,16 +528,16 @@ export default function GorevlerClient({
                         </td>
                       )}
                       <td style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isArsiv ? '#475569' : undefined }} title={g.tanim ?? ''}>{g.tanim}</td>
-                      <td style={{ color: isArsiv ? '#64748b' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-                      <td style={{ color: isArsiv ? '#64748b' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.atanan?.isim_soyisim ?? ''}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                      <td style={{ color: isArsiv ? '#64748b' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}>{getLocPath(g.lokasyon_id)}</td>
+                      <td style={{ color: isArsiv ? '#64748b' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={atananAd}>{atananAd}</td>
                       <td>
                         <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>{GOREV_DURUM_LABEL[g.durum] ?? g.durum}</span>
                       </td>
                       <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>{g.olusturma_tarihi ? formatDateTime(g.olusturma_tarihi) : '—'}</td>
-                      <td style={{ color: isArsiv ? '#94a3b8' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.islemi_yapan?.isim_soyisim ?? ''}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
+                      <td style={{ color: isArsiv ? '#94a3b8' : '#506050', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={islemiYapanAd}>{islemiYapanAd}</td>
                       <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', fontSize: 13, whiteSpace: 'nowrap' }}>
                         {isArsiv
-                          ? (g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—')
+                          ? (g.arsivleme_tarihi ? formatDateTime(g.arsivleme_tarihi) : '—')
                           : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
                       </td>
                       {canManage && (
