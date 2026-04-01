@@ -62,8 +62,6 @@ export default function GorevlerClient({
   const [filtreOlusTo,   setFiltreOlusTo]   = useState('')
   const [filtreIslemFrom,setFiltreIslemFrom]= useState('')
   const [filtreIslemTo,  setFiltreIslemTo]  = useState('')
-  const [arsivRows,    setArsivRows]    = useState<any[]>([])
-  const [arsivLoading, setArsivLoading] = useState(false)
   const [arsivAktif,   setArsivAktif]   = useState(false)
   // Filtre için ayrı 3-kademeli lokasyon seçimi
   const [floc1, setFloc1] = useState('')
@@ -177,8 +175,7 @@ export default function GorevlerClient({
 
   async function filtrele() {
     if (!firmaId) return
-    setLoading(true); setArsivLoading(true); setError('')
-    const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    setLoading(true); setError('')
 
     // ── Ana tablo: gorevler ───────────────────────────────────────────────────
     let query = supabase.from('gorevler').select(SEL).eq('firma_id', firmaId)
@@ -201,31 +198,7 @@ export default function GorevlerClient({
     if (qErr) showError(qErr.message)
     else setGorevler(data ?? [])
     setLoading(false)
-
-    // ── Arşiv tablosu: API route üzerinden admin client ile çekiliyor ─────────
-    try {
-      const params = new URLSearchParams({ firmaId })
-      if (projeId)           params.set('projeId', projeId)
-      if (filtreDurum)       params.set('durum', filtreDurum)
-      if (filtreSelectedLok) params.set('lokasyonId', filtreSelectedLok)
-      if (filtreAtananId)    params.set('atananId', filtreAtananId)
-      if (filtreOlusFrom)    params.set('olusFrom', filtreOlusFrom)
-      if (filtreOlusTo)      params.set('olusTo', filtreOlusTo)
-      if (filtreIslemFrom)   params.set('islemFrom', filtreIslemFrom)
-      if (filtreIslemTo)     params.set('islemTo', filtreIslemTo)
-
-      const res = await fetch(`/api/tasks/arsiv-listesi?${params}`, { cache: 'no-store' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Arşiv yüklenemedi')
-      setArsivRows(json.data ?? [])
-      setArsivAktif(true)
-    } catch (e: any) {
-      console.error('[arsiv-listesi]', e.message)
-      setArsivRows([])
-      setArsivAktif(true) // yine de true — sayaç 0 gösterir ama UI kırılmaz
-    } finally {
-      setArsivLoading(false)
-    }
+    setArsivAktif(true)
   }
 
   function temizleFiltreler() {
@@ -234,7 +207,7 @@ export default function GorevlerClient({
     setFiltreOlusFrom(''); setFiltreOlusTo('')
     setFiltreIslemFrom(''); setFiltreIslemTo('')
     setFiltreArama('')
-    setArsivRows([]); setArsivAktif(false)
+    setArsivAktif(false)
     if (firmaId) refreshAll(firmaId)
   }
 
@@ -251,37 +224,29 @@ export default function GorevlerClient({
   }, [filtreArama, gorevler, getLocPath])
 
   // ── Tablo + arşiv birleşik ─────────────────────────────────────────────────
+  // gorevler_arsiv cron ile taşınana kadar kayıtlar gorevler'de kalır.
+  // Arşiv kriteri: IPTAL veya (TAMAMLANDI + durum_degisim_tarihi > 24s önce)
+  function isArsivKaydi(g: any): boolean {
+    if (g.durum === 'IPTAL') return true
+    if (g.durum === 'TAMAMLANDI' && g.durum_degisim_tarihi) {
+      const sinir = Date.now() - 24 * 60 * 60 * 1000
+      return new Date(g.durum_degisim_tarihi).getTime() < sinir
+    }
+    return false
+  }
+
   const combinedRows = useMemo(() => {
-    const tablo = filtered.map(r => ({ ...r, _source: 'tablo' as const }))
-    if (!arsivAktif || arsivRows.length === 0) return tablo
-
-    const s = filtreArama.trim().toLowerCase()
-    const filteredArsiv = arsivRows.filter((g: any) => {
-      if (s) {
-        const atananAd = g.atanan?.isim_soyisim
-          ?? kullanicilar.find((u: any) => u.id === g.atanan_kullanici_id)?.isim_soyisim ?? ''
-        const islemiYapanAd = g.islemi_yapan?.isim_soyisim
-          ?? kullanicilar.find((u: any) => u.id === g.islemi_yapan_id)?.isim_soyisim ?? ''
-        const hay = [
-          g.tanim ?? '',
-          getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim) ?? '',
-          atananAd,
-          islemiYapanAd,
-        ].join(' ').toLowerCase()
-        if (!hay.includes(s)) return false
-      }
-      return true
-    })
-
-    const arsiv = filteredArsiv.map(r => ({ ...r, _source: 'arsiv' as const }))
-    const all = [...tablo, ...arsiv]
-    all.sort((a, b) => {
-      const da = a.olusturma_tarihi
-      const db = b.olusturma_tarihi
-      return new Date(db ?? 0).getTime() - new Date(da ?? 0).getTime()
-    })
-    return all
-  }, [arsivAktif, filtered, arsivRows, filtreArama, getLocPath, kullanicilar])
+    if (!arsivAktif) {
+      return filtered.map(r => ({ ...r, _source: 'tablo' as const }))
+    }
+    // Uygula yapıldıysa: kayıtları arşiv/tablo olarak etiketle
+    return filtered.map(r => ({
+      ...r,
+      _source: isArsivKaydi(r) ? ('arsiv' as const) : ('tablo' as const),
+    })).sort((a, b) =>
+      new Date(b.olusturma_tarihi ?? 0).getTime() - new Date(a.olusturma_tarihi ?? 0).getTime()
+    )
+  }, [arsivAktif, filtered])
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
   function openCreate() {
@@ -483,12 +448,10 @@ export default function GorevlerClient({
               <span><strong style={{ color: '#1f6b1f' }}>{combinedRows.length}</strong> kayıt</span>
               {arsivAktif && (
                 <>
-                  <span style={{ color: '#475569' }}>Tablo: <strong>{filtered.length}</strong></span>
-                  <span style={{ color: '#6d28d9' }}>Arşiv: <strong>{arsivRows.length}</strong></span>
-                  {arsivLoading && <span style={{ color: '#d97706', fontSize: 11 }}>⏳ Arşiv yükleniyor…</span>}
+                  <span style={{ color: '#475569' }}>Tablo: <strong>{combinedRows.filter(r => r._source === 'tablo').length}</strong></span>
+                  <span style={{ color: '#64748b' }}>Arşiv: <strong>{combinedRows.filter(r => r._source === 'arsiv').length}</strong></span>
                 </>
               )}
-
             </div>
             <table className="verde-table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <thead>
