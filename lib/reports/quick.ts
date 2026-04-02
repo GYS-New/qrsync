@@ -392,21 +392,31 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     const parentLocOptions = parentLocs.map((x: any) => ({ id: x.id, label: x.tanim ?? '-' }))
       .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label, 'tr'))
 
+    // Proje filtreli lokasyon id seti (grup ve üye filtresi için)
+    const projeLokIds = new Set(locs.map((x: any) => x.id))
+
     // Grupları çek
     let grpQ = admin.from('lokasyon_gruplari').select('id,firma_id,ad,ust_lokasyon_id,kayit_tarihi').order('ad')
     if (filters.firmaId) grpQ = grpQ.eq('firma_id', filters.firmaId)
-    const { data: grpList } = await grpQ
+    const { data: grpListRaw } = await grpQ
+
+    // Proje filtresi: ust_lokasyon_id projedeki lokasyonlardan biri olmalı
+    const grpList = filters.projeId
+      ? (grpListRaw ?? []).filter((g: any) => !g.ust_lokasyon_id || projeLokIds.has(g.ust_lokasyon_id))
+      : (grpListRaw ?? [])
 
     // Seçili üst lokasyon filtresi
     const selectedParentId = filters.parentLocationId || null
     const filteredGrpList = selectedParentId
-      ? (grpList ?? []).filter((g: any) => g.ust_lokasyon_id === selectedParentId)
-      : (grpList ?? [])
+      ? grpList.filter((g: any) => g.ust_lokasyon_id === selectedParentId)
+      : grpList
 
-    // Üyeleri çek
+    // Üyeleri çek — proje filtreli lokasyonlarla sınırla
     const { data: members } = await admin.from('lokasyon_grup_uyeleri').select('grup_id,lokasyon_id')
     const grpLocMap: Record<string, string[]> = {}
     for (const m of members ?? []) {
+      // Proje filtresi: sadece projedeki lokasyonları say
+      if (!projeLokIds.has(m.lokasyon_id)) continue
       if (!grpLocMap[m.grup_id]) grpLocMap[m.grup_id] = []
       grpLocMap[m.grup_id].push(m.lokasyon_id)
     }
@@ -416,11 +426,12 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     const activeGrpIds = selectedGrpId ? [selectedGrpId] : filteredGrpList.map((g: any) => g.id)
     const activeLocIds = activeGrpIds.flatMap((gid: string) => grpLocMap[gid] ?? [])
 
-    // Görevleri çek — aktif + arşiv birleşimi
+    // Görevleri çek — aktif + arşiv birleşimi, projeId filtreli
     const arsivCols = 'lokasyon_id,durum,aktif_olma_tarihi,firma_id'
     let qAktifGrp = admin.from('canli_gorevler').select(arsivCols)
     let qArsivGrp  = admin.from('canli_gorevler_arsiv').select(arsivCols)
     if (filters.firmaId) { qAktifGrp = qAktifGrp.eq('firma_id', filters.firmaId); qArsivGrp = qArsivGrp.eq('firma_id', filters.firmaId) }
+    if (filters.projeId) { qAktifGrp = (qAktifGrp as any).eq('proje_id', filters.projeId); qArsivGrp = (qArsivGrp as any).eq('proje_id', filters.projeId) }
     if (filters.dateFrom) { qAktifGrp = qAktifGrp.gte('aktif_olma_tarihi', filters.dateFrom); qArsivGrp = qArsivGrp.gte('aktif_olma_tarihi', filters.dateFrom) }
     if (filters.dateTo)   { qAktifGrp = qAktifGrp.lte('aktif_olma_tarihi', filters.dateTo);   qArsivGrp = qArsivGrp.lte('aktif_olma_tarihi', filters.dateTo) }
     if (activeLocIds.length > 0) {
