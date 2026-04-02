@@ -45,7 +45,7 @@ export async function GET(req: Request) {
     .from('canli_gorevler')
     .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, lokasyon_id, lokasyonlar(tanim)')
     .eq('tamamlayan_kullanici_id', user.id)
-    .in('durum', ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI'])
+    .eq('durum', 'TAMAMLANDI')
     .gte('tamamlanma_tarihi', sonYirmiDortSaat)
     .order('tamamlanma_tarihi', { ascending: false })
     .limit(50)
