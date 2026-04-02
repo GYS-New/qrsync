@@ -50,10 +50,22 @@ export interface KayipRow {
   gorevTanimi: string
   tarihSaat: string
   durum: string
+  kayipNedeni: string
+}
+
+export interface FrekansDisiRow {
+  sn: number
+  ustLokasyon: string
+  grupTanimi: string
+  lokasyonTanimi: string
+  personel: string
+  tarihSaat: string
+  aciklama: string
 }
 
 export interface GenelRaporData {
   firmaAdi: string
+  projeAdi: string
   ustLokTanim: string
   altLokTanim: string
   raporTarihLabel: string
@@ -70,6 +82,7 @@ export interface GenelRaporData {
   tamamlananGorevler: TamamlananRow[]
   sapmaGorevler: SapmaRow[]
   kayipGorevler: KayipRow[]
+  frekansDisiGorevler: FrekansDisiRow[]
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -107,13 +120,15 @@ function daysBetween(from?: string | null, to?: string | null): number {
 export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<GenelRaporData> {
   const admin = createAdminClient()
 
-  // 1. Firma bilgisi
-  const { data: firma } = await admin
-    .from('firmalar')
-    .select('id,ticari_unvan,firma_adi')
-    .eq('id', filters.firmaId)
-    .single()
+  // 1. Firma ve proje bilgisi
+  const [{ data: firma }, { data: proje }] = await Promise.all([
+    admin.from('firmalar').select('id,ticari_unvan,firma_adi').eq('id', filters.firmaId).single(),
+    filters.projeId
+      ? admin.from('projeler').select('id,ad').eq('id', filters.projeId).single()
+      : Promise.resolve({ data: null }),
+  ])
   const firmaAdi = firma ? (firma.firma_adi || firma.ticari_unvan || '') : ''
+  const projeAdi = (proje as any)?.ad ?? ''
 
   // 2. Lokasyon bilgileri
   let ustLokTanim = ''
@@ -508,30 +523,85 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     })
 
   // 10b. Kayıp görevler: ZAMANI_GECMIS, IPTAL, SILINDI, BEKLEMEDE
-  // HAZIR, ACIK, ISLEMDE → henüz aktif, kayıp değil
   const KAYIP_HARIC_DURUMLAR = new Set(['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'HAZIR', 'ACIK', 'ISLEMDE'])
+  const durumLabel: Record<string, string> = {
+    HAZIR: 'Hazır', ACIK: 'Açık', BEKLEMEDE: 'Beklemede',
+    ZAMANI_GECMIS: 'Zamanı Geçmiş', IPTAL: 'İptal', KAPATILDI: 'Kapatıldı', SILINDI: 'Silindi',
+  }
+  const kayipNedeniLabel: Record<string, string> = {
+    ZAMANI_GECMIS: 'Süre aşıldı, gerçekleşmedi',
+    IPTAL: 'Manuel iptal edildi',
+    SILINDI: 'Kayıt silindi',
+    BEKLEMEDE: 'Beklemede kaldı',
+    KAPATILDI: 'Kapatıldı',
+  }
   const kayipGorevler: KayipRow[] = tumGorevler
     .filter((g: any) => !KAYIP_HARIC_DURUMLAR.has(g.durum))
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
-      const durumLabel: Record<string, string> = {
-        HAZIR: 'Hazır',
-        ACIK: 'Açık',
-        BEKLEMEDE: 'Beklemede',
-        ZAMANI_GECMIS: 'Zamanı Geçmiş',
-        IPTAL: 'İptal',
-        KAPATILDI: 'Kapatıldı',
-        SILINDI: 'Silindi',
-      }
       return {
         sn: i + 1,
         lokasyon: lok?.tanim ?? '',
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
-        tarihSaat: formatDate(g.aktif_olma_tarihi),   // aktif olma tarihi
+        tarihSaat: formatDate(g.aktif_olma_tarihi),
         durum: durumLabel[g.durum] ?? g.durum,
+        kayipNedeni: kayipNedeniLabel[g.durum] ?? g.durum,
       }
     })
+
+  // 11. Frekans dışı görevler (gorevler tablosu — spesifik görevler)
+  const frekansDisiGorevler: FrekansDisiRow[] = []
+  if (targetLokasyonIds && targetLokasyonIds.length > 0 || !filters.ustLokasyonId) {
+    // Grup → lokasyon → üst lokasyon haritası (frekans dışı için)
+    const lokGrupMap = new Map<string, string>() // lokasyon_id → grup adı
+    const lokUstMap  = new Map<string, string>() // lokasyon_id → üst lokasyon adı
+    for (const [grupId, lokIds] of grupLokMap) {
+      const grup = (gruplar ?? []).find((g: any) => g.id === grupId) as any
+      for (const lid of lokIds) {
+        if (grup) lokGrupMap.set(lid, grup.ad ?? '')
+        // Üst lokasyon: en tepedeki parent
+        let cur = lokMap.get(lid) as any
+        let ust = cur
+        while (cur?.parent_id) { cur = lokMap.get(cur.parent_id) as any; if (cur) ust = cur }
+        lokUstMap.set(lid, ust?.tanim ?? '')
+      }
+    }
+
+    let spQ = admin
+      .from('gorevler')
+      .select('id,tanim,lokasyon_id,islemi_yapan_id,atanan_kullanici_id,tamamlanma_tarihi,olusturma_tarihi,durum,aciklama')
+      .eq('firma_id', filters.firmaId)
+    if (filters.projeId) spQ = (spQ as any).eq('proje_id', filters.projeId)
+    if (targetLokasyonIds?.length) spQ = spQ.in('lokasyon_id', targetLokasyonIds)
+    if (filters.raporBaslangic) spQ = spQ.gte('olusturma_tarihi', filters.raporBaslangic)
+    if (filters.raporBitis) spQ = spQ.lte('olusturma_tarihi', filters.raporBitis + 'T23:59:59')
+    const { data: spGorevler } = await spQ
+
+    // Spesifik görevlerin kullanıcı id'lerini topla
+    const spUserIds = Array.from(new Set(
+      (spGorevler ?? []).flatMap((g: any) => [g.islemi_yapan_id, g.atanan_kullanici_id].filter(Boolean))
+    ))
+    if (spUserIds.length > 0) {
+      const { data: spUsers } = await admin.from('users').select('id,isim_soyisim').in('id', spUserIds)
+      for (const u of spUsers ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
+    }
+
+    for (let i = 0; i < (spGorevler ?? []).length; i++) {
+      const g = (spGorevler as any[])[i]
+      const lok = lokMap.get(g.lokasyon_id) as any
+      const personelId = g.islemi_yapan_id ?? g.atanan_kullanici_id ?? ''
+      frekansDisiGorevler.push({
+        sn: i + 1,
+        ustLokasyon: lokUstMap.get(g.lokasyon_id) ?? '',
+        grupTanimi: lokGrupMap.get(g.lokasyon_id) ?? '',
+        lokasyonTanimi: lok?.tanim ?? '',
+        personel: userMap.get(personelId) ?? '',
+        tarihSaat: formatDate(g.tamamlanma_tarihi ?? g.olusturma_tarihi),
+        aciklama: g.aciklama ?? g.tanim ?? '',
+      })
+    }
+  }
 
   // Rapor tarihi etiketi
   let raporTarihLabel = ''
@@ -550,6 +620,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
 
   return {
     firmaAdi,
+    projeAdi,
     ustLokTanim,
     altLokTanim,
     raporTarihLabel,
@@ -564,5 +635,6 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     tamamlananGorevler,
     sapmaGorevler,
     kayipGorevler,
+    frekansDisiGorevler,
   }
 }
