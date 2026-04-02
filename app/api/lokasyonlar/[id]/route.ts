@@ -60,21 +60,42 @@ export async function DELETE(
     // 4. Tüm alt lokasyonları bul
     const allIds = await getAllDescendantIds(adminSb, lokId, firmaId)
 
-    // 5. canli_gorevler sil
+    // 5. Çeklist kayıtlarını sil (aktif + arşiv)
+    const { data: baslikIds } = await adminSb
+      .from('checklist_sonuc_basliklari')
+      .select('id')
+      .in('lokasyon_id', allIds)
+    if (baslikIds?.length) {
+      const ids = baslikIds.map((b: any) => b.id)
+      await adminSb.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', ids)
+    }
+    await adminSb.from('checklist_sonuc_basliklari').delete().in('lokasyon_id', allIds)
+
+    const { data: arsivBaslikIds } = await adminSb
+      .from('checklist_sonuc_basliklari_arsiv')
+      .select('id')
+      .in('lokasyon_id', allIds)
+    if (arsivBaslikIds?.length) {
+      const ids = arsivBaslikIds.map((b: any) => b.id)
+      await adminSb.from('checklist_sonuc_maddeleri_arsiv').delete().in('sonuc_id', ids)
+    }
+    await adminSb.from('checklist_sonuc_basliklari_arsiv').delete().in('lokasyon_id', allIds)
+
+    // 6. canli_gorevler sil
     const { error: canliErr } = await adminSb
       .from('canli_gorevler')
       .delete()
       .in('lokasyon_id', allIds)
     if (canliErr) throw new Error('Canlı görevler silinirken hata: ' + canliErr.message)
 
-    // 6. gorevler sil
+    // 7. gorevler sil
     const { error: gorevErr } = await adminSb
       .from('gorevler')
       .delete()
       .in('lokasyon_id', allIds)
     if (gorevErr) throw new Error('Görevler silinirken hata: ' + gorevErr.message)
 
-    // 7. Lokasyonları leaf → root sırasıyla sil
+    // 8. Lokasyonları leaf → root sırasıyla sil
     const leafFirst = [...allIds].reverse()
     for (const id of leafFirst) {
       const { error: lokErr } = await adminSb

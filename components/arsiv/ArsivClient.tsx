@@ -1386,19 +1386,6 @@ function CeklistArsivSekme({
                           }}>
                           <ExternalLink size={13} />
                         </button>
-                        {/* Geri Yükle */}
-                        <button
-                          onClick={() => geriYukle(r)}
-                          title="Geri Yükle"
-                          disabled={busy}
-                          style={{
-                            width: 30, height: 30, border: 'none', borderRadius: 7,
-                            background: busy ? '#f1f5f9' : '#eff6ff', color: busy ? '#94a3b8' : '#1d4ed8',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: busy ? 'not-allowed' : 'pointer',
-                          }}>
-                          {busy ? <RefreshCw size={12} style={spinning} /> : <RotateCcw size={13} />}
-                        </button>
                         {/* Sil */}
                         <button
                           onClick={() => tekSil(r)}

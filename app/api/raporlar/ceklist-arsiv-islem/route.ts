@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     if (!isSA && !isTA) return NextResponse.json({ error: 'Yetki yetersiz' }, { status: 403 })
 
     const body = await req.json()
-    const { action, id, gorev_id, gorev_task_type, firma_id, proje_id } = body
+    const { action, id, firma_id, proje_id } = body
 
     // Firma güvenlik kontrolü
     const hedefFirmaId = isSA ? firma_id : me.firma_id
@@ -66,73 +66,6 @@ export async function POST(req: NextRequest) {
       // Ayrıca aktif tablodaki "arşiv" segmentindeki çeklist kayıtlarını da temizle
       // (gorevler_arsiv veya canli_gorevler_arsiv içindeki görevlere ait olanlar)
       return NextResponse.json({ ok: true, silinen: ids.length })
-    }
-
-    // ── GERİ YÜKLE ────────────────────────────────────────────────────────
-    if (action === 'geri-yukle') {
-      if (!gorev_id || !gorev_task_type) {
-        return NextResponse.json({ error: 'gorev_id ve gorev_task_type gerekli' }, { status: 400 })
-      }
-
-      const isCanli    = gorev_task_type === 'canli_gorevler'
-      const arsivTablo = isCanli ? 'canli_gorevler_arsiv' : 'gorevler_arsiv'
-      const aktifTablo = isCanli ? 'canli_gorevler'       : 'gorevler'
-
-      // 1. Görevi önce arşivde ara
-      const { data: gorev, error: gErr } = await admin
-        .from(arsivTablo).select('*').eq('id', gorev_id).maybeSingle()
-      if (gErr) throw gErr
-
-      if (gorev) {
-        // Firma güvenliği
-        if (!isSA && gorev.firma_id !== hedefFirmaId) {
-          return NextResponse.json({ error: 'Bu göreve erişim yetkiniz yok' }, { status: 403 })
-        }
-
-        // 2a. Görevi aktif tabloya taşı (arsiv kolonlarını çıkar)
-        const { arsiv_tarihi, arsivleme_tarihi, arsiv_nedeni, ...gorevPayload } = gorev
-        const { error: insErr } = await admin.from(aktifTablo).insert(gorevPayload)
-        if (insErr) throw insErr
-
-        // 3a. Görevi arşivden sil
-        await admin.from(arsivTablo).delete().eq('id', gorev_id)
-      } else {
-        // 2b. Görev zaten aktif tabloda olabilir — kontrol et
-        const { data: aktifGorev, error: aErr } = await admin
-          .from(aktifTablo).select('id,firma_id').eq('id', gorev_id).maybeSingle()
-        if (aErr) throw aErr
-        if (!aktifGorev) {
-          return NextResponse.json({ error: 'Görev arşivde veya aktif tabloda bulunamadı' }, { status: 404 })
-        }
-        // Firma güvenliği
-        if (!isSA && aktifGorev.firma_id !== hedefFirmaId) {
-          return NextResponse.json({ error: 'Bu göreve erişim yetkiniz yok' }, { status: 403 })
-        }
-        // Görev zaten aktif — sadece çeklisti geri taşımak yeterli
-      }
-
-      // 4. Çeklist başlığını arşivden aktif tabloya taşı (varsa)
-      if (id) {
-        const { data: baslik } = await admin
-          .from('checklist_sonuc_basliklari_arsiv').select('*').eq('id', id).maybeSingle()
-        if (baslik) {
-          const { arsiv_tarihi: _, ...baslikPayload } = baslik
-          // kayit_tarihi'ni şimdiye al — rapor görünümünde "taze" göstermek için
-          baslikPayload.kayit_tarihi = new Date().toISOString()
-          await admin.from('checklist_sonuc_basliklari').insert(baslikPayload)
-          await admin.from('checklist_sonuc_basliklari_arsiv').delete().eq('id', id)
-
-          // 5. Çeklist maddelerini arşivden aktif tabloya taşı
-          const { data: maddeler } = await admin
-            .from('checklist_sonuc_maddeleri_arsiv').select('*').eq('sonuc_id', id)
-          if (maddeler?.length) {
-            await admin.from('checklist_sonuc_maddeleri').insert(maddeler)
-            await admin.from('checklist_sonuc_maddeleri_arsiv').delete().eq('sonuc_id', id)
-          }
-        }
-      }
-
-      return NextResponse.json({ ok: true })
     }
 
     return NextResponse.json({ error: 'Geçersiz action' }, { status: 400 })
