@@ -6,9 +6,9 @@
  * 1. personel_mesai_kayitlari   → 24h+ → _arsiv'e hard taşı
  * 2. musteri_degerlendirmeleri  → 24h+ → _arsiv'e hard taşı
  * 3. gorevler                   → tüm durumlar, 48h+ → _arsiv'e hard taşı + çeklistleri birlikte taşı
- * 4. frekansiyel çeklistler     → canli_gorevler_arsiv'e geçmiş görevlerin çeklistlerini taşı
  *
  * Not: canli_gorevler arşivlenmesi Supabase RPC (gece_tam_dongu) ile yapılır.
+ *      Frekansiyel çeklist arşivlenmesi DB trigger (trg_canli_gorev_arsiv_ceklist) ile anlık yapılır.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -154,52 +154,8 @@ export async function POST(req: NextRequest) {
       results.spesifik = { ok: false, error: e.message }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 4. FREKANSİYEL ÇEKLİSTLER — canli_gorevler_arsiv'e geçmiş görevlerin çeklistlerini taşı
-    //    (canli_gorevler arşivlenmesi Supabase RPC ile yapılır, çeklistler burada temizlenir)
-    // ─────────────────────────────────────────────────────────────────────────
-    try {
-      // Aktif çeklistlerin canli_gorev_id'si artık canli_gorevler_arsiv'de olan kayıtlar
-      const { data: arsivGorevIds } = await admin
-        .from('canli_gorevler_arsiv')
-        .select('id')
-        .limit(10000)
-
-      if (arsivGorevIds?.length) {
-        const ids = arsivGorevIds.map((g: any) => g.id)
-
-        const { data: basliklar } = await admin
-          .from('checklist_sonuc_basliklari')
-          .select('*')
-          .in('canli_gorev_id', ids)
-
-        if (basliklar?.length) {
-          const baslikIds = basliklar.map(b => b.id)
-
-          const { data: maddeler } = await admin
-            .from('checklist_sonuc_maddeleri')
-            .select('*')
-            .in('sonuc_id', baslikIds)
-
-          if (maddeler?.length) {
-            await admin.from('checklist_sonuc_maddeleri_arsiv').insert(maddeler)
-            await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', baslikIds)
-          }
-
-          const arsivBasliklar = basliklar.map(b => ({ ...b, arsiv_tarihi: new Date().toISOString() }))
-          await admin.from('checklist_sonuc_basliklari_arsiv').insert(arsivBasliklar)
-          await admin.from('checklist_sonuc_basliklari').delete().in('id', baslikIds)
-
-          results.frekCeklist = { moved: basliklar.length, ok: true }
-        } else {
-          results.frekCeklist = { moved: 0, ok: true }
-        }
-      } else {
-        results.frekCeklist = { moved: 0, ok: true }
-      }
-    } catch (e: any) {
-      results.frekCeklist = { ok: false, error: e.message }
-    }
+    // Not: Frekansiyel çeklist arşivlenmesi DB trigger ile anlık yapılır.
+    // canli_gorevler_arsiv'e INSERT olduğu anda trg_canli_gorev_arsiv_ceklist tetiklenir.
 
     return NextResponse.json({ ok: true, message: 'Arşivleme tamamlandı', results })
   } catch (e: any) {
