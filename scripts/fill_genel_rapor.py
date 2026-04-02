@@ -21,14 +21,17 @@ WHITE       = 'FFFFFF'
 GRAY_STRIPE = 'F4F8F4'
 
 def write(ws, row, col, value, align='left'):
+    # Find any merged range that CONTAINS (row, col) — not just top-left match
     merge_range = None
+    write_row, write_col = row, col
     for m in list(ws.merged_cells.ranges):
-        if m.min_row == row and m.min_col == col:
+        if m.min_row <= row <= m.max_row and m.min_col <= col <= m.max_col:
             merge_range = str(m)
+            write_row, write_col = m.min_row, m.min_col  # always write to top-left
             break
     if merge_range:
         ws.unmerge_cells(merge_range)
-    cell = ws.cell(row=row, column=col)
+    cell = ws.cell(row=write_row, column=write_col)
     cell.value = value
     try:
         cell.alignment = Alignment(horizontal=align, vertical='center', wrap_text=True)
