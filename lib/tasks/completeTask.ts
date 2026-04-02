@@ -74,6 +74,15 @@ export async function completeTask(input: CompleteTaskInput) {
       .eq('id', taskId)
 
     if (updateError) throw new Error(updateError.message)
+
+    // Görevi tamamlayan kullanıcının okunmamış gorev_atama bildirimlerini okundu yap
+    await supabase
+      .from('bildirimler')
+      .update({ okundu: true })
+      .eq('alici_id', userId)
+      .eq('tip', 'gorev_atama')
+      .eq('okundu', false)
+
     return { ok: true as const, taskType, taskId }
   }
 
@@ -132,5 +141,14 @@ export async function completeTask(input: CompleteTaskInput) {
     .eq('id', taskId)
 
   if (liveUpdateError) throw new Error(liveUpdateError.message)
+
+  // Görevi tamamlayan kullanıcının okunmamış gorev_atama bildirimlerini okundu yap
+  await supabase
+    .from('bildirimler')
+    .update({ okundu: true })
+    .eq('alici_id', userId)
+    .eq('tip', 'gorev_atama')
+    .eq('okundu', false)
+
   return { ok: true as const, taskType, taskId }
 }
