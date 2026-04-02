@@ -1,27 +1,35 @@
 'use client'
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
-import { useToast } from '@/components/ui/ToastProvider'
-import { RefreshCw, FileSpreadsheet, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Target, Activity } from 'lucide-react'
 import { useFirma } from '@/components/layout/FirmaContext'
+import { useToast } from '@/components/ui/ToastProvider'
+import {
+  RefreshCw, FileSpreadsheet,
+  CheckCircle, XCircle, Clock, AlertTriangle, TrendingUp, Activity, Target,
+} from 'lucide-react'
 
-type Props = {
+interface Props {
   base: string
   isSA: boolean
   tenantFirmaId?: string | null
   projeId?: string | null
 }
+
 type Lokasyon = { id: string; tanim: string; parent_id: string | null }
+
 type GrupMetrik = {
   grup: string; lokasyon: string; gorevTanimi: string; gunlukFrekans: number
   hedef: number; tamamlanan: number; sapma: number; kayip: number
   basariOrani: string; genelOran: string
 }
-type TamamlananRow = { sn: number; personel: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string }
-type SapmaRow = { sn: number; personel: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; sapmaNedeni: string }
-type KayipRow = { sn: number; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string }
+type TamamlananRow  = { sn: number; personel: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string }
+type SapmaRow       = { sn: number; personel: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; sapmaNedeni: string }
+type KayipRow       = { sn: number; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string; kayipNedeni: string }
+type FrekansDisiRow = { sn: number; ustLokasyon: string; grupTanimi: string; lokasyonTanimi: string; personel: string; tarihSaat: string; aciklama: string }
+
 type RaporData = {
-  firmaAdi: string; ustLokTanim: string; altLokTanim: string
+  firmaAdi: string; projeAdi: string; ustLokTanim: string; altLokTanim: string
   raporTarihLabel: string; gunSayisi: number; raporuAlan: string
   toplamGorev: number; toplamTamamlanan: number; toplamSapma: number
   toplamKayip: number; genelBasari: number
@@ -29,571 +37,277 @@ type RaporData = {
   tamamlananGorevler: TamamlananRow[]
   sapmaGorevler: SapmaRow[]
   kayipGorevler: KayipRow[]
+  frekansDisiGorevler: FrekansDisiRow[]
 }
 
-// ─── Design tokens ───────────────────────────────────────────────
+// ── Design tokens (SpesifikRaporKarti ile aynı) ────────────────────
 const T = {
-  green:    '#1a5c2a',
-  greenMid: '#2e8b2e',
-  greenLight:'#e8f5e8',
-  amber:    '#d97706',
-  amberLight:'#fef3c7',
-  red:      '#dc2626',
-  redLight: '#fee2e2',
-  blue:     '#1d4ed8',
-  blueLight:'#dbeafe',
-  gray:     '#475569',
-  grayLight:'#f8fafc',
-  border:   '#e2e8f0',
-  white:    '#ffffff',
-  text:     '#0f172a',
-  textMid:  '#334155',
-  textSoft: '#64748b',
+  blue:      '#1d4ed8', blueLight: '#eff6ff', blueMid: '#3b82f6',
+  green:     '#1a5c2a', greenMid:  '#2e8b2e', greenLight: '#f0fdf4',
+  amber:     '#d97706', amberLight: '#fef3c7',
+  red:       '#dc2626', redLight:   '#fee2e2',
+  gray:      '#475569', grayLight:  '#f8fafc',
+  border:    '#e2e8f0', text:       '#0f172a', textSoft: '#64748b',
+}
+const spinning = { animation: 'spin 0.9s linear infinite' }
+const inp: React.CSSProperties = {
+  height: 34, padding: '0 10px', borderRadius: 8,
+  border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, width: '100%',
 }
 
-// ─── Shared components ───────────────────────────────────────────
-function MetricCard({ label, value, sub, color, icon: Icon }: {
-  label: string; value: string | number; sub?: string; color: string; icon: any
+// ── Mini bar chart ─────────────────────────────────────────────────
+function BarChart({ data, valueKey, labelKey, color }: {
+  data: Record<string, any>[]; valueKey: string; labelKey: string; color?: string
 }) {
+  if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+  const barClr = color ?? T.blueMid
+  const chartH = 180, barArea = 120, bottomH = 40, topPad = 20
+  const barW = 36, gap = 16
+  const totalW = data.length * (barW + gap) + gap
+  const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
   return (
-    <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-      <div style={{ width: 40, height: 40, borderRadius: 10, background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Icon size={18} color={color} />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
-        <div style={{ fontSize: 26, fontWeight: 900, color: T.text, lineHeight: 1 }}>{value}</div>
-        {sub && <div style={{ fontSize: 11.5, color: T.textSoft, marginTop: 3 }}>{sub}</div>}
+    <div style={{ overflowX: 'auto' }}>
+      <svg width={totalW} height={chartH} style={{ display: 'block', minWidth: Math.min(totalW, 600) }}>
+        {[0.25, 0.5, 0.75, 1].map(ratio => {
+          const y = topPad + barArea * (1 - ratio)
+          return (
+            <g key={ratio}>
+              <line x1={0} y1={y} x2={totalW} y2={y} stroke="#e2e8f0" strokeWidth={0.5} />
+              <text x={2} y={y - 2} fontSize={8} fill={T.textSoft}>{Math.round(max * ratio)}</text>
+            </g>
+          )
+        })}
+        {data.map((d, i) => {
+          const val = Number(d[valueKey]) || 0
+          const barH = (val / max) * barArea
+          const x = gap + i * (barW + gap)
+          const y = topPad + barArea - barH
+          const label = String(d[labelKey] ?? '').slice(0, 12)
+          return (
+            <g key={i}>
+              <rect x={x} y={y} width={barW} height={barH} fill={barClr} rx={3} opacity={0.9} />
+              <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight="bold" fill={T.gray}>{val}</text>
+              <text x={x + barW / 2} y={topPad + barArea + 8} textAnchor="end" fontSize={9} fill={T.textSoft}
+                transform={`rotate(-40, ${x + barW / 2}, ${topPad + barArea + 8})`}>{label}</text>
+            </g>
+          )
+        })}
+        <line x1={0} y1={topPad + barArea} x2={totalW} y2={topPad + barArea} stroke={T.border} strokeWidth={1} />
+      </svg>
+    </div>
+  )
+}
+
+// ── Pasta grafik ───────────────────────────────────────────────────
+function PieChart({ slices }: { slices: { label: string; value: number; color: string }[] }) {
+  const total = slices.reduce((s, x) => s + x.value, 0)
+  if (!total) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+  const cx = 50, cy = 50, r = 40
+  let angle = -Math.PI / 2
+  const paths = slices.filter(s => s.value > 0).map(s => {
+    const a = (s.value / total) * Math.PI * 2
+    const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle)
+    angle += a
+    const x2 = cx + r * Math.cos(angle), y2 = cy + r * Math.sin(angle)
+    const large = a > Math.PI ? 1 : 0
+    return { d: `M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z`, color: s.color, label: s.label, pct: Math.round(s.value / total * 100) }
+  })
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <svg viewBox="0 0 100 100" style={{ width: 120, height: 120, flexShrink: 0 }}>
+        {paths.map((p, i) => <path key={i} d={p.d} fill={p.color} stroke="#fff" strokeWidth={0.8} />)}
+      </svg>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {paths.map((p, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: p.color, flexShrink: 0 }} />
+            <span style={{ color: T.textSoft }}>{p.label}</span>
+            <span style={{ fontWeight: 700, color: T.text, marginLeft: 'auto' }}>{p.pct}%</span>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
-function SectionHead({ title, color = T.green }: { title: string; color?: string }) {
+// ── KPI kart ───────────────────────────────────────────────────────
+function KpiCard({ label, value, sub, color, Icon }: { label: string; value: string | number; sub?: string; color: string; Icon: any }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-      <div style={{ width: 3, height: 18, borderRadius: 2, background: color }} />
-      <span style={{ fontSize: 13, fontWeight: 800, color: T.text, letterSpacing: '0.02em' }}>{title}</span>
+    <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 8, background: color + '18', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+        <Icon size={16} color={color} />
+      </div>
+      <div>
+        <div style={{ fontSize: 10.5, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: T.text, lineHeight: 1 }}>{value}</div>
+        {sub && <div style={{ fontSize: 11, color: T.textSoft, marginTop: 2 }}>{sub}</div>}
+      </div>
     </div>
   )
 }
 
+// ── DataTable ──────────────────────────────────────────────────────
 function DataTable({ headers, rows, accentCol, accentColor }: {
-  headers: string[]
-  rows: (string | number)[][]
-  accentCol?: number
-  accentColor?: string
+  headers: string[]; rows: (string | number)[][]; accentCol?: number; accentColor?: string
 }) {
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
         <thead>
-          <tr>
-            {headers.map((h, i) => (
-              <th key={i} style={{
-                padding: '8px 12px', background: T.green, color: T.white,
-                fontWeight: 700, fontSize: 11.5, textAlign: i === 0 ? 'left' : 'center',
-                whiteSpace: 'nowrap', letterSpacing: '0.03em',
-              }}>{h}</th>
-            ))}
-          </tr>
+          <tr>{headers.map((h, i) => (
+            <th key={i} style={{ padding: '7px 10px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 11, textAlign: i === 0 ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
+          ))}</tr>
         </thead>
         <tbody>
-          {rows.length === 0 ? (
-            <tr><td colSpan={headers.length} style={{ padding: '24px 12px', textAlign: 'center', color: T.textSoft, fontSize: 13 }}>Veri bulunamadı.</td></tr>
-          ) : rows.map((row, ri) => (
-            <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : T.white }}>
-              {row.map((cell, ci) => (
-                <td key={ci} style={{
-                  padding: '7px 12px',
-                  borderBottom: `1px solid ${T.border}`,
-                  textAlign: ci === 0 ? 'left' : 'center',
-                  fontWeight: ci === accentCol ? 700 : ci === 0 ? 600 : 400,
-                  color: ci === accentCol ? (accentColor ?? T.greenMid) : ci === 0 ? T.textMid : T.text,
-                  fontSize: 12.5,
-                }}>{String(cell ?? '')}</td>
-              ))}
-            </tr>
-          ))}
+          {rows.length === 0
+            ? <tr><td colSpan={headers.length} style={{ padding: '20px', textAlign: 'center', color: T.textSoft }}>Veri bulunamadı.</td></tr>
+            : rows.map((row, ri) => (
+              <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : '#fff' }}>
+                {row.map((cell, ci) => (
+                  <td key={ci} style={{
+                    padding: '6px 10px', borderBottom: `1px solid ${T.border}`,
+                    textAlign: ci === 0 ? 'left' : 'center', fontSize: 12.5,
+                    fontWeight: ci === accentCol ? 700 : ci === 0 ? 600 : 400,
+                    color: ci === accentCol ? (accentColor ?? T.greenMid) : undefined,
+                  }}>{String(cell ?? '')}</td>
+                ))}
+              </tr>
+            ))
+          }
         </tbody>
       </table>
     </div>
   )
 }
 
-function Badge({ text, color, bg }: { text: string; color: string; bg: string }) {
-  return (
-    <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, color, background: bg }}>
-      {text}
-    </span>
-  )
-}
+const TABS = ['Özet & Grafikler', 'Grup Metrikleri', 'Tamamlanan', 'Sapmalar', 'Kayıp Frekanslar', 'Frekans Dışı'] as const
+type Tab = typeof TABS[number]
 
-// ─── GİRİŞ SEKMESİ ───────────────────────────────────────────────
-function GirisSheet({ data }: { data: RaporData }) {
-  const toplamHedef       = data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0) || data.toplamGorev
-  const toplamGerceklesen = data.toplamTamamlanan + data.toplamSapma
-  const sapmaOrani        = toplamHedef > 0 ? Math.round(data.toplamSapma / toplamHedef * 100) : 0
-  const kayipOrani        = toplamHedef > 0 ? Math.round(data.toplamKayip / toplamHedef * 100) : 0
-
-
-  // ── tablo helper ──────────────────────────────────────────────
-  const th = (extra?: React.CSSProperties): React.CSSProperties => ({
-    background: '#375623', color: '#fff', fontWeight: 700, fontSize: 10.5,
-    padding: '5px 7px', border: '1px solid #b8c8b8',
-    textAlign: 'center', verticalAlign: 'middle',
-    whiteSpace: 'normal', lineHeight: 1.3, ...extra,
-  })
-  const td = (extra?: React.CSSProperties): React.CSSProperties => ({
-    fontSize: 11, padding: '4px 7px', border: '1px solid #d0d8d0',
-    verticalAlign: 'middle', ...extra,
-  })
-  const stripe = (i: number) => ({ background: i % 2 === 0 ? '#f4f8f4' : '#fff' })
-  const totRow: React.CSSProperties = { background: '#e8f4e0', fontWeight: 700 }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontFamily: 'Calibri, Arial, sans-serif', fontSize: 11 }}>
-
-      {/* ══ SATIR 1: Parametreler | Genel Durum | Hakediş ══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: 10, alignItems: 'start' }}>
-
-        {/* SOL: Parametreler tablosu */}
-        <table style={{ borderCollapse: 'collapse', width: '100%', height: '100%' }}>
-          <tbody>
-            <tr>
-              <td rowSpan={6} style={{
-                ...td({ background: '#375623', color: '#fff', fontWeight: 800, fontSize: 10.5, width: 22, padding: '8px 3px' }),
-                writingMode: 'vertical-lr' as any, transform: 'rotate(180deg)',
-                textAlign: 'center', letterSpacing: 1.5,
-              }}>PARAMETRELER</td>
-              <td style={td({ background: '#FFC000', fontWeight: 600, width: 100 })}>Firma</td>
-              <td style={td({ background: '#FFC000', fontWeight: 700 })}>{data.firmaAdi || '—'}</td>
-            </tr>
-            <tr>
-              <td style={td({ background: '#FFC000', fontWeight: 600 })}>Üst Lokasyon:</td>
-              <td style={td({ background: '#FFC000', fontWeight: 700 })}>{data.ustLokTanim || 'Tümü'}</td>
-            </tr>
-            <tr>
-              <td style={td({ background: '#FFC000', fontWeight: 600 })}>Alt Lokasyon</td>
-              <td style={td({ background: '#FFC000', fontWeight: 700 })}>{data.altLokTanim || 'Tümü'}</td>
-            </tr>
-            <tr>
-              <td style={td({ fontWeight: 600 })}>RaporTarihi:</td>
-              <td style={td({ fontWeight: 700 })}>{data.raporTarihLabel || '—'}</td>
-            </tr>
-            <tr>
-              <td style={td({ fontWeight: 600 })}>Rapor Gün Sayısı:</td>
-              <td style={td()}>{data.gunSayisi > 0 ? data.gunSayisi : 'Otomatik'}</td>
-            </tr>
-            <tr>
-              <td style={td({ fontWeight: 600 })}>Raporu Alan:</td>
-              <td style={td()}>{data.raporuAlan || 'Yönetim'}</td>
-            </tr>
-          </tbody>
-        </table>
-
-
-        {/* SAĞ: Hakediş Faktörleri tablosu */}
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#375623', textAlign: 'center', background: '#FFC000', padding: '4px 6px', border: '1px solid #b8c8b8', borderBottom: 'none' }}>
-            HAKEDİŞ FAKTÖRLERİ
-          </div>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-            <thead>
-              <tr>
-                {['GRUP TANIMI','HEDEF FREKANS','BİRİM FİYAT','TOPLAM HAKEDİŞ','KAYIP FREKANS','KAYIP HAKEDİŞ','GERÇEKLEŞEN HAKEDİŞ'].map(h => (
-                  <th key={h} style={th({ fontSize: 9, padding: '4px 4px' })}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.grupMetrikleri.length > 0 ? data.grupMetrikleri.map((g, i) => (
-                <tr key={i} style={stripe(i)}>
-                  <td style={td({ fontWeight: 600, fontSize: 10 })}>{g.grup}</td>
-                  <td style={td({ textAlign: 'center', fontSize: 10 })}>{g.hedef}</td>
-                  <td style={td({ textAlign: 'center', fontSize: 10, color: '#888' })}>₺0,00</td>
-                  <td style={td({ textAlign: 'center', fontSize: 10, color: '#888' })}>₺0,00</td>
-                  <td style={td({ textAlign: 'center', fontSize: 10 })}>{g.kayip}</td>
-                  <td style={td({ textAlign: 'center', fontSize: 10, color: '#888' })}>₺0,00</td>
-                  <td style={td({ textAlign: 'center', fontSize: 10, background: '#E2EFDA', fontWeight: 700, color: '#375623' })}>₺0,00</td>
-                </tr>
-              )) : (
-                <tr><td colSpan={7} style={td({ textAlign: 'center', color: '#aaa', padding: 10, fontSize: 10 })}>Grup tanımı yok</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ══ SATIR 2: Grup Frekans Göstergeleri | 3 istatistik kutusu ══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'start' }}>
-
-        {/* SOL: Grup Frekans Göstergeleri */}
-        <div>
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#375623', marginBottom: 4, borderBottom: '2px solid #FFC000', paddingBottom: 3 }}>
-            GRUP FREKANS GÖSTERGELERİ
-          </div>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-            <thead>
-              <tr>
-                <th style={th({ textAlign: 'left', minWidth: 110 })}>GRUP TANIMI</th>
-                <th style={th()}>HEDEF FREKANS SAYISI</th>
-                <th style={th()}>TAMAMLANMIŞ FREKANS SAYISI</th>
-                <th style={th()}>ZAMANINDA GERÇEKLEŞEN İŞLEM ORANI</th>
-                <th style={th()}>SAPMA FREKANS SAYISI</th>
-                <th style={th()}>KAYIP FREKANS SAYISI</th>
-                <th style={th()}>GENEL ORAN</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.grupMetrikleri.length > 0 ? data.grupMetrikleri.map((g, i) => (
-                <tr key={i} style={stripe(i)}>
-                  <td style={td({ fontWeight: 600, color: '#375623' })}>{g.grup}</td>
-                  <td style={td({ textAlign: 'center' })}>{g.hedef}</td>
-                  <td style={td({ textAlign: 'center', color: '#27AE60', fontWeight: 700 })}>{g.tamamlanan}</td>
-                  <td style={td({ textAlign: 'center', fontWeight: 800, color: '#1F4E2C' })}>{g.basariOrani}</td>
-                  <td style={td({ textAlign: 'center', color: '#C55A00' })}>{g.sapma}</td>
-                  <td style={td({ textAlign: 'center', color: '#C0392B' })}>{g.kayip}</td>
-                  <td style={td({ textAlign: 'center', fontWeight: 700 })}>{g.genelOran}</td>
-                </tr>
-              )) : (
-                <tr><td colSpan={7} style={td({ textAlign: 'center', color: '#aaa', padding: 14 })}>Grup tanımlanmamış</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* SAĞ: 3 istatistik kutusu yan yana */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 185px)', gap: 8 }}>
-          {[
-            { title: 'FREKANS GÖSTERGELERİ', color: '#375623', rows: [
-              ['Toplam Frekans Sayısı',      toplamHedef,               ''],
-              ['Tamamlanmış Frekans Sayısı', data.toplamTamamlanan,     '#27AE60'],
-              ['Gerçekleşen Frekans Sayısı', toplamGerceklesen,         ''],
-              ['Sapma Frekans Sayısı',       data.toplamSapma,          '#C55A00'],
-              ['Kayıp Frekans Sayısı',       data.toplamKayip,          '#C0392B'],
-              ['Başarı Ortalaması',          `%${data.genelBasari}`,    '#1F4E2C'],
-            ]},
-            { title: 'FREKANS SAPMALARI', color: '#C55A00', rows: [
-              ['Toplam Frekans Sayısı', toplamHedef,        ''],
-              ['Sapma Frekans Sayısı',  data.toplamSapma,   '#C55A00'],
-              ['Sapma Frekans Oranı',   `%${sapmaOrani}`,   '#C55A00'],
-            ]},
-            { title: 'KAYIP FREKANS GÖSTERGELERİ', color: '#C0392B', rows: [
-              ['Toplam Frekans Sayısı', toplamHedef,         ''],
-              ['Kayıp Frekans Sayısı',  data.toplamKayip,    '#C0392B'],
-              ['Kayıp Frekans Oranı',   `%${kayipOrani}`,    '#C0392B'],
-            ]},
-          ].map((box, bi) => (
-            <div key={bi} style={{ border: '1.5px solid #d0d8d0', borderRadius: 5, overflow: 'hidden' }}>
-              <div style={{ background: box.color, color: '#fff', padding: '5px 8px', fontWeight: 800, fontSize: 10, textAlign: 'center', lineHeight: 1.3 }}>
-                {box.title}
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  {box.rows.map(([label, value, color], i) => (
-                    <tr key={i} style={stripe(i)}>
-                      <td style={td({ fontSize: 10, color: '#375623' })}>{label as string}</td>
-                      <td style={td({ textAlign: 'center', fontWeight: 700, fontSize: 10.5, color: (color as string) || '#1a1a1a', width: 48 })}>{String(value)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ══ SATIR 4: Frekans Sapmaları + Kayıp Frekans tabloları ══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#375623', marginBottom: 4, borderBottom: '2px solid #FFC000', paddingBottom: 3 }}>
-            FREKANS SAPMALARI
-          </div>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-            <thead>
-              <tr>{['GRUP TANIMI','TOPLAM FREKANS','SAPMA FREKANS','SAPMA ORANI'].map(h => <th key={h} style={th()}>{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {data.grupMetrikleri.length > 0 ? data.grupMetrikleri.map((g, i) => (
-                <tr key={i} style={{ background: i % 2 === 0 ? '#FFF8E1' : '#fff' }}>
-                  <td style={td({ fontWeight: 600 })}>{g.grup}</td>
-                  <td style={td({ textAlign: 'center' })}>{g.hedef}</td>
-                  <td style={td({ textAlign: 'center', color: '#C55A00', fontWeight: 700 })}>{g.sapma}</td>
-                  <td style={td({ textAlign: 'center' })}>{g.hedef > 0 ? `%${Math.round(g.sapma/g.hedef*100)}` : '%0'}</td>
-                </tr>
-              )) : <tr><td colSpan={4} style={td({ textAlign: 'center', color: '#aaa', padding: 10 })}>Veri yok</td></tr>}
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#375623', marginBottom: 4, borderBottom: '2px solid #FFC000', paddingBottom: 3 }}>
-            KAYIP FREKANS GÖSTERGESİ
-          </div>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-            <thead>
-              <tr>{['GRUP TANIMI','TOPLAM FREKANS','KAYIP FREKANS','KAYIP ORANI'].map(h => <th key={h} style={th()}>{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {data.grupMetrikleri.length > 0 ? data.grupMetrikleri.map((g, i) => (
-                <tr key={i} style={{ background: i % 2 === 0 ? '#FFF0F0' : '#fff' }}>
-                  <td style={td({ fontWeight: 600 })}>{g.grup}</td>
-                  <td style={td({ textAlign: 'center' })}>{g.hedef}</td>
-                  <td style={td({ textAlign: 'center', color: '#C0392B', fontWeight: 700 })}>{g.kayip}</td>
-                  <td style={td({ textAlign: 'center' })}>{g.hedef > 0 ? `%${Math.round(g.kayip/g.hedef*100)}` : '%0'}</td>
-                </tr>
-              )) : <tr><td colSpan={4} style={td({ textAlign: 'center', color: '#aaa', padding: 10 })}>Veri yok</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
-// ─── TAMAMLANAN SEKMESİ ───────────────────────────────────────────
-function TamamlananSheet({ data }: { data: RaporData }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <SectionHead title="TAMAMLANAN FREKANSLAR" />
-        <Badge text={`${data.tamamlananGorevler.length} kayıt`} color={T.greenMid} bg={T.greenLight} />
-      </div>
-      <DataTable
-        headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
-        rows={data.tamamlananGorevler.map(r => [r.sn, r.personel, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, 'TAMAMLANDI'])}
-        accentCol={6} accentColor={T.greenMid}
-      />
-    </div>
-  )
-}
-
-// ─── SAPMALAR SEKMESİ ─────────────────────────────────────────────
-function SapmaSheet({ data }: { data: RaporData }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <SectionHead title="SAPMA FREKANSLAR" color={T.amber} />
-        <Badge text={`${data.sapmaGorevler.length} kayıt`} color={T.amber} bg={T.amberLight} />
-      </div>
-      <DataTable
-        headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
-        rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.sapmaNedeni])}
-        accentCol={6} accentColor={T.amber}
-      />
-    </div>
-  )
-}
-
-// ─── KAYIP FREKANSLAR SEKMESİ ─────────────────────────────────────
-function KayipFrekanslarSheet({ data }: { data: RaporData }) {
-  const rows = data.kayipGorevler ?? []
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <SectionHead title="KAYIP FREKANSLAR" color={T.red} />
-        <Badge text={`${rows.length} kayıt`} color={T.red} bg={T.redLight} />
-      </div>
-      <DataTable
-        headers={['SN', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
-        rows={rows.map(r => [r.sn, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum])}
-        accentCol={5} accentColor={T.red}
-      />
-    </div>
-  )
-}
-
-// ─── GRUPLAR SEKMESİ ──────────────────────────────────────────────
-function GruplarSheet({ data }: { data: RaporData }) {
-  const tT   = data.toplamGorev, tTam = data.toplamTamamlanan
-  const tSap = data.toplamSapma, tKay = data.toplamKayip
-  const tGunluk = data.grupMetrikleri.reduce((s, g) => s + g.gunlukFrekans, 0)
-  const tHedef  = data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0)
-  const tBasari = tT > 0 ? Math.round(tTam / tT * 100) : 0
-  const tGenel  = tT > 0 ? Math.round((tTam + tSap) / tT * 100) : 0
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <SectionHead title="GRUP DETAY TABLOSU" />
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-          <thead>
-            <tr>
-              {['SN', 'GRUP', 'LOKASYON', 'GÖREV TANIMI', 'GÜNLÜK FREKANS', 'HEDEF FREKANS', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI ORANI\nTamamlanan/Hedef', 'GENEL ORAN\nTamamlanan+Sapma/Hedef'].map((h, i) => (
-                <th key={i} style={{
-                  padding: '8px 10px', background: T.green, color: T.white, fontWeight: 700,
-                  fontSize: 11, textAlign: i < 4 ? 'left' : 'center', whiteSpace: 'pre-line',
-                  lineHeight: 1.3, letterSpacing: '0.02em',
-                }}>{h}</th>
-              ))}
-            </tr>
-            {/* Toplamlar satırı */}
-            <tr style={{ background: '#f0f9f0', borderBottom: `2px solid ${T.green}` }}>
-              <td colSpan={4} style={{ padding: '7px 10px', fontWeight: 800, fontSize: 12.5, color: T.green }}>Toplamlar</td>
-              <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700 }}>{tGunluk}</td>
-              <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700 }}>{tHedef}</td>
-              <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 800, color: T.greenMid }}>{tTam}</td>
-              <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 800, color: T.amber }}>{tSap}</td>
-              <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 800, color: T.red }}>{tKay}</td>
-              <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 800, color: T.green }}>%{tBasari}</td>
-              <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 800 }}>%{tGenel}</td>
-            </tr>
-          </thead>
-          <tbody>
-            {data.grupMetrikleri.length === 0 ? (
-              <tr><td colSpan={11} style={{ padding: '24px', textAlign: 'center', color: T.textSoft }}>Lokasyon grubu tanımlanmamış.</td></tr>
-            ) : data.grupMetrikleri.map((g, i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? T.grayLight : T.white }}>
-                <td style={{ padding: '7px 10px', textAlign: 'center', color: T.textSoft, width: 36 }}>{i + 1}</td>
-                <td style={{ padding: '7px 10px', fontWeight: 700, color: T.textMid }}>{g.grup}</td>
-                <td style={{ padding: '7px 10px', color: T.textSoft }}>{g.lokasyon}</td>
-                <td style={{ padding: '7px 10px', color: T.textSoft }}>{g.gorevTanimi}</td>
-                <td style={{ padding: '7px 10px', textAlign: 'center' }}>{g.gunlukFrekans}</td>
-                <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{g.hedef}</td>
-                <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700, color: T.greenMid }}>{g.tamamlanan}</td>
-                <td style={{ padding: '7px 10px', textAlign: 'center', color: T.amber }}>{g.sapma}</td>
-                <td style={{ padding: '7px 10px', textAlign: 'center', color: T.red }}>{g.kayip}</td>
-                <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 800, color: T.green }}>{g.basariOrani}</td>
-                <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700 }}>{g.genelOran}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-// ─── ANA BİLEŞEN ─────────────────────────────────────────────────
-const TABS = ['Giriş', 'Tamamlanan Frekanslar', 'Sapmalar', 'Kayıp Frekanslar', 'Gruplar'] as const
-type TabName = typeof TABS[number]
-
-const TAB_COLORS: Record<TabName, { active: string; dot: string }> = {
-  'Giriş':                  { active: T.green,    dot: T.green },
-  'Tamamlanan Frekanslar':  { active: T.greenMid, dot: T.greenMid },
-  'Sapmalar':               { active: T.amber,    dot: T.amber },
-  'Kayıp Frekanslar':       { active: T.red,      dot: T.red },
-  'Gruplar':                { active: T.blue,     dot: T.blue },
-}
-
-const spinning = { animation: 'spin 0.9s linear infinite' }
-
-const inp: React.CSSProperties = {
-  height: 34, padding: '0 10px', borderRadius: 8, border: `1px solid ${T.border}`,
-  background: T.white, fontSize: 13, color: T.text, outline: 'none', width: '100%',
-}
-
+// ── Ana bileşen ────────────────────────────────────────────────────
 export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: Props) {
   const { toast } = useToast()
   const { firmaId: saFirmaId } = useFirma()
-  const [lokasyonlar, setLokasyonlar] = useState<Lokasyon[]>([])
-  const [ustLokasyonId, setUstLokasyonId] = useState('')
-  const [altLokasyonId, setAltLokasyonId] = useState('')
-  const [raporBaslangic, setRaporBaslangic] = useState('')
-  const [raporBitis, setRaporBitis] = useState('')
-  const [raporuAlan, setRaporuAlan] = useState('')
-  const [activeTab, setActiveTab] = useState<TabName>('Giriş')
-  const [raporData, setRaporData] = useState<RaporData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [loadingExcel, setLoadingExcel] = useState(false)
-  const debounceRef = useRef<any>(null)
-
   const currentFirmaId = isSA ? (saFirmaId ?? '') : (tenantFirmaId ?? '')
+
+  const [lokasyonlar,    setLokasyonlar]    = useState<Lokasyon[]>([])
+  const [ustLokasyonId,  setUstLokasyonId]  = useState('')
+  const [altLokasyonId,  setAltLokasyonId]  = useState('')
+  const [raporBaslangic, setRaporBaslangic] = useState('')
+  const [raporBitis,     setRaporBitis]     = useState('')
+  const [raporuAlan,     setRaporuAlan]     = useState('')
+  const [data,           setData]           = useState<RaporData | null>(null)
+  const [loading,        setLoading]        = useState(false)
+  const [dlLoading,      setDlLoading]      = useState(false)
+  const [activeTab,      setActiveTab]      = useState<Tab>('Özet & Grafikler')
+  const debRef = useRef<any>(null)
+
   const ustLokasyonlar = useMemo(() => lokasyonlar.filter(l => !l.parent_id), [lokasyonlar])
   const altLokasyonlar = useMemo(() => lokasyonlar.filter(l => l.parent_id === ustLokasyonId), [lokasyonlar, ustLokasyonId])
 
+  // Lokasyon listesini çek
   useEffect(() => {
     if (!currentFirmaId) { setLokasyonlar([]); return }
-    const lokParams = new URLSearchParams({ firmaId: currentFirmaId })
-    if (projeId) lokParams.set('projeId', projeId)
-    fetch(`/api/lokasyonlar-list?${lokParams}`, { cache: 'no-store' })
+    const p = new URLSearchParams({ firmaId: currentFirmaId })
+    if (projeId) p.set('projeId', projeId)
+    fetch(`/api/lokasyonlar-list?${p}`, { cache: 'no-store' })
       .then(r => r.json()).then(d => setLokasyonlar(Array.isArray(d) ? d : []))
       .catch(() => setLokasyonlar([]))
-  }, [currentFirmaId])
+  }, [currentFirmaId, projeId])
 
-  const fetchRaporData = useCallback(async () => {
+  const buildParams = useCallback(() => {
+    const p = new URLSearchParams({ firmaId: currentFirmaId })
+    if (projeId)        p.set('projeId', projeId)
+    if (ustLokasyonId)  p.set('ustLokasyonId', ustLokasyonId)
+    if (altLokasyonId)  p.set('altLokasyonId', altLokasyonId)
+    if (raporBaslangic) p.set('raporBaslangic', raporBaslangic)
+    if (raporBitis)     p.set('raporBitis', raporBitis)
+    if (raporuAlan)     p.set('raporuAlan', raporuAlan)
+    return p
+  }, [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, raporBaslangic, raporBitis, raporuAlan])
+
+  const fetchData = useCallback(async () => {
     if (!currentFirmaId) return
     setLoading(true)
     try {
-      const params = new URLSearchParams({ firmaId: currentFirmaId })
-      if (projeId) params.set('projeId', projeId)
-      if (ustLokasyonId) params.set('ustLokasyonId', ustLokasyonId)
-      if (altLokasyonId) params.set('altLokasyonId', altLokasyonId)
-      if (raporBaslangic) params.set('raporBaslangic', raporBaslangic)
-      if (raporBitis) params.set('raporBitis', raporBitis)
-      if (raporuAlan) params.set('raporuAlan', raporuAlan)
-      const res = await fetch(`/api/reports/genel-rapor?${params}`, { cache: 'no-store' })
+      const res  = await fetch(`/api/reports/genel-rapor?${buildParams()}`, { cache: 'no-store' })
       const json = await res.json()
-      if (!res.ok) throw new Error(json?.error ?? 'Rapor verisi alınamadı.')
-      setRaporData(json)
+      if (!res.ok) throw new Error(json?.error ?? 'Veri alınamadı.')
+      setData(json)
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
     }
     setLoading(false)
-  }, [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, raporBaslangic, raporBitis, raporuAlan, toast])
+  }, [buildParams, currentFirmaId, toast])
 
   useEffect(() => {
     if (!currentFirmaId) return
-    clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(fetchRaporData, 600)
-    return () => clearTimeout(debounceRef.current)
-  }, [currentFirmaId, ustLokasyonId, altLokasyonId, raporBaslangic, raporBitis, raporuAlan, fetchRaporData])
+    clearTimeout(debRef.current)
+    debRef.current = setTimeout(fetchData, 600)
+    return () => clearTimeout(debRef.current)
+  }, [fetchData, currentFirmaId])
 
-  const handleExcelExport = useCallback(async () => {
-    if (!raporData || !currentFirmaId) return
-    setLoadingExcel(true)
+  async function downloadExcel() {
+    if (!data || !currentFirmaId) return
+    setDlLoading(true)
     try {
-      const params = new URLSearchParams({ firmaId: currentFirmaId })
-      if (projeId) params.set('projeId', projeId)
-      if (ustLokasyonId) params.set('ustLokasyonId', ustLokasyonId)
-      if (altLokasyonId) params.set('altLokasyonId', altLokasyonId)
-      if (raporBaslangic) params.set('raporBaslangic', raporBaslangic)
-      if (raporBitis) params.set('raporBitis', raporBitis)
-      if (raporuAlan) params.set('raporuAlan', raporuAlan)
-      const res = await fetch(`/api/reports/genel-rapor-excel?${params}`)
+      const res = await fetch(`/api/reports/genel-rapor-excel?${buildParams()}`)
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
         throw new Error(json.error ?? 'Excel indirilemedi.')
       }
       const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = `genel-rapor-${Date.now()}.xlsx`; a.click()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url; a.download = `frekansiyel-rapor-${Date.now()}.xlsx`; a.click()
       URL.revokeObjectURL(url)
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
     }
-    setLoadingExcel(false)
-  }, [raporData, currentFirmaId, projeId, ustLokasyonId, altLokasyonId, raporBaslangic, raporBitis, raporuAlan, toast])
+    setDlLoading(false)
+  }
+
+  const tabStyle = (t: Tab): React.CSSProperties => ({
+    padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+    border: 'none', cursor: 'pointer', transition: 'all .15s',
+    background: activeTab === t ? T.blue : 'transparent',
+    color: activeTab === t ? '#fff' : T.textSoft,
+  })
+
+  const toplamHedef = data ? (data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0) || data.toplamGorev) : 0
 
   return (
     <div>
-      <Topbar title="Rapor Özelleştir" base={base}
+      <Topbar title="Frekansiyel Görevler Raporu" base={base}
         breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: `${base}/dashboard/raporlar` }, { label: 'Rapor Özelleştir', href: `${base}/dashboard/raporlar/ozellestir` }, { label: 'Frekansiyel Görevler Raporu' }]} />
 
       <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* Filtre kartı */}
+        {/* ── Filtreler + export ── */}
         <div className="verde-card" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.06em' }}>QR-SYNC Frekans Raporu</div>
-              <h2 style={{ fontSize: 18, fontWeight: 900, color: T.text, margin: 0 }}>Genel Rapor Şablonu</h2>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.06em' }}>QR-SYNC Frekansiyel Raporu</div>
+              <h2 style={{ fontSize: 17, fontWeight: 900, color: T.text, margin: 0 }}>Frekansiyel Görevler Raporu</h2>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={fetchRaporData} disabled={loading || !currentFirmaId}
-                style={{ height: 36, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.textMid, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={fetchData} disabled={loading || !currentFirmaId}
+                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.gray, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
                 <RefreshCw size={13} style={loading ? spinning : {}} />
                 {loading ? 'Yükleniyor…' : 'Yenile'}
               </button>
-              <button onClick={handleExcelExport} disabled={loadingExcel || !raporData}
-                style={{ height: 36, padding: '0 14px', borderRadius: 8, border: `1px solid #d1fae5`, background: T.greenLight, color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
-                <FileSpreadsheet size={13} />
-                {loadingExcel ? 'İndiriliyor…' : 'Excel İndir'}
+              <button onClick={downloadExcel} disabled={!data || dlLoading}
+                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #d1fae5', background: '#f0fdf4', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                <FileSpreadsheet size={13} style={dlLoading ? spinning : {}} />
+                Excel İndir
               </button>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
-            {[
+
+          {/* Filtre grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 10 }}>
+            {([
+              { label: 'Başlangıç',    node: <input type="date" value={raporBaslangic} onChange={e => setRaporBaslangic(e.target.value)} style={inp} /> },
+              { label: 'Bitiş',        node: <input type="date" value={raporBitis}     onChange={e => setRaporBitis(e.target.value)}     style={inp} /> },
               { label: 'Üst Lokasyon', node: (
                 <select value={ustLokasyonId} onChange={e => { setUstLokasyonId(e.target.value); setAltLokasyonId('') }} style={inp}>
                   <option value="">Tümü</option>
@@ -606,76 +320,204 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   {altLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
                 </select>
               )},
-              { label: 'Başlangıç Tarihi', node: <input type="date" value={raporBaslangic} onChange={e => setRaporBaslangic(e.target.value)} style={inp} /> },
-              { label: 'Bitiş Tarihi', node: <input type="date" value={raporBitis} onChange={e => setRaporBitis(e.target.value)} style={inp} /> },
-              { label: 'Raporu Alan', node: <input value={raporuAlan} onChange={e => setRaporuAlan(e.target.value)} placeholder="Yönetim" style={inp} /> },
-            ].map(({ label, node }) => (
+              { label: 'Raporu Alan',  node: <input type="text" value={raporuAlan} onChange={e => setRaporuAlan(e.target.value)} placeholder="Ad Soyad" style={inp} /> },
+            ] as { label: string; node: React.ReactNode }[]).map(({ label, node }) => (
               <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{label}</span>
                 {node}
               </label>
             ))}
           </div>
         </div>
 
-        {!currentFirmaId ? (
-          <div className="verde-card" style={{ padding: 48, textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: T.text, marginBottom: 8 }}>Firma Seçin</div>
-            <div style={{ color: T.textSoft, fontSize: 13 }}>Raporu görüntülemek için üstten bir firma seçin.</div>
-          </div>
-        ) : (
-          <div className="verde-card">
-            {/* Sekmeler */}
-            <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, background: T.grayLight, overflowX: 'auto' }}>
-              {TABS.map(tab => {
-                const isActive = activeTab === tab
-                const tc = TAB_COLORS[tab]
-                return (
-                  <button key={tab} onClick={() => setActiveTab(tab)} style={{
-                    padding: '12px 20px', fontWeight: isActive ? 800 : 500, fontSize: 13,
-                    color: isActive ? tc.active : T.textSoft,
-                    background: isActive ? T.white : 'transparent',
-                    border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                    borderBottom: isActive ? `2.5px solid ${tc.active}` : '2.5px solid transparent',
-                    marginBottom: -1, transition: 'all 0.12s',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}>
-                    {isActive && <span style={{ width: 6, height: 6, borderRadius: '50%', background: tc.dot }} />}
-                    {tab}
-                  </button>
-                )
-              })}
-              {loading && (
-                <div style={{ marginLeft: 'auto', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 6, color: T.greenMid, fontSize: 11, fontWeight: 700 }}>
-                  <RefreshCw size={11} style={spinning} /> Veri yükleniyor…
-                </div>
-              )}
-            </div>
-
-            {/* İçerik */}
-            <div style={{ padding: '20px 24px', minHeight: 300, overflowX: 'auto', overflowY: 'visible' }}>
-              {!raporData && loading && (
-                <div style={{ textAlign: 'center', padding: 60, color: T.textSoft }}>
-                  <RefreshCw size={24} style={{ ...spinning, margin: '0 auto 12px', display: 'block', color: T.greenMid }} />
-                  <div style={{ fontWeight: 700 }}>Rapor verisi hazırlanıyor…</div>
-                </div>
-              )}
-              {!raporData && !loading && (
-                <div style={{ textAlign: 'center', padding: 60, color: T.textSoft }}>
-                  <Activity size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
-                  <div style={{ fontWeight: 700 }}>Filtre seçildiğinde rapor otomatik yüklenecek.</div>
-                </div>
-              )}
-              {raporData && activeTab === 'Giriş'                 && <GirisSheet data={raporData} />}
-              {raporData && activeTab === 'Tamamlanan Frekanslar' && <TamamlananSheet data={raporData} />}
-              {raporData && activeTab === 'Sapmalar'              && <SapmaSheet data={raporData} />}
-              {raporData && activeTab === 'Kayıp Frekanslar'      && <KayipFrekanslarSheet data={raporData} />}
-              {raporData && activeTab === 'Gruplar'               && <GruplarSheet data={raporData} />}
-            </div>
+        {/* Boş durum */}
+        {!data && !loading && (
+          <div className="verde-card" style={{ padding: 48, textAlign: 'center', color: T.textSoft }}>
+            <Activity size={28} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }} />
+            <div style={{ fontWeight: 700 }}>Filtre seçildiğinde rapor otomatik yüklenecek.</div>
           </div>
         )}
+
+        {/* ── İçerik ── */}
+        {data && (
+          <>
+            {/* KPI kartlar */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))', gap: 10 }}>
+              <KpiCard label="Hedef"      value={toplamHedef}           color={T.blue}    Icon={Target}        />
+              <KpiCard label="Tamamlanan" value={data.toplamTamamlanan} color={T.green}   Icon={CheckCircle}   sub={`%${data.genelBasari} başarı`} />
+              <KpiCard label="Sapma"      value={data.toplamSapma}      color={T.amber}   Icon={AlertTriangle} />
+              <KpiCard label="Kayıp"      value={data.toplamKayip}      color={T.red}     Icon={XCircle}       />
+              <KpiCard label="Frekans Dışı" value={data.frekansDisiGorevler.length} color={T.gray} Icon={Activity} />
+              <KpiCard label="Gün Sayısı" value={`${data.gunSayisi} gün`} color={T.blueMid} Icon={Clock} />
+            </div>
+
+            {/* Meta bandı */}
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, color: T.textSoft, padding: '8px 14px', background: T.grayLight, borderRadius: 8, border: `1px solid ${T.border}` }}>
+              <span><strong>Firma:</strong> {data.firmaAdi}</span>
+              {data.projeAdi && <span><strong>Proje:</strong> {data.projeAdi}</span>}
+              {data.ustLokTanim && <span><strong>Üst Lok.:</strong> {data.ustLokTanim}</span>}
+              {data.altLokTanim && <span><strong>Alt Lok.:</strong> {data.altLokTanim}</span>}
+              <span><strong>Dönem:</strong> {data.raporTarihLabel}</span>
+              {data.raporuAlan && <span><strong>Raporu Alan:</strong> {data.raporuAlan}</span>}
+            </div>
+
+            {/* Sekme navigasyon */}
+            <div style={{ display: 'flex', gap: 4, background: T.grayLight, borderRadius: 8, padding: 4, alignSelf: 'flex-start', flexWrap: 'wrap', border: `1px solid ${T.border}` }}>
+              {TABS.map(t => <button key={t} style={tabStyle(t)} onClick={() => setActiveTab(t)}>{t}</button>)}
+            </div>
+
+            {/* ── ÖZET & GRAFİKLER ── */}
+            {activeTab === 'Özet & Grafikler' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+                {/* Durum dağılımı pasta */}
+                <div className="verde-card" style={{ padding: '16px 20px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dağılımı</div>
+                  <PieChart slices={[
+                    { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
+                    { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
+                    { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
+                  ]} />
+                </div>
+
+                {/* Başarı oranı */}
+                <div className="verde-card" style={{ padding: '16px 20px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Başarı Oranı</div>
+                  <div style={{ fontSize: 52, fontWeight: 900, color: data.genelBasari >= 80 ? T.green : data.genelBasari >= 50 ? T.amber : T.red, lineHeight: 1 }}>%{data.genelBasari}</div>
+                  <div style={{ fontSize: 13, color: T.textSoft, marginTop: 6 }}>{data.toplamTamamlanan} tamamlanan / {toplamHedef} hedef</div>
+                  <div style={{ marginTop: 12, height: 10, background: T.border, borderRadius: 5, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${data.genelBasari}%`, background: data.genelBasari >= 80 ? T.green : data.genelBasari >= 50 ? T.amber : T.red, borderRadius: 5, transition: 'width .6s ease' }} />
+                  </div>
+                  <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    {[
+                      { label: 'Sapma', value: data.toplamSapma, color: T.amber },
+                      { label: 'Kayıp', value: data.toplamKayip, color: T.red },
+                      { label: 'Frekans Dışı', value: data.frekansDisiGorevler.length, color: T.gray },
+                    ].map(s => (
+                      <div key={s.label} style={{ padding: '8px 10px', background: T.grayLight, borderRadius: 8, textAlign: 'center' }}>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: s.color }}>{s.value}</div>
+                        <div style={{ fontSize: 10.5, color: T.textSoft, marginTop: 2 }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Grup bazlı bar grafik */}
+                <div className="verde-card" style={{ padding: '16px 20px', gridColumn: '1 / -1' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Bazlı Tamamlanan Frekans (İlk 10)</div>
+                  <BarChart data={data.grupMetrikleri.slice(0, 10)} valueKey="tamamlanan" labelKey="grup" color={T.greenMid} />
+                </div>
+
+                {/* Grup bazlı kayıp bar grafik */}
+                <div className="verde-card" style={{ padding: '16px 20px', gridColumn: '1 / -1' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Bazlı Kayıp Frekans (İlk 10)</div>
+                  <BarChart data={data.grupMetrikleri.slice(0, 10)} valueKey="kayip" labelKey="grup" color={T.red} />
+                </div>
+              </div>
+            )}
+
+            {/* ── GRUP METRİKLERİ ── */}
+            {activeTab === 'Grup Metrikleri' && (
+              <div className="verde-card" style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Frekans Metrikleri</div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{data.grupMetrikleri.length} grup</span>
+                </div>
+                {/* Toplamlar */}
+                {data.grupMetrikleri.length > 0 && (() => {
+                  const tGunluk = data.grupMetrikleri.reduce((s, g) => s + g.gunlukFrekans, 0)
+                  const tHedef  = data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0)
+                  const tTam    = data.grupMetrikleri.reduce((s, g) => s + g.tamamlanan, 0)
+                  const tSap    = data.grupMetrikleri.reduce((s, g) => s + g.sapma, 0)
+                  const tKay    = data.grupMetrikleri.reduce((s, g) => s + g.kayip, 0)
+                  const tBas    = tHedef > 0 ? Math.round(tTam / tHedef * 100) : 0
+                  const tGenel  = tHedef > 0 ? Math.round((tTam + tSap) / tHedef * 100) : 0
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px,1fr))', gap: 8, marginBottom: 14, padding: '10px 12px', background: T.greenLight, borderRadius: 8, border: `1px solid #bbf7d0` }}>
+                      {[
+                        { label: 'Günlük Frekans', value: tGunluk, color: T.blue },
+                        { label: 'Hedef',          value: tHedef,  color: T.blue },
+                        { label: 'Tamamlanan',     value: tTam,    color: T.green },
+                        { label: 'Sapma',          value: tSap,    color: T.amber },
+                        { label: 'Kayıp',          value: tKay,    color: T.red },
+                        { label: 'Başarı',         value: `%${tBas}`, color: T.green },
+                        { label: 'Genel Oran',     value: `%${tGenel}`, color: T.gray },
+                      ].map(s => (
+                        <div key={s.label} style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 16, fontWeight: 900, color: s.color }}>{s.value}</div>
+                          <div style={{ fontSize: 10, color: T.textSoft, marginTop: 1 }}>{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+                <DataTable
+                  headers={['SN', 'GRUP', 'LOKASYON', 'GÜNLÜK FREKANS', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
+                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
+                  accentCol={8} accentColor={T.greenMid}
+                />
+              </div>
+            )}
+
+            {/* ── TAMAMLANAN ── */}
+            {activeTab === 'Tamamlanan' && (
+              <div className="verde-card" style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Tamamlanan Frekanslar</div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{data.tamamlananGorevler.length} kayıt</span>
+                </div>
+                <DataTable
+                  headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
+                  rows={data.tamamlananGorevler.map(r => [r.sn, r.personel, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum])}
+                />
+              </div>
+            )}
+
+            {/* ── SAPMALAR ── */}
+            {activeTab === 'Sapmalar' && (
+              <div className="verde-card" style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.sapmaGorevler.length} kayıt</span>
+                </div>
+                <DataTable
+                  headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'SAPMA NEDENİ']}
+                  rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.sapmaNedeni])}
+                />
+              </div>
+            )}
+
+            {/* ── KAYIP FREKANSLAR ── */}
+            {activeTab === 'Kayıp Frekanslar' && (
+              <div className="verde-card" style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar</div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: T.redLight, color: T.red }}>{data.kayipGorevler.length} kayıt</span>
+                </div>
+                <DataTable
+                  headers={['SN', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM', 'KAYIP NEDENİ']}
+                  rows={data.kayipGorevler.map(r => [r.sn, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum, r.kayipNedeni])}
+                />
+              </div>
+            )}
+
+            {/* ── FREKANS DIŞI ── */}
+            {activeTab === 'Frekans Dışı' && (
+              <div className="verde-card" style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Spesifik Görevler)</div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{data.frekansDisiGorevler.length} kayıt</span>
+                </div>
+                <DataTable
+                  headers={['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH-SAAT', 'AÇIKLAMA']}
+                  rows={data.frekansDisiGorevler.map(r => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarihSaat, r.aciklama])}
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
     </div>
   )
 }
