@@ -51,29 +51,29 @@ const T = {
 }
 const spinning = { animation: 'spin 0.9s linear infinite' }
 const inp: React.CSSProperties = {
-  height: 34, padding: '0 10px', borderRadius: 8,
-  border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, width: '100%',
+  height: 36, padding: '0 10px', borderRadius: 8,
+  border: `1px solid ${T.border}`, background: '#fff', fontSize: 14, width: '100%',
 }
 
 // ── Mini bar chart ─────────────────────────────────────────────────
 function BarChart({ data, valueKey, labelKey, color }: {
   data: Record<string, any>[]; valueKey: string; labelKey: string; color?: string
 }) {
-  if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+  if (!data.length) return <div style={{ color: T.textSoft, fontSize: 14, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
   const barClr = color ?? T.blueMid
-  const chartH = 180, barArea = 120, bottomH = 40, topPad = 20
-  const barW = 36, gap = 16
+  const chartH = 280, barArea = 160, topPad = 24
+  const barW = 44, gap = 20
   const totalW = data.length * (barW + gap) + gap
   const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
   return (
     <div style={{ overflowX: 'auto' }}>
-      <svg width={totalW} height={chartH} style={{ display: 'block', minWidth: Math.min(totalW, 600) }}>
+      <svg width={totalW} height={chartH} style={{ display: 'block', minWidth: Math.min(totalW, 700) }}>
         {[0.25, 0.5, 0.75, 1].map(ratio => {
           const y = topPad + barArea * (1 - ratio)
           return (
             <g key={ratio}>
               <line x1={0} y1={y} x2={totalW} y2={y} stroke="#e2e8f0" strokeWidth={0.5} />
-              <text x={2} y={y - 2} fontSize={8} fill={T.textSoft}>{Math.round(max * ratio)}</text>
+              <text x={2} y={y - 3} fontSize={10} fill={T.textSoft}>{Math.round(max * ratio)}</text>
             </g>
           )
         })}
@@ -82,13 +82,13 @@ function BarChart({ data, valueKey, labelKey, color }: {
           const barH = (val / max) * barArea
           const x = gap + i * (barW + gap)
           const y = topPad + barArea - barH
-          const label = String(d[labelKey] ?? '').slice(0, 12)
+          const label = String(d[labelKey] ?? '').slice(0, 14)
           return (
             <g key={i}>
               <rect x={x} y={y} width={barW} height={barH} fill={barClr} rx={3} opacity={0.9} />
-              <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight="bold" fill={T.gray}>{val}</text>
-              <text x={x + barW / 2} y={topPad + barArea + 8} textAnchor="end" fontSize={9} fill={T.textSoft}
-                transform={`rotate(-40, ${x + barW / 2}, ${topPad + barArea + 8})`}>{label}</text>
+              <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={11} fontWeight="bold" fill={T.gray}>{val}</text>
+              <text x={x + barW / 2} y={topPad + barArea + 10} textAnchor="end" fontSize={11} fill={T.textSoft}
+                transform={`rotate(-40, ${x + barW / 2}, ${topPad + barArea + 10})`}>{label}</text>
             </g>
           )
         })}
@@ -119,7 +119,7 @@ function PieChart({ slices }: { slices: { label: string; value: number; color: s
       </svg>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {paths.map((p, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
             <div style={{ width: 10, height: 10, borderRadius: 2, background: p.color, flexShrink: 0 }} />
             <span style={{ color: T.textSoft }}>{p.label}</span>
             <span style={{ fontWeight: 700, color: T.text, marginLeft: 'auto' }}>{p.pct}%</span>
@@ -138,9 +138,9 @@ function KpiCard({ label, value, sub, color, Icon }: { label: string; value: str
         <Icon size={16} color={color} />
       </div>
       <div>
-        <div style={{ fontSize: 10.5, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
-        <div style={{ fontSize: 22, fontWeight: 900, color: T.text, lineHeight: 1 }}>{value}</div>
-        {sub && <div style={{ fontSize: 11, color: T.textSoft, marginTop: 2 }}>{sub}</div>}
+        <div style={{ fontSize: 12, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: 26, fontWeight: 900, color: T.text, lineHeight: 1 }}>{value}</div>
+        {sub && <div style={{ fontSize: 12.5, color: T.textSoft, marginTop: 2 }}>{sub}</div>}
       </div>
     </div>
   )
@@ -155,7 +155,7 @@ function DataTable({ headers, rows, accentCol, accentColor }: {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
         <thead>
           <tr>{headers.map((h, i) => (
-            <th key={i} style={{ padding: '7px 10px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 11, textAlign: i === 0 ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
+            <th key={i} style={{ padding: '8px 12px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 12.5, textAlign: i === 0 ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
           ))}</tr>
         </thead>
         <tbody>
@@ -165,8 +165,8 @@ function DataTable({ headers, rows, accentCol, accentColor }: {
               <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : '#fff' }}>
                 {row.map((cell, ci) => (
                   <td key={ci} style={{
-                    padding: '6px 10px', borderBottom: `1px solid ${T.border}`,
-                    textAlign: ci === 0 ? 'left' : 'center', fontSize: 12.5,
+                    padding: '7px 12px', borderBottom: `1px solid ${T.border}`,
+                    textAlign: ci === 0 ? 'left' : 'center', fontSize: 13.5,
                     fontWeight: ci === accentCol ? 700 : ci === 0 ? 600 : 400,
                     color: ci === accentCol ? (accentColor ?? T.greenMid) : undefined,
                   }}>{String(cell ?? '')}</td>
@@ -267,7 +267,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   }
 
   const tabStyle = (t: Tab): React.CSSProperties => ({
-    padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+    padding: '7px 16px', borderRadius: 6, fontSize: 13.5, fontWeight: 600,
     border: 'none', cursor: 'pointer', transition: 'all .15s',
     background: activeTab === t ? T.blue : 'transparent',
     color: activeTab === t ? '#fff' : T.textSoft,
@@ -286,8 +286,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
         <div className="verde-card" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.06em' }}>QR-SYNC Frekansiyel Raporu</div>
-              <h2 style={{ fontSize: 17, fontWeight: 900, color: T.text, margin: 0 }}>Frekansiyel Görevler Raporu</h2>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.06em' }}>QR-SYNC Frekansiyel Raporu</div>
+              <h2 style={{ fontSize: 19, fontWeight: 900, color: T.text, margin: 0 }}>Frekansiyel Görevler Raporu</h2>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button onClick={fetchData} disabled={loading || !currentFirmaId}
@@ -323,7 +323,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
               { label: 'Raporu Alan',  node: <input type="text" value={raporuAlan} onChange={e => setRaporuAlan(e.target.value)} placeholder="Ad Soyad" style={inp} /> },
             ] as { label: string; node: React.ReactNode }[]).map(({ label, node }) => (
               <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 10.5, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{label}</span>
                 {node}
               </label>
             ))}
@@ -352,7 +352,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             </div>
 
             {/* Meta bandı */}
-            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, color: T.textSoft, padding: '8px 14px', background: T.grayLight, borderRadius: 8, border: `1px solid ${T.border}` }}>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 13.5, color: T.textSoft, padding: '9px 16px', background: T.grayLight, borderRadius: 8, border: `1px solid ${T.border}` }}>
               <span><strong>Firma:</strong> {data.firmaAdi}</span>
               {data.projeAdi && <span><strong>Proje:</strong> {data.projeAdi}</span>}
               {data.ustLokTanim && <span><strong>Üst Lok.:</strong> {data.ustLokTanim}</span>}
@@ -372,7 +372,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
 
                 {/* Durum dağılımı pasta */}
                 <div className="verde-card" style={{ padding: '16px 20px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dağılımı</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dağılımı</div>
                   <PieChart slices={[
                     { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
                     { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
@@ -382,7 +382,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
 
                 {/* Başarı oranı */}
                 <div className="verde-card" style={{ padding: '16px 20px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Başarı Oranı</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Başarı Oranı</div>
                   <div style={{ fontSize: 52, fontWeight: 900, color: data.genelBasari >= 80 ? T.green : data.genelBasari >= 50 ? T.amber : T.red, lineHeight: 1 }}>%{data.genelBasari}</div>
                   <div style={{ fontSize: 13, color: T.textSoft, marginTop: 6 }}>{data.toplamTamamlanan} tamamlanan / {toplamHedef} hedef</div>
                   <div style={{ marginTop: 12, height: 10, background: T.border, borderRadius: 5, overflow: 'hidden' }}>
@@ -404,13 +404,13 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
 
                 {/* Grup bazlı bar grafik */}
                 <div className="verde-card" style={{ padding: '16px 20px', gridColumn: '1 / -1' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Bazlı Tamamlanan Frekans (İlk 10)</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Bazlı Tamamlanan Frekans (İlk 10)</div>
                   <BarChart data={data.grupMetrikleri.slice(0, 10)} valueKey="tamamlanan" labelKey="grup" color={T.greenMid} />
                 </div>
 
                 {/* Grup bazlı kayıp bar grafik */}
                 <div className="verde-card" style={{ padding: '16px 20px', gridColumn: '1 / -1' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Bazlı Kayıp Frekans (İlk 10)</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Bazlı Kayıp Frekans (İlk 10)</div>
                   <BarChart data={data.grupMetrikleri.slice(0, 10)} valueKey="kayip" labelKey="grup" color={T.red} />
                 </div>
               </div>
@@ -420,8 +420,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {activeTab === 'Grup Metrikleri' && (
               <div className="verde-card" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Frekans Metrikleri</div>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{data.grupMetrikleri.length} grup</span>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Frekans Metrikleri</div>
+                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{data.grupMetrikleri.length} grup</span>
                 </div>
                 {/* Toplamlar */}
                 {data.grupMetrikleri.length > 0 && (() => {
@@ -463,8 +463,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {activeTab === 'Tamamlanan' && (
               <div className="verde-card" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Tamamlanan Frekanslar</div>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{data.tamamlananGorevler.length} kayıt</span>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Tamamlanan Frekanslar</div>
+                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{data.tamamlananGorevler.length} kayıt</span>
                 </div>
                 <DataTable
                   headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
@@ -477,8 +477,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {activeTab === 'Sapmalar' && (
               <div className="verde-card" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.sapmaGorevler.length} kayıt</span>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
+                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.sapmaGorevler.length} kayıt</span>
                 </div>
                 <DataTable
                   headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'SAPMA NEDENİ']}
@@ -491,8 +491,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {activeTab === 'Kayıp Frekanslar' && (
               <div className="verde-card" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar</div>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: T.redLight, color: T.red }}>{data.kayipGorevler.length} kayıt</span>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar</div>
+                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.redLight, color: T.red }}>{data.kayipGorevler.length} kayıt</span>
                 </div>
                 <DataTable
                   headers={['SN', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM', 'KAYIP NEDENİ']}
@@ -505,8 +505,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {activeTab === 'Frekans Dışı' && (
               <div className="verde-card" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Spesifik Görevler)</div>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{data.frekansDisiGorevler.length} kayıt</span>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Spesifik Görevler)</div>
+                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{data.frekansDisiGorevler.length} kayıt</span>
                 </div>
                 <DataTable
                   headers={['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH-SAAT', 'AÇIKLAMA']}
