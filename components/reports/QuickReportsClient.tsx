@@ -29,6 +29,7 @@ type QuickPayload = {
   summary: { title: string; value: string | number; hint?: string }[]
   options: {
     locations: { id: string; label: string; parentId?: string | null }[]
+    parentLocations?: { id: string; label: string }[]
     users: { id: string; label: string }[]
     statuses: string[]
   }
@@ -52,6 +53,7 @@ type ChartFilters = {
   userId: string
   status: string
   groupId: string
+  parentLocationId: string
 }
 
 const TYPE_OPTIONS: { key: QuickType; title: string; desc: string; accent: string }[] = [
@@ -364,6 +366,7 @@ function getDefaultChartFilters(): ChartFilters {
     userId: '',
     status: '',
     groupId: '',
+    parentLocationId: '',
   }
 }
 
@@ -380,7 +383,7 @@ function getChartFilterMeta(type: QuickType, key: string) {
     return { date: true, location: false, user: false, status: false }
   }
   if (type === 'location_groups') {
-    return { date: true, location: false, user: false, status: false, group: true }
+    return { date: true, location: false, user: false, status: false, group: true, parentLocation: true }
   }
   if (key === 'g1') return { date: true, location: false, user: false, status: false }
   if (key === 'g2') return { date: true, location: false, user: false, status: true }
@@ -818,6 +821,7 @@ function QuickChartCard({
         if (filterMeta.user && filters.userId) params.set('userId', filters.userId)
         if (filterMeta.status && filters.status) params.set('status', filters.status)
         if ((filterMeta as any).group && filters.groupId) params.set('groupId', filters.groupId)
+        if ((filterMeta as any).parentLocation && filters.parentLocationId) params.set('parentLocationId', filters.parentLocationId)
 
         const res = await fetch(`/api/reports/quick?${params.toString()}`, { cache: 'no-store' })
         const json = await res.json()
@@ -891,12 +895,28 @@ function QuickChartCard({
               </div>
             ) : null}
 
+            {(filterMeta as any).parentLocation && (options.parentLocations ?? []).length > 0 ? (
+              <div>
+                <label className="verde-label">Üst Lokasyon</label>
+                <select
+                  className="verde-input"
+                  value={filters.parentLocationId}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, parentLocationId: e.target.value, groupId: '' }))}
+                >
+                  <option value="">Tüm üst lokasyonlar</option>
+                  {(options.parentLocations ?? []).map((loc) => <option key={loc.id} value={loc.id}>{loc.label}</option>)}
+                </select>
+              </div>
+            ) : null}
+
             {(filterMeta as any).group && options.locations.length > 0 ? (
               <div>
                 <label className="verde-label">Lokasyon Grubu</label>
                 <select className="verde-input" value={filters.groupId} onChange={(e) => setFilters((prev) => ({ ...prev, groupId: e.target.value }))}>
                   <option value="">Tüm gruplar</option>
-                  {options.locations.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+                  {options.locations
+                    .filter((g) => !filters.parentLocationId || g.parentId === filters.parentLocationId)
+                    .map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
                 </select>
               </div>
             ) : null}

@@ -31,6 +31,7 @@ type Filters = {
   userId?: string | null
   status?: string | null
   groupId?: string | null
+  parentLocationId?: string | null
 }
 
 type ChartDatum = Record<string, string | number>
@@ -40,6 +41,7 @@ type QuickReportResponse = {
   summary: { title: string; value: string | number; hint?: string }[]
   options: {
     locations: { id: string; label: string; parentId?: string | null }[]
+    parentLocations?: { id: string; label: string }[]
     users: { id: string; label: string }[]
     statuses: string[]
   }
@@ -385,20 +387,34 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
   })
   // ── LOKASYON GRUPLARI ──────────────────────────────────────────────────
   if (type === 'location_groups') {
+    // Üst lokasyonlar (parent_id = null)
+    const parentLocs = locs.filter((x: any) => !x.parent_id)
+    const parentLocOptions = parentLocs.map((x: any) => ({ id: x.id, label: x.tanim ?? '-' }))
+      .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label, 'tr'))
+
     // Grupları çek
     let grpQ = admin.from('lokasyon_gruplari').select('id,firma_id,ad,ust_lokasyon_id,kayit_tarihi').order('ad')
     if (filters.firmaId) grpQ = grpQ.eq('firma_id', filters.firmaId)
     const { data: grpList } = await grpQ
 
+    // Seçili üst lokasyon filtresi
+    const selectedParentId = filters.parentLocationId || null
+    const filteredGrpList = selectedParentId
+      ? (grpList ?? []).filter((g: any) => g.ust_lokasyon_id === selectedParentId)
+      : (grpList ?? [])
+
     // Üyeleri çek
     const { data: members } = await admin.from('lokasyon_grup_uyeleri').select('grup_id,lokasyon_id')
     const grpLocMap: Record<string, string[]> = {}
-    const allLocIds: string[] = []
     for (const m of members ?? []) {
       if (!grpLocMap[m.grup_id]) grpLocMap[m.grup_id] = []
       grpLocMap[m.grup_id].push(m.lokasyon_id)
-      allLocIds.push(m.lokasyon_id)
     }
+
+    // Seçili gruptaki lokasyon id'leri
+    const selectedGrpId = filters.groupId || null
+    const activeGrpIds = selectedGrpId ? [selectedGrpId] : filteredGrpList.map((g: any) => g.id)
+    const activeLocIds = activeGrpIds.flatMap((gid: string) => grpLocMap[gid] ?? [])
 
     // Görevleri çek — aktif + arşiv birleşimi
     const arsivCols = 'lokasyon_id,durum,aktif_olma_tarihi,firma_id'
@@ -407,11 +423,9 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     if (filters.firmaId) { qAktifGrp = qAktifGrp.eq('firma_id', filters.firmaId); qArsivGrp = qArsivGrp.eq('firma_id', filters.firmaId) }
     if (filters.dateFrom) { qAktifGrp = qAktifGrp.gte('aktif_olma_tarihi', filters.dateFrom); qArsivGrp = qArsivGrp.gte('aktif_olma_tarihi', filters.dateFrom) }
     if (filters.dateTo)   { qAktifGrp = qAktifGrp.lte('aktif_olma_tarihi', filters.dateTo);   qArsivGrp = qArsivGrp.lte('aktif_olma_tarihi', filters.dateTo) }
-
-    const selectedGrpId = filters.groupId
-    if (selectedGrpId && grpLocMap[selectedGrpId]) {
-      qAktifGrp = qAktifGrp.in('lokasyon_id', grpLocMap[selectedGrpId])
-      qArsivGrp  = (qArsivGrp as any).in('lokasyon_id', grpLocMap[selectedGrpId])
+    if (activeLocIds.length > 0) {
+      qAktifGrp = qAktifGrp.in('lokasyon_id', activeLocIds)
+      qArsivGrp  = (qArsivGrp as any).in('lokasyon_id', activeLocIds)
     }
 
     const [{ data: aktifGrp }, { data: arsivGrp }] = await Promise.all([qAktifGrp, qArsivGrp])
@@ -425,15 +439,20 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     }
 
     // Grup bazında istatistik
-    const grpStats = (grpList ?? []).map((grp: any) => {
+    // Bar label: "ÜstLokasyon / Grup" formatı (filtre yoksa), sadece grup adı (filtre varsa)
+    const grpStats = filteredGrpList.map((grp: any) => {
+      const ustLokTanim = locMap.get(grp.ust_lokasyon_id)?.tanim ?? null
+      const barLabel = selectedParentId
+        ? grp.ad
+        : (ustLokTanim ? `${ustLokTanim} / ${grp.ad}` : grp.ad)
       const lIds = grpLocMap[grp.id] ?? []
       let toplam = 0, tamamlanan = 0
       for (const lid of lIds) { toplam += locGorevMap[lid]?.toplam ?? 0; tamamlanan += locGorevMap[lid]?.tamamlanan ?? 0 }
       const basari = toplam > 0 ? Math.round((tamamlanan / toplam) * 100) : 0
-      return { grup: grp.ad, toplam, tamamlanan, basari, lokasyon_sayisi: lIds.length }
-    }).filter(s => s.toplam > 0 || true).sort((a, b) => b.toplam - a.toplam)
+      return { grup: barLabel, toplam, tamamlanan, basari, lokasyon_sayisi: lIds.length }
+    }).sort((a: { toplam: number; grup: string }, b: { toplam: number; grup: string }) => b.toplam - a.toplam)
 
-    // Günlük trend (seçili grup veya tüm)
+    // Günlük trend
     const trendMap: Record<string, { tamamlanan: number; diger: number }> = {}
     for (const g of gorevler ?? []) {
       const day = (g.aktif_olma_tarihi ?? '').slice(0, 10)
@@ -445,25 +464,31 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     const trendData = Object.entries(trendMap).sort(([a], [b]) => a.localeCompare(b))
       .map(([tarih, v]) => ({ tarih, tamamlanan: v.tamamlanan, diger: v.diger }))
 
-    const grpOptions = (grpList ?? []).map((g: any) => ({ id: g.id, label: g.ad }))
-    const totalToplam = grpStats.reduce((s, x) => s + x.toplam, 0)
-    const totalTamamlanan = grpStats.reduce((s, x) => s + x.tamamlanan, 0)
+    // Grup options: parentId = ust_lokasyon_id (client-side Seçim2 filtresi için)
+    const grpOptions = (grpList ?? []).map((g: any) => ({ id: g.id, label: g.ad, parentId: g.ust_lokasyon_id ?? null }))
+
+    const totalToplam = grpStats.reduce((s: number, x: { toplam: number }) => s + x.toplam, 0)
+    const totalTamamlanan = grpStats.reduce((s: number, x: { tamamlanan: number }) => s + x.tamamlanan, 0)
     const genelBasari = totalToplam > 0 ? Math.round((totalTamamlanan / totalToplam) * 100) : 0
+
+    const parentLabel = selectedParentId ? (locMap.get(selectedParentId)?.tanim ?? '-') : null
+    const grpLabel = selectedGrpId ? ((grpList ?? []).find((g: any) => g.id === selectedGrpId)?.ad ?? '-') : null
+    const trendSubtitle = grpLabel ? `Grup: ${grpLabel}` : parentLabel ? `Üst lokasyon: ${parentLabel}` : 'Tüm gruplar'
 
     return {
       type,
       summary: [
         { title: 'Toplam Grup', value: (grpList ?? []).length },
+        { title: 'Filtrelenen Grup', value: filteredGrpList.length },
         { title: 'Toplam Görev', value: totalToplam, hint: 'Tarih aralığı' },
-        { title: 'Tamamlanan', value: totalTamamlanan },
         { title: 'Genel Başarı', value: `%${genelBasari}` },
       ],
-      options: { locations: grpOptions, users: [], statuses: [] },
+      options: { locations: grpOptions, parentLocations: parentLocOptions, users: [], statuses: [] },
       charts: [
-        chartOrEmpty({ key: 'lg1', title: 'Grup bazlı görev sayısı', subtitle: 'Her grubun tarih aralığındaki toplam görevi', chart: 'bar', data: grpStats, xKey: 'grup', dataKey: 'toplam' }),
-        chartOrEmpty({ key: 'lg2', title: 'Grup bazlı başarı oranı (%)', subtitle: 'Tamamlanma yüzdesine göre gruplar', chart: 'bar', data: grpStats, xKey: 'grup', dataKey: 'basari' }),
-        chartOrEmpty({ key: 'lg3', title: 'Günlük görev trendi', subtitle: selectedGrpId ? `Seçili grup filtreli` : 'Tüm gruplar', chart: 'line', data: trendData, xKey: 'tarih', dataKey: 'tamamlanan' }),
-        chartOrEmpty({ key: 'lg4', title: 'Lokasyon sayısına göre gruplar', subtitle: 'Her grubun lokasyon adedi', chart: 'bar', data: grpStats, xKey: 'grup', dataKey: 'lokasyon_sayisi' }),
+        chartOrEmpty({ key: 'lg1', title: 'Grup bazlı görev sayısı', subtitle: parentLabel ? `Üst lokasyon: ${parentLabel}` : 'Tüm gruplar', chart: 'bar', data: grpStats, xKey: 'grup', dataKey: 'toplam' }),
+        chartOrEmpty({ key: 'lg2', title: 'Grup bazlı başarı oranı (%)', subtitle: parentLabel ? `Üst lokasyon: ${parentLabel}` : 'Tüm gruplar', chart: 'bar', data: grpStats, xKey: 'grup', dataKey: 'basari' }),
+        chartOrEmpty({ key: 'lg3', title: 'Günlük görev trendi', subtitle: trendSubtitle, chart: 'line', data: trendData, xKey: 'tarih', dataKey: 'tamamlanan' }),
+        chartOrEmpty({ key: 'lg4', title: 'Lokasyon sayısına göre gruplar', subtitle: parentLabel ? `Üst lokasyon: ${parentLabel}` : 'Tüm gruplar', chart: 'bar', data: grpStats, xKey: 'grup', dataKey: 'lokasyon_sayisi' }),
       ],
     }
   }

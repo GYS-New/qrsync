@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
       userId: searchParams.get('userId'),
       status: searchParams.get('status'),
       groupId: searchParams.get('groupId'),
+      parentLocationId: searchParams.get('parentLocationId'),
     })
 
     return NextResponse.json(payload)
