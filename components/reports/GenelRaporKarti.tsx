@@ -99,7 +99,7 @@ function BarChart({ data, valueKey, labelKey, color }: {
 }
 
 // ── Pasta grafik ───────────────────────────────────────────────────
-function PieChart({ slices }: { slices: { label: string; value: number; color: string }[] }) {
+function PieChart({ slices, size = 120 }: { slices: { label: string; value: number; color: string }[]; size?: number }) {
   const total = slices.reduce((s, x) => s + x.value, 0)
   if (!total) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
   const cx = 50, cy = 50, r = 40
@@ -110,19 +110,20 @@ function PieChart({ slices }: { slices: { label: string; value: number; color: s
     angle += a
     const x2 = cx + r * Math.cos(angle), y2 = cy + r * Math.sin(angle)
     const large = a > Math.PI ? 1 : 0
-    return { d: `M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z`, color: s.color, label: s.label, pct: Math.round(s.value / total * 100) }
+    return { d: `M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z`, color: s.color, label: s.label, value: s.value, pct: Math.round(s.value / total * 100) }
   })
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-      <svg viewBox="0 0 100 100" style={{ width: 120, height: 120, flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+      <svg viewBox="0 0 100 100" style={{ width: size, height: size, flexShrink: 0 }}>
         {paths.map((p, i) => <path key={i} d={p.d} fill={p.color} stroke="#fff" strokeWidth={0.8} />)}
       </svg>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {paths.map((p, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: p.color, flexShrink: 0 }} />
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+            <div style={{ width: 12, height: 12, borderRadius: 3, background: p.color, flexShrink: 0 }} />
             <span style={{ color: T.textSoft }}>{p.label}</span>
-            <span style={{ fontWeight: 700, color: T.text, marginLeft: 'auto' }}>{p.pct}%</span>
+            <span style={{ fontWeight: 700, color: T.text, marginLeft: 4 }}>{p.value}</span>
+            <span style={{ color: T.textSoft, fontSize: 12 }}>(%{p.pct})</span>
           </div>
         ))}
       </div>
@@ -321,13 +322,17 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       .map(([neden, sayi]) => ({ neden, sayi }))
       .sort((a, b) => b.sayi - a.sayi)
 
-    // Grup başarı rengi helper
-    const grupRenk = (g: GrupMetrik) => {
-      const pct = g.hedef > 0 ? Math.round(g.tamamlanan / g.hedef * 100) : 0
-      return pct >= 80 ? T.green : pct >= 50 ? T.amber : T.red
+    // Grup bazlı tamamlanan (aynı isimli grupları birleştir, tüm gruplar)
+    const grupAgg = new Map<string, { tamamlanan: number; hedef: number; sapma: number; kayip: number }>()
+    for (const g of data.grupMetrikleri) {
+      const ex = grupAgg.get(g.grup) ?? { tamamlanan: 0, hedef: 0, sapma: 0, kayip: 0 }
+      grupAgg.set(g.grup, { tamamlanan: ex.tamamlanan + g.tamamlanan, hedef: ex.hedef + g.hedef, sapma: ex.sapma + g.sapma, kayip: ex.kayip + g.kayip })
     }
+    const grupBazli = [...grupAgg.entries()]
+      .map(([grup, v]) => ({ grup, ...v }))
+      .sort((a, b) => b.tamamlanan - a.tamamlanan)
 
-    return { toplamGerceklesen, genelOran, persBazli, lokBazli, kayipNedeni, sapmaNedeni, grupRenk }
+    return { toplamGerceklesen, genelOran, persBazli, lokBazli, kayipNedeni, sapmaNedeni, grupBazli }
   }, [data, toplamHedef])
 
   return (
@@ -462,12 +467,13 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   {/* 6 stat grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 10 }}>
                     {[
-                      { label: 'Hedef Frekans',    value: toplamHedef,                      color: T.blue,    bg: T.blueLight },
-                      { label: 'Tamamlanan',        value: data.toplamTamamlanan,            color: T.green,   bg: T.greenLight },
-                      { label: 'Gerçekleşen',       value: ozetData.toplamGerceklesen,       color: T.greenMid,bg: '#f0fdf4' },
-                      { label: 'Sapma',             value: data.toplamSapma,                 color: T.amber,   bg: T.amberLight },
-                      { label: 'Kayıp',             value: data.toplamKayip,                 color: T.red,     bg: T.redLight },
-                      { label: `${data.gunSayisi} Gün`, value: data.frekansDisiGorevler.length + ' frekans dışı', color: T.gray, bg: T.grayLight },
+                      { label: 'Hedef Frekans',  value: toplamHedef,                   color: T.blue,    bg: T.blueLight },
+                      { label: 'Tamamlanan',      value: data.toplamTamamlanan,         color: T.green,   bg: T.greenLight },
+                      { label: 'Gerçekleşen',     value: ozetData.toplamGerceklesen,    color: T.greenMid,bg: '#f0fdf4' },
+                      { label: 'Sapma',           value: data.toplamSapma,              color: T.amber,   bg: T.amberLight },
+                      { label: 'Kayıp',           value: data.toplamKayip,              color: T.red,     bg: T.redLight },
+                      { label: 'Frekans Dışı',    value: data.frekansDisiGorevler.length, color: T.gray,  bg: T.grayLight },
+                      { label: 'Gün Sayısı',      value: `${data.gunSayisi} gün`,       color: T.gray,    bg: T.grayLight },
                     ].map(s => (
                       <div key={s.label} style={{ padding: '10px 12px', background: s.bg, borderRadius: 8, textAlign: 'center', border: `1px solid ${T.border}` }}>
                         <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
@@ -480,59 +486,20 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 {/* ── 2. Frekans Dağılımı + Grup Tamamlanan Bar ── */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16 }}>
                   <div className="verde-card" style={{ padding: '16px 20px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dağılımı</div>
-                    <PieChart slices={[
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dağılımı</div>
+                    <PieChart size={200} slices={[
                       { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
                       { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
                       { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
                     ]} />
                   </div>
                   <div className="verde-card" style={{ padding: '16px 20px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Bazlı Tamamlanan (İlk 10)</div>
-                    <BarChart data={data.grupMetrikleri.slice(0, 10)} valueKey="tamamlanan" labelKey="grup" color={T.greenMid} />
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Bazlı Tamamlanan</div>
+                    <BarChart data={ozetData.grupBazli} valueKey="tamamlanan" labelKey="grup" color={T.greenMid} />
                   </div>
                 </div>
 
-                {/* ── 3. Grup Performans Tablosu ── */}
-                {data.grupMetrikleri.length > 0 && (
-                  <div className="verde-card" style={{ padding: '16px 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Performans Tablosu</div>
-                      <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{data.grupMetrikleri.length} grup</span>
-                    </div>
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                        <thead>
-                          <tr>{['GRUP', 'LOKASYON', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL'].map((h, i) => (
-                            <th key={h} style={{ padding: '7px 10px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 12, textAlign: i < 2 ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
-                          ))}</tr>
-                        </thead>
-                        <tbody>
-                          {data.grupMetrikleri.map((g, ri) => {
-                            const basariPct = parseInt(g.basariOrani) || 0
-                            const clr = basariPct >= 80 ? T.green : basariPct >= 50 ? T.amber : T.red
-                            return (
-                              <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : '#fff' }}>
-                                <td style={{ padding: '6px 10px', borderBottom: `1px solid ${T.border}`, fontWeight: 600, fontSize: 13 }}>{g.grup}</td>
-                                <td style={{ padding: '6px 10px', borderBottom: `1px solid ${T.border}`, fontSize: 12.5, color: T.textSoft }}>{g.lokasyon}</td>
-                                <td style={{ padding: '6px 10px', borderBottom: `1px solid ${T.border}`, textAlign: 'center' }}>{g.hedef}</td>
-                                <td style={{ padding: '6px 10px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', color: T.greenMid, fontWeight: 700 }}>{g.tamamlanan}</td>
-                                <td style={{ padding: '6px 10px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', color: T.amber }}>{g.sapma}</td>
-                                <td style={{ padding: '6px 10px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', color: T.red }}>{g.kayip}</td>
-                                <td style={{ padding: '6px 10px', borderBottom: `1px solid ${T.border}`, textAlign: 'center' }}>
-                                  <span style={{ fontWeight: 800, color: clr, background: clr + '18', padding: '2px 8px', borderRadius: 6, fontSize: 12 }}>{g.basariOrani}</span>
-                                </td>
-                                <td style={{ padding: '6px 10px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', fontWeight: 600 }}>{g.genelOran}</td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── 4. Personel Bazlı + Kayıp Neden Analizi ── */}
+                {/* ── 3. Personel Bazlı + Lokasyon Bazlı ── */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="verde-card" style={{ padding: '16px 20px' }}>
                     <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Bazlı Tamamlanan (İlk 10)</div>
@@ -542,62 +509,36 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                     }
                   </div>
                   <div className="verde-card" style={{ padding: '16px 20px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Neden Analizi</div>
-                    {ozetData.kayipNedeni.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {ozetData.kayipNedeni.map((n, i) => {
-                          const pct = data.toplamKayip > 0 ? Math.round(n.sayi / data.toplamKayip * 100) : 0
-                          return (
-                            <div key={i}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
-                                <span style={{ color: T.text, fontWeight: 600 }}>{n.neden}</span>
-                                <span style={{ color: T.red, fontWeight: 700 }}>{n.sayi} <span style={{ color: T.textSoft, fontWeight: 400 }}>(%{pct})</span></span>
-                              </div>
-                              <div style={{ height: 7, background: T.border, borderRadius: 4, overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${pct}%`, background: T.red, borderRadius: 4 }} />
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Kayıp kayıt yok</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── 5. Sapma Neden + Lokasyon Bazlı ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div className="verde-card" style={{ padding: '16px 20px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Neden Analizi</div>
-                    {ozetData.sapmaNedeni.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {ozetData.sapmaNedeni.map((n, i) => {
-                          const pct = data.sapmaGorevler.length > 0 ? Math.round(n.sayi / data.sapmaGorevler.length * 100) : 0
-                          return (
-                            <div key={i}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
-                                <span style={{ color: T.text, fontWeight: 600 }}>{n.neden}</span>
-                                <span style={{ color: T.amber, fontWeight: 700 }}>{n.sayi} <span style={{ color: T.textSoft, fontWeight: 400 }}>(%{pct})</span></span>
-                              </div>
-                              <div style={{ height: 7, background: T.border, borderRadius: 4, overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${pct}%`, background: T.amber, borderRadius: 4 }} />
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Sapma kayıt yok</div>
-                    )}
-                  </div>
-                  <div className="verde-card" style={{ padding: '16px 20px' }}>
                     <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Lokasyon Bazlı Tamamlanan (İlk 10)</div>
                     {ozetData.lokBazli.length > 0
                       ? <BarChart data={ozetData.lokBazli} valueKey="sayi" labelKey="lokasyon" color={T.blueMid} />
                       : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
                     }
                   </div>
+                </div>
+
+                {/* ── 4. Kayıp Frekanslar tablosu ── */}
+                <div className="verde-card" style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar</div>
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.redLight, color: T.red }}>{data.kayipGorevler.length} kayıt</span>
+                  </div>
+                  <DataTable
+                    headers={['SN', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM', 'KAYIP NEDENİ']}
+                    rows={data.kayipGorevler.map(r => [r.sn, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum, r.kayipNedeni])}
+                  />
+                </div>
+
+                {/* ── 5. Sapma Frekanslar tablosu ── */}
+                <div className="verde-card" style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.sapmaGorevler.length} kayıt</span>
+                  </div>
+                  <DataTable
+                    headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'SAPMA NEDENİ']}
+                    rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.sapmaNedeni])}
+                  />
                 </div>
 
                 {/* ── 6. Frekans Dışı Çalışmalar ── */}
