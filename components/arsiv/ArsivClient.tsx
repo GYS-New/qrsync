@@ -244,7 +244,12 @@ export default function ArsivClient({
     const ok = await confirm({ title: 'Kalıcı Sil', message: `"${row.tanim}" kalıcı silinsin mi?`, confirmText: 'Kalıcı Sil', variant: 'danger' })
     if (!ok) return
     try {
-      await supabase.from('canli_gorevler_arsiv').delete().eq('id', row.id)
+      const res = await fetch('/api/tasks/sil', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [row.id], tablo: 'canli_gorevler_arsiv', firma_id: firmaId }),
+      })
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error ?? 'Silinemedi')
       setFrekData(p => p.filter(r => r.id !== row.id))
       toast({ type: 'success', title: 'Silindi', message: 'Arşiv kaydı kalıcı olarak silindi.' })
     } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
@@ -294,8 +299,12 @@ export default function ArsivClient({
     const ok = await confirm({ title: 'Kalıcı Sil', message: `"${row.tanim}" kalıcı silinsin mi?\nBu işlem geri alınamaz.`, confirmText: 'Kalıcı Sil', variant: 'danger' })
     if (!ok) return
     try {
-      const { error } = await supabase.from('gorevler').delete().eq('id', row.id)
-      if (error) throw error
+      const res = await fetch('/api/tasks/sil', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [row.id], tablo: 'gorevler', firma_id: firmaId }),
+      })
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error ?? 'Silinemedi')
       setSpesifikData(p => p.filter(r => r.id !== row.id))
       toast({ type: 'success', title: 'Silindi', message: 'Görev kalıcı olarak silindi.' })
     } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
@@ -318,12 +327,21 @@ export default function ArsivClient({
       const toISO   = topluSilTo   ? new Date(topluSilTo   + 'T23:59:59').toISOString() : null
 
       if (topluSilSekme === 'frekansiyel') {
-        let q = supabase.from('canli_gorevler_arsiv').delete().eq('firma_id', firmaId)
+        let q = supabase.from('canli_gorevler_arsiv').select('id').eq('firma_id', firmaId)
         if (projeId) q = (q as any).eq('proje_id', projeId)
         if (fromISO) q = (q as any).gte('arsiv_tarihi', fromISO)
         if (toISO)   q = (q as any).lte('arsiv_tarihi', toISO)
-        const { error } = await q
-        if (error) throw error
+        const { data: rows, error: selErr } = await q
+        if (selErr) throw selErr
+        const ids = (rows ?? []).map((r: any) => r.id)
+        if (ids.length > 0) {
+          const res = await fetch('/api/tasks/sil', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, tablo: 'canli_gorevler_arsiv', firma_id: firmaId }),
+          })
+          const json = await res.json()
+          if (!json.ok) throw new Error(json.error ?? 'Silinemedi')
+        }
         await yukle_frekansiyel()
 
       } else if (topluSilSekme === 'personel') {
@@ -344,13 +362,22 @@ export default function ArsivClient({
 
       } else if (topluSilSekme === 'spesifik') {
         const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-        let q = supabase.from('gorevler').delete().eq('firma_id', firmaId)
+        let q = supabase.from('gorevler').select('id').eq('firma_id', firmaId)
           .or(`durum.eq.IPTAL,and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.lt.${sinir24s})`)
         if (projeId) q = (q as any).eq('proje_id', projeId)
         if (fromISO) q = (q as any).gte('olusturma_tarihi', fromISO)
         if (toISO)   q = (q as any).lte('olusturma_tarihi', toISO)
-        const { error } = await q
-        if (error) throw error
+        const { data: rows, error: selErr } = await q
+        if (selErr) throw selErr
+        const ids = (rows ?? []).map((r: any) => r.id)
+        if (ids.length > 0) {
+          const res = await fetch('/api/tasks/sil', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, tablo: 'gorevler', firma_id: firmaId }),
+          })
+          const json = await res.json()
+          if (!json.ok) throw new Error(json.error ?? 'Silinemedi')
+        }
         await yukle_spesifik()
 
       }

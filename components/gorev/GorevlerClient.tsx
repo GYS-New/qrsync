@@ -333,8 +333,12 @@ export default function GorevlerClient({
       const ok2 = await confirm({ title: '⚠️ Kalıcı Silme Onayı', message: 'Bu görev veritabanından kalıcı olarak silinecek.\n\nBu işlem GERİ ALINAMAZ. Onaylıyor musunuz?', confirmText: 'Evet, Kalıcı Olarak Sil', cancelText: 'İptal', variant: 'danger' })
       if (!ok2) return
       setLoading(true); setError('')
-      const { error: err } = await supabase.from('gorevler').delete().eq('id', id)
-      if (err) showError(err.message)
+      const res = await fetch('/api/tasks/sil', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id], tablo: 'gorevler', firma_id: firmaId }),
+      })
+      const json = await res.json()
+      if (!json.ok) showError(json.error ?? 'Silinemedi')
       else { showSuccess('Görev kalıcı olarak silindi.'); setGorevler(prev => prev.filter(g => g.id !== id)) }
     } else {
       setLoading(true); setError('')

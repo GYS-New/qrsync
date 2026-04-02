@@ -577,7 +577,12 @@ useEffect(() => {
       // TA için: fiziksel silme yok, durum SILINDI yapılır ve listeden düşer.
       await updateDurum(selected.id, 'SILINDI')
     } else {
-      await supabase.from('canli_gorevler').delete().eq('id', selected.id)
+      const res = await fetch('/api/tasks/sil', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [selected.id], tablo: 'canli_gorevler', firma_id: firmaId }),
+      })
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error ?? 'Silinemedi')
     }
     setSelectedId(null)
     setSelectedGorev(null)
