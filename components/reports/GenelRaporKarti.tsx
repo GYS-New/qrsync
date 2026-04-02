@@ -550,7 +550,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       if (raporBitis) params.set('raporBitis', raporBitis)
       if (raporuAlan) params.set('raporuAlan', raporuAlan)
       const res = await fetch(`/api/reports/genel-rapor-excel?${params}`)
-      if (!res.ok) throw new Error('Excel indirilemedi.')
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? 'Excel indirilemedi.')
+      }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
