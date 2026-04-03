@@ -1,4 +1,4 @@
-export async function sendFCMToUser(userId: string, title: string, body: string) {
+export async function sendFCMToUser(userId: string, title: string, body: string, channelId: string = 'default') {
   try {
     const projectId = process.env.FIREBASE_PROJECT_ID
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
@@ -7,7 +7,6 @@ export async function sendFCMToUser(userId: string, title: string, body: string)
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!projectId || !clientEmail || !privateKey || !supabaseUrl || !supabaseKey) return
 
-    // Supabase'den FCM token'larını al (direkt fetch ile)
     const res = await fetch(
       `${supabaseUrl}/rest/v1/device_tokens?user_id=eq.${userId}&aktif=eq.true&fcm_token=not.is.null&select=fcm_token`,
       { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
@@ -15,7 +14,6 @@ export async function sendFCMToUser(userId: string, title: string, body: string)
     const devices: { fcm_token: string }[] = await res.json()
     if (!devices?.length) return
 
-    // JWT oluştur
     const now = Math.floor(Date.now() / 1000)
     const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
     const payload = Buffer.from(JSON.stringify({
@@ -38,6 +36,8 @@ export async function sendFCMToUser(userId: string, title: string, body: string)
     })
     const { access_token } = await tokenRes.json()
 
+    const soundName = channelId === 'gorev_uyari' ? 'vav' : 'default'
+
     for (const d of devices) {
       if (!d.fcm_token) continue
       try {
@@ -48,7 +48,13 @@ export async function sendFCMToUser(userId: string, title: string, body: string)
             message: {
               token: d.fcm_token,
               notification: { title, body },
-              android: { priority: 'high', notification: { sound: 'default' } },
+              android: {
+                priority: 'high',
+                notification: {
+                  sound: soundName,
+                  channel_id: channelId,
+                },
+              },
             },
           }),
         })

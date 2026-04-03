@@ -36,7 +36,8 @@ export async function POST(req: Request) {
     await sendFCMToUser(
       user.id,
       '⏱ Süreli Göreviniz Devam Ediyor',
-      `${lokasyonAdi || 'Lokasyon'} için göreviniz hâlâ aktif. Lütfen uygulamaya dönün.`
+      `${lokasyonAdi || 'Lokasyon'} için göreviniz hâlâ aktif. Lütfen uygulamaya dönün.`,
+      'gorev_uyari'
     )
 
     return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
