@@ -284,7 +284,7 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
   return (
     <div>
       <Topbar title="Spesifik Görevler Raporu" base={base}
-        breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: `${base}/dashboard/raporlar` }, { label: 'Rapor Özelleştir', href: `${base}/dashboard/raporlar/ozellestir` }, { label: 'Spesifik Görevler Raporu' }]} />
+        breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: `${base}/dashboard/raporlar` }, { label: 'Spesifik Görevler Raporu' }]} />
 
       <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 

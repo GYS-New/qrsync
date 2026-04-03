@@ -358,7 +358,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   return (
     <div>
       <Topbar title="Frekansiyel Görevler Raporu" base={base}
-        breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: `${base}/dashboard/raporlar` }, { label: 'Rapor Özelleştir', href: `${base}/dashboard/raporlar/ozellestir` }, { label: 'Frekansiyel Görevler Raporu' }]} />
+        breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: `${base}/dashboard/raporlar` }, { label: 'Frekansiyel Görevler Raporu' }]} />
 
       <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0, overflow: 'hidden' }}>
 
