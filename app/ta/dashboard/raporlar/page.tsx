@@ -104,6 +104,12 @@ export default async function TARaporlarPage() {
   )
   initialRaporTurleri = raporYetkiSonuclari.filter(r => r.gorebilir)
 
+  // frekansiyel/spesifik rapor yetki kontrolü (firma_rapor_turleri dışında)
+  const [frekanYetki, spesifYetki] = await Promise.all([
+    sayfaGorebilirMi(me.rol, 'frekansiyel-rapor', me.firma_id ?? null),
+    sayfaGorebilirMi(me.rol, 'spesifik-rapor', me.firma_id ?? null),
+  ])
+
   
   // Süre analiz kartı için süreli görev durumu
   let sureliGorevAktif: boolean | undefined = undefined
@@ -118,5 +124,5 @@ export default async function TARaporlarPage() {
     sureliGorevAktif = (loks?.length ?? 0) > 0
   }
 
-return <ReportsHubClient base="/ta" initialFirmaId={me.firma_id ?? null} isSA={false} firmaAdi={firmaAdi} initialRaporTurleri={initialRaporTurleri} sureliGorevAktif={sureliGorevAktif} birimFiyatAktif={birimFiyatAktif} />
+return <ReportsHubClient base="/ta" initialFirmaId={me.firma_id ?? null} isSA={false} firmaAdi={firmaAdi} initialRaporTurleri={initialRaporTurleri} sureliGorevAktif={sureliGorevAktif} birimFiyatAktif={birimFiyatAktif} frekanRaporYetki={frekanYetki} spesifRaporYetki={spesifYetki} />
 }

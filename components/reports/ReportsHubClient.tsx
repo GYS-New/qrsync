@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Topbar from '@/components/layout/Topbar'
 import { useRouteLoading } from '@/components/ui/RouteLoadingProvider'
 import { useToast } from '@/components/ui/ToastProvider'
-import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2, MessageSquare, CheckSquare, Receipt } from 'lucide-react'
+import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2, MessageSquare, CheckSquare, Receipt, BarChart2, ClipboardList } from 'lucide-react'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 
@@ -60,16 +60,32 @@ const RAPOR_KARTLARI = [
     eyebrow: 'HAKEDİŞ', badge: 'Excel + PDF', tone: 'amber' as const,
     icon: 'receipt', path: '/raporlar/hakedis', disabled: false,
   },
+  {
+    id: 'frekansiyel_rapor',
+    title: 'Frekansiyel Görevler Raporu',
+    description: 'Canlı görevler bazında lokasyon, grup ve personel frekans analizi, sapma ve kayıp görevler. Excel çıktısı.',
+    eyebrow: 'FREKANSİYEL', badge: 'Excel + PDF', tone: 'green' as const,
+    icon: 'bar2', path: '/raporlar/ozellestir/frekansiyel', disabled: false,
+  },
+  {
+    id: 'spesifik_rapor',
+    title: 'Spesifik Görevler Raporu',
+    description: 'Personel bazlı görev dağılımı, tamamlanma süreleri, başarı oranları ve lokasyon analizi. Excel çıktısı.',
+    eyebrow: 'SPESİFİK', badge: 'Excel + PDF', tone: 'violet' as const,
+    icon: 'clipboard', path: '/raporlar/ozellestir/spesifik', disabled: false,
+  },
 ]
 
 const IKON_MAP: Record<string, ReactNode> = {
-  database: <Database size={22} />,
-  bar:      <BarChart3 size={22} />,
-  sparkles: <Sparkles size={22} />,
-  clock:    <Clock3 size={22} />,
+  database:  <Database size={22} />,
+  bar:       <BarChart3 size={22} />,
+  sparkles:  <Sparkles size={22} />,
+  clock:     <Clock3 size={22} />,
   message:   <MessageSquare size={22} />,
   checklist: <CheckSquare size={22} />,
   receipt:   <Receipt size={22} />,
+  bar2:      <BarChart2 size={22} />,
+  clipboard: <ClipboardList size={22} />,
 }
 
 // ─── HubCard ─────────────────────────────────────────────────────────────────
@@ -143,6 +159,8 @@ export default function ReportsHubClient({
   initialFirmaId,
   sureliGorevAktif,
   birimFiyatAktif,
+  frekanRaporYetki,
+  spesifRaporYetki,
 }: {
   base: string
   firmaAdi?: string | null
@@ -150,7 +168,9 @@ export default function ReportsHubClient({
   initialRaporTurleri?: { id: string; aktif: boolean }[]
   initialFirmaId?: string | null
   sureliGorevAktif?: boolean
-  birimFiyatAktif?: boolean  // Hakediş kartı görünürlüğü
+  birimFiyatAktif?: boolean      // Hakediş kartı görünürlüğü
+  frekanRaporYetki?: boolean     // Frekansiyel rapor yetki (TA/U SSR'dan gelir)
+  spesifRaporYetki?: boolean     // Spesifik rapor yetki (TA/U SSR'dan gelir)
 }) {
   const router     = useRouter()
   const { start }  = useRouteLoading()
@@ -241,8 +261,19 @@ export default function ReportsHubClient({
   //        prop değişmediği sürece bu hesaplama yeniden yapılmaz
   //        herhangi bir client state değişimi bu değeri ETKILEYEMEZ
   const gorunurKartlar = useMemo(() => {
+    // hakedis ve yeni rapor kartları firma_rapor_turleri dışında yönetilir
+    const FIRMA_RAPOR_DISI = new Set(['hakedis', 'frekansiyel_rapor', 'spesifik_rapor'])
+
     const kartlar = RAPOR_KARTLARI
       .filter(k => k.id !== 'hakedis' || hakedisGoster)
+      // SA için frekansiyel/spesifik her zaman görünür; TA/U için prop'tan gelir
+      .filter(k => {
+        if (!isSA) {
+          if (k.id === 'frekansiyel_rapor') return frekanRaporYetki !== false
+          if (k.id === 'spesifik_rapor')    return spesifRaporYetki !== false
+        }
+        return true
+      })
       .map(k => ({
         ...k, icon: IKON_MAP[k.icon], href: `${base}/dashboard${k.path}`,
       }))
@@ -250,7 +281,7 @@ export default function ReportsHubClient({
     if (isSA) {
       // SA: saAktifTurler null ise (henüz yüklenmedi veya hata) tümünü göster
       if (!saAktifTurler) return kartlar
-      return kartlar.filter(k => k.id === 'hakedis' || saAktifTurler.has(k.id))
+      return kartlar.filter(k => FIRMA_RAPOR_DISI.has(k.id) || saAktifTurler.has(k.id))
     }
 
     // TA: initialRaporTurleri prop'undan direkt hesapla
@@ -261,9 +292,9 @@ export default function ReportsHubClient({
     )
     // Aktif ID seti boşsa (hepsi pasif) tümünü göster — bu bir veri tutarsızlığıdır
     if (aktifIdler.size === 0) return kartlar
-    // hakedis firma_rapor_turleri'nde kayıtlı değil — görünürlüğü hakedisGoster ile kontrol edilir
-    return kartlar.filter(k => k.id === 'hakedis' || aktifIdler.has(k.id))
-  }, [isSA, saAktifTurler, base, initialRaporTurleri, hakedisGoster])
+    // hakedis + frekansiyel/spesifik rapor firma_rapor_turleri'nde kayıtlı değil
+    return kartlar.filter(k => FIRMA_RAPOR_DISI.has(k.id) || aktifIdler.has(k.id))
+  }, [isSA, saAktifTurler, base, initialRaporTurleri, hakedisGoster, frekanRaporYetki, spesifRaporYetki])
   // ↑ TA için: sadece `base` veya `initialRaporTurleri` prop'u değişirse yeniden hesaplanır
   //   ProjeContext, FirmaContext, Sidebar, Topbar yeniden render'ı bu hesaplamayı ETKİLEMEZ
 

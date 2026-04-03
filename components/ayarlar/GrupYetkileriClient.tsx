@@ -32,6 +32,8 @@ const SAYFALAR = [
   { kod: 'grafiksel-raporlar',    label: 'Grafiksel Raporlar',         grup: 'Raporlar' },
   { kod: 'ceklist-raporlari',     label: 'Çeklist Raporları',          grup: 'Raporlar' },
   { kod: 'rapor-ozellestir',      label: 'Rapor Özelleştir',           grup: 'Raporlar' },
+  { kod: 'frekansiyel-rapor',    label: 'Frekansiyel Görevler Raporu', grup: 'Raporlar' },
+  { kod: 'spesifik-rapor',       label: 'Spesifik Görevler Raporu',    grup: 'Raporlar' },
   { kod: 'sure-analiz-raporlari', label: 'Süre Analiz Raporları',      grup: 'Raporlar' },
   { kod: 'hakedis-raporu',        label: 'Hakediş Raporu',             grup: 'Raporlar' },
 ]

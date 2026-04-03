@@ -69,6 +69,12 @@ export default async function URaporlarPage() {
   )
   initialRaporTurleri = raporYetkiSonuclari.filter(r => r.gorebilir)
 
+  // frekansiyel/spesifik rapor yetki kontrolü (firma_rapor_turleri dışında)
+  const [frekanYetki, spesifYetki] = await Promise.all([
+    sayfaGorebilirMi(me.rol, 'frekansiyel-rapor', (me as any).firma_id ?? null),
+    sayfaGorebilirMi(me.rol, 'spesifik-rapor', (me as any).firma_id ?? null),
+  ])
+
   // Süre analiz kartı için süreli görev durumu
   let sureliGorevAktif: boolean | undefined = undefined
   if (me.proje_id) {
@@ -90,6 +96,8 @@ export default async function URaporlarPage() {
       firmaAdi={firmaAdi}
       initialRaporTurleri={initialRaporTurleri}
       sureliGorevAktif={sureliGorevAktif}
+      frekanRaporYetki={frekanYetki}
+      spesifRaporYetki={spesifYetki}
     />
   )
 }
