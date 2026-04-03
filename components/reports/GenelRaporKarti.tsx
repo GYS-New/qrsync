@@ -19,7 +19,7 @@ interface Props {
 type Lokasyon = { id: string; tanim: string; parent_id: string | null }
 
 type GrupMetrik = {
-  grup: string; lokasyon: string; gorevTanimi: string; gunlukFrekans: number
+  grup: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gunlukFrekans: number
   hedef: number; tamamlanan: number; sapma: number; kayip: number
   basariOrani: string; genelOran: string
 }
@@ -614,9 +614,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   )
                 })()}
                 <DataTable
-                  headers={['SN', 'GRUP', 'LOKASYON', 'GÜNLÜK FREKANS', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
-                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
-                  accentCol={8} accentColor={T.greenMid}
+                  headers={['SN', 'ÜST LOKASYON', 'GRUP', 'LOKASYON', 'GÜNLÜK FREKANS', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
+                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.ustLokasyon, g.grup, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
+                  accentCol={9} accentColor={T.greenMid}
                 />
               </div>
             )}

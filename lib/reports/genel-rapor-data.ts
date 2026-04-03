@@ -12,6 +12,7 @@ export interface GenelRaporFilters {
 
 export interface GrupMetrik {
   grup: string
+  ustLokasyon: string
   lokasyon: string
   gorevTanimi: string   // Gruba ait görev tanımı (varsa ilk eşleşen)
   gunlukFrekans: number
@@ -418,8 +419,13 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       gorevTanimi = Array.from(taninCounts.entries()).sort((a, b) => b[1] - a[1])[0][0]
     }
 
+    // Grubun üst lokasyonu: grup tablosundaki ust_lokasyon_id'nin tanim'ı
+    const ustLokId = (grup as any).ust_lokasyon_id
+    const ustLokasyon = ustLokId ? ((lokMap.get(ustLokId) as any)?.tanim ?? '') : ''
+
     grupMetrikleri.push({
       grup: (grup as any).ad ?? '',
+      ustLokasyon,
       lokasyon: lokTanim,
       gorevTanimi,
       gunlukFrekans,
@@ -432,36 +438,40 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     })
   }
 
-  // Aynı isimli grupları birleştir (Tümü seçilince farklı üst lokasyonlardaki aynı isimli gruplar tekrarlanır)
-  const birlesikGruplar = new Map<string, GrupMetrik>()
-  for (const gm of grupMetrikleri) {
-    const mevcut = birlesikGruplar.get(gm.grup)
-    if (!mevcut) {
-      birlesikGruplar.set(gm.grup, { ...gm })
-    } else {
-      const yeniHedef     = mevcut.hedef + gm.hedef
-      const yeniTamamlanan = mevcut.tamamlanan + gm.tamamlanan
-      const yeniSapma     = mevcut.sapma + gm.sapma
-      const yeniKayip     = mevcut.kayip + gm.kayip
-      const yeniGunluk    = mevcut.gunlukFrekans + gm.gunlukFrekans
-      const basariOran    = yeniHedef > 0 ? Math.round((yeniTamamlanan / yeniHedef) * 100) : 0
-      const genelOran     = yeniHedef > 0 ? Math.round(((yeniTamamlanan + yeniSapma) / yeniHedef) * 100) : 0
-      birlesikGruplar.set(gm.grup, {
-        grup: gm.grup,
-        lokasyon: '',   // birden fazla lokasyon — boş bırak
-        gorevTanimi: mevcut.gorevTanimi || gm.gorevTanimi,
-        gunlukFrekans: yeniGunluk,
-        hedef: yeniHedef,
-        tamamlanan: yeniTamamlanan,
-        sapma: yeniSapma,
-        kayip: yeniKayip,
-        basariOrani: `%${basariOran}`,
-        genelOran: `%${genelOran}`,
-      })
+  // Üst lokasyon filtresi "Tümü" ise aynı isimli grupları birleştir
+  // (farklı üst lokasyonlardaki aynı isimli gruplar tek satırda toplanır)
+  if (!filters.ustLokasyonId) {
+    const birlesikGruplar = new Map<string, GrupMetrik>()
+    for (const gm of grupMetrikleri) {
+      const mevcut = birlesikGruplar.get(gm.grup)
+      if (!mevcut) {
+        birlesikGruplar.set(gm.grup, { ...gm, ustLokasyon: 'Tümü', lokasyon: 'Tümü' })
+      } else {
+        const yeniHedef      = mevcut.hedef + gm.hedef
+        const yeniTamamlanan = mevcut.tamamlanan + gm.tamamlanan
+        const yeniSapma      = mevcut.sapma + gm.sapma
+        const yeniKayip      = mevcut.kayip + gm.kayip
+        const yeniGunluk     = mevcut.gunlukFrekans + gm.gunlukFrekans
+        const basariOran     = yeniHedef > 0 ? Math.round((yeniTamamlanan / yeniHedef) * 100) : 0
+        const genelOran      = yeniHedef > 0 ? Math.round(((yeniTamamlanan + yeniSapma) / yeniHedef) * 100) : 0
+        birlesikGruplar.set(gm.grup, {
+          grup: gm.grup,
+          ustLokasyon: 'Tümü',
+          lokasyon: 'Tümü',
+          gorevTanimi: mevcut.gorevTanimi || gm.gorevTanimi,
+          gunlukFrekans: yeniGunluk,
+          hedef: yeniHedef,
+          tamamlanan: yeniTamamlanan,
+          sapma: yeniSapma,
+          kayip: yeniKayip,
+          basariOrani: `%${basariOran}`,
+          genelOran: `%${genelOran}`,
+        })
+      }
     }
+    grupMetrikleri.length = 0
+    grupMetrikleri.push(...Array.from(birlesikGruplar.values()))
   }
-  grupMetrikleri.length = 0
-  grupMetrikleri.push(...Array.from(birlesikGruplar.values()))
 
   // Grup yoksa genel toplamı göster
   if (grupMetrikleri.length === 0) {
@@ -477,6 +487,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     if (hedef > 0) {
       grupMetrikleri.push({
         grup: 'Genel',
+        ustLokasyon: '',
         lokasyon: ustLokTanim || altLokTanim || 'Tüm Lokasyonlar',
         gunlukFrekans: Math.round(hedef / gunSayisi),
         hedef,

@@ -114,15 +114,16 @@ export async function GET(request: Request) {
     const ws2 = wb.addWorksheet('Grup Metrikleri')
     setHdr(ws2, 1, [
       { col: 1,  text: 'SN',             width: 6  },
-      { col: 2,  text: 'GRUP',           width: 28 },
-      { col: 3,  text: 'LOKASYON',       width: 22 },
-      { col: 4,  text: 'GÜNLÜK FREKANS', width: 16 },
-      { col: 5,  text: 'HEDEF',          width: 10 },
-      { col: 6,  text: 'TAMAMLANAN',     width: 13 },
-      { col: 7,  text: 'SAPMA',          width: 10 },
-      { col: 8,  text: 'KAYIP',          width: 10 },
-      { col: 9,  text: 'BAŞARI',         width: 10 },
-      { col: 10, text: 'GENEL ORAN',     width: 12 },
+      { col: 2,  text: 'ÜST LOKASYON',  width: 20 },
+      { col: 3,  text: 'GRUP',           width: 28 },
+      { col: 4,  text: 'LOKASYON',       width: 22 },
+      { col: 5,  text: 'GÜNLÜK FREKANS', width: 16 },
+      { col: 6,  text: 'HEDEF',          width: 10 },
+      { col: 7,  text: 'TAMAMLANAN',     width: 13 },
+      { col: 8,  text: 'SAPMA',          width: 10 },
+      { col: 9,  text: 'KAYIP',          width: 10 },
+      { col: 10, text: 'BAŞARI',         width: 10 },
+      { col: 11, text: 'GENEL ORAN',     width: 12 },
     ])
 
     if (data.grupMetrikleri.length > 0) {
@@ -136,23 +137,23 @@ export async function GET(request: Request) {
       const totFill = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFD1FAE5' } }
       const totRow  = ws2.getRow(2)
       totRow.height = 20
-      const totVals: any[] = ['—', 'TOPLAM', '—', tGunluk, tHedef, tTam, tSap, tKay, `%${tBas}`, `%${tGenel}`]
+      const totVals: any[] = ['—', '—', 'TOPLAM', '—', tGunluk, tHedef, tTam, tSap, tKay, `%${tBas}`, `%${tGenel}`]
       totVals.forEach((v, ci) => {
         const c = totRow.getCell(ci + 1)
         c.value = v; c.font = { bold: true, size: 10 }; c.fill = totFill
-        c.alignment = { horizontal: ci < 2 ? 'left' : 'center' }
+        c.alignment = { horizontal: ci < 3 ? 'left' : 'center' }
       })
     }
 
     data.grupMetrikleri.forEach((g, i) => {
       const r = ws2.getRow((data.grupMetrikleri.length > 0 ? 3 : 2) + i)
       r.height = 18
-      const vals: any[] = [i + 1, g.grup, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran]
+      const vals: any[] = [i + 1, g.ustLokasyon, g.grup, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran]
       vals.forEach((v, ci) => {
         const c = r.getCell(ci + 1)
         c.value = v; c.font = { size: 10 }
         c.fill  = i % 2 === 0 ? EVEN_FILL : ODD_FILL
-        c.alignment = { horizontal: ci < 2 ? 'left' : 'center' }
+        c.alignment = { horizontal: ci < 3 ? 'left' : 'center' }
       })
     })
 
