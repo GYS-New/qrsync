@@ -191,9 +191,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   const { firmaId: saFirmaId } = useFirma()
   const currentFirmaId = isSA ? (saFirmaId ?? '') : (tenantFirmaId ?? '')
 
-  const [lokasyonlar,    setLokasyonlar]    = useState<Lokasyon[]>([])
-  const [ustLokasyonId,  setUstLokasyonId]  = useState('')
-  const [altLokasyonId,  setAltLokasyonId]  = useState('')
+  const [lokasyonlar,       setLokasyonlar]       = useState<Lokasyon[]>([])
+  const [ustLokasyonId,     setUstLokasyonId]     = useState('')
+  const [altLokasyonId,     setAltLokasyonId]     = useState('')
+  const [altAltLokasyonId,  setAltAltLokasyonId]  = useState('')
   const [raporBaslangic, setRaporBaslangic] = useState('')
   const [raporBitis,     setRaporBitis]     = useState('')
   const [raporuAlan,     setRaporuAlan]     = useState('')
@@ -203,8 +204,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   const [activeTab,      setActiveTab]      = useState<Tab>('Özet & Grafikler')
   const debRef = useRef<any>(null)
 
-  const ustLokasyonlar = useMemo(() => lokasyonlar.filter(l => !l.parent_id), [lokasyonlar])
-  const altLokasyonlar = useMemo(() => lokasyonlar.filter(l => l.parent_id === ustLokasyonId), [lokasyonlar, ustLokasyonId])
+  const ustLokasyonlar    = useMemo(() => lokasyonlar.filter(l => !l.parent_id), [lokasyonlar])
+  const altLokasyonlar    = useMemo(() => lokasyonlar.filter(l => l.parent_id === ustLokasyonId), [lokasyonlar, ustLokasyonId])
+  const altAltLokasyonlar = useMemo(() => lokasyonlar.filter(l => l.parent_id === altLokasyonId), [lokasyonlar, altLokasyonId])
+  const hasAltAlt         = altLokasyonId !== '' && altAltLokasyonlar.length > 0
 
   // Lokasyon listesini çek
   useEffect(() => {
@@ -218,14 +221,15 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
 
   const buildParams = useCallback(() => {
     const p = new URLSearchParams({ firmaId: currentFirmaId })
-    if (projeId)        p.set('projeId', projeId)
-    if (ustLokasyonId)  p.set('ustLokasyonId', ustLokasyonId)
-    if (altLokasyonId)  p.set('altLokasyonId', altLokasyonId)
-    if (raporBaslangic) p.set('raporBaslangic', raporBaslangic)
-    if (raporBitis)     p.set('raporBitis', raporBitis)
-    if (raporuAlan)     p.set('raporuAlan', raporuAlan)
+    if (projeId)           p.set('projeId', projeId)
+    if (ustLokasyonId)     p.set('ustLokasyonId', ustLokasyonId)
+    if (altLokasyonId)     p.set('altLokasyonId', altLokasyonId)
+    if (altAltLokasyonId)  p.set('altAltLokasyonId', altAltLokasyonId)
+    if (raporBaslangic)    p.set('raporBaslangic', raporBaslangic)
+    if (raporBitis)        p.set('raporBitis', raporBitis)
+    if (raporuAlan)        p.set('raporuAlan', raporuAlan)
     return p
-  }, [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, raporBaslangic, raporBitis, raporuAlan])
+  }, [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, altAltLokasyonId, raporBaslangic, raporBitis, raporuAlan])
 
   const fetchData = useCallback(async () => {
     if (!currentFirmaId) return
@@ -390,17 +394,23 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
               { label: 'Başlangıç',    node: <input type="date" value={raporBaslangic} onChange={e => setRaporBaslangic(e.target.value)} style={inp} /> },
               { label: 'Bitiş',        node: <input type="date" value={raporBitis}     onChange={e => setRaporBitis(e.target.value)}     style={inp} /> },
               { label: 'Üst Lokasyon', node: (
-                <select value={ustLokasyonId} onChange={e => { setUstLokasyonId(e.target.value); setAltLokasyonId('') }} style={inp}>
+                <select value={ustLokasyonId} onChange={e => { setUstLokasyonId(e.target.value); setAltLokasyonId(''); setAltAltLokasyonId('') }} style={inp}>
                   <option value="">Tümü</option>
                   {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
                 </select>
               )},
               { label: 'Alt Lokasyon', node: (
-                <select value={altLokasyonId} onChange={e => setAltLokasyonId(e.target.value)} style={inp} disabled={!ustLokasyonId}>
+                <select value={altLokasyonId} onChange={e => { setAltLokasyonId(e.target.value); setAltAltLokasyonId('') }} style={inp} disabled={!ustLokasyonId}>
                   <option value="">Tümü</option>
                   {altLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
                 </select>
               )},
+              ...(hasAltAlt ? [{ label: 'Alt-Alt Lokasyon', node: (
+                <select value={altAltLokasyonId} onChange={e => setAltAltLokasyonId(e.target.value)} style={inp}>
+                  <option value="">Tümü</option>
+                  {altAltLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                </select>
+              )}] : []),
               { label: 'Raporu Alan',  node: <input type="text" value={raporuAlan} onChange={e => setRaporuAlan(e.target.value)} placeholder="Ad Soyad" style={inp} /> },
             ] as { label: string; node: React.ReactNode }[]).map(({ label, node }) => (
               <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -615,7 +625,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   )
                 })()}
                 <DataTable
-                  headers={['SN', 'GRUP', 'ÜST LOKASYON', 'LOKASYON', 'GÜNLÜK FREKANS', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
+                  headers={['SN', 'GRUP',
+                    altAltLokasyonId ? 'ALT LOKASYON' : altLokasyonId ? 'ÜST LOKASYON' : 'ÜST LOKASYON',
+                    altAltLokasyonId ? 'ALT-ALT LOKASYON' : altLokasyonId ? 'ALT LOKASYON' : 'LOKASYON',
+                    'GÜNLÜK FREKANS', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
                   rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
                   accentCol={9} accentColor={T.greenMid} leftCols={[1, 2, 3]}
                 />

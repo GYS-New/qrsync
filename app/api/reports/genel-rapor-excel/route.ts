@@ -21,9 +21,10 @@ export async function GET(request: Request) {
 
     const data = await buildGenelRaporData({
       firmaId,
-      projeId:        p.get('projeId')        || null,
-      ustLokasyonId:  p.get('ustLokasyonId')  || null,
-      altLokasyonId:  p.get('altLokasyonId')  || null,
+      projeId:          p.get('projeId')          || null,
+      ustLokasyonId:    p.get('ustLokasyonId')    || null,
+      altLokasyonId:    p.get('altLokasyonId')    || null,
+      altAltLokasyonId: p.get('altAltLokasyonId') || null,
       raporBaslangic: p.get('raporBaslangic') || null,
       raporBitis:     p.get('raporBitis')     || null,
       raporuAlan:     p.get('raporuAlan')     || null,

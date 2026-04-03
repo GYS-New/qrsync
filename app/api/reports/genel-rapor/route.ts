@@ -24,8 +24,9 @@ export async function GET(request: Request) {
     const data = await buildGenelRaporData({
       firmaId,
       projeId,
-      ustLokasyonId: searchParams.get('ustLokasyonId'),
-      altLokasyonId: searchParams.get('altLokasyonId'),
+      ustLokasyonId:    searchParams.get('ustLokasyonId'),
+      altLokasyonId:    searchParams.get('altLokasyonId'),
+      altAltLokasyonId: searchParams.get('altAltLokasyonId'),
       raporBaslangic: searchParams.get('raporBaslangic'),
       raporBitis: searchParams.get('raporBitis'),
       raporuAlan: searchParams.get('raporuAlan'),
