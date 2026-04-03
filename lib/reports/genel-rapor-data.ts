@@ -26,6 +26,7 @@ export interface GrupMetrik {
 export interface TamamlananRow {
   sn: number
   personel: string
+  ustLokasyon: string
   lokasyon: string
   gorevNo: string
   gorevTanimi: string
@@ -36,6 +37,7 @@ export interface TamamlananRow {
 export interface SapmaRow {
   sn: number
   personel: string
+  ustLokasyon: string
   lokasyon: string
   gorevNo: string
   gorevTanimi: string
@@ -45,6 +47,7 @@ export interface SapmaRow {
 
 export interface KayipRow {
   sn: number
+  ustLokasyon: string
   lokasyon: string
   gorevNo: string
   gorevTanimi: string
@@ -168,6 +171,18 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       current = current.parent_id ? lokMap.get(current.parent_id) as any : null
     }
     return parts.join(' > ')
+  }
+
+  // Bir lokasyonun en tepedeki (kök) üst lokasyon adını döndürür
+  function getUstLokasyon(lokId: string): string {
+    let cur = lokMap.get(lokId) as any
+    if (!cur) return ''
+    while (cur.parent_id) {
+      const parent = lokMap.get(cur.parent_id) as any
+      if (!parent) break
+      cur = parent
+    }
+    return cur.tanim ?? ''
   }
 
   if (filters.ustLokasyonId) {
@@ -433,7 +448,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       const genelOran     = yeniHedef > 0 ? Math.round(((yeniTamamlanan + yeniSapma) / yeniHedef) * 100) : 0
       birlesikGruplar.set(gm.grup, {
         grup: gm.grup,
-        lokasyon: mevcut.lokasyon,
+        lokasyon: '',   // birden fazla lokasyon — boş bırak
         gorevTanimi: mevcut.gorevTanimi || gm.gorevTanimi,
         gunlukFrekans: yeniGunluk,
         hedef: yeniHedef,
@@ -495,6 +510,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       return {
         sn: i + 1,
         personel: kullanici,
+        ustLokasyon: getUstLokasyon(g.lokasyon_id),
         lokasyon: lok?.tanim ?? '',
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
@@ -514,6 +530,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       return {
         sn: i + 1,
         personel: kullanici,
+        ustLokasyon: getUstLokasyon(g.lokasyon_id),
         lokasyon: lok?.tanim ?? '',
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
@@ -541,6 +558,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       const lok = lokMap.get(g.lokasyon_id) as any
       return {
         sn: i + 1,
+        ustLokasyon: getUstLokasyon(g.lokasyon_id),
         lokasyon: lok?.tanim ?? '',
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',

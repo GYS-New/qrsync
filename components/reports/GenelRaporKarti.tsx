@@ -23,9 +23,9 @@ type GrupMetrik = {
   hedef: number; tamamlanan: number; sapma: number; kayip: number
   basariOrani: string; genelOran: string
 }
-type TamamlananRow  = { sn: number; personel: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string }
-type SapmaRow       = { sn: number; personel: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; sapmaNedeni: string }
-type KayipRow       = { sn: number; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string; kayipNedeni: string }
+type TamamlananRow  = { sn: number; personel: string; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string }
+type SapmaRow       = { sn: number; personel: string; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; sapmaNedeni: string }
+type KayipRow       = { sn: number; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string; kayipNedeni: string }
 type FrekansDisiRow = { sn: number; ustLokasyon: string; grupTanimi: string; lokasyonTanimi: string; personel: string; tarihSaat: string; aciklama: string }
 
 type RaporData = {
@@ -629,8 +629,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{data.tamamlananGorevler.length} kayıt</span>
                 </div>
                 <DataTable
-                  headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
-                  rows={data.tamamlananGorevler.map(r => [r.sn, r.personel, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum])}
+                  headers={['SN', 'PERSONEL', 'ÜST LOKASYON', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
+                  rows={data.tamamlananGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum])}
                 />
               </div>
             )}
@@ -643,8 +643,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.sapmaGorevler.length} kayıt</span>
                 </div>
                 <DataTable
-                  headers={['SN', 'PERSONEL', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'SAPMA NEDENİ']}
-                  rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.sapmaNedeni])}
+                  headers={['SN', 'PERSONEL', 'ÜST LOKASYON', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'SAPMA NEDENİ']}
+                  rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.sapmaNedeni])}
                 />
               </div>
             )}
@@ -657,8 +657,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.redLight, color: T.red }}>{data.kayipGorevler.length} kayıt</span>
                 </div>
                 <DataTable
-                  headers={['SN', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM', 'KAYIP NEDENİ']}
-                  rows={data.kayipGorevler.map(r => [r.sn, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum, r.kayipNedeni])}
+                  headers={['SN', 'ÜST LOKASYON', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM', 'KAYIP NEDENİ']}
+                  rows={data.kayipGorevler.map(r => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum, r.kayipNedeni])}
                 />
               </div>
             )}

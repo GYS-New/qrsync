@@ -159,17 +159,18 @@ export async function GET(request: Request) {
     // ── Sayfa 3: Tamamlanan Frekanslar ───────────────────────────────────────
     const ws3 = wb.addWorksheet('Tamamlanan')
     setHdr(ws3, 1, [
-      { col: 1, text: 'SN',           width: 6  },
-      { col: 2, text: 'PERSONEL',     width: 22 },
-      { col: 3, text: 'LOKASYON',     width: 22 },
-      { col: 4, text: 'GÖREV NO',     width: 14 },
-      { col: 5, text: 'GÖREV TANIMI', width: 32 },
-      { col: 6, text: 'TARİH-SAAT',  width: 18 },
-      { col: 7, text: 'DURUM',        width: 14 },
+      { col: 1, text: 'SN',            width: 6  },
+      { col: 2, text: 'PERSONEL',      width: 22 },
+      { col: 3, text: 'ÜST LOKASYON', width: 20 },
+      { col: 4, text: 'LOKASYON',      width: 22 },
+      { col: 5, text: 'GÖREV NO',      width: 14 },
+      { col: 6, text: 'GÖREV TANIMI',  width: 32 },
+      { col: 7, text: 'TARİH-SAAT',   width: 18 },
+      { col: 8, text: 'DURUM',         width: 14 },
     ])
     data.tamamlananGorevler.forEach((t, i) => {
       const r = ws3.getRow(2 + i); r.height = 17
-      const vals: any[] = [t.sn, t.personel, t.lokasyon, t.gorevNo, t.gorevTanimi, t.tarihSaat, t.durum]
+      const vals: any[] = [t.sn, t.personel, t.ustLokasyon, t.lokasyon, t.gorevNo, t.gorevTanimi, t.tarihSaat, t.durum]
       vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
     })
 
@@ -178,15 +179,16 @@ export async function GET(request: Request) {
     setHdr(ws4, 1, [
       { col: 1, text: 'SN',            width: 6  },
       { col: 2, text: 'PERSONEL',      width: 22 },
-      { col: 3, text: 'LOKASYON',      width: 22 },
-      { col: 4, text: 'GÖREV NO',      width: 14 },
-      { col: 5, text: 'GÖREV TANIMI',  width: 32 },
-      { col: 6, text: 'TARİH-SAAT',   width: 18 },
-      { col: 7, text: 'SAPMA NEDENİ', width: 24 },
+      { col: 3, text: 'ÜST LOKASYON', width: 20 },
+      { col: 4, text: 'LOKASYON',      width: 22 },
+      { col: 5, text: 'GÖREV NO',      width: 14 },
+      { col: 6, text: 'GÖREV TANIMI',  width: 32 },
+      { col: 7, text: 'TARİH-SAAT',   width: 18 },
+      { col: 8, text: 'SAPMA NEDENİ', width: 24 },
     ])
     data.sapmaGorevler.forEach((s, i) => {
       const r = ws4.getRow(2 + i); r.height = 17
-      const vals: any[] = [s.sn, s.personel, s.lokasyon, s.gorevNo, s.gorevTanimi, s.tarihSaat, s.sapmaNedeni]
+      const vals: any[] = [s.sn, s.personel, s.ustLokasyon, s.lokasyon, s.gorevNo, s.gorevTanimi, s.tarihSaat, s.sapmaNedeni]
       vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
     })
 
@@ -194,16 +196,17 @@ export async function GET(request: Request) {
     const ws5 = wb.addWorksheet('Kayıp Frekanslar')
     setHdr(ws5, 1, [
       { col: 1, text: 'SN',            width: 6  },
-      { col: 2, text: 'LOKASYON',      width: 22 },
-      { col: 3, text: 'GÖREV NO',      width: 14 },
-      { col: 4, text: 'GÖREV TANIMI',  width: 32 },
-      { col: 5, text: 'TARİH-SAAT',   width: 18 },
-      { col: 6, text: 'DURUM',         width: 14 },
-      { col: 7, text: 'KAYIP NEDENİ', width: 24 },
+      { col: 2, text: 'ÜST LOKASYON', width: 20 },
+      { col: 3, text: 'LOKASYON',      width: 22 },
+      { col: 4, text: 'GÖREV NO',      width: 14 },
+      { col: 5, text: 'GÖREV TANIMI',  width: 32 },
+      { col: 6, text: 'TARİH-SAAT',   width: 18 },
+      { col: 7, text: 'DURUM',         width: 14 },
+      { col: 8, text: 'KAYIP NEDENİ', width: 24 },
     ])
     data.kayipGorevler.forEach((k, i) => {
       const r = ws5.getRow(2 + i); r.height = 17
-      const vals: any[] = [k.sn, k.lokasyon, k.gorevNo, k.gorevTanimi, k.tarihSaat, k.durum, k.kayipNedeni]
+      const vals: any[] = [k.sn, k.ustLokasyon, k.lokasyon, k.gorevNo, k.gorevTanimi, k.tarihSaat, k.durum, k.kayipNedeni]
       vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
     })
 
