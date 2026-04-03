@@ -90,7 +90,10 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
       label: 'Sistem',
       items: [
         { label: 'Profil Ayarları', href: `${base}/dashboard/ayarlar`, icon: '⚙' },
-        { label: 'Dashboard Ayarları', href: `${base}/dashboard/ayarlar/dashboard`, icon: '🧩' },
+        ...(isSA || isTA
+          ? [{ label: 'Sistem Ayarları', href: `${base}/dashboard/sistem-ayarlari`, icon: '🛠️' }]
+          : [{ label: 'Dashboard Ayarları', href: `${base}/dashboard/ayarlar/dashboard`, icon: '🧩' }]
+        ),
         ...(isSA ? [{ label: 'Kullanıcı Grubu Yetkileri', href: `${base}/dashboard/ayarlar/kullanici-grubu-yetkileri`, icon: '🔐' }] : []),
         ...(isTA ? [{ label: 'Kullanıcı Grubu Yetkileri', href: `${base}/dashboard/ayarlar/kullanici-grubu-yetkileri`, icon: '🔐' }] : []),
       ],

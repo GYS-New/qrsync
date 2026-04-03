@@ -81,6 +81,8 @@ export interface Lokasyon {
   nfc_token?: string | null
   checklist_sablon_id?: string | null
   sureli_gorev_aktif?: boolean
+  min_sure_dakika?: number | null
+  max_sure_dakika?: number | null
   atanan_kullanici_id?: string
   kayit_tarihi: string
   kayit_yapan_id?: string

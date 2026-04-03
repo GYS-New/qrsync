@@ -49,6 +49,8 @@ export type ScanContext = {
     tanim: string
     aktif: boolean
     sureli_gorev_aktif: boolean
+    min_sure_dakika: number | null
+    max_sure_dakika: number | null
   }
   /** Standart çeklist şablonu — null ise lokasyona şablon bağlı değil */
   checklistTemplate: ScanChecklistTemplate | null
@@ -74,6 +76,8 @@ export async function resolveScanContext(opts: {
       ${tokenColumn},
       checklist_sablon_id,
       sureli_gorev_aktif,
+      min_sure_dakika,
+      max_sure_dakika,
       firmalar(id, firma_adi, ticari_unvan, aktif, qr_sistemi_aktif, nfc_sistemi_aktif)
     `)
     .eq(tokenColumn, token)
@@ -184,6 +188,8 @@ export async function resolveScanContext(opts: {
       tanim: loc.tanim,
       aktif: !!loc.aktif,
       sureli_gorev_aktif: !!(loc as any).sureli_gorev_aktif,
+      min_sure_dakika: (loc as any).min_sure_dakika ?? null,
+      max_sure_dakika: (loc as any).max_sure_dakika ?? null,
     },
     checklistTemplate,
     tasks: [...visibleManual, ...visibleLive],
