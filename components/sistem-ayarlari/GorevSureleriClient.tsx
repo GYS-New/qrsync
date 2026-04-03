@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface LokasyonRow {
   id: string
@@ -62,6 +63,7 @@ async function saveSingle(id: string, d: DraftValues): Promise<void> {
 }
 
 export default function GorevSureleriClient({ lokasyonlar }: Props) {
+  const router = useRouter()
   const { roots, childrenOf } = useMemo(() => buildTree(lokasyonlar), [lokasyonlar])
 
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
@@ -139,6 +141,7 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
         for (const id of allIds) next[id] = true
         return next
       })
+      router.refresh()
     } catch (err: any) {
       setErrors(prev => ({ ...prev, [parentId]: err.message }))
     } finally {
