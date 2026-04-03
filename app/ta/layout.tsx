@@ -44,7 +44,7 @@ export default async function TALayout({ children }: { children: React.ReactNode
     <ProjeProvider firmaId={user.firma_id ?? null}>
       <div style={{ display: 'flex', minHeight: '100vh', background: '#f7f9f7' }}>
         <Sidebar user={user} firma={firma} birimFiyatAktifProp={(firma as any)?.birim_fiyat_aktif === true} />
-        <div style={{ marginLeft: 282, flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <div style={{ marginLeft: 282, flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
           {/* Durum banner — pasif veya lisans dolmuşsa tüm sayfalarda görünür */}
           <FirmaDurumBanner durum={durum} lisansTarihi={lisansTarihi} />
           {children}
