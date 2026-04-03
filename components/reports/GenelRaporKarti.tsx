@@ -148,15 +148,16 @@ function KpiCard({ label, value, sub, color, Icon }: { label: string; value: str
 }
 
 // ── DataTable ──────────────────────────────────────────────────────
-function DataTable({ headers, rows, accentCol, accentColor }: {
-  headers: string[]; rows: (string | number)[][]; accentCol?: number; accentColor?: string
+function DataTable({ headers, rows, accentCol, accentColor, leftCols }: {
+  headers: string[]; rows: (string | number)[][]; accentCol?: number; accentColor?: string; leftCols?: number[]
 }) {
+  const isLeft = (i: number) => i === 0 || (leftCols?.includes(i) ?? false)
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
         <thead>
           <tr>{headers.map((h, i) => (
-            <th key={i} style={{ padding: '8px 12px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 12.5, textAlign: i === 0 ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
+            <th key={i} style={{ padding: '8px 12px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 12.5, textAlign: isLeft(i) ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
           ))}</tr>
         </thead>
         <tbody>
@@ -167,8 +168,8 @@ function DataTable({ headers, rows, accentCol, accentColor }: {
                 {row.map((cell, ci) => (
                   <td key={ci} style={{
                     padding: '7px 12px', borderBottom: `1px solid ${T.border}`,
-                    textAlign: ci === 0 ? 'left' : 'center', fontSize: 13.5,
-                    fontWeight: ci === accentCol ? 700 : ci === 0 ? 600 : 400,
+                    textAlign: isLeft(ci) ? 'left' : 'center', fontSize: 13.5,
+                    fontWeight: ci === accentCol ? 700 : isLeft(ci) ? 600 : 400,
                     color: ci === accentCol ? (accentColor ?? T.greenMid) : undefined,
                   }}>{String(cell ?? '')}</td>
                 ))}
@@ -616,7 +617,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 <DataTable
                   headers={['SN', 'GRUP', 'ÜST LOKASYON', 'LOKASYON', 'GÜNLÜK FREKANS', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
                   rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
-                  accentCol={9} accentColor={T.greenMid}
+                  accentCol={9} accentColor={T.greenMid} leftCols={[1, 2, 3]}
                 />
               </div>
             )}

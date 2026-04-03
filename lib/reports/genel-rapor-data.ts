@@ -438,9 +438,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     })
   }
 
-  // Üst lokasyon filtresi "Tümü" ise aynı isimli grupları birleştir
-  // (farklı üst lokasyonlardaki aynı isimli gruplar tek satırda toplanır)
-  if (!filters.ustLokasyonId) {
+  // Her iki filtre de "Tümü" ise aynı isimli grupları birleştir
+  // Üst lokasyon veya alt lokasyon filtresi seçiliyse birleştirme yapma
+  if (!filters.ustLokasyonId && !filters.altLokasyonId) {
     const birlesikGruplar = new Map<string, GrupMetrik>()
     for (const gm of grupMetrikleri) {
       const mevcut = birlesikGruplar.get(gm.grup)
