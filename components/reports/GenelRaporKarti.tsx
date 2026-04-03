@@ -614,8 +614,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   )
                 })()}
                 <DataTable
-                  headers={['SN', 'ÜST LOKASYON', 'GRUP', 'LOKASYON', 'GÜNLÜK FREKANS', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
-                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.ustLokasyon, g.grup, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
+                  headers={['SN', 'GRUP', 'ÜST LOKASYON', 'LOKASYON', 'GÜNLÜK FREKANS', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
+                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
                   accentCol={9} accentColor={T.greenMid}
                 />
               </div>
