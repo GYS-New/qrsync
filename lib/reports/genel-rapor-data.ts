@@ -342,89 +342,57 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
 
   // 7. Grup metrikleri
   const grupMetrikleri: GrupMetrik[] = []
-  for (const grup of gruplar ?? []) {
-    const lokIds = grupLokMap.get((grup as any).id) ?? []
-    // targetLokasyonIds filtresi: grup üyelerinden sadece hedef kapsamındaki lokasyonları al
-    const filteredLokIds = targetLokasyonIds
-      ? lokIds.filter(id => targetLokasyonIds!.includes(id))
-      : lokIds
 
-    // Grup kapsamında görev olan lokasyon varsa dahil et (hedef=0 olsa bile grup görünsün)
-    // (sadece filteredLokIds boşsa ve hiç görev yoksa atla)
-    if (filteredLokIds.length === 0) continue
+  // Grubun üst lokasyon adını döndüren yardımcı
+  function getGrupUstLokTanim(grup: any): string {
+    const ustLokId = grup.ust_lokasyon_id
+    return ustLokId ? ((lokMap.get(ustLokId) as any)?.tanim ?? '') : ''
+  }
 
-    let tekilToplamı = 0
-    let tamamlanan = 0, sapma = 0, kayip = 0
-    for (const lid of filteredLokIds) {
-      const entry = lokGorevCount.get(lid)
-      if (!entry) continue
-      tekilToplamı += entry.tekil
-      tamamlanan += entry.tamamlanan
-      sapma += entry.sapma
-      kayip += entry.kayip
-    }
+  // Tek bir lokasyon için metrik hesapla ve GrupMetrik oluştur
+  function buildRowForLok(grup: any, lid: string, lokTanim: string, ustLokasyon: string): GrupMetrik | null {
+    const entry = lokGorevCount.get(lid)
+    const tekilToplamı = entry?.tekil ?? 0
+    const tamamlanan   = entry?.tamamlanan ?? 0
+    const sapma        = entry?.sapma ?? 0
+    const kayip        = entry?.kayip ?? 0
 
-    // Günlük frekans: GRUP içindeki benzersiz görev TANIMI başına gfs toplamı
-    // Lokasyon sayısından bağımsız — "FREKANS TEST GÖREVİ" gfs=6 demek günde 6 kez yapılır
-    // Birden fazla lokasyon aynı tanımı içerse de gfs 1 kez sayılır
-    const grupTanimGfs = new Map<string, number>()
+    const lokTanimGfs = new Map<string, number>()
     for (const g of tumGorevler) {
-      if (!filteredLokIds.includes((g as any).lokasyon_id)) continue
+      if ((g as any).lokasyon_id !== lid) continue
       const gfs = (g as any).gunluk_frekans_sayisi ?? 0
       if (gfs === 0) continue
       const tanim = (g as any).tanim ?? ''
-      if (!grupTanimGfs.has(tanim)) {
-        grupTanimGfs.set(tanim, gfs)  // Her benzersiz tanım için gfs bir kez alınır
-      }
+      if (!lokTanimGfs.has(tanim)) lokTanimGfs.set(tanim, gfs)
     }
-    const gunlukFrekansToplamı = Array.from(grupTanimGfs.values()).reduce((s, v) => s + v, 0)
+    const gunlukFrekansToplamı = Array.from(lokTanimGfs.values()).reduce((s, v) => s + v, 0)
 
-    // Hedef = rapor tarih aralığında kaydedilen TÜM görevler (duruma bakılmaz)
-    // HAZIR/ACIK/ISLEMDE da dahil — henüz tamamlanmamış ama planlanmış görevler
     const hazirAcikSayisi = (tumGorevler as any[]).filter((g: any) =>
-      filteredLokIds.includes(g.lokasyon_id) && (g.durum === 'HAZIR' || g.durum === 'ACIK' || g.durum === 'ISLEMDE')
+      g.lokasyon_id === lid && (g.durum === 'HAZIR' || g.durum === 'ACIK' || g.durum === 'ISLEMDE')
     ).length
-    const toplamGrupGorev = tamamlanan + sapma + kayip + tekilToplamı + hazirAcikSayisi
-    const hedef = toplamGrupGorev
+    const hedef = tamamlanan + sapma + kayip + tekilToplamı + hazirAcikSayisi
+    if (hedef === 0 && tamamlanan === 0 && sapma === 0 && kayip === 0) return null
 
-    // Günlük frekans: gfs değeri (migration varsa), yoksa hedef/gunSayisi
-    let gunlukFrekans = gunlukFrekansToplamı > 0
+    const gunlukFrekans = gunlukFrekansToplamı > 0
       ? gunlukFrekansToplamı
       : (gunSayisi > 0 ? Math.round(hedef / gunSayisi) : hedef)
 
-    // Lokasyon tam yolu: kök'ten görev lokasyonuna "Ust > Alt > AltAlt" formatında
-    let lokTanim = ''
-    if (filteredLokIds.length > 0) {
-      // İlk lokasyonun tam yolunu kullan (tüm üyeler aynı hiyerarşideyse)
-      const firstLok = filteredLokIds[0]
-      lokTanim = getLokasyonFullPath(firstLok)
-    }
-
-    // Kayıp = DB'deki gerçek kayıp sayısı (ZAMANI_GECMIS + IPTAL + SILINDI)
-    // Kayıp Frekanslar sekmesi ile senkronize — formül değil DB sayımı
-    const kayipFormul = kayip
-    const basariOran = hedef > 0 ? Math.round((tamamlanan / hedef) * 100) : 0
-    const genelOran  = hedef > 0 ? Math.round(((tamamlanan + sapma) / hedef) * 100) : 0
-
-    // Gruba ait görev tanımını bul: filteredLokIds'teki lokasyonlarda en sık görülen tanim
-    let gorevTanimi = ''
     const taninCounts = new Map<string, number>()
     for (const g of tumGorevler) {
-      if (filteredLokIds.includes((g as any).lokasyon_id)) {
+      if ((g as any).lokasyon_id === lid) {
         const t = (g as any).tanim ?? ''
         if (t) taninCounts.set(t, (taninCounts.get(t) ?? 0) + 1)
       }
     }
-    if (taninCounts.size > 0) {
-      gorevTanimi = Array.from(taninCounts.entries()).sort((a, b) => b[1] - a[1])[0][0]
-    }
+    const gorevTanimi = taninCounts.size > 0
+      ? Array.from(taninCounts.entries()).sort((a, b) => b[1] - a[1])[0][0]
+      : ''
 
-    // Grubun üst lokasyonu: grup tablosundaki ust_lokasyon_id'nin tanim'ı
-    const ustLokId = (grup as any).ust_lokasyon_id
-    const ustLokasyon = ustLokId ? ((lokMap.get(ustLokId) as any)?.tanim ?? '') : ''
+    const basariOran = hedef > 0 ? Math.round((tamamlanan / hedef) * 100) : 0
+    const genelOran  = hedef > 0 ? Math.round(((tamamlanan + sapma) / hedef) * 100) : 0
 
-    grupMetrikleri.push({
-      grup: (grup as any).ad ?? '',
+    return {
+      grup: grup.ad ?? '',
       ustLokasyon,
       lokasyon: lokTanim,
       gorevTanimi,
@@ -432,10 +400,84 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       hedef,
       tamamlanan,
       sapma,
-      kayip: kayipFormul,
+      kayip,
       basariOrani: `%${basariOran}`,
       genelOran: `%${genelOran}`,
-    })
+    }
+  }
+
+  for (const grup of gruplar ?? []) {
+    const lokIds = grupLokMap.get((grup as any).id) ?? []
+    const filteredLokIds = targetLokasyonIds
+      ? lokIds.filter(id => targetLokasyonIds!.includes(id))
+      : lokIds
+
+    if (filteredLokIds.length === 0) continue
+
+    const grupUstLok = getGrupUstLokTanim(grup as any)
+
+    if (targetLokasyonIds) {
+      // Filtre aktif: her lokasyon için ayrı satır
+      // LOKASYON = sadece o lokasyonun kendi tanim'ı (parent zinciri yok)
+      // ÜST LOKASYON = grubun üst lokasyon adı
+      for (const lid of filteredLokIds) {
+        const lokTanim = (lokMap.get(lid) as any)?.tanim ?? ''
+        const row = buildRowForLok(grup, lid, lokTanim, grupUstLok)
+        if (row) grupMetrikleri.push(row)
+      }
+    } else {
+      // Filtre yok: grup başına tek satır (aggregate), full path lokasyon
+      let tekilToplamı = 0, tamamlanan = 0, sapma = 0, kayip = 0
+      for (const lid of filteredLokIds) {
+        const entry = lokGorevCount.get(lid)
+        if (!entry) continue
+        tekilToplamı += entry.tekil
+        tamamlanan   += entry.tamamlanan
+        sapma        += entry.sapma
+        kayip        += entry.kayip
+      }
+      const grupTanimGfs = new Map<string, number>()
+      for (const g of tumGorevler) {
+        if (!filteredLokIds.includes((g as any).lokasyon_id)) continue
+        const gfs = (g as any).gunluk_frekans_sayisi ?? 0
+        if (gfs === 0) continue
+        const tanim = (g as any).tanim ?? ''
+        if (!grupTanimGfs.has(tanim)) grupTanimGfs.set(tanim, gfs)
+      }
+      const gunlukFrekansToplamı = Array.from(grupTanimGfs.values()).reduce((s, v) => s + v, 0)
+      const hazirAcikSayisi = (tumGorevler as any[]).filter((g: any) =>
+        filteredLokIds.includes(g.lokasyon_id) && (g.durum === 'HAZIR' || g.durum === 'ACIK' || g.durum === 'ISLEMDE')
+      ).length
+      const hedef = tamamlanan + sapma + kayip + tekilToplamı + hazirAcikSayisi
+      const gunlukFrekans = gunlukFrekansToplamı > 0
+        ? gunlukFrekansToplamı
+        : (gunSayisi > 0 ? Math.round(hedef / gunSayisi) : hedef)
+      const lokTanim = filteredLokIds.length > 0 ? getLokasyonFullPath(filteredLokIds[0]) : ''
+      const taninCounts = new Map<string, number>()
+      for (const g of tumGorevler) {
+        if (filteredLokIds.includes((g as any).lokasyon_id)) {
+          const t = (g as any).tanim ?? ''
+          if (t) taninCounts.set(t, (taninCounts.get(t) ?? 0) + 1)
+        }
+      }
+      const gorevTanimi = taninCounts.size > 0
+        ? Array.from(taninCounts.entries()).sort((a, b) => b[1] - a[1])[0][0] : ''
+      const basariOran = hedef > 0 ? Math.round((tamamlanan / hedef) * 100) : 0
+      const genelOran  = hedef > 0 ? Math.round(((tamamlanan + sapma) / hedef) * 100) : 0
+      grupMetrikleri.push({
+        grup: (grup as any).ad ?? '',
+        ustLokasyon: grupUstLok,
+        lokasyon: lokTanim,
+        gorevTanimi,
+        gunlukFrekans,
+        hedef,
+        tamamlanan,
+        sapma,
+        kayip,
+        basariOrani: `%${basariOran}`,
+        genelOran: `%${genelOran}`,
+      })
+    }
   }
 
   // Her iki filtre de "Tümü" ise aynı isimli grupları birleştir
