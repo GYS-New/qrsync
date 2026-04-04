@@ -398,12 +398,9 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     // Grupları çek
     let grpQ = admin.from('lokasyon_gruplari').select('id,firma_id,ad,ust_lokasyon_id,kayit_tarihi').order('ad')
     if (filters.firmaId) grpQ = grpQ.eq('firma_id', filters.firmaId)
+    if (filters.projeId) grpQ = (grpQ as any).eq('proje_id', filters.projeId)
     const { data: grpListRaw } = await grpQ
-
-    // Proje filtresi: ust_lokasyon_id projedeki lokasyonlardan biri olmalı
-    const grpList = filters.projeId
-      ? (grpListRaw ?? []).filter((g: any) => !g.ust_lokasyon_id || projeLokIds.has(g.ust_lokasyon_id))
-      : (grpListRaw ?? [])
+    const grpList = grpListRaw ?? []
 
     // Seçili üst lokasyon filtresi
     const selectedParentId = filters.parentLocationId || null
