@@ -48,7 +48,7 @@ export default async function SACanliIslemlerPage() {
 
   const [{ data: lokasyonlar }, { data: kullanicilar }, { data: canliGorevler }] = await Promise.all([
     lokQ,
-    supabase.from('users').select('id,isim_soyisim,profil_foto').eq('firma_id', firmaId).eq('aktif', true),
+    (() => { let q = supabase.from('users').select('id,isim_soyisim,profil_foto').eq('firma_id', firmaId).eq('aktif', true); if (projeId) q = (q as any).eq('proje_id', projeId); return q })(),
     gorevQ,
   ])
 

@@ -45,6 +45,7 @@ export default async function TAGorevlerPage() {
       .select('id,isim_soyisim,aktif')
       .eq('firma_id', firmaId)
       .eq('aktif', true)
+      .eq('proje_id', aktifProje.id)
       .order('isim_soyisim'),
   ])
 

@@ -109,8 +109,12 @@ export async function GET(req: Request) {
       return cur.tanim ?? ''
     }
 
-    // Kullanıcılar
-    const { data: kullanicilar } = await admin.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true)
+    // Kullanıcılar — proje seçiliyse sadece o projenin personeli
+    let kulQ = admin.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true)
+    if (ustLokasyonId || altLokasyonId || altAltLokasyonId || projeId) {
+      if (projeId) kulQ = (kulQ as any).eq('proje_id', projeId)
+    }
+    const { data: kullanicilar } = await kulQ
     const userMap = new Map<string, string>((kullanicilar ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
 
     // Görevler (aktif tablo)

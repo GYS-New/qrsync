@@ -32,8 +32,9 @@ export default async function UserCanliIslemler() {
     .eq('firma_id', firmaId).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
 
-  const { data: kullanicilar } = await supabase.from('users')
-    .select('id,isim_soyisim,profil_foto').eq('firma_id', firmaId).eq('aktif', true)
+  let kulQ2 = supabase.from('users').select('id,isim_soyisim,profil_foto').eq('firma_id', firmaId).eq('aktif', true)
+  if (projeId) kulQ2 = (kulQ2 as any).eq('proje_id', projeId)
+  const { data: kullanicilar } = await kulQ2
 
   let gorevQ = supabase.from('canli_gorevler')
     .select('*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)')

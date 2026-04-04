@@ -33,7 +33,7 @@ export default async function SAGorevlerPage() {
     gorevQ ?? Promise.resolve({ data: [] as any[] }),
     lokQ ?? Promise.resolve({ data: [] as any[] }),
     firmaId
-      ? supabase.from('users').select('id,isim_soyisim,aktif').eq('firma_id', firmaId).eq('aktif', true).order('isim_soyisim')
+      ? supabase.from('users').select('id,isim_soyisim,aktif').eq('firma_id', firmaId).eq('aktif', true).eq('proje_id', projeId).order('isim_soyisim')
       : Promise.resolve({ data: [] as any[] }),
   ])
 

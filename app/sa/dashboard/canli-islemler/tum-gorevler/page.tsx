@@ -52,12 +52,7 @@ export default async function SATumGorevlerPage() {
   const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }] = await Promise.all([
     gorevQ,
     lokQ,
-    supabase
-      .from('users')
-      .select('id,isim_soyisim')
-      .eq('firma_id', firmaId)
-      .eq('aktif', true)
-      .order('isim_soyisim'),
+    (() => { let q = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true); if (projeId) q = (q as any).eq('proje_id', projeId); return q.order('isim_soyisim') })(),
   ])
 
   return (

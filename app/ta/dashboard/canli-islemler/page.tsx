@@ -25,7 +25,7 @@ export default async function CanliIslemlerPage() {
 
   const [{ data: lokasyonlar }, { data: kullanicilar }, { data: canliGorevler }] = await Promise.all([
     supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).eq('aktif', true).order('tanim'),
-    supabase.from('users').select('id,isim_soyisim,profil_foto').eq('firma_id', firmaId).eq('aktif', true),
+    supabase.from('users').select('id,isim_soyisim,profil_foto').eq('firma_id', firmaId).eq('aktif', true).eq('proje_id', aktifProje.id),
     supabase.from('canli_gorevler').select('*,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)').eq('firma_id', firmaId).or(`proje_id.eq.${aktifProje.id},proje_id.is.null`).order('olusturma_tarihi', { ascending: false }).limit(50),
   ])
 
