@@ -289,11 +289,11 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
     const toplamGerceklesen = data.toplamTamamlanan + data.toplamSapma
     const genelOran = toplamHedef > 0 ? Math.round(toplamGerceklesen / toplamHedef * 100) : 0
 
-    // Personel bazlı tamamlanan
+    // Personel bazlı tamamlanan (yalnızca proje personeli — boş personel atlanır)
     const persSayac = new Map<string, number>()
     for (const r of data.tamamlananGorevler) {
-      const k = r.personel || 'Bilinmiyor'
-      persSayac.set(k, (persSayac.get(k) ?? 0) + 1)
+      if (!r.personel) continue
+      persSayac.set(r.personel, (persSayac.get(r.personel) ?? 0) + 1)
     }
     const persBazli = [...persSayac.entries()]
       .map(([personel, sayi]) => ({ personel, sayi }))
@@ -576,25 +576,55 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
 
                 {/* ── 4. Kayıp Frekanslar + Sapma Frekanslar grafikleri ── */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  {/* Kayıp Frekanslar */}
                   <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                       <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar (İlk 10)</div>
                       <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.redLight, color: T.red, flexShrink: 0 }}>{data.kayipGorevler.length} kayıt</span>
                     </div>
-                    {ozetData.kayipLokBazli.length > 0
-                      ? <BarChart data={ozetData.kayipLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.red} />
-                      : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Kayıp kayıt yok</div>
-                    }
+                    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 0 }}>
+                      {/* Pasta grafik */}
+                      <div style={{ flexShrink: 0 }}>
+                        <PieChart size={200} slices={[
+                          { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
+                          { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
+                          { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
+                        ]} />
+                      </div>
+                      {/* Bar chart */}
+                      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Kayıp</div>
+                        {ozetData.kayipLokBazli.length > 0
+                          ? <BarChart data={ozetData.kayipLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.red} />
+                          : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Kayıp kayıt yok</div>
+                        }
+                      </div>
+                    </div>
                   </div>
+                  {/* Sapma Frekanslar */}
                   <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                       <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar (İlk 10)</div>
                       <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.amberLight, color: T.amber, flexShrink: 0 }}>{data.sapmaGorevler.length} kayıt</span>
                     </div>
-                    {ozetData.sapmaLokBazli.length > 0
-                      ? <BarChart data={ozetData.sapmaLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.amber} />
-                      : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Sapma kayıt yok</div>
-                    }
+                    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 0 }}>
+                      {/* Pasta grafik */}
+                      <div style={{ flexShrink: 0 }}>
+                        <PieChart size={200} slices={[
+                          { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
+                          { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
+                          { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
+                        ]} />
+                      </div>
+                      {/* Bar chart */}
+                      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Sapma</div>
+                        {ozetData.sapmaLokBazli.length > 0
+                          ? <BarChart data={ozetData.sapmaLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.amber} />
+                          : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Sapma kayıt yok</div>
+                        }
+                      </div>
+                    </div>
                   </div>
                 </div>
 

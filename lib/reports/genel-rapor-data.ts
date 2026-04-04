@@ -273,7 +273,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     withinRange(g.aktif_olma_tarihi, filters.raporBaslangic, filters.raporBitis)
   )
 
-  // 4. Kullanıcı isimleri
+  // 4. Kullanıcı isimleri + proje personel ID seti
   const userIds = Array.from(new Set(tumGorevler.flatMap((g: any) =>
     [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id].filter(Boolean)
   )))
@@ -284,6 +284,13 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       .select('id,isim_soyisim')
       .in('id', userIds)
     for (const u of users ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
+  }
+
+  // Proje personel ID seti — sadece bu projeye atanmış kullanıcılar (grafiklerde yabancı proje personeli çıkmasın)
+  let projePersonelIds: Set<string> | null = null
+  if (filters.projeId) {
+    const { data: projeUsers } = await admin.from('users').select('id').eq('proje_id', filters.projeId).eq('aktif', true)
+    projePersonelIds = new Set((projeUsers ?? []).map((u: any) => u.id))
   }
 
   // 5. Lokasyon grupları
@@ -525,7 +532,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     .filter((g: any) => g.durum === 'TAMAMLANDI')
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
-      const kullanici = userMap.get(g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? g.atanan_kullanici_id ?? '') ?? ''
+      const kullaniciId = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? g.atanan_kullanici_id ?? ''
+      const isProjePersonel = !projePersonelIds || projePersonelIds.has(kullaniciId)
+      const kullanici = isProjePersonel ? (userMap.get(kullaniciId) ?? '') : ''
       return {
         sn: i + 1,
         personel: kullanici,
@@ -544,7 +553,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     .filter((g: any) => g.durum === 'ZAMANINDA_YAPILAMAYAN')
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
-      const kullanici = userMap.get(g.islemi_yapan_id ?? g.atanan_kullanici_id ?? '') ?? ''
+      const kullaniciIdS = g.islemi_yapan_id ?? g.atanan_kullanici_id ?? ''
+      const isProjePersonelS = !projePersonelIds || projePersonelIds.has(kullaniciIdS)
+      const kullanici = isProjePersonelS ? (userMap.get(kullaniciIdS) ?? '') : ''
       const sapmaNedeni = g.durum === 'BEKLEMEDE' ? 'Zamanında tamamlanamadı' : 'Gecikme ile tamamlandı'
       return {
         sn: i + 1,
