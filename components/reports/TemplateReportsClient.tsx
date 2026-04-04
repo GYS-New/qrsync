@@ -193,9 +193,12 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
         ]}
       />
 
-      <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 800 }}>
+      <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* Başlık kartı */}
+        {/* Üst satır: Genel Rapor + Mail Gönderimi yan yana */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+
+        {/* SOL: Genel Rapor */}
         <div className="verde-card" style={{ padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{ width: 44, height: 44, borderRadius: 10, background: '#f0fdf4', display: 'grid', placeItems: 'center' }}>
@@ -262,61 +265,7 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
           </div>
         </div>
 
-        {/* Şablon Yönetimi */}
-        <div className="verde-card" style={{ padding: '16px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>Rapor Şablonu</div>
-            {sablonInfo.exists && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: T.green }}>
-                <CheckCircle size={14} />
-                <span>Şablon yüklü{sablonInfo.updatedAt ? ` · ${new Date(sablonInfo.updatedAt).toLocaleDateString('tr-TR')}` : ''}</span>
-              </div>
-            )}
-          </div>
-
-          <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.6, marginBottom: 12 }}>
-            Rapor çıktısı bu şablon üzerine oluşturulur. Şablonun yapısı (sayfalar, başlıklar, formatlar) korunarak
-            veriler ilgili hücrelere doldurulur. Yeni bir şablon yükleyerek rapor formatını değiştirebilirsiniz.
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <input ref={fileRef} type="file" accept=".xlsx" onChange={handleUpload} style={{ display: 'none' }} />
-            <button onClick={() => fileRef.current?.click()} disabled={uploading}
-              style={{
-                height: 38, padding: '0 20px', borderRadius: 8,
-                border: `1px solid ${T.border}`, background: '#fff', color: T.text,
-                fontWeight: 700, fontSize: 13, cursor: uploading ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', gap: 8, opacity: uploading ? 0.6 : 1,
-              }}>
-              <Upload size={16} />
-              {uploading ? 'Yükleniyor...' : 'Şablon Yükle (.xlsx)'}
-            </button>
-            {!sablonInfo.exists && (
-              <span style={{ fontSize: 12, color: '#d97706' }}>Henüz şablon yüklenmemiş — varsayılan şablon kullanılacak.</span>
-            )}
-          </div>
-
-          {/* Sayfa bilgileri */}
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: T.textSoft, marginBottom: 6 }}>Şablon Sayfaları:</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-              {[
-                { sayfa: 'Giriş', desc: 'Parametreler, göstergeler, hakediş' },
-                { sayfa: 'Tamamlanan Frekanslar', desc: 'Detaylı görev listesi' },
-                { sayfa: 'Sapmalar', desc: 'Zamanında yapılamayanlar' },
-                { sayfa: 'Kayıp Frekanslar', desc: 'Gerçekleşmeyenler' },
-                { sayfa: 'Gruplar', desc: 'Grup bazlı özet' },
-                { sayfa: 'Frekans Fazlası', desc: 'Ek çalışmalar' },
-              ].map(({ sayfa, desc }) => (
-                <div key={sayfa} style={{ padding: '8px 10px', background: T.grayLight, borderRadius: 6, border: `1px solid ${T.border}` }}>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: T.green }}>{sayfa}</div>
-                  <div style={{ fontSize: 10.5, color: T.textSoft, marginTop: 1 }}>{desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        {/* ═══ RAPOR GÖNDERME / ZAMANLAMA ═══ */}
+        {/* SAĞ: Otomatik Rapor Gönderimi */}
         <div className="verde-card" style={{ padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{ width: 44, height: 44, borderRadius: 10, background: '#eff6ff', display: 'grid', placeItems: 'center' }}>
@@ -437,6 +386,37 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
               </div>
             </div>
           )}
+        </div>
+
+        </div>{/* grid 2-sütun kapanış */}
+
+        {/* Şablon Yönetimi — tam genişlik */}
+        <div className="verde-card" style={{ padding: '16px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>Rapor Şablonu</div>
+            {sablonInfo.exists && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: T.green }}>
+                <CheckCircle size={14} />
+                <span>Şablon yüklü{sablonInfo.updatedAt ? ` · ${new Date(sablonInfo.updatedAt).toLocaleDateString('tr-TR')}` : ''}</span>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input ref={fileRef} type="file" accept=".xlsx" onChange={handleUpload} style={{ display: 'none' }} />
+            <button onClick={() => fileRef.current?.click()} disabled={uploading}
+              style={{
+                height: 34, padding: '0 16px', borderRadius: 8,
+                border: `1px solid ${T.border}`, background: '#fff', color: T.text,
+                fontWeight: 700, fontSize: 13, cursor: uploading ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8, opacity: uploading ? 0.6 : 1,
+              }}>
+              <Upload size={16} />
+              {uploading ? 'Yükleniyor...' : 'Şablon Yükle (.xlsx)'}
+            </button>
+            {!sablonInfo.exists && (
+              <span style={{ fontSize: 12, color: '#d97706' }}>Henüz şablon yüklenmemiş.</span>
+            )}
+          </div>
         </div>
       </div>
     </div>
