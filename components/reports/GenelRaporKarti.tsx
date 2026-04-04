@@ -134,7 +134,7 @@ function PieChart({ slices, size = 120 }: { slices: { label: string; value: numb
 }
 
 // ── KPI kart ───────────────────────────────────────────────────────
-function KpiCard({ label, value, sub, color, Icon }: { label: string; value: string | number; sub?: string; color: string; Icon: any }) {
+function KpiCard({ label, value, sub, pct, color, Icon }: { label: string; value: string | number; sub?: string; pct?: string; color: string; Icon: any }) {
   return (
     <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
       <div style={{ width: 36, height: 36, borderRadius: 8, background: color + '18', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
@@ -143,6 +143,7 @@ function KpiCard({ label, value, sub, color, Icon }: { label: string; value: str
       <div>
         <div style={{ fontSize: 12, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
         <div style={{ fontSize: 26, fontWeight: 900, color: T.text, lineHeight: 1 }}>{value}</div>
+        {pct && <div style={{ fontSize: 18, fontWeight: 800, color, marginTop: 3, lineHeight: 1 }}>{pct}</div>}
         {sub && <div style={{ fontSize: 12.5, color: T.textSoft, marginTop: 2 }}>{sub}</div>}
       </div>
     </div>
@@ -459,14 +460,22 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
         {data && (
           <>
             {/* KPI kartlar */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))', gap: 10 }}>
-              <KpiCard label="Hedef"      value={toplamHedef}           color={T.blue}    Icon={Target}        />
-              <KpiCard label="Tamamlanan" value={data.toplamTamamlanan} color={T.green}   Icon={CheckCircle}   sub={`%${data.genelBasari} başarı`} />
-              <KpiCard label="Sapma"      value={data.toplamSapma}      color={T.amber}   Icon={AlertTriangle} />
-              <KpiCard label="Kayıp"      value={data.toplamKayip}      color={T.red}     Icon={XCircle}       />
-              <KpiCard label="Frekans Dışı" value={data.frekansDisiGorevler.length} color={T.gray} Icon={Activity} />
-              <KpiCard label="Rapor Dönemi" value={`${data.gunSayisi} gün`} color={T.blueMid} Icon={Clock} sub={raporBaslangic && raporBitis ? `${raporBaslangic} – ${raporBitis}` : 'Tüm dönem'} />
-            </div>
+            {(() => {
+              const sapmaPct  = toplamHedef > 0 ? Math.round(data.toplamSapma  / toplamHedef * 100) : 0
+              const kayipPct  = toplamHedef > 0 ? Math.round(data.toplamKayip  / toplamHedef * 100) : 0
+              const tamPct    = toplamHedef > 0 ? Math.round(data.toplamTamamlanan / toplamHedef * 100) : 0
+              const frekansPct = toplamHedef > 0 ? Math.round(data.frekansDisiGorevler.length / toplamHedef * 100) : 0
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))', gap: 10 }}>
+                  <KpiCard label="Hedef"        value={toplamHedef}                        color={T.blue}    Icon={Target}        pct="%100" />
+                  <KpiCard label="Tamamlanan"   value={data.toplamTamamlanan}              color={T.green}   Icon={CheckCircle}   pct={`%${tamPct}`} />
+                  <KpiCard label="Sapma"        value={data.toplamSapma}                   color={T.amber}   Icon={AlertTriangle} pct={`%${sapmaPct}`} />
+                  <KpiCard label="Kayıp"        value={data.toplamKayip}                   color={T.red}     Icon={XCircle}       pct={`%${kayipPct}`} />
+                  <KpiCard label="Frekans Dışı" value={data.frekansDisiGorevler.length}    color={T.gray}    Icon={Activity}      pct={`%${frekansPct}`} />
+                  <KpiCard label="Rapor Dönemi" value={`${data.gunSayisi} gün`}            color={T.blueMid} Icon={Clock}         sub={raporBaslangic && raporBitis ? `${raporBaslangic} – ${raporBitis}` : 'Tüm dönem'} />
+                </div>
+              )
+            })()}
 
             {/* Meta bandı */}
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 13.5, color: T.textSoft, padding: '9px 16px', background: T.grayLight, borderRadius: 8, border: `1px solid ${T.border}` }}>
@@ -583,16 +592,15 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                       <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.redLight, color: T.red, flexShrink: 0 }}>{data.kayipGorevler.length} kayıt</span>
                     </div>
                     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 0 }}>
-                      {/* Pasta grafik */}
+                      {/* Pasta grafik — Kayıp vs Diğer */}
                       <div style={{ flexShrink: 0 }}>
                         <PieChart size={200} slices={[
-                          { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
-                          { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
-                          { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
+                          { label: 'Kayıp',  value: data.toplamKayip,                                            color: T.red },
+                          { label: 'Diğer', value: Math.max(0, data.toplamGorev - data.toplamKayip), color: '#e2e8f0' },
                         ]} />
                       </div>
                       {/* Bar chart */}
-                      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Kayıp</div>
                         {ozetData.kayipLokBazli.length > 0
                           ? <BarChart data={ozetData.kayipLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.red} />
@@ -608,16 +616,15 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                       <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.amberLight, color: T.amber, flexShrink: 0 }}>{data.sapmaGorevler.length} kayıt</span>
                     </div>
                     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 0 }}>
-                      {/* Pasta grafik */}
+                      {/* Pasta grafik — Sapma vs Diğer */}
                       <div style={{ flexShrink: 0 }}>
                         <PieChart size={200} slices={[
-                          { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
-                          { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
-                          { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
+                          { label: 'Sapma',  value: data.toplamSapma,                                            color: T.amber },
+                          { label: 'Diğer', value: Math.max(0, data.toplamGorev - data.toplamSapma), color: '#e2e8f0' },
                         ]} />
                       </div>
                       {/* Bar chart */}
-                      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Sapma</div>
                         {ozetData.sapmaLokBazli.length > 0
                           ? <BarChart data={ozetData.sapmaLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.amber} />
@@ -628,53 +635,14 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   </div>
                 </div>
 
-                {/* ── 5. Personel Başarı Grafiği (Atanan Frekanslar) ── */}
+                {/* ── 5. Personel Başarı Grafiği (Atanan Frekanslar — İlk 10) ── */}
                 {ozetData.persBazliBasari.length > 0 && (
                   <div className="verde-card" style={{ padding: '20px 24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Başarı Analizi (Atanan Frekanslar)</div>
-                      <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{ozetData.persBazliBasari.length} personel</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Başarı Analizi — Tamamlanan (İlk 10)</div>
+                      <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{Math.min(ozetData.persBazliBasari.length, 10)} personel</span>
                     </div>
-                    {/* Bar chart — tamamlanan */}
-                    <div style={{ marginBottom: 20 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: T.textSoft, marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Tamamlanan Görev Sayısı</div>
-                      <BarChart data={ozetData.persBazliBasari} valueKey="tamamlanan" labelKey="personel" color={T.greenMid} />
-                    </div>
-                    {/* Tablo */}
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                        <thead>
-                          <tr>
-                            {['PERSONEL', 'ATANAN', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'AKTİF', 'BAŞARI %'].map((h, i) => (
-                              <th key={i} style={{ padding: '8px 12px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 12.5, textAlign: i === 0 ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {ozetData.persBazliBasari.map((r, ri) => {
-                            const basariClr = r.basariOrani >= 80 ? T.greenMid : r.basariOrani >= 50 ? T.amber : T.red
-                            return (
-                              <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : '#fff' }}>
-                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, fontWeight: 600 }}>{r.personel}</td>
-                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', fontWeight: 700, color: T.blue }}>{r.atanan}</td>
-                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', fontWeight: 700, color: T.greenMid }}>{r.tamamlanan}</td>
-                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', fontWeight: 700, color: T.amber }}>{r.sapma}</td>
-                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', fontWeight: 700, color: T.red }}>{r.kayip}</td>
-                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', color: T.textSoft }}>{r.aktif}</td>
-                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
-                                    <div style={{ flex: 1, height: 8, background: T.border, borderRadius: 4, overflow: 'hidden', minWidth: 60 }}>
-                                      <div style={{ height: '100%', width: `${r.basariOrani}%`, background: basariClr, borderRadius: 4 }} />
-                                    </div>
-                                    <span style={{ fontWeight: 700, color: basariClr, minWidth: 36, textAlign: 'right' }}>%{r.basariOrani}</span>
-                                  </div>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                    <BarChart data={ozetData.persBazliBasari.slice(0, 10)} valueKey="tamamlanan" labelKey="personel" color={T.greenMid} />
                   </div>
                 )}
 
