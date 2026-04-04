@@ -467,7 +467,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
               const frekansPct = toplamHedef > 0 ? Math.round(data.frekansDisiGorevler.length / toplamHedef * 100) : 0
               return (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))', gap: 10 }}>
-                  <KpiCard label="Hedef"        value={toplamHedef}                        color={T.blue}    Icon={Target}        pct="%100" />
+                  <KpiCard label="Hedef"        value={toplamHedef}                        color={T.blue}    Icon={Target} />
                   <KpiCard label="Tamamlanan"   value={data.toplamTamamlanan}              color={T.green}   Icon={CheckCircle}   pct={`%${tamPct}`} />
                   <KpiCard label="Sapma"        value={data.toplamSapma}                   color={T.amber}   Icon={AlertTriangle} pct={`%${sapmaPct}`} />
                   <KpiCard label="Kayıp"        value={data.toplamKayip}                   color={T.red}     Icon={XCircle}       pct={`%${kayipPct}`} />
@@ -549,102 +549,119 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   </div>
                 </div>
 
-                {/* ── 2. Frekans Dağılımı + Grup Tamamlanan Bar ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16, minWidth: 0 }}>
-                  <div className="verde-card" style={{ padding: '16px 20px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dağılımı</div>
-                    <PieChart size={200} slices={[
-                      { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
-                      { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
-                      { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
-                    ]} />
-                  </div>
-                  <div className="verde-card" style={{ padding: '16px 20px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Bazlı Tamamlanan</div>
-                    <BarChart data={ozetData.grupBazli} valueKey="tamamlanan" labelKey="grup" color={T.greenMid} />
-                  </div>
-                </div>
-
-                {/* ── 3. Personel Bazlı + Lokasyon Bazlı ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, minWidth: 0 }}>
-                  <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Bazlı Tamamlanan (İlk 10)</div>
-                    {ozetData.persBazli.length > 0
-                      ? <BarChart data={ozetData.persBazli} valueKey="sayi" labelKey="personel" color={T.blue} />
-                      : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
-                    }
-                  </div>
-                  <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Lokasyon Bazlı Tamamlanan (İlk 10)</div>
-                    {ozetData.lokBazli.length > 0
-                      ? <BarChart data={ozetData.lokBazli} valueKey="sayi" labelKey="lokasyon" color={T.blueMid} />
-                      : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
-                    }
-                  </div>
-                </div>
-
-                {/* ── 4. Kayıp Frekanslar + Sapma Frekanslar grafikleri ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  {/* Kayıp Frekanslar */}
-                  <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar (İlk 10)</div>
-                      <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.redLight, color: T.red, flexShrink: 0 }}>{data.kayipGorevler.length} kayıt</span>
+                {/* ── 2. Frekans Dağılımı | Grup Bazlı Tamamlanan ── */}
+                <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dağılımı &amp; Grup Bazlı Tamamlanan</div>
+                  <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                    <div style={{ flexShrink: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Genel Dağılım</div>
+                      <PieChart size={200} slices={[
+                        { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
+                        { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
+                        { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
+                      ]} />
                     </div>
-                    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 0 }}>
-                      {/* Pasta grafik — Kayıp vs Diğer */}
-                      <div style={{ flexShrink: 0 }}>
-                        <PieChart size={200} slices={[
-                          { label: 'Kayıp',  value: data.toplamKayip,                                            color: T.red },
-                          { label: 'Diğer', value: Math.max(0, data.toplamGorev - data.toplamKayip), color: '#e2e8f0' },
-                        ]} />
-                      </div>
-                      {/* Bar chart */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Kayıp</div>
-                        {ozetData.kayipLokBazli.length > 0
-                          ? <BarChart data={ozetData.kayipLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.red} />
-                          : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Kayıp kayıt yok</div>
-                        }
-                      </div>
-                    </div>
-                  </div>
-                  {/* Sapma Frekanslar */}
-                  <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar (İlk 10)</div>
-                      <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.amberLight, color: T.amber, flexShrink: 0 }}>{data.sapmaGorevler.length} kayıt</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 0 }}>
-                      {/* Pasta grafik — Sapma vs Diğer */}
-                      <div style={{ flexShrink: 0 }}>
-                        <PieChart size={200} slices={[
-                          { label: 'Sapma',  value: data.toplamSapma,                                            color: T.amber },
-                          { label: 'Diğer', value: Math.max(0, data.toplamGorev - data.toplamSapma), color: '#e2e8f0' },
-                        ]} />
-                      </div>
-                      {/* Bar chart */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Sapma</div>
-                        {ozetData.sapmaLokBazli.length > 0
-                          ? <BarChart data={ozetData.sapmaLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.amber} />
-                          : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Sapma kayıt yok</div>
-                        }
-                      </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Grup Bazlı Tamamlanan</div>
+                      <BarChart data={ozetData.grupBazli} valueKey="tamamlanan" labelKey="grup" color={T.greenMid} />
                     </div>
                   </div>
                 </div>
 
-                {/* ── 5. Personel Başarı Grafiği (Atanan Frekanslar — İlk 10) ── */}
-                {ozetData.persBazliBasari.length > 0 && (
-                  <div className="verde-card" style={{ padding: '20px 24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Başarı Analizi — Tamamlanan (İlk 10)</div>
-                      <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{Math.min(ozetData.persBazliBasari.length, 10)} personel</span>
+                {/* ── 3. Personel Başarı Analizi (pasta + bar) ── */}
+                {ozetData.persBazliBasari.length > 0 && (() => {
+                  const topTam  = ozetData.persBazliBasari.reduce((s, r) => s + r.tamamlanan, 0)
+                  const topSap  = ozetData.persBazliBasari.reduce((s, r) => s + r.sapma, 0)
+                  const topKay  = ozetData.persBazliBasari.reduce((s, r) => s + r.kayip, 0)
+                  return (
+                    <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Başarı Analizi (İlk 10)</div>
+                        <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{Math.min(ozetData.persBazliBasari.length, 10)} personel</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                        <div style={{ flexShrink: 0 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Toplam Atanan Dağılımı</div>
+                          <PieChart size={200} slices={[
+                            { label: 'Tamamlanan', value: topTam, color: T.greenMid },
+                            { label: 'Sapma',      value: topSap, color: T.amber },
+                            { label: 'Kayıp',      value: topKay, color: T.red },
+                          ]} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Tamamlanan (İlk 10)</div>
+                          <BarChart data={ozetData.persBazliBasari.slice(0, 10)} valueKey="tamamlanan" labelKey="personel" color={T.greenMid} />
+                        </div>
+                      </div>
                     </div>
-                    <BarChart data={ozetData.persBazliBasari.slice(0, 10)} valueKey="tamamlanan" labelKey="personel" color={T.greenMid} />
+                  )
+                })()}
+
+                {/* ── 4. Personel Bazlı Tamamlanan ── */}
+                <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Bazlı Tamamlanan (İlk 10)</div>
+                  {ozetData.persBazli.length > 0
+                    ? <BarChart data={ozetData.persBazli} valueKey="sayi" labelKey="personel" color={T.blue} />
+                    : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+                  }
+                </div>
+
+                {/* ── 5. Lokasyon Bazlı Tamamlanan ── */}
+                <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Lokasyon Bazlı Tamamlanan (İlk 10)</div>
+                  {ozetData.lokBazli.length > 0
+                    ? <BarChart data={ozetData.lokBazli} valueKey="sayi" labelKey="lokasyon" color={T.blueMid} />
+                    : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+                  }
+                </div>
+
+                {/* ── 6. Kayıp Frekanslar: pasta (hedef vs kayıp) | lokasyon bar ── */}
+                <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar</div>
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.redLight, color: T.red, flexShrink: 0 }}>{data.kayipGorevler.length} kayıt</span>
                   </div>
-                )}
+                  <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                    <div style={{ flexShrink: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Hedef / Kayıp Oranı</div>
+                      <PieChart size={200} slices={[
+                        { label: 'Kayıp',       value: data.toplamKayip,                                       color: T.red },
+                        { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamKayip),            color: '#e2e8f0' },
+                      ]} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Kayıp (İlk 10)</div>
+                      {ozetData.kayipLokBazli.length > 0
+                        ? <BarChart data={ozetData.kayipLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.red} />
+                        : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Kayıp kayıt yok</div>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── 7. Sapma Frekanslar: pasta (hedef vs sapma) | lokasyon bar ── */}
+                <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.amberLight, color: T.amber, flexShrink: 0 }}>{data.sapmaGorevler.length} kayıt</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                    <div style={{ flexShrink: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Hedef / Sapma Oranı</div>
+                      <PieChart size={200} slices={[
+                        { label: 'Sapma',       value: data.toplamSapma,                                       color: T.amber },
+                        { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamSapma),            color: '#e2e8f0' },
+                      ]} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Sapma (İlk 10)</div>
+                      {ozetData.sapmaLokBazli.length > 0
+                        ? <BarChart data={ozetData.sapmaLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.amber} />
+                        : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Sapma kayıt yok</div>
+                      }
+                    </div>
+                  </div>
+                </div>
 
                 {/* ── 6. Frekans Dışı Çalışmalar ── */}
                 {data.frekansDisiGorevler.length > 0 && (
