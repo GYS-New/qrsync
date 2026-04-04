@@ -382,6 +382,151 @@ function PersonelKarsilastirma({ data, renk, tolerans = 10 }: { data: PersonelRo
   )
 }
 
+// ── Görev Bazlı Panel (arama + filtre + sayfalama) ──────────────────
+const PAGE_SIZE = 25
+
+function GorevBazliPanel({ bolum, renk, meta, tolerans, ustLokasyonlar }: {
+  bolum: Bolum; renk: string; meta: SureData['meta']; tolerans: number
+  ustLokasyonlar: MetaLokasyon[]
+}) {
+  const [ustLokId, setUstLokId]     = React.useState('')
+  const [arama, setArama]           = React.useState('')
+  const [durumF, setDurumF]         = React.useState<'tumu' | 'uygun' | 'sapma'>('tumu')
+  const [sayfa, setSayfa]           = React.useState(1)
+
+  // Üst lokasyon filtresi
+  const filteredLokIds: Set<string> | null = ustLokId
+    ? new Set(meta.lokasyonlar.filter(l => l.parent_id === ustLokId || l.id === ustLokId).map(l => l.id))
+    : null
+
+  // Zincirleme filtre
+  let liste = filteredLokIds ? bolum.gorev.filter(r => filteredLokIds.has(r.lokasyon_id)) : bolum.gorev
+  if (arama) {
+    const q = arama.toLocaleLowerCase('tr')
+    liste = liste.filter(r => r.tanim.toLocaleLowerCase('tr').includes(q) || r.lokasyon.toLocaleLowerCase('tr').includes(q))
+  }
+  if (durumF === 'uygun')  liste = liste.filter(r => r.hedef_fark_pct != null && !isAsim(r.hedef_fark_pct, tolerans))
+  if (durumF === 'sapma')  liste = liste.filter(r => isAsim(r.hedef_fark_pct, tolerans))
+
+  const topSayfa  = Math.max(1, Math.ceil(liste.length / PAGE_SIZE))
+  const sayfaData = liste.slice((sayfa - 1) * PAGE_SIZE, sayfa * PAGE_SIZE)
+  const hasHedef  = bolum.gorev.some(r => r.hedef_sure != null)
+
+  // Özet sayılar (filtresiz)
+  const allFiltered = filteredLokIds ? bolum.gorev.filter(r => filteredLokIds.has(r.lokasyon_id)) : bolum.gorev
+  const uygunSayi   = allFiltered.filter(r => r.hedef_fark_pct != null && !isAsim(r.hedef_fark_pct, tolerans)).length
+  const sapmaSayi   = allFiltered.filter(r => isAsim(r.hedef_fark_pct, tolerans)).length
+
+  // Filtre/arama değişince sayfayı sıfırla
+  React.useEffect(() => { setSayfa(1) }, [ustLokId, arama, durumF])
+
+  const durumBtnStyle = (v: string): React.CSSProperties => ({
+    padding: '5px 12px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+    border: `1px solid ${durumF === v ? renk : T.border}`, cursor: 'pointer',
+    background: durumF === v ? renk : '#fff',
+    color: durumF === v ? '#fff' : T.textSoft,
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Filtre satırı */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {ustLokasyonlar.length > 0 && (
+          <>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: T.textSoft, whiteSpace: 'nowrap' }}>Üst Lokasyon:</span>
+            <select value={ustLokId} onChange={e => setUstLokId(e.target.value)}
+              style={{ height: 34, padding: '0 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, minWidth: 160 }}>
+              <option value="">Tümü</option>
+              {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+            </select>
+          </>
+        )}
+        <input
+          type="text" placeholder="Görev veya lokasyon ara..." value={arama}
+          onChange={e => setArama(e.target.value)}
+          style={{ height: 34, padding: '0 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, minWidth: 200, flex: 1, maxWidth: 320 }}
+        />
+        {hasHedef && (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button style={durumBtnStyle('tumu')}  onClick={() => setDurumF('tumu')}>Tümü ({allFiltered.length})</button>
+            <button style={durumBtnStyle('uygun')} onClick={() => setDurumF('uygun')}>Uygun ({uygunSayi})</button>
+            <button style={durumBtnStyle('sapma')} onClick={() => setDurumF('sapma')}>Sapma ({sapmaSayi})</button>
+          </div>
+        )}
+      </div>
+
+      {/* Özet bandı */}
+      {hasHedef && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ padding: '8px 14px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.green }}>
+            ✓ Hedefe Uygun: {uygunSayi} görev
+          </div>
+          <div style={{ padding: '8px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.red }}>
+            ✗ Tolerans Dışı: {sapmaSayi} görev
+          </div>
+          <div style={{ padding: '8px 14px', background: T.grayLight, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, color: T.textSoft }}>
+            Toplam: {allFiltered.length} görev türü
+          </div>
+        </div>
+      )}
+
+      {/* Sonuç bilgisi */}
+      <div style={{ fontSize: 12.5, color: T.textSoft }}>
+        {liste.length} sonuç · Sayfa {sayfa}/{topSayfa}
+      </div>
+
+      {/* Tablo */}
+      {sayfaData.length === 0
+        ? <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Sonuç bulunamadı.</div>
+        : <Tablo
+            color={renk}
+            headers={hasHedef
+              ? ['GÖREV', 'LOKASYON', 'ADET', 'HEDEF SÜRE', 'ORT. SÜRE', 'FARK', 'DURUM', 'EN HIZLI', 'EN YAVAŞ']
+              : ['GÖREV', 'LOKASYON', 'ADET', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
+            rows={sayfaData.map(r => {
+              if (hasHedef) {
+                const farkLabel = r.hedef_fark == null ? '—'
+                  : r.hedef_fark > 0 ? `+${fmtS(r.hedef_fark)}`
+                  : r.hedef_fark < 0 ? `-${fmtS(Math.abs(r.hedef_fark))}`
+                  : '0'
+                const durum = durumLabel(r.hedef_fark_pct, tolerans)
+                return [r.tanim, r.lokasyon, r.adet, r.hedef_sure != null ? fmtS(r.hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, durum, fmtS(r.min_sure), fmtS(r.max_sure)]
+              }
+              return [r.tanim, r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)]
+            })}
+          />
+      }
+
+      {/* Sayfalama */}
+      {topSayfa > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+          <button disabled={sayfa <= 1} onClick={() => setSayfa(s => s - 1)}
+            style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: sayfa <= 1 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, color: T.textSoft, opacity: sayfa <= 1 ? 0.4 : 1 }}>
+            ← Önceki
+          </button>
+          {Array.from({ length: Math.min(topSayfa, 7) }, (_, i) => {
+            let pg: number
+            if (topSayfa <= 7) pg = i + 1
+            else if (sayfa <= 4) pg = i + 1
+            else if (sayfa >= topSayfa - 3) pg = topSayfa - 6 + i
+            else pg = sayfa - 3 + i
+            return (
+              <button key={pg} onClick={() => setSayfa(pg)}
+                style={{ width: 34, height: 34, borderRadius: 6, border: `1px solid ${sayfa === pg ? renk : T.border}`, background: sayfa === pg ? renk : '#fff', color: sayfa === pg ? '#fff' : T.textSoft, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                {pg}
+              </button>
+            )
+          })}
+          <button disabled={sayfa >= topSayfa} onClick={() => setSayfa(s => s + 1)}
+            style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: sayfa >= topSayfa ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, color: T.textSoft, opacity: sayfa >= topSayfa ? 0.4 : 1 }}>
+            Sonraki →
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Görev hedef vs gerçekleşen karşılaştırma ────────────────────────
 function GorevKarsilastirma({ data, renk, tolerans = 10 }: { data: GorevRow[]; renk: string; tolerans?: number }) {
   if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
@@ -580,70 +725,7 @@ function BolumPanel({ bolum, renk, meta, tolerans = 10 }: { bolum: Bolum; renk: 
 
         {/* ── Görev Bazlı ── */}
         {subTab === 'Görev Bazlı' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Üst lokasyon filtresi */}
-            {ustLokasyonlar.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: T.textSoft, whiteSpace: 'nowrap' }}>Üst Lokasyon:</span>
-                <select
-                  value={ustLokId}
-                  onChange={e => setUstLokId(e.target.value)}
-                  style={{ height: 34, padding: '0 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, minWidth: 180 }}
-                >
-                  <option value="">Tümü</option>
-                  {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
-                </select>
-              </div>
-            )}
-
-            {(() => {
-              const filteredGorev = filteredLokIds
-                ? bolum.gorev.filter(r => filteredLokIds.has(r.lokasyon_id))
-                : bolum.gorev
-
-              if (!filteredGorev.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
-
-              const hasGorevHedef = filteredGorev.some(r => r.hedef_sure != null)
-              const gorevAsimlar  = filteredGorev.filter(r => isAsim(r.hedef_fark_pct, tolerans))
-              const gorevUyumlu   = filteredGorev.filter(r => r.hedef_fark_pct != null && !isAsim(r.hedef_fark_pct, tolerans))
-
-              return <>
-                {/* Hedef özet bandı */}
-                {hasGorevHedef && (
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <div style={{ padding: '8px 14px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.green }}>
-                      ✓ Hedefe Uygun: {gorevUyumlu.length} görev
-                    </div>
-                    <div style={{ padding: '8px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.red }}>
-                      ✗ Tolerans Dışı: {gorevAsimlar.length} görev
-                    </div>
-                  </div>
-                )}
-
-                {/* Görev karşılaştırma görseli */}
-                <GorevKarsilastirma data={filteredGorev} renk={renk} tolerans={tolerans} />
-
-                {/* Tablo */}
-                <Tablo
-                  color={renk}
-                  headers={hasGorevHedef
-                    ? ['GÖREV', 'LOKASYON', 'ADET', 'HEDEF SÜRE', 'ORT. SÜRE', 'FARK', 'DURUM', 'EN HIZLI', 'EN YAVAŞ']
-                    : ['GÖREV', 'LOKASYON', 'ADET', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
-                  rows={filteredGorev.map(r => {
-                    if (hasGorevHedef) {
-                      const farkLabel = r.hedef_fark == null ? '—'
-                        : r.hedef_fark > 0 ? `+${fmtS(r.hedef_fark)}`
-                        : r.hedef_fark < 0 ? `-${fmtS(Math.abs(r.hedef_fark))}`
-                        : '0'
-                      const durum = durumLabel(r.hedef_fark_pct, tolerans)
-                      return [r.tanim, r.lokasyon, r.adet, r.hedef_sure != null ? fmtS(r.hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, durum, fmtS(r.min_sure), fmtS(r.max_sure)]
-                    }
-                    return [r.tanim, r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)]
-                  })}
-                />
-              </>
-            })()}
-          </div>
+          <GorevBazliPanel bolum={bolum} renk={renk} meta={meta} tolerans={tolerans} ustLokasyonlar={ustLokasyonlar} />
         )}
 
         {/* ── Personel Bazlı ── */}
