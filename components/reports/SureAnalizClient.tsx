@@ -67,38 +67,31 @@ function KpiCard({ label, value, sub, color, Icon, wide }: {
   )
 }
 
-// ── Yatay BarChart (SVG) ──────────────────────────────────────────────────
+// ── Yatay BarChart (div tabanlı — viewBox ölçekleme sorunu yok) ──────────
 function HBarChart({ data, valueKey, labelKey, color }: {
   data: Record<string, any>[]; valueKey: string; labelKey: string; color: string
 }) {
   if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '16px 0', textAlign: 'center' }}>Veri yok</div>
-  const max    = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
-  const rowH   = 22
-  const labelW = 200
-  const chartW = 260
-  const valW   = 70
-  const totalW = labelW + chartW + valW
-  const totalH = data.length * rowH + 8
+  const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <svg width="100%" viewBox={`0 0 ${totalW} ${totalH}`} style={{ display: 'block', minWidth: 400 }}>
-        {data.map((d, i) => {
-          const val   = Number(d[valueKey]) || 0
-          const bw    = (val / max) * chartW
-          const y     = i * rowH
-          const label = String(d[labelKey] ?? '')
-          const bg    = i % 2 === 0 ? '#f8fafc' : '#fff'
-          return (
-            <g key={i}>
-              <rect x={0} y={y + 1} width={totalW} height={rowH - 2} fill={bg} rx={2} />
-              <text x={labelW - 8} y={y + rowH * 0.67} textAnchor="end" fontSize={10} fill={T.textSoft}>{label}</text>
-              <rect x={labelW} y={y + 5} width={Math.max(bw, 2)} height={rowH - 12} fill={color} rx={2} opacity={0.85} />
-              <text x={labelW + bw + 6} y={y + rowH * 0.67} fontSize={10} fontWeight="700" fill={T.text}>{fmtS(val)}</text>
-            </g>
-          )
-        })}
-        <line x1={labelW} y1={0} x2={labelW} y2={totalH} stroke={T.border} strokeWidth={0.5} />
-      </svg>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {data.map((d, i) => {
+        const val = Number(d[valueKey]) || 0
+        const pct = (val / max) * 100
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, background: i % 2 === 0 ? '#f8fafc' : '#fff', borderRadius: 4, padding: '3px 6px' }}>
+            <div style={{ width: 200, flexShrink: 0, textAlign: 'right', fontSize: 12, color: T.textSoft, paddingRight: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {String(d[labelKey] ?? '')}
+            </div>
+            <div style={{ flex: 1, height: 12, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width .4s', minWidth: val > 0 ? 3 : 0, opacity: 0.85 }} />
+            </div>
+            <div style={{ width: 72, flexShrink: 0, fontSize: 12, fontWeight: 700, color: T.text }}>
+              {fmtS(val)}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -108,17 +101,18 @@ function VBarChart({ data, valueKey, labelKey, color }: {
   data: Record<string, any>[]; valueKey: string; labelKey: string; color: string
 }) {
   if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '16px 0', textAlign: 'center' }}>Veri yok</div>
-  const max  = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
-  const barW = 32, gap = 10, barAreaH = 120, bottomH = 48, topPad = 20
-  const totalW = data.length * (barW + gap) + gap
+  const max     = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
+  const barW    = 44, gap = 20, barAreaH = 200, bottomH = 56, topPad = 24
+  const totalW  = data.length * (barW + gap) + gap
+  const svgH    = barAreaH + bottomH + topPad
   return (
     <div style={{ overflowX: 'auto' }}>
-      <svg width={totalW} height={barAreaH + bottomH + topPad} style={{ display: 'block', minWidth: Math.min(totalW, 500) }}>
+      <svg width={totalW} height={svgH} style={{ display: 'block', minWidth: Math.min(totalW, 600) }}>
         {[0.25, 0.5, 0.75, 1].map(r => {
           const y = topPad + barAreaH * (1 - r)
           return <g key={r}>
             <line x1={0} y1={y} x2={totalW} y2={y} stroke="#e2e8f0" strokeWidth={0.5} />
-            <text x={2} y={y - 2} fontSize={7} fill={T.textSoft}>{fmtS(Math.round(max * r))}</text>
+            <text x={2} y={y - 3} fontSize={9} fill={T.textSoft}>{fmtS(Math.round(max * r))}</text>
           </g>
         })}
         {data.map((d, i) => {
@@ -126,13 +120,13 @@ function VBarChart({ data, valueKey, labelKey, color }: {
           const bh   = (val / max) * barAreaH
           const x    = gap + i * (barW + gap)
           const y    = topPad + barAreaH - bh
-          const lbl  = String(d[labelKey] ?? '').slice(0, 10)
+          const lbl  = String(d[labelKey] ?? '').slice(0, 12)
           return (
             <g key={i}>
-              <rect x={x} y={y} width={barW} height={bh} fill={color} rx={3} opacity={0.88} />
-              <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={8} fontWeight="bold" fill={T.gray}>{fmtS(val)}</text>
-              <text x={x + barW / 2} y={topPad + barAreaH + 10} textAnchor="end" fontSize={7.5} fill={T.textSoft}
-                transform={`rotate(-38, ${x + barW / 2}, ${topPad + barAreaH + 10})`}>{lbl}</text>
+              <rect x={x} y={y} width={barW} height={Math.max(bh, 1)} fill={color} rx={3} opacity={0.88} />
+              <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={10} fontWeight="bold" fill={T.gray}>{fmtS(val)}</text>
+              <text x={x + barW / 2} y={topPad + barAreaH + 12} textAnchor="end" fontSize={10} fill={T.textSoft}
+                transform={`rotate(-38, ${x + barW / 2}, ${topPad + barAreaH + 12})`}>{lbl}</text>
             </g>
           )
         })}
