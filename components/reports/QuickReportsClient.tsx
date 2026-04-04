@@ -1010,6 +1010,7 @@ export default function QuickReportsClient({
         const params = new URLSearchParams()
         params.set('type', type)
         if (firmaId) params.set('firmaId', firmaId)
+        if (projeId) params.set('projeId', projeId)
         params.set('dateFrom', todayMinus(30))
         params.set('dateTo', todayMinus(0))
         const res = await fetch(`/api/reports/quick?${params.toString()}`, { cache: 'no-store' })
@@ -1023,7 +1024,7 @@ export default function QuickReportsClient({
     }
     load()
     return () => { cancelled = true }
-  }, [open, type, firmaId])
+  }, [open, type, firmaId, projeId])
 
   if (!open) return null
 
