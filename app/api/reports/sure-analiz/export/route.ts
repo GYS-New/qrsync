@@ -62,7 +62,11 @@ export async function GET(req: NextRequest) {
     admin.from('users').select('id,isim_soyisim').eq('firma_id', firmaId),
     admin.from('firmalar').select('gorev_suresi_hedef_orani').eq('id', firmaId).single(),
   ])
-  const tolerans = firma?.gorev_suresi_hedef_orani ?? 10
+  let tolerans = firma?.gorev_suresi_hedef_orani ?? 10
+  if (projeId) {
+    const { data: proje } = await admin.from('projeler').select('gorev_suresi_hedef_orani').eq('id', projeId).single()
+    if (proje?.gorev_suresi_hedef_orani != null) tolerans = proje.gorev_suresi_hedef_orani
+  }
 
   const lokNodeMap = new Map<string, { tanim: string; parent_id: string | null }>()
   for (const l of loks ?? []) lokNodeMap.set(l.id, { tanim: l.tanim ?? '', parent_id: l.parent_id ?? null })

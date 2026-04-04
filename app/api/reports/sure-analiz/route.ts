@@ -255,9 +255,13 @@ export async function GET(req: Request) {
 
     const admin = createAdminClient()
 
-    // Firma tolerans oranı
+    // Tolerans oranı: proje override > firma default
     const { data: firma } = await admin.from('firmalar').select('gorev_suresi_hedef_orani').eq('id', firmaId).single()
-    const hedefTolerans = firma?.gorev_suresi_hedef_orani ?? 10
+    let hedefTolerans = firma?.gorev_suresi_hedef_orani ?? 10
+    if (projeId) {
+      const { data: proje } = await admin.from('projeler').select('gorev_suresi_hedef_orani').eq('id', projeId).single()
+      if (proje?.gorev_suresi_hedef_orani != null) hedefTolerans = proje.gorev_suresi_hedef_orani
+    }
 
     // Lokasyon ve kullanıcı map'leri
     let loksQ = admin.from('lokasyonlar').select('id,tanim,parent_id,hedef_sure_dakika').eq('firma_id', firmaId)

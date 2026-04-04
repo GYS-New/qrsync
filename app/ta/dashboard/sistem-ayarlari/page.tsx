@@ -59,6 +59,7 @@ export default async function TASistemAyarlariPage() {
         lokasyonlar={lokasyonlar ?? []}
         isSA={false}
         firmaId={firmaId}
+        projeId={aktifProje.id}
       />
     </div>
   )

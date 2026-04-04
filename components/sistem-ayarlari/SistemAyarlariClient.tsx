@@ -32,9 +32,10 @@ interface Props {
   lokasyonlar: LokasyonRow[]
   isSA?: boolean
   firmaId?: string | null
+  projeId?: string | null
 }
 
-export default function SistemAyarlariClient({ meId, initialBloklar, lokasyonlar, isSA = false, firmaId }: Props) {
+export default function SistemAyarlariClient({ meId, initialBloklar, lokasyonlar, isSA = false, firmaId, projeId }: Props) {
   const [aktifTab, setAktifTab] = useState<Tab>('genel')
 
   return (
@@ -73,7 +74,7 @@ export default function SistemAyarlariClient({ meId, initialBloklar, lokasyonlar
       </div>
 
       {/* Tab içerikleri */}
-      {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} />}
+      {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} projeId={projeId} />}
       {aktifTab === 'frekans' && <EmptyTab label="Frekans Sayıları" />}
       {aktifTab === 'gorev-kurallari' && <EmptyTab label="Görev Kuralları" />}
       {aktifTab === 'gorev-sureleri' && <GorevSureleriClient lokasyonlar={lokasyonlar} />}

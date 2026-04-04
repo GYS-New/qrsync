@@ -55,6 +55,7 @@ export default async function SASistemAyarlariPage() {
         lokasyonlar={lokasyonlar}
         isSA={true}
         firmaId={firmaId}
+        projeId={projeId}
       />
     </div>
   )

@@ -71,6 +71,7 @@ export interface Firma {
   arsiv_mesai_saat?: number
   arsiv_musteri_saat?: number
   arsiv_spesifik_saat?: number
+  arsiv_frekansiyel_saat?: number
 }
 
 export interface Lokasyon {
@@ -183,4 +184,9 @@ export interface Proje {
   aktif: boolean
   kayit_tarihi: string
   kayit_yapan_id?: string
+  gorev_suresi_hedef_orani?: number | null
+  arsiv_mesai_saat?: number | null
+  arsiv_musteri_saat?: number | null
+  arsiv_spesifik_saat?: number | null
+  arsiv_frekansiyel_saat?: number | null
 }
