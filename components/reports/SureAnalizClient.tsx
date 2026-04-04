@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
-import { RefreshCw, Clock, TrendingUp, TrendingDown, Activity, BarChart2, Users, MapPin, Zap } from 'lucide-react'
+import { RefreshCw, Clock, TrendingUp, TrendingDown, Activity, BarChart2, Users, MapPin, Zap, Download } from 'lucide-react'
 
 interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null; projeId?: string | null; sureliGorevAktif?: boolean }
 
@@ -624,6 +624,32 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
     color: activeTab === t ? '#fff' : T.textSoft,
   })
 
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = useCallback(async () => {
+    if (!currentFirmaId || !data) return
+    setExporting(true)
+    try {
+      const tip = activeTab === 'Frekansiyel Görevler' ? 'frekansiyel' : 'spesifik'
+      const q = new URLSearchParams({ firmaId: currentFirmaId, tip })
+      if (projeId)   q.set('projeId', projeId)
+      if (baslangic) q.set('baslangic', baslangic)
+      if (bitis)     q.set('bitis', bitis)
+      const res = await fetch(`/api/reports/sure-analiz/export?${q}`)
+      if (!res.ok) throw new Error('Excel indirilemedi.')
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url
+      a.download = `sure_analiz_${tip}_${Date.now()}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setExporting(false)
+  }, [currentFirmaId, projeId, baslangic, bitis, activeTab, data, toast])
+
   const freqRenk = T.greenMid
   const specRenk = T.blue
 
@@ -684,9 +710,16 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
         {/* İçerik */}
         {data && (
           <>
-            {/* Ana sekmeler */}
-            <div style={{ display: 'flex', gap: 4, background: T.grayLight, borderRadius: 8, padding: 4, alignSelf: 'flex-start', border: `1px solid ${T.border}` }}>
-              {ANA_TABS.map(t => <button key={t} style={tabStyle(t)} onClick={() => setActiveTab(t)}>{t}</button>)}
+            {/* Ana sekmeler + Excel butonu */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 4, background: T.grayLight, borderRadius: 8, padding: 4, border: `1px solid ${T.border}` }}>
+                {ANA_TABS.map(t => <button key={t} style={tabStyle(t)} onClick={() => setActiveTab(t)}>{t}</button>)}
+              </div>
+              <button onClick={handleExport} disabled={exporting || !data}
+                style={{ height: 36, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: data ? 'pointer' : 'not-allowed', fontSize: 12.5, opacity: data ? 1 : 0.5 }}>
+                <Download size={14} />
+                {exporting ? 'İndiriliyor…' : 'Excel İndir'}
+              </button>
             </div>
 
             {/* Frekansiyel panel */}
