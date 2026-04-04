@@ -126,9 +126,17 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 4. Şablonu aç ve doldur ──────────────────────────────────────────
-  const templatePath = path.join(process.cwd(), 'public', 'templates', 'Genel_Rapor_Sablonu.xlsx')
+  // Önce Storage'dan oku, yoksa local fallback
   const wb = new ExcelJS.Workbook()
-  await wb.xlsx.readFile(templatePath)
+  const storagePath = 'Genel_Rapor_Sablonu.xlsx'
+  const { data: storageFile } = await admin.storage.from('templates').download(storagePath)
+  if (storageFile) {
+    const arrBuf = await storageFile.arrayBuffer()
+    await wb.xlsx.load(Buffer.from(arrBuf) as any)
+  } else {
+    const localPath = path.join(process.cwd(), 'public', 'templates', 'Genel_Rapor_Sablonu.xlsx')
+    await wb.xlsx.readFile(localPath)
+  }
 
   // ── SAYFA: Giriş ─────────────────────────────────────────────────────
   const wsGiris = wb.getWorksheet('Giriş')
