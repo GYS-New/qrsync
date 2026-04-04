@@ -266,8 +266,9 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
         <div style={{ marginBottom: 12 }}>
           <label style={{ fontSize: 14, fontWeight: 700, color: T.text, display: 'block', marginBottom: 4 }}>Personel Takip Bildirim Süresi</label>
           <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.5 }}>
-            Görev başlatıldıktan sonra tamamlanmazsa, belirtilen süre aralıklarında personele bildirim gönderilir.
-            Her aralıkta tekrar bildirim gider (1., 2., 3. bildirim). 0 girilirse bildirim gönderilmez.
+            Personel iş başı yaptıktan (QR/NFC ile mesai girişi) sonra belirtilen süre içinde görev başlatmazsa bildirim gönderilir.
+            Her aralıkta tekrar bildirim gider. 3. bildirimde yöneticiye (TA) "personel işte ama görev yapmıyor" bildirimi gönderilir.
+            0 girilirse bildirim gönderilmez.
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -281,9 +282,9 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
         </div>
         {(efektif.personel_takip_bildirim_dk as number) > 0 && (
           <div style={{ marginTop: 10, padding: '10px 14px', background: T.grayLight, borderRadius: 8, fontSize: 12.5, color: T.textSoft, lineHeight: 1.6 }}>
-            Görev başlatıldıktan <strong style={{ color: T.green }}>{efektif.personel_takip_bildirim_dk as number} dk</strong> sonra tamamlanmamışsa 1. bildirim,
-            <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 2} dk</strong> sonra 2. bildirim,
-            <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 3} dk</strong> sonra 3. bildirim gönderilir.
+            İş başı yaptıktan <strong style={{ color: T.green }}>{efektif.personel_takip_bildirim_dk as number} dk</strong> sonra görev başlatılmamışsa 1. hatırlatma,
+            <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 2} dk</strong> sonra 2. hatırlatma,
+            <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 3} dk</strong> sonra 3. hatırlatma + yöneticiye bildirim gönderilir.
           </div>
         )}
         <OverrideBadge ayarKey="personel_takip_bildirim_dk" />
