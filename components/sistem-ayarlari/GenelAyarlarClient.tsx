@@ -298,39 +298,59 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
               <div style={{ fontSize: 12, color: T.textSoft, marginBottom: 8 }}>
                 3. hatırlatmada TA ile birlikte web bildirimi alacak kullanıcıları seçin. TA otomatik alır.
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                {kullanicilar.map(u => {
-                  const selected = bildirimAlicilar.includes(u.id)
-                  return (
-                    <button key={u.id} onClick={() => {
-                      setBildirimAlicilar(prev => selected ? prev.filter(id => id !== u.id) : [...prev, u.id])
-                    }} style={{
-                      padding: '5px 12px', borderRadius: 16, fontSize: 12.5, fontWeight: 600,
-                      border: `1px solid ${selected ? T.green : T.border}`,
-                      background: selected ? '#dcfce7' : '#fff',
-                      color: selected ? T.green : T.textSoft,
-                      cursor: 'pointer',
-                    }}>
-                      {selected ? '✓ ' : ''}{u.isim_soyisim}
-                    </button>
-                  )
-                })}
-                {kullanicilar.length === 0 && <span style={{ fontSize: 12, color: T.textSoft }}>Kullanıcı bulunamadı</span>}
+
+              {/* Seçilen kullanıcılar chip'leri */}
+              {bildirimAlicilar.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                  {bildirimAlicilar.map(id => {
+                    const u = kullanicilar.find(k => k.id === id)
+                    return (
+                      <span key={id} style={{
+                        padding: '4px 10px', borderRadius: 14, fontSize: 12, fontWeight: 600,
+                        background: '#dcfce7', color: T.green, border: `1px solid #86efac`,
+                        display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        {u?.isim_soyisim ?? id.slice(0, 8)}
+                        <button onClick={() => setBildirimAlicilar(prev => prev.filter(x => x !== id))}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: T.green, padding: 0, lineHeight: 1 }}>
+                          ×
+                        </button>
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Dropdown ile kullanıcı ekle */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                <select
+                  value=""
+                  onChange={e => {
+                    const val = e.target.value
+                    if (val && !bildirimAlicilar.includes(val)) setBildirimAlicilar(prev => [...prev, val])
+                  }}
+                  style={{ height: 34, padding: '0 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, minWidth: 220 }}
+                >
+                  <option value="">Kullanıcı ekle...</option>
+                  {kullanicilar.filter(u => !bildirimAlicilar.includes(u.id)).map(u => (
+                    <option key={u.id} value={u.id}>{u.isim_soyisim}</option>
+                  ))}
+                </select>
+                <SaveBtn id="personel_takip_bildirim_alicilar" onClick={async () => {
+                  setSavingKey('personel_takip_bildirim_alicilar')
+                  try {
+                    const hedef = projeId ? 'proje' : 'firma'
+                    const res = await fetch('/api/sistem-ayarlari/genel', {
+                      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ firmaId: currentFirmaId, projeId, hedef, personel_takip_bildirim_alicilar: bildirimAlicilar }),
+                    })
+                    const json = await res.json()
+                    if (!res.ok) throw new Error(json.error)
+                    toast({ type: 'success', title: 'Başarılı', message: 'Alıcılar kaydedildi.' })
+                  } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
+                  setSavingKey(null)
+                }} />
               </div>
-              <SaveBtn id="personel_takip_bildirim_alicilar" onClick={async () => {
-                setSavingKey('personel_takip_bildirim_alicilar')
-                try {
-                  const hedef = projeId ? 'proje' : 'firma'
-                  const res = await fetch('/api/sistem-ayarlari/genel', {
-                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ firmaId: currentFirmaId, projeId, hedef, personel_takip_bildirim_alicilar: bildirimAlicilar }),
-                  })
-                  const json = await res.json()
-                  if (!res.ok) throw new Error(json.error)
-                  toast({ type: 'success', title: 'Başarılı', message: 'Alıcılar kaydedildi.' })
-                } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
-                setSavingKey(null)
-              }} />
             </div>
           </>
         )}
