@@ -10,7 +10,6 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useLicenseExpired } from '@/components/hooks/useLicense'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
-import GorevKurallariClient from '@/components/gorev-kurallari/GorevKurallariClient'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 
 type SortKey = 'tanim' | 'lokasyon' | 'atanan' | 'aktif' | 'islem' | 'durum' | 'actor'
@@ -853,7 +852,6 @@ async function del() {
       <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid #e8f0e8', marginBottom: 16 }}>
         {[
           { key: 'gorevler', label: '📋 Görev Listesi' },
-          ...(!isU ? [{ key: 'kurallar', label: '⚙️ Görev Kuralları' }] : []),
         ].map(({ key, label }) => (
           <button key={key} onClick={() => setSekme(key as any)} style={{
             padding: '10px 18px', background: 'none', border: 'none',
@@ -865,22 +863,6 @@ async function del() {
           }}>{label}</button>
         ))}
       </div>
-
-      {/* ── GÖREV KURALLARI SEKMESİ ── */}
-      {sekme === 'kurallar' && (
-        <GorevKurallariClient
-          base={base as '/ta' | '/sa'}
-          firmaId={firmaId}
-          meId={meId}
-          initialKuralar={[]}
-          lokasyonlar={lokasyonlar}
-          kullanicilar={kullanicilar}
-          readonly={readonly}
-          embedded={true}
-          projeId={projeId}
-          personelAtamaAktif={personelAtamaAktif}
-        />
-      )}
 
       {/* ── GÖREV LİSTESİ SEKMESİ ── */}
       {sekme === 'gorevler' && (<>

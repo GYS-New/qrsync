@@ -5,6 +5,7 @@ import SistemAyarlariClient from '@/components/sistem-ayarlari/SistemAyarlariCli
 import { ensureDashboardDefaults } from '@/lib/dashboard/ensureDefaults'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,7 @@ export default async function SASistemAyarlariPage() {
   const projeId = aktifProje?.id ?? null
 
   let lokasyonlar: any[] = []
+  let kullanicilar: any[] = []
   if (firmaId) {
     let q = supabase
       .from('lokasyonlar')
@@ -40,7 +42,14 @@ export default async function SASistemAyarlariPage() {
     if (projeId) q = (q as any).eq('proje_id', projeId)
     const { data } = await q
     lokasyonlar = data ?? []
+
+    let uq = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true).order('isim_soyisim')
+    if (projeId) uq = (uq as any).eq('proje_id', projeId)
+    const { data: uData } = await uq
+    kullanicilar = uData ?? []
   }
+
+  const ayarlar = firmaId ? await getEfektifAyar(firmaId, projeId) : null
 
   return (
     <div>
@@ -51,11 +60,14 @@ export default async function SASistemAyarlariPage() {
       />
       <SistemAyarlariClient
         meId={meId}
+        base="/sa"
         initialBloklar={(bloklar as any) ?? []}
         lokasyonlar={lokasyonlar}
+        kullanicilar={kullanicilar}
         isSA={true}
         firmaId={firmaId}
         projeId={projeId}
+        personelAtamaAktif={ayarlar?.frekansiyel_personel_atama_aktif ?? true}
       />
     </div>
   )

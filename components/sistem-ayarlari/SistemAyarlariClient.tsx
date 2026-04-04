@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 const DashboardSettingsClient = dynamic(() => import('@/components/dashboard/DashboardSettingsClient'), { ssr: false })
 const GorevSureleriClient = dynamic(() => import('./GorevSureleriClient'), { ssr: false })
 const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: false })
+const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/GorevKurallariClient'), { ssr: false })
 
 type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'dashboard'
 
@@ -28,14 +29,18 @@ interface LokasyonRow {
 
 interface Props {
   meId: string
+  base: '/sa' | '/ta'
   initialBloklar: any[]
   lokasyonlar: LokasyonRow[]
+  kullanicilar: { id: string; isim_soyisim: string }[]
   isSA?: boolean
   firmaId?: string | null
   projeId?: string | null
+  readonly?: boolean
+  personelAtamaAktif?: boolean
 }
 
-export default function SistemAyarlariClient({ meId, initialBloklar, lokasyonlar, isSA = false, firmaId, projeId }: Props) {
+export default function SistemAyarlariClient({ meId, base, initialBloklar, lokasyonlar, kullanicilar, isSA = false, firmaId, projeId, readonly = false, personelAtamaAktif = true }: Props) {
   const [aktifTab, setAktifTab] = useState<Tab>('genel')
 
   return (
@@ -76,7 +81,20 @@ export default function SistemAyarlariClient({ meId, initialBloklar, lokasyonlar
       {/* Tab içerikleri */}
       {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} projeId={projeId} />}
       {aktifTab === 'frekans' && <EmptyTab label="Frekans Sayıları" />}
-      {aktifTab === 'gorev-kurallari' && <EmptyTab label="Görev Kuralları" />}
+      {aktifTab === 'gorev-kurallari' && firmaId && (
+        <GorevKurallariClient
+          base={base}
+          firmaId={firmaId}
+          meId={meId}
+          initialKuralar={[]}
+          lokasyonlar={lokasyonlar}
+          kullanicilar={kullanicilar}
+          readonly={readonly}
+          embedded={true}
+          projeId={projeId}
+          personelAtamaAktif={personelAtamaAktif}
+        />
+      )}
       {aktifTab === 'gorev-sureleri' && <GorevSureleriClient lokasyonlar={lokasyonlar} />}
       {aktifTab === 'dashboard' && (
         <DashboardSettingsClient meId={meId} initialBloklar={initialBloklar} />
