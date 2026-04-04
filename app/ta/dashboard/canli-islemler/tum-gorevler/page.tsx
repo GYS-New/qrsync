@@ -42,12 +42,7 @@ export default async function TATumGorevlerPage() {
       .eq('proje_id', aktifProje.id)
       .eq('aktif', true)
       .order('tanim'),
-    supabase
-      .from('users')
-      .select('id,isim_soyisim')
-      .eq('firma_id', firmaId)
-      .eq('aktif', true)
-      .order('isim_soyisim'),
+    (() => { let q = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true); q = (q as any).eq('proje_id', aktifProje.id); return q.order('isim_soyisim') })(),
   ])
 
   return (

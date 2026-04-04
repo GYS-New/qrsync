@@ -67,9 +67,9 @@ export default async function UTumGorevlerPage() {
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
 
   const { data: lokasyonlar } = await lokQ
-  const { data: kullanicilar } = await supabase
-    .from('users').select('id,isim_soyisim')
-    .eq('firma_id', firmaId).eq('aktif', true).order('isim_soyisim')
+  let kulQ = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true)
+  if (projeId) kulQ = (kulQ as any).eq('proje_id', projeId)
+  const { data: kullanicilar } = await kulQ.order('isim_soyisim')
 
   return (
     <div>
