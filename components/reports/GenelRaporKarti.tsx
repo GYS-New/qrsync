@@ -27,7 +27,7 @@ type TamamlananRow  = { sn: number; personel: string; ustLokasyon: string; lokas
 type SapmaRow       = { sn: number; personel: string; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; sapmaNedeni: string }
 type KayipRow       = { sn: number; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string; kayipNedeni: string }
 type FrekansDisiRow  = { sn: number; ustLokasyon: string; grupTanimi: string; lokasyonTanimi: string; personel: string; tarihSaat: string; aciklama: string }
-type AtananFrekanRow = { sn: number; atanan: string; tamamlayan: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gorevDurumu: string; atamaTarihi: string; tamamlanmaTarihi: string }
+type AtananFrekanRow = { sn: number; atanan: string; tamamlayan: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gorevDurumu: string; durumKod: string; atamaTarihi: string; tamamlanmaTarihi: string }
 
 type RaporData = {
   firmaAdi: string; projeAdi: string; ustLokTanim: string; altLokTanim: string
@@ -359,7 +359,31 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       .map(([lokasyon, sayi]) => ({ lokasyon, sayi }))
       .sort((a, b) => b.sayi - a.sayi).slice(0, 10)
 
-    return { toplamGerceklesen, genelOran, persBazli, lokBazli, kayipNedeni, sapmaNedeni, grupBazli, kayipLokBazli, sapmaLokBazli }
+    // Atanan frekanslar — personel bazlı başarı
+    const persBazliBasariMap = new Map<string, { atanan: number; tamamlanan: number; sapma: number; kayip: number; aktif: number }>()
+    for (const r of data.atananFrekanslar) {
+      const key = r.atanan === '—' ? 'Atanmamış' : r.atanan
+      if (!persBazliBasariMap.has(key)) persBazliBasariMap.set(key, { atanan: 0, tamamlanan: 0, sapma: 0, kayip: 0, aktif: 0 })
+      const e = persBazliBasariMap.get(key)!
+      e.atanan++
+      if (r.durumKod === 'TAMAMLANDI') e.tamamlanan++
+      else if (r.durumKod === 'ZAMANINDA_YAPILAMAYAN') e.sapma++
+      else if (['ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI', 'SILINDI', 'BEKLEMEDE'].includes(r.durumKod)) e.kayip++
+      else e.aktif++
+    }
+    const persBazliBasari = [...persBazliBasariMap.entries()]
+      .map(([personel, v]) => ({
+        personel,
+        atanan: v.atanan,
+        tamamlanan: v.tamamlanan,
+        sapma: v.sapma,
+        kayip: v.kayip,
+        aktif: v.aktif,
+        basariOrani: v.atanan > 0 ? Math.round(v.tamamlanan / v.atanan * 100) : 0,
+      }))
+      .sort((a, b) => b.atanan - a.atanan)
+
+    return { toplamGerceklesen, genelOran, persBazli, lokBazli, kayipNedeni, sapmaNedeni, grupBazli, kayipLokBazli, sapmaLokBazli, persBazliBasari }
   }, [data, toplamHedef])
 
   return (
@@ -573,6 +597,56 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                     }
                   </div>
                 </div>
+
+                {/* ── 5. Personel Başarı Grafiği (Atanan Frekanslar) ── */}
+                {ozetData.persBazliBasari.length > 0 && (
+                  <div className="verde-card" style={{ padding: '20px 24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Başarı Analizi (Atanan Frekanslar)</div>
+                      <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{ozetData.persBazliBasari.length} personel</span>
+                    </div>
+                    {/* Bar chart — tamamlanan */}
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: T.textSoft, marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Tamamlanan Görev Sayısı</div>
+                      <BarChart data={ozetData.persBazliBasari} valueKey="tamamlanan" labelKey="personel" color={T.greenMid} />
+                    </div>
+                    {/* Tablo */}
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                        <thead>
+                          <tr>
+                            {['PERSONEL', 'ATANAN', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'AKTİF', 'BAŞARI %'].map((h, i) => (
+                              <th key={i} style={{ padding: '8px 12px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 12.5, textAlign: i === 0 ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ozetData.persBazliBasari.map((r, ri) => {
+                            const basariClr = r.basariOrani >= 80 ? T.greenMid : r.basariOrani >= 50 ? T.amber : T.red
+                            return (
+                              <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : '#fff' }}>
+                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, fontWeight: 600 }}>{r.personel}</td>
+                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', fontWeight: 700, color: T.blue }}>{r.atanan}</td>
+                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', fontWeight: 700, color: T.greenMid }}>{r.tamamlanan}</td>
+                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', fontWeight: 700, color: T.amber }}>{r.sapma}</td>
+                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', fontWeight: 700, color: T.red }}>{r.kayip}</td>
+                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center', color: T.textSoft }}>{r.aktif}</td>
+                                <td style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: 'center' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+                                    <div style={{ flex: 1, height: 8, background: T.border, borderRadius: 4, overflow: 'hidden', minWidth: 60 }}>
+                                      <div style={{ height: '100%', width: `${r.basariOrani}%`, background: basariClr, borderRadius: 4 }} />
+                                    </div>
+                                    <span style={{ fontWeight: 700, color: basariClr, minWidth: 36, textAlign: 'right' }}>%{r.basariOrani}</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
                 {/* ── 6. Frekans Dışı Çalışmalar ── */}
                 {data.frekansDisiGorevler.length > 0 && (

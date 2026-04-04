@@ -76,6 +76,7 @@ export interface AtananFrekanRow {
   lokasyon: string
   gorevTanimi: string
   gorevDurumu: string
+  durumKod: string
   atamaTarihi: string
   tamamlanmaTarihi: string
 }
@@ -670,6 +671,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         lokasyon: lok?.tanim ?? '—',
         gorevTanimi: g.tanim ?? '—',
         gorevDurumu: durumTurkce[g.durum] ?? g.durum ?? '—',
+        durumKod: g.durum ?? '',
         atamaTarihi: formatDate(g.olusturma_tarihi),
         tamamlanmaTarihi: g.tamamlanma_tarihi ? formatDate(g.tamamlanma_tarihi) : '—',
       }
