@@ -5,69 +5,37 @@
  */
 import JSZip from 'jszip'
 
-// Sheet XML namespace'leri
-const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
-
 interface SheetMapping {
   name: string
-  file: string // xl/worksheets/sheetN.xml
+  file: string
 }
 
-/**
- * xlsx buffer'dan sheet isimlerini ve dosya eşlemelerini çıkarır.
- */
 async function getSheetMappings(zip: JSZip): Promise<SheetMapping[]> {
   const wbXml = await zip.file('xl/workbook.xml')!.async('string')
   const relsXml = await zip.file('xl/_rels/workbook.xml.rels')!.async('string')
 
-  // workbook.xml: <sheet name="Giriş" sheetId="15" r:id="rId1"/>
   const sheets: { name: string; rId: string }[] = []
   const sheetRegex = /<sheet\s+name="([^"]+)"[^>]*r:id="([^"]+)"/g
   let m
-  while ((m = sheetRegex.exec(wbXml)) !== null) {
-    sheets.push({ name: m[1], rId: m[2] })
-  }
+  while ((m = sheetRegex.exec(wbXml)) !== null) sheets.push({ name: m[1], rId: m[2] })
 
-  // rels: <Relationship Id="rId1" ... Target="worksheets/sheet1.xml"/>
   const relMap = new Map<string, string>()
   const relRegex = /Id="([^"]+)"[^>]*Target="([^"]+)"/g
-  while ((m = relRegex.exec(relsXml)) !== null) {
-    relMap.set(m[1], m[2])
-  }
+  while ((m = relRegex.exec(relsXml)) !== null) relMap.set(m[1], m[2])
 
-  return sheets.map(s => ({
-    name: s.name,
-    file: 'xl/' + (relMap.get(s.rId) ?? ''),
-  }))
+  return sheets.map(s => ({ name: s.name, file: 'xl/' + (relMap.get(s.rId) ?? '') }))
 }
 
-/**
- * SharedStrings tablosuna yeni string ekler ve index'ini döndürür.
- */
-function addSharedString(ssStrings: string[], value: string): number {
-  const idx = ssStrings.length
-  ssStrings.push(value)
-  return idx
-}
-
-/**
- * Sütun harfini (A, B, ..., Z, AA, AB...) hesaplar.
- */
 function colLetter(col: number): string {
   let s = ''
-  while (col > 0) {
-    const r = (col - 1) % 26
-    s = String.fromCharCode(65 + r) + s
-    col = Math.floor((col - 1) / 26)
-  }
+  while (col > 0) { const r = (col - 1) % 26; s = String.fromCharCode(65 + r) + s; col = Math.floor((col - 1) / 26) }
   return s
 }
 
-/**
- * Hücre referansı oluşturur (1-indexed col+row → "A1").
- */
-function cellRef(col: number, row: number): string {
-  return colLetter(col) + row
+function cellRef(col: number, row: number): string { return colLetter(col) + row }
+
+function escapeXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
 }
 
 export type CellValue = string | number | null
@@ -76,9 +44,7 @@ export type CellData = { col: number; row: number; value: CellValue }
 export interface SheetData {
   sheetName: string
   cells: CellData[]
-  /** Şablondaki son boş satırdan sonra eklenen yeni satırlar için referans satır numarası */
   templateDataRow?: number
-  /** Yeni satır sayısı (şablondaki boş satırlardan fazla olan) */
   totalDataRows?: number
 }
 
@@ -93,26 +59,29 @@ export async function fillXlsxTemplate(
   const zip = await JSZip.loadAsync(templateBuffer)
   const mappings = await getSheetMappings(zip)
 
-  // SharedStrings yükle
+  // ── SharedStrings ──────────────────────────────────────────────────────
+  // Orijinal XML'i koruyarak sadece yeni string'leri ekle
   const ssFile = zip.file('xl/sharedStrings.xml')
-  let ssStrings: string[] = []
-  let ssXml = ''
+  let originalSsXml = ''
+  let originalSsCount = 0
+  const newStrings: string[] = []
+
   if (ssFile) {
-    ssXml = await ssFile.async('string')
-    // Mevcut string'leri parse et
-    const siRegex = /<si>[\s\S]*?<\/si>/g
-    let sm
-    while ((sm = siRegex.exec(ssXml)) !== null) {
-      // <si><t>value</t></si> → value
-      const tMatch = sm[0].match(/<t[^>]*>([\s\S]*?)<\/t>/)
-      ssStrings.push(tMatch ? tMatch[1] : '')
-    }
+    originalSsXml = await ssFile.async('string')
+    originalSsCount = (originalSsXml.match(/<si>/g) || []).length
   }
 
+  function getOrAddSharedString(value: string): number {
+    // Yeni string ekle (orijinallerin sonuna)
+    const idx = originalSsCount + newStrings.length
+    newStrings.push(value)
+    return idx
+  }
+
+  // ── Sheet'leri işle ────────────────────────────────────────────────────
   for (const sd of sheetsData) {
     const mapping = mappings.find(m => m.name === sd.sheetName)
     if (!mapping) continue
-
     const sheetFile = zip.file(mapping.file)
     if (!sheetFile) continue
 
@@ -125,109 +94,104 @@ export async function fillXlsxTemplate(
       rowMap.get(c.row)!.set(c.col, c.value)
     }
 
-    // Gerekirse yeni satırlar ekle (şablondaki satırlardan fazla veri varsa)
+    // Yeni satırlar ekle (şablondaki boş satırlardan fazla veri varsa)
     if (sd.totalDataRows && sd.templateDataRow) {
-      const existingRowCount = (xml.match(/<row /g) || []).length
-      const templateRowRef = sd.templateDataRow
+      const existingRows = (xml.match(/<row /g) || []).length
+      const needed = sd.templateDataRow - 1 + sd.totalDataRows
 
-      // Şablondaki referans satırın XML'ini bul (stil kopyası için)
-      const refRowRegex = new RegExp(`<row r="${templateRowRef}"[^>]*>([\\s\\S]*?)</row>`)
-      const refRowMatch = xml.match(refRowRegex)
-      const refRowContent = refRowMatch ? refRowMatch[0] : null
+      if (needed > existingRows) {
+        // Referans satırın XML'ini bul
+        const refRegex = new RegExp(`<row r="${sd.templateDataRow}"([^>]*)>([\\s\\S]*?)</row>`)
+        const refMatch = xml.match(refRegex)
 
-      if (refRowContent && sd.totalDataRows > 0) {
-        // </sheetData> öncesine yeni satırlar ekle
-        const newRows: string[] = []
-        for (let i = existingRowCount + 1; i <= sd.templateDataRow - 1 + sd.totalDataRows; i++) {
-          // Referans satırı klonla, row numarasını güncelle
-          let newRow = refRowContent.replace(/r="(\d+)"/, `r="${i}"`)
-          // Hücre referanslarını güncelle (A4 → A25 gibi)
-          newRow = newRow.replace(/r="([A-Z]+)\d+"/g, (_, col) => `r="${col}${i}"`)
-          // Hücre değerlerini temizle
-          newRow = newRow.replace(/<v>[^<]*<\/v>/g, '<v></v>')
-          newRow = newRow.replace(/t="s"\s*/g, '') // string type'ı kaldır
-          newRows.push(newRow)
-        }
-        if (newRows.length > 0) {
-          xml = xml.replace('</sheetData>', newRows.join('') + '</sheetData>')
+        if (refMatch) {
+          const newRows: string[] = []
+          for (let i = existingRows + 1; i <= needed; i++) {
+            let newRow = refMatch[0]
+            // Row numarasını güncelle
+            newRow = newRow.replace(`r="${sd.templateDataRow}"`, `r="${i}"`)
+            // Hücre referanslarını güncelle
+            newRow = newRow.replace(/r="([A-Z]+)\d+"/g, (_, col) => `r="${col}${i}"`)
+            // Değerleri temizle
+            newRow = newRow.replace(/<v>[^<]*<\/v>/g, '')
+            newRows.push(newRow)
+          }
+          xml = xml.replace('</sheetData>', newRows.join('\n') + '</sheetData>')
         }
       }
     }
 
-    // Her satır için hücreleri güncelle veya ekle
+    // Her hücreyi güncelle
     for (const [rowNum, cols] of rowMap) {
-      const rowRegex = new RegExp(`<row r="${rowNum}"([^>]*)>([\\s\\S]*?)</row>`)
+      // Satır var mı?
+      const rowRegex = new RegExp(`(<row r="${rowNum}"[^>]*>)([\\s\\S]*?)(</row>)`)
       const rowMatch = xml.match(rowRegex)
 
       if (rowMatch) {
         let rowContent = rowMatch[2]
-        const rowAttrs = rowMatch[1]
 
         for (const [colNum, value] of cols) {
           const ref = cellRef(colNum, rowNum)
-          const cellRegex = new RegExp(`<c r="${ref}"([^>]*)(?:>(.*?)</c>|/>)`, 's')
+          // Hücre var mı?
+          const cellRegex = new RegExp(`<c r="${ref}"([^/>]*?)(?:>(.*?)</c>|/>)`, 's')
           const cellMatch = rowContent.match(cellRegex)
 
-          let cellXml: string
           if (value === null || value === '') {
-            // Boş hücre
+            // Boş bırak — varsa değerini temizle
             if (cellMatch) {
-              cellXml = `<c r="${ref}"${cellMatch[1].replace(/\s*t="[^"]*"/, '')}/>`
-              rowContent = rowContent.replace(cellMatch[0], cellXml)
+              const attrs = cellMatch[1].replace(/\s*t="[^"]*"/g, '')
+              rowContent = rowContent.replace(cellMatch[0], `<c r="${ref}"${attrs}/>`)
             }
           } else if (typeof value === 'number') {
-            const attrs = cellMatch ? cellMatch[1].replace(/\s*t="[^"]*"/, '') : ''
-            cellXml = `<c r="${ref}"${attrs}><v>${value}</v></c>`
-            if (cellMatch) {
-              rowContent = rowContent.replace(cellMatch[0], cellXml)
-            } else {
-              rowContent += cellXml
-            }
+            const attrs = cellMatch ? cellMatch[1].replace(/\s*t="[^"]*"/g, '') : ''
+            const newCell = `<c r="${ref}"${attrs}><v>${value}</v></c>`
+            if (cellMatch) rowContent = rowContent.replace(cellMatch[0], newCell)
+            else rowContent += newCell
           } else {
-            // String → sharedStrings'e ekle
-            const ssIdx = addSharedString(ssStrings, escapeXml(value))
-            const attrs = cellMatch ? cellMatch[1].replace(/\s*t="[^"]*"/, '') : ''
-            cellXml = `<c r="${ref}"${attrs} t="s"><v>${ssIdx}</v></c>`
-            if (cellMatch) {
-              rowContent = rowContent.replace(cellMatch[0], cellXml)
-            } else {
-              rowContent += cellXml
-            }
+            // String → SharedStrings
+            const ssIdx = getOrAddSharedString(escapeXml(value))
+            const attrs = cellMatch ? cellMatch[1].replace(/\s*t="[^"]*"/g, '') : ''
+            const newCell = `<c r="${ref}"${attrs} t="s"><v>${ssIdx}</v></c>`
+            if (cellMatch) rowContent = rowContent.replace(cellMatch[0], newCell)
+            else rowContent += newCell
           }
         }
 
-        xml = xml.replace(rowMatch[0], `<row r="${rowNum}"${rowAttrs}>${rowContent}</row>`)
+        xml = xml.replace(rowMatch[0], `${rowMatch[1]}${rowContent}${rowMatch[3]}`)
       } else {
-        // Satır yok — yeni satır oluştur
+        // Satır yok — yeni oluştur
         const cellsXml = Array.from(cols.entries()).map(([colNum, value]) => {
           const ref = cellRef(colNum, rowNum)
           if (value === null || value === '') return ''
           if (typeof value === 'number') return `<c r="${ref}"><v>${value}</v></c>`
-          const ssIdx = addSharedString(ssStrings, escapeXml(value))
+          const ssIdx = getOrAddSharedString(escapeXml(value))
           return `<c r="${ref}" t="s"><v>${ssIdx}</v></c>`
         }).filter(Boolean).join('')
-
-        const newRowXml = `<row r="${rowNum}">${cellsXml}</row>`
-        xml = xml.replace('</sheetData>', newRowXml + '</sheetData>')
+        xml = xml.replace('</sheetData>', `<row r="${rowNum}">${cellsXml}</row></sheetData>`)
       }
     }
 
     zip.file(mapping.file, xml)
   }
 
-  // SharedStrings güncelle
-  if (ssStrings.length > 0) {
-    const newSsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<sst xmlns="${NS}" count="${ssStrings.length}" uniqueCount="${ssStrings.length}">
-${ssStrings.map(s => `<si><t>${s}</t></si>`).join('')}
-</sst>`
-    zip.file('xl/sharedStrings.xml', newSsXml)
+  // ── SharedStrings güncelle — orijinali koru, yeni string'leri ekle ────
+  if (newStrings.length > 0 && originalSsXml) {
+    const totalCount = originalSsCount + newStrings.length
+    const newSiElements = newStrings.map(s => `<si><t>${s}</t></si>`).join('')
+
+    // count ve uniqueCount güncelle
+    let updatedSs = originalSsXml.replace(
+      /count="(\d+)"/g,
+      `count="${totalCount}"`
+    ).replace(
+      /uniqueCount="(\d+)"/g,
+      `uniqueCount="${totalCount}"`
+    )
+
+    // </sst> öncesine yeni string'leri ekle
+    updatedSs = updatedSs.replace('</sst>', newSiElements + '</sst>')
+    zip.file('xl/sharedStrings.xml', updatedSs)
   }
 
-  const outBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
-  return outBuf
-}
-
-function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
 }
