@@ -5,6 +5,7 @@ import SistemAyarlariClient from '@/components/sistem-ayarlari/SistemAyarlariCli
 import { ensureDashboardDefaults } from '@/lib/dashboard/ensureDefaults'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { createAdminClient } from '@/lib/supabase/server'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 
 export const dynamic = 'force-dynamic'
@@ -40,6 +41,7 @@ export default async function TASistemAyarlariPage() {
     )
   }
 
+  const admin = createAdminClient()
   const [{ data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
     supabase.from('lokasyonlar')
       .select('id, tanim, parent_id, aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika, gunluk_frekans_sayisi')
@@ -49,6 +51,16 @@ export default async function TASistemAyarlariPage() {
       .eq('proje_id', aktifProje.id).order('isim_soyisim'),
     getEfektifAyar(firmaId, aktifProje.id),
   ])
+
+  // Yetki verileri
+  const { data: firmaYetkileri } = await admin.from('kullanici_grubu_yetkileri').select('*')
+    .eq('firma_id', firmaId).in('rol', ['musteri', 'tenant_user']).order('rol').order('sayfa_kodu')
+  let initialYetkileri = firmaYetkileri ?? []
+  if (initialYetkileri.length === 0) {
+    const { data: global } = await admin.from('kullanici_grubu_yetkileri').select('*')
+      .is('firma_id', null).in('rol', ['musteri', 'tenant_user']).order('rol').order('sayfa_kodu')
+    initialYetkileri = (global ?? []).map((y: any) => ({ ...y, firma_id: firmaId }))
+  }
 
   return (
     <div>
@@ -67,6 +79,10 @@ export default async function TASistemAyarlariPage() {
         firmaId={firmaId}
         projeId={aktifProje.id}
         personelAtamaAktif={ayarlar.frekansiyel_personel_atama_aktif}
+        initialYetkileri={initialYetkileri as any}
+        yetkiApiEndpoint="/api/ta/grup-yetkileri"
+        yetkilLimitRoller={['musteri', 'tenant_user']}
+        yetkiGizliSayfalar={['firmalar', 'projeler']}
       />
     </div>
   )

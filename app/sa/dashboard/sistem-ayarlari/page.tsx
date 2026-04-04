@@ -6,6 +6,7 @@ import { ensureDashboardDefaults } from '@/lib/dashboard/ensureDefaults'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +52,18 @@ export default async function SASistemAyarlariPage() {
 
   const ayarlar = firmaId ? await getEfektifAyar(firmaId, projeId) : null
 
+  // Yetki verileri
+  const admin = createAdminClient()
+  const { data: firmalar } = await admin.from('firmalar').select('id,firma_adi,ticari_unvan').eq('aktif', true).order('ticari_unvan')
+  let yetkileriQ = admin.from('kullanici_grubu_yetkileri').select('*').order('rol').order('sayfa_kodu')
+  yetkileriQ = firmaId ? yetkileriQ.eq('firma_id', firmaId) : yetkileriQ.is('firma_id', null)
+  const { data: yetkileri } = await yetkileriQ
+  let initialYetkileri = yetkileri ?? []
+  if (firmaId && initialYetkileri.length === 0) {
+    const { data: global } = await admin.from('kullanici_grubu_yetkileri').select('*').is('firma_id', null).order('rol').order('sayfa_kodu')
+    initialYetkileri = (global ?? []).map((y: any) => ({ ...y, firma_id: firmaId }))
+  }
+
   return (
     <div>
       <Topbar
@@ -68,6 +81,9 @@ export default async function SASistemAyarlariPage() {
         firmaId={firmaId}
         projeId={projeId}
         personelAtamaAktif={ayarlar?.frekansiyel_personel_atama_aktif ?? true}
+        initialYetkileri={initialYetkileri as any}
+        firmalar={(firmalar as any) ?? []}
+        yetkiApiEndpoint="/api/sa/grup-yetkileri"
       />
     </div>
   )

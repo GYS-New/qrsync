@@ -8,14 +8,16 @@ const GorevSureleriClient = dynamic(() => import('./GorevSureleriClient'), { ssr
 const FrekansSayilariClient = dynamic(() => import('./FrekansSayilariClient'), { ssr: false })
 const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: false })
 const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/GorevKurallariClient'), { ssr: false })
+const GrupYetkileriClient = dynamic(() => import('@/components/ayarlar/GrupYetkileriClient'), { ssr: false })
 
-type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'dashboard'
+type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'dashboard'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'genel',          label: 'Genel Ayarlar'   },
   { key: 'frekans',        label: 'Frekans Sayıları' },
   { key: 'gorev-kurallari',label: 'Görev Kuralları'  },
   { key: 'gorev-sureleri', label: 'Görev Süreleri'   },
+  { key: 'yetkiler',       label: 'Kullanıcı Yetkileri' },
   { key: 'dashboard',      label: 'Dashboard'        },
 ]
 
@@ -39,9 +41,15 @@ interface Props {
   projeId?: string | null
   readonly?: boolean
   personelAtamaAktif?: boolean
+  // Yetki props
+  initialYetkileri?: any[]
+  firmalar?: any[]
+  yetkilLimitRoller?: string[]
+  yetkiGizliSayfalar?: string[]
+  yetkiApiEndpoint?: string
 }
 
-export default function SistemAyarlariClient({ meId, base, initialBloklar, lokasyonlar, kullanicilar, isSA = false, firmaId, projeId, readonly = false, personelAtamaAktif = true }: Props) {
+export default function SistemAyarlariClient({ meId, base, initialBloklar, lokasyonlar, kullanicilar, isSA = false, firmaId, projeId, readonly = false, personelAtamaAktif = true, initialYetkileri = [], firmalar = [], yetkilLimitRoller, yetkiGizliSayfalar, yetkiApiEndpoint }: Props) {
   const [aktifTab, setAktifTab] = useState<Tab>('genel')
 
   return (
@@ -97,6 +105,17 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
         />
       )}
       {aktifTab === 'gorev-sureleri' && <GorevSureleriClient lokasyonlar={lokasyonlar} />}
+      {aktifTab === 'yetkiler' && (
+        <GrupYetkileriClient
+          initialYetkileri={initialYetkileri}
+          firmaId={firmaId}
+          apiEndpoint={yetkiApiEndpoint}
+          limitRoller={yetkilLimitRoller}
+          gizliSayfalar={yetkiGizliSayfalar}
+          firmalar={isSA ? firmalar : undefined}
+          currentPath={`${base}/dashboard/sistem-ayarlari`}
+        />
+      )}
       {aktifTab === 'dashboard' && (
         <DashboardSettingsClient meId={meId} initialBloklar={initialBloklar} />
       )}
