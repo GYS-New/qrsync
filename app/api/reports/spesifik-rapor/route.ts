@@ -47,14 +47,16 @@ export async function GET(req: Request) {
     if (!isSA && !isTA && !isTenantViewer) return NextResponse.json({ error: 'Yetkisiz erişim.' }, { status: 403 })
 
     const p = new URL(req.url).searchParams
-    const firmaId       = isSA ? p.get('firmaId') : me.firma_id
-    const projeId       = p.get('projeId')       ?? null
-    const baslangic     = p.get('baslangic')      ?? null
-    const bitis         = p.get('bitis')          ?? null
-    const raporuAlan    = p.get('raporuAlan')     ?? (me.isim_soyisim ?? '')
-    const lokasyonId    = p.get('lokasyonId')     ?? null
-    const atananId      = p.get('atananId')       ?? null
-    const durumFiltreRaw = p.get('durum')         ?? null
+    const firmaId        = isSA ? p.get('firmaId') : me.firma_id
+    const projeId        = p.get('projeId')        ?? null
+    const baslangic      = p.get('baslangic')       ?? null
+    const bitis          = p.get('bitis')           ?? null
+    const raporuAlan     = p.get('raporuAlan')      ?? (me.isim_soyisim ?? '')
+    const ustLokasyonId  = p.get('ustLokasyonId')   ?? null
+    const altLokasyonId  = p.get('altLokasyonId')   ?? null
+    const altAltLokasyonId = p.get('altAltLokasyonId') ?? null
+    const atananId       = p.get('atananId')        ?? null
+    const durumFiltreRaw = p.get('durum')           ?? null
 
     if (!firmaId) return NextResponse.json({ error: 'Firma ID gerekli.' }, { status: 400 })
 
@@ -77,6 +79,36 @@ export async function GET(req: Request) {
     const { data: lokasyonlar } = await lokQ
     const lokMap = new Map<string, any>((lokasyonlar ?? []).map((l: any) => [l.id, l]))
 
+    // Hiyerarşik lokasyon filtresi: altAlt > alt > ust
+    function getAllDescendants(rootId: string): string[] {
+      const result: string[] = [rootId]
+      const queue = [rootId]
+      while (queue.length > 0) {
+        const pid = queue.shift()!
+        for (const l of (lokasyonlar ?? [])) {
+          if ((l as any).parent_id === pid) { result.push((l as any).id); queue.push((l as any).id) }
+        }
+      }
+      return result
+    }
+
+    let targetLokasyonIds: string[] | null = null
+    if (altAltLokasyonId) targetLokasyonIds = getAllDescendants(altAltLokasyonId)
+    else if (altLokasyonId) targetLokasyonIds = getAllDescendants(altLokasyonId)
+    else if (ustLokasyonId) targetLokasyonIds = getAllDescendants(ustLokasyonId)
+
+    function getUstLokasyon(lokId: string): string {
+      if (altAltLokasyonId) {
+        const loc = lokMap.get(lokId)
+        if (loc?.parent_id) return lokMap.get(loc.parent_id)?.tanim ?? ''
+        return ''
+      }
+      let cur = lokMap.get(lokId)
+      if (!cur) return ''
+      while (cur.parent_id) { const p2 = lokMap.get(cur.parent_id); if (!p2) break; cur = p2 }
+      return cur.tanim ?? ''
+    }
+
     // Kullanıcılar
     const { data: kullanicilar } = await admin.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true)
     const userMap = new Map<string, string>((kullanicilar ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
@@ -86,7 +118,7 @@ export async function GET(req: Request) {
       .select('id,tanim,durum,lokasyon_id,atanan_kullanici_id,olusturan_id,islemi_yapan_id,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi')
       .eq('firma_id', firmaId)
     if (projeId)     qAktif = (qAktif as any).eq('proje_id', projeId)
-    if (lokasyonId)  qAktif = (qAktif as any).eq('lokasyon_id', lokasyonId)
+    if (targetLokasyonIds) qAktif = (qAktif as any).in('lokasyon_id', targetLokasyonIds)
     if (atananId)    qAktif = (qAktif as any).eq('atanan_kullanici_id', atananId)
     if (durumFiltreRaw && durumFiltreRaw !== 'TUMU') qAktif = (qAktif as any).eq('durum', durumFiltreRaw)
 
@@ -155,6 +187,7 @@ export async function GET(req: Request) {
       .map((g: any, i: number) => ({
         sn: i + 1,
         tanim: g.tanim ?? '—',
+        ustLokasyon: targetLokasyonIds ? getUstLokasyon(g.lokasyon_id) : '',
         lokasyon: lokMap.get(g.lokasyon_id)?.tanim ?? '—',
         atanan: g.atanan_kullanici_id ? userMap.get(g.atanan_kullanici_id) ?? '—' : '—',
         tamamlayan: g.islemi_yapan_id ? userMap.get(g.islemi_yapan_id) ?? '—' : '—',
@@ -170,6 +203,7 @@ export async function GET(req: Request) {
       .map((g: any, i: number) => ({
         sn: i + 1,
         tanim: g.tanim ?? '—',
+        ustLokasyon: targetLokasyonIds ? getUstLokasyon(g.lokasyon_id) : '',
         lokasyon: lokMap.get(g.lokasyon_id)?.tanim ?? '—',
         atanan: g.atanan_kullanici_id ? userMap.get(g.atanan_kullanici_id) ?? '—' : '—',
         durum: g.durum,
@@ -192,7 +226,7 @@ export async function GET(req: Request) {
       persBazliRows,
       tamamlananGorevler,
       aktifGorevler,
-      lokasyonlar: (lokasyonlar ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim })),
+      lokasyonlar: (lokasyonlar ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim, parent_id: l.parent_id ?? null })),
       kullanicilar: (kullanicilar ?? []).map((u: any) => ({ id: u.id, isim_soyisim: u.isim_soyisim })),
     })
   } catch (err: any) {

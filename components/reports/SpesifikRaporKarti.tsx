@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -20,14 +20,15 @@ type Ozet = {
   toplam: number; tamamlanan: number; acik: number
   islemde: number; iptal: number; basariOrani: number; ortSure: number | null
 }
+type LokRow = { id: string; tanim: string; parent_id: string | null }
 type SpesifikData = {
   meta: { firmaAdi: string; projeAdi: string; raporTarihLabel: string; raporuAlan: string }
   ozet: Ozet
   lokBazliRows: { lokasyon: string; toplam: number; tamamlanan: number; iptal: number; basari: string }[]
   persBazliRows: { personel: string; toplam: number; tamamlanan: number; basari: string }[]
-  tamamlananGorevler: { sn: number; tanim: string; lokasyon: string; atanan: string; tamamlayan: string; olusturma: string; tamamlanma: string; sure: string }[]
-  aktifGorevler: { sn: number; tanim: string; lokasyon: string; atanan: string; durum: string; olusturma: string; sonIslem: string }[]
-  lokasyonlar: { id: string; tanim: string }[]
+  tamamlananGorevler: { sn: number; tanim: string; ustLokasyon: string; lokasyon: string; atanan: string; tamamlayan: string; olusturma: string; tamamlanma: string; sure: string }[]
+  aktifGorevler: { sn: number; tanim: string; ustLokasyon: string; lokasyon: string; atanan: string; durum: string; olusturma: string; sonIslem: string }[]
+  lokasyonlar: LokRow[]
   kullanicilar: { id: string; isim_soyisim: string }[]
 }
 
@@ -209,29 +210,49 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
   const { firmaId: saFirmaId } = useFirma()
   const currentFirmaId = isSA ? (saFirmaId ?? '') : (tenantFirmaId ?? '')
 
-  const [baslangic,  setBaslangic]  = useState('')
-  const [bitis,      setBitis]      = useState('')
-  const [raporuAlan, setRaporuAlan] = useState('')
-  const [lokasyonId, setLokasyonId] = useState('')
-  const [atananId,   setAtananId]   = useState('')
-  const [durum,      setDurum]      = useState('TUMU')
-  const [data,       setData]       = useState<SpesifikData | null>(null)
-  const [loading,    setLoading]    = useState(false)
-  const [dlLoading,  setDlLoading]  = useState<'excel'|'pdf'|null>(null)
-  const [activeTab,  setActiveTab]  = useState<Tab>('Özet & Grafikler')
+  const [baslangic,      setBaslangic]      = useState('')
+  const [bitis,          setBitis]          = useState('')
+  const [raporuAlan,     setRaporuAlan]     = useState('')
+  const [ustLokId,       setUstLokId]       = useState('')
+  const [altLokId,       setAltLokId]       = useState('')
+  const [altAltLokId,    setAltAltLokId]    = useState('')
+  const [atananId,       setAtananId]       = useState('')
+  const [durum,          setDurum]          = useState('TUMU')
+  const [lokasyonlar,    setLokasyonlar]    = useState<LokRow[]>([])
+  const [data,           setData]           = useState<SpesifikData | null>(null)
+  const [loading,        setLoading]        = useState(false)
+  const [dlLoading,      setDlLoading]      = useState<'excel'|'pdf'|null>(null)
+  const [activeTab,      setActiveTab]      = useState<Tab>('Özet & Grafikler')
   const debRef = useRef<any>(null)
+
+  const ustLokasyonlar    = useMemo(() => lokasyonlar.filter(l => !l.parent_id), [lokasyonlar])
+  const altLokasyonlar    = useMemo(() => lokasyonlar.filter(l => l.parent_id === ustLokId), [lokasyonlar, ustLokId])
+  const altAltLokasyonlar = useMemo(() => lokasyonlar.filter(l => l.parent_id === altLokId), [lokasyonlar, altLokId])
+  const hasAltAlt         = altLokId !== '' && altAltLokasyonlar.length > 0
+
+  // Lokasyon listesini çek
+  useEffect(() => {
+    if (!currentFirmaId) { setLokasyonlar([]); return }
+    const p = new URLSearchParams({ firmaId: currentFirmaId })
+    if (projeId) p.set('projeId', projeId)
+    fetch(`/api/lokasyonlar-list?${p}`, { cache: 'no-store' })
+      .then(r => r.json()).then(d => setLokasyonlar(Array.isArray(d) ? d : []))
+      .catch(() => setLokasyonlar([]))
+  }, [currentFirmaId, projeId])
 
   const buildParams = useCallback(() => {
     const p = new URLSearchParams({ firmaId: currentFirmaId })
-    if (projeId)    p.set('projeId', projeId)
-    if (baslangic)  p.set('baslangic', baslangic)
-    if (bitis)      p.set('bitis', bitis)
-    if (raporuAlan) p.set('raporuAlan', raporuAlan)
-    if (lokasyonId) p.set('lokasyonId', lokasyonId)
-    if (atananId)   p.set('atananId', atananId)
+    if (projeId)      p.set('projeId', projeId)
+    if (baslangic)    p.set('baslangic', baslangic)
+    if (bitis)        p.set('bitis', bitis)
+    if (raporuAlan)   p.set('raporuAlan', raporuAlan)
+    if (ustLokId)     p.set('ustLokasyonId', ustLokId)
+    if (altLokId)     p.set('altLokasyonId', altLokId)
+    if (altAltLokId)  p.set('altAltLokasyonId', altAltLokId)
+    if (atananId)     p.set('atananId', atananId)
     if (durum !== 'TUMU') p.set('durum', durum)
     return p
-  }, [currentFirmaId, projeId, baslangic, bitis, raporuAlan, lokasyonId, atananId, durum])
+  }, [currentFirmaId, projeId, baslangic, bitis, raporuAlan, ustLokId, altLokId, altAltLokId, atananId, durum])
 
   const fetchData = useCallback(async () => {
     if (!currentFirmaId) return
@@ -317,21 +338,33 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
           {/* Filtre grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 10 }}>
             {([
-              { label: 'Başlangıç', node: <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)} style={inp} /> },
-              { label: 'Bitiş',     node: <input type="date" value={bitis}     onChange={e => setBitis(e.target.value)}     style={inp} /> },
-              { label: 'Lokasyon',  node: (
-                <select value={lokasyonId} onChange={e => setLokasyonId(e.target.value)} style={inp}>
+              { label: 'Başlangıç',    node: <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)} style={inp} /> },
+              { label: 'Bitiş',        node: <input type="date" value={bitis}     onChange={e => setBitis(e.target.value)}     style={inp} /> },
+              { label: 'Üst Lokasyon', node: (
+                <select value={ustLokId} onChange={e => { setUstLokId(e.target.value); setAltLokId(''); setAltAltLokId('') }} style={inp}>
                   <option value="">Tümü</option>
-                  {(data?.lokasyonlar ?? []).map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                  {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
                 </select>
               )},
-              { label: 'Atanan',    node: (
+              { label: 'Alt Lokasyon', node: (
+                <select value={altLokId} onChange={e => { setAltLokId(e.target.value); setAltAltLokId('') }} style={inp} disabled={!ustLokId}>
+                  <option value="">Tümü</option>
+                  {altLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                </select>
+              )},
+              ...(hasAltAlt ? [{ label: 'Alt-Alt Lokasyon', node: (
+                <select value={altAltLokId} onChange={e => setAltAltLokId(e.target.value)} style={inp}>
+                  <option value="">Tümü</option>
+                  {altAltLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                </select>
+              )}] : []),
+              { label: 'Atanan',       node: (
                 <select value={atananId} onChange={e => setAtananId(e.target.value)} style={inp}>
                   <option value="">Tümü</option>
                   {(data?.kullanicilar ?? []).map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
                 </select>
               )},
-              { label: 'Durum',     node: (
+              { label: 'Durum',        node: (
                 <select value={durum} onChange={e => setDurum(e.target.value)} style={inp}>
                   <option value="TUMU">Tümü</option>
                   <option value="ACIK">Açık</option>
@@ -340,7 +373,7 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
                   <option value="IPTAL">İptal</option>
                 </select>
               )},
-              { label: 'Raporu Alan', node: <input type="text" value={raporuAlan} onChange={e => setRaporuAlan(e.target.value)} placeholder="Ad Soyad" style={inp} /> },
+              { label: 'Raporu Alan',  node: <input type="text" value={raporuAlan} onChange={e => setRaporuAlan(e.target.value)} placeholder="Ad Soyad" style={inp} /> },
             ] as { label: string; node: React.ReactNode }[]).map(({ label, node }) => (
               <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{label}</span>
@@ -466,10 +499,17 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
                   <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Tamamlanan Görevler</div>
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{data.tamamlananGorevler.length} kayıt</span>
                 </div>
-                <DataTable
-                  headers={['SN', 'GÖREV', 'LOKASYON', 'ATANAN', 'TAMAMLAYAN', 'OLUŞTURMA', 'TAMAMLANMA', 'SÜRE']}
-                  rows={data.tamamlananGorevler.map(r => [r.sn, r.tanim, r.lokasyon, r.atanan, r.tamamlayan, r.olusturma, r.tamamlanma, r.sure])}
-                />
+                {ustLokId ? (
+                  <DataTable
+                    headers={['SN', 'GÖREV', altAltLokId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'ATANAN', 'TAMAMLAYAN', 'OLUŞTURMA', 'TAMAMLANMA', 'SÜRE']}
+                    rows={data.tamamlananGorevler.map(r => [r.sn, r.tanim, r.ustLokasyon, r.lokasyon, r.atanan, r.tamamlayan, r.olusturma, r.tamamlanma, r.sure])}
+                  />
+                ) : (
+                  <DataTable
+                    headers={['SN', 'GÖREV', 'LOKASYON', 'ATANAN', 'TAMAMLAYAN', 'OLUŞTURMA', 'TAMAMLANMA', 'SÜRE']}
+                    rows={data.tamamlananGorevler.map(r => [r.sn, r.tanim, r.lokasyon, r.atanan, r.tamamlayan, r.olusturma, r.tamamlanma, r.sure])}
+                  />
+                )}
               </div>
             )}
 
@@ -480,10 +520,17 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
                   <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Açık / İptal Görevler</div>
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.aktifGorevler.length} kayıt</span>
                 </div>
-                <DataTable
-                  headers={['SN', 'GÖREV', 'LOKASYON', 'ATANAN', 'DURUM', 'OLUŞTURMA', 'SON İŞLEM']}
-                  rows={data.aktifGorevler.map(r => [r.sn, r.tanim, r.lokasyon, r.atanan, r.durum, r.olusturma, r.sonIslem])}
-                />
+                {ustLokId ? (
+                  <DataTable
+                    headers={['SN', 'GÖREV', altAltLokId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'ATANAN', 'DURUM', 'OLUŞTURMA', 'SON İŞLEM']}
+                    rows={data.aktifGorevler.map(r => [r.sn, r.tanim, r.ustLokasyon, r.lokasyon, r.atanan, r.durum, r.olusturma, r.sonIslem])}
+                  />
+                ) : (
+                  <DataTable
+                    headers={['SN', 'GÖREV', 'LOKASYON', 'ATANAN', 'DURUM', 'OLUŞTURMA', 'SON İŞLEM']}
+                    rows={data.aktifGorevler.map(r => [r.sn, r.tanim, r.lokasyon, r.atanan, r.durum, r.olusturma, r.sonIslem])}
+                  />
+                )}
               </div>
             )}
           </>

@@ -643,7 +643,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{data.tamamlananGorevler.length} kayıt</span>
                 </div>
                 <DataTable
-                  headers={['SN', 'PERSONEL', 'ÜST LOKASYON', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
+                  headers={['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
                   rows={data.tamamlananGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum])}
                 />
               </div>
@@ -657,7 +657,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.sapmaGorevler.length} kayıt</span>
                 </div>
                 <DataTable
-                  headers={['SN', 'PERSONEL', 'ÜST LOKASYON', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'SAPMA NEDENİ']}
+                  headers={['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'SAPMA NEDENİ']}
                   rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.sapmaNedeni])}
                 />
               </div>
@@ -671,7 +671,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.redLight, color: T.red }}>{data.kayipGorevler.length} kayıt</span>
                 </div>
                 <DataTable
-                  headers={['SN', 'ÜST LOKASYON', 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM', 'KAYIP NEDENİ']}
+                  headers={['SN', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM', 'KAYIP NEDENİ']}
                   rows={data.kayipGorevler.map(r => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum, r.kayipNedeni])}
                 />
               </div>

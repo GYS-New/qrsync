@@ -187,6 +187,18 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     return cur.tanim ?? ''
   }
 
+  // Filtre seviyesine göre ÜST LOKASYON değerini döndürür:
+  // altAltLokasyonId seçiliyse → direkt parent adı (alt seviye)
+  // diğer durumlarda → kök adı
+  function getContextUstLokasyon(lokId: string): string {
+    if (filters.altAltLokasyonId) {
+      const loc = lokMap.get(lokId) as any
+      if (loc?.parent_id) return (lokMap.get(loc.parent_id) as any)?.tanim ?? ''
+      return ''
+    }
+    return getUstLokasyon(lokId)
+  }
+
   if (filters.ustLokasyonId) {
     const ust = lokMap.get(filters.ustLokasyonId) as any
     ustLokTanim = ust?.tanim ?? ''
@@ -378,7 +390,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       ids.includes(g.lokasyon_id) && (g.durum === 'HAZIR' || g.durum === 'ACIK' || g.durum === 'ISLEMDE')
     ).length
     const hedef = tamamlanan + sapma + kayip + tekil + hazirAcik
-    if (hedef === 0 && tamamlanan === 0 && sapma === 0 && kayip === 0) return null
+    // Always return a row even when counts are zero (lokasyon exists in group but no tasks)
     const gunlukFrekans = gunlukFrekansToplamı > 0
       ? gunlukFrekansToplamı
       : (gunSayisi > 0 ? Math.round(hedef / gunSayisi) : hedef)
@@ -503,7 +515,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       return {
         sn: i + 1,
         personel: kullanici,
-        ustLokasyon: getUstLokasyon(g.lokasyon_id),
+        ustLokasyon: getContextUstLokasyon(g.lokasyon_id),
         lokasyon: lok?.tanim ?? '',
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
@@ -523,7 +535,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       return {
         sn: i + 1,
         personel: kullanici,
-        ustLokasyon: getUstLokasyon(g.lokasyon_id),
+        ustLokasyon: getContextUstLokasyon(g.lokasyon_id),
         lokasyon: lok?.tanim ?? '',
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
@@ -551,7 +563,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       const lok = lokMap.get(g.lokasyon_id) as any
       return {
         sn: i + 1,
-        ustLokasyon: getUstLokasyon(g.lokasyon_id),
+        ustLokasyon: getContextUstLokasyon(g.lokasyon_id),
         lokasyon: lok?.tanim ?? '',
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
