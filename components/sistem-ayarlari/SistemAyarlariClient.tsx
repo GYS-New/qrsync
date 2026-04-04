@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 
 const DashboardSettingsClient = dynamic(() => import('@/components/dashboard/DashboardSettingsClient'), { ssr: false })
 const GorevSureleriClient = dynamic(() => import('./GorevSureleriClient'), { ssr: false })
+const FrekansSayilariClient = dynamic(() => import('./FrekansSayilariClient'), { ssr: false })
 const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: false })
 const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/GorevKurallariClient'), { ssr: false })
 
@@ -80,7 +81,7 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
 
       {/* Tab içerikleri */}
       {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} projeId={projeId} />}
-      {aktifTab === 'frekans' && <EmptyTab label="Frekans Sayıları" />}
+      {aktifTab === 'frekans' && <FrekansSayilariClient lokasyonlar={lokasyonlar as any} />}
       {aktifTab === 'gorev-kurallari' && firmaId && (
         <GorevKurallariClient
           base={base}
