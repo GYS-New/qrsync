@@ -16,8 +16,9 @@ type GunlukRow     = { tarih: string; ort_sure: number; adet: number }
 type LokasyonRow   = { lokasyon_id: string; lokasyon: string; ort_sure: number; min_sure: number; max_sure: number; adet: number; hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null }
 type PersonelRow   = { personel: string; ort_sure: number; tamamlanan: number; en_hizli: number; en_yavas: number; ort_hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null }
 type DagilimRow    = { aralik: string; adet: number }
+type GorevRow      = { tanim: string; lokasyon_id: string; lokasyon: string; adet: number; ort_sure: number; min_sure: number; max_sure: number; hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null }
 type MetaLokasyon  = { id: string; tanim: string; parent_id: string | null }
-type Bolum         = { analiz: Analiz; gunlukTrend: GunlukRow[]; lokasyon: LokasyonRow[]; personel: PersonelRow[]; dagilim: DagilimRow[] }
+type Bolum         = { analiz: Analiz; gunlukTrend: GunlukRow[]; lokasyon: LokasyonRow[]; personel: PersonelRow[]; gorev: GorevRow[]; dagilim: DagilimRow[] }
 type SureData      = { ok: boolean; frekansiyel: Bolum; spesifik: Bolum; meta: { lokasyonlar: MetaLokasyon[]; kullanicilar: any[] } }
 
 // ── Tokens ────────────────────────────────────────────────────────────────
@@ -361,8 +362,60 @@ function PersonelKarsilastirma({ data, renk }: { data: PersonelRow[]; renk: stri
   )
 }
 
+// ── Görev hedef vs gerçekleşen karşılaştırma ────────────────────────
+function GorevKarsilastirma({ data, renk }: { data: GorevRow[]; renk: string }) {
+  if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+  const maxVal = Math.max(...data.flatMap(r => [r.ort_sure, r.hedef_sure ?? 0]), 1)
+  const hasHedef = data.some(r => r.hedef_sure != null)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {hasHedef && (
+        <div style={{ display: 'flex', gap: 16, marginBottom: 6, fontSize: 12, color: T.textSoft }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: renk, display: 'inline-block' }} /> Ort. Süre</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: '#cbd5e1', display: 'inline-block' }} /> Hedef Süre</span>
+        </div>
+      )}
+      {data.map((r, i) => {
+        const ortPct   = (r.ort_sure / maxVal) * 100
+        const hedefPct = r.hedef_sure != null ? (r.hedef_sure / maxVal) * 100 : null
+        const asim     = r.hedef_fark != null && r.hedef_fark > 0
+        const barColor = r.hedef_sure == null ? renk : asim ? T.red : T.greenMid
+        return (
+          <div key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff', borderRadius: 6, padding: '8px 10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+              <div style={{ minWidth: 0 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: T.text }}>{r.tanim}</span>
+                <span style={{ fontSize: 11.5, color: T.textSoft, marginLeft: 8 }}>{r.lokasyon}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 12, color: T.textSoft }}>{r.adet} görev</span>
+                {r.hedef_fark_pct != null && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: asim ? T.red : T.greenMid }}>
+                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} erken`}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div style={{ position: 'relative', height: 10, background: '#e2e8f0', borderRadius: 5, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${ortPct}%`, background: barColor, borderRadius: 5, transition: 'width .4s' }} />
+              {hedefPct != null && (
+                <div style={{ position: 'absolute', left: `${hedefPct}%`, top: 0, width: 2, height: '100%', background: '#64748b', transform: 'translateX(-1px)' }} />
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 11.5 }}>
+              <span style={{ color: barColor, fontWeight: 700 }}>{fmtS(r.ort_sure)}</span>
+              {r.hedef_sure != null && <span style={{ color: T.textSoft }}>Hedef: {fmtS(r.hedef_sure)}</span>}
+              <span style={{ color: T.textSoft, marginLeft: 'auto' }}>Min: {fmtS(r.min_sure)} · Max: {fmtS(r.max_sure)}</span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Tek görev tipi analiz paneli ──────────────────────────────────────────
-const SUB_TABS = ['Lokasyon Bazlı', 'Personel Bazlı'] as const
+const SUB_TABS = ['Lokasyon Bazlı', 'Personel Bazlı', 'Görev Bazlı'] as const
 type SubTab = typeof SUB_TABS[number]
 
 function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: SureData['meta'] }) {
@@ -503,6 +556,74 @@ function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: S
                 })}
               />
             )}
+          </div>
+        )}
+
+        {/* ── Görev Bazlı ── */}
+        {subTab === 'Görev Bazlı' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Üst lokasyon filtresi */}
+            {ustLokasyonlar.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: T.textSoft, whiteSpace: 'nowrap' }}>Üst Lokasyon:</span>
+                <select
+                  value={ustLokId}
+                  onChange={e => setUstLokId(e.target.value)}
+                  style={{ height: 34, padding: '0 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, minWidth: 180 }}
+                >
+                  <option value="">Tümü</option>
+                  {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                </select>
+              </div>
+            )}
+
+            {(() => {
+              const filteredGorev = filteredLokIds
+                ? bolum.gorev.filter(r => filteredLokIds.has(r.lokasyon_id))
+                : bolum.gorev
+
+              if (!filteredGorev.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+
+              const hasGorevHedef = filteredGorev.some(r => r.hedef_sure != null)
+              const gorevAsimlar  = filteredGorev.filter(r => r.hedef_fark != null && r.hedef_fark > 0)
+              const gorevUyumlu   = filteredGorev.filter(r => r.hedef_fark != null && r.hedef_fark <= 0)
+
+              return <>
+                {/* Hedef özet bandı */}
+                {hasGorevHedef && (
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ padding: '8px 14px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.green }}>
+                      ✓ Hedefe Uygun: {gorevUyumlu.length} görev
+                    </div>
+                    <div style={{ padding: '8px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.red }}>
+                      ✗ Hedef Aşımı: {gorevAsimlar.length} görev
+                    </div>
+                  </div>
+                )}
+
+                {/* Görev karşılaştırma görseli */}
+                <GorevKarsilastirma data={filteredGorev} renk={renk} />
+
+                {/* Tablo */}
+                <Tablo
+                  color={renk}
+                  headers={hasGorevHedef
+                    ? ['GÖREV', 'LOKASYON', 'ADET', 'HEDEF SÜRE', 'ORT. SÜRE', 'FARK', 'DURUM', 'EN HIZLI', 'EN YAVAŞ']
+                    : ['GÖREV', 'LOKASYON', 'ADET', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
+                  rows={filteredGorev.map(r => {
+                    if (hasGorevHedef) {
+                      const farkLabel = r.hedef_fark == null ? '—'
+                        : r.hedef_fark > 0 ? `+${fmtS(r.hedef_fark)}`
+                        : r.hedef_fark < 0 ? `-${fmtS(Math.abs(r.hedef_fark))}`
+                        : '0'
+                      const durum = r.hedef_fark == null ? '—' : r.hedef_fark > 0 ? '✗ Aşım' : '✓ Uygun'
+                      return [r.tanim, r.lokasyon, r.adet, r.hedef_sure != null ? fmtS(r.hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, durum, fmtS(r.min_sure), fmtS(r.max_sure)]
+                    }
+                    return [r.tanim, r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)]
+                  })}
+                />
+              </>
+            })()}
           </div>
         )}
 

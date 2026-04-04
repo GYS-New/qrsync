@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
   // Görevleri çek
   let gorevler: any[] = []
   if (tip === 'frekansiyel') {
-    const SEL = 'id,firma_id,lokasyon_id,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,aktif_olma_tarihi'
+    const SEL = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,aktif_olma_tarihi'
     let qA = admin.from('canli_gorevler').select(SEL).eq('firma_id', firmaId)
     let qB = admin.from('canli_gorevler_arsiv').select(SEL).eq('firma_id', firmaId)
     if (projeId) { qA = (qA as any).eq('proje_id', projeId); qB = (qB as any).eq('proje_id', projeId) }
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
     for (const r of (a ?? [])) m.set(r.id, r)
     gorevler = Array.from(m.values())
   } else {
-    const SEL = 'id,firma_id,lokasyon_id,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'
+    const SEL = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'
     let q = admin.from('gorevler').select(SEL).eq('firma_id', firmaId)
     if (projeId) q = (q as any).eq('proje_id', projeId)
     const { data } = await q
@@ -165,6 +165,33 @@ export async function GET(req: NextRequest) {
       durum: fark == null ? '—' : fark > 0 ? 'Aşım' : 'Uygun',
     }
   }).sort((a, b) => b.tamamlanan - a.tamamlanan)
+
+  // Görev analizi (tanim + lokasyon bazında)
+  const gorevGrup: Record<string, number[]> = {}
+  const gorevLokIdMap: Record<string, string> = {}
+  for (const g of gorevler) {
+    if (g.durum !== 'TAMAMLANDI' || !g.tamamlanma_suresi_saniye || !g.tanim) continue
+    const key = `${g.tanim}|||${g.lokasyon_id ?? ''}`
+    if (!gorevGrup[key]) gorevGrup[key] = []
+    gorevGrup[key].push(g.tamamlanma_suresi_saniye)
+    if (g.lokasyon_id) gorevLokIdMap[key] = g.lokasyon_id
+  }
+  const gorevRows = Object.entries(gorevGrup).map(([key, vals]) => {
+    const [tanim] = key.split('|||')
+    const lid = gorevLokIdMap[key] ?? ''
+    const sorted = [...vals].sort((a, b) => a - b)
+    const ortS = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+    const hdk = lid ? hedefMap.get(lid) ?? null : null
+    const hedefSn = hdk != null ? hdk * 60 : null
+    const fark = hedefSn != null ? ortS - hedefSn : null
+    const farkPct = hedefSn != null && hedefSn > 0 ? Math.round(((ortS - hedefSn) / hedefSn) * 100) : null
+    return {
+      tanim, lokasyon: lid ? lokMap.get(lid) ?? '—' : '—',
+      adet: vals.length, ort_sure: ortS, min_sure: sorted[0], max_sure: sorted[sorted.length - 1],
+      hedef_sure: hedefSn, fark, farkPct,
+      durum: fark == null ? '—' : fark > 0 ? 'Aşım' : 'Uygun',
+    }
+  }).sort((a, b) => b.adet - a.adet)
 
   // ── Excel oluştur ─────────────────────────────────────────────────────────
   const tipLabel = tip === 'frekansiyel' ? 'Frekansiyel Görevler' : 'Spesifik Görevler'
@@ -329,6 +356,47 @@ export async function GET(req: NextRequest) {
   wsPer.columns = hasPerHedef
     ? [{ width: 28 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 10 }, { width: 12 }, { width: 14 }, { width: 14 }]
     : [{ width: 28 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }]
+
+  // ── Sayfa 4: Görev Bazlı ────────────────────────────────────────────────
+  const wsGorev = wb.addWorksheet('Görev Bazlı')
+  const hasGorevHedef = gorevRows.some(r => r.hedef_sure != null)
+  const gorevHeaders = hasGorevHedef
+    ? ['GÖREV', 'LOKASYON', 'ADET', 'HEDEF SÜRE', 'ORT. SÜRE', 'FARK', 'FARK %', 'DURUM', 'EN HIZLI', 'EN YAVAŞ']
+    : ['GÖREV', 'LOKASYON', 'ADET', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']
+  addTitle(wsGorev, 'Görev Bazlı Analiz', gorevHeaders.length)
+  addHeaders(wsGorev, gorevHeaders)
+
+  for (const r of gorevRows) {
+    if (hasGorevHedef) {
+      const farkLabel = r.fark == null ? '—' : r.fark > 0 ? `+${fmtS(r.fark)}` : r.fark < 0 ? `-${fmtS(Math.abs(r.fark))}` : '0'
+      const farkPctLabel = r.farkPct == null ? '—' : r.farkPct > 0 ? `+%${r.farkPct}` : `%${r.farkPct}`
+      const row = wsGorev.addRow([r.tanim, r.lokasyon, r.adet, r.hedef_sure != null ? fmtS(r.hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, farkPctLabel, r.durum, fmtS(r.min_sure), fmtS(r.max_sure)])
+      const durumCell = row.getCell(8)
+      if (r.durum === 'Aşım') durumCell.font = { bold: true, color: { argb: 'FFDC2626' } }
+      else if (r.durum === 'Uygun') durumCell.font = { bold: true, color: { argb: 'FF1A5C2A' } }
+    } else {
+      wsGorev.addRow([r.tanim, r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)])
+    }
+  }
+
+  if (gorevRows.length > 0) {
+    wsGorev.addRow([])
+    const topAdet = gorevRows.reduce((s, r) => s + r.adet, 0)
+    const topOrt = Math.round(gorevRows.reduce((s, r) => s + r.ort_sure * r.adet, 0) / topAdet)
+    if (hasGorevHedef) {
+      const uyumlu = gorevRows.filter(r => r.fark != null && r.fark <= 0).length
+      const asim   = gorevRows.filter(r => r.fark != null && r.fark > 0).length
+      const sr = wsGorev.addRow(['TOPLAM', '', topAdet, '', fmtS(topOrt), '', '', `${uyumlu} uygun / ${asim} aşım`, '', ''])
+      sr.eachCell(c => { c.font = { bold: true }; c.fill = ozetFill })
+    } else {
+      const sr = wsGorev.addRow(['TOPLAM', '', topAdet, fmtS(topOrt), '', ''])
+      sr.eachCell(c => { c.font = { bold: true }; c.fill = ozetFill })
+    }
+  }
+
+  wsGorev.columns = hasGorevHedef
+    ? [{ width: 32 }, { width: 36 }, { width: 10 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 10 }, { width: 12 }, { width: 14 }, { width: 14 }]
+    : [{ width: 32 }, { width: 36 }, { width: 10 }, { width: 14 }, { width: 14 }, { width: 14 }]
 
   // ── Dosya döndür ──────────────────────────────────────────────────────────
   const buf = await wb.xlsx.writeBuffer()

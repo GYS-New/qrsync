@@ -169,6 +169,45 @@ function personelAnalizi(
     .slice(0, 12)
 }
 
+function gorevAnalizi(
+  gorevler: any[],
+  lokMap: Map<string, string>,
+  hedefMap: Map<string, number | null>,
+): {
+  tanim: string; lokasyon_id: string; lokasyon: string; adet: number
+  ort_sure: number; min_sure: number; max_sure: number
+  hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null
+}[] {
+  // tanim + lokasyon_id bazında grupla
+  const map: Record<string, number[]> = {}
+  const lokIdMap: Record<string, string> = {}
+  for (const g of gorevler) {
+    if (g.durum !== 'TAMAMLANDI' || !g.tamamlanma_suresi_saniye || !g.tanim) continue
+    const key = `${g.tanim}|||${g.lokasyon_id ?? ''}`
+    if (!map[key]) map[key] = []
+    map[key].push(g.tamamlanma_suresi_saniye)
+    if (g.lokasyon_id) lokIdMap[key] = g.lokasyon_id
+  }
+  return Object.entries(map)
+    .map(([key, vals]) => {
+      const [tanim] = key.split('|||')
+      const lid = lokIdMap[key] ?? ''
+      const sorted = [...vals].sort((a, b) => a - b)
+      const ort_sure = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+      const hdk = lid ? hedefMap.get(lid) ?? null : null
+      const hedef_sure = hdk != null ? hdk * 60 : null
+      const hedef_fark = hedef_sure != null ? ort_sure - hedef_sure : null
+      const hedef_fark_pct = hedef_sure != null && hedef_sure > 0
+        ? Math.round(((ort_sure - hedef_sure) / hedef_sure) * 100) : null
+      return {
+        tanim, lokasyon_id: lid, lokasyon: lid ? lokMap.get(lid) ?? '—' : '—',
+        adet: vals.length, ort_sure, min_sure: sorted[0], max_sure: sorted[sorted.length - 1],
+        hedef_sure, hedef_fark, hedef_fark_pct,
+      }
+    })
+    .sort((a, b) => b.adet - a.adet)
+}
+
 function dagılımKovalari(gorevler: any[]): { aralik: string; adet: number }[] {
   const kovalar = [
     { label: '< 5 dk',    min: 0,      max: 300 },
@@ -241,8 +280,8 @@ export async function GET(req: Request) {
     const hedefMap = new Map<string, number | null>((loks ?? []).map((l: any) => [l.id, l.hedef_sure_dakika ?? null]))
     const userMap  = new Map<string, string>((users ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
 
-    const SEL_FREQ  = 'id,firma_id,lokasyon_id,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,aktif_olma_tarihi'
-    const SEL_SPEC  = 'id,firma_id,lokasyon_id,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'
+    const SEL_FREQ  = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,aktif_olma_tarihi'
+    const SEL_SPEC  = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'
 
     // ── Frekansiyel: aktif + arşiv ──────────────────────────────────────────
     let qFreqA = admin.from('canli_gorevler').select(SEL_FREQ).eq('firma_id', firmaId)
@@ -276,6 +315,7 @@ export async function GET(req: Request) {
         gunlukTrend: gunlukTrend(freqTum),
         lokasyon:    lokasyonAnalizi(freqTum, lokMap, hedefMap),
         personel:    personelAnalizi(freqTum, userMap, hedefMap),
+        gorev:       gorevAnalizi(freqTum, lokMap, hedefMap),
         dagilim:     dagılımKovalari(freqTum),
       },
       spesifik: {
@@ -283,6 +323,7 @@ export async function GET(req: Request) {
         gunlukTrend: gunlukTrend(specTum),
         lokasyon:    lokasyonAnalizi(specTum, lokMap, hedefMap),
         personel:    personelAnalizi(specTum, userMap, hedefMap),
+        gorev:       gorevAnalizi(specTum, lokMap, hedefMap),
         dagilim:     dagılımKovalari(specTum),
       },
       meta: {
