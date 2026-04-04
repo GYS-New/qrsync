@@ -132,6 +132,18 @@ export async function POST(req: Request, { params }: { params: { token: string }
         if (maddeError) throw new Error(maddeError.message)
       }
     }
+    // Ardışık başlatma kontrolü — görev henüz başlatılmamışsa
+    if (!task.baslatilma_tarihi) {
+      const tabloArd = task.taskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'
+      const { data: gorevRow } = await supabase.from(tabloArd).select('firma_id,proje_id').eq('id', task.id).maybeSingle()
+      if (gorevRow) {
+        const ardisikHata = await ardisikBaslatmaKontrol(supabase, user.id, (gorevRow as any).firma_id, (gorevRow as any).proje_id)
+        if (ardisikHata) {
+          return NextResponse.json({ ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' }, { status: 429 })
+        }
+      }
+    }
+
     // Süreli görev: baslatilma_tarihi yoksa otomatik başlat
     if (context.lokasyon.sureli_gorev_aktif && !task.baslatilma_tarihi) {
       const nowIso = new Date().toISOString()
