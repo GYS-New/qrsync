@@ -25,7 +25,7 @@ const T = {
   blue: '#1d4ed8', blueMid: '#3b82f6', blueLight: '#eff6ff',
   amber: '#d97706', amberLight: '#fef3c7',
   red: '#dc2626', redLight: '#fee2e2',
-  purple: '#7c3aed', purpleLight: '#f5f3ff',
+  purple: '#7c3aed',
   teal: '#0d9488', tealLight: '#f0fdfa',
   gray: '#475569', grayLight: '#f8fafc', border: '#e2e8f0',
   text: '#0f172a', textSoft: '#64748b',
@@ -377,7 +377,7 @@ function BolumPanel({ bolum, renk, tip }: { bolum: Bolum; renk: string; tip: 'fr
 }
 
 // ── Ana bileşen ────────────────────────────────────────────────────────────
-const ANA_TABS = ['Frekansiyel Görevler', 'Spesifik Görevler', 'Karşılaştırma'] as const
+const ANA_TABS = ['Frekansiyel Görevler', 'Spesifik Görevler'] as const
 type AnaTab = typeof ANA_TABS[number]
 
 export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, sureliGorevAktif = true }: Props) {
@@ -420,7 +420,7 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
   const tabStyle = (t: AnaTab): React.CSSProperties => ({
     padding: '8px 18px', borderRadius: 8, fontSize: 13.5, fontWeight: 700,
     border: 'none', cursor: 'pointer', transition: 'all .15s',
-    background: activeTab === t ? (t === 'Spesifik Görevler' ? T.blue : t === 'Karşılaştırma' ? T.purple : T.green) : T.grayLight,
+    background: activeTab === t ? (t === 'Spesifik Görevler' ? T.blue : T.green) : T.grayLight,
     color: activeTab === t ? '#fff' : T.textSoft,
   })
 
@@ -484,22 +484,8 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
         {/* İçerik */}
         {data && (
           <>
-            {/* Özet karşılaştırma bandı */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {[
-                { label: 'Frekansiyel Ort. Süre', val: fmtS(data.frekansiyel.analiz.ort), sub: `${data.frekansiyel.analiz.tamamlananSayi} görev`, color: freqRenk, Icon: Activity },
-                { label: 'Spesifik Ort. Süre',    val: fmtS(data.spesifik.analiz.ort),    sub: `${data.spesifik.analiz.tamamlananSayi} görev`, color: specRenk, Icon: Activity },
-              ].map(({ label, val, sub, color, Icon }) => (
-                <div key={label} style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px', borderTop: `4px solid ${color}` }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: T.text, lineHeight: 1 }}>{val}</div>
-                  <div style={{ fontSize: 12, color: T.textSoft, marginTop: 4 }}>{sub}</div>
-                </div>
-              ))}
-            </div>
-
             {/* Ana sekmeler */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 4, background: T.grayLight, borderRadius: 8, padding: 4, alignSelf: 'flex-start', border: `1px solid ${T.border}` }}>
               {ANA_TABS.map(t => <button key={t} style={tabStyle(t)} onClick={() => setActiveTab(t)}>{t}</button>)}
             </div>
 
@@ -511,79 +497,6 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
             {/* Spesifik panel */}
             {activeTab === 'Spesifik Görevler' && (
               <BolumPanel bolum={data.spesifik} renk={specRenk} tip="spesifik" />
-            )}
-
-            {/* Karşılaştırma */}
-            {activeTab === 'Karşılaştırma' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-                {/* Yan yana metrik karşılaştırması */}
-                <div className="verde-card" style={{ padding: '16px 18px' }}>
-                  <SekHead title="Metrik Karşılaştırması" color={T.purple} />
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ padding: '8px 14px', background: T.purple, color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left' }}>METRİK</th>
-                          <th style={{ padding: '8px 14px', background: freqRenk, color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'center' }}>FREKANSİYEL</th>
-                          <th style={{ padding: '8px 14px', background: specRenk, color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'center' }}>SPESİFİK</th>
-                          <th style={{ padding: '8px 14px', background: '#64748b', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'center' }}>FARK</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          { label: 'Ortalama Süre',      f: data.frekansiyel.analiz.ort,       s: data.spesifik.analiz.ort,       fmt: fmtS },
-                          { label: 'Medyan (P50)',        f: data.frekansiyel.analiz.p50,       s: data.spesifik.analiz.p50,       fmt: fmtS },
-                          { label: 'P90',                 f: data.frekansiyel.analiz.p90,       s: data.spesifik.analiz.p90,       fmt: fmtS },
-                          { label: 'En Hızlı',            f: data.frekansiyel.analiz.min,       s: data.spesifik.analiz.min,       fmt: fmtS },
-                          { label: 'En Yavaş',            f: data.frekansiyel.analiz.max,       s: data.spesifik.analiz.max,       fmt: fmtS },
-                          { label: 'Ort. Bekleme Süresi', f: data.frekansiyel.analiz.ortBekleme, s: data.spesifik.analiz.ortBekleme, fmt: fmtS },
-                          { label: 'Tamamlanan Görev',    f: data.frekansiyel.analiz.tamamlananSayi, s: data.spesifik.analiz.tamamlananSayi, fmt: (v: number) => String(v) },
-                        ].map(({ label, f, s, fmt }, i) => {
-                          const fark = f > 0 && s > 0 ? Math.round(((s - f) / f) * 100) : null
-                          return (
-                            <tr key={label} style={{ background: i % 2 === 0 ? T.grayLight : '#fff' }}>
-                              <td style={{ padding: '8px 14px', fontWeight: 600, color: T.text }}>{label}</td>
-                              <td style={{ padding: '8px 14px', textAlign: 'center', fontWeight: 700, color: freqRenk }}>{fmt(f)}</td>
-                              <td style={{ padding: '8px 14px', textAlign: 'center', fontWeight: 700, color: specRenk }}>{fmt(s)}</td>
-                              <td style={{ padding: '8px 14px', textAlign: 'center', fontWeight: 700, color: fark === null ? T.textSoft : fark > 0 ? T.red : T.green }}>
-                                {fark === null ? '—' : fark > 0 ? `+%${fark} yavaş` : `%${Math.abs(fark)} hızlı`}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Dağılım karşılaştırması yan yana */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                  <div className="verde-card" style={{ padding: '16px 18px' }}>
-                    <SekHead title="Frekansiyel Dağılım" color={freqRenk} />
-                    <DagilimBar data={data.frekansiyel.dagilim} color={freqRenk} />
-                  </div>
-                  <div className="verde-card" style={{ padding: '16px 18px' }}>
-                    <SekHead title="Spesifik Dağılım" color={specRenk} />
-                    <DagilimBar data={data.spesifik.dagilim} color={specRenk} />
-                  </div>
-                </div>
-
-                {/* Trend karşılaştırması */}
-                <div className="verde-card" style={{ padding: '16px 18px' }}>
-                  <SekHead title="Günlük Trend Karşılaştırması" color={T.purple} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                    <div>
-                      <div style={{ fontSize: 11.5, fontWeight: 700, color: freqRenk, marginBottom: 8 }}>● Frekansiyel</div>
-                      <LineChart data={data.frekansiyel.gunlukTrend} valueKey="ort_sure" labelKey="tarih" color={freqRenk} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11.5, fontWeight: 700, color: specRenk, marginBottom: 8 }}>● Spesifik</div>
-                      <LineChart data={data.spesifik.gunlukTrend} valueKey="ort_sure" labelKey="tarih" color={specRenk} />
-                    </div>
-                  </div>
-                </div>
-              </div>
             )}
           </>
         )}
