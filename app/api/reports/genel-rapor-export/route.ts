@@ -54,14 +54,17 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 3. Lokasyon hedef süreleri + günlük frekans sayıları ──────────────
-  let lokQ = admin.from('lokasyonlar').select('id,hedef_sure_dakika,gunluk_frekans_sayisi').eq('firma_id', firmaId)
+  let lokQ = admin.from('lokasyonlar').select('id,tanim,hedef_sure_dakika,gunluk_frekans_sayisi').eq('firma_id', firmaId)
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
   const { data: lokSureList } = await lokQ
   const lokHedefMap = new Map<string, number>()
-  const lokFrekansMap = new Map<string, number>()
+  const lokFrekansMap = new Map<string, number>()       // id → frekans
+  const lokTanimToFrekans = new Map<string, number>()   // tanim → frekans (gruplar için)
   for (const l of lokSureList ?? []) {
     if ((l as any).hedef_sure_dakika) lokHedefMap.set(l.id, (l as any).hedef_sure_dakika)
-    lokFrekansMap.set(l.id, (l as any).gunluk_frekans_sayisi ?? 1)
+    const frek = (l as any).gunluk_frekans_sayisi ?? 1
+    lokFrekansMap.set(l.id, frek)
+    lokTanimToFrekans.set((l as any).tanim ?? '', frek)
   }
 
   // ── 4. Görev süre verileri ────────────────────────────────────────────
@@ -130,15 +133,16 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 6. Grup metrikleri birleştirme (üst lokasyon seçildiğinde) ────────
-  // Aynı isimli grupları birleştir
-  const birlesikGruplar = new Map<string, typeof data.grupMetrikleri[0]>()
+  // Aynı isimli grupları birleştir + lokasyon frekanslarını topla
+  const birlesikGruplar = new Map<string, typeof data.grupMetrikleri[0] & { lokFrekansTop: number }>()
   for (const gm of data.grupMetrikleri) {
+    const lokFrek = lokTanimToFrekans.get(gm.lokasyon) ?? gm.gunlukFrekans ?? 1
     const m = birlesikGruplar.get(gm.grup)
     if (!m) {
-      birlesikGruplar.set(gm.grup, { ...gm })
+      birlesikGruplar.set(gm.grup, { ...gm, lokFrekansTop: lokFrek })
     } else {
       m.hedef += gm.hedef; m.tamamlanan += gm.tamamlanan; m.sapma += gm.sapma
-      m.kayip += gm.kayip; m.gunlukFrekans += gm.gunlukFrekans
+      m.kayip += gm.kayip; m.lokFrekansTop += lokFrek
       m.basariOrani = `%${m.hedef > 0 ? Math.round(m.tamamlanan / m.hedef * 100) : 0}`
       m.genelOran = `%${m.hedef > 0 ? Math.round((m.tamamlanan + m.sapma) / m.hedef * 100) : 0}`
     }
@@ -283,11 +287,9 @@ export async function GET(req: NextRequest) {
     grpC.push({ col: cn('B'), row: r, value: gm.grup })
     grpC.push({ col: cn('C'), row: r, value: gm.ustLokasyon })
     grpC.push({ col: cn('D'), row: r, value: gm.lokasyon })
-    // Günlük frekans: lokasyon bazlı sistem ayarlarından
-    const lokId = data.grupMetrikleri[i].lokasyon
-    // lokasyon adından ID'ye çevirelim — genel rapor data'da lokasyon_id yok
-    // gunlukFrekans zaten hesaplanmış, onu kullan
-    grpC.push({ col: cn('E'), row: r, value: gm.gunlukFrekans })
+    // Günlük frekans: lokasyon tablosundaki gunluk_frekans_sayisi (Sistem Ayarları'ndan)
+    const lokFrekans = lokTanimToFrekans.get(gm.lokasyon) ?? gm.gunlukFrekans ?? 1
+    grpC.push({ col: cn('E'), row: r, value: lokFrekans })
     // Hedef frekans = o satırdaki lokasyon için üretilen toplam görev sayısı
     grpC.push({ col: cn('F'), row: r, value: gm.hedef })
     grpC.push({ col: cn('G'), row: r, value: gm.tamamlanan })
@@ -302,7 +304,7 @@ export async function GET(req: NextRequest) {
     const genelOran = gm.hedef > 0 ? Math.round((gm.tamamlanan + gm.sapma) / gm.hedef * 100) : 0
     grpC.push({ col: cn('L'), row: r, value: `%${genelOran}` })
 
-    topE += gm.gunlukFrekans; topF += gm.hedef; topG += gm.tamamlanan
+    topE += lokFrekans; topF += gm.hedef; topG += gm.tamamlanan
     topH += gFaz > 0 ? gFaz : 0; topI += gm.sapma; topJ += gm.kayip
   }
   // Toplamlar
