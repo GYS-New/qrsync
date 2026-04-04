@@ -91,7 +91,7 @@ function lokasyonAnalizi(
   lokMap: Map<string, string>,
   hedefMap: Map<string, number | null>,
 ): {
-  lokasyon: string; ort_sure: number; min_sure: number; max_sure: number; adet: number
+  lokasyon_id: string; lokasyon: string; ort_sure: number; min_sure: number; max_sure: number; adet: number
   hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null
 }[] {
   const map: Record<string, number[]> = {}
@@ -112,6 +112,7 @@ function lokasyonAnalizi(
         ? Math.round(((ort_sure - hedef_sure) / hedef_sure) * 100)
         : null
       return {
+        lokasyon_id: lid,
         lokasyon: lokMap.get(lid) ?? '—',
         ort_sure,
         min_sure: sorted[0],
@@ -123,28 +124,45 @@ function lokasyonAnalizi(
       }
     })
     .sort((a, b) => b.adet - a.adet)
-    .slice(0, 12)
 }
 
-function personelAnalizi(gorevler: any[], userMap: Map<string, string>): {
+function personelAnalizi(
+  gorevler: any[],
+  userMap: Map<string, string>,
+  hedefMap: Map<string, number | null>,
+): {
   personel: string; ort_sure: number; tamamlanan: number; en_hizli: number; en_yavas: number
+  ort_hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null
 }[] {
-  const map: Record<string, number[]> = {}
+  const map: Record<string, { sureler: number[]; hedefler: number[] }> = {}
   for (const g of gorevler) {
     const uid = g.tamamlayan_kullanici_id ?? g.islemi_yapan_id ?? g.atanan_kullanici_id
     if (g.durum !== 'TAMAMLANDI' || !g.tamamlanma_suresi_saniye || !uid) continue
-    if (!map[uid]) map[uid] = []
-    map[uid].push(g.tamamlanma_suresi_saniye)
+    if (!map[uid]) map[uid] = { sureler: [], hedefler: [] }
+    map[uid].sureler.push(g.tamamlanma_suresi_saniye)
+    const hdk = g.lokasyon_id ? hedefMap.get(g.lokasyon_id) : null
+    if (hdk != null) map[uid].hedefler.push(hdk * 60)
   }
   return Object.entries(map)
-    .map(([uid, vals]) => {
-      const sorted = [...vals].sort((a, b) => a - b)
+    .map(([uid, { sureler, hedefler }]) => {
+      const sorted = [...sureler].sort((a, b) => a - b)
+      const ort_sure = Math.round(sureler.reduce((a, b) => a + b, 0) / sureler.length)
+      const ort_hedef_sure = hedefler.length > 0
+        ? Math.round(hedefler.reduce((a, b) => a + b, 0) / hedefler.length)
+        : null
+      const hedef_fark = ort_hedef_sure != null ? ort_sure - ort_hedef_sure : null
+      const hedef_fark_pct = ort_hedef_sure != null && ort_hedef_sure > 0
+        ? Math.round(((ort_sure - ort_hedef_sure) / ort_hedef_sure) * 100)
+        : null
       return {
         personel: userMap.get(uid) ?? '—',
-        ort_sure: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
-        tamamlanan: vals.length,
+        ort_sure,
+        tamamlanan: sureler.length,
         en_hizli: sorted[0],
         en_yavas: sorted[sorted.length - 1],
+        ort_hedef_sure,
+        hedef_fark,
+        hedef_fark_pct,
       }
     })
     .sort((a, b) => b.tamamlanan - a.tamamlanan)
@@ -255,18 +273,18 @@ export async function GET(req: Request) {
         analiz:      freqAnaliz,
         gunlukTrend: gunlukTrend(freqTum),
         lokasyon:    lokasyonAnalizi(freqTum, lokMap, hedefMap),
-        personel:    personelAnalizi(freqTum, userMap),
+        personel:    personelAnalizi(freqTum, userMap, hedefMap),
         dagilim:     dagılımKovalari(freqTum),
       },
       spesifik: {
         analiz:      specAnaliz,
         gunlukTrend: gunlukTrend(specTum),
         lokasyon:    lokasyonAnalizi(specTum, lokMap, hedefMap),
-        personel:    personelAnalizi(specTum, userMap),
+        personel:    personelAnalizi(specTum, userMap, hedefMap),
         dagilim:     dagılımKovalari(specTum),
       },
       meta: {
-        lokasyonlar: (loks  ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim })),
+        lokasyonlar: (loks  ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim, parent_id: l.parent_id ?? null })),
         kullanicilar: (users ?? []).map((u: any) => ({ id: u.id, isim_soyisim: u.isim_soyisim })),
       },
     })

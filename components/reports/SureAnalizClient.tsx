@@ -13,11 +13,12 @@ type Analiz = {
   ortBekleme: number; tamamlananSayi: number; toplam: number
 }
 type GunlukRow     = { tarih: string; ort_sure: number; adet: number }
-type LokasyonRow   = { lokasyon: string; ort_sure: number; min_sure: number; max_sure: number; adet: number; hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null }
-type PersonelRow   = { personel: string; ort_sure: number; tamamlanan: number; en_hizli: number; en_yavas: number }
+type LokasyonRow   = { lokasyon_id: string; lokasyon: string; ort_sure: number; min_sure: number; max_sure: number; adet: number; hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null }
+type PersonelRow   = { personel: string; ort_sure: number; tamamlanan: number; en_hizli: number; en_yavas: number; ort_hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null }
 type DagilimRow    = { aralik: string; adet: number }
+type MetaLokasyon  = { id: string; tanim: string; parent_id: string | null }
 type Bolum         = { analiz: Analiz; gunlukTrend: GunlukRow[]; lokasyon: LokasyonRow[]; personel: PersonelRow[]; dagilim: DagilimRow[] }
-type SureData      = { ok: boolean; frekansiyel: Bolum; spesifik: Bolum; meta: { lokasyonlar: any[]; kullanicilar: any[] } }
+type SureData      = { ok: boolean; frekansiyel: Bolum; spesifik: Bolum; meta: { lokasyonlar: MetaLokasyon[]; kullanicilar: any[] } }
 
 // ── Tokens ────────────────────────────────────────────────────────────────
 const T = {
@@ -260,121 +261,316 @@ function SekHead({ title, color }: { title: string; color: string }) {
   )
 }
 
+// ── Lokasyon hedef vs gerçekleşen karşılaştırma ──────────────────────────
+function LokasyonKarsilastirma({ data, renk }: { data: LokasyonRow[]; renk: string }) {
+  if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+  const maxVal = Math.max(...data.flatMap(r => [r.ort_sure, r.hedef_sure ?? 0]), 1)
+  const hasHedef = data.some(r => r.hedef_sure != null)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* Lejant */}
+      {hasHedef && (
+        <div style={{ display: 'flex', gap: 16, marginBottom: 6, fontSize: 12, color: T.textSoft }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: renk, display: 'inline-block' }} /> Ort. Süre</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: '#cbd5e1', display: 'inline-block' }} /> Hedef Süre</span>
+        </div>
+      )}
+      {data.map((r, i) => {
+        const ortPct   = (r.ort_sure / maxVal) * 100
+        const hedefPct = r.hedef_sure != null ? (r.hedef_sure / maxVal) * 100 : null
+        const asim     = r.hedef_fark != null && r.hedef_fark > 0
+        const barColor = r.hedef_sure == null ? renk : asim ? T.red : T.greenMid
+        return (
+          <div key={r.lokasyon_id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff', borderRadius: 6, padding: '8px 10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: T.text }}>{r.lokasyon}</span>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 12, color: T.textSoft }}>{r.adet} görev</span>
+                {r.hedef_fark_pct != null && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: asim ? T.red : T.greenMid }}>
+                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} erken`}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div style={{ position: 'relative', height: 10, background: '#e2e8f0', borderRadius: 5, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${ortPct}%`, background: barColor, borderRadius: 5, transition: 'width .4s' }} />
+              {hedefPct != null && (
+                <div style={{ position: 'absolute', left: `${hedefPct}%`, top: 0, width: 2, height: '100%', background: '#64748b', transform: 'translateX(-1px)' }} />
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 11.5 }}>
+              <span style={{ color: barColor, fontWeight: 700 }}>{fmtS(r.ort_sure)}</span>
+              {r.hedef_sure != null && <span style={{ color: T.textSoft }}>Hedef: {fmtS(r.hedef_sure)}</span>}
+              <span style={{ color: T.textSoft, marginLeft: 'auto' }}>Min: {fmtS(r.min_sure)} · Max: {fmtS(r.max_sure)}</span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Personel hedef vs gerçekleşen karşılaştırma ─────────────────────
+function PersonelKarsilastirma({ data, renk }: { data: PersonelRow[]; renk: string }) {
+  if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+  const maxVal = Math.max(...data.flatMap(r => [r.ort_sure, r.ort_hedef_sure ?? 0]), 1)
+  const hasHedef = data.some(r => r.ort_hedef_sure != null)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* Lejant */}
+      {hasHedef && (
+        <div style={{ display: 'flex', gap: 16, marginBottom: 6, fontSize: 12, color: T.textSoft }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: renk, display: 'inline-block' }} /> Ort. Süre</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: '#cbd5e1', display: 'inline-block' }} /> Hedef Süre</span>
+        </div>
+      )}
+      {data.map((r, i) => {
+        const ortPct   = (r.ort_sure / maxVal) * 100
+        const hedefPct = r.ort_hedef_sure != null ? (r.ort_hedef_sure / maxVal) * 100 : null
+        const asim     = r.hedef_fark != null && r.hedef_fark > 0
+        const barColor = r.ort_hedef_sure == null ? renk : asim ? T.red : T.greenMid
+        return (
+          <div key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff', borderRadius: 6, padding: '8px 10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: T.text }}>{r.personel}</span>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 12, color: T.textSoft }}>{r.tamamlanan} görev</span>
+                {r.hedef_fark_pct != null && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: asim ? T.red : T.greenMid }}>
+                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} erken`}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div style={{ position: 'relative', height: 10, background: '#e2e8f0', borderRadius: 5, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${ortPct}%`, background: barColor, borderRadius: 5, transition: 'width .4s' }} />
+              {hedefPct != null && (
+                <div style={{ position: 'absolute', left: `${hedefPct}%`, top: 0, width: 2, height: '100%', background: '#64748b', transform: 'translateX(-1px)' }} />
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 11.5 }}>
+              <span style={{ color: barColor, fontWeight: 700 }}>{fmtS(r.ort_sure)}</span>
+              {r.ort_hedef_sure != null && <span style={{ color: T.textSoft }}>Hedef: {fmtS(r.ort_hedef_sure)}</span>}
+              <span style={{ color: T.textSoft, marginLeft: 'auto' }}>Min: {fmtS(r.en_hizli)} · Max: {fmtS(r.en_yavas)}</span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Tek görev tipi analiz paneli ──────────────────────────────────────────
-function BolumPanel({ bolum, renk, tip }: { bolum: Bolum; renk: string; tip: 'frekansiyel' | 'spesifik' }) {
+const SUB_TABS = ['Lokasyon Bazlı', 'Personel Bazlı'] as const
+type SubTab = typeof SUB_TABS[number]
+
+function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: SureData['meta'] }) {
+  const [subTab,    setSubTab]    = React.useState<SubTab>('Lokasyon Bazlı')
+  const [ustLokId,  setUstLokId]  = React.useState('')
+
   const a = bolum.analiz
   const basariOrani = a.toplam > 0 ? Math.round((a.tamamlananSayi / a.toplam) * 100) : 0
+
+  // Üst lokasyonlar (parent_id === null)
+  const ustLokasyonlar = meta.lokasyonlar.filter(l => !l.parent_id)
+
+  // Seçili üst lokasyona göre alt lokasyon ID'leri
+  const filteredLokIds: Set<string> | null = ustLokId
+    ? new Set(meta.lokasyonlar.filter(l => l.parent_id === ustLokId || l.id === ustLokId).map(l => l.id))
+    : null
+
+  const filteredLok = filteredLokIds
+    ? bolum.lokasyon.filter(r => filteredLokIds.has(r.lokasyon_id))
+    : bolum.lokasyon
+
+  const subTabStyle = (t: SubTab): React.CSSProperties => ({
+    padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 600,
+    border: 'none', cursor: 'pointer', transition: 'all .15s',
+    background: subTab === t ? renk : 'transparent',
+    color: subTab === t ? '#fff' : T.textSoft,
+  })
+
+  const hasHedef = filteredLok.some(r => r.hedef_sure != null)
+  const asimlar  = filteredLok.filter(r => r.hedef_fark != null && r.hedef_fark > 0)
+  const uyumlu   = filteredLok.filter(r => r.hedef_fark != null && r.hedef_fark <= 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* KPI grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 10 }}>
-        <KpiCard label="Ort. Süre"     value={fmtS(a.ort)}       color={renk}       Icon={Clock}       sub={`${a.tamamlananSayi} tamamlanan görev`} />
-        <KpiCard label="En Hızlı"      value={fmtS(a.min)}       color={T.green}    Icon={Zap}         />
-        <KpiCard label="En Yavaş"      value={fmtS(a.max)}       color={T.red}      Icon={TrendingUp}  />
-        <KpiCard label="Medyan"        value={fmtS(a.p50)}       color={T.purple}   Icon={Activity}    sub="P50 — yarısı bu sürenin altında" />
-        <KpiCard label="Ort. Bekleme"  value={fmtS(a.ortBekleme)} color={T.amber}   Icon={TrendingDown} sub="Oluşturma → Başlama" />
-        <KpiCard label="Başarı Oranı"  value={`%${basariOrani}`} color={renk}       Icon={BarChart2}   sub={`${a.toplam} toplam`} />
+        <KpiCard label="Ort. Süre"     value={fmtS(a.ort)}        color={renk}      Icon={Clock}        sub={`${a.tamamlananSayi} tamamlanan görev`} />
+        <KpiCard label="En Hızlı"      value={fmtS(a.min)}        color={T.green}   Icon={Zap}          />
+        <KpiCard label="En Yavaş"      value={fmtS(a.max)}        color={T.red}      Icon={TrendingUp}   />
+        <KpiCard label="Medyan (P50)"  value={fmtS(a.p50)}        color={T.purple}  Icon={Activity}     sub="Yarısı bu sürenin altında" />
+        <KpiCard label="Ort. Bekleme" value={fmtS(a.ortBekleme)} color={T.amber}   Icon={TrendingDown} sub="Oluşturma → Başlama" />
+        <KpiCard label="Başarı Oranı" value={`%${basariOrani}`}  color={renk}      Icon={BarChart2}    sub={`${a.toplam} toplam`} />
       </div>
 
       {/* Yüzdelik dilimler */}
       <div className="verde-card" style={{ padding: '16px 18px' }}>
         <SekHead title="Yüzdelik Dilimler (Tamamlanma Süresi)" color={renk} />
         <PercentileCard analiz={a} />
-        <div style={{ marginTop: 10, fontSize: 11.5, color: T.textSoft, lineHeight: 1.6 }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: T.textSoft, lineHeight: 1.6 }}>
           Görevlerin <strong>%50'si</strong> {fmtS(a.p50)} içinde, <strong>%90'ı</strong> {fmtS(a.p90)} içinde tamamlanmıştır.
           {a.p90 > a.ort * 2 && <span style={{ color: T.red }}> Yüksek sapmalar gözlemlendi — belirli görevler süreci yavaşlatıyor olabilir.</span>}
         </div>
       </div>
 
-      {/* Dağılım */}
-      <div className="verde-card" style={{ padding: '16px 18px' }}>
-        <SekHead title="Süre Dağılımı" color={renk} />
-        <DagilimBar data={bolum.dagilim} color={renk} />
-      </div>
-
-      {/* Günlük trend */}
-      <div className="verde-card" style={{ padding: '16px 18px' }}>
-        <SekHead title="Günlük Ortalama Süre Trendi" color={renk} />
-        <LineChart data={bolum.gunlukTrend} valueKey="ort_sure" labelKey="tarih" color={renk} />
-        {bolum.gunlukTrend.length > 1 && (() => {
-          const first = bolum.gunlukTrend[0].ort_sure
-          const last  = bolum.gunlukTrend[bolum.gunlukTrend.length - 1].ort_sure
-          const fark  = Math.round(((last - first) / first) * 100)
-          return (
-            <div style={{ marginTop: 8, fontSize: 11.5, color: fark < 0 ? T.green : T.red, fontWeight: 600 }}>
-              {fark < 0 ? `↘ Son dönemde %${Math.abs(fark)} iyileşme gözlemlendi.` : fark > 0 ? `↗ Son dönemde %${fark} yavaşlama gözlemlendi.` : 'Süre trendi stabil.'}
-            </div>
-          )
-        })()}
-      </div>
-
-      {/* Lokasyon bazlı */}
-      <div className="verde-card" style={{ padding: '16px 18px' }}>
-        <SekHead title="Lokasyon Bazlı Ortalama Süre" color={renk} />
-        <div style={{ marginBottom: 14 }}>
-          <HBarChart data={bolum.lokasyon.slice(0, 10)} valueKey="ort_sure" labelKey="lokasyon" color={renk} />
+      {/* Dağılım + Trend yan yana */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16 }}>
+        <div className="verde-card" style={{ padding: '16px 18px' }}>
+          <SekHead title="Süre Dağılımı" color={renk} />
+          <DagilimBar data={bolum.dagilim} color={renk} />
         </div>
-        {/* Hedef karşılaştırma varsa özet bandı */}
-        {bolum.lokasyon.some(r => r.hedef_sure != null) && (() => {
-          const asimlar = bolum.lokasyon.filter(r => r.hedef_fark != null && r.hedef_fark > 0)
-          const uyumlu  = bolum.lokasyon.filter(r => r.hedef_fark != null && r.hedef_fark <= 0)
-          return (
-            <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-              <div style={{ padding: '8px 14px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, fontSize: 12.5, fontWeight: 700, color: T.green }}>
-                ✓ Hedefe Uygun: {uyumlu.length} lokasyon
+        <div className="verde-card" style={{ padding: '16px 18px' }}>
+          <SekHead title="Günlük Ortalama Süre Trendi" color={renk} />
+          <LineChart data={bolum.gunlukTrend} valueKey="ort_sure" labelKey="tarih" color={renk} />
+          {bolum.gunlukTrend.length > 1 && (() => {
+            const first = bolum.gunlukTrend[0].ort_sure
+            const last  = bolum.gunlukTrend[bolum.gunlukTrend.length - 1].ort_sure
+            const fark  = Math.round(((last - first) / first) * 100)
+            return (
+              <div style={{ marginTop: 6, fontSize: 12, color: fark < 0 ? T.green : T.red, fontWeight: 600 }}>
+                {fark < 0 ? `↘ Son dönemde %${Math.abs(fark)} iyileşme gözlemlendi.` : fark > 0 ? `↗ Son dönemde %${fark} yavaşlama gözlemlendi.` : 'Süre trendi stabil.'}
               </div>
-              <div style={{ padding: '8px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 12.5, fontWeight: 700, color: T.red }}>
-                ✗ Hedef Aşımı: {asimlar.length} lokasyon
-              </div>
-            </div>
-          )
-        })()}
-        <Tablo
-          color={renk}
-          headers={bolum.lokasyon.some(r => r.hedef_sure != null)
-            ? ['LOKASYON', 'ADET', 'HEDEF', 'ORT. SÜRE', 'FARK', 'EN HIZLI', 'EN YAVAŞ']
-            : ['LOKASYON', 'ADET', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
-          rows={bolum.lokasyon.map(r => {
-            if (bolum.lokasyon.some(x => x.hedef_sure != null)) {
-              const farkLabel = r.hedef_fark == null ? '—'
-                : r.hedef_fark > 0 ? `+${fmtS(r.hedef_fark)} (aşım)`
-                : r.hedef_fark < 0 ? `${fmtS(Math.abs(r.hedef_fark))} erken`
-                : 'Tam hedef'
-              return [r.lokasyon, r.adet, r.hedef_sure != null ? fmtS(r.hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, fmtS(r.min_sure), fmtS(r.max_sure)]
-            }
-            return [r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)]
-          })}
-        />
+            )
+          })()}
+        </div>
       </div>
 
-      {/* Personel bazlı */}
+      {/* ── Alt sekmeler ── */}
       <div className="verde-card" style={{ padding: '16px 18px' }}>
-        <SekHead title="Personel Bazlı Süre Analizi" color={renk} />
-        <div style={{ marginBottom: 14 }}>
-          <VBarChart data={bolum.personel.slice(0, 10)} valueKey="ort_sure" labelKey="personel" color={renk} />
+        {/* Sub-tab bar */}
+        <div style={{ display: 'flex', gap: 4, background: T.grayLight, borderRadius: 8, padding: 4, alignSelf: 'flex-start', border: `1px solid ${T.border}`, marginBottom: 16, width: 'fit-content' }}>
+          {SUB_TABS.map(t => <button key={t} style={subTabStyle(t)} onClick={() => setSubTab(t)}>{t}</button>)}
         </div>
-        <Tablo
-          color={renk}
-          headers={['PERSONEL', 'TAMAMLANAN', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
-          rows={bolum.personel.map(r => [r.personel, r.tamamlanan, fmtS(r.ort_sure), fmtS(r.en_hizli), fmtS(r.en_yavas)])}
-        />
-        {bolum.personel.length > 0 && (() => {
-          const sorted = [...bolum.personel].sort((a, b) => a.ort_sure - b.ort_sure)
-          return (
-            <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ padding: '8px 14px', background: T.green + '18', border: `1px solid ${T.green}30`, borderRadius: 8, fontSize: 12, color: T.green, fontWeight: 700 }}>
-                🏆 En hızlı: {sorted[0].personel} — {fmtS(sorted[0].ort_sure)}
+
+        {/* ── Lokasyon Bazlı ── */}
+        {subTab === 'Lokasyon Bazlı' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Üst lokasyon filtresi */}
+            {ustLokasyonlar.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: T.textSoft, whiteSpace: 'nowrap' }}>Üst Lokasyon:</span>
+                <select
+                  value={ustLokId}
+                  onChange={e => setUstLokId(e.target.value)}
+                  style={{ height: 34, padding: '0 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, minWidth: 180 }}
+                >
+                  <option value="">Tümü</option>
+                  {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                </select>
+                {filteredLok.length > 0 && (
+                  <span style={{ fontSize: 12, color: T.textSoft }}>{filteredLok.length} lokasyon</span>
+                )}
               </div>
-              {sorted.length > 1 && (
-                <div style={{ padding: '8px 14px', background: T.amber + '18', border: `1px solid ${T.amber}30`, borderRadius: 8, fontSize: 12, color: T.amber, fontWeight: 700 }}>
-                  ⚠️ En yavaş: {sorted[sorted.length - 1].personel} — {fmtS(sorted[sorted.length - 1].ort_sure)}
+            )}
+
+            {/* Hedef özet bandı */}
+            {hasHedef && (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ padding: '8px 14px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.green }}>
+                  ✓ Hedefe Uygun: {uyumlu.length} lokasyon
                 </div>
-              )}
-            </div>
-          )
-        })()}
+                <div style={{ padding: '8px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.red }}>
+                  ✗ Hedef Aşımı: {asimlar.length} lokasyon
+                </div>
+              </div>
+            )}
+
+            {/* Karşılaştırma görseli */}
+            <LokasyonKarsilastirma data={filteredLok} renk={renk} />
+
+            {/* Tablo */}
+            {filteredLok.length > 0 && (
+              <Tablo
+                color={renk}
+                headers={hasHedef
+                  ? ['LOKASYON', 'ADET', 'HEDEF SÜRE', 'ORT. SÜRE', 'FARK', 'DURUM', 'EN HIZLI', 'EN YAVAŞ']
+                  : ['LOKASYON', 'ADET', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
+                rows={filteredLok.map(r => {
+                  if (hasHedef) {
+                    const farkLabel = r.hedef_fark == null ? '—'
+                      : r.hedef_fark > 0 ? `+${fmtS(r.hedef_fark)}`
+                      : r.hedef_fark < 0 ? `-${fmtS(Math.abs(r.hedef_fark))}`
+                      : '0'
+                    const durum = r.hedef_fark == null ? '—' : r.hedef_fark > 0 ? '✗ Aşım' : '✓ Uygun'
+                    return [r.lokasyon, r.adet, r.hedef_sure != null ? fmtS(r.hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, durum, fmtS(r.min_sure), fmtS(r.max_sure)]
+                  }
+                  return [r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)]
+                })}
+              />
+            )}
+          </div>
+        )}
+
+        {/* ── Personel Bazlı ── */}
+        {subTab === 'Personel Bazlı' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {bolum.personel.length === 0
+              ? <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+              : (() => {
+                  const hasPerHedef = bolum.personel.some(r => r.ort_hedef_sure != null)
+                  const perAsimlar  = bolum.personel.filter(r => r.hedef_fark != null && r.hedef_fark > 0)
+                  const perUyumlu   = bolum.personel.filter(r => r.hedef_fark != null && r.hedef_fark <= 0)
+                  return <>
+                    {/* Hedef özet bandı */}
+                    {hasPerHedef && (
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <div style={{ padding: '8px 14px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.green }}>
+                          ✓ Hedefe Uygun: {perUyumlu.length} personel
+                        </div>
+                        <div style={{ padding: '8px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.red }}>
+                          ✗ Hedef Aşımı: {perAsimlar.length} personel
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Personel hedef karşılaştırma görseli */}
+                    <PersonelKarsilastirma data={bolum.personel} renk={renk} />
+
+                    {/* Tablo */}
+                    <Tablo
+                      color={renk}
+                      headers={hasPerHedef
+                        ? ['PERSONEL', 'TAMAMLANAN', 'HEDEF SÜRE', 'ORT. SÜRE', 'FARK', 'DURUM', 'EN HIZLI', 'EN YAVAŞ']
+                        : ['PERSONEL', 'TAMAMLANAN', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
+                      rows={bolum.personel.map(r => {
+                        if (hasPerHedef) {
+                          const farkLabel = r.hedef_fark == null ? '—'
+                            : r.hedef_fark > 0 ? `+${fmtS(r.hedef_fark)}`
+                            : r.hedef_fark < 0 ? `-${fmtS(Math.abs(r.hedef_fark))}`
+                            : '0'
+                          const durum = r.hedef_fark == null ? '—' : r.hedef_fark > 0 ? '✗ Aşım' : '✓ Uygun'
+                          return [r.personel, r.tamamlanan, r.ort_hedef_sure != null ? fmtS(r.ort_hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, durum, fmtS(r.en_hizli), fmtS(r.en_yavas)]
+                        }
+                        return [r.personel, r.tamamlanan, fmtS(r.ort_sure), fmtS(r.en_hizli), fmtS(r.en_yavas)]
+                      })}
+                    />
+
+                    {/* En hızlı / En yavaş bandı */}
+                    {(() => {
+                      const sorted = [...bolum.personel].sort((a, b) => a.ort_sure - b.ort_sure)
+                      return (
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <div style={{ padding: '8px 14px', background: T.green + '18', border: `1px solid ${T.green}30`, borderRadius: 8, fontSize: 13, color: T.green, fontWeight: 700 }}>
+                            En hızlı: {sorted[0].personel} — {fmtS(sorted[0].ort_sure)}
+                          </div>
+                          {sorted.length > 1 && (
+                            <div style={{ padding: '8px 14px', background: T.amber + '18', border: `1px solid ${T.amber}30`, borderRadius: 8, fontSize: 13, color: T.amber, fontWeight: 700 }}>
+                              En yavaş: {sorted[sorted.length - 1].personel} — {fmtS(sorted[sorted.length - 1].ort_sure)}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </>
+                })()
+            }
+          </div>
+        )}
       </div>
     </div>
   )
@@ -495,12 +691,12 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
 
             {/* Frekansiyel panel */}
             {activeTab === 'Frekansiyel Görevler' && (
-              <BolumPanel bolum={data.frekansiyel} renk={freqRenk} tip="frekansiyel" />
+              <BolumPanel bolum={data.frekansiyel} renk={freqRenk} meta={data.meta} />
             )}
 
             {/* Spesifik panel */}
             {activeTab === 'Spesifik Görevler' && (
-              <BolumPanel bolum={data.spesifik} renk={specRenk} tip="spesifik" />
+              <BolumPanel bolum={data.spesifik} renk={specRenk} meta={data.meta} />
             )}
           </>
         )}
