@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
       lokasyon: lokMap.get(lid) ?? '—', adet: vals.length,
       hedef_sure: hedefSn, ort_sure: ortS, min_sure: sorted[0], max_sure: sorted[sorted.length - 1],
       fark, farkPct,
-      durum: farkPct == null ? '—' : farkPct > tolerans ? 'Aşım' : 'Uygun',
+      durum: farkPct == null ? '—' : Math.abs(farkPct) > tolerans ? (farkPct > 0 ? 'Hedef Aşımı' : 'Hedef Altı') : 'Uygun',
     }
   }).sort((a, b) => b.adet - a.adet)
 
@@ -164,7 +164,7 @@ export async function GET(req: NextRequest) {
       personel: userMap.get(uid) ?? '—', tamamlanan: s.length,
       hedef_sure: ortH, ort_sure: ortS, en_hizli: sorted[0], en_yavas: sorted[sorted.length - 1],
       fark, farkPct,
-      durum: farkPct == null ? '—' : farkPct > tolerans ? 'Aşım' : 'Uygun',
+      durum: farkPct == null ? '—' : Math.abs(farkPct) > tolerans ? (farkPct > 0 ? 'Hedef Aşımı' : 'Hedef Altı') : 'Uygun',
     }
   }).sort((a, b) => b.tamamlanan - a.tamamlanan)
 
@@ -191,7 +191,7 @@ export async function GET(req: NextRequest) {
       tanim, lokasyon: lid ? lokMap.get(lid) ?? '—' : '—',
       adet: vals.length, ort_sure: ortS, min_sure: sorted[0], max_sure: sorted[sorted.length - 1],
       hedef_sure: hedefSn, fark, farkPct,
-      durum: farkPct == null ? '—' : farkPct > tolerans ? 'Aşım' : 'Uygun',
+      durum: farkPct == null ? '—' : Math.abs(farkPct) > tolerans ? (farkPct > 0 ? 'Hedef Aşımı' : 'Hedef Altı') : 'Uygun',
     }
   }).sort((a, b) => b.adet - a.adet)
 
@@ -303,8 +303,8 @@ export async function GET(req: NextRequest) {
     const topAdet = lokRows.reduce((s, r) => s + r.adet, 0)
     const topOrt = Math.round(lokRows.reduce((s, r) => s + r.ort_sure * r.adet, 0) / topAdet)
     if (hasLokHedef) {
-      const uyumlu = lokRows.filter(r => r.farkPct != null && r.farkPct <= tolerans).length
-      const asim   = lokRows.filter(r => r.farkPct != null && r.farkPct > tolerans).length
+      const uyumlu = lokRows.filter(r => r.farkPct != null && Math.abs(r.farkPct) <= tolerans).length
+      const asim   = lokRows.filter(r => r.farkPct != null && Math.abs(r.farkPct) > tolerans).length
       const sr = wsLok.addRow(['TOPLAM', topAdet, '', fmtS(topOrt), '', '', `${uyumlu} uygun / ${asim} aşım`, '', ''])
       sr.eachCell(c => { c.font = { bold: true }; c.fill = ozetFill })
     } else {
@@ -345,8 +345,8 @@ export async function GET(req: NextRequest) {
     const topTam = perRows.reduce((s, r) => s + r.tamamlanan, 0)
     const topOrt = Math.round(perRows.reduce((s, r) => s + r.ort_sure * r.tamamlanan, 0) / topTam)
     if (hasPerHedef) {
-      const uyumlu = perRows.filter(r => r.farkPct != null && r.farkPct <= tolerans).length
-      const asim   = perRows.filter(r => r.farkPct != null && r.farkPct > tolerans).length
+      const uyumlu = perRows.filter(r => r.farkPct != null && Math.abs(r.farkPct) <= tolerans).length
+      const asim   = perRows.filter(r => r.farkPct != null && Math.abs(r.farkPct) > tolerans).length
       const sr = wsPer.addRow(['TOPLAM', topTam, '', fmtS(topOrt), '', '', `${uyumlu} uygun / ${asim} aşım`, '', ''])
       sr.eachCell(c => { c.font = { bold: true }; c.fill = ozetFill })
     } else {
@@ -386,8 +386,8 @@ export async function GET(req: NextRequest) {
     const topAdet = gorevRows.reduce((s, r) => s + r.adet, 0)
     const topOrt = Math.round(gorevRows.reduce((s, r) => s + r.ort_sure * r.adet, 0) / topAdet)
     if (hasGorevHedef) {
-      const uyumlu = gorevRows.filter(r => r.farkPct != null && r.farkPct <= tolerans).length
-      const asim   = gorevRows.filter(r => r.farkPct != null && r.farkPct > tolerans).length
+      const uyumlu = gorevRows.filter(r => r.farkPct != null && Math.abs(r.farkPct) <= tolerans).length
+      const asim   = gorevRows.filter(r => r.farkPct != null && Math.abs(r.farkPct) > tolerans).length
       const sr = wsGorev.addRow(['TOPLAM', '', topAdet, '', fmtS(topOrt), '', '', `${uyumlu} uygun / ${asim} aşım`, '', ''])
       sr.eachCell(c => { c.font = { bold: true }; c.fill = ozetFill })
     } else {

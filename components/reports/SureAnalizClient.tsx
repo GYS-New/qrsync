@@ -263,13 +263,25 @@ function SekHead({ title, color }: { title: string; color: string }) {
 }
 
 // ── Hedef tolerans yardımcıları ───────────────────────────────────────
-/** fark yüzdesi tolerans aralığında mı? */
+/** fark yüzdesi ±tolerans aralığı dışında mı? */
+/** fark yüzdesi ±tolerans aralığı dışında mı? */
 function isAsim(farkPct: number | null, tolerans: number): boolean {
-  return farkPct != null && farkPct > tolerans
+  return farkPct != null && Math.abs(farkPct) > tolerans
 }
 function durumLabel(farkPct: number | null, tolerans: number): string {
   if (farkPct == null) return '—'
-  return isAsim(farkPct, tolerans) ? '✗ Aşım' : '✓ Uygun'
+  if (!isAsim(farkPct, tolerans)) return '✓ Uygun'
+  return farkPct! > 0 ? '✗ Hedef Aşımı' : '✗ Hedef Altı'
+}
+/** Sapma rengi: uygun=yeşil, hedef üstü=kırmızı, hedef altı=turuncu */
+function sapmaRenk(farkPct: number | null, tolerans: number): string {
+  if (farkPct == null || !isAsim(farkPct, tolerans)) return T.greenMid
+  return farkPct > 0 ? T.red : T.amber
+}
+function sapmaEtiket(farkPct: number | null, tolerans: number): string {
+  if (farkPct == null) return ''
+  if (!isAsim(farkPct, tolerans)) return `±%${Math.abs(farkPct)} uygun`
+  return farkPct > 0 ? `+%${farkPct} aşım` : `-%${Math.abs(farkPct)} altı`
 }
 
 // ── Lokasyon hedef vs gerçekleşen karşılaştırma ──────────────────────────
@@ -289,8 +301,7 @@ function LokasyonKarsilastirma({ data, renk, tolerans = 10 }: { data: LokasyonRo
       {data.map((r, i) => {
         const ortPct   = (r.ort_sure / maxVal) * 100
         const hedefPct = r.hedef_sure != null ? (r.hedef_sure / maxVal) * 100 : null
-        const asim     = isAsim(r.hedef_fark_pct, tolerans)
-        const barColor = r.hedef_sure == null ? renk : asim ? T.red : T.greenMid
+        const barColor = r.hedef_sure == null ? renk : sapmaRenk(r.hedef_fark_pct, tolerans)
         return (
           <div key={r.lokasyon_id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff', borderRadius: 6, padding: '8px 10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
@@ -298,8 +309,8 @@ function LokasyonKarsilastirma({ data, renk, tolerans = 10 }: { data: LokasyonRo
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
                 <span style={{ fontSize: 12, color: T.textSoft }}>{r.adet} görev</span>
                 {r.hedef_fark_pct != null && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: asim ? T.red : T.greenMid }}>
-                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} uygun`}
+                  <span style={{ fontSize: 12, fontWeight: 700, color: barColor }}>
+                    {sapmaEtiket(r.hedef_fark_pct, tolerans)}
                   </span>
                 )}
               </div>
@@ -339,8 +350,7 @@ function PersonelKarsilastirma({ data, renk, tolerans = 10 }: { data: PersonelRo
       {data.map((r, i) => {
         const ortPct   = (r.ort_sure / maxVal) * 100
         const hedefPct = r.ort_hedef_sure != null ? (r.ort_hedef_sure / maxVal) * 100 : null
-        const asim     = isAsim(r.hedef_fark_pct, tolerans)
-        const barColor = r.ort_hedef_sure == null ? renk : asim ? T.red : T.greenMid
+        const barColor = r.ort_hedef_sure == null ? renk : sapmaRenk(r.hedef_fark_pct, tolerans)
         return (
           <div key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff', borderRadius: 6, padding: '8px 10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
@@ -348,8 +358,8 @@ function PersonelKarsilastirma({ data, renk, tolerans = 10 }: { data: PersonelRo
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
                 <span style={{ fontSize: 12, color: T.textSoft }}>{r.tamamlanan} görev</span>
                 {r.hedef_fark_pct != null && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: asim ? T.red : T.greenMid }}>
-                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} uygun`}
+                  <span style={{ fontSize: 12, fontWeight: 700, color: barColor }}>
+                    {sapmaEtiket(r.hedef_fark_pct, tolerans)}
                   </span>
                 )}
               </div>
@@ -388,8 +398,7 @@ function GorevKarsilastirma({ data, renk, tolerans = 10 }: { data: GorevRow[]; r
       {data.map((r, i) => {
         const ortPct   = (r.ort_sure / maxVal) * 100
         const hedefPct = r.hedef_sure != null ? (r.hedef_sure / maxVal) * 100 : null
-        const asim     = isAsim(r.hedef_fark_pct, tolerans)
-        const barColor = r.hedef_sure == null ? renk : asim ? T.red : T.greenMid
+        const barColor = r.hedef_sure == null ? renk : sapmaRenk(r.hedef_fark_pct, tolerans)
         return (
           <div key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff', borderRadius: 6, padding: '8px 10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
@@ -400,8 +409,8 @@ function GorevKarsilastirma({ data, renk, tolerans = 10 }: { data: GorevRow[]; r
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
                 <span style={{ fontSize: 12, color: T.textSoft }}>{r.adet} görev</span>
                 {r.hedef_fark_pct != null && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: asim ? T.red : T.greenMid }}>
-                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} uygun`}
+                  <span style={{ fontSize: 12, fontWeight: 700, color: barColor }}>
+                    {sapmaEtiket(r.hedef_fark_pct, tolerans)}
                   </span>
                 )}
               </div>
@@ -538,7 +547,7 @@ function BolumPanel({ bolum, renk, meta, tolerans = 10 }: { bolum: Bolum; renk: 
                   ✓ Hedefe Uygun: {uyumlu.length} lokasyon
                 </div>
                 <div style={{ padding: '8px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.red }}>
-                  ✗ Hedef Aşımı: {asimlar.length} lokasyon
+                  ✗ Tolerans Dışı: {asimlar.length} lokasyon
                 </div>
               </div>
             )}
@@ -606,7 +615,7 @@ function BolumPanel({ bolum, renk, meta, tolerans = 10 }: { bolum: Bolum; renk: 
                       ✓ Hedefe Uygun: {gorevUyumlu.length} görev
                     </div>
                     <div style={{ padding: '8px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.red }}>
-                      ✗ Hedef Aşımı: {gorevAsimlar.length} görev
+                      ✗ Tolerans Dışı: {gorevAsimlar.length} görev
                     </div>
                   </div>
                 )}
@@ -654,7 +663,7 @@ function BolumPanel({ bolum, renk, meta, tolerans = 10 }: { bolum: Bolum; renk: 
                           ✓ Hedefe Uygun: {perUyumlu.length} personel
                         </div>
                         <div style={{ padding: '8px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.red }}>
-                          ✗ Hedef Aşımı: {perAsimlar.length} personel
+                          ✗ Tolerans Dışı: {perAsimlar.length} personel
                         </div>
                       </div>
                     )}
