@@ -9,6 +9,7 @@ const DEFAULTS = {
   spesifik_ceklist_aktif: true,
   spesifik_personel_atama_aktif: true,
   frekansiyel_personel_atama_aktif: true,
+  ardisik_baslatma_suresi_dk: 0,
 }
 
 const SEL = Object.keys(DEFAULTS).join(',')

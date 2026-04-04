@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { resolveScanContext } from '@/lib/scan/core'
 import { completeTask } from '@/lib/tasks/completeTask'
+import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 
 async function getAuthUser(req: Request) {
   const deviceToken = req.headers.get('X-Device-Token')
@@ -47,9 +48,16 @@ export async function POST(req: Request, { params }: { params: { token: string }
     if (action === 'basla' && selectedTaskId) {
       const tablo = selectedTaskType === 'canli_gorevler' ? 'canli_gorevler' : 'gorevler'
       const nowIso = new Date().toISOString()
-      const { data: gorev } = await supabase.from(tablo).select('id,baslatilma_tarihi').eq('id', selectedTaskId).maybeSingle()
+      const { data: gorev } = await supabase.from(tablo).select('id,baslatilma_tarihi,firma_id,proje_id').eq('id', selectedTaskId).maybeSingle()
       if (gorev?.baslatilma_tarihi) {
         return NextResponse.json({ ok: true, baslatilma_tarihi: gorev.baslatilma_tarihi, mesaj: 'Zaten başlatılmış' })
+      }
+      // Ardışık başlatma kontrolü
+      if (gorev) {
+        const ardisikHata = await ardisikBaslatmaKontrol(supabase, user.id, gorev.firma_id, (gorev as any).proje_id)
+        if (ardisikHata) {
+          return NextResponse.json({ ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' }, { status: 429 })
+        }
       }
       const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
       await supabase.from(tablo).update(updatePayload).eq('id', selectedTaskId)

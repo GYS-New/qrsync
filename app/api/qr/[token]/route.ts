@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { resolveScanContext } from '@/lib/scan/core'
 import { completeTask } from '@/lib/tasks/completeTask'
+import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -59,9 +60,16 @@ export async function POST(req: Request, { params }: { params: { token: string }
       const tablo = selectedTaskType === 'canli_gorevler' ? 'canli_gorevler' : 'gorevler'
       const nowIso = new Date().toISOString()
       // Zaten başlatılmış mı kontrol et
-      const { data: gorev } = await supabase.from(tablo).select('id,baslatilma_tarihi,durum').eq('id', selectedTaskId).maybeSingle()
+      const { data: gorev } = await supabase.from(tablo).select('id,baslatilma_tarihi,durum,firma_id,proje_id').eq('id', selectedTaskId).maybeSingle()
       if (gorev?.baslatilma_tarihi) {
         return NextResponse.json({ ok: true, baslatilma_tarihi: gorev.baslatilma_tarihi, mesaj: 'Zaten başlatılmış' }, { headers: CORS_HEADERS })
+      }
+      // Ardışık başlatma kontrolü
+      if (gorev) {
+        const ardisikHata = await ardisikBaslatmaKontrol(supabase, user.id, gorev.firma_id, (gorev as any).proje_id)
+        if (ardisikHata) {
+          return NextResponse.json({ ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' }, { status: 429, headers: CORS_HEADERS })
+        }
       }
       const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
       await supabase.from(tablo).update(updatePayload).eq('id', selectedTaskId)

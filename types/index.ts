@@ -75,6 +75,7 @@ export interface Firma {
   spesifik_ceklist_aktif?: boolean
   spesifik_personel_atama_aktif?: boolean
   frekansiyel_personel_atama_aktif?: boolean
+  ardisik_baslatma_suresi_dk?: number
 }
 
 export interface Lokasyon {
@@ -195,4 +196,5 @@ export interface Proje {
   spesifik_ceklist_aktif?: boolean | null
   spesifik_personel_atama_aktif?: boolean | null
   frekansiyel_personel_atama_aktif?: boolean | null
+  ardisik_baslatma_suresi_dk?: number | null
 }

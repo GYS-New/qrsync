@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -85,6 +86,14 @@ export async function POST(req: Request) {
 
     if (!tamamlanabilir) {
       return NextResponse.json({ ok: false, error: `Görev zaten ${gorev.durum} durumunda` }, { status: 409, headers: CORS })
+    }
+
+    // Ardışık başlatma kontrolü — henüz başlatılmamış (ACIK) görev tamamlanmaya çalışılırsa
+    if (!gorev.baslatilma_tarihi) {
+      const ardisikHata = await ardisikBaslatmaKontrol(admin, userId, firmaId, (gorev as any).proje_id)
+      if (ardisikHata) {
+        return NextResponse.json({ ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' }, { status: 429, headers: CORS })
+      }
     }
 
     // Çeklist: mobil uygulama checklist_cevaplari yazar; raporlar ise checklist_sonuc_basliklari okur

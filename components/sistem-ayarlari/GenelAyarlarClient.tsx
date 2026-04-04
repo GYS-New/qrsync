@@ -38,6 +38,7 @@ type AllValues = Record<string, number | boolean>
 
 const NUM_DEFAULTS: Record<string, number> = {
   gorev_suresi_hedef_orani: 10,
+  ardisik_baslatma_suresi_dk: 0,
   arsiv_mesai_saat: 24, arsiv_musteri_saat: 24, arsiv_spesifik_saat: 48, arsiv_frekansiyel_saat: 24,
 }
 const BOOL_DEFAULTS: Record<string, boolean> = {
@@ -230,6 +231,33 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
           <span style={{ color: T.green, fontWeight: 700 }}>{Math.round(60 * (1 - (efektif.gorev_suresi_hedef_orani as number) / 100))} – {Math.round(60 * (1 + (efektif.gorev_suresi_hedef_orani as number) / 100))} dk</span> aralığı uygun.
         </div>
         <OverrideBadge ayarKey="gorev_suresi_hedef_orani" />
+      </div>
+
+      {/* Ardışık Başlatma Süresi */}
+      <div style={{ background: '#fff', border: `1px solid ${overrides.ardisik_baslatma_suresi_dk ? '#c4b5fd' : T.border}`, borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 14, fontWeight: 700, color: T.text, display: 'block', marginBottom: 4 }}>Ardışık Başlatma Süresi</label>
+          <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.5 }}>
+            Görevlerin ard arda başlatılmasını engeller. Son görevin tamamlanmasının ardından yeni bir görev başlatılabilmesi için buradaki süre kadar beklenmesi gerekir.
+            0 girilirse kontrol devre dışı kalır.
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 200 }}>
+            <input type="number" min={0} max={1440} value={efektif.ardisik_baslatma_suresi_dk as number}
+              onChange={e => setEfektif(prev => ({ ...prev, ardisik_baslatma_suresi_dk: Math.max(0, Math.min(1440, Number(e.target.value) || 0)) }))}
+              style={inpStyle} />
+            <span style={{ fontSize: 14, color: T.textSoft, fontWeight: 600, whiteSpace: 'nowrap' }}>dk</span>
+          </div>
+          <SaveBtn id="ardisik_baslatma_suresi_dk" onClick={() => handleSave('ardisik_baslatma_suresi_dk', efektif.ardisik_baslatma_suresi_dk)} />
+        </div>
+        {(efektif.ardisik_baslatma_suresi_dk as number) > 0 && (
+          <div style={{ marginTop: 10, padding: '10px 14px', background: T.grayLight, borderRadius: 8, fontSize: 12.5, color: T.textSoft, lineHeight: 1.6 }}>
+            Kullanıcı bir görevi tamamladıktan sonra <strong style={{ color: T.green }}>{efektif.ardisik_baslatma_suresi_dk as number} dakika</strong> boyunca yeni görev başlatamaz.
+            Erken denerse "<em>Henüz yeni görev süreniz başlamadı! Kalan süre: X dakika</em>" uyarısı alır.
+          </div>
+        )}
+        <OverrideBadge ayarKey="ardisik_baslatma_suresi_dk" />
       </div>
 
       {/* Toggle'lar — 2'li grid */}
