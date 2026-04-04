@@ -162,7 +162,7 @@ export default function GorevlerClient({
     if (projeId) lokQuery = (lokQuery as any).eq('proje_id', projeId)
     const [gRes, lRes, uRes] = await Promise.all([
       gorevQuery, lokQuery,
-      supabase.from('users').select('id,isim_soyisim,aktif').eq('firma_id', fid).eq('aktif', true).order('isim_soyisim'),
+      (() => { let q = supabase.from('users').select('id,isim_soyisim,aktif').eq('firma_id', fid).eq('aktif', true).order('isim_soyisim'); if (projeId) q = (q as any).eq('proje_id', projeId); return q })(),
     ])
     if (gRes.error) showError(gRes.error.message)
     if (lRes.error) showError(lRes.error.message)
