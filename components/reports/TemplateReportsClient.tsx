@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
-import { Download, FileSpreadsheet, Upload, CheckCircle } from 'lucide-react'
+import { Download, FileSpreadsheet, Upload, CheckCircle, Mail, Trash2, Clock } from 'lucide-react'
 
 interface Props {
   base: string
@@ -35,6 +35,15 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
   const [lokasyonlar, setLokasyonlar]   = useState<any[]>([])
   const [downloading, setDownloading]   = useState(false)
   const [uploading, setUploading]       = useState(false)
+  // Zamanlama
+  const [zamanlamalar, setZamanlamalar] = useState<any[]>([])
+  const [mailEmails, setMailEmails]     = useState('')
+  const [mailAciklama, setMailAciklama] = useState('')
+  const [mailTekrar, setMailTekrar]     = useState<'tek_sefer' | 'gunluk' | 'haftalik' | 'aylik'>('tek_sefer')
+  const [mailSaat, setMailSaat]         = useState('08:00')
+  const [mailGunSayisi, setMailGunSayisi] = useState(30)
+  const [mailGonderimTarihi, setMailGonderimTarihi] = useState('')
+  const [savingMail, setSavingMail]     = useState(false)
   const [sablonInfo, setSablonInfo]     = useState<{ exists: boolean; updatedAt: string | null }>({ exists: false, updatedAt: null })
   const fileRef = React.useRef<HTMLInputElement>(null)
 
@@ -63,6 +72,59 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
     }
     setUploading(false)
     if (fileRef.current) fileRef.current.value = ''
+  }
+
+  // Zamanlamaları çek
+  const fetchZamanlamalar = useCallback(async () => {
+    if (!currentFirmaId) return
+    const q = new URLSearchParams({ firmaId: currentFirmaId })
+    if (projeId) q.set('projeId', projeId)
+    try {
+      const res = await fetch(`/api/reports/rapor-zamanlama?${q}`)
+      const json = await res.json()
+      if (Array.isArray(json)) setZamanlamalar(json)
+    } catch {}
+  }, [currentFirmaId, projeId])
+
+  useEffect(() => { fetchZamanlamalar() }, [fetchZamanlamalar])
+
+  const handleSaveZamanlama = async () => {
+    const emails = mailEmails.split(/[,;\n]+/).map(e => e.trim()).filter(e => e.includes('@'))
+    if (!emails.length) { toast({ type: 'error', title: 'Hata', message: 'En az bir geçerli e-posta adresi girin.' }); return }
+    setSavingMail(true)
+    try {
+      const body: any = {
+        firmaId: currentFirmaId, projeId,
+        ust_lokasyon_id: ustLokId || null,
+        alici_emails: emails,
+        tekrar_tipi: mailTekrar,
+        saat: mailSaat,
+        rapor_gun_sayisi: mailGunSayisi,
+        aciklama: mailAciklama,
+      }
+      if (mailTekrar === 'tek_sefer') {
+        body.rapor_baslangic = baslangic
+        body.rapor_bitis = bitis
+        body.gonderim_tarihi = mailGonderimTarihi || new Date().toISOString().slice(0, 10)
+      }
+      const res = await fetch('/api/reports/rapor-zamanlama', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Kaydetme hatası')
+      toast({ type: 'success', title: 'Başarılı', message: 'Rapor gönderimi zamanlandı.' })
+      setMailEmails(''); setMailAciklama('')
+      fetchZamanlamalar()
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setSavingMail(false)
+  }
+
+  const handleDeleteZamanlama = async (id: string) => {
+    try {
+      await fetch('/api/reports/rapor-zamanlama', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      fetchZamanlamalar()
+      toast({ type: 'success', title: 'Silindi', message: 'Zamanlama kaldırıldı.' })
+    } catch {}
   }
 
   // Lokasyonları çek
@@ -253,6 +315,128 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
               ))}
             </div>
           </div>
+        </div>
+        {/* ═══ RAPOR GÖNDERME / ZAMANLAMA ═══ */}
+        <div className="verde-card" style={{ padding: '20px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#eff6ff', display: 'grid', placeItems: 'center' }}>
+              <Mail size={22} color="#1d4ed8" />
+            </div>
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 900, color: T.text, margin: 0 }}>Otomatik Rapor Gönderimi</h2>
+              <div style={{ fontSize: 13, color: T.textSoft, marginTop: 2 }}>
+                Raporu belirli tarihlerde otomatik oluşturup e-posta ile gönderin
+              </div>
+            </div>
+          </div>
+
+          {/* Form */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Alıcı E-posta Adresleri</span>
+              <textarea
+                value={mailEmails} onChange={e => setMailEmails(e.target.value)}
+                placeholder="ornek@firma.com, diger@firma.com"
+                rows={2}
+                style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, resize: 'vertical' }}
+              />
+              <span style={{ fontSize: 11, color: T.textSoft }}>Birden fazla adres virgül veya yeni satır ile ayırın</span>
+            </label>
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Tekrar</span>
+              <select value={mailTekrar} onChange={e => setMailTekrar(e.target.value as any)} style={inp}>
+                <option value="tek_sefer">Tek Sefer</option>
+                <option value="gunluk">Her Gün</option>
+                <option value="haftalik">Her Hafta</option>
+                <option value="aylik">Her Ay</option>
+              </select>
+            </label>
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Gönderim Saati</span>
+              <input type="time" value={mailSaat} onChange={e => setMailSaat(e.target.value)} style={inp} />
+            </label>
+
+            {mailTekrar === 'tek_sefer' && (
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Gönderim Tarihi</span>
+                <input type="date" value={mailGonderimTarihi} onChange={e => setMailGonderimTarihi(e.target.value)} style={inp} />
+              </label>
+            )}
+
+            {mailTekrar !== 'tek_sefer' && (
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Rapor Aralığı (Son X Gün)</span>
+                <input type="number" min={1} max={365} value={mailGunSayisi} onChange={e => setMailGunSayisi(Number(e.target.value) || 30)} style={inp} />
+              </label>
+            )}
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Açıklama (opsiyonel)</span>
+              <textarea
+                value={mailAciklama} onChange={e => setMailAciklama(e.target.value)}
+                placeholder="Mail gövdesine eklenecek not..."
+                rows={2}
+                style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, resize: 'vertical' }}
+              />
+            </label>
+          </div>
+
+          <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.6, padding: '10px 14px', background: T.grayLight, borderRadius: 8, marginBottom: 14 }}>
+            {mailTekrar === 'tek_sefer'
+              ? `Yukarıdaki Başlangıç/Bitiş tarih aralığı ve Üst Lokasyon filtresi kullanılarak rapor oluşturulup ${mailGonderimTarihi || 'bugün'} saat ${mailSaat}'de gönderilecek.`
+              : `Her ${mailTekrar === 'gunluk' ? 'gün' : mailTekrar === 'haftalik' ? 'hafta' : 'ay'} saat ${mailSaat}'de son ${mailGunSayisi} günlük rapor oluşturulup gönderilecek.`
+            }
+          </div>
+
+          <button onClick={handleSaveZamanlama} disabled={savingMail}
+            style={{
+              height: 44, padding: '0 28px', borderRadius: 10, border: 'none',
+              background: '#1d4ed8', color: '#fff', fontWeight: 800, fontSize: 14,
+              cursor: savingMail ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8, opacity: savingMail ? 0.6 : 1,
+            }}>
+            <Mail size={18} />
+            {savingMail ? 'Kaydediliyor...' : 'Gönderimi Zamanla'}
+          </button>
+
+          {/* Mevcut zamanlamalar */}
+          {zamanlamalar.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 8 }}>Zamanlanmış Gönderimler</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {zamanlamalar.map((z: any) => (
+                  <div key={z.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                    background: z.aktif ? T.grayLight : '#fef2f2', border: `1px solid ${z.aktif ? T.border : '#fca5a5'}`,
+                    borderRadius: 8,
+                  }}>
+                    <Clock size={16} color={z.aktif ? '#1d4ed8' : '#dc2626'} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
+                        {z.alici_emails?.join(', ')}
+                      </div>
+                      <div style={{ fontSize: 12, color: T.textSoft, marginTop: 2 }}>
+                        {z.tekrar_tipi === 'tek_sefer' ? 'Tek sefer' : z.tekrar_tipi === 'gunluk' ? 'Her gün' : z.tekrar_tipi === 'haftalik' ? 'Her hafta' : 'Her ay'}
+                        {' · '}{z.saat}
+                        {z.son_gonderim_tarihi && ` · Son: ${new Date(z.son_gonderim_tarihi).toLocaleDateString('tr-TR')}`}
+                        {z.sonraki_gonderim_tarihi && z.aktif && ` · Sonraki: ${new Date(z.sonraki_gonderim_tarihi).toLocaleDateString('tr-TR')}`}
+                        {z.aciklama && ` · ${z.aciklama}`}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: z.aktif ? '#1d4ed8' : '#dc2626' }}>
+                      {z.aktif ? 'Aktif' : 'Tamamlandı'}
+                    </span>
+                    <button onClick={() => handleDeleteZamanlama(z.id)}
+                      style={{ width: 32, height: 32, borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                      <Trash2 size={14} color="#dc2626" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

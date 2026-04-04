@@ -11,6 +11,7 @@ declare module 'nodemailer' {
     subject?: string
     text?: string
     html?: string
+    attachments?: { filename?: string; content?: any; contentType?: string }[]
   }
   interface SentMessageInfo {
     messageId?: string
