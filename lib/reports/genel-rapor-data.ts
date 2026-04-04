@@ -231,8 +231,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     .select(SELECT_COLS)
     .eq('firma_id', filters.firmaId)
   if (filters.projeId) {
-    qAktif = (qAktif as any).or(`proje_id.eq.${filters.projeId},proje_id.is.null`)
-    qArsiv = (qArsiv as any).or(`proje_id.eq.${filters.projeId},proje_id.is.null`)
+    qAktif = (qAktif as any).eq('proje_id', filters.projeId)
+    qArsiv = (qArsiv as any).eq('proje_id', filters.projeId)
   }
 
   if (targetLokasyonIds && targetLokasyonIds.length > 0) {
