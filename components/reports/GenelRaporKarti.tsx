@@ -599,7 +599,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
 
                 {/* ── 4. Personel Bazlı Tamamlanan ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Bazlı Tamamlanan (İlk 10)</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Bazlı Tamamlanan Göreveler</div>
                   {ozetData.persBazli.length > 0
                     ? <BarChart data={ozetData.persBazli} valueKey="sayi" labelKey="personel" color={T.blue} />
                     : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
@@ -608,7 +608,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
 
                 {/* ── 5. Lokasyon Bazlı Tamamlanan ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Lokasyon Bazlı Tamamlanan (İlk 10)</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Lokasyon Bazlı Tamamlanan Görevler</div>
                   {ozetData.lokBazli.length > 0
                     ? <BarChart data={ozetData.lokBazli} valueKey="sayi" labelKey="lokasyon" color={T.blueMid} />
                     : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
