@@ -336,19 +336,17 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     tamamlanan: number
     sapma: number
     kayip: number
-    tekil: number                  // gunluk_frekans_sayisi=0 olan tekil görevler
   }>()
 
   for (const g of tumGorevler) {
     const lid = (g as any).lokasyon_id
     if (!lid) continue
-    if (!lokGorevCount.has(lid)) lokGorevCount.set(lid, { gunlukFrekansToplamı: 0, tamamlanan: 0, sapma: 0, kayip: 0, tekil: 0 })
+    if (!lokGorevCount.has(lid)) lokGorevCount.set(lid, { gunlukFrekansToplamı: 0, tamamlanan: 0, sapma: 0, kayip: 0 })
     const entry = lokGorevCount.get(lid)!
     const gfs = (g as any).gunluk_frekans_sayisi ?? 0
 
     if (gfs > 0) {
       // gfs değerini lokasyon+tanim bazlı sakla — grup hesabında kullanılacak
-      // (günlük frekans = GRUP düzeyinde benzersiz tanım başına gfs — lokasyon sayısından bağımsız)
       const tanim = (g as any).tanim ?? ''
       const tanımKey = `${lid}::${tanim}`
       if (!lokGunFrekans.has(lid)) lokGunFrekans.set(lid, new Map())
@@ -356,25 +354,17 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       if (!gunMap.has(tanımKey)) {
         gunMap.set(tanımKey, gfs)
       }
-    } else {
-      // gfs=0 → tekil görev
-      // HAZIR/ACIK/ISLEMDE: hedef'e dahil edilir ama tekil sayımına girmiyor (hazirAcikSayisi ayrıca ekleniyor)
-      const durumTekil = (g as any).durum
-      if (durumTekil !== 'HAZIR' && durumTekil !== 'ACIK' && durumTekil !== 'ISLEMDE') {
-        entry.tekil++
-      }
     }
 
     const durum = (g as any).durum
-    // Durum → Kategori:
-    // TAMAMLANDI                          → tamamlanan
-    // ZAMANINDA_YAPILAMAYAN               → sapma
+    // Durum → Kategori (gfs değerinden bağımsız, her görev bir kez sayılır):
+    // TAMAMLANDI                                → tamamlanan
+    // ZAMANINDA_YAPILAMAYAN                     → sapma
     // ZAMANI_GECMIS, IPTAL, SILINDI, BEKLEMEDE → kayıp
-    // HAZIR, ACIK, ISLEMDE               → hedef'e girer ama kategoriye girmez (henüz aktif)
+    // HAZIR, ACIK, ISLEMDE                      → hedef'e girer (hazirAcik), kategoriye girmez
     if (durum === 'TAMAMLANDI') entry.tamamlanan++
     else if (durum === 'ZAMANINDA_YAPILAMAYAN') entry.sapma++
     else if (durum === 'ZAMANI_GECMIS' || durum === 'IPTAL' || durum === 'SILINDI' || durum === 'BEKLEMEDE') entry.kayip++
-    // HAZIR, ACIK, ISLEMDE: sayılmaz (aktif görevler)
   }
   // Günlük frekans = günlükFrekansToplamı / gunSayisi
   // (11 gün × 6/gün = 66 → toplam 66 kayıt, 66/11 = 6 günlük frekans)
@@ -389,11 +379,10 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     lokTanim: string,
     ustLokasyon: string,
   ): GrupMetrik | null {
-    let tekil = 0, tamamlanan = 0, sapma = 0, kayip = 0
+    let tamamlanan = 0, sapma = 0, kayip = 0
     for (const id of ids) {
       const e = lokGorevCount.get(id)
       if (!e) continue
-      tekil      += e.tekil
       tamamlanan += e.tamamlanan
       sapma      += e.sapma
       kayip      += e.kayip
@@ -410,7 +399,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     const hazirAcik = (tumGorevler as any[]).filter((g: any) =>
       ids.includes(g.lokasyon_id) && (g.durum === 'HAZIR' || g.durum === 'ACIK' || g.durum === 'ISLEMDE')
     ).length
-    const hedef = tamamlanan + sapma + kayip + tekil + hazirAcik
+    const hedef = tamamlanan + sapma + kayip + hazirAcik
     // Always return a row even when counts are zero (lokasyon exists in group but no tasks)
     const gunlukFrekans = gunlukFrekansToplamı > 0
       ? gunlukFrekansToplamı
