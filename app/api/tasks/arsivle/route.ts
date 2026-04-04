@@ -3,9 +3,9 @@
  *
  * Cron job: 6 saatte bir çalışır (00:00, 06:00, 12:00, 18:00 UTC)
  *
- * 1. personel_mesai_kayitlari   → 24h+ → _arsiv'e hard taşı
- * 2. musteri_degerlendirmeleri  → 24h+ → _arsiv'e hard taşı
- * 3. gorevler                   → tüm durumlar, 48h+ → _arsiv'e hard taşı + çeklistleri birlikte taşı
+ * 1. personel_mesai_kayitlari   → firma ayarı (varsayılan 24h) → _arsiv'e hard taşı
+ * 2. musteri_degerlendirmeleri  → firma ayarı (varsayılan 24h) → _arsiv'e hard taşı
+ * 3. gorevler                   → firma ayarı (varsayılan 48h) → _arsiv'e hard taşı + çeklistleri birlikte taşı
  *
  * Not: canli_gorevler arşivlenmesi Supabase RPC (gece_tam_dongu) ile yapılır.
  *      Frekansiyel çeklist arşivlenmesi DB trigger (trg_canli_gorev_arsiv_ceklist) ile anlık yapılır.
@@ -13,9 +13,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-
-const MS24H = 24 * 60 * 60 * 1000
-const MS48H = 48 * 60 * 60 * 1000
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,135 +24,145 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient()
     const now = Date.now()
-    const cutoff24h = new Date(now - MS24H).toISOString()
-    const cutoff48h = new Date(now - MS48H).toISOString()
     const results: any = {}
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 1. PERSONEL MESAİ — 24h+ olanlar hard arşivle
-    // ─────────────────────────────────────────────────────────────────────────
-    try {
-      const { data: rows } = await admin
-        .from('personel_mesai_kayitlari')
-        .select('*')
-        .eq('arsivlendi', false)
-        .lt('kayit_tarihi', cutoff24h)
-        .limit(5000)
+    // Tüm firmaları ve arşiv ayarlarını çek
+    const { data: firmalar } = await admin
+      .from('firmalar')
+      .select('id,arsiv_mesai_saat,arsiv_musteri_saat,arsiv_spesifik_saat')
+      .eq('aktif', true)
 
-      if (rows?.length) {
-        const arsivRows = rows.map(r => ({ ...r, arsivleme_tarihi: new Date().toISOString() }))
-        const { error: insErr } = await admin.from('personel_mesai_kayitlari_arsiv').insert(arsivRows)
-        if (insErr) throw insErr
-        const ids = rows.map(r => r.id)
-        const { error: delErr } = await admin.from('personel_mesai_kayitlari').delete().in('id', ids)
-        if (delErr) throw delErr
-        results.personel = { moved: ids.length, ok: true }
-      } else {
-        results.personel = { moved: 0, ok: true }
-      }
-    } catch (e: any) {
-      results.personel = { ok: false, error: e.message }
-    }
+    for (const firma of firmalar ?? []) {
+      const firmaId = firma.id
+      const mesaiSaat    = firma.arsiv_mesai_saat    ?? 24
+      const musteriSaat  = firma.arsiv_musteri_saat  ?? 24
+      const spesifikSaat = firma.arsiv_spesifik_saat ?? 48
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 2. MÜŞTERİ DEĞERLENDİRMELERİ — 24h+ olanlar hard arşivle
-    //    (Daha önce soft arşivlenmiş arsivlendi=true kayıtlar da temizlenir)
-    // ─────────────────────────────────────────────────────────────────────────
-    try {
-      // 2a. Yeni arşivlenecekler (arsivlendi=false, 24h+)
-      const { data: yeniRows } = await admin
-        .from('musteri_degerlendirmeleri')
-        .select('*')
-        .eq('arsivlendi', false)
-        .lt('olusturma_tarihi', cutoff24h)
-        .limit(5000)
+      const cutoffMesai    = new Date(now - mesaiSaat    * 60 * 60 * 1000).toISOString()
+      const cutoffMusteri  = new Date(now - musteriSaat  * 60 * 60 * 1000).toISOString()
+      const cutoffSpesifik = new Date(now - spesifikSaat * 60 * 60 * 1000).toISOString()
 
-      let moved = 0
-      if (yeniRows?.length) {
-        const arsivRows = yeniRows.map(r => ({ ...r, arsivleme_tarihi: new Date().toISOString() }))
-        const { error: insErr } = await admin.from('musteri_degerlendirmeleri_arsiv').insert(arsivRows)
-        if (insErr) throw insErr
-        const ids = yeniRows.map(r => r.id)
-        const { error: delErr } = await admin.from('musteri_degerlendirmeleri').delete().in('id', ids)
-        if (delErr) throw delErr
-        moved += ids.length
-      }
+      const firmaResult: any = {}
 
-      // 2b. Eski soft arşivler (arsivlendi=true) — _arsiv'de kayıt yoksa ekle, ana tablodan sil
-      const { data: softRows } = await admin
-        .from('musteri_degerlendirmeleri')
-        .select('id')
-        .eq('arsivlendi', true)
-        .limit(5000)
-
-      if (softRows?.length) {
-        const softIds = softRows.map(r => r.id)
-        // _arsiv'de zaten varsa duplicate vermemek için insert etme, direkt sil
-        await admin.from('musteri_degerlendirmeleri').delete().in('id', softIds)
-        moved += softIds.length
-      }
-
-      results.musteri = { moved, ok: true }
-    } catch (e: any) {
-      results.musteri = { ok: false, error: e.message }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // 3. SPESİFİK GÖREVLER — tüm durumlar, 48h+ → hard arşivle + çeklistleri birlikte taşı
-    // ─────────────────────────────────────────────────────────────────────────
-    try {
-      const { data: gorevler } = await admin
-        .from('gorevler')
-        .select('*')
-        .lt('olusturma_tarihi', cutoff48h)
-        .limit(5000)
-
-      if (gorevler?.length) {
-        const gorevIds = gorevler.map(g => g.id)
-
-        // 3a. Çeklist başlıklarını bul ve taşı
-        const { data: basliklar } = await admin
-          .from('checklist_sonuc_basliklari')
+      // ── 1. PERSONEL MESAİ ──────────────────────────────────────────────
+      try {
+        const { data: rows } = await admin
+          .from('personel_mesai_kayitlari')
           .select('*')
-          .in('gorev_id', gorevIds)
+          .eq('firma_id', firmaId)
+          .eq('arsivlendi', false)
+          .lt('kayit_tarihi', cutoffMesai)
+          .limit(5000)
 
-        if (basliklar?.length) {
-          const baslikIds = basliklar.map(b => b.id)
+        if (rows?.length) {
+          const arsivRows = rows.map(r => ({ ...r, arsivleme_tarihi: new Date().toISOString() }))
+          const { error: insErr } = await admin.from('personel_mesai_kayitlari_arsiv').insert(arsivRows)
+          if (insErr) throw insErr
+          const ids = rows.map(r => r.id)
+          const { error: delErr } = await admin.from('personel_mesai_kayitlari').delete().in('id', ids)
+          if (delErr) throw delErr
+          firmaResult.personel = { moved: ids.length, ok: true }
+        } else {
+          firmaResult.personel = { moved: 0, ok: true }
+        }
+      } catch (e: any) {
+        firmaResult.personel = { ok: false, error: e.message }
+      }
 
-          // Maddeler
-          const { data: maddeler } = await admin
-            .from('checklist_sonuc_maddeleri')
-            .select('*')
-            .in('sonuc_id', baslikIds)
+      // ── 2. MÜŞTERİ DEĞERLENDİRMELERİ ─────────────────────────────────
+      try {
+        const { data: yeniRows } = await admin
+          .from('musteri_degerlendirmeleri')
+          .select('*')
+          .eq('firma_id', firmaId)
+          .eq('arsivlendi', false)
+          .lt('olusturma_tarihi', cutoffMusteri)
+          .limit(5000)
 
-          if (maddeler?.length) {
-            await admin.from('checklist_sonuc_maddeleri_arsiv').insert(maddeler)
-            await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', baslikIds)
-          }
-
-          // Başlıklar
-          const arsivBasliklar = basliklar.map(b => ({ ...b, arsiv_tarihi: new Date().toISOString() }))
-          await admin.from('checklist_sonuc_basliklari_arsiv').insert(arsivBasliklar)
-          await admin.from('checklist_sonuc_basliklari').delete().in('id', baslikIds)
+        let moved = 0
+        if (yeniRows?.length) {
+          const arsivRows = yeniRows.map(r => ({ ...r, arsivleme_tarihi: new Date().toISOString() }))
+          const { error: insErr } = await admin.from('musteri_degerlendirmeleri_arsiv').insert(arsivRows)
+          if (insErr) throw insErr
+          const ids = yeniRows.map(r => r.id)
+          const { error: delErr } = await admin.from('musteri_degerlendirmeleri').delete().in('id', ids)
+          if (delErr) throw delErr
+          moved += ids.length
         }
 
-        // 3b. Görevi arşivle
-        const arsivGorevler = gorevler.map(g => ({ ...g, arsivleme_tarihi: new Date().toISOString() }))
-        const { error: insErr } = await admin.from('gorevler_arsiv').insert(arsivGorevler)
-        if (insErr) throw insErr
-        const { error: delErr } = await admin.from('gorevler').delete().in('id', gorevIds)
-        if (delErr) throw delErr
+        // Eski soft arşivler (arsivlendi=true) — ana tablodan sil
+        const { data: softRows } = await admin
+          .from('musteri_degerlendirmeleri')
+          .select('id')
+          .eq('firma_id', firmaId)
+          .eq('arsivlendi', true)
+          .limit(5000)
 
-        results.spesifik = { moved: gorevIds.length, ceklist: basliklar?.length ?? 0, ok: true }
-      } else {
-        results.spesifik = { moved: 0, ceklist: 0, ok: true }
+        if (softRows?.length) {
+          const softIds = softRows.map(r => r.id)
+          await admin.from('musteri_degerlendirmeleri').delete().in('id', softIds)
+          moved += softIds.length
+        }
+
+        firmaResult.musteri = { moved, ok: true }
+      } catch (e: any) {
+        firmaResult.musteri = { ok: false, error: e.message }
       }
-    } catch (e: any) {
-      results.spesifik = { ok: false, error: e.message }
-    }
 
-    // Not: Frekansiyel çeklist arşivlenmesi DB trigger ile anlık yapılır.
-    // canli_gorevler_arsiv'e INSERT olduğu anda trg_canli_gorev_arsiv_ceklist tetiklenir.
+      // ── 3. SPESİFİK GÖREVLER ──────────────────────────────────────────
+      try {
+        const { data: gorevler } = await admin
+          .from('gorevler')
+          .select('*')
+          .eq('firma_id', firmaId)
+          .lt('olusturma_tarihi', cutoffSpesifik)
+          .limit(5000)
+
+        if (gorevler?.length) {
+          const gorevIds = gorevler.map(g => g.id)
+
+          // Çeklist başlıklarını bul ve taşı
+          const { data: basliklar } = await admin
+            .from('checklist_sonuc_basliklari')
+            .select('*')
+            .in('gorev_id', gorevIds)
+
+          if (basliklar?.length) {
+            const baslikIds = basliklar.map(b => b.id)
+
+            const { data: maddeler } = await admin
+              .from('checklist_sonuc_maddeleri')
+              .select('*')
+              .in('sonuc_id', baslikIds)
+
+            if (maddeler?.length) {
+              await admin.from('checklist_sonuc_maddeleri_arsiv').insert(maddeler)
+              await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', baslikIds)
+            }
+
+            const arsivBasliklar = basliklar.map(b => ({ ...b, arsiv_tarihi: new Date().toISOString() }))
+            await admin.from('checklist_sonuc_basliklari_arsiv').insert(arsivBasliklar)
+            await admin.from('checklist_sonuc_basliklari').delete().in('id', baslikIds)
+          }
+
+          const arsivGorevler = gorevler.map(g => ({ ...g, arsivleme_tarihi: new Date().toISOString() }))
+          const { error: insErr } = await admin.from('gorevler_arsiv').insert(arsivGorevler)
+          if (insErr) throw insErr
+          const { error: delErr } = await admin.from('gorevler').delete().in('id', gorevIds)
+          if (delErr) throw delErr
+
+          firmaResult.spesifik = { moved: gorevIds.length, ceklist: basliklar?.length ?? 0, ok: true }
+        } else {
+          firmaResult.spesifik = { moved: 0, ceklist: 0, ok: true }
+        }
+      } catch (e: any) {
+        firmaResult.spesifik = { ok: false, error: e.message }
+      }
+
+      // Sadece bir şey taşındıysa logla
+      const anyMoved = (firmaResult.personel?.moved || 0) + (firmaResult.musteri?.moved || 0) + (firmaResult.spesifik?.moved || 0)
+      if (anyMoved > 0) results[firmaId] = firmaResult
+    }
 
     return NextResponse.json({ ok: true, message: 'Arşivleme tamamlandı', results })
   } catch (e: any) {

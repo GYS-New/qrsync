@@ -68,6 +68,9 @@ export interface Firma {
   kayit_yapan_id?: string
   aktif: boolean
   gorev_suresi_hedef_orani?: number
+  arsiv_mesai_saat?: number
+  arsiv_musteri_saat?: number
+  arsiv_spesifik_saat?: number
 }
 
 export interface Lokasyon {
