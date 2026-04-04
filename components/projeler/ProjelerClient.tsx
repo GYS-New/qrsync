@@ -45,6 +45,10 @@ export default function ProjelerClient({
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BOSH })
+  const [silModal, setSilModal] = useState<Proje | null>(null)
+  const [silSifre, setSilSifre] = useState('')
+  const [silLoading, setSilLoading] = useState(false)
+  const [silHata, setSilHata] = useState('')
 
   const fetchProjeler = useCallback(async () => {
     if (!firmaId) { setLoading(false); return }
@@ -125,19 +129,41 @@ export default function ProjelerClient({
   async function del(p: Proje) {
     const ok = await confirm({
       title: '⚠️ PROJEYİ KALICI OLARAK SİL',
-      message: `"${p.ad}" projesi ve altındaki TÜM VERİLER veritabanından kalıcı olarak silinecektir:\n\n• Tüm lokasyonlar ve lokasyon grupları\n• Tüm frekansiyel görevler (aktif + arşiv)\n• Tüm spesifik görevler (aktif + arşiv)\n• Tüm çeklist sonuçları (aktif + arşiv)\n• Tüm görev kuralları\n• Müşteri değerlendirmeleri ve mesai kayıtları\n\nPersonel hesapları silinmez, proje bağlantısı kaldırılır.\n\nBu işlem GERİ ALINAMAZ. Devam edilsin mi?`,
-      confirmText: 'Kalıcı Olarak Sil',
+      message: `"${p.ad}" projesi ve altındaki TÜM VERİLER veritabanından kalıcı olarak silinecektir:\n\n• Tüm personel hesapları\n• Tüm lokasyonlar ve lokasyon grupları\n• Tüm frekansiyel görevler (aktif + arşiv)\n• Tüm spesifik görevler (aktif + arşiv)\n• Tüm çeklist sonuçları (aktif + arşiv)\n• Tüm görev kuralları\n• Müşteri değerlendirmeleri ve mesai kayıtları\n\nBu işlem GERİ ALINAMAZ.\nDevam etmek için şifrenizi girmeniz gerekecektir.`,
+      confirmText: 'Devam Et',
       cancelText: 'Vazgeç',
       variant: 'danger',
     })
     if (!ok) return
+    // Şifre doğrulama modalını aç
+    setSilSifre('')
+    setSilHata('')
+    setSilModal(p)
+  }
+
+  async function silOnayla() {
+    if (!silModal) return
+    if (!silSifre) { setSilHata('Şifre boş olamaz.'); return }
+    setSilLoading(true)
+    setSilHata('')
     try {
-      const res = await fetch(`/api/projeler/${p.id}`, { method: 'DELETE' })
+      const vRes = await fetch('/api/auth/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: silSifre }),
+      })
+      const vJson = await vRes.json()
+      if (!vJson.ok) { setSilHata('Şifre hatalı. Lütfen tekrar deneyin.'); setSilLoading(false); return }
+
+      const res = await fetch(`/api/projeler/${silModal.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error((await res.json()).error)
-      toast({ type: 'success', title: 'Silindi', message: `"${p.ad}" projesi silindi` })
+      toast({ type: 'success', title: 'Silindi', message: `"${silModal.ad}" projesi kalıcı olarak silindi.` })
+      setSilModal(null)
       fetchProjeler()
     } catch (e: any) {
-      toast({ type: 'error', title: 'Hata', message: e.message })
+      setSilHata(e.message)
+    } finally {
+      setSilLoading(false)
     }
   }
 
@@ -416,6 +442,58 @@ export default function ProjelerClient({
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Şifre Doğrulama Modalı */}
+      {silModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div className="verde-card" style={{ width: 'min(440px, 96vw)', padding: 28, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <div style={{ fontSize: 28 }}>🔐</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: '#991b1b' }}>Şifre Doğrulama</div>
+                <div style={{ fontSize: 12.5, color: '#6b7280', marginTop: 2 }}>"{silModal.ad}" projesini kalıcı silmek için şifrenizi girin</div>
+              </div>
+            </div>
+            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', marginBottom: 18, fontSize: 12.5, color: '#991b1b', fontWeight: 600 }}>
+              ⚠️ Bu işlem geri alınamaz. Proje altındaki tüm veriler ve personeller kalıcı olarak silinecektir.
+            </div>
+            <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Şifreniz</label>
+            <input
+              type="password"
+              className="verde-input"
+              value={silSifre}
+              onChange={e => { setSilSifre(e.target.value); setSilHata('') }}
+              onKeyDown={e => { if (e.key === 'Enter') silOnayla() }}
+              placeholder="Giriş şifrenizi girin"
+              autoFocus
+              disabled={silLoading}
+            />
+            {silHata && (
+              <div style={{ marginTop: 8, fontSize: 12.5, color: '#dc2626', fontWeight: 600 }}>⛔ {silHata}</div>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setSilModal(null); setSilSifre(''); setSilHata('') }}
+                className="verde-btn-ghost"
+                disabled={silLoading}
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={silOnayla}
+                disabled={silLoading || !silSifre}
+                style={{
+                  padding: '8px 20px', borderRadius: 8, border: 'none', cursor: silLoading || !silSifre ? 'not-allowed' : 'pointer',
+                  background: silLoading || !silSifre ? '#fca5a5' : '#dc2626', color: '#fff',
+                  fontWeight: 700, fontSize: 13,
+                }}
+              >
+                {silLoading ? 'Siliniyor…' : '🗑️ Kalıcı Olarak Sil'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

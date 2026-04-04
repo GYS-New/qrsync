@@ -95,8 +95,14 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     // 5. Lokasyonlar
     await admin.from('lokasyonlar').delete().eq('proje_id', projeId)
 
-    // 6. Personellerin proje bağlantısını kaldır (kullanıcı hesaplarını silme)
-    await admin.from('users').update({ proje_id: null }).eq('proje_id', projeId)
+    // 6. Projeye ait personelleri kalıcı sil (auth + users tablosu)
+    const { data: projePersonel } = await admin.from('users').select('id').eq('proje_id', projeId)
+    const personelIds = (projePersonel ?? []).map((u: any) => u.id)
+    if (personelIds.length > 0) {
+      await admin.from('users').delete().in('id', personelIds)
+      // Supabase Auth kayıtlarını da sil
+      await Promise.all(personelIds.map((uid: string) => admin.auth.admin.deleteUser(uid)))
+    }
 
     // 7. Projeyi sil
     const { error } = await admin.from('projeler').delete().eq('id', projeId)
