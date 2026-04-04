@@ -36,7 +36,9 @@ export async function sendFCMToUser(userId: string, title: string, body: string,
     })
     const { access_token } = await tokenRes.json()
 
-    const soundName = channelId === 'gorev_uyari' ? 'vav' : 'default'
+    const soundName = channelId === 'gorev_uyari' ? 'vav' 
+                    : channelId === 'gorev_tamamla' ? 'tamamla' 
+                    : 'default'
 
     for (const d of devices) {
       if (!d.fcm_token) continue

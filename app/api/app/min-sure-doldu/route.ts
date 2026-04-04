@@ -31,28 +31,14 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const { lokasyonAdi, minSureKaldi } = body
+    const { lokasyonAdi } = body
 
-    if (minSureKaldi && minSureKaldi > 0) {
-      // Min süre dolmadan çıktı — vav sesiyle uyar
-      const dakika = Math.floor(minSureKaldi / 60)
-      const saniye = minSureKaldi % 60
-      const kalan = dakika > 0 ? `${dakika} dk ${saniye} sn` : `${saniye} sn`
-      await sendFCMToUser(
-        user.id,
-        '⚠️ Görevi Tamamlayamazsınız!',
-        `${lokasyonAdi || 'Lokasyon'} için minimum süre dolmadı. Kalan süre: ${kalan}. Lütfen uygulamaya dönün.`,
-        'gorev_uyari'
-      )
-    } else {
-      // Normal arka plan bildirimi
-      await sendFCMToUser(
-        user.id,
-        '⏱ Göreviniz Devam Ediyor',
-        `${lokasyonAdi || 'Lokasyon'} için göreviniz hâlâ aktif. Lütfen uygulamaya dönün.`,
-        'gorev_uyari'
-      )
-    }
+    await sendFCMToUser(
+      user.id,
+      '✅ Görevi Tamamlayabilirsiniz!',
+      `${lokasyonAdi || 'Lokasyon'} için minimum süre doldu. Görevi tamamlamak için uygulamaya dönün.`,
+      'gorev_tamamla'
+    )
 
     return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
   } catch (e: any) {
