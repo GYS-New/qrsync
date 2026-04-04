@@ -800,11 +800,18 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
               <h2 style={{ fontSize: 18, fontWeight: 900, color: T.text, margin: 0 }}>Süre Analiz Raporları</h2>
               <div style={{ fontSize: 13, color: T.textSoft, marginTop: 2 }}>Tamamlanma süreleri, bekleme analizleri ve personel/lokasyon karşılaştırmaları</div>
             </div>
-            <button onClick={fetchData} disabled={loading || !currentFirmaId}
-              style={{ height: 36, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.gray, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
-              <RefreshCw size={13} style={loading ? spinning : {}} />
-              {loading ? 'Yükleniyor…' : 'Yenile'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button onClick={fetchData} disabled={loading || !currentFirmaId}
+                style={{ height: 36, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.grayLight, color: T.gray, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
+                <RefreshCw size={13} style={loading ? spinning : {}} />
+                {loading ? 'Yükleniyor…' : 'Yenile'}
+              </button>
+              <button onClick={handleExport} disabled={exporting || !data}
+                style={{ height: 36, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: data ? 'pointer' : 'not-allowed', fontSize: 12.5, opacity: data ? 1 : 0.5 }}>
+                <Download size={14} />
+                {exporting ? 'İndiriliyor…' : 'Excel İndir'}
+              </button>
+            </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: 10 }}>
             {[
@@ -831,16 +838,9 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
         {/* İçerik */}
         {data && (
           <>
-            {/* Ana sekmeler + Excel butonu */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: 4, background: T.grayLight, borderRadius: 8, padding: 4, border: `1px solid ${T.border}` }}>
-                {ANA_TABS.map(t => <button key={t} style={tabStyle(t)} onClick={() => setActiveTab(t)}>{t}</button>)}
-              </div>
-              <button onClick={handleExport} disabled={exporting || !data}
-                style={{ height: 36, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: data ? 'pointer' : 'not-allowed', fontSize: 12.5, opacity: data ? 1 : 0.5 }}>
-                <Download size={14} />
-                {exporting ? 'İndiriliyor…' : 'Excel İndir'}
-              </button>
+            {/* Ana sekmeler */}
+            <div style={{ display: 'flex', gap: 4, background: T.grayLight, borderRadius: 8, padding: 4, alignSelf: 'flex-start', border: `1px solid ${T.border}` }}>
+              {ANA_TABS.map(t => <button key={t} style={tabStyle(t)} onClick={() => setActiveTab(t)}>{t}</button>)}
             </div>
 
             {/* Frekansiyel panel */}
