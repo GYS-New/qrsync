@@ -57,6 +57,8 @@ export default async function TASistemAyarlariPage() {
         meId={meId}
         initialBloklar={(bloklar as any) ?? []}
         lokasyonlar={lokasyonlar ?? []}
+        isSA={false}
+        firmaId={firmaId}
       />
     </div>
   )

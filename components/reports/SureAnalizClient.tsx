@@ -19,7 +19,7 @@ type DagilimRow    = { aralik: string; adet: number }
 type GorevRow      = { tanim: string; lokasyon_id: string; lokasyon: string; adet: number; ort_sure: number; min_sure: number; max_sure: number; hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null }
 type MetaLokasyon  = { id: string; tanim: string; parent_id: string | null }
 type Bolum         = { analiz: Analiz; gunlukTrend: GunlukRow[]; lokasyon: LokasyonRow[]; personel: PersonelRow[]; gorev: GorevRow[]; dagilim: DagilimRow[] }
-type SureData      = { ok: boolean; frekansiyel: Bolum; spesifik: Bolum; meta: { lokasyonlar: MetaLokasyon[]; kullanicilar: any[] } }
+type SureData      = { ok: boolean; frekansiyel: Bolum; spesifik: Bolum; hedefTolerans: number; meta: { lokasyonlar: MetaLokasyon[]; kullanicilar: any[] } }
 
 // ── Tokens ────────────────────────────────────────────────────────────────
 const T = {
@@ -262,8 +262,18 @@ function SekHead({ title, color }: { title: string; color: string }) {
   )
 }
 
+// ── Hedef tolerans yardımcıları ───────────────────────────────────────
+/** fark yüzdesi tolerans aralığında mı? */
+function isAsim(farkPct: number | null, tolerans: number): boolean {
+  return farkPct != null && farkPct > tolerans
+}
+function durumLabel(farkPct: number | null, tolerans: number): string {
+  if (farkPct == null) return '—'
+  return isAsim(farkPct, tolerans) ? '✗ Aşım' : '✓ Uygun'
+}
+
 // ── Lokasyon hedef vs gerçekleşen karşılaştırma ──────────────────────────
-function LokasyonKarsilastirma({ data, renk }: { data: LokasyonRow[]; renk: string }) {
+function LokasyonKarsilastirma({ data, renk, tolerans = 10 }: { data: LokasyonRow[]; renk: string; tolerans?: number }) {
   if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
   const maxVal = Math.max(...data.flatMap(r => [r.ort_sure, r.hedef_sure ?? 0]), 1)
   const hasHedef = data.some(r => r.hedef_sure != null)
@@ -279,7 +289,7 @@ function LokasyonKarsilastirma({ data, renk }: { data: LokasyonRow[]; renk: stri
       {data.map((r, i) => {
         const ortPct   = (r.ort_sure / maxVal) * 100
         const hedefPct = r.hedef_sure != null ? (r.hedef_sure / maxVal) * 100 : null
-        const asim     = r.hedef_fark != null && r.hedef_fark > 0
+        const asim     = isAsim(r.hedef_fark_pct, tolerans)
         const barColor = r.hedef_sure == null ? renk : asim ? T.red : T.greenMid
         return (
           <div key={r.lokasyon_id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff', borderRadius: 6, padding: '8px 10px' }}>
@@ -289,7 +299,7 @@ function LokasyonKarsilastirma({ data, renk }: { data: LokasyonRow[]; renk: stri
                 <span style={{ fontSize: 12, color: T.textSoft }}>{r.adet} görev</span>
                 {r.hedef_fark_pct != null && (
                   <span style={{ fontSize: 12, fontWeight: 700, color: asim ? T.red : T.greenMid }}>
-                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} erken`}
+                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} uygun`}
                   </span>
                 )}
               </div>
@@ -313,7 +323,7 @@ function LokasyonKarsilastirma({ data, renk }: { data: LokasyonRow[]; renk: stri
 }
 
 // ── Personel hedef vs gerçekleşen karşılaştırma ─────────────────────
-function PersonelKarsilastirma({ data, renk }: { data: PersonelRow[]; renk: string }) {
+function PersonelKarsilastirma({ data, renk, tolerans = 10 }: { data: PersonelRow[]; renk: string; tolerans?: number }) {
   if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
   const maxVal = Math.max(...data.flatMap(r => [r.ort_sure, r.ort_hedef_sure ?? 0]), 1)
   const hasHedef = data.some(r => r.ort_hedef_sure != null)
@@ -329,7 +339,7 @@ function PersonelKarsilastirma({ data, renk }: { data: PersonelRow[]; renk: stri
       {data.map((r, i) => {
         const ortPct   = (r.ort_sure / maxVal) * 100
         const hedefPct = r.ort_hedef_sure != null ? (r.ort_hedef_sure / maxVal) * 100 : null
-        const asim     = r.hedef_fark != null && r.hedef_fark > 0
+        const asim     = isAsim(r.hedef_fark_pct, tolerans)
         const barColor = r.ort_hedef_sure == null ? renk : asim ? T.red : T.greenMid
         return (
           <div key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff', borderRadius: 6, padding: '8px 10px' }}>
@@ -339,7 +349,7 @@ function PersonelKarsilastirma({ data, renk }: { data: PersonelRow[]; renk: stri
                 <span style={{ fontSize: 12, color: T.textSoft }}>{r.tamamlanan} görev</span>
                 {r.hedef_fark_pct != null && (
                   <span style={{ fontSize: 12, fontWeight: 700, color: asim ? T.red : T.greenMid }}>
-                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} erken`}
+                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} uygun`}
                   </span>
                 )}
               </div>
@@ -363,7 +373,7 @@ function PersonelKarsilastirma({ data, renk }: { data: PersonelRow[]; renk: stri
 }
 
 // ── Görev hedef vs gerçekleşen karşılaştırma ────────────────────────
-function GorevKarsilastirma({ data, renk }: { data: GorevRow[]; renk: string }) {
+function GorevKarsilastirma({ data, renk, tolerans = 10 }: { data: GorevRow[]; renk: string; tolerans?: number }) {
   if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
   const maxVal = Math.max(...data.flatMap(r => [r.ort_sure, r.hedef_sure ?? 0]), 1)
   const hasHedef = data.some(r => r.hedef_sure != null)
@@ -378,7 +388,7 @@ function GorevKarsilastirma({ data, renk }: { data: GorevRow[]; renk: string }) 
       {data.map((r, i) => {
         const ortPct   = (r.ort_sure / maxVal) * 100
         const hedefPct = r.hedef_sure != null ? (r.hedef_sure / maxVal) * 100 : null
-        const asim     = r.hedef_fark != null && r.hedef_fark > 0
+        const asim     = isAsim(r.hedef_fark_pct, tolerans)
         const barColor = r.hedef_sure == null ? renk : asim ? T.red : T.greenMid
         return (
           <div key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff', borderRadius: 6, padding: '8px 10px' }}>
@@ -391,7 +401,7 @@ function GorevKarsilastirma({ data, renk }: { data: GorevRow[]; renk: string }) 
                 <span style={{ fontSize: 12, color: T.textSoft }}>{r.adet} görev</span>
                 {r.hedef_fark_pct != null && (
                   <span style={{ fontSize: 12, fontWeight: 700, color: asim ? T.red : T.greenMid }}>
-                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} erken`}
+                    {asim ? `+%${r.hedef_fark_pct} aşım` : `%${Math.abs(r.hedef_fark_pct)} uygun`}
                   </span>
                 )}
               </div>
@@ -418,7 +428,7 @@ function GorevKarsilastirma({ data, renk }: { data: GorevRow[]; renk: string }) 
 const SUB_TABS = ['Lokasyon Bazlı', 'Personel Bazlı', 'Görev Bazlı'] as const
 type SubTab = typeof SUB_TABS[number]
 
-function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: SureData['meta'] }) {
+function BolumPanel({ bolum, renk, meta, tolerans = 10 }: { bolum: Bolum; renk: string; meta: SureData['meta']; tolerans?: number }) {
   const [subTab,    setSubTab]    = React.useState<SubTab>('Lokasyon Bazlı')
   const [ustLokId,  setUstLokId]  = React.useState('')
 
@@ -445,8 +455,8 @@ function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: S
   })
 
   const hasHedef = filteredLok.some(r => r.hedef_sure != null)
-  const asimlar  = filteredLok.filter(r => r.hedef_fark != null && r.hedef_fark > 0)
-  const uyumlu   = filteredLok.filter(r => r.hedef_fark != null && r.hedef_fark <= 0)
+  const asimlar  = filteredLok.filter(r => isAsim(r.hedef_fark_pct, tolerans))
+  const uyumlu   = filteredLok.filter(r => r.hedef_fark_pct != null && !isAsim(r.hedef_fark_pct, tolerans))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -534,7 +544,7 @@ function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: S
             )}
 
             {/* Karşılaştırma görseli */}
-            <LokasyonKarsilastirma data={filteredLok} renk={renk} />
+            <LokasyonKarsilastirma data={filteredLok} renk={renk} tolerans={tolerans} />
 
             {/* Tablo */}
             {filteredLok.length > 0 && (
@@ -549,7 +559,7 @@ function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: S
                       : r.hedef_fark > 0 ? `+${fmtS(r.hedef_fark)}`
                       : r.hedef_fark < 0 ? `-${fmtS(Math.abs(r.hedef_fark))}`
                       : '0'
-                    const durum = r.hedef_fark == null ? '—' : r.hedef_fark > 0 ? '✗ Aşım' : '✓ Uygun'
+                    const durum = durumLabel(r.hedef_fark_pct, tolerans)
                     return [r.lokasyon, r.adet, r.hedef_sure != null ? fmtS(r.hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, durum, fmtS(r.min_sure), fmtS(r.max_sure)]
                   }
                   return [r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)]
@@ -585,8 +595,8 @@ function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: S
               if (!filteredGorev.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
 
               const hasGorevHedef = filteredGorev.some(r => r.hedef_sure != null)
-              const gorevAsimlar  = filteredGorev.filter(r => r.hedef_fark != null && r.hedef_fark > 0)
-              const gorevUyumlu   = filteredGorev.filter(r => r.hedef_fark != null && r.hedef_fark <= 0)
+              const gorevAsimlar  = filteredGorev.filter(r => isAsim(r.hedef_fark_pct, tolerans))
+              const gorevUyumlu   = filteredGorev.filter(r => r.hedef_fark_pct != null && !isAsim(r.hedef_fark_pct, tolerans))
 
               return <>
                 {/* Hedef özet bandı */}
@@ -602,7 +612,7 @@ function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: S
                 )}
 
                 {/* Görev karşılaştırma görseli */}
-                <GorevKarsilastirma data={filteredGorev} renk={renk} />
+                <GorevKarsilastirma data={filteredGorev} renk={renk} tolerans={tolerans} />
 
                 {/* Tablo */}
                 <Tablo
@@ -616,7 +626,7 @@ function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: S
                         : r.hedef_fark > 0 ? `+${fmtS(r.hedef_fark)}`
                         : r.hedef_fark < 0 ? `-${fmtS(Math.abs(r.hedef_fark))}`
                         : '0'
-                      const durum = r.hedef_fark == null ? '—' : r.hedef_fark > 0 ? '✗ Aşım' : '✓ Uygun'
+                      const durum = durumLabel(r.hedef_fark_pct, tolerans)
                       return [r.tanim, r.lokasyon, r.adet, r.hedef_sure != null ? fmtS(r.hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, durum, fmtS(r.min_sure), fmtS(r.max_sure)]
                     }
                     return [r.tanim, r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)]
@@ -634,8 +644,8 @@ function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: S
               ? <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
               : (() => {
                   const hasPerHedef = bolum.personel.some(r => r.ort_hedef_sure != null)
-                  const perAsimlar  = bolum.personel.filter(r => r.hedef_fark != null && r.hedef_fark > 0)
-                  const perUyumlu   = bolum.personel.filter(r => r.hedef_fark != null && r.hedef_fark <= 0)
+                  const perAsimlar  = bolum.personel.filter(r => isAsim(r.hedef_fark_pct, tolerans))
+                  const perUyumlu   = bolum.personel.filter(r => r.hedef_fark_pct != null && !isAsim(r.hedef_fark_pct, tolerans))
                   return <>
                     {/* Hedef özet bandı */}
                     {hasPerHedef && (
@@ -650,7 +660,7 @@ function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: S
                     )}
 
                     {/* Personel hedef karşılaştırma görseli */}
-                    <PersonelKarsilastirma data={bolum.personel} renk={renk} />
+                    <PersonelKarsilastirma data={bolum.personel} renk={renk} tolerans={tolerans} />
 
                     {/* Tablo */}
                     <Tablo
@@ -664,7 +674,7 @@ function BolumPanel({ bolum, renk, meta }: { bolum: Bolum; renk: string; meta: S
                             : r.hedef_fark > 0 ? `+${fmtS(r.hedef_fark)}`
                             : r.hedef_fark < 0 ? `-${fmtS(Math.abs(r.hedef_fark))}`
                             : '0'
-                          const durum = r.hedef_fark == null ? '—' : r.hedef_fark > 0 ? '✗ Aşım' : '✓ Uygun'
+                          const durum = durumLabel(r.hedef_fark_pct, tolerans)
                           return [r.personel, r.tamamlanan, r.ort_hedef_sure != null ? fmtS(r.ort_hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, durum, fmtS(r.en_hizli), fmtS(r.en_yavas)]
                         }
                         return [r.personel, r.tamamlanan, fmtS(r.ort_sure), fmtS(r.en_hizli), fmtS(r.en_yavas)]
@@ -845,12 +855,12 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
 
             {/* Frekansiyel panel */}
             {activeTab === 'Frekansiyel Görevler' && (
-              <BolumPanel bolum={data.frekansiyel} renk={freqRenk} meta={data.meta} />
+              <BolumPanel bolum={data.frekansiyel} renk={freqRenk} meta={data.meta} tolerans={data.hedefTolerans} />
             )}
 
             {/* Spesifik panel */}
             {activeTab === 'Spesifik Görevler' && (
-              <BolumPanel bolum={data.spesifik} renk={specRenk} meta={data.meta} />
+              <BolumPanel bolum={data.spesifik} renk={specRenk} meta={data.meta} tolerans={data.hedefTolerans} />
             )}
           </>
         )}

@@ -53,6 +53,8 @@ export default async function SASistemAyarlariPage() {
         meId={meId}
         initialBloklar={(bloklar as any) ?? []}
         lokasyonlar={lokasyonlar}
+        isSA={true}
+        firmaId={firmaId}
       />
     </div>
   )

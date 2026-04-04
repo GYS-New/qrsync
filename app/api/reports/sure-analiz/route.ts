@@ -255,6 +255,10 @@ export async function GET(req: Request) {
 
     const admin = createAdminClient()
 
+    // Firma tolerans oranı
+    const { data: firma } = await admin.from('firmalar').select('gorev_suresi_hedef_orani').eq('id', firmaId).single()
+    const hedefTolerans = firma?.gorev_suresi_hedef_orani ?? 10
+
     // Lokasyon ve kullanıcı map'leri
     let loksQ = admin.from('lokasyonlar').select('id,tanim,parent_id,hedef_sure_dakika').eq('firma_id', firmaId)
     if (projeId) loksQ = (loksQ as any).eq('proje_id', projeId)
@@ -326,6 +330,7 @@ export async function GET(req: Request) {
         gorev:       gorevAnalizi(specTum, lokMap, hedefMap),
         dagilim:     dagılımKovalari(specTum),
       },
+      hedefTolerans,
       meta: {
         lokasyonlar: (loks  ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim, parent_id: l.parent_id ?? null })),
         kullanicilar: (users ?? []).map((u: any) => ({ id: u.id, isim_soyisim: u.isim_soyisim })),

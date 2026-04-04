@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 
 const DashboardSettingsClient = dynamic(() => import('@/components/dashboard/DashboardSettingsClient'), { ssr: false })
 const GorevSureleriClient = dynamic(() => import('./GorevSureleriClient'), { ssr: false })
+const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: false })
 
 type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'dashboard'
 
@@ -29,9 +30,11 @@ interface Props {
   meId: string
   initialBloklar: any[]
   lokasyonlar: LokasyonRow[]
+  isSA?: boolean
+  firmaId?: string | null
 }
 
-export default function SistemAyarlariClient({ meId, initialBloklar, lokasyonlar }: Props) {
+export default function SistemAyarlariClient({ meId, initialBloklar, lokasyonlar, isSA = false, firmaId }: Props) {
   const [aktifTab, setAktifTab] = useState<Tab>('genel')
 
   return (
@@ -70,7 +73,7 @@ export default function SistemAyarlariClient({ meId, initialBloklar, lokasyonlar
       </div>
 
       {/* Tab içerikleri */}
-      {aktifTab === 'genel' && <EmptyTab label="Genel Ayarlar" />}
+      {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} />}
       {aktifTab === 'frekans' && <EmptyTab label="Frekans Sayıları" />}
       {aktifTab === 'gorev-kurallari' && <EmptyTab label="Görev Kuralları" />}
       {aktifTab === 'gorev-sureleri' && <GorevSureleriClient lokasyonlar={lokasyonlar} />}
