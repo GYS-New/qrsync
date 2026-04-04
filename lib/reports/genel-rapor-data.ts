@@ -68,6 +68,18 @@ export interface FrekansDisiRow {
   aciklama: string
 }
 
+export interface AtananFrekanRow {
+  sn: number
+  atanan: string
+  tamamlayan: string
+  ustLokasyon: string
+  lokasyon: string
+  gorevTanimi: string
+  gorevDurumu: string
+  atamaTarihi: string
+  tamamlanmaTarihi: string
+}
+
 export interface GenelRaporData {
   firmaAdi: string
   projeAdi: string
@@ -88,6 +100,7 @@ export interface GenelRaporData {
   sapmaGorevler: SapmaRow[]
   kayipGorevler: KayipRow[]
   frekansDisiGorevler: FrekansDisiRow[]
+  atananFrekanslar: AtananFrekanRow[]
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -626,6 +639,42 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     }
   }
 
+  // 12. Atanan frekanslar: atanan_kullanici_id dolu olan tüm canli_gorevler
+  const durumTurkce: Record<string, string> = {
+    HAZIR: 'Hazır', ACIK: 'Açık', BEKLEMEDE: 'Beklemede', ISLEMDE: 'İşlemde',
+    TAMAMLANDI: 'Tamamlandı', ZAMANINDA_YAPILAMAYAN: 'Zamanında Yapılamayan',
+    ZAMANI_GECMIS: 'Zamanı Geçmiş', IPTAL: 'İptal', KAPATILDI: 'Kapatıldı', SILINDI: 'Silindi',
+  }
+
+  // Tüm atanan kullanıcı id'lerini userMap'e ekle (eksik varsa toplu çek)
+  const atananIds = Array.from(new Set(
+    tumGorevler.filter((g: any) => g.atanan_kullanici_id).map((g: any) => g.atanan_kullanici_id as string)
+  ))
+  const missingIds = atananIds.filter(id => !userMap.has(id))
+  if (missingIds.length > 0) {
+    const { data: extraUsers } = await admin.from('users').select('id,isim_soyisim').in('id', missingIds)
+    for (const u of extraUsers ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
+  }
+
+  const atananFrekanslar: AtananFrekanRow[] = tumGorevler
+    .filter((g: any) => g.atanan_kullanici_id)
+    .sort((a: any, b: any) => new Date(b.olusturma_tarihi ?? 0).getTime() - new Date(a.olusturma_tarihi ?? 0).getTime())
+    .map((g: any, i: number) => {
+      const lok = lokMap.get(g.lokasyon_id) as any
+      const tamamlayanId = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? ''
+      return {
+        sn: i + 1,
+        atanan: userMap.get(g.atanan_kullanici_id) ?? '—',
+        tamamlayan: tamamlayanId ? (userMap.get(tamamlayanId) ?? '—') : '—',
+        ustLokasyon: getContextUstLokasyon(g.lokasyon_id),
+        lokasyon: lok?.tanim ?? '—',
+        gorevTanimi: g.tanim ?? '—',
+        gorevDurumu: durumTurkce[g.durum] ?? g.durum ?? '—',
+        atamaTarihi: formatDate(g.olusturma_tarihi),
+        tamamlanmaTarihi: g.tamamlanma_tarihi ? formatDate(g.tamamlanma_tarihi) : '—',
+      }
+    })
+
   // Rapor tarihi etiketi
   let raporTarihLabel = ''
   if (filters.raporBaslangic && filters.raporBitis) {
@@ -659,5 +708,6 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     sapmaGorevler,
     kayipGorevler,
     frekansDisiGorevler,
+    atananFrekanslar,
   }
 }

@@ -26,7 +26,8 @@ type GrupMetrik = {
 type TamamlananRow  = { sn: number; personel: string; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string }
 type SapmaRow       = { sn: number; personel: string; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; sapmaNedeni: string }
 type KayipRow       = { sn: number; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string; kayipNedeni: string }
-type FrekansDisiRow = { sn: number; ustLokasyon: string; grupTanimi: string; lokasyonTanimi: string; personel: string; tarihSaat: string; aciklama: string }
+type FrekansDisiRow  = { sn: number; ustLokasyon: string; grupTanimi: string; lokasyonTanimi: string; personel: string; tarihSaat: string; aciklama: string }
+type AtananFrekanRow = { sn: number; atanan: string; tamamlayan: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gorevDurumu: string; atamaTarihi: string; tamamlanmaTarihi: string }
 
 type RaporData = {
   firmaAdi: string; projeAdi: string; ustLokTanim: string; altLokTanim: string
@@ -38,6 +39,7 @@ type RaporData = {
   sapmaGorevler: SapmaRow[]
   kayipGorevler: KayipRow[]
   frekansDisiGorevler: FrekansDisiRow[]
+  atananFrekanslar: AtananFrekanRow[]
 }
 
 // ── Design tokens (SpesifikRaporKarti ile aynı) ────────────────────
@@ -182,7 +184,7 @@ function DataTable({ headers, rows, accentCol, accentColor, leftCols }: {
   )
 }
 
-const TABS = ['Özet & Grafikler', 'Grup Metrikleri', 'Tamamlanan', 'Sapmalar', 'Kayıp Frekanslar', 'Frekans Dışı'] as const
+const TABS = ['Özet & Grafikler', 'Grup Metrikleri', 'Tamamlanan', 'Sapmalar', 'Kayıp Frekanslar', 'Frekans Dışı', 'Atanan Frekanslar'] as const
 type Tab = typeof TABS[number]
 
 // ── Ana bileşen ────────────────────────────────────────────────────
@@ -687,6 +689,21 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 <DataTable
                   headers={['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH-SAAT', 'AÇIKLAMA']}
                   rows={data.frekansDisiGorevler.map(r => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarihSaat, r.aciklama])}
+                />
+              </div>
+            )}
+
+            {/* ── ATANAN FREKANSLAR ── */}
+            {activeTab === 'Atanan Frekanslar' && (
+              <div className="verde-card" style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Atanan Frekanslar</div>
+                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{data.atananFrekanslar.length} kayıt</span>
+                </div>
+                <DataTable
+                  headers={['SN', 'ATANAN', 'TAMAMLAYAN', 'ÜST LOKASYON', 'LOKASYON', 'GÖREV TANIMI', 'GÖREV DURUMU', 'ATAMA TARİHİ', 'TAMAMLANMA TARİH+SAAT']}
+                  rows={data.atananFrekanslar.map(r => [r.sn, r.atanan, r.tamamlayan, r.ustLokasyon, r.lokasyon, r.gorevTanimi, r.gorevDurumu, r.atamaTarihi, r.tamamlanmaTarihi])}
+                  leftCols={[1, 2, 3, 4, 5]}
                 />
               </div>
             )}
