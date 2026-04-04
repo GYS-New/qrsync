@@ -39,6 +39,7 @@ type AllValues = Record<string, number | boolean>
 const NUM_DEFAULTS: Record<string, number> = {
   gorev_suresi_hedef_orani: 10,
   ardisik_baslatma_suresi_dk: 0,
+  personel_takip_bildirim_dk: 0,
   arsiv_mesai_saat: 24, arsiv_musteri_saat: 24, arsiv_spesifik_saat: 48, arsiv_frekansiyel_saat: 24,
 }
 const BOOL_DEFAULTS: Record<string, boolean> = {
@@ -258,6 +259,34 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
           </div>
         )}
         <OverrideBadge ayarKey="ardisik_baslatma_suresi_dk" />
+      </div>
+
+      {/* Personel Takip Bildirim Süresi */}
+      <div style={{ background: '#fff', border: `1px solid ${overrides.personel_takip_bildirim_dk ? '#c4b5fd' : T.border}`, borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 14, fontWeight: 700, color: T.text, display: 'block', marginBottom: 4 }}>Personel Takip Bildirim Süresi</label>
+          <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.5 }}>
+            Görev başlatıldıktan sonra tamamlanmazsa, belirtilen süre aralıklarında personele bildirim gönderilir.
+            Her aralıkta tekrar bildirim gider (1., 2., 3. bildirim). 0 girilirse bildirim gönderilmez.
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 200 }}>
+            <input type="number" min={0} max={1440} value={efektif.personel_takip_bildirim_dk as number}
+              onChange={e => setEfektif(prev => ({ ...prev, personel_takip_bildirim_dk: Math.max(0, Math.min(1440, Number(e.target.value) || 0)) }))}
+              style={inpStyle} />
+            <span style={{ fontSize: 14, color: T.textSoft, fontWeight: 600, whiteSpace: 'nowrap' }}>dk</span>
+          </div>
+          <SaveBtn id="personel_takip_bildirim_dk" onClick={() => handleSave('personel_takip_bildirim_dk', efektif.personel_takip_bildirim_dk)} />
+        </div>
+        {(efektif.personel_takip_bildirim_dk as number) > 0 && (
+          <div style={{ marginTop: 10, padding: '10px 14px', background: T.grayLight, borderRadius: 8, fontSize: 12.5, color: T.textSoft, lineHeight: 1.6 }}>
+            Görev başlatıldıktan <strong style={{ color: T.green }}>{efektif.personel_takip_bildirim_dk as number} dk</strong> sonra tamamlanmamışsa 1. bildirim,
+            <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 2} dk</strong> sonra 2. bildirim,
+            <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 3} dk</strong> sonra 3. bildirim gönderilir.
+          </div>
+        )}
+        <OverrideBadge ayarKey="personel_takip_bildirim_dk" />
       </div>
 
       {/* Toggle'lar — 2'li grid */}
