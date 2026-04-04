@@ -61,7 +61,7 @@ function KpiCard({ label, value, sub, color, Icon, wide }: {
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 10.5, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
         <div style={{ fontSize: 22, fontWeight: 900, color: T.text, lineHeight: 1 }}>{value}</div>
-        {sub && <div style={{ fontSize: 11, color: T.textSoft, marginTop: 3 }}>{sub}</div>}
+        {sub && <div style={{ fontSize: 12.5, color: T.textSoft, marginTop: 3 }}>{sub}</div>}
       </div>
     </div>
   )
@@ -112,7 +112,7 @@ function VBarChart({ data, valueKey, labelKey, color }: {
           const y = topPad + barAreaH * (1 - r)
           return <g key={r}>
             <line x1={0} y1={y} x2={totalW} y2={y} stroke="#e2e8f0" strokeWidth={0.5} />
-            <text x={2} y={y - 3} fontSize={9} fill={T.textSoft}>{fmtS(Math.round(max * r))}</text>
+            <text x={2} y={y - 3} fontSize={11} fill={T.textSoft}>{fmtS(Math.round(max * r))}</text>
           </g>
         })}
         {data.map((d, i) => {
@@ -120,13 +120,13 @@ function VBarChart({ data, valueKey, labelKey, color }: {
           const bh   = (val / max) * barAreaH
           const x    = gap + i * (barW + gap)
           const y    = topPad + barAreaH - bh
-          const lbl  = String(d[labelKey] ?? '').slice(0, 12)
+          const lbl  = String(d[labelKey] ?? '').slice(0, 14)
           return (
             <g key={i}>
               <rect x={x} y={y} width={barW} height={Math.max(bh, 1)} fill={color} rx={3} opacity={0.88} />
-              <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={10} fontWeight="bold" fill={T.gray}>{fmtS(val)}</text>
-              <text x={x + barW / 2} y={topPad + barAreaH + 12} textAnchor="end" fontSize={10} fill={T.textSoft}
-                transform={`rotate(-38, ${x + barW / 2}, ${topPad + barAreaH + 12})`}>{lbl}</text>
+              <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={12} fontWeight="bold" fill={T.gray}>{fmtS(val)}</text>
+              <text x={x + barW / 2} y={topPad + barAreaH + 14} textAnchor="end" fontSize={12} fill={T.textSoft}
+                transform={`rotate(-38, ${x + barW / 2}, ${topPad + barAreaH + 14})`}>{lbl}</text>
             </g>
           )
         })}
@@ -142,7 +142,7 @@ function LineChart({ data, valueKey, labelKey, color }: {
 }) {
   if (data.length < 2) return <div style={{ color: T.textSoft, fontSize: 13, padding: '16px 0', textAlign: 'center' }}>{data.length === 1 ? 'Tek veri noktası' : 'Veri yok'}</div>
   const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
-  const W = 460, H = 110, padX = 8, padT = 16, padB = 24
+  const W = 560, H = 160, padX = 12, padT = 20, padB = 36
   const plotW = W - padX * 2, plotH = H - padT - padB
   const pts   = data.map((d, i) => {
     const x = padX + (i / (data.length - 1)) * plotW
@@ -162,15 +162,18 @@ function LineChart({ data, valueKey, labelKey, color }: {
         </defs>
         {[0.25, 0.5, 0.75, 1].map(r => {
           const y = padT + plotH * (1 - r)
-          return <line key={r} x1={padX} y1={y} x2={W - padX} y2={y} stroke="#e2e8f0" strokeWidth={0.5} />
+          return <g key={r}>
+            <line x1={padX} y1={y} x2={W - padX} y2={y} stroke="#e2e8f0" strokeWidth={0.5} />
+            <text x={padX - 4} y={y + 4} textAnchor="end" fontSize={10} fill={T.textSoft}>{fmtS(Math.round(max * r))}</text>
+          </g>
         })}
         <path d={areaD} fill={`url(#lg-${color.replace('#','')})`} />
         <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
         {pts.map((p, i) => (
           <g key={i}>
-            <circle cx={p.x} cy={p.y} r={3} fill={color} />
-            {i % Math.max(1, Math.floor(pts.length / 8)) === 0 && (
-              <text x={p.x} y={H - 4} textAnchor="middle" fontSize={7} fill={T.textSoft}>
+            <circle cx={p.x} cy={p.y} r={4} fill={color} />
+            {i % Math.max(1, Math.floor(pts.length / 10)) === 0 && (
+              <text x={p.x} y={H - 6} textAnchor="middle" fontSize={11} fill={T.textSoft}>
                 {p.lbl.slice(5)}
               </text>
             )}
@@ -189,11 +192,11 @@ function DagilimBar({ data, color }: { data: DagilimRow[]; color: string }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {data.map((d, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: T.textSoft, width: 70, flexShrink: 0, textAlign: 'right' }}>{d.aralik}</span>
+          <span style={{ fontSize: 13, color: T.textSoft, width: 76, flexShrink: 0, textAlign: 'right' }}>{d.aralik}</span>
           <div style={{ flex: 1, height: 16, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${(d.adet / max) * 100}%`, background: color, borderRadius: 3, transition: 'width .5s ease', minWidth: d.adet > 0 ? 4 : 0 }} />
           </div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: T.text, width: 28, textAlign: 'right' }}>{d.adet}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: T.text, width: 32, textAlign: 'right' }}>{d.adet}</span>
         </div>
       ))}
     </div>
@@ -212,8 +215,8 @@ function PercentileCard({ analiz }: { analiz: Analiz }) {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
       {items.map(({ label, val, color }) => (
         <div key={label} style={{ padding: '10px 12px', background: color + '10', border: `1px solid ${color}30`, borderRadius: 8, borderLeft: `3px solid ${color}` }}>
-          <div style={{ fontSize: 10.5, color, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{label}</div>
-          <div style={{ fontSize: 18, fontWeight: 900, color: T.text, marginTop: 2 }}>{fmtS(val)}</div>
+          <div style={{ fontSize: 12, color, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{label}</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: T.text, marginTop: 4 }}>{fmtS(val)}</div>
         </div>
       ))}
     </div>
