@@ -4,6 +4,7 @@ import GorevlerClient from '@/components/gorev/GorevlerClient'
 import { redirect } from 'next/navigation'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,7 @@ export default async function TAGorevlerPage() {
   )
 
   const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }] = await Promise.all([
+  const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
     supabase
       .from('gorevler')
       .select('*,lokasyonlar(id,tanim,parent_id),users!atanan_kullanici_id(isim_soyisim)')
@@ -47,6 +48,7 @@ export default async function TAGorevlerPage() {
       .eq('aktif', true)
       .eq('proje_id', aktifProje.id)
       .order('isim_soyisim'),
+    getEfektifAyar(firmaId!, aktifProje.id),
   ])
 
   return (
@@ -61,6 +63,8 @@ export default async function TAGorevlerPage() {
         initialLokasyonlar={(lokasyonlar as any) ?? []}
         initialKullanicilar={(kullanicilar as any) ?? []}
         projeId={aktifProje.id}
+        personelAtamaAktif={ayarlar.spesifik_personel_atama_aktif}
+        ceklistAktif={ayarlar.spesifik_ceklist_aktif}
       />
     </div>
   )

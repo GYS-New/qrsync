@@ -3,6 +3,7 @@ import Topbar from '@/components/layout/Topbar'
 import GorevlerClient from '@/components/gorev/GorevlerClient'
 import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
+import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,6 +53,8 @@ export default async function UGorevlerPage() {
     .eq('aktif', true)
     .order('isim_soyisim')
 
+  const ayarlar = await getEfektifAyar(firmaId!, projeId)
+
   return (
     <div>
       <Topbar title="Spesifik Görevler" base="/u" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Spesifik Görevler' }]} />
@@ -64,6 +67,8 @@ export default async function UGorevlerPage() {
         initialLokasyonlar={(lokasyonlar as any) ?? []}
         initialKullanicilar={(kullanicilar as any) ?? []}
         projeId={projeId ?? null}
+        personelAtamaAktif={ayarlar.spesifik_personel_atama_aktif}
+        ceklistAktif={ayarlar.spesifik_ceklist_aktif}
       />
     </div>
   )

@@ -21,6 +21,7 @@ type Props = {
   readonly: boolean
   embedded?: boolean
   projeId?: string | null
+  personelAtamaAktif?: boolean
 }
 
 const BOSH_FORM = {
@@ -39,7 +40,7 @@ const stepBtn: React.CSSProperties = {
 }
 
 export default function GorevKurallariClient({
-  base, firmaId, meId, initialKuralar, lokasyonlar, kullanicilar, readonly, embedded = false, projeId
+  base, firmaId, meId, initialKuralar, lokasyonlar, kullanicilar, readonly, embedded = false, projeId, personelAtamaAktif = true
 }: Props) {
   const { confirm } = useConfirm()
   const { toast }   = useToast()
@@ -509,6 +510,7 @@ export default function GorevKurallariClient({
                   <input type="date" className="verde-input" style={{ width: '100%' }} value={form.bitis_tarihi} onChange={e => setForm(p => ({ ...p, bitis_tarihi: e.target.value }))} />
                 </div>
               </div>
+              {personelAtamaAktif && (
               <div>
                 <label style={lbl}>Atanan <span style={{ fontSize: 11, color: '#7a907a' }}>(opsiyonel)</span></label>
                 <select className="verde-select" style={{ width: '100%' }} value={form.atanan_kullanici_id} onChange={e => setForm(p => ({ ...p, atanan_kullanici_id: e.target.value }))}>
@@ -516,6 +518,7 @@ export default function GorevKurallariClient({
                   {kullanicilar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
                 </select>
               </div>
+              )}
               {form.lokasyon_id && form.aktif_gunler.length > 0 && (
                 <div style={{ background: '#f0f9f0', border: '1px solid #c8e6c8', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#2a4a2a' }}>
                   <strong>Özet:</strong> {gunEtiket(form.aktif_gunler)}, saat {form.aktif_olma_saati}'de, günde <strong>{form.gunluk_frekans_sayisi}×</strong> "{form.tanim || '…'}" görevi üretilir.

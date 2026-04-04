@@ -3,6 +3,7 @@ import Topbar from '@/components/layout/Topbar'
 import TumGorevlerClient from '@/components/canli/TumGorevlerClient'
 import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
+import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,6 +71,7 @@ export default async function UTumGorevlerPage() {
   let kulQ = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true)
   if (projeId) kulQ = (kulQ as any).eq('proje_id', projeId)
   const { data: kullanicilar } = await kulQ.order('isim_soyisim')
+  const ayarlar = await getEfektifAyar(firmaId, projeId)
 
   return (
     <div>
@@ -83,6 +85,7 @@ export default async function UTumGorevlerPage() {
         lokasyonlar={(lokasyonlar as any) ?? []}
         kullanicilar={(kullanicilar as any) ?? []}
         initialGorevler={(gorevler as any) ?? []}
+        personelAtamaAktif={ayarlar.frekansiyel_personel_atama_aktif}
       />
     </div>
   )

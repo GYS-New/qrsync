@@ -30,6 +30,7 @@ const SEL = '*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!
 
 export default function GorevlerClient({
   base, meId, readonly, initialFirmaId, initialGorevler, initialLokasyonlar, initialKullanicilar, projeId,
+  personelAtamaAktif = true, ceklistAktif = true,
 }: {
   base: '/sa' | '/ta' | '/u'
   meId: string
@@ -39,6 +40,8 @@ export default function GorevlerClient({
   initialLokasyonlar: Pick<Lokasyon, 'id' | 'tanim' | 'aktif' | 'parent_id'>[]
   initialKullanicilar: Pick<User, 'id' | 'isim_soyisim' | 'aktif'>[]
   projeId?: string | null
+  personelAtamaAktif?: boolean
+  ceklistAktif?: boolean
 }) {
   const supabase = createClient()
   const { toast } = useToast()
@@ -266,8 +269,8 @@ export default function GorevlerClient({
 
   async function save() {
     if (!firmaId) { setError('Firma seçilmedi'); return }
-    if (!form.tanim.trim() || !loc1 || !form.atanan_kullanici_id) {
-      showError('Tanım, lokasyon ve kullanıcı zorunludur.'); return
+    if (!form.tanim.trim() || !loc1 || (personelAtamaAktif && !form.atanan_kullanici_id)) {
+      showError(personelAtamaAktif ? 'Tanım, lokasyon ve kullanıcı zorunludur.' : 'Tanım ve lokasyon zorunludur.'); return
     }
     setLoading(true); setError('')
     if (editing) {
@@ -510,8 +513,8 @@ export default function GorevlerClient({
                       {canManage && (
                         <td style={{ whiteSpace: 'nowrap', paddingRight: 8 }}>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-end' }}>
-                            {/* Çeklist butonu — sadece çeklist bağlı görevlerde */}
-                            {g.lokasyonlar?.checklist_sablon_id && (
+                            {/* Çeklist butonu — sadece çeklist bağlı görevlerde ve ayar aktifse */}
+                            {ceklistAktif && g.lokasyonlar?.checklist_sablon_id && (
                               <button onClick={() => setChecklistGorev({ id: g.id, type: 'gorevler' })}
                                 style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                 📋
@@ -589,6 +592,7 @@ export default function GorevlerClient({
                     </select>
                   </div>
                 </div>
+                {personelAtamaAktif && (
                 <div>
                   <label className="verde-label">Atanan Kullanıcı *</label>
                   <select className="verde-input" value={form.atanan_kullanici_id} onChange={e => setForm(f => ({ ...f, atanan_kullanici_id: e.target.value }))}>
@@ -596,6 +600,7 @@ export default function GorevlerClient({
                     {kullanicilar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
                   </select>
                 </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <Button variant="primary" onClick={save} disabled={loading}>{loading ? 'Kaydediliyor…' : '✓ Kaydet'}</Button>

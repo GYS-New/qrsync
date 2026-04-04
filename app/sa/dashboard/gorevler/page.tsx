@@ -4,6 +4,7 @@ import GorevlerClient from '@/components/gorev/GorevlerClient'
 import { redirect } from 'next/navigation'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,12 +30,13 @@ export default async function SAGorevlerPage() {
     : null
   if (lokQ && projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
 
-  const [gorevlerRes, lokasyonlarRes, kullanicilarRes] = await Promise.all([
+  const [gorevlerRes, lokasyonlarRes, kullanicilarRes, ayarlar] = await Promise.all([
     gorevQ ?? Promise.resolve({ data: [] as any[] }),
     lokQ ?? Promise.resolve({ data: [] as any[] }),
     firmaId
       ? supabase.from('users').select('id,isim_soyisim,aktif').eq('firma_id', firmaId).eq('aktif', true).eq('proje_id', projeId).order('isim_soyisim')
       : Promise.resolve({ data: [] as any[] }),
+    firmaId ? getEfektifAyar(firmaId, projeId) : Promise.resolve({ spesifik_personel_atama_aktif: true, spesifik_ceklist_aktif: true } as any),
   ])
 
   return (
@@ -49,6 +51,8 @@ export default async function SAGorevlerPage() {
         initialGorevler={(gorevlerRes.data as any) ?? []}
         initialLokasyonlar={(lokasyonlarRes.data as any) ?? []}
         initialKullanicilar={(kullanicilarRes.data as any) ?? []}
+        personelAtamaAktif={ayarlar.spesifik_personel_atama_aktif}
+        ceklistAktif={ayarlar.spesifik_ceklist_aktif}
       />
     </div>
   )

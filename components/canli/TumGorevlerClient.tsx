@@ -58,6 +58,7 @@ export default function TumGorevlerClient({
   kullanicilar,
   initialGorevler,
   projeId,
+  personelAtamaAktif = true,
 }: {
   base: '/sa' | '/ta' | '/u'
   firmaId: string
@@ -67,6 +68,7 @@ export default function TumGorevlerClient({
   kullanicilar: { id: string; isim_soyisim: string }[]
   initialGorevler: any[]
   projeId?: string | null
+  personelAtamaAktif?: boolean
 }) {
   const isTA = base === '/ta'
   const isU = base === '/u'
@@ -876,6 +878,7 @@ async function del() {
           readonly={readonly}
           embedded={true}
           projeId={projeId}
+          personelAtamaAktif={personelAtamaAktif}
         />
       )}
 
@@ -1339,6 +1342,7 @@ async function del() {
                 </div>
               </div>
 
+              {personelAtamaAktif && (
               <div>
                 <div style={{ fontSize: 13, color: '#506050', marginBottom: 6 }}>Atanan</div>
                 <select
@@ -1354,6 +1358,7 @@ async function del() {
                   ))}
                 </select>
               </div>
+              )}
 
 
               <div style={{ gridColumn: '1 / -1' }}>

@@ -4,6 +4,7 @@ import TumGorevlerClient from '@/components/canli/TumGorevlerClient'
 import { redirect } from 'next/navigation'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,7 @@ export default async function TATumGorevlerPage() {
 
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }] = await Promise.all([
+  const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
     supabase
       .from('canli_gorevler')
       .select(sel)
@@ -43,6 +44,7 @@ export default async function TATumGorevlerPage() {
       .eq('aktif', true)
       .order('tanim'),
     (() => { let q = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true); q = (q as any).eq('proje_id', aktifProje.id); return q.order('isim_soyisim') })(),
+    getEfektifAyar(firmaId, aktifProje.id),
   ])
 
   return (
@@ -61,6 +63,7 @@ export default async function TATumGorevlerPage() {
         kullanicilar={(kullanicilar as any) ?? []}
         initialGorevler={(gorevler as any) ?? []}
         projeId={aktifProje.id}
+        personelAtamaAktif={ayarlar.frekansiyel_personel_atama_aktif}
       />
     </div>
   )

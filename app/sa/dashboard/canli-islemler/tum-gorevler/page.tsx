@@ -4,6 +4,7 @@ import TumGorevlerClient from '@/components/canli/TumGorevlerClient'
 import { redirect } from 'next/navigation'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,10 +50,11 @@ export default async function SATumGorevlerPage() {
     .order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
 
-  const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }] = await Promise.all([
+  const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
     gorevQ,
     lokQ,
     (() => { let q = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true); if (projeId) q = (q as any).eq('proje_id', projeId); return q.order('isim_soyisim') })(),
+    getEfektifAyar(firmaId, projeId),
   ])
 
   return (
@@ -67,6 +69,7 @@ export default async function SATumGorevlerPage() {
         lokasyonlar={(lokasyonlar as any) ?? []}
         kullanicilar={(kullanicilar as any) ?? []}
         initialGorevler={(gorevler as any) ?? []}
+        personelAtamaAktif={ayarlar.frekansiyel_personel_atama_aktif}
       />
     </div>
   )
