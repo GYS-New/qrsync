@@ -1,38 +1,21 @@
 /**
  * GET /api/reports/genel-rapor-export
- * Genel Rapor şablonunu (Genel_Rapor_Sablonu.xlsx) import edip
- * verilerle doldurup Excel olarak döndürür.
+ * Genel Rapor şablonunu JSZip ile açıp verileri doldurup döndürür.
+ * Grafikler, çizimler, stiller birebir korunur.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { buildGenelRaporData } from '@/lib/reports/genel-rapor-data'
-import ExcelJS from 'exceljs'
-import path from 'path'
+import { fillXlsxTemplate, type SheetData, type CellData } from '@/lib/reports/xlsx-template-filler'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-function fmtSure(sn: number | null | undefined): string {
-  if (!sn || sn <= 0) return '—'
-  const h = Math.floor(sn / 3600), m = Math.floor((sn % 3600) / 60)
-  if (h > 0) return `${h}s ${m}dk`
-  if (m > 0) return `${m}dk`
-  return `${sn % 60}sn`
-}
-
-/**
- * Şablondaki referans satırının stilini yeni satıra kopyalar.
- * Satır yoksa oluşturur, varsa stil'i override eder.
- */
-function ensureStyledRow(ws: ExcelJS.Worksheet, targetRow: number, templateRow: number, colCount: number) {
-  const srcRow = ws.getRow(templateRow)
-  const dstRow = ws.getRow(targetRow)
-  dstRow.height = srcRow.height
-  for (let c = 1; c <= colCount; c++) {
-    const srcCell = srcRow.getCell(c)
-    const dstCell = dstRow.getCell(c)
-    if (srcCell.style) dstCell.style = JSON.parse(JSON.stringify(srcCell.style))
-  }
+// Sütun harfi → sayı: A=1, B=2, ..., Z=26, AA=27
+function cn(col: string): number {
+  let n = 0
+  for (let i = 0; i < col.length; i++) n = n * 26 + (col.charCodeAt(i) - 64)
+  return n
 }
 
 export async function GET(req: NextRequest) {
@@ -54,336 +37,317 @@ export async function GET(req: NextRequest) {
 
   if (!firmaId) return NextResponse.json({ error: 'Firma ID gerekli' }, { status: 400 })
 
+  const admin = createAdminClient()
+
   // ── 1. Rapor verisini topla ───────────────────────────────────────────
   const data = await buildGenelRaporData({
-    firmaId,
-    projeId,
-    ustLokasyonId: ustLokId,
-    altLokasyonId: altLokId,
-    raporBaslangic: baslangic,
-    raporBitis: bitis,
+    firmaId, projeId, ustLokasyonId: ustLokId, altLokasyonId: altLokId,
+    raporBaslangic: baslangic, raporBitis: bitis,
     raporuAlan: me.isim_soyisim ?? 'Yönetim',
   })
 
-  // ── 2. Hakediş verisi ─────────────────────────────────────────────────
-  const admin = createAdminClient()
-  let hakedisRows: any[] = []
-  if (projeId) {
-    const [lokRes, fiyatRes, grupRes] = await Promise.all([
-      admin.from('lokasyonlar').select('id,tanim,parent_id').eq('firma_id', firmaId).eq('proje_id', projeId),
-      admin.from('birim_fiyatlar').select('lokasyon_id,grup_id,fiyat,para_birimi').eq('proje_id', projeId),
-      admin.from('lokasyon_gruplari').select('id,ad').eq('proje_id', projeId).eq('firma_id', firmaId),
-    ])
-    const loks = lokRes.data ?? []
-    const fiyatlar = fiyatRes.data ?? []
-    const gruplar = grupRes.data ?? []
-    const grupIds = gruplar.map((g: any) => g.id)
-    const { data: grupUyeleri } = grupIds.length > 0
-      ? await admin.from('lokasyon_grup_uyeleri').select('grup_id,lokasyon_id').in('grup_id', grupIds)
-      : { data: [] }
-
-    const grupMap = new Map(gruplar.map((g: any) => [g.id, g.ad]))
-    const lokGrupMap = new Map<string, string>()
-    for (const u of grupUyeleri ?? []) {
-      lokGrupMap.set(u.lokasyon_id, u.grup_id)
-    }
-
-    // grup frekans göstergeleri verisinden hakediş hesapla
-    for (const gm of data.grupMetrikleri) {
-      // Gruba ait birim fiyatı bul
-      const grupId = Array.from(grupMap.entries()).find(([, ad]) => ad === gm.grup)?.[0]
-      let birimFiyat = 0
-      if (grupId) {
-        const gf = fiyatlar.find((f: any) => f.grup_id === grupId && f.fiyat > 0)
-        if (gf) birimFiyat = gf.fiyat
-      }
-      const toplamHakedis = gm.hedef * birimFiyat
-      const kayipHakedis = gm.kayip * birimFiyat
-      const fazlaHakedis = 0 // frekans fazlası hakediş hesabı
-      hakedisRows.push({
-        grup: gm.grup,
-        hedefFrekans: gm.hedef,
-        birimFiyat,
-        toplamHakedis,
-        kayipFrekans: gm.kayip,
-        kayipHakedis,
-        frekFazlasi: 0,
-        gerceklesenHakedis: toplamHakedis - kayipHakedis + fazlaHakedis,
-      })
-    }
+  // ── 2. Proje adı ─────────────────────────────────────────────────────
+  let projeAdi = data.projeAdi
+  if (!projeAdi && projeId) {
+    const { data: prj } = await admin.from('projeler').select('ad').eq('id', projeId).single()
+    projeAdi = prj?.ad ?? ''
   }
 
-  // ── 3. Süre analizi ───────────────────────────────────────────────────
-  // Hedef süre ve tamamlanan süre map'i
-  let lokHedefMap = new Map<string, number>()
-  if (firmaId) {
-    let lq = admin.from('lokasyonlar').select('id,hedef_sure_dakika').eq('firma_id', firmaId)
-    if (projeId) lq = (lq as any).eq('proje_id', projeId)
-    const { data: loks } = await lq
-    for (const l of loks ?? []) {
-      if ((l as any).hedef_sure_dakika) lokHedefMap.set(l.id, (l as any).hedef_sure_dakika * 60)
-    }
+  // ── 3. Lokasyon hedef süreleri + günlük frekans sayıları ──────────────
+  let lokQ = admin.from('lokasyonlar').select('id,hedef_sure_dakika,gunluk_frekans_sayisi').eq('firma_id', firmaId)
+  if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+  const { data: lokSureList } = await lokQ
+  const lokHedefMap = new Map<string, number>()
+  const lokFrekansMap = new Map<string, number>()
+  for (const l of lokSureList ?? []) {
+    if ((l as any).hedef_sure_dakika) lokHedefMap.set(l.id, (l as any).hedef_sure_dakika)
+    lokFrekansMap.set(l.id, (l as any).gunluk_frekans_sayisi ?? 1)
   }
 
-  // ── 4. Şablonu aç ve doldur ──────────────────────────────────────────
-  // Önce Storage'dan oku, yoksa local fallback
-  const wb = new ExcelJS.Workbook()
-  const storagePath = 'Genel_Rapor_Sablonu.xlsx'
-  const { data: storageFile } = await admin.storage.from('templates').download(storagePath)
-  if (storageFile) {
-    const arrBuf = await storageFile.arrayBuffer()
-    await wb.xlsx.load(Buffer.from(arrBuf) as any)
-  } else {
-    const localPath = path.join(process.cwd(), 'public', 'templates', 'Genel_Rapor_Sablonu.xlsx')
-    await wb.xlsx.readFile(localPath)
-  }
-
-  // ── Süre verileri hazırla (detay sayfalarında da kullanılacak) ────────
-  // Tüm görevlerin süre bilgisini topla (buildGenelRaporData'daki tumGorevler'den)
-  // gorevNo → { hedefSureDk, tamamlananSureSn, lokasyonId } map
-  // Görevlerin tam listesini tekrar çekelim (süre bilgisi için)
-  const SEL_SURE = 'id,lokasyon_id,tamamlanma_suresi_saniye,durum'
-  let sureLiveQ = admin.from('canli_gorevler').select(SEL_SURE).eq('firma_id', firmaId)
-  let sureArsivQ = admin.from('canli_gorevler_arsiv').select(SEL_SURE).eq('firma_id', firmaId)
+  // ── 4. Görev süre verileri ────────────────────────────────────────────
+  const SEL_SURE = 'id,lokasyon_id,tamamlanma_suresi_saniye'
+  let sureLiveQ = admin.from('canli_gorevler').select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI')
+  let sureArsivQ = admin.from('canli_gorevler_arsiv').select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI')
   if (projeId) { sureLiveQ = (sureLiveQ as any).eq('proje_id', projeId); sureArsivQ = (sureArsivQ as any).eq('proje_id', projeId) }
   if (baslangic) { sureLiveQ = sureLiveQ.gte('aktif_olma_tarihi', baslangic); sureArsivQ = sureArsivQ.gte('aktif_olma_tarihi', baslangic) }
   if (bitis) { sureLiveQ = sureLiveQ.lte('aktif_olma_tarihi', bitis + 'T23:59:59'); sureArsivQ = sureArsivQ.lte('aktif_olma_tarihi', bitis + 'T23:59:59') }
   const [{ data: sureLive }, { data: sureArsiv }] = await Promise.all([sureLiveQ, sureArsivQ])
-  const sureMap = new Map<string, number>() // gorev_id → tamamlanma_suresi_saniye
-  const gorevLokMap = new Map<string, string>() // gorev_id → lokasyon_id
+
+  const sureMap = new Map<string, number>()
+  const gorevLokMap2 = new Map<string, string>()
   for (const g of [...(sureLive ?? []), ...(sureArsiv ?? [])]) {
     if (g.tamamlanma_suresi_saniye) {
       sureMap.set(g.id, g.tamamlanma_suresi_saniye)
-      sureMap.set(g.id.slice(-8).toUpperCase(), g.tamamlanma_suresi_saniye) // gorevNo ile de eşle
+      sureMap.set(g.id.slice(-8).toUpperCase(), g.tamamlanma_suresi_saniye)
     }
     if (g.lokasyon_id) {
-      gorevLokMap.set(g.id, g.lokasyon_id)
-      gorevLokMap.set(g.id.slice(-8).toUpperCase(), g.lokasyon_id)
+      gorevLokMap2.set(g.id, g.lokasyon_id)
+      gorevLokMap2.set(g.id.slice(-8).toUpperCase(), g.lokasyon_id)
     }
   }
 
-  // Süre analizi toplam hesabı
-  let toplamHedefSureSn = 0, toplamGercekSureSn = 0
+  // Süre toplam
+  let toplamHedefDk = 0, toplamGercekDk = 0
   for (const [gId, sureSn] of sureMap) {
-    toplamGercekSureSn += sureSn
-    const lokId = gorevLokMap.get(gId)
-    if (lokId && lokHedefMap.has(lokId)) toplamHedefSureSn += lokHedefMap.get(lokId)!
+    if (gId.length <= 8) continue // short key duplicate'ı atla
+    toplamGercekDk += Math.round(sureSn / 60)
+    const lokId = gorevLokMap2.get(gId)
+    if (lokId && lokHedefMap.has(lokId)) toplamHedefDk += lokHedefMap.get(lokId)!
   }
 
-  // ── SAYFA: Giriş ─────────────────────────────────────────────────────
-  const wsGiris = wb.getWorksheet('Giriş')
-  if (wsGiris) {
-    // Parametreler (E sütunu = merged cell değerleri)
-    wsGiris.getCell('E2').value = data.firmaAdi
-    wsGiris.getCell('E3').value = data.projeAdi
-    wsGiris.getCell('E4').value = data.ustLokTanim || 'Tümü'
-    wsGiris.getCell('E5').value = data.altLokTanim || 'Tümü'
-    wsGiris.getCell('E6').value = data.raporTarihLabel
-    wsGiris.getCell('E7').value = data.gunSayisi
-    wsGiris.getCell('E8').value = data.raporuAlan
-
-    // ── Frekans Göstergeleri (grafik chart1 bağlı: T12:T17=etiket, U12:U17=değer) ──
-    wsGiris.getCell('U12').value = data.toplamGorev
-    wsGiris.getCell('U13').value = data.toplamTamamlanan
-    wsGiris.getCell('U14').value = data.toplamTamamlanan + data.toplamSapma // gerçekleşen
-    const fazla = data.grupMetrikleri.reduce((s, g) => {
-      const f = g.tamamlanan + g.sapma - g.hedef
-      return s + (f > 0 ? f : 0)
-    }, 0)
-    wsGiris.getCell('U15').value = fazla
-    wsGiris.getCell('U16').value = data.toplamSapma
-    wsGiris.getCell('U17').value = data.toplamKayip
-    // Başarı ortalaması (satır 18 — grafik dışı)
-    wsGiris.getCell('U18').value = data.toplamGorev > 0 ? data.genelBasari / 100 : 0
-
-    // ── Frekans Sapmaları (grafik chart2 bağlı: T21:T22=etiket, U21:U22=değer) ──
-    wsGiris.getCell('U21').value = data.toplamGorev
-    wsGiris.getCell('U22').value = data.toplamSapma
-    wsGiris.getCell('U23').value = data.toplamGorev > 0 ? data.toplamSapma / data.toplamGorev : 0
-
-    // ── Kayıp Frekans Göstergeleri (grafik chart3 bağlı: T26:T27=etiket, U26:U27=değer) ──
-    wsGiris.getCell('U26').value = data.toplamGorev
-    wsGiris.getCell('U27').value = data.toplamKayip
-    wsGiris.getCell('U28').value = data.toplamGorev > 0 ? data.toplamKayip / data.toplamGorev : 0
-
-    // ── Süre Analizi (grafik chart4+5 bağlı: W26:W28=etiket, X26:X28=değer) ──
-    wsGiris.getCell('X26').value = Math.round(toplamHedefSureSn / 60) // toplam hedef süre (dk)
-    wsGiris.getCell('X27').value = Math.round(toplamGercekSureSn / 60) // gerçekleşen toplam süre (dk)
-    wsGiris.getCell('X28').value = Math.round((toplamGercekSureSn - toplamHedefSureSn) / 60) // toplam sapma (dk)
-
-    // ── Grup Frekans Göstergeleri tablosu (B-I sütunları, satır 12'den) ──
-    const grupStartRow = 12
-    for (let i = 0; i < data.grupMetrikleri.length; i++) {
-      const gm = data.grupMetrikleri[i]
-      const r = grupStartRow + i
-      wsGiris.getCell(`B${r}`).value = gm.grup
-      wsGiris.getCell(`C${r}`).value = gm.hedef
-      wsGiris.getCell(`D${r}`).value = gm.tamamlanan
-      wsGiris.getCell(`E${r}`).value = gm.hedef > 0 ? gm.tamamlanan / gm.hedef : 0
-      wsGiris.getCell(`F${r}`).value = gm.sapma
-      wsGiris.getCell(`G${r}`).value = gm.kayip
-      const gFazla = gm.tamamlanan + gm.sapma - gm.hedef
-      wsGiris.getCell(`H${r}`).value = gFazla > 0 ? gFazla : 0
-      wsGiris.getCell(`I${r}`).value = gm.hedef > 0 ? (gm.tamamlanan + gm.sapma) / gm.hedef : 0
+  // ── 5. Hakediş verileri ───────────────────────────────────────────────
+  let hakedisRows: { grup: string; hedef: number; birimFiyat: number; toplam: number; kayipF: number; kayipH: number; fazla: number; gerceklesen: number }[] = []
+  if (projeId) {
+    const [fiyatRes, grupRes] = await Promise.all([
+      admin.from('birim_fiyatlar').select('lokasyon_id,grup_id,fiyat').eq('proje_id', projeId),
+      admin.from('lokasyon_gruplari').select('id,ad').eq('proje_id', projeId).eq('firma_id', firmaId),
+    ])
+    const grupMap = new Map((grupRes.data ?? []).map((g: any) => [g.id, g.ad]))
+    const grupFiyat = new Map<string, number>()
+    for (const f of fiyatRes.data ?? []) {
+      if (f.grup_id && f.fiyat > 0) grupFiyat.set(f.grup_id, f.fiyat)
     }
-
-    // ── Hakediş Faktörleri tablosu (K-R sütunları, satır 12'den) ──
-    for (let i = 0; i < hakedisRows.length; i++) {
-      const h = hakedisRows[i]
-      const r = grupStartRow + i
-      wsGiris.getCell(`K${r}`).value = h.grup
-      wsGiris.getCell(`L${r}`).value = h.hedefFrekans
-      wsGiris.getCell(`M${r}`).value = h.birimFiyat
-      wsGiris.getCell(`N${r}`).value = h.toplamHakedis
-      wsGiris.getCell(`O${r}`).value = h.kayipFrekans
-      wsGiris.getCell(`P${r}`).value = h.kayipHakedis
-      wsGiris.getCell(`Q${r}`).value = h.frekFazlasi
-      wsGiris.getCell(`R${r}`).value = h.gerceklesenHakedis
+    // Grup metrikleri üzerinden hakediş
+    const grupBirlesik = new Map<string, { hedef: number; kayip: number; fazla: number }>()
+    for (const gm of data.grupMetrikleri) {
+      const m = grupBirlesik.get(gm.grup) ?? { hedef: 0, kayip: 0, fazla: 0 }
+      m.hedef += gm.hedef; m.kayip += gm.kayip
+      const f = gm.tamamlanan + gm.sapma - gm.hedef
+      m.fazla += f > 0 ? f : 0
+      grupBirlesik.set(gm.grup, m)
+    }
+    for (const [grupAd, m] of grupBirlesik) {
+      const grupId = Array.from(grupMap.entries()).find(([, ad]) => ad === grupAd)?.[0]
+      const birimFiyat = grupId ? (grupFiyat.get(grupId) ?? 0) : 0
+      const toplam = m.hedef * birimFiyat
+      const kayipH = m.kayip * birimFiyat
+      hakedisRows.push({
+        grup: grupAd, hedef: m.hedef, birimFiyat, toplam,
+        kayipF: m.kayip, kayipH, fazla: m.fazla,
+        gerceklesen: toplam - kayipH,
+      })
     }
   }
 
-  // ── SAYFA: Tamamlanan Frekanslar ──────────────────────────────────────
-  const wsTam = wb.getWorksheet('Tamamlanan Frekanslar')
-  if (wsTam) {
-    wsTam.getCell('C3').value = data.tamamlananGorevler.length
-    const TEMPLATE_ROW_TAM = 4 // İlk veri satırı (stil referansı)
-    const COL_COUNT_TAM = 10
-
-    for (let i = 0; i < data.tamamlananGorevler.length; i++) {
-      const g = data.tamamlananGorevler[i]
-      const r = 4 + i
-      ensureStyledRow(wsTam, r, TEMPLATE_ROW_TAM, COL_COUNT_TAM)
-      wsTam.getCell(`A${r}`).value = i + 1
-      wsTam.getCell(`B${r}`).value = g.personel
-      wsTam.getCell(`C${r}`).value = g.ustLokasyon
-      wsTam.getCell(`D${r}`).value = g.lokasyon
-      wsTam.getCell(`E${r}`).value = g.gorevNo
-      wsTam.getCell(`F${r}`).value = g.gorevTanimi
-      // Hedef süre (lokasyon bazlı, dakika) ve tamamlanan süre (görev bazlı, dakika)
-      const tamLokId = gorevLokMap.get(g.gorevNo) ?? ''
-      const tamHedefSn = tamLokId ? (lokHedefMap.get(tamLokId) ?? 0) : 0
-      const tamGercekSn = sureMap.get(g.gorevNo) ?? 0
-      wsTam.getCell(`G${r}`).value = tamHedefSn > 0 ? Math.round(tamHedefSn / 60) : ''
-      wsTam.getCell(`H${r}`).value = tamGercekSn > 0 ? Math.round(tamGercekSn / 60) : ''
-      wsTam.getCell(`I${r}`).value = g.tarihSaat
-      wsTam.getCell(`J${r}`).value = g.durum
+  // ── 6. Grup metrikleri birleştirme (üst lokasyon seçildiğinde) ────────
+  // Aynı isimli grupları birleştir
+  const birlesikGruplar = new Map<string, typeof data.grupMetrikleri[0]>()
+  for (const gm of data.grupMetrikleri) {
+    const m = birlesikGruplar.get(gm.grup)
+    if (!m) {
+      birlesikGruplar.set(gm.grup, { ...gm })
+    } else {
+      m.hedef += gm.hedef; m.tamamlanan += gm.tamamlanan; m.sapma += gm.sapma
+      m.kayip += gm.kayip; m.gunlukFrekans += gm.gunlukFrekans
+      m.basariOrani = `%${m.hedef > 0 ? Math.round(m.tamamlanan / m.hedef * 100) : 0}`
+      m.genelOran = `%${m.hedef > 0 ? Math.round((m.tamamlanan + m.sapma) / m.hedef * 100) : 0}`
     }
   }
+  const mergedGruplar = Array.from(birlesikGruplar.values())
 
-  // ── SAYFA: Sapmalar ───────────────────────────────────────────────────
-  const wsSapma = wb.getWorksheet('Sapmalar')
-  if (wsSapma) {
-    wsSapma.getCell('C3').value = data.sapmaGorevler.length
-    const TEMPLATE_ROW_SAP = 4
-    const COL_COUNT_SAP = 10
+  // ── 7. Frekans fazlası hesabı ─────────────────────────────────────────
+  const fazlaTop = mergedGruplar.reduce((s, g) => {
+    const f = g.tamamlanan + g.sapma - g.hedef
+    return s + (f > 0 ? f : 0)
+  }, 0)
 
-    for (let i = 0; i < data.sapmaGorevler.length; i++) {
-      const g = data.sapmaGorevler[i]
-      const r = 4 + i
-      ensureStyledRow(wsSapma, r, TEMPLATE_ROW_SAP, COL_COUNT_SAP)
-      wsSapma.getCell(`A${r}`).value = i + 1
-      wsSapma.getCell(`B${r}`).value = g.personel
-      wsSapma.getCell(`C${r}`).value = g.ustLokasyon
-      wsSapma.getCell(`D${r}`).value = g.lokasyon
-      wsSapma.getCell(`E${r}`).value = g.gorevNo
-      wsSapma.getCell(`F${r}`).value = g.gorevTanimi
-      const sapLokId = gorevLokMap.get(g.gorevNo) ?? ''
-      const sapHedefSn = sapLokId ? (lokHedefMap.get(sapLokId) ?? 0) : 0
-      const sapGercekSn = sureMap.get(g.gorevNo) ?? 0
-      wsSapma.getCell(`G${r}`).value = sapHedefSn > 0 ? Math.round(sapHedefSn / 60) : ''
-      wsSapma.getCell(`H${r}`).value = sapGercekSn > 0 ? Math.round(sapGercekSn / 60) : ''
-      wsSapma.getCell(`I${r}`).value = g.tarihSaat
-      wsSapma.getCell(`J${r}`).value = g.sapmaNedeni
-    }
+  // ═══ ŞABLON DOLDURMA ═══════════════════════════════════════════════════
+  const sheets: SheetData[] = []
+
+  // ── GİRİŞ SAYFASI ─────────────────────────────────────────────────────
+  const girisC: CellData[] = []
+  const c = (col: string, row: number, value: CellData['value']) => girisC.push({ col: cn(col), row, value })
+
+  // Parametreler (E sütunu — merged cell sol üstü)
+  c('E', 2, data.firmaAdi)
+  c('E', 3, projeAdi)
+  c('E', 4, data.ustLokTanim || 'Tümü')
+  c('E', 5, data.altLokTanim || 'Tümü')
+  c('E', 6, data.raporTarihLabel)
+  c('E', 7, data.gunSayisi)
+  c('E', 8, data.raporuAlan)
+
+  // Grup Frekans Göstergeleri (B-I, satır 12'den)
+  for (let i = 0; i < mergedGruplar.length; i++) {
+    const gm = mergedGruplar[i], r = 12 + i
+    c('B', r, gm.grup)
+    c('C', r, gm.hedef)
+    c('D', r, gm.tamamlanan)
+    c('E', r, gm.hedef > 0 ? Math.round(gm.tamamlanan / gm.hedef * 100) / 100 : 0) // oran
+    c('F', r, gm.sapma)
+    c('G', r, gm.kayip)
+    const gF = gm.tamamlanan + gm.sapma - gm.hedef
+    c('H', r, gF > 0 ? gF : 0)
+    c('I', r, gm.hedef > 0 ? Math.round((gm.tamamlanan + gm.sapma) / gm.hedef * 100) / 100 : 0)
   }
 
-  // ── SAYFA: Kayıp Frekanslar ───────────────────────────────────────────
-  const wsKayip = wb.getWorksheet('Kayıp Frekanslar')
-  if (wsKayip) {
-    wsKayip.getCell('C3').value = data.kayipGorevler.length
-    const TEMPLATE_ROW_KAY = 4
-    const COL_COUNT_KAY = 7
-
-    for (let i = 0; i < data.kayipGorevler.length; i++) {
-      const g = data.kayipGorevler[i]
-      const r = 4 + i
-      ensureStyledRow(wsKayip, r, TEMPLATE_ROW_KAY, COL_COUNT_KAY)
-      wsKayip.getCell(`A${r}`).value = i + 1
-      wsKayip.getCell(`B${r}`).value = g.lokasyon
-      wsKayip.getCell(`C${r}`).value = g.gorevNo
-      wsKayip.getCell(`D${r}`).value = g.gorevTanimi
-      wsKayip.getCell(`E${r}`).value = g.tarihSaat
-      wsKayip.getCell(`F${r}`).value = g.durum
-      wsKayip.getCell(`G${r}`).value = g.kayipNedeni
-    }
+  // Hakediş Faktörleri (K-R, satır 12'den)
+  for (let i = 0; i < hakedisRows.length; i++) {
+    const h = hakedisRows[i], r = 12 + i
+    c('K', r, h.grup); c('L', r, h.hedef); c('M', r, h.birimFiyat)
+    c('N', r, h.toplam); c('O', r, h.kayipF); c('P', r, h.kayipH)
+    c('Q', r, h.fazla); c('R', r, h.gerceklesen)
   }
 
-  // ── SAYFA: Gruplar ────────────────────────────────────────────────────
-  const wsGrup = wb.getWorksheet('Gruplar')
-  if (wsGrup) {
-    // Toplamlar satırı (R2) — formüller şablonda var, SUM range'i güncelle
-    const dataCount = data.grupMetrikleri.length
-    const lastDataRow = 2 + dataCount
+  // Frekans Göstergeleri (U sütunu, satır 12-18) — chart1 bağlı
+  c('U', 12, data.toplamGorev)
+  c('U', 13, data.toplamTamamlanan)
+  c('U', 14, data.toplamTamamlanan + data.toplamSapma)
+  c('U', 15, fazlaTop)
+  c('U', 16, data.toplamSapma)
+  c('U', 17, data.toplamKayip)
+  c('U', 18, data.toplamGorev > 0 ? Math.round(data.genelBasari) / 100 : 0)
 
-    const TEMPLATE_ROW_GRP = 3
-    const COL_COUNT_GRP = 12
+  // Frekans Sapmaları (U, satır 21-23) — chart2 bağlı
+  c('U', 21, data.toplamGorev)
+  c('U', 22, data.toplamSapma)
+  c('U', 23, data.toplamGorev > 0 ? Math.round(data.toplamSapma / data.toplamGorev * 100) / 100 : 0)
 
-    for (let i = 0; i < data.grupMetrikleri.length; i++) {
-      const gm = data.grupMetrikleri[i]
-      const r = 3 + i
-      ensureStyledRow(wsGrup, r, TEMPLATE_ROW_GRP, COL_COUNT_GRP)
-      wsGrup.getCell(`A${r}`).value = i + 1
-      wsGrup.getCell(`B${r}`).value = gm.grup
-      wsGrup.getCell(`C${r}`).value = gm.ustLokasyon
-      wsGrup.getCell(`D${r}`).value = gm.lokasyon
-      wsGrup.getCell(`E${r}`).value = gm.gunlukFrekans
-      wsGrup.getCell(`F${r}`).value = gm.hedef
-      wsGrup.getCell(`G${r}`).value = gm.tamamlanan
-      const gFazla = gm.tamamlanan + gm.sapma - gm.hedef
-      wsGrup.getCell(`H${r}`).value = gFazla > 0 ? gFazla : 0
-      wsGrup.getCell(`I${r}`).value = gm.sapma
-      wsGrup.getCell(`J${r}`).value = gm.kayip
-      wsGrup.getCell(`K${r}`).value = gm.basariOrani
-      wsGrup.getCell(`L${r}`).value = gm.genelOran
-    }
+  // Kayıp Frekans (U, satır 26-28) — chart3 bağlı
+  c('U', 26, data.toplamGorev)
+  c('U', 27, data.toplamKayip)
+  c('U', 28, data.toplamGorev > 0 ? Math.round(data.toplamKayip / data.toplamGorev * 100) / 100 : 0)
 
-    // Toplamlar satırı formüllerini güncelle (R2)
-    if (dataCount > 0) {
-      wsGrup.getCell('E2').value = { formula: `SUM(E3:E${lastDataRow})` }
-      wsGrup.getCell('F2').value = { formula: `SUM(F3:F${lastDataRow})` }
-      wsGrup.getCell('G2').value = { formula: `SUM(G3:G${lastDataRow})` }
-      wsGrup.getCell('I2').value = { formula: `SUM(I3:I${lastDataRow})` }
-      wsGrup.getCell('J2').value = { formula: `F2-(G2+I2)` }
-    }
+  // Süre Analizi (X, satır 26-28) — chart4+5 bağlı
+  c('X', 26, toplamHedefDk)
+  c('X', 27, toplamGercekDk)
+  c('X', 28, toplamGercekDk - toplamHedefDk)
+
+  sheets.push({ sheetName: 'Giriş', cells: girisC })
+
+  // ── TAMAMLANAN FREKANSLAR ─────────────────────────────────────────────
+  const tamC: CellData[] = []
+  tamC.push({ col: cn('C'), row: 3, value: data.tamamlananGorevler.length })
+  for (let i = 0; i < data.tamamlananGorevler.length; i++) {
+    const g = data.tamamlananGorevler[i], r = 4 + i
+    tamC.push({ col: cn('A'), row: r, value: i + 1 })
+    tamC.push({ col: cn('B'), row: r, value: g.personel })
+    tamC.push({ col: cn('C'), row: r, value: g.ustLokasyon })
+    tamC.push({ col: cn('D'), row: r, value: g.lokasyon })
+    tamC.push({ col: cn('E'), row: r, value: g.gorevNo })
+    tamC.push({ col: cn('F'), row: r, value: g.gorevTanimi })
+    // Hedef süre DK
+    const lokId = gorevLokMap2.get(g.gorevNo) ?? ''
+    const hedefDk = lokId ? (lokHedefMap.get(lokId) ?? null) : null
+    tamC.push({ col: cn('G'), row: r, value: hedefDk })
+    // Tamamlanan süre DK
+    const sureSn = sureMap.get(g.gorevNo) ?? null
+    tamC.push({ col: cn('H'), row: r, value: sureSn ? Math.round(sureSn / 60) : null })
+    tamC.push({ col: cn('I'), row: r, value: g.tarihSaat })
+    tamC.push({ col: cn('J'), row: r, value: g.durum })
+  }
+  sheets.push({ sheetName: 'Tamamlanan Frekanslar', cells: tamC, templateDataRow: 4, totalDataRows: data.tamamlananGorevler.length })
+
+  // ── SAPMALAR ──────────────────────────────────────────────────────────
+  const sapC: CellData[] = []
+  sapC.push({ col: cn('C'), row: 3, value: data.sapmaGorevler.length })
+  for (let i = 0; i < data.sapmaGorevler.length; i++) {
+    const g = data.sapmaGorevler[i], r = 4 + i
+    sapC.push({ col: cn('A'), row: r, value: i + 1 })
+    sapC.push({ col: cn('B'), row: r, value: g.personel })
+    sapC.push({ col: cn('C'), row: r, value: g.ustLokasyon })
+    sapC.push({ col: cn('D'), row: r, value: g.lokasyon })
+    sapC.push({ col: cn('E'), row: r, value: g.gorevNo })
+    sapC.push({ col: cn('F'), row: r, value: g.gorevTanimi })
+    const lokIdS = gorevLokMap2.get(g.gorevNo) ?? ''
+    sapC.push({ col: cn('G'), row: r, value: lokIdS ? (lokHedefMap.get(lokIdS) ?? null) : null })
+    const sureSn2 = sureMap.get(g.gorevNo) ?? null
+    sapC.push({ col: cn('H'), row: r, value: sureSn2 ? Math.round(sureSn2 / 60) : null })
+    sapC.push({ col: cn('I'), row: r, value: g.tarihSaat })
+    sapC.push({ col: cn('J'), row: r, value: g.sapmaNedeni })
+  }
+  sheets.push({ sheetName: 'Sapmalar', cells: sapC, templateDataRow: 4, totalDataRows: data.sapmaGorevler.length })
+
+  // ── KAYIP FREKANSLAR ──────────────────────────────────────────────────
+  const kayC: CellData[] = []
+  kayC.push({ col: cn('C'), row: 3, value: data.kayipGorevler.length })
+  for (let i = 0; i < data.kayipGorevler.length; i++) {
+    const g = data.kayipGorevler[i], r = 4 + i
+    kayC.push({ col: cn('A'), row: r, value: i + 1 })
+    kayC.push({ col: cn('B'), row: r, value: g.lokasyon })
+    kayC.push({ col: cn('C'), row: r, value: g.gorevNo })
+    kayC.push({ col: cn('D'), row: r, value: g.gorevTanimi })
+    kayC.push({ col: cn('E'), row: r, value: g.tarihSaat })
+    kayC.push({ col: cn('F'), row: r, value: g.durum })
+    kayC.push({ col: cn('G'), row: r, value: g.kayipNedeni })
+  }
+  sheets.push({ sheetName: 'Kayıp Frekanslar', cells: kayC, templateDataRow: 4, totalDataRows: data.kayipGorevler.length })
+
+  // ── GRUPLAR ───────────────────────────────────────────────────────────
+  const grpC: CellData[] = []
+  // Toplamlar satırı (R2) — sayısal değerler doğrudan yazalım
+  let topE = 0, topF = 0, topG = 0, topH = 0, topI = 0, topJ = 0
+  for (let i = 0; i < data.grupMetrikleri.length; i++) {
+    const gm = data.grupMetrikleri[i], r = 3 + i
+    grpC.push({ col: cn('A'), row: r, value: i + 1 })
+    grpC.push({ col: cn('B'), row: r, value: gm.grup })
+    grpC.push({ col: cn('C'), row: r, value: gm.ustLokasyon })
+    grpC.push({ col: cn('D'), row: r, value: gm.lokasyon })
+    // Günlük frekans: lokasyon bazlı sistem ayarlarından
+    const lokId = data.grupMetrikleri[i].lokasyon
+    // lokasyon adından ID'ye çevirelim — genel rapor data'da lokasyon_id yok
+    // gunlukFrekans zaten hesaplanmış, onu kullan
+    grpC.push({ col: cn('E'), row: r, value: gm.gunlukFrekans })
+    // Hedef frekans = o satırdaki lokasyon için üretilen toplam görev sayısı
+    grpC.push({ col: cn('F'), row: r, value: gm.hedef })
+    grpC.push({ col: cn('G'), row: r, value: gm.tamamlanan })
+    const gFaz = gm.tamamlanan + gm.sapma - gm.hedef
+    grpC.push({ col: cn('H'), row: r, value: gFaz > 0 ? gFaz : 0 })
+    grpC.push({ col: cn('I'), row: r, value: gm.sapma })
+    grpC.push({ col: cn('J'), row: r, value: gm.kayip })
+    // Başarılı İşlem Oranı = Tamamlanan/Hedef (yüzde)
+    const basariOran = gm.hedef > 0 ? Math.round(gm.tamamlanan / gm.hedef * 100) : 0
+    grpC.push({ col: cn('K'), row: r, value: `%${basariOran}` })
+    // Genel Oran = (Tamamlanan+Sapma)/Hedef
+    const genelOran = gm.hedef > 0 ? Math.round((gm.tamamlanan + gm.sapma) / gm.hedef * 100) : 0
+    grpC.push({ col: cn('L'), row: r, value: `%${genelOran}` })
+
+    topE += gm.gunlukFrekans; topF += gm.hedef; topG += gm.tamamlanan
+    topH += gFaz > 0 ? gFaz : 0; topI += gm.sapma; topJ += gm.kayip
+  }
+  // Toplamlar
+  grpC.push({ col: cn('E'), row: 2, value: topE })
+  grpC.push({ col: cn('F'), row: 2, value: topF })
+  grpC.push({ col: cn('G'), row: 2, value: topG })
+  grpC.push({ col: cn('H'), row: 2, value: topH })
+  grpC.push({ col: cn('I'), row: 2, value: topI })
+  grpC.push({ col: cn('J'), row: 2, value: topJ })
+  grpC.push({ col: cn('K'), row: 2, value: topF > 0 ? `%${Math.round(topG / topF * 100)}` : '%0' })
+  grpC.push({ col: cn('L'), row: 2, value: topF > 0 ? `%${Math.round((topG + topI) / topF * 100)}` : '%0' })
+
+  sheets.push({ sheetName: 'Gruplar', cells: grpC, templateDataRow: 3, totalDataRows: data.grupMetrikleri.length })
+
+  // ── FREKANS FAZLASI ───────────────────────────────────────────────────
+  const fazC: CellData[] = []
+  for (let i = 0; i < data.frekansDisiGorevler.length; i++) {
+    const g = data.frekansDisiGorevler[i], r = 3 + i
+    fazC.push({ col: cn('A'), row: r, value: i + 1 })
+    fazC.push({ col: cn('B'), row: r, value: g.ustLokasyon })
+    fazC.push({ col: cn('C'), row: r, value: g.grupTanimi })
+    fazC.push({ col: cn('D'), row: r, value: g.lokasyonTanimi })
+    fazC.push({ col: cn('E'), row: r, value: g.aciklama })
+    fazC.push({ col: cn('F'), row: r, value: g.personel })
+    fazC.push({ col: cn('G'), row: r, value: g.tarihSaat })
+  }
+  sheets.push({ sheetName: 'Frekans Fazlası', cells: fazC, templateDataRow: 3, totalDataRows: data.frekansDisiGorevler.length })
+
+  // ── Şablonu aç, doldur, döndür ────────────────────────────────────────
+  const { data: storageFile } = await admin.storage.from('templates').download('Genel_Rapor_Sablonu.xlsx')
+  let templateBuf: Buffer
+  if (storageFile) {
+    templateBuf = Buffer.from(await storageFile.arrayBuffer())
+  } else {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    templateBuf = await fs.readFile(path.join(process.cwd(), 'public', 'templates', 'Genel_Rapor_Sablonu.xlsx'))
   }
 
-  // ── SAYFA: Frekans Fazlası ────────────────────────────────────────────
-  const wsFazla = wb.getWorksheet('Frekans Fazlası')
-  if (wsFazla) {
-    const TEMPLATE_ROW_FAZ = 3
-    const COL_COUNT_FAZ = 7
+  const outBuf = await fillXlsxTemplate(templateBuf, sheets)
 
-    for (let i = 0; i < data.frekansDisiGorevler.length; i++) {
-      const g = data.frekansDisiGorevler[i]
-      const r = 3 + i
-      ensureStyledRow(wsFazla, r, TEMPLATE_ROW_FAZ, COL_COUNT_FAZ)
-      wsFazla.getCell(`A${r}`).value = i + 1
-      wsFazla.getCell(`B${r}`).value = g.ustLokasyon
-      wsFazla.getCell(`C${r}`).value = g.grupTanimi
-      wsFazla.getCell(`D${r}`).value = g.lokasyonTanimi
-      wsFazla.getCell(`E${r}`).value = g.aciklama
-      wsFazla.getCell(`F${r}`).value = g.personel
-      wsFazla.getCell(`G${r}`).value = g.tarihSaat
-    }
-  }
-
-  // ── Buffer olarak döndür ──────────────────────────────────────────────
-  const buf = await wb.xlsx.writeBuffer()
-  const fileName = `Genel_Rapor_${Date.now()}.xlsx`
-  return new NextResponse(buf as unknown as BodyInit, {
+  return new NextResponse(outBuf as unknown as BodyInit, {
     headers: {
       'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'content-disposition': `attachment; filename=${fileName}`,
+      'content-disposition': `attachment; filename=Genel_Rapor_${Date.now()}.xlsx`,
     },
   })
 }

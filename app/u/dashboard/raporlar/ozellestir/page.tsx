@@ -18,5 +18,5 @@ export default async function URaporlarOzellestirPage() {
   const gorebilir = await sayfaGorebilirMi(me.rol, 'rapor-ozellestir', (me as any).firma_id ?? null)
   if (!gorebilir) redirect('/u/dashboard/raporlar')
 
-  return <TemplateReportsClient base="/u" isSA={false} tenantFirmaId={(me as any).firma_id ?? null} />
+  return <TemplateReportsClient base="/u" isSA={false} tenantFirmaId={(me as any).firma_id ?? null} projeId={(me as any).proje_id ?? null} />
 }

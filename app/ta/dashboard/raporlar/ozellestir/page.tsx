@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import TemplateReportsClient from '@/components/reports/TemplateReportsClient'
 import { sayfaGorebilirMi } from '@/lib/yetki/sayfaYetkisi'
+import { getAktifProje } from '@/lib/projeler/getAktifProje'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -16,5 +17,7 @@ export default async function TARaporlarOzellestirPage() {
   if (!me || me.rol !== 'tenant_admin') redirect('/ta/dashboard')
   if (!await sayfaGorebilirMi(me.rol, 'rapor-ozellestir', me.firma_id ?? null)) redirect('/ta/dashboard/raporlar')
 
-  return <TemplateReportsClient base="/ta" isSA={false} tenantFirmaId={me.firma_id ?? null} />
+  const aktifProje = await getAktifProje(me.firma_id ?? null)
+
+  return <TemplateReportsClient base="/ta" isSA={false} tenantFirmaId={me.firma_id ?? null} projeId={aktifProje?.id ?? null} />
 }
