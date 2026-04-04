@@ -199,9 +199,25 @@ export async function GET(req: Request) {
     const admin = createAdminClient()
 
     // Lokasyon ve kullanıcı map'leri
-    const { data: loks }  = await admin.from('lokasyonlar').select('id,tanim,hedef_sure_dakika').eq('firma_id', firmaId)
+    const { data: loks }  = await admin.from('lokasyonlar').select('id,tanim,parent_id,hedef_sure_dakika').eq('firma_id', firmaId)
     const { data: users } = await admin.from('users').select('id,isim_soyisim').eq('firma_id', firmaId)
-    const lokMap   = new Map<string, string>((loks  ?? []).map((l: any) => [l.id, l.tanim]))
+
+    // Üst > Alt > Alt-Alt tam yolu oluşturan yardımcı fonksiyon
+    const lokNodeMap = new Map<string, { tanim: string; parent_id: string | null }>()
+    for (const l of loks ?? []) lokNodeMap.set(l.id, { tanim: l.tanim ?? '', parent_id: l.parent_id ?? null })
+    function lokFullPath(id: string): string {
+      const parts: string[] = []
+      let cur: string | null = id
+      while (cur) {
+        const node = lokNodeMap.get(cur)
+        if (!node) break
+        parts.unshift(node.tanim)
+        cur = node.parent_id
+      }
+      return parts.join(' > ') || '—'
+    }
+
+    const lokMap   = new Map<string, string>((loks  ?? []).map((l: any) => [l.id, lokFullPath(l.id)]))
     const hedefMap = new Map<string, number | null>((loks ?? []).map((l: any) => [l.id, l.hedef_sure_dakika ?? null]))
     const userMap  = new Map<string, string>((users ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
 

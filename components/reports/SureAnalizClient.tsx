@@ -72,27 +72,34 @@ function HBarChart({ data, valueKey, labelKey, color }: {
   data: Record<string, any>[]; valueKey: string; labelKey: string; color: string
 }) {
   if (!data.length) return <div style={{ color: T.textSoft, fontSize: 13, padding: '16px 0', textAlign: 'center' }}>Veri yok</div>
-  const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
-  const rowH = 28
-  const labelW = 110
-  const chartW = 300
-  const totalH = data.length * rowH + 10
+  const max    = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
+  const rowH   = 22
+  const labelW = 200
+  const chartW = 260
+  const valW   = 70
+  const totalW = labelW + chartW + valW
+  const totalH = data.length * rowH + 8
   return (
-    <svg width="100%" viewBox={`0 0 ${labelW + chartW + 60} ${totalH}`} style={{ display: 'block' }}>
-      {data.map((d, i) => {
-        const val  = Number(d[valueKey]) || 0
-        const bw   = (val / max) * chartW
-        const y    = i * rowH
-        const label = String(d[labelKey] ?? '').slice(0, 16)
-        return (
-          <g key={i}>
-            <text x={labelW - 6} y={y + rowH * 0.65} textAnchor="end" fontSize={9} fill={T.gray}>{label}</text>
-            <rect x={labelW} y={y + 4} width={Math.max(bw, 2)} height={rowH - 10} fill={color} rx={3} opacity={0.85} />
-            <text x={labelW + bw + 5} y={y + rowH * 0.65} fontSize={9} fontWeight="bold" fill={T.gray}>{fmtS(val)}</text>
-          </g>
-        )
-      })}
-    </svg>
+    <div style={{ overflowX: 'auto' }}>
+      <svg width="100%" viewBox={`0 0 ${totalW} ${totalH}`} style={{ display: 'block', minWidth: 400 }}>
+        {data.map((d, i) => {
+          const val   = Number(d[valueKey]) || 0
+          const bw    = (val / max) * chartW
+          const y     = i * rowH
+          const label = String(d[labelKey] ?? '')
+          const bg    = i % 2 === 0 ? '#f8fafc' : '#fff'
+          return (
+            <g key={i}>
+              <rect x={0} y={y + 1} width={totalW} height={rowH - 2} fill={bg} rx={2} />
+              <text x={labelW - 8} y={y + rowH * 0.67} textAnchor="end" fontSize={10} fill={T.textSoft}>{label}</text>
+              <rect x={labelW} y={y + 5} width={Math.max(bw, 2)} height={rowH - 12} fill={color} rx={2} opacity={0.85} />
+              <text x={labelW + bw + 6} y={y + rowH * 0.67} fontSize={10} fontWeight="700" fill={T.text}>{fmtS(val)}</text>
+            </g>
+          )
+        })}
+        <line x1={labelW} y1={0} x2={labelW} y2={totalH} stroke={T.border} strokeWidth={0.5} />
+      </svg>
+    </div>
   )
 }
 
