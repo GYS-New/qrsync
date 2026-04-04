@@ -262,18 +262,19 @@ export async function GET(req: NextRequest) {
   }
   sheets.push({ sheetName: 'Sapmalar', cells: sapC, templateDataRow: 4, totalDataRows: data.sapmaGorevler.length })
 
-  // ── KAYIP FREKANSLAR ──────────────────────────────────────────────────
+  // ── KAYIP FREKANSLAR (A=SN, B=ÜST LOKASYON, C=LOKASYON, D=GÖREV NO, E=GÖREV TANIMI, F=TARİH-SAAT, G=DURUM, H=KAYIP NEDENİ)
   const kayC: CellData[] = []
   kayC.push({ col: cn('C'), row: 3, value: data.kayipGorevler.length })
   for (let i = 0; i < data.kayipGorevler.length; i++) {
     const g = data.kayipGorevler[i], r = 4 + i
     kayC.push({ col: cn('A'), row: r, value: i + 1 })
-    kayC.push({ col: cn('B'), row: r, value: g.lokasyon })
-    kayC.push({ col: cn('C'), row: r, value: g.gorevNo })
-    kayC.push({ col: cn('D'), row: r, value: g.gorevTanimi })
-    kayC.push({ col: cn('E'), row: r, value: g.tarihSaat })
-    kayC.push({ col: cn('F'), row: r, value: g.durum })
-    kayC.push({ col: cn('G'), row: r, value: g.kayipNedeni })
+    kayC.push({ col: cn('B'), row: r, value: g.ustLokasyon })
+    kayC.push({ col: cn('C'), row: r, value: g.lokasyon })
+    kayC.push({ col: cn('D'), row: r, value: g.gorevNo })
+    kayC.push({ col: cn('E'), row: r, value: g.gorevTanimi })
+    kayC.push({ col: cn('F'), row: r, value: g.tarihSaat })
+    kayC.push({ col: cn('G'), row: r, value: g.durum })
+    kayC.push({ col: cn('H'), row: r, value: g.kayipNedeni })
   }
   sheets.push({ sheetName: 'Kayıp Frekanslar', cells: kayC, templateDataRow: 4, totalDataRows: data.kayipGorevler.length })
 
