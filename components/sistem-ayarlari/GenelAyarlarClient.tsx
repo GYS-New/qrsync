@@ -53,7 +53,7 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
   const [efektif, setEfektif]             = useState<AyarValues>({ ...DEFAULTS })
   const [overrides, setOverrides]         = useState<Record<AyarKey, boolean>>({ gorev_suresi_hedef_orani: false, arsiv_mesai_saat: false, arsiv_musteri_saat: false, arsiv_spesifik_saat: false, arsiv_frekansiyel_saat: false })
   const [loading, setLoading]             = useState(false)
-  const [saving, setSaving]               = useState(false)
+  const [savingKey, setSavingKey]         = useState<string | null>(null)
 
   const fetchAyarlar = useCallback(async () => {
     if (!currentFirmaId) return
@@ -81,9 +81,8 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
 
   const handleSave = async (key: AyarKey, value: number) => {
     if (!currentFirmaId) return
-    setSaving(true)
+    setSavingKey(key)
     try {
-      // Proje varsa proje bazlı, yoksa firma bazlı kaydet
       const hedef = projeId ? 'proje' : 'firma'
       const res = await fetch('/api/sistem-ayarlari/genel', {
         method: 'PATCH',
@@ -99,12 +98,12 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
     }
-    setSaving(false)
+    setSavingKey(null)
   }
 
   const handleReset = async (key: AyarKey) => {
     if (!currentFirmaId || !projeId) return
-    setSaving(true)
+    setSavingKey(`${key}_reset`)
     try {
       const res = await fetch('/api/sistem-ayarlari/genel', {
         method: 'PATCH',
@@ -119,27 +118,30 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
     }
-    setSaving(false)
+    setSavingKey(null)
   }
 
   if (loading) {
     return <div style={{ padding: '40px 0', textAlign: 'center', color: T.textSoft, fontSize: 14 }}>Yükleniyor...</div>
   }
 
-  const SaveBtn = ({ onClick }: { onClick: () => void }) => (
-    <button onClick={onClick} disabled={saving}
-      style={{ height: 34, padding: '0 16px', borderRadius: 8, background: T.green, color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-      {saving ? '...' : 'Kaydet'}
-    </button>
-  )
+  const SaveBtn = ({ onClick, id }: { onClick: () => void; id: string }) => {
+    const busy = savingKey === id
+    return (
+      <button onClick={onClick} disabled={savingKey != null}
+        style={{ height: 34, padding: '0 16px', borderRadius: 8, background: T.green, color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: savingKey != null ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+        {busy ? '...' : 'Kaydet'}
+      </button>
+    )
+  }
 
   function OverrideBadge({ ayarKey }: { ayarKey: AyarKey }) {
     if (!projeId || !overrides[ayarKey]) return null
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
         <span style={{ fontSize: 11.5, color: T.purple, fontWeight: 600 }}>Proje özel ayarı aktif (Firma varsayılanı: {ayarKey === 'gorev_suresi_hedef_orani' ? `±%${firmaDefaults[ayarKey]}` : saatLabel(firmaDefaults[ayarKey])})</span>
-        <button onClick={() => handleReset(ayarKey)} disabled={saving}
-          style={{ fontSize: 11.5, color: T.textSoft, background: 'none', border: `1px solid ${T.border}`, borderRadius: 6, padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        <button onClick={() => handleReset(ayarKey)} disabled={savingKey != null}
+          style={{ fontSize: 11.5, color: T.textSoft, background: 'none', border: `1px solid ${T.border}`, borderRadius: 6, padding: '3px 10px', cursor: savingKey != null ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
           Varsayılana Dön
         </button>
       </div>
@@ -160,7 +162,7 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
               style={inpStyle} />
             <span style={{ fontSize: 14, color: T.textSoft, fontWeight: 600, whiteSpace: 'nowrap' }}>saat</span>
           </div>
-          <SaveBtn onClick={() => handleSave(ayarKey, efektif[ayarKey])} />
+          <SaveBtn id={ayarKey} onClick={() => handleSave(ayarKey, efektif[ayarKey])} />
           <span style={{ fontSize: 12, color: T.textSoft }}>= {saatLabel(efektif[ayarKey])}</span>
         </div>
         <OverrideBadge ayarKey={ayarKey} />
@@ -190,7 +192,7 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
               style={inpStyle} />
             <span style={{ fontSize: 14, color: T.textSoft, fontWeight: 600 }}>%</span>
           </div>
-          <SaveBtn onClick={() => handleSave('gorev_suresi_hedef_orani', efektif.gorev_suresi_hedef_orani)} />
+          <SaveBtn id="gorev_suresi_hedef_orani" onClick={() => handleSave('gorev_suresi_hedef_orani', efektif.gorev_suresi_hedef_orani)} />
         </div>
         <div style={{ marginTop: 14, padding: '10px 14px', background: T.grayLight, borderRadius: 8, fontSize: 12.5, color: T.textSoft, lineHeight: 1.6 }}>
           <strong>Örnek:</strong> Hedef süre 60 dk, tolerans ±%{efektif.gorev_suresi_hedef_orani} →{' '}
