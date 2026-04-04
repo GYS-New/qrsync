@@ -20,6 +20,21 @@ function fmtSure(sn: number | null | undefined): string {
   return `${sn % 60}sn`
 }
 
+/**
+ * Şablondaki referans satırının stilini yeni satıra kopyalar.
+ * Satır yoksa oluşturur, varsa stil'i override eder.
+ */
+function ensureStyledRow(ws: ExcelJS.Worksheet, targetRow: number, templateRow: number, colCount: number) {
+  const srcRow = ws.getRow(templateRow)
+  const dstRow = ws.getRow(targetRow)
+  dstRow.height = srcRow.height
+  for (let c = 1; c <= colCount; c++) {
+    const srcCell = srcRow.getCell(c)
+    const dstCell = dstRow.getCell(c)
+    if (srcCell.style) dstCell.style = JSON.parse(JSON.stringify(srcCell.style))
+  }
+}
+
 export async function GET(req: NextRequest) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -192,22 +207,21 @@ export async function GET(req: NextRequest) {
   // ── SAYFA: Tamamlanan Frekanslar ──────────────────────────────────────
   const wsTam = wb.getWorksheet('Tamamlanan Frekanslar')
   if (wsTam) {
-    // R3 = toplam sayısı
     wsTam.getCell('C3').value = data.tamamlananGorevler.length
+    const TEMPLATE_ROW_TAM = 4 // İlk veri satırı (stil referansı)
+    const COL_COUNT_TAM = 10
 
-    // Satır 4'ten itibaren veri — şablondaki boş satırları doldur
     for (let i = 0; i < data.tamamlananGorevler.length; i++) {
       const g = data.tamamlananGorevler[i]
       const r = 4 + i
+      ensureStyledRow(wsTam, r, TEMPLATE_ROW_TAM, COL_COUNT_TAM)
       wsTam.getCell(`A${r}`).value = i + 1
       wsTam.getCell(`B${r}`).value = g.personel
       wsTam.getCell(`C${r}`).value = g.ustLokasyon
       wsTam.getCell(`D${r}`).value = g.lokasyon
       wsTam.getCell(`E${r}`).value = g.gorevNo
       wsTam.getCell(`F${r}`).value = g.gorevTanimi
-      // Hedef süre ve tamamlanan süre (lokasyon hedef_sure_dakika'dan)
-      // Not: buildGenelRaporData şu an süre bilgisi döndürmüyor, lokHedefMap kullanacağız
-      wsTam.getCell(`G${r}`).value = '' // hedef süre — sonra doldurulacak
+      wsTam.getCell(`G${r}`).value = '' // hedef süre
       wsTam.getCell(`H${r}`).value = '' // tamamlanan süre
       wsTam.getCell(`I${r}`).value = g.tarihSaat
       wsTam.getCell(`J${r}`).value = g.durum
@@ -218,10 +232,13 @@ export async function GET(req: NextRequest) {
   const wsSapma = wb.getWorksheet('Sapmalar')
   if (wsSapma) {
     wsSapma.getCell('C3').value = data.sapmaGorevler.length
+    const TEMPLATE_ROW_SAP = 4
+    const COL_COUNT_SAP = 10
 
     for (let i = 0; i < data.sapmaGorevler.length; i++) {
       const g = data.sapmaGorevler[i]
       const r = 4 + i
+      ensureStyledRow(wsSapma, r, TEMPLATE_ROW_SAP, COL_COUNT_SAP)
       wsSapma.getCell(`A${r}`).value = i + 1
       wsSapma.getCell(`B${r}`).value = g.personel
       wsSapma.getCell(`C${r}`).value = g.ustLokasyon
@@ -239,10 +256,13 @@ export async function GET(req: NextRequest) {
   const wsKayip = wb.getWorksheet('Kayıp Frekanslar')
   if (wsKayip) {
     wsKayip.getCell('C3').value = data.kayipGorevler.length
+    const TEMPLATE_ROW_KAY = 4
+    const COL_COUNT_KAY = 7
 
     for (let i = 0; i < data.kayipGorevler.length; i++) {
       const g = data.kayipGorevler[i]
       const r = 4 + i
+      ensureStyledRow(wsKayip, r, TEMPLATE_ROW_KAY, COL_COUNT_KAY)
       wsKayip.getCell(`A${r}`).value = i + 1
       wsKayip.getCell(`B${r}`).value = g.lokasyon
       wsKayip.getCell(`C${r}`).value = g.gorevNo
@@ -260,9 +280,13 @@ export async function GET(req: NextRequest) {
     const dataCount = data.grupMetrikleri.length
     const lastDataRow = 2 + dataCount
 
+    const TEMPLATE_ROW_GRP = 3
+    const COL_COUNT_GRP = 12
+
     for (let i = 0; i < data.grupMetrikleri.length; i++) {
       const gm = data.grupMetrikleri[i]
-      const r = 3 + i // veri satır 3'ten başlıyor
+      const r = 3 + i
+      ensureStyledRow(wsGrup, r, TEMPLATE_ROW_GRP, COL_COUNT_GRP)
       wsGrup.getCell(`A${r}`).value = i + 1
       wsGrup.getCell(`B${r}`).value = gm.grup
       wsGrup.getCell(`C${r}`).value = gm.ustLokasyon
@@ -291,14 +315,18 @@ export async function GET(req: NextRequest) {
   // ── SAYFA: Frekans Fazlası ────────────────────────────────────────────
   const wsFazla = wb.getWorksheet('Frekans Fazlası')
   if (wsFazla) {
+    const TEMPLATE_ROW_FAZ = 3
+    const COL_COUNT_FAZ = 7
+
     for (let i = 0; i < data.frekansDisiGorevler.length; i++) {
       const g = data.frekansDisiGorevler[i]
       const r = 3 + i
+      ensureStyledRow(wsFazla, r, TEMPLATE_ROW_FAZ, COL_COUNT_FAZ)
       wsFazla.getCell(`A${r}`).value = i + 1
       wsFazla.getCell(`B${r}`).value = g.ustLokasyon
       wsFazla.getCell(`C${r}`).value = g.grupTanimi
       wsFazla.getCell(`D${r}`).value = g.lokasyonTanimi
-      wsFazla.getCell(`E${r}`).value = g.aciklama // görev tanımı
+      wsFazla.getCell(`E${r}`).value = g.aciklama
       wsFazla.getCell(`F${r}`).value = g.personel
       wsFazla.getCell(`G${r}`).value = g.tarihSaat
     }
