@@ -45,17 +45,66 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   }
 
   const admin = createAdminClient()
+  const projeId = params.id
 
-  // Projeye bağlı kayıtları NULL'a çek (silme, veri kaybı olmasın)
-  await Promise.all([
-    admin.from('lokasyonlar').update({ proje_id: null }).eq('proje_id', params.id),
-    admin.from('gorevler').update({ proje_id: null }).eq('proje_id', params.id),
-    admin.from('canli_gorevler').update({ proje_id: null }).eq('proje_id', params.id),
-    admin.from('gorev_kurallari').update({ proje_id: null }).eq('proje_id', params.id),
-    admin.from('users').update({ proje_id: null }).eq('proje_id', params.id),
-  ])
+  try {
+    // 1. Lokasyon grupları → önce grup üyelerini ve birim fiyatları sil
+    const { data: gruplar } = await admin.from('lokasyon_gruplari').select('id').eq('proje_id', projeId)
+    const grupIds = (gruplar ?? []).map((g: any) => g.id)
+    if (grupIds.length > 0) {
+      await Promise.all([
+        admin.from('lokasyon_grup_uyeleri').delete().in('grup_id', grupIds),
+        admin.from('birim_fiyatlar').delete().eq('proje_id', projeId),
+      ])
+    }
+    await admin.from('lokasyon_gruplari').delete().eq('proje_id', projeId)
 
-  const { error } = await admin.from('projeler').delete().eq('id', params.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+    // 2. Checklist sonuç başlıkları → önce maddeleri sil (aktif + arşiv)
+    const [{ data: cBasliklari }, { data: cBasliklariArsiv }] = await Promise.all([
+      admin.from('checklist_sonuc_basliklari').select('id').eq('proje_id', projeId),
+      admin.from('checklist_sonuc_basliklari_arsiv').select('id').eq('proje_id', projeId),
+    ])
+    const cIds      = (cBasliklari ?? []).map((r: any) => r.id)
+    const cIdsArsiv = (cBasliklariArsiv ?? []).map((r: any) => r.id)
+    if (cIds.length > 0)
+      await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', cIds)
+    if (cIdsArsiv.length > 0)
+      await admin.from('checklist_sonuc_maddeleri_arsiv').delete().in('sonuc_id', cIdsArsiv)
+    await Promise.all([
+      admin.from('checklist_sonuc_basliklari').delete().eq('proje_id', projeId),
+      admin.from('checklist_sonuc_basliklari_arsiv').delete().eq('proje_id', projeId),
+    ])
+
+    // 3. Görevler (aktif + arşiv) — frekansiyel ve spesifik
+    await Promise.all([
+      admin.from('gorevler').delete().eq('proje_id', projeId),
+      admin.from('gorevler_arsiv').delete().eq('proje_id', projeId),
+      admin.from('canli_gorevler').delete().eq('proje_id', projeId),
+      admin.from('canli_gorevler_arsiv').delete().eq('proje_id', projeId),
+      admin.from('gorev_kurallari').delete().eq('proje_id', projeId),
+    ])
+
+    // 4. Diğer proje verileri
+    await Promise.all([
+      admin.from('musteri_degerlendirmeleri').delete().eq('proje_id', projeId),
+      admin.from('musteri_degerlendirmeleri_arsiv').delete().eq('proje_id', projeId),
+      admin.from('personel_mesai_kayitlari').delete().eq('proje_id', projeId),
+      admin.from('personel_mesai_kayitlari_arsiv').delete().eq('proje_id', projeId),
+    ])
+
+    // 5. Lokasyonlar
+    await admin.from('lokasyonlar').delete().eq('proje_id', projeId)
+
+    // 6. Personellerin proje bağlantısını kaldır (kullanıcı hesaplarını silme)
+    await admin.from('users').update({ proje_id: null }).eq('proje_id', projeId)
+
+    // 7. Projeyi sil
+    const { error } = await admin.from('projeler').delete().eq('id', projeId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    return NextResponse.json({ ok: true })
+  } catch (err: any) {
+    console.error('[proje-sil]', err)
+    return NextResponse.json({ error: err?.message ?? 'Silme işlemi başarısız.' }, { status: 500 })
+  }
 }

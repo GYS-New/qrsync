@@ -124,11 +124,11 @@ export default function ProjelerClient({
 
   async function del(p: Proje) {
     const ok = await confirm({
-      title: 'Projeyi Sil',
-      message: `"${p.ad}" projesi silinecek. Projeye bağlı tüm kayıtlar (lokasyon, görev vb.) projesiz kalır, silinmez. Devam edilsin mi?`,
-     confirmText: 'Sil',
-cancelText: 'Vazgeç',
-variant: 'danger'
+      title: '⚠️ PROJEYİ KALICI OLARAK SİL',
+      message: `"${p.ad}" projesi ve altındaki TÜM VERİLER veritabanından kalıcı olarak silinecektir:\n\n• Tüm lokasyonlar ve lokasyon grupları\n• Tüm frekansiyel görevler (aktif + arşiv)\n• Tüm spesifik görevler (aktif + arşiv)\n• Tüm çeklist sonuçları (aktif + arşiv)\n• Tüm görev kuralları\n• Müşteri değerlendirmeleri ve mesai kayıtları\n\nPersonel hesapları silinmez, proje bağlantısı kaldırılır.\n\nBu işlem GERİ ALINAMAZ. Devam edilsin mi?`,
+      confirmText: 'Kalıcı Olarak Sil',
+      cancelText: 'Vazgeç',
+      variant: 'danger',
     })
     if (!ok) return
     try {
