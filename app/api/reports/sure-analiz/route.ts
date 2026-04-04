@@ -217,7 +217,9 @@ export async function GET(req: Request) {
     const admin = createAdminClient()
 
     // Lokasyon ve kullanıcı map'leri
-    const { data: loks }  = await admin.from('lokasyonlar').select('id,tanim,parent_id,hedef_sure_dakika').eq('firma_id', firmaId)
+    let loksQ = admin.from('lokasyonlar').select('id,tanim,parent_id,hedef_sure_dakika').eq('firma_id', firmaId)
+    if (projeId) loksQ = (loksQ as any).eq('proje_id', projeId)
+    const { data: loks } = await loksQ
     const { data: users } = await admin.from('users').select('id,isim_soyisim').eq('firma_id', firmaId)
 
     // Üst > Alt > Alt-Alt tam yolu oluşturan yardımcı fonksiyon
