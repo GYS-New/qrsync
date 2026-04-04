@@ -72,6 +72,9 @@ export interface Firma {
   arsiv_musteri_saat?: number
   arsiv_spesifik_saat?: number
   arsiv_frekansiyel_saat?: number
+  spesifik_ceklist_aktif?: boolean
+  spesifik_personel_atama_aktif?: boolean
+  frekansiyel_personel_atama_aktif?: boolean
 }
 
 export interface Lokasyon {
@@ -189,4 +192,7 @@ export interface Proje {
   arsiv_musteri_saat?: number | null
   arsiv_spesifik_saat?: number | null
   arsiv_frekansiyel_saat?: number | null
+  spesifik_ceklist_aktif?: boolean | null
+  spesifik_personel_atama_aktif?: boolean | null
+  frekansiyel_personel_atama_aktif?: boolean | null
 }
