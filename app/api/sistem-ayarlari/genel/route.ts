@@ -3,7 +3,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-const SEL = 'gorev_suresi_hedef_orani,arsiv_mesai_saat,arsiv_musteri_saat,arsiv_spesifik_saat,arsiv_frekansiyel_saat,spesifik_ceklist_aktif,spesifik_personel_atama_aktif,frekansiyel_personel_atama_aktif,ardisik_baslatma_suresi_dk,personel_takip_bildirim_dk'
+const SEL = 'gorev_suresi_hedef_orani,arsiv_mesai_saat,arsiv_musteri_saat,arsiv_spesifik_saat,arsiv_frekansiyel_saat,spesifik_ceklist_aktif,spesifik_personel_atama_aktif,frekansiyel_personel_atama_aktif,ardisik_baslatma_suresi_dk,personel_takip_bildirim_dk,personel_takip_bildirim_alicilar'
 
 const DEFAULTS: Record<string, number | boolean> = {
   gorev_suresi_hedef_orani: 10,
@@ -105,6 +105,12 @@ export async function PATCH(req: NextRequest) {
       if (hedef === 'proje' && body[key] === null) { update[key] = null; continue }
       update[key] = !!body[key]
     }
+  }
+
+  // Array alanlar
+  if (body.personel_takip_bildirim_alicilar !== undefined) {
+    if (hedef === 'proje' && body.personel_takip_bildirim_alicilar === null) { update.personel_takip_bildirim_alicilar = null }
+    else { update.personel_takip_bildirim_alicilar = Array.isArray(body.personel_takip_bildirim_alicilar) ? body.personel_takip_bildirim_alicilar : [] }
   }
 
   if (!Object.keys(update).length) return NextResponse.json({ error: 'Güncellenecek alan yok' }, { status: 400 })

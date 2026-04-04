@@ -9,7 +9,7 @@ const T = {
   blue: '#1d4ed8', purple: '#7c3aed',
 }
 
-interface Props { isSA: boolean; firmaId?: string | null; projeId?: string | null }
+interface Props { isSA: boolean; firmaId?: string | null; projeId?: string | null; kullanicilar?: { id: string; isim_soyisim: string }[] }
 
 const inpStyle: React.CSSProperties = {
   height: 38, padding: '0 12px', borderRadius: 8,
@@ -47,7 +47,7 @@ const BOOL_DEFAULTS: Record<string, boolean> = {
 }
 const ALL_DEFAULTS: AllValues = { ...NUM_DEFAULTS, ...BOOL_DEFAULTS }
 
-export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId }: Props) {
+export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId, kullanicilar = [] }: Props) {
   const { toast } = useToast()
   const { firmaId: saFirmaId } = useFirma()
   const currentFirmaId = isSA ? (saFirmaId ?? '') : (propFirmaId ?? '')
@@ -57,6 +57,7 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
   const [overrides, setOverrides]         = useState<Record<string, boolean>>({})
   const [loading, setLoading]             = useState(false)
   const [savingKey, setSavingKey]         = useState<string | null>(null)
+  const [bildirimAlicilar, setBildirimAlicilar] = useState<string[]>([])
 
   const fetchAyarlar = useCallback(async () => {
     if (!currentFirmaId) return
@@ -72,6 +73,9 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
         const ov: Record<string, boolean> = {}
         for (const k of Object.keys(ALL_DEFAULTS)) ov[k] = json.proje != null && json.proje[k] != null
         setOverrides(ov)
+        // Bildirim alıcılar
+        const alicilar = json.efektif?.personel_takip_bildirim_alicilar ?? json.firma?.personel_takip_bildirim_alicilar ?? []
+        setBildirimAlicilar(Array.isArray(alicilar) ? alicilar : [])
       }
     } catch {}
     setLoading(false)
@@ -281,11 +285,54 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
           <SaveBtn id="personel_takip_bildirim_dk" onClick={() => handleSave('personel_takip_bildirim_dk', efektif.personel_takip_bildirim_dk)} />
         </div>
         {(efektif.personel_takip_bildirim_dk as number) > 0 && (
-          <div style={{ marginTop: 10, padding: '10px 14px', background: T.grayLight, borderRadius: 8, fontSize: 12.5, color: T.textSoft, lineHeight: 1.6 }}>
-            İş başı yaptıktan <strong style={{ color: T.green }}>{efektif.personel_takip_bildirim_dk as number} dk</strong> sonra görev başlatılmamışsa 1. hatırlatma,
-            <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 2} dk</strong> sonra 2. hatırlatma,
-            <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 3} dk</strong> sonra 3. hatırlatma + yöneticiye bildirim gönderilir.
-          </div>
+          <>
+            <div style={{ marginTop: 10, padding: '10px 14px', background: T.grayLight, borderRadius: 8, fontSize: 12.5, color: T.textSoft, lineHeight: 1.6 }}>
+              İş başı yaptıktan <strong style={{ color: T.green }}>{efektif.personel_takip_bildirim_dk as number} dk</strong> sonra görev başlatılmamışsa 1. hatırlatma,
+              <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 2} dk</strong> sonra 2. hatırlatma,
+              <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 3} dk</strong> sonra 3. hatırlatma + aşağıdaki alıcılara bildirim gönderilir.
+            </div>
+
+            {/* Bildirim alıcıları */}
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 6 }}>3. Bildirim Alıcıları</div>
+              <div style={{ fontSize: 12, color: T.textSoft, marginBottom: 8 }}>
+                3. hatırlatmada TA ile birlikte web bildirimi alacak kullanıcıları seçin. TA otomatik alır.
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                {kullanicilar.map(u => {
+                  const selected = bildirimAlicilar.includes(u.id)
+                  return (
+                    <button key={u.id} onClick={() => {
+                      setBildirimAlicilar(prev => selected ? prev.filter(id => id !== u.id) : [...prev, u.id])
+                    }} style={{
+                      padding: '5px 12px', borderRadius: 16, fontSize: 12.5, fontWeight: 600,
+                      border: `1px solid ${selected ? T.green : T.border}`,
+                      background: selected ? '#dcfce7' : '#fff',
+                      color: selected ? T.green : T.textSoft,
+                      cursor: 'pointer',
+                    }}>
+                      {selected ? '✓ ' : ''}{u.isim_soyisim}
+                    </button>
+                  )
+                })}
+                {kullanicilar.length === 0 && <span style={{ fontSize: 12, color: T.textSoft }}>Kullanıcı bulunamadı</span>}
+              </div>
+              <SaveBtn id="personel_takip_bildirim_alicilar" onClick={async () => {
+                setSavingKey('personel_takip_bildirim_alicilar')
+                try {
+                  const hedef = projeId ? 'proje' : 'firma'
+                  const res = await fetch('/api/sistem-ayarlari/genel', {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ firmaId: currentFirmaId, projeId, hedef, personel_takip_bildirim_alicilar: bildirimAlicilar }),
+                  })
+                  const json = await res.json()
+                  if (!res.ok) throw new Error(json.error)
+                  toast({ type: 'success', title: 'Başarılı', message: 'Alıcılar kaydedildi.' })
+                } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
+                setSavingKey(null)
+              }} />
+            </div>
+          </>
         )}
         <OverrideBadge ayarKey="personel_takip_bildirim_dk" />
       </div>

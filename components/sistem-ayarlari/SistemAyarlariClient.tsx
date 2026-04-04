@@ -88,7 +88,7 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
       </div>
 
       {/* Tab içerikleri */}
-      {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} projeId={projeId} />}
+      {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} projeId={projeId} kullanicilar={kullanicilar} />}
       {aktifTab === 'frekans' && <FrekansSayilariClient lokasyonlar={lokasyonlar as any} />}
       {aktifTab === 'gorev-kurallari' && firmaId && (
         <GorevKurallariClient
