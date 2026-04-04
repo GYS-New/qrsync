@@ -138,10 +138,42 @@ export async function GET(req: NextRequest) {
     await wb.xlsx.readFile(localPath)
   }
 
+  // ── Süre verileri hazırla (detay sayfalarında da kullanılacak) ────────
+  // Tüm görevlerin süre bilgisini topla (buildGenelRaporData'daki tumGorevler'den)
+  // gorevNo → { hedefSureDk, tamamlananSureSn, lokasyonId } map
+  // Görevlerin tam listesini tekrar çekelim (süre bilgisi için)
+  const SEL_SURE = 'id,lokasyon_id,tamamlanma_suresi_saniye,durum'
+  let sureLiveQ = admin.from('canli_gorevler').select(SEL_SURE).eq('firma_id', firmaId)
+  let sureArsivQ = admin.from('canli_gorevler_arsiv').select(SEL_SURE).eq('firma_id', firmaId)
+  if (projeId) { sureLiveQ = (sureLiveQ as any).eq('proje_id', projeId); sureArsivQ = (sureArsivQ as any).eq('proje_id', projeId) }
+  if (baslangic) { sureLiveQ = sureLiveQ.gte('aktif_olma_tarihi', baslangic); sureArsivQ = sureArsivQ.gte('aktif_olma_tarihi', baslangic) }
+  if (bitis) { sureLiveQ = sureLiveQ.lte('aktif_olma_tarihi', bitis + 'T23:59:59'); sureArsivQ = sureArsivQ.lte('aktif_olma_tarihi', bitis + 'T23:59:59') }
+  const [{ data: sureLive }, { data: sureArsiv }] = await Promise.all([sureLiveQ, sureArsivQ])
+  const sureMap = new Map<string, number>() // gorev_id → tamamlanma_suresi_saniye
+  const gorevLokMap = new Map<string, string>() // gorev_id → lokasyon_id
+  for (const g of [...(sureLive ?? []), ...(sureArsiv ?? [])]) {
+    if (g.tamamlanma_suresi_saniye) {
+      sureMap.set(g.id, g.tamamlanma_suresi_saniye)
+      sureMap.set(g.id.slice(-8).toUpperCase(), g.tamamlanma_suresi_saniye) // gorevNo ile de eşle
+    }
+    if (g.lokasyon_id) {
+      gorevLokMap.set(g.id, g.lokasyon_id)
+      gorevLokMap.set(g.id.slice(-8).toUpperCase(), g.lokasyon_id)
+    }
+  }
+
+  // Süre analizi toplam hesabı
+  let toplamHedefSureSn = 0, toplamGercekSureSn = 0
+  for (const [gId, sureSn] of sureMap) {
+    toplamGercekSureSn += sureSn
+    const lokId = gorevLokMap.get(gId)
+    if (lokId && lokHedefMap.has(lokId)) toplamHedefSureSn += lokHedefMap.get(lokId)!
+  }
+
   // ── SAYFA: Giriş ─────────────────────────────────────────────────────
   const wsGiris = wb.getWorksheet('Giriş')
   if (wsGiris) {
-    // Parametreler (E sütunu = değerler)
+    // Parametreler (E sütunu = merged cell değerleri)
     wsGiris.getCell('E2').value = data.firmaAdi
     wsGiris.getCell('E3').value = data.projeAdi
     wsGiris.getCell('E4').value = data.ustLokTanim || 'Tümü'
@@ -150,7 +182,7 @@ export async function GET(req: NextRequest) {
     wsGiris.getCell('E7').value = data.gunSayisi
     wsGiris.getCell('E8').value = data.raporuAlan
 
-    // Frekans Göstergeleri (sütun U = değerler, satır 12-18)
+    // ── Frekans Göstergeleri (grafik chart1 bağlı: T12:T17=etiket, U12:U17=değer) ──
     wsGiris.getCell('U12').value = data.toplamGorev
     wsGiris.getCell('U13').value = data.toplamTamamlanan
     wsGiris.getCell('U14').value = data.toplamTamamlanan + data.toplamSapma // gerçekleşen
@@ -161,43 +193,41 @@ export async function GET(req: NextRequest) {
     wsGiris.getCell('U15').value = fazla
     wsGiris.getCell('U16').value = data.toplamSapma
     wsGiris.getCell('U17').value = data.toplamKayip
-    wsGiris.getCell('U18').value = data.toplamGorev > 0 ? `%${data.genelBasari}` : '%0'
+    // Başarı ortalaması (satır 18 — grafik dışı)
+    wsGiris.getCell('U18').value = data.toplamGorev > 0 ? data.genelBasari / 100 : 0
 
-    // Frekans Sapmaları (satır 21-23)
+    // ── Frekans Sapmaları (grafik chart2 bağlı: T21:T22=etiket, U21:U22=değer) ──
     wsGiris.getCell('U21').value = data.toplamGorev
     wsGiris.getCell('U22').value = data.toplamSapma
-    wsGiris.getCell('U23').value = data.toplamGorev > 0 ? `%${Math.round((data.toplamSapma / data.toplamGorev) * 100)}` : '%0'
+    wsGiris.getCell('U23').value = data.toplamGorev > 0 ? data.toplamSapma / data.toplamGorev : 0
 
-    // Kayıp Frekans Göstergeleri (satır 26-28)
+    // ── Kayıp Frekans Göstergeleri (grafik chart3 bağlı: T26:T27=etiket, U26:U27=değer) ──
     wsGiris.getCell('U26').value = data.toplamGorev
     wsGiris.getCell('U27').value = data.toplamKayip
-    wsGiris.getCell('U28').value = data.toplamGorev > 0 ? `%${Math.round((data.toplamKayip / data.toplamGorev) * 100)}` : '%0'
+    wsGiris.getCell('U28').value = data.toplamGorev > 0 ? data.toplamKayip / data.toplamGorev : 0
 
-    // Süre Analizi (sütun Y, satır 26-28)
-    let toplamHedefSure = 0, toplamGercekSure = 0
-    for (const g of data.tamamlananGorevler) {
-      // hedef süre ve tamamlanan süre hesabı aşağıda detay sayfalarına yazılırken kullanılıyor
-    }
-    // Toplam süre analizi sonra doldurulacak (detay satırlarından)
+    // ── Süre Analizi (grafik chart4+5 bağlı: W26:W28=etiket, X26:X28=değer) ──
+    wsGiris.getCell('X26').value = Math.round(toplamHedefSureSn / 60) // toplam hedef süre (dk)
+    wsGiris.getCell('X27').value = Math.round(toplamGercekSureSn / 60) // gerçekleşen toplam süre (dk)
+    wsGiris.getCell('X28').value = Math.round((toplamGercekSureSn - toplamHedefSureSn) / 60) // toplam sapma (dk)
 
-    // Grup Frekans Göstergeleri tablosu (satır 12'den itibaren, B-I sütunları)
+    // ── Grup Frekans Göstergeleri tablosu (B-I sütunları, satır 12'den) ──
     const grupStartRow = 12
     for (let i = 0; i < data.grupMetrikleri.length; i++) {
       const gm = data.grupMetrikleri[i]
       const r = grupStartRow + i
-      // Yeterli satır yoksa ekle (şablonda 5 boş satır var, daha fazlası için)
       wsGiris.getCell(`B${r}`).value = gm.grup
       wsGiris.getCell(`C${r}`).value = gm.hedef
       wsGiris.getCell(`D${r}`).value = gm.tamamlanan
-      wsGiris.getCell(`E${r}`).value = gm.hedef > 0 ? `%${Math.round((gm.tamamlanan / gm.hedef) * 100)}` : '%0'
+      wsGiris.getCell(`E${r}`).value = gm.hedef > 0 ? gm.tamamlanan / gm.hedef : 0
       wsGiris.getCell(`F${r}`).value = gm.sapma
       wsGiris.getCell(`G${r}`).value = gm.kayip
       const gFazla = gm.tamamlanan + gm.sapma - gm.hedef
       wsGiris.getCell(`H${r}`).value = gFazla > 0 ? gFazla : 0
-      wsGiris.getCell(`I${r}`).value = gm.genelOran
+      wsGiris.getCell(`I${r}`).value = gm.hedef > 0 ? (gm.tamamlanan + gm.sapma) / gm.hedef : 0
     }
 
-    // Hakediş Faktörleri tablosu (satır 12'den itibaren, K-R sütunları)
+    // ── Hakediş Faktörleri tablosu (K-R sütunları, satır 12'den) ──
     for (let i = 0; i < hakedisRows.length; i++) {
       const h = hakedisRows[i]
       const r = grupStartRow + i
@@ -229,8 +259,12 @@ export async function GET(req: NextRequest) {
       wsTam.getCell(`D${r}`).value = g.lokasyon
       wsTam.getCell(`E${r}`).value = g.gorevNo
       wsTam.getCell(`F${r}`).value = g.gorevTanimi
-      wsTam.getCell(`G${r}`).value = '' // hedef süre
-      wsTam.getCell(`H${r}`).value = '' // tamamlanan süre
+      // Hedef süre (lokasyon bazlı, dakika) ve tamamlanan süre (görev bazlı, dakika)
+      const tamLokId = gorevLokMap.get(g.gorevNo) ?? ''
+      const tamHedefSn = tamLokId ? (lokHedefMap.get(tamLokId) ?? 0) : 0
+      const tamGercekSn = sureMap.get(g.gorevNo) ?? 0
+      wsTam.getCell(`G${r}`).value = tamHedefSn > 0 ? Math.round(tamHedefSn / 60) : ''
+      wsTam.getCell(`H${r}`).value = tamGercekSn > 0 ? Math.round(tamGercekSn / 60) : ''
       wsTam.getCell(`I${r}`).value = g.tarihSaat
       wsTam.getCell(`J${r}`).value = g.durum
     }
@@ -253,8 +287,11 @@ export async function GET(req: NextRequest) {
       wsSapma.getCell(`D${r}`).value = g.lokasyon
       wsSapma.getCell(`E${r}`).value = g.gorevNo
       wsSapma.getCell(`F${r}`).value = g.gorevTanimi
-      wsSapma.getCell(`G${r}`).value = '' // hedef süre
-      wsSapma.getCell(`H${r}`).value = '' // tamamlanan süre
+      const sapLokId = gorevLokMap.get(g.gorevNo) ?? ''
+      const sapHedefSn = sapLokId ? (lokHedefMap.get(sapLokId) ?? 0) : 0
+      const sapGercekSn = sureMap.get(g.gorevNo) ?? 0
+      wsSapma.getCell(`G${r}`).value = sapHedefSn > 0 ? Math.round(sapHedefSn / 60) : ''
+      wsSapma.getCell(`H${r}`).value = sapGercekSn > 0 ? Math.round(sapGercekSn / 60) : ''
       wsSapma.getCell(`I${r}`).value = g.tarihSaat
       wsSapma.getCell(`J${r}`).value = g.sapmaNedeni
     }
