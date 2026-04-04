@@ -7,6 +7,7 @@ interface LokasyonRow {
   id: string
   tanim: string
   parent_id?: string | null
+  hedef_sure_dakika?: number | null
   min_sure_dakika?: number | null
   max_sure_dakika?: number | null
   aktif: boolean
@@ -17,6 +18,7 @@ interface Props {
 }
 
 interface DraftValues {
+  hedef: string
   min: string
   max: string
 }
@@ -54,6 +56,7 @@ async function saveSingle(id: string, d: DraftValues): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       id,
+      hedef_sure_dakika: d.hedef === '' ? null : Number(d.hedef),
       min_sure_dakika: d.min === '' ? null : Number(d.min),
       max_sure_dakika: d.max === '' ? null : Number(d.max),
     }),
@@ -71,6 +74,7 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
     const init: Record<string, DraftValues> = {}
     for (const lok of lokasyonlar) {
       init[lok.id] = {
+        hedef: lok.hedef_sure_dakika != null ? String(lok.hedef_sure_dakika) : '',
         min: lok.min_sure_dakika != null ? String(lok.min_sure_dakika) : '',
         max: lok.max_sure_dakika != null ? String(lok.max_sure_dakika) : '',
       }
@@ -90,7 +94,7 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
   }
 
   /** Alt lokasyonu olmayan normal draft değişimi */
-  const setDraft = (id: string, field: 'min' | 'max', val: string) => {
+  const setDraft = (id: string, field: 'hedef' | 'min' | 'max', val: string) => {
     setDrafts(prev => ({ ...prev, [id]: { ...prev[id], [field]: val } }))
     setSaved(prev => ({ ...prev, [id]: false }))
   }
@@ -99,7 +103,7 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
    * Üst lokasyon draft değişimi:
    * Üst lokasyonun değerini günceller VE tüm torunlarına propagate eder.
    */
-  const setParentDraft = (id: string, field: 'min' | 'max', val: string) => {
+  const setParentDraft = (id: string, field: 'hedef' | 'min' | 'max', val: string) => {
     const descendantIds = getAllDescendantIds(id, childrenOf)
     setDrafts(prev => {
       const next = { ...prev, [id]: { ...prev[id], [field]: val } }
@@ -162,12 +166,14 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
   const renderRow = (lok: LokasyonRow, indent = 0) => {
     const isParent = indent === 0
     const hasChildren = !!(childrenOf[lok.id]?.length)
-    const d = drafts[lok.id] ?? { min: '', max: '' }
+    const d = drafts[lok.id] ?? { hedef: '', min: '', max: '' }
     const isSaving = saving[lok.id]
     const isSaved = saved[lok.id]
     const err = errors[lok.id]
     const isOpen = openIds.has(lok.id)
 
+    const onChangeHedef = (val: string) =>
+      isParent && hasChildren ? setParentDraft(lok.id, 'hedef', val) : setDraft(lok.id, 'hedef', val)
     const onChangeMin = (val: string) =>
       isParent && hasChildren ? setParentDraft(lok.id, 'min', val) : setDraft(lok.id, 'min', val)
     const onChangeMax = (val: string) =>
@@ -242,6 +248,22 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
               </span>
             )}
           </span>
+
+          {/* Hedef süre */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <span style={{ fontSize: 10, color: '#1d4ed8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Hedef (dk)</span>
+            <input
+              type="number"
+              min={0}
+              value={d.hedef}
+              onChange={e => onChangeHedef(e.target.value)}
+              placeholder="—"
+              style={{
+                ...inputStyle,
+                borderColor: isParent && hasChildren ? '#93c5fd' : '#bfdbfe',
+              }}
+            />
+          </div>
 
           {/* Min süre */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -338,6 +360,8 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
         color: '#1e40af',
         lineHeight: 1.6,
       }}>
+        <strong>Hedef Süre:</strong> Görevin tamamlanması için beklenen ideal süre. Süre Analiz Raporları'nda gerçekleşen sürelerle karşılaştırılır.
+        <br />
         <strong>Min. Süre:</strong> SG (Süreli Görev)'lerde görev başlatma ile tamamlama arasındaki zorunlu bekleme süresi. Süre dolmadan görev tamamlanamaz.
         <br />
         <strong>Max. Süre:</strong> Bu süre sonunda görev hâlâ tamamlanmamış ise durum otomatik olarak <strong>İPTAL</strong> edilir.
@@ -361,6 +385,7 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
       }}>
         <span style={{ width: 22, flexShrink: 0 }} />
         <span style={{ flex: 1 }}>Lokasyon</span>
+        <span style={{ width: 90, textAlign: 'center' }}>Hedef (dk)</span>
         <span style={{ width: 90, textAlign: 'center' }}>Min. (dk)</span>
         <span style={{ width: 90, textAlign: 'center' }}>Max. (dk)</span>
         <span style={{ width: 130 }} />

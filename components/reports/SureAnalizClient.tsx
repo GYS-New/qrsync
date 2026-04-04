@@ -13,7 +13,7 @@ type Analiz = {
   ortBekleme: number; tamamlananSayi: number; toplam: number
 }
 type GunlukRow     = { tarih: string; ort_sure: number; adet: number }
-type LokasyonRow   = { lokasyon: string; ort_sure: number; min_sure: number; max_sure: number; adet: number }
+type LokasyonRow   = { lokasyon: string; ort_sure: number; min_sure: number; max_sure: number; adet: number; hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null }
 type PersonelRow   = { personel: string; ort_sure: number; tamamlanan: number; en_hizli: number; en_yavas: number }
 type DagilimRow    = { aralik: string; adet: number }
 type Bolum         = { analiz: Analiz; gunlukTrend: GunlukRow[]; lokasyon: LokasyonRow[]; personel: PersonelRow[]; dagilim: DagilimRow[] }
@@ -312,10 +312,36 @@ function BolumPanel({ bolum, renk, tip }: { bolum: Bolum; renk: string; tip: 'fr
         <div style={{ marginBottom: 14 }}>
           <HBarChart data={bolum.lokasyon.slice(0, 10)} valueKey="ort_sure" labelKey="lokasyon" color={renk} />
         </div>
+        {/* Hedef karşılaştırma varsa özet bandı */}
+        {bolum.lokasyon.some(r => r.hedef_sure != null) && (() => {
+          const asimlar = bolum.lokasyon.filter(r => r.hedef_fark != null && r.hedef_fark > 0)
+          const uyumlu  = bolum.lokasyon.filter(r => r.hedef_fark != null && r.hedef_fark <= 0)
+          return (
+            <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+              <div style={{ padding: '8px 14px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, fontSize: 12.5, fontWeight: 700, color: T.green }}>
+                ✓ Hedefe Uygun: {uyumlu.length} lokasyon
+              </div>
+              <div style={{ padding: '8px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 12.5, fontWeight: 700, color: T.red }}>
+                ✗ Hedef Aşımı: {asimlar.length} lokasyon
+              </div>
+            </div>
+          )
+        })()}
         <Tablo
           color={renk}
-          headers={['LOKASYON', 'ADET', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
-          rows={bolum.lokasyon.map(r => [r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)])}
+          headers={bolum.lokasyon.some(r => r.hedef_sure != null)
+            ? ['LOKASYON', 'ADET', 'HEDEF', 'ORT. SÜRE', 'FARK', 'EN HIZLI', 'EN YAVAŞ']
+            : ['LOKASYON', 'ADET', 'ORT. SÜRE', 'EN HIZLI', 'EN YAVAŞ']}
+          rows={bolum.lokasyon.map(r => {
+            if (bolum.lokasyon.some(x => x.hedef_sure != null)) {
+              const farkLabel = r.hedef_fark == null ? '—'
+                : r.hedef_fark > 0 ? `+${fmtS(r.hedef_fark)} (aşım)`
+                : r.hedef_fark < 0 ? `${fmtS(Math.abs(r.hedef_fark))} erken`
+                : 'Tam hedef'
+              return [r.lokasyon, r.adet, r.hedef_sure != null ? fmtS(r.hedef_sure) : '—', fmtS(r.ort_sure), farkLabel, fmtS(r.min_sure), fmtS(r.max_sure)]
+            }
+            return [r.lokasyon, r.adet, fmtS(r.ort_sure), fmtS(r.min_sure), fmtS(r.max_sure)]
+          })}
         />
       </div>
 

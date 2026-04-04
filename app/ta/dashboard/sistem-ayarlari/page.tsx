@@ -41,7 +41,7 @@ export default async function TASistemAyarlariPage() {
 
   const { data: lokasyonlar } = await supabase
     .from('lokasyonlar')
-    .select('id, tanim, parent_id, aktif, min_sure_dakika, max_sure_dakika')
+    .select('id, tanim, parent_id, aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika')
     .eq('firma_id', firmaId)
     .eq('proje_id', aktifProje.id)
     .order('tanim', { ascending: true })

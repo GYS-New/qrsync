@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { id, min_sure_dakika, max_sure_dakika } = body
+    const { id, min_sure_dakika, max_sure_dakika, hedef_sure_dakika } = body
 
     if (!id) return NextResponse.json({ error: 'Lokasyon ID gerekli' }, { status: 400 })
 
@@ -41,14 +41,17 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Bu lokasyona erişim yetkiniz yok' }, { status: 403 })
     }
 
-    const minVal = min_sure_dakika === '' || min_sure_dakika === undefined ? null : Number(min_sure_dakika)
-    const maxVal = max_sure_dakika === '' || max_sure_dakika === undefined ? null : Number(max_sure_dakika)
+    const toInt = (v: any) => (v === '' || v === undefined || v === null) ? null : Number(v)
+    const minVal    = toInt(min_sure_dakika)
+    const maxVal    = toInt(max_sure_dakika)
+    const hedefVal  = toInt(hedef_sure_dakika)
 
     const { error } = await supabase
       .from('lokasyonlar')
       .update({
-        min_sure_dakika: minVal != null && !isNaN(minVal) ? minVal : null,
-        max_sure_dakika: maxVal != null && !isNaN(maxVal) ? maxVal : null,
+        min_sure_dakika:   minVal   != null && !isNaN(minVal)   ? minVal   : null,
+        max_sure_dakika:   maxVal   != null && !isNaN(maxVal)   ? maxVal   : null,
+        hedef_sure_dakika: hedefVal != null && !isNaN(hedefVal) ? hedefVal : null,
       })
       .eq('id', id)
 

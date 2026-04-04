@@ -86,8 +86,13 @@ function gunlukTrend(gorevler: any[]): { tarih: string; ort_sure: number; adet: 
     }))
 }
 
-function lokasyonAnalizi(gorevler: any[], lokMap: Map<string, string>): {
+function lokasyonAnalizi(
+  gorevler: any[],
+  lokMap: Map<string, string>,
+  hedefMap: Map<string, number | null>,
+): {
   lokasyon: string; ort_sure: number; min_sure: number; max_sure: number; adet: number
+  hedef_sure: number | null; hedef_fark: number | null; hedef_fark_pct: number | null
 }[] {
   const map: Record<string, number[]> = {}
   for (const g of gorevler) {
@@ -99,12 +104,22 @@ function lokasyonAnalizi(gorevler: any[], lokMap: Map<string, string>): {
   return Object.entries(map)
     .map(([lid, vals]) => {
       const sorted = [...vals].sort((a, b) => a - b)
+      const ort_sure = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+      const hedef_dk = hedefMap.get(lid) ?? null
+      const hedef_sure = hedef_dk != null ? hedef_dk * 60 : null
+      const hedef_fark = hedef_sure != null ? ort_sure - hedef_sure : null
+      const hedef_fark_pct = hedef_sure != null && hedef_sure > 0
+        ? Math.round(((ort_sure - hedef_sure) / hedef_sure) * 100)
+        : null
       return {
         lokasyon: lokMap.get(lid) ?? '—',
-        ort_sure: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+        ort_sure,
         min_sure: sorted[0],
         max_sure: sorted[sorted.length - 1],
         adet: vals.length,
+        hedef_sure,
+        hedef_fark,
+        hedef_fark_pct,
       }
     })
     .sort((a, b) => b.adet - a.adet)
@@ -184,10 +199,11 @@ export async function GET(req: Request) {
     const admin = createAdminClient()
 
     // Lokasyon ve kullanıcı map'leri
-    const { data: loks }  = await admin.from('lokasyonlar').select('id,tanim').eq('firma_id', firmaId)
+    const { data: loks }  = await admin.from('lokasyonlar').select('id,tanim,hedef_sure_dakika').eq('firma_id', firmaId)
     const { data: users } = await admin.from('users').select('id,isim_soyisim').eq('firma_id', firmaId)
-    const lokMap  = new Map<string, string>((loks  ?? []).map((l: any) => [l.id, l.tanim]))
-    const userMap = new Map<string, string>((users ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
+    const lokMap   = new Map<string, string>((loks  ?? []).map((l: any) => [l.id, l.tanim]))
+    const hedefMap = new Map<string, number | null>((loks ?? []).map((l: any) => [l.id, l.hedef_sure_dakika ?? null]))
+    const userMap  = new Map<string, string>((users ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
 
     const SEL_FREQ  = 'id,firma_id,lokasyon_id,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,aktif_olma_tarihi'
     const SEL_SPEC  = 'id,firma_id,lokasyon_id,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'
@@ -222,14 +238,14 @@ export async function GET(req: Request) {
       frekansiyel: {
         analiz:      freqAnaliz,
         gunlukTrend: gunlukTrend(freqTum),
-        lokasyon:    lokasyonAnalizi(freqTum, lokMap),
+        lokasyon:    lokasyonAnalizi(freqTum, lokMap, hedefMap),
         personel:    personelAnalizi(freqTum, userMap),
         dagilim:     dagılımKovalari(freqTum),
       },
       spesifik: {
         analiz:      specAnaliz,
         gunlukTrend: gunlukTrend(specTum),
-        lokasyon:    lokasyonAnalizi(specTum, lokMap),
+        lokasyon:    lokasyonAnalizi(specTum, lokMap, hedefMap),
         personel:    personelAnalizi(specTum, userMap),
         dagilim:     dagılımKovalari(specTum),
       },
