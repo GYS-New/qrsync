@@ -46,6 +46,10 @@ export default function GorevKurallariClient({
   const { toast }   = useToast()
 
   const [kuralar, setKuralar]       = useState<any[]>(initialKuralar)
+  const [duraklatModal, setDuraklatModal] = useState<{ kuralId: string; tanim: string } | null>(null)
+  const [duraklatSaat, setDuraklatSaat]   = useState(24)
+  const [duraklatNeden, setDuraklatNeden] = useState('')
+  const [duraklatSaving, setDuraklatSaving] = useState(false)
 
   // Sekme içinde (embedded=true) ilk yüklemede kuralları çek
   useEffect(() => {
@@ -204,6 +208,36 @@ export default function GorevKurallariClient({
     }
   }
 
+  async function handleDuraklat() {
+    if (!duraklatModal) return
+    setDuraklatSaving(true)
+    try {
+      const res = await fetch(`/api/gorev-kurallari/${duraklatModal.kuralId}/duraklat`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'duraklat', saat: duraklatSaat, neden: duraklatNeden }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error)
+      setKuralar(p => p.map(k => k.id === duraklatModal.kuralId ? { ...k, duraklatma_bitis: j.duraklatma_bitis } : k))
+      toast({ type: 'success', title: 'Duraklatıldı', message: j.message })
+      setDuraklatModal(null); setDuraklatSaat(24); setDuraklatNeden('')
+    } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
+    setDuraklatSaving(false)
+  }
+
+  async function handleDevam(k: any) {
+    try {
+      const res = await fetch(`/api/gorev-kurallari/${k.id}/duraklat`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'devam' }),
+      })
+      if (res.ok) {
+        setKuralar(p => p.map(x => x.id === k.id ? { ...x, duraklatma_bitis: null } : x))
+        toast({ type: 'success', title: 'Devam', message: `"${k.tanim}" devam ediyor.` })
+      }
+    } catch {}
+  }
+
   async function handleDelete(k: any) {
     const ok = await confirm({
       title: 'Kuralı Sil',
@@ -325,8 +359,15 @@ export default function GorevKurallariClient({
               {filtered.map(k => {
                 const o = ozet[k.id]
                 return (
-                  <tr key={k.id} style={{ opacity: k.aktif ? 1 : 0.5 }}>
-                    <td style={{ fontWeight: 600, fontSize: 13 }}>{k.tanim}</td>
+                  <tr key={k.id} style={{ opacity: k.aktif ? 1 : 0.5, background: k.duraklatma_bitis && new Date(k.duraklatma_bitis).getTime() > Date.now() ? '#fffbeb' : undefined }}>
+                    <td style={{ fontWeight: 600, fontSize: 13 }}>
+                      {k.tanim}
+                      {k.duraklatma_bitis && new Date(k.duraklatma_bitis).getTime() > Date.now() && (
+                        <div style={{ fontSize: 11, color: '#92400e', marginTop: 2 }}>
+                          ⏸ Duraklatıldı — {new Date(k.duraklatma_bitis).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}'e kadar
+                        </div>
+                      )}
+                    </td>
                     <td style={{ fontSize: 12, color: '#506050', maxWidth: 180 }}>{lokMap.get(k.lokasyon_id) ?? '—'}</td>
                     <td style={{ whiteSpace: 'nowrap', fontSize: 12.5 }}>{gunEtiket(k.aktif_gunler ?? [])}</td>
                     <td style={{ textAlign: 'center' }}>
@@ -364,7 +405,17 @@ export default function GorevKurallariClient({
                     </td>
                     {!readonly && (
                       <td>
-                        <div style={{ display: 'flex', gap: 5 }}>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          {k.duraklatma_bitis && new Date(k.duraklatma_bitis).getTime() > Date.now() ? (
+                            <button onClick={() => handleDevam(k)} style={{ padding: '3px 9px', fontSize: 12, borderRadius: 6, border: '1px solid #86efac', background: '#dcfce7', color: '#15803d', fontWeight: 600, cursor: 'pointer' }}>
+                              ▶ Devam
+                            </button>
+                          ) : (
+                            <button onClick={() => { setDuraklatModal({ kuralId: k.id, tanim: k.tanim }); setDuraklatSaat(24); setDuraklatNeden('') }}
+                              style={{ padding: '3px 9px', fontSize: 12, borderRadius: 6, border: '1px solid #fbbf24', background: '#fef9c3', color: '#92400e', fontWeight: 600, cursor: 'pointer' }}>
+                              ⏸ Duraklat
+                            </button>
+                          )}
                           <button onClick={() => openEdit(k)} className="verde-btn-outline-strong" style={{ padding: '3px 9px', fontSize: 12 }}>Düzenle</button>
                           <button onClick={() => handleDelete(k)} className="verde-btn-outline-strong" style={{ padding: '3px 9px', fontSize: 12, color: '#b91c1c' }}>Sil</button>
                         </div>
@@ -396,6 +447,50 @@ export default function GorevKurallariClient({
       )}
 
       {/* ══ KURAL MODAL ══ */}
+      {/* Duraklat Modal */}
+      {duraklatModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={() => setDuraklatModal(null)}>
+          <div onClick={e => e.stopPropagation()} className="verde-card" style={{ width: 'min(400px, 96vw)', padding: 24 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f1a0f', marginBottom: 6 }}>⏸ Görev Kuralını Duraklat</div>
+            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
+              "<strong>{duraklatModal.tanim}</strong>" kuralı belirtilen süre boyunca yeni görev üretmeyecek. Süre dolunca otomatik devam eder.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#506050' }}>Duraklatma Süresi *</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[6, 12, 24, 48, 72].map(s => (
+                    <button key={s} onClick={() => setDuraklatSaat(s)}
+                      style={{ padding: '5px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, border: duraklatSaat === s ? '2px solid #92400e' : '1px solid #e2e8f0', background: duraklatSaat === s ? '#fef9c3' : '#fff', color: duraklatSaat === s ? '#92400e' : '#64748b', cursor: 'pointer' }}>
+                      {s < 24 ? `${s} saat` : `${s / 24} gün`}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>veya</span>
+                  <input type="number" min={1} max={720} value={duraklatSaat} onChange={e => setDuraklatSaat(Math.max(1, Math.min(720, Number(e.target.value) || 1)))}
+                    style={{ width: 70, height: 30, textAlign: 'center', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 700 }} />
+                  <span style={{ fontSize: 12, color: '#64748b' }}>saat</span>
+                </div>
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#506050' }}>Neden (opsiyonel)</span>
+                <input value={duraklatNeden} onChange={e => setDuraklatNeden(e.target.value)} placeholder="Neden duraklatılıyor?"
+                  style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
+              <button onClick={() => setDuraklatModal(null)} className="verde-btn-ghost" disabled={duraklatSaving}>Vazgeç</button>
+              <button onClick={handleDuraklat} disabled={duraklatSaving}
+                style={{ padding: '6px 18px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: duraklatSaving ? 0.6 : 1 }}>
+                {duraklatSaving ? 'Duraklatılıyor...' : `⏸ ${duraklatSaat} saat duraklat`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(15,26,15,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onMouseDown={e => { if (e.target === e.currentTarget) setModal(null) }}>
