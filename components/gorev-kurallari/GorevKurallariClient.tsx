@@ -16,7 +16,7 @@ type Props = {
   firmaId: string | null
   meId: string
   initialKuralar: any[]
-  lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[]
+  lokasyonlar: { id: string; tanim: string; parent_id?: string | null; gunluk_frekans_sayisi?: number | null }[]
   kullanicilar: { id: string; isim_soyisim: string }[]
   readonly: boolean
   embedded?: boolean
@@ -95,7 +95,9 @@ export default function GorevKurallariClient({
     })
     // Seçilen id'nin çocukları varsa lokasyon_id'yi boş bırak (ara seviye)
     const hasChildren = lokasyonlar.some(l => l.parent_id === id)
-    setForm(p => ({ ...p, lokasyon_id: hasChildren ? '' : id }))
+    const seciliLok = lokasyonlar.find(l => l.id === id)
+    const lokFrekans = seciliLok?.gunluk_frekans_sayisi ?? 1
+    setForm(p => ({ ...p, lokasyon_id: hasChildren ? '' : id, gunluk_frekans_sayisi: hasChildren ? p.gunluk_frekans_sayisi : lokFrekans }))
   }
 
   // level bazında gösterilecek çocuk listesi
@@ -581,13 +583,12 @@ export default function GorevKurallariClient({
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <label style={lbl}>Günlük Frekans *</label>
+                  <label style={lbl}>Günlük Frekans</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button type="button" onClick={() => setForm(p => ({ ...p, gunluk_frekans_sayisi: Math.max(1, p.gunluk_frekans_sayisi - 1) }))} style={stepBtn}>−</button>
                     <span style={{ fontSize: 20, fontWeight: 900, color: '#2e8b2e', minWidth: 28, textAlign: 'center' }}>{form.gunluk_frekans_sayisi}</span>
-                    <button type="button" onClick={() => setForm(p => ({ ...p, gunluk_frekans_sayisi: Math.min(24, p.gunluk_frekans_sayisi + 1) }))} style={stepBtn}>+</button>
                     <span style={{ fontSize: 12, color: '#7a907a' }}>kez/gün</span>
                   </div>
+                  <div style={{ fontSize: 11, color: '#7a907a', marginTop: 3 }}>Lokasyonun frekans sayısı (Sistem Ayarları'ndan)</div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>Gün İçi Aktifleşme Saati *</label>
