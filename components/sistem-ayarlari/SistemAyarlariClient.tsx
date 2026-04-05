@@ -131,16 +131,18 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
 
 function UygulamaAyarlariPanel() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [sidebarLogoUrl, setSidebarLogoUrl] = useState<string | null>(null)
   const [appName, setAppName] = useState('QR-Sync')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadingSidebar, setUploadingSidebar] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/sistem-ayarlari/konfigurasyon')
       .then(r => r.json())
-      .then(j => { setLogoUrl(j.uygulama_logo_url ?? null); setAppName(j.uygulama_ismi ?? 'QR-Sync'); setLoading(false) })
+      .then(j => { setLogoUrl(j.uygulama_logo_url ?? null); setSidebarLogoUrl(j.sidebar_logo_url ?? null); setAppName(j.uygulama_ismi ?? 'QR-Sync'); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
@@ -241,6 +243,54 @@ function UygulamaAyarlariPanel() {
           </button>
         </div>
         <span style={{ fontSize: 11, color: '#7a907a', marginTop: 4, display: 'block' }}>Login sayfasında, sayfa başlığında ve bildirimlerde kullanılır.</span>
+      </div>
+
+      {/* Sidebar Logosu (SA/alt_SA üst sol köşe) */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>Sidebar Logosu (SA/Alt SA)</div>
+        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginBottom: 14 }}>
+          SA ve Alt SA kullanıcılarının sidebar sol üst köşesinde gösterilecek logo.
+          Yatay (landscape) formatta, arka planı transparan PNG olmalıdır.
+          Önerilen boyut: <strong>220×48 piksel</strong> veya bu orana yakın.
+        </div>
+        <div style={{
+          border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, marginBottom: 14,
+          background: 'linear-gradient(135deg, #f8fafc, #f0fdf4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 64,
+        }}>
+          {sidebarLogoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={sidebarLogoUrl} alt="Sidebar Logo" style={{ height: 'auto', maxHeight: 48, maxWidth: '100%', objectFit: 'contain' }} />
+          ) : (
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>Henüz sidebar logosu yüklenmedi</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#fff', fontSize: 13, fontWeight: 600, color: '#506050', cursor: uploadingSidebar ? 'not-allowed' : 'pointer' }}>
+            {uploadingSidebar ? 'Yükleniyor...' : sidebarLogoUrl ? 'Değiştir' : 'Logo Yükle'}
+            <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={async (e) => {
+              const file = e.target.files?.[0]; if (!file) return
+              setUploadingSidebar(true)
+              try {
+                const fd = new FormData(); fd.append('file', file)
+                const res = await fetch('/api/upload/sidebar-logo', { method: 'POST', body: fd })
+                const j = await res.json()
+                if (!res.ok) throw new Error(j.error)
+                setSidebarLogoUrl(j.url); setMsg('Sidebar logosu yüklendi.')
+              } catch (err: any) { setMsg('Hata: ' + err.message) }
+              setUploadingSidebar(false); e.target.value = ''
+            }} disabled={uploadingSidebar} />
+          </label>
+          {sidebarLogoUrl && (
+            <button onClick={async () => {
+              const fd = new FormData(); fd.append('action', 'delete')
+              await fetch('/api/upload/sidebar-logo', { method: 'POST', body: fd })
+              setSidebarLogoUrl(null); setMsg('Sidebar logosu silindi.')
+            }} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fff', fontSize: 13, fontWeight: 600, color: '#dc2626', cursor: 'pointer' }}>
+              Sil
+            </button>
+          )}
+        </div>
       </div>
 
       {msg && (

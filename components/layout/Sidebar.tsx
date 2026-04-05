@@ -156,7 +156,7 @@ function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' |
   )
 }
 
-export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, uygulamaLogo, birimFiyatAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; uygulamaLogo?: string | null; birimFiyatAktifProp?: boolean }) {
+export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, birimFiyatAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; birimFiyatAktifProp?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeLoading = useRouteLoading()
@@ -311,9 +311,9 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           title="Gösterge Paneli"
         >
           {isSA ? (
-            uygulamaLogo ? (
+            sidebarLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={uygulamaLogo} alt="Logo" style={{ height: 48, maxWidth: 220, objectFit: 'contain' }} />
+              <img src={sidebarLogo} alt="Logo" style={{ height: 48, maxWidth: 220, objectFit: 'contain' }} />
             ) : null
           ) : firma?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -404,13 +404,10 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
       <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
         {/* Brand label — SA: boş veya proje logosu, TA/U: ProATA */}
         {isSA ? (
-          projeLogo || projeAdiProp ? (
-            <div style={{ padding: '8px 14px', margin: '8px 2px 6px', borderRadius: 10, background: '#eaf6ea', border: '1px solid #d6e4d6', display: 'flex', alignItems: 'center', gap: 10 }}>
-              {projeLogo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={projeLogo} alt="Proje" style={{ height: 36, objectFit: 'contain', borderRadius: 4 }} />
-              ) : null}
-              {projeAdiProp && <span style={{ fontSize: 14, fontWeight: 700, color: '#1f6b1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{projeAdiProp}</span>}
+          projeLogo ? (
+            <div style={{ padding: '8px 14px', margin: '8px 2px 6px', borderRadius: 10, background: '#eaf6ea', border: '1px solid #d6e4d6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={projeLogo} alt="Proje" style={{ height: 36, objectFit: 'contain' }} />
             </div>
           ) : null
         ) : (
