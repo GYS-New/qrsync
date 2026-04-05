@@ -313,7 +313,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           {isSA ? (
             sidebarLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={sidebarLogo} alt="Logo" style={{ height: 48, maxWidth: 220, objectFit: 'contain' }} />
+              <img src={sidebarLogo} alt="Logo" style={{ height: 60, maxWidth: 230, objectFit: 'contain' }} />
             ) : null
           ) : firma?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -407,7 +407,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           projeLogo ? (
             <div style={{ padding: '8px 14px', margin: '8px 2px 6px', borderRadius: 10, background: '#eaf6ea', border: '1px solid #d6e4d6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={projeLogo} alt="Proje" style={{ height: 36, objectFit: 'contain' }} />
+              <img src={projeLogo} alt="Proje" style={{ height: 48, objectFit: 'contain' }} />
             </div>
           ) : null
         ) : (
