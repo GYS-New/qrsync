@@ -26,6 +26,10 @@ export default async function UKullanicilarPage() {
 
   const { data: users } = await q
 
+  let lokQ = supabase.from('lokasyonlar').select('id,tanim').eq('firma_id', firmaId).is('parent_id', null).eq('aktif', true).order('tanim')
+  if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+  const { data: lokasyonlar } = await lokQ
+
   return (
     <div>
       <Topbar title="Kullanıcılar" base="/u" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Kullanıcılar' }]} />
@@ -36,6 +40,7 @@ export default async function UKullanicilarPage() {
         canCreate={yetki.ekleyebilir}
         canManage={yetki.duzenleyebilir || yetki.silebilir}
         projeId={projeId ?? undefined}
+        ustLokasyonlar={(lokasyonlar as any) ?? []}
       />
     </div>
   )

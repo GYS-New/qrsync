@@ -48,6 +48,7 @@ export interface User {
   kayit_tarihi: string
   kayit_yapan_id?: string
   aktif: boolean
+  ust_lokasyon_id?: string | null
 }
 
 export interface Firma {

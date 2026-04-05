@@ -35,6 +35,7 @@ export default function KullanicilarClient({
   canManage,
   enableBulkImport = false,
   projeId,
+  ustLokasyonlar = [],
 }: {
   base: '/ta' | '/u' | '/sa'
   firmaId?: string | null
@@ -43,11 +44,13 @@ export default function KullanicilarClient({
   canManage: boolean
   enableBulkImport?: boolean
   projeId?: string | null
+  ustLokasyonlar?: { id: string; tanim: string }[]
 }) {
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
   const isSA = base === '/sa'
+  const lokMap = useMemo(() => new Map(ustLokasyonlar.map(l => [l.id, l.tanim])), [ustLokasyonlar])
   const apiBase = base === '/sa' ? '/api/sa' : base === '/ta' ? '/api/ta' : '/api'
 
   const [q, setQ] = useState('')
@@ -320,6 +323,7 @@ export default function KullanicilarClient({
             <tr>
               <th>Kullanıcı</th>
               <th>Rol</th>
+              <th>Üst Lokasyon</th>
               <th>Telefon</th>
               <th>Cihaz Eşleşmesi</th>
               <th>Durum</th>
@@ -345,6 +349,27 @@ export default function KullanicilarClient({
                       ? <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: b.bg, color: b.color }}>{b.kisa}</span>
                       : <span style={{ color: '#506050', fontSize: 13 }}>{u.rol}</span>
                   })()}
+                </td>
+                <td>
+                  {canManage && ustLokasyonlar.length > 0 ? (
+                    <select
+                      value={(u as any).ust_lokasyon_id ?? ''}
+                      onChange={async (e) => {
+                        const val = e.target.value || null
+                        const { error } = await supabase.from('users').update({ ust_lokasyon_id: val }).eq('id', u.id)
+                        if (!error) {
+                          setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ust_lokasyon_id: val } as any : x))
+                          toast({ type: 'success', title: 'Güncellendi', message: `${u.isim_soyisim} üst lokasyonu değiştirildi.` })
+                        }
+                      }}
+                      style={{ height: 30, padding: '0 6px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 12.5, maxWidth: 140 }}
+                    >
+                      <option value="">—</option>
+                      {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                    </select>
+                  ) : (
+                    <span style={{ fontSize: 12.5, color: '#506050' }}>{(u as any).ust_lokasyon_id ? lokMap.get((u as any).ust_lokasyon_id) ?? '—' : '—'}</span>
+                  )}
                 </td>
                 <td style={{ color: '#506050' }}>{u.telefon ?? '—'}</td>
                 <td>

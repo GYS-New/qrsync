@@ -24,13 +24,10 @@ export default async function TAKullanicilarPage() {
   )
 
   // Sadece aktif projeye bağlı tenant_user'ları göster
-  const { data: users } = await supabase
-    .from('users')
-    .select('*')
-    .eq('firma_id', firmaId)
-    .eq('rol', 'tenant_user')
-    .eq('proje_id', aktifProje.id)
-    .order('kayit_tarihi', { ascending: false })
+  const [{ data: users }, { data: lokasyonlar }] = await Promise.all([
+    supabase.from('users').select('*').eq('firma_id', firmaId).eq('rol', 'tenant_user').eq('proje_id', aktifProje.id).order('kayit_tarihi', { ascending: false }),
+    supabase.from('lokasyonlar').select('id,tanim').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).is('parent_id', null).eq('aktif', true).order('tanim'),
+  ])
 
   return (
     <div>
@@ -43,6 +40,7 @@ export default async function TAKullanicilarPage() {
         canManage={me?.rol === 'tenant_admin'}
         enableBulkImport={me?.rol === 'tenant_admin'}
         projeId={aktifProje.id}
+        ustLokasyonlar={(lokasyonlar as any) ?? []}
       />
     </div>
   )
