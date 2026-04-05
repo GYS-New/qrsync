@@ -137,6 +137,8 @@ function MobilAyarlariPanel() {
   const [minVersion, setMinVersion] = useState('')
   const [surecNotu, setSurecNotu] = useState('')
   const [zorunlu, setZorunlu] = useState(false)
+  // Mevcut yayında olan değerler (referans için)
+  const [mevcut, setMevcut] = useState<{ apk_url: string; latest_version: string; min_version: string; surec_notu: string; zorunlu: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -146,7 +148,9 @@ function MobilAyarlariPanel() {
       .then(r => r.json())
       .then(j => {
         setApkUrl(j.apk_url ?? ''); setLatestVersion(j.latest_version ?? ''); setMinVersion(j.min_version ?? '')
-        setSurecNotu(j.surec_notu ?? ''); setZorunlu(j.zorunlu ?? false); setLoading(false)
+        setSurecNotu(j.surec_notu ?? ''); setZorunlu(j.zorunlu ?? false)
+        setMevcut({ apk_url: j.apk_url ?? '', latest_version: j.latest_version ?? '', min_version: j.min_version ?? '', surec_notu: j.surec_notu ?? '', zorunlu: j.zorunlu ?? false })
+        setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [])
@@ -161,6 +165,7 @@ function MobilAyarlariPanel() {
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error)
+      setMevcut({ apk_url: apkUrl.trim(), latest_version: latestVersion, min_version: minVersion, surec_notu: surecNotu, zorunlu })
       setMsg('Güncelleme yayınlandı! Mobil kullanıcılar yeni sürümü görecek.')
     } catch (e: any) { setMsg('Hata: ' + e.message) }
     setSaving(false)
@@ -171,65 +176,94 @@ function MobilAyarlariPanel() {
   const sinp: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, width: '100%' }
 
   return (
-    <div style={{ maxWidth: 560 }}>
+    <div style={{ maxWidth: 720 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
         <div style={{ width: 4, height: 20, borderRadius: 2, background: '#0d9488' }} />
         <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Mobil Uygulama Ayarları</h3>
       </div>
 
-      <div style={{ padding: '10px 14px', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: 8, fontSize: 12.5, color: '#0f766e', lineHeight: 1.6, marginBottom: 16 }}>
-        Mobil uygulama güncelleme bilgileri. APK linki güncellendikten sonra mobil kullanıcılar yeni sürümü indirmeleri için bildirim alır.
-      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
 
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>APK İndirme Linki *</span>
-            <input value={apkUrl} onChange={e => setApkUrl(e.target.value)} style={sinp} placeholder="https://drive.google.com/..." />
-            <span style={{ fontSize: 11, color: '#64748b' }}>Google Drive, direkt link veya başka bir depolama adresi</span>
-          </label>
+        {/* ═══ Android ═══ */}
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <span style={{ fontSize: 22 }}>🤖</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Android</span>
+          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {/* Mevcut sürüm bilgisi */}
+          {mevcut && (mevcut.latest_version || mevcut.min_version) && (
+            <div style={{ padding: '8px 12px', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: 8, marginBottom: 14, fontSize: 12 }}>
+              <div style={{ fontWeight: 700, color: '#0f766e', marginBottom: 4 }}>Yayında Olan Sürüm</div>
+              <div style={{ display: 'flex', gap: 16, color: '#0f766e' }}>
+                {mevcut.latest_version && <span>Son: <strong>{mevcut.latest_version}</strong></span>}
+                {mevcut.min_version && <span>Min: <strong>{mevcut.min_version}</strong></span>}
+                {mevcut.zorunlu && <span style={{ color: '#dc2626', fontWeight: 700 }}>Zorunlu</span>}
+              </div>
+              {mevcut.surec_notu && <div style={{ marginTop: 4, color: '#64748b', fontSize: 11 }}>{mevcut.surec_notu}</div>}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Son Sürüm</span>
-              <input value={latestVersion} onChange={e => setLatestVersion(e.target.value)} style={sinp} placeholder="1.2.0" />
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>APK İndirme Linki *</span>
+              <input value={apkUrl} onChange={e => setApkUrl(e.target.value)} style={sinp} placeholder="https://drive.google.com/..." />
             </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Yeni Sürüm</span>
+                <input value={latestVersion} onChange={e => setLatestVersion(e.target.value)} style={sinp} placeholder="1.3.0" />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Minimum Sürüm</span>
+                <input value={minVersion} onChange={e => setMinVersion(e.target.value)} style={sinp} placeholder="1.0.0" />
+              </label>
+            </div>
+
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Minimum Sürüm</span>
-              <input value={minVersion} onChange={e => setMinVersion(e.target.value)} style={sinp} placeholder="1.0.0" />
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Güncelleme Notu</span>
+              <textarea value={surecNotu} onChange={e => setSurecNotu(e.target.value)} rows={2}
+                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, resize: 'vertical' }}
+                placeholder="Bu sürümde neler değişti..." />
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input type="checkbox" checked={zorunlu} onChange={e => setZorunlu(e.target.checked)} style={{ width: 16, height: 16 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Zorunlu güncelleme</span>
             </label>
           </div>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Güncelleme Notu</span>
-            <textarea value={surecNotu} onChange={e => setSurecNotu(e.target.value)} rows={2}
-              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, resize: 'vertical' }}
-              placeholder="Bu sürümde neler değişti..." />
-          </label>
+          <button onClick={handlePublish} disabled={saving}
+            style={{
+              marginTop: 14, height: 40, padding: '0 20px', borderRadius: 8, border: 'none', width: '100%',
+              background: '#0d9488', color: '#fff', fontWeight: 800, fontSize: 13,
+              cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
+            }}>
+            {saving ? 'Yayınlanıyor...' : '🚀 Güncellemeleri Yayınla'}
+          </button>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={zorunlu} onChange={e => setZorunlu(e.target.checked)} style={{ width: 16, height: 16 }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Zorunlu güncelleme</span>
-            <span style={{ fontSize: 11, color: '#64748b' }}>(eski sürüm kullanılamaz)</span>
-          </label>
+          {msg && (
+            <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, fontSize: 12, background: msg.includes('Hata') ? '#fef2f2' : '#f0fdfa', color: msg.includes('Hata') ? '#dc2626' : '#0f766e', fontWeight: 600 }}>
+              {msg}
+            </div>
+          )}
         </div>
+
+        {/* ═══ Apple (Yakında) ═══ */}
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', opacity: 0.5 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <span style={{ fontSize: 22 }}>🍎</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Apple iOS</span>
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>Yakında</span>
+          </div>
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+            iOS uygulama desteği ilerleyen dönemde eklenecektir.
+            App Store veya TestFlight entegrasyonu bu alandan yönetilecek.
+          </div>
+        </div>
+
       </div>
-
-      <button onClick={handlePublish} disabled={saving}
-        style={{
-          height: 44, padding: '0 28px', borderRadius: 10, border: 'none',
-          background: '#0d9488', color: '#fff', fontWeight: 800, fontSize: 14,
-          cursor: saving ? 'not-allowed' : 'pointer',
-          display: 'flex', alignItems: 'center', gap: 8, opacity: saving ? 0.6 : 1,
-        }}>
-        {saving ? 'Yayınlanıyor...' : '🚀 Güncellemeleri Yayınla'}
-      </button>
-
-      {msg && (
-        <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, background: msg.includes('Hata') ? '#fef2f2' : '#f0fdfa', color: msg.includes('Hata') ? '#dc2626' : '#0f766e', fontWeight: 600 }}>
-          {msg}
-        </div>
-      )}
     </div>
   )
 }
