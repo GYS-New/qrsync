@@ -191,29 +191,40 @@ function UygulamaAyarlariPanel() {
 
       {/* Uygulama Logosu */}
       <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>Uygulama Logosu</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 80, height: 80, borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
-            {logoUrl ? (
-              <img src={logoUrl} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-            ) : (
-              <span style={{ fontSize: 28, color: '#cbd5e1' }}>🖼</span>
-            )}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <label style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#fff', fontSize: 13, fontWeight: 600, color: '#506050', cursor: uploading ? 'not-allowed' : 'pointer' }}>
-                {uploading ? 'Yükleniyor...' : logoUrl ? 'Değiştir' : 'Logo Yükle'}
-                <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={handleLogoUpload} disabled={uploading} />
-              </label>
-              {logoUrl && (
-                <button onClick={handleLogoDelete} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fff', fontSize: 13, fontWeight: 600, color: '#dc2626', cursor: 'pointer' }}>
-                  Sil
-                </button>
-              )}
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>Uygulama Logosu</div>
+        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginBottom: 14 }}>
+          Login sayfasında gösterilecek logo. Logo; uygulama simgesi, uygulama adı ve alt açıklama yazısını
+          tek bir görsel olarak içermelidir. Yatay (landscape) formatta, arka planı transparan PNG olmalıdır.
+          Önerilen boyut: <strong>420×120 piksel</strong> veya bu orana yakın. Minimum genişlik 300px.
+        </div>
+
+        {/* Logo önizleme */}
+        <div style={{
+          border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, marginBottom: 14,
+          background: 'linear-gradient(135deg, #f8fafc, #f0fdf4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80,
+        }}>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="Uygulama Logosu" style={{ height: 'auto', maxHeight: 100, maxWidth: '100%', objectFit: 'contain' }} />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#cbd5e1' }}>
+              <span style={{ fontSize: 36 }}>🖼</span>
+              <span style={{ fontSize: 12, color: '#94a3b8' }}>Henüz logo yüklenmedi</span>
             </div>
-            <span style={{ fontSize: 11, color: '#7a907a' }}>PNG (arka plansız), JPEG. Max 320x320px otomatik boyutlandırılır.</span>
-          </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#fff', fontSize: 13, fontWeight: 600, color: '#506050', cursor: uploading ? 'not-allowed' : 'pointer' }}>
+            {uploading ? 'Yükleniyor...' : logoUrl ? 'Değiştir' : 'Logo Yükle'}
+            <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={handleLogoUpload} disabled={uploading} />
+          </label>
+          {logoUrl && (
+            <button onClick={handleLogoDelete} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fff', fontSize: 13, fontWeight: 600, color: '#dc2626', cursor: 'pointer' }}>
+              Sil
+            </button>
+          )}
         </div>
       </div>
 
