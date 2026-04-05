@@ -1,8 +1,11 @@
+import { getSistemKonfig } from '@/lib/config/getSistemKonfig'
+
 export async function sendFCMToUser(userId: string, title: string, body: string, channelId: string = 'default') {
   try {
-    const projectId = process.env.FIREBASE_PROJECT_ID
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-    const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n')
+    const konfig = await getSistemKonfig()
+    const projectId = konfig.firebase_project_id
+    const clientEmail = konfig.firebase_client_email
+    const privateKey = konfig.firebase_private_key.replace(/\\n/g, '\n')
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!projectId || !clientEmail || !privateKey || !supabaseUrl || !supabaseKey) return

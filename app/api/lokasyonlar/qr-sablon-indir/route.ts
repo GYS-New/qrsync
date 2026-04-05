@@ -25,7 +25,14 @@ export async function POST(req: NextRequest) {
   const firmaId       = form.get('firma_id') as string | null
   const projeId       = form.get('proje_id') as string | null
   const ustLokasyonId = form.get('ust_lokasyon_id') as string | null
-  const origin        = (form.get('origin') as string | null) || 'https://app.qrsync.com'
+  let origin = form.get('origin') as string | null
+  if (!origin) {
+    try {
+      const { getSistemKonfig } = await import('@/lib/config/getSistemKonfig')
+      const konfig = await getSistemKonfig()
+      origin = `https://${konfig.uygulama_domain}`
+    } catch { origin = 'https://app.qrsync.com' }
+  }
   const ayarlarRaw    = form.get('ayarlar') as string | null
 
   if (!sablonFile) return NextResponse.json({ error: 'Şablon dosyası zorunlu (sablon)' }, { status: 400 })

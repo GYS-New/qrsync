@@ -10,7 +10,7 @@ const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: 
 const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/GorevKurallariClient'), { ssr: false })
 const GrupYetkileriClient = dynamic(() => import('@/components/ayarlar/GrupYetkileriClient'), { ssr: false })
 
-type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'smtp' | 'dashboard'
+type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'smtp' | 'konfigurasyon' | 'dashboard'
 
 const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'genel',          label: 'Genel Ayarlar'   },
@@ -19,6 +19,7 @@ const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'gorev-sureleri', label: 'Görev Süreleri'   },
   { key: 'yetkiler',       label: 'Kullanıcı Yetkileri' },
   { key: 'smtp',           label: 'Mail Sunucusu', saOnly: true },
+  { key: 'konfigurasyon',  label: 'Sistem Konfigürasyonu', saOnly: true },
   { key: 'dashboard',      label: 'Dashboard'        },
 ]
 
@@ -118,8 +119,105 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
         />
       )}
       {aktifTab === 'smtp' && isSA && <SmtpAyarlariPanel />}
+      {aktifTab === 'konfigurasyon' && isSA && <SistemKonfigurasyonPanel />}
       {aktifTab === 'dashboard' && (
         <DashboardSettingsClient meId={meId} initialBloklar={initialBloklar} />
+      )}
+    </div>
+  )
+}
+
+function SistemKonfigurasyonPanel() {
+  const [form, setForm] = useState({ uygulama_domain: 'app.qrsync.com', firebase_project_id: '', firebase_client_email: '', firebase_private_key: '', cron_secret: '' })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/sistem-ayarlari/konfigurasyon')
+      .then(r => r.json())
+      .then(j => { if (j.uygulama_domain) setForm(j); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await fetch('/api/sistem-ayarlari/konfigurasyon', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error)
+      setMsg('Konfigürasyon kaydedildi.')
+    } catch (e: any) { setMsg('Hata: ' + e.message) }
+    setSaving(false)
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#7a907a' }}>Yükleniyor...</div>
+
+  const sinp: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, width: '100%' }
+
+  return (
+    <div style={{ maxWidth: 640 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+        <div style={{ width: 4, height: 20, borderRadius: 2, background: '#7c3aed' }} />
+        <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Sistem Konfigürasyonu</h3>
+      </div>
+      <div style={{ padding: '10px 14px', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 8, fontSize: 12.5, color: '#6b21a8', lineHeight: 1.6, marginBottom: 16 }}>
+        Bu ayarlar sunucu, domain veya altyapı değişikliğinde kullanılır. Yanlış değer girilirse sistem çalışmayabilir.
+        Değişiklik yapmadan önce mevcut değerleri not alın.
+      </div>
+
+      {/* Uygulama */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>Uygulama</div>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Domain (QR/NFC bağlantı adresi)</span>
+          <input value={form.uygulama_domain} onChange={e => setForm(f => ({ ...f, uygulama_domain: e.target.value }))} style={sinp} placeholder="app.qrsync.com" />
+          <span style={{ fontSize: 11, color: '#64748b' }}>QR kodlarında ve sistem bağlantılarında kullanılan domain adresi</span>
+        </label>
+      </div>
+
+      {/* Firebase/FCM */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>Firebase Cloud Messaging (Mobil Bildirimler)</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Project ID</span>
+            <input value={form.firebase_project_id} onChange={e => setForm(f => ({ ...f, firebase_project_id: e.target.value }))} style={sinp} placeholder="my-project-12345" />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Client Email (Service Account)</span>
+            <input value={form.firebase_client_email} onChange={e => setForm(f => ({ ...f, firebase_client_email: e.target.value }))} style={sinp} placeholder="firebase-adminsdk-xxx@project.iam.gserviceaccount.com" />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Private Key</span>
+            <textarea value={form.firebase_private_key} onChange={e => setForm(f => ({ ...f, firebase_private_key: e.target.value }))} rows={3}
+              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }}
+              placeholder="-----BEGIN PRIVATE KEY-----\n..." />
+            <span style={{ fontSize: 11, color: '#64748b' }}>Firebase Console &gt; Proje Ayarları &gt; Hizmet Hesapları &gt; Anahtar Oluştur</span>
+          </label>
+        </div>
+      </div>
+
+      {/* Cron */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>Güvenlik</div>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Cron Secret Token</span>
+          <input value={form.cron_secret} onChange={e => setForm(f => ({ ...f, cron_secret: e.target.value }))} style={{ ...sinp, fontFamily: 'monospace' }} placeholder="Otomatik görevler için güvenlik anahtarı" />
+          <span style={{ fontSize: 11, color: '#64748b' }}>Zamanlanmış görevlerin (arşivleme, bildirim, rapor) yetkisiz çalıştırılmasını engeller</span>
+        </label>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <button onClick={handleSave} disabled={saving}
+          style={{ height: 38, padding: '0 20px', borderRadius: 8, background: '#7c3aed', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
+          {saving ? 'Kaydediliyor...' : 'Kaydet'}
+        </button>
+      </div>
+      {msg && (
+        <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, background: msg.includes('Hata') ? '#fef2f2' : '#f0fdf4', color: msg.includes('Hata') ? '#dc2626' : '#1a5c2a', fontWeight: 600 }}>
+          {msg}
+        </div>
       )}
     </div>
   )

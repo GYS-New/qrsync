@@ -24,7 +24,14 @@ export async function GET(req: NextRequest) {
   const firmaId       = url.searchParams.get('firma_id')
   const projeId       = url.searchParams.get('proje_id')
   const ustLokasyonId = url.searchParams.get('ust_lokasyon_id')
-  const origin        = url.searchParams.get('origin') || 'https://app.qrsync.com'
+  let origin = url.searchParams.get('origin')
+  if (!origin) {
+    try {
+      const { getSistemKonfig } = await import('@/lib/config/getSistemKonfig')
+      const konfig = await getSistemKonfig()
+      origin = `https://${konfig.uygulama_domain}`
+    } catch { origin = 'https://app.qrsync.com' }
+  }
 
   const effectiveFirmaId = isSA ? firmaId : me.firma_id
   if (!effectiveFirmaId) return NextResponse.json({ error: 'firma_id zorunlu' }, { status: 400 })
