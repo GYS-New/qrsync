@@ -310,11 +310,11 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           onClick={() => go(`${base}/dashboard`)}
           title="Gösterge Paneli"
         >
-          {isSA && uygulamaLogo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={uygulamaLogo} alt="Logo" style={{ height: 40, objectFit: 'contain' }} />
-          ) : isSA ? (
-            <ProataMark size={46} rounded={8} gap={3} />
+          {isSA ? (
+            uygulamaLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={uygulamaLogo} alt="Logo" style={{ height: 48, maxWidth: 220, objectFit: 'contain' }} />
+            ) : null
           ) : firma?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -349,8 +349,8 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
             </div>
           )}
 
-          {/* SA + uygulama logosu varsa yazı gösterme (logo zaten yazıyı içeriyor) */}
-          {!(isSA && uygulamaLogo) && (
+          {/* SA: logo varsa yazı gizle, logo yoksa alan boş — TA/U: firma adı + proje logo */}
+          {!isSA && (
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.15 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div
@@ -379,60 +379,49 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
             </div>
           )}
 
-          <span
-            style={{
-              marginLeft: 'auto',
-              fontSize: 11,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.6px',
-              color: '#2e8b2e',
-              background: '#dcf0dc',
-              border: '1px solid #b8e0b8',
-              padding: '2px 6px',
-              borderRadius: 4,
-            }}
-          >
-            Pro
-          </span>
+          {!isSA && (
+            <span
+              style={{
+                marginLeft: 'auto',
+                fontSize: 11,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.6px',
+                color: '#2e8b2e',
+                background: '#dcf0dc',
+                border: '1px solid #b8e0b8',
+                padding: '2px 6px',
+                borderRadius: 4,
+              }}
+            >
+              Pro
+            </span>
+          )}
         </div>
       </div>
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
-        {/* Brand label / SA: aktif proje logosu */}
-        <div
-          style={{
-            padding: '10px 14px',
-            margin: '8px 2px 6px',
-            borderRadius: 10,
-            background: '#eaf6ea',
-            border: '1px solid #d6e4d6',
-            fontWeight: 700,
-            fontSize: 14,
-            color: '#1f7a3f',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          {isSA && projeLogo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={projeLogo} alt="Proje" style={{ height: 28, objectFit: 'contain', borderRadius: 4 }} />
-          ) : (
+        {/* Brand label — SA: boş veya proje logosu, TA/U: ProATA */}
+        {isSA ? (
+          projeLogo || projeAdiProp ? (
+            <div style={{ padding: '10px 14px', margin: '8px 2px 6px', borderRadius: 10, background: '#eaf6ea', border: '1px solid #d6e4d6', display: 'flex', alignItems: 'center', gap: 10 }}>
+              {projeLogo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={projeLogo} alt="Proje" style={{ height: 28, objectFit: 'contain', borderRadius: 4 }} />
+              ) : null}
+              {projeAdiProp && <span style={{ fontSize: 14, fontWeight: 700, color: '#1f6b1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{projeAdiProp}</span>}
+            </div>
+          ) : null
+        ) : (
+          <div style={{ padding: '10px 14px', margin: '8px 2px 6px', borderRadius: 10, background: '#eaf6ea', border: '1px solid #d6e4d6', fontWeight: 700, fontSize: 14, color: '#1f7a3f', display: 'flex', alignItems: 'center', gap: 10 }}>
             <ProataMark size={28} rounded={6} gap={2} />
-          )}
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700 }}>
-            {isSA && projeLogo && projeAdiProp ? (
-              <span style={{ fontWeight: 700, color: '#1f6b1f' }}>{projeAdiProp}</span>
-            ) : (
-              <>
-                <span style={{ fontWeight: 300, color: '#506050' }}>Pro</span>
-                <span style={{ fontWeight: 800, color: '#1f6b1f' }}>ATA</span>
-              </>
-            )}
-          </span>
-        </div>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700 }}>
+              <span style={{ fontWeight: 300, color: '#506050' }}>Pro</span>
+              <span style={{ fontWeight: 800, color: '#1f6b1f' }}>ATA</span>
+            </span>
+          </div>
+        )}
 
         {groups.map((g) => {
           // U ve M rolleri için yetki filtresi uygula + birim-fiyatlar proje bayrağı kontrolü
