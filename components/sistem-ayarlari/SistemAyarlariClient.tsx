@@ -10,10 +10,11 @@ const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: 
 const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/GorevKurallariClient'), { ssr: false })
 const GrupYetkileriClient = dynamic(() => import('@/components/ayarlar/GrupYetkileriClient'), { ssr: false })
 
-type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'uygulama' | 'mobil' | 'smtp' | 'konfigurasyon' | 'dashboard'
+type Tab = 'genel' | 'proje-ayarlari' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'uygulama' | 'mobil' | 'smtp' | 'konfigurasyon' | 'dashboard'
 
 const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'genel',          label: 'Genel Ayarlar'   },
+  { key: 'proje-ayarlari', label: 'Proje Ayarları'  },
   { key: 'frekans',        label: 'Frekans Sayıları' },
   { key: 'gorev-kurallari',label: 'Görev Kuralları'  },
   { key: 'gorev-sureleri', label: 'Görev Süreleri'   },
@@ -93,6 +94,7 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
 
       {/* Tab içerikleri */}
       {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} projeId={projeId} kullanicilar={kullanicilar} />}
+      {aktifTab === 'proje-ayarlari' && projeId && <ProjeAyarlariPanel projeId={projeId} />}
       {aktifTab === 'frekans' && <FrekansSayilariClient lokasyonlar={lokasyonlar as any} />}
       {aktifTab === 'gorev-kurallari' && firmaId && (
         <GorevKurallariClient
@@ -127,6 +129,86 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
       {aktifTab === 'dashboard' && (
         <DashboardSettingsClient meId={meId} initialBloklar={initialBloklar} />
       )}
+    </div>
+  )
+}
+
+function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
+  const [proje, setProje] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [savingKey, setSavingKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/projeler/${projeId}`)
+      .then(r => r.json())
+      .then(j => { setProje(j); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [projeId])
+
+  const toggle = async (field: string, current: boolean) => {
+    setSavingKey(field)
+    try {
+      const res = await fetch(`/api/projeler/${projeId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: !current }),
+      })
+      if (res.ok) setProje((p: any) => ({ ...p, [field]: !current }))
+    } catch {}
+    setSavingKey(null)
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#7a907a' }}>Yükleniyor...</div>
+  if (!proje) return <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>Proje bulunamadı.</div>
+
+  const items: { key: string; label: string; desc: string; icon: string }[] = [
+    { key: 'aktif', label: 'Proje Durumu', desc: 'Proje aktif/pasif durumu. Pasif projeler kullanıcılar tarafından görüntülenemez.', icon: '🔄' },
+    { key: 'personel_takibi_aktif', label: 'Personel Takibi', desc: 'Personel mesai giriş/çıkış takibi. Aktif olduğunda QR/NFC ile mesai okutma yapılabilir.', icon: '👷' },
+    { key: 'qr_sistemi_aktif', label: 'QR Sistemi', desc: 'QR kod ile görev başlatma, tamamlama ve mesai okutma.', icon: '📷' },
+    { key: 'nfc_sistemi_aktif', label: 'NFC Sistemi', desc: 'NFC tag ile görev başlatma, tamamlama ve mesai okutma.', icon: '📶' },
+    { key: 'birim_fiyat_aktif', label: 'Birim Fiyat Sistemi', desc: 'Lokasyon ve gruplar için birim fiyat tanımlama ve hakediş hesaplama.', icon: '💰' },
+  ]
+
+  return (
+    <div style={{ maxWidth: 560 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+        <div style={{ width: 4, height: 20, borderRadius: 2, background: '#1d4ed8' }} />
+        <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Proje Ayarları — {proje.ad}</h3>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {items.map(item => {
+          const val = proje[item.key] ?? false
+          const busy = savingKey === item.key
+          return (
+            <div key={item.key} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ fontSize: 16 }}>{item.icon}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{item.label}</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>{item.desc}</div>
+              </div>
+              <button
+                onClick={() => toggle(item.key, val)}
+                disabled={busy}
+                style={{
+                  width: 52, height: 28, borderRadius: 14, border: 'none',
+                  cursor: busy ? 'not-allowed' : 'pointer', flexShrink: 0,
+                  background: val ? '#1a5c2a' : '#cbd5e1', position: 'relative', transition: 'background .2s',
+                }}
+              >
+                <div style={{
+                  width: 22, height: 22, borderRadius: 11, background: '#fff', position: 'absolute', top: 3,
+                  left: val ? 27 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                }} />
+              </button>
+              <span style={{ fontSize: 12, fontWeight: 600, color: val ? '#1a5c2a' : '#94a3b8', minWidth: 36 }}>
+                {val ? 'Açık' : 'Kapalı'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

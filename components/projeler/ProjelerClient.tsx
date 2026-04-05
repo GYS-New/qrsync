@@ -367,74 +367,7 @@ export default function ProjelerClient({
               {/* İşlemler */}
               {!readonly && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {/* Aktif/Pasif toggle */}
-                  <button
-                    onClick={() => toggleAktif(p)}
-                    style={{
-                      padding: '5px 12px', borderRadius: 6, border: '1px solid #d6e4d6',
-                      background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      color: p.aktif ? '#b45309' : '#2e8b2e',
-                    }}
-                  >
-                    {p.aktif ? 'Pasife Al' : 'Aktife Al'}
-                  </button>
-                  {/* Personel Takibi AÇ/KAPAT */}
-                  <button
-                    onClick={() => togglePersonelTakibi(p)}
-                    title="Proje için personel takibini aç/kapat"
-                    style={{
-                      padding: '5px 12px', borderRadius: 6,
-                      border: p.personel_takibi_aktif ? '1px solid #93c5fd' : '1px solid #d6e4d6',
-                      background: p.personel_takibi_aktif ? '#dbeafe' : '#fff',
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      color: p.personel_takibi_aktif ? '#1d4ed8' : '#7a907a',
-                    }}
-                  >
-                    👷 PT {p.personel_takibi_aktif ? 'Kapat' : 'Aç'}
-                  </button>
-                  {/* QR Sistemi AÇ/KAPAT */}
-                  <button
-                    onClick={() => toggleQrSistemi(p)}
-                    title="Proje için QR sistemini aç/kapat"
-                    style={{
-                      padding: '5px 12px', borderRadius: 6,
-                      border: p.qr_sistemi_aktif ? '1px solid #86efac' : '1px solid #d6e4d6',
-                      background: p.qr_sistemi_aktif ? '#dcfce7' : '#fff',
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      color: p.qr_sistemi_aktif ? '#15803d' : '#7a907a',
-                    }}
-                  >
-                    📷 QR {p.qr_sistemi_aktif ? 'Kapat' : 'Aç'}
-                  </button>
-                  {/* NFC Sistemi AÇ/KAPAT */}
-                  <button
-                    onClick={() => toggleNfcSistemi(p)}
-                    title="Proje için NFC sistemini aç/kapat"
-                    style={{
-                      padding: '5px 12px', borderRadius: 6,
-                      border: p.nfc_sistemi_aktif ? '1px solid #7dd3fc' : '1px solid #d6e4d6',
-                      background: p.nfc_sistemi_aktif ? '#e0f2fe' : '#fff',
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      color: p.nfc_sistemi_aktif ? '#0369a1' : '#7a907a',
-                    }}
-                  >
-                    📶 NFC {p.nfc_sistemi_aktif ? 'Kapat' : 'Aç'}
-                  </button>
-                  {/* Birim Fiyat — kaldırıldı, Sistem Ayarları üzerinden yönetilir */}
-                  {/* Süreli Görev AÇ/KAPAT */}
-                  <button
-                    onClick={() => toggleSureliGorevler(p)}
-                    title="Projedeki tüm lokasyonlarda süreli görevi toplu aç/kapat"
-                    style={{
-                      padding: '5px 12px', borderRadius: 6,
-                      border: p.sureli_gorev_aktif ? '1px solid #c4b5fd' : '1px solid #e9d5ff',
-                      background: p.sureli_gorev_aktif ? '#f3e8ff' : '#fff',
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      color: p.sureli_gorev_aktif ? '#7c3aed' : '#9ca3af',
-                    }}
-                  >
-                    ⚡ SG {p.sureli_gorev_aktif ? 'Kapat' : 'Aç'}
-                  </button>
+                  {/* Proje ayarları Sistem Ayarları > Proje Ayarları'na taşındı */}
                   <button onClick={() => openEdit(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                     <Pencil size={14} style={{ color: '#506050' }} />
                   </button>
