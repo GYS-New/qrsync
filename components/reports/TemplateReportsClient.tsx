@@ -316,8 +316,9 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
 
             {mailTekrar !== 'tek_sefer' && (
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Rapor Aralığı (Son X Gün)</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Rapor Kapsamı (Gün)</span>
                 <input type="number" min={1} max={365} value={mailGunSayisi} onChange={e => setMailGunSayisi(Number(e.target.value) || 30)} style={inp} />
+                <span style={{ fontSize: 11, color: T.textSoft, marginTop: 2 }}>Gönderim tarihinden geriye doğru kaç günlük veri raporlansın</span>
               </label>
             )}
 
@@ -335,7 +336,7 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
           <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.6, padding: '10px 14px', background: T.grayLight, borderRadius: 8, marginBottom: 14 }}>
             {mailTekrar === 'tek_sefer'
               ? `Yukarıdaki Başlangıç/Bitiş tarih aralığı ve Üst Lokasyon filtresi kullanılarak rapor oluşturulup ${mailGonderimTarihi || 'bugün'} saat ${mailSaat}'de gönderilecek.`
-              : `Her ${mailTekrar === 'gunluk' ? 'gün' : mailTekrar === 'haftalik' ? 'hafta' : 'ay'} saat ${mailSaat}'de son ${mailGunSayisi} günlük rapor oluşturulup gönderilecek.`
+              : `Her ${mailTekrar === 'gunluk' ? 'gün' : mailTekrar === 'haftalik' ? 'hafta' : 'ay'} saat ${mailSaat}'de, gönderim tarihinden geriye ${mailGunSayisi} günlük veriyi kapsayan rapor oluşturulup gönderilecek.`
             }
           </div>
 
