@@ -310,93 +310,14 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           onClick={() => go(`${base}/dashboard`)}
           title="Gösterge Paneli"
         >
-          {isSA ? (
-            sidebarLogo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={sidebarLogo} alt="Logo" style={{ height: 60, maxWidth: 230, objectFit: 'contain' }} />
-            ) : null
-          ) : firma?.logo_url ? (
+          {/* Logo alanı — tüm roller için tek yapı */}
+          {isSA && sidebarLogo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={firma.logo_url}
-              alt="Firma Logo"
-              style={{
-                width: 46,
-                height: 46,
-                borderRadius: 6,
-                objectFit: 'cover',
-                border: '1px solid #d6e4d6',
-                background: '#fff',
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: 46,
-                height: 46,
-                background: '#2e8b2e',
-                borderRadius: 6,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: 14,
-                fontWeight: 800,
-                letterSpacing: -1,
-              }}
-            >
-              {(firmaLabel || 'QR').slice(0, 2).toUpperCase()}
-            </div>
-          )}
-
-          {/* SA: logo varsa yazı gizle, logo yoksa alan boş — TA/U: firma adı + proje logo */}
-          {!isSA && (
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.15 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div
-                  style={{
-                    fontSize: 17.5,
-                    fontWeight: 800,
-                    color: '#0f1a0f',
-                    letterSpacing: '-0.4px',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    maxWidth: projeLogo ? 130 : 170,
-                  }}
-                  title={isSA ? 'ProATA' : firmaLabel || 'Firma'}
-                >
-                  {isSA ? 'ProATA' : firmaLabel || 'Firma'}
-                </div>
-                {projeLogo && !isSA && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={projeLogo} alt="Proje" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'contain', border: '1px solid #e2e8f0', background: '#fff', flexShrink: 0 }} />
-                )}
-              </div>
-              <div style={{ marginTop: 4, fontSize: 11.5, fontWeight: 700, letterSpacing: '1px', color: '#2d3f2d' }}>
-                TASK MANAGEMENT
-              </div>
-            </div>
-          )}
-
-          {!isSA && (
-            <span
-              style={{
-                marginLeft: 'auto',
-                fontSize: 11,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.6px',
-                color: '#2e8b2e',
-                background: '#dcf0dc',
-                border: '1px solid #b8e0b8',
-                padding: '2px 6px',
-                borderRadius: 4,
-              }}
-            >
-              Pro
-            </span>
-          )}
+            <img src={sidebarLogo} alt="Logo" style={{ height: 60, maxWidth: 230, objectFit: 'contain' }} />
+          ) : !isSA && firma?.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={firma.logo_url} alt="Firma Logo" style={{ height: 60, maxWidth: 230, objectFit: 'contain' }} />
+          ) : null}
         </div>
       </div>
 
