@@ -10,7 +10,7 @@ const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: 
 const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/GorevKurallariClient'), { ssr: false })
 const GrupYetkileriClient = dynamic(() => import('@/components/ayarlar/GrupYetkileriClient'), { ssr: false })
 
-type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'uygulama' | 'smtp' | 'konfigurasyon' | 'dashboard'
+type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'uygulama' | 'mobil' | 'smtp' | 'konfigurasyon' | 'dashboard'
 
 const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'genel',          label: 'Genel Ayarlar'   },
@@ -19,6 +19,7 @@ const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'gorev-sureleri', label: 'Görev Süreleri'   },
   { key: 'yetkiler',       label: 'Kullanıcı Yetkileri' },
   { key: 'uygulama',       label: 'Uygulama Ayarları', saOnly: true },
+  { key: 'mobil',          label: 'Mobil Ayarlar', saOnly: true },
   { key: 'smtp',           label: 'Mail Sunucusu', saOnly: true },
   { key: 'konfigurasyon',  label: 'Sistem Konfigürasyonu', saOnly: true },
   { key: 'dashboard',      label: 'Dashboard'        },
@@ -120,10 +121,114 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
         />
       )}
       {aktifTab === 'uygulama' && isSA && <UygulamaAyarlariPanel />}
+      {aktifTab === 'mobil' && isSA && <MobilAyarlariPanel />}
       {aktifTab === 'smtp' && isSA && <SmtpAyarlariPanel />}
       {aktifTab === 'konfigurasyon' && isSA && <SistemKonfigurasyonPanel />}
       {aktifTab === 'dashboard' && (
         <DashboardSettingsClient meId={meId} initialBloklar={initialBloklar} />
+      )}
+    </div>
+  )
+}
+
+function MobilAyarlariPanel() {
+  const [apkUrl, setApkUrl] = useState('')
+  const [latestVersion, setLatestVersion] = useState('')
+  const [minVersion, setMinVersion] = useState('')
+  const [surecNotu, setSurecNotu] = useState('')
+  const [zorunlu, setZorunlu] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/sistem-ayarlari/mobil')
+      .then(r => r.json())
+      .then(j => {
+        setApkUrl(j.apk_url ?? ''); setLatestVersion(j.latest_version ?? ''); setMinVersion(j.min_version ?? '')
+        setSurecNotu(j.surec_notu ?? ''); setZorunlu(j.zorunlu ?? false); setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const handlePublish = async () => {
+    if (!apkUrl.trim()) { setMsg('APK linki boş olamaz.'); return }
+    setSaving(true); setMsg(null)
+    try {
+      const res = await fetch('/api/sistem-ayarlari/mobil', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apk_url: apkUrl.trim(), latest_version: latestVersion, min_version: minVersion, surec_notu: surecNotu, zorunlu }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error)
+      setMsg('Güncelleme yayınlandı! Mobil kullanıcılar yeni sürümü görecek.')
+    } catch (e: any) { setMsg('Hata: ' + e.message) }
+    setSaving(false)
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#7a907a' }}>Yükleniyor...</div>
+
+  const sinp: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, width: '100%' }
+
+  return (
+    <div style={{ maxWidth: 560 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+        <div style={{ width: 4, height: 20, borderRadius: 2, background: '#0d9488' }} />
+        <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Mobil Uygulama Ayarları</h3>
+      </div>
+
+      <div style={{ padding: '10px 14px', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: 8, fontSize: 12.5, color: '#0f766e', lineHeight: 1.6, marginBottom: 16 }}>
+        Mobil uygulama güncelleme bilgileri. APK linki güncellendikten sonra mobil kullanıcılar yeni sürümü indirmeleri için bildirim alır.
+      </div>
+
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>APK İndirme Linki *</span>
+            <input value={apkUrl} onChange={e => setApkUrl(e.target.value)} style={sinp} placeholder="https://drive.google.com/..." />
+            <span style={{ fontSize: 11, color: '#64748b' }}>Google Drive, direkt link veya başka bir depolama adresi</span>
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Son Sürüm</span>
+              <input value={latestVersion} onChange={e => setLatestVersion(e.target.value)} style={sinp} placeholder="1.2.0" />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Minimum Sürüm</span>
+              <input value={minVersion} onChange={e => setMinVersion(e.target.value)} style={sinp} placeholder="1.0.0" />
+            </label>
+          </div>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Güncelleme Notu</span>
+            <textarea value={surecNotu} onChange={e => setSurecNotu(e.target.value)} rows={2}
+              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, resize: 'vertical' }}
+              placeholder="Bu sürümde neler değişti..." />
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={zorunlu} onChange={e => setZorunlu(e.target.checked)} style={{ width: 16, height: 16 }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Zorunlu güncelleme</span>
+            <span style={{ fontSize: 11, color: '#64748b' }}>(eski sürüm kullanılamaz)</span>
+          </label>
+        </div>
+      </div>
+
+      <button onClick={handlePublish} disabled={saving}
+        style={{
+          height: 44, padding: '0 28px', borderRadius: 10, border: 'none',
+          background: '#0d9488', color: '#fff', fontWeight: 800, fontSize: 14,
+          cursor: saving ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', gap: 8, opacity: saving ? 0.6 : 1,
+        }}>
+        {saving ? 'Yayınlanıyor...' : '🚀 Güncellemeleri Yayınla'}
+      </button>
+
+      {msg && (
+        <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, background: msg.includes('Hata') ? '#fef2f2' : '#f0fdfa', color: msg.includes('Hata') ? '#dc2626' : '#0f766e', fontWeight: 600 }}>
+          {msg}
+        </div>
       )}
     </div>
   )
