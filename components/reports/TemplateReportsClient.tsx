@@ -41,8 +41,9 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
   const [mailAciklama, setMailAciklama] = useState('')
   const [mailTekrar, setMailTekrar]     = useState<'tek_sefer' | 'gunluk' | 'haftalik' | 'aylik'>('tek_sefer')
   const [mailSaat, setMailSaat]         = useState('08:00')
-  const [mailGunSayisi, setMailGunSayisi] = useState(30)
   const [mailGonderimTarihi, setMailGonderimTarihi] = useState('')
+  const [mailAyGunu, setMailAyGunu]     = useState(1) // aylık: ayın kaçıncı günü
+  const [mailHaftaGunu, setMailHaftaGunu] = useState(1) // haftalık: 0=Pazar...6=Cumartesi
   const [savingMail, setSavingMail]     = useState(false)
   const [sablonInfo, setSablonInfo]     = useState<{ exists: boolean; updatedAt: string | null }>({ exists: false, updatedAt: null })
   const fileRef = React.useRef<HTMLInputElement>(null)
@@ -99,7 +100,6 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
         alici_emails: emails,
         tekrar_tipi: mailTekrar,
         saat: mailSaat,
-        rapor_gun_sayisi: mailGunSayisi,
         aciklama: mailAciklama,
       }
       if (mailTekrar === 'tek_sefer') {
@@ -107,6 +107,8 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
         body.rapor_bitis = bitis
         body.gonderim_tarihi = mailGonderimTarihi || new Date().toISOString().slice(0, 10)
       }
+      if (mailTekrar === 'aylik') body.gun_secimi = [mailAyGunu]
+      if (mailTekrar === 'haftalik') body.gun_secimi = [mailHaftaGunu]
       const res = await fetch('/api/reports/rapor-zamanlama', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Kaydetme hatası')
@@ -314,11 +316,25 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
               </label>
             )}
 
-            {mailTekrar !== 'tek_sefer' && (
+            {mailTekrar === 'aylik' && (
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Rapor Kapsamı (Gün)</span>
-                <input type="number" min={1} max={365} value={mailGunSayisi} onChange={e => setMailGunSayisi(Number(e.target.value) || 30)} style={inp} />
-                <span style={{ fontSize: 11, color: T.textSoft, marginTop: 2 }}>Gönderim tarihinden geriye doğru kaç günlük veri raporlansın</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Ayın Günü</span>
+                <select value={mailAyGunu} onChange={e => setMailAyGunu(Number(e.target.value))} style={inp}>
+                  {Array.from({ length: 28 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                </select>
+                <span style={{ fontSize: 11, color: T.textSoft }}>Her ayın bu gününde bir önceki ayın raporu gönderilir</span>
+              </label>
+            )}
+
+            {mailTekrar === 'haftalik' && (
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase' as const }}>Haftanın Günü</span>
+                <select value={mailHaftaGunu} onChange={e => setMailHaftaGunu(Number(e.target.value))} style={inp}>
+                  {[{ v: 1, l: 'Pazartesi' }, { v: 2, l: 'Salı' }, { v: 3, l: 'Çarşamba' }, { v: 4, l: 'Perşembe' }, { v: 5, l: 'Cuma' }, { v: 6, l: 'Cumartesi' }, { v: 0, l: 'Pazar' }].map(g =>
+                    <option key={g.v} value={g.v}>{g.l}</option>
+                  )}
+                </select>
+                <span style={{ fontSize: 11, color: T.textSoft }}>Her hafta bu günde bir önceki haftanın raporu gönderilir</span>
               </label>
             )}
 
@@ -334,10 +350,18 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
           </div>
 
           <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.6, padding: '10px 14px', background: T.grayLight, borderRadius: 8, marginBottom: 14 }}>
-            {mailTekrar === 'tek_sefer'
-              ? `Yukarıdaki Başlangıç/Bitiş tarih aralığı ve Üst Lokasyon filtresi kullanılarak rapor oluşturulup ${mailGonderimTarihi || 'bugün'} saat ${mailSaat}'de gönderilecek.`
-              : `Her ${mailTekrar === 'gunluk' ? 'gün' : mailTekrar === 'haftalik' ? 'hafta' : 'ay'} saat ${mailSaat}'de, gönderim tarihinden geriye ${mailGunSayisi} günlük veriyi kapsayan rapor oluşturulup gönderilecek.`
-            }
+            {mailTekrar === 'tek_sefer' && (
+              <>Yukarıdaki Başlangıç/Bitiş tarih aralığı ve Üst Lokasyon filtresi kullanılarak rapor oluşturulup <strong>{mailGonderimTarihi || 'bugün'}</strong> saat <strong>{mailSaat}</strong>'de gönderilecek.</>
+            )}
+            {mailTekrar === 'gunluk' && (
+              <>Her gün saat <strong>{mailSaat}</strong>'de, <strong>bir önceki günün</strong> raporu otomatik oluşturulup gönderilecek.</>
+            )}
+            {mailTekrar === 'haftalik' && (
+              <>Her <strong>{['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'][mailHaftaGunu]}</strong> günü saat <strong>{mailSaat}</strong>'de, <strong>bir önceki haftanın</strong> (Pazartesi-Pazar) raporu otomatik gönderilecek.</>
+            )}
+            {mailTekrar === 'aylik' && (
+              <>Her ayın <strong>{mailAyGunu}.</strong> günü saat <strong>{mailSaat}</strong>'de, <strong>bir önceki ayın</strong> tamamının raporu otomatik gönderilecek.</>
+            )}
           </div>
 
           <button onClick={handleSaveZamanlama} disabled={savingMail}
@@ -368,7 +392,7 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
                         {z.alici_emails?.join(', ')}
                       </div>
                       <div style={{ fontSize: 12, color: T.textSoft, marginTop: 2 }}>
-                        {z.tekrar_tipi === 'tek_sefer' ? 'Tek sefer' : z.tekrar_tipi === 'gunluk' ? 'Her gün' : z.tekrar_tipi === 'haftalik' ? 'Her hafta' : 'Her ay'}
+                        {z.tekrar_tipi === 'tek_sefer' ? 'Tek sefer' : z.tekrar_tipi === 'gunluk' ? 'Her gün · önceki günün raporu' : z.tekrar_tipi === 'haftalik' ? `Her ${['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][z.gun_secimi?.[0] ?? 0]} · önceki hafta raporu` : `Her ayın ${z.gun_secimi?.[0] ?? 1}. günü · önceki ay raporu`}
                         {' · '}{z.saat}
                         {z.son_gonderim_tarihi && ` · Son: ${new Date(z.son_gonderim_tarihi).toLocaleDateString('tr-TR')}`}
                         {z.sonraki_gonderim_tarihi && z.aktif && ` · Sonraki: ${new Date(z.sonraki_gonderim_tarihi).toLocaleDateString('tr-TR')}`}

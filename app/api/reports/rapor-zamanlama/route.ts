@@ -52,15 +52,43 @@ export async function POST(req: NextRequest) {
   // Sonraki gönderim tarihini hesapla
   const saat = body.saat ?? '08:00'
   let sonrakiGonderim: string | null = null
+  const gunSecimi = body.gun_secimi ?? null
+  const saatParts = saat.split(':')
+  const hh = parseInt(saatParts[0]), mm = parseInt(saatParts[1] ?? '0')
+
   if (tekrarTipi === 'tek_sefer') {
     const tarih = body.gonderim_tarihi ?? new Date().toISOString().slice(0, 10)
     sonrakiGonderim = `${tarih}T${saat}:00`
+  } else if (tekrarTipi === 'gunluk') {
+    const d = new Date()
+    d.setHours(hh, mm, 0, 0)
+    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
+    sonrakiGonderim = d.toISOString()
+  } else if (tekrarTipi === 'haftalik' && gunSecimi?.[0] != null) {
+    // Sonraki seçilen haftanın gününü bul
+    const hedefGun = gunSecimi[0] // 0=Pazar...6=Cumartesi
+    const d = new Date()
+    d.setHours(hh, mm, 0, 0)
+    const bugun = d.getDay()
+    let fark = hedefGun - bugun
+    if (fark < 0 || (fark === 0 && d.getTime() <= Date.now())) fark += 7
+    d.setDate(d.getDate() + fark)
+    sonrakiGonderim = d.toISOString()
+  } else if (tekrarTipi === 'aylik' && gunSecimi?.[0] != null) {
+    // Sonraki ayın seçilen gününü bul
+    const hedefGun = gunSecimi[0]
+    const d = new Date()
+    d.setHours(hh, mm, 0, 0)
+    if (d.getDate() > hedefGun || (d.getDate() === hedefGun && d.getTime() <= Date.now())) {
+      d.setMonth(d.getMonth() + 1)
+    }
+    d.setDate(Math.min(hedefGun, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()))
+    sonrakiGonderim = d.toISOString()
   } else {
-    // Bugünden itibaren ilk gönderim
-    const bugun = new Date()
-    bugun.setHours(parseInt(saat.split(':')[0]), parseInt(saat.split(':')[1]), 0, 0)
-    if (bugun.getTime() < Date.now()) bugun.setDate(bugun.getDate() + 1)
-    sonrakiGonderim = bugun.toISOString()
+    const d = new Date()
+    d.setHours(hh, mm, 0, 0)
+    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
+    sonrakiGonderim = d.toISOString()
   }
 
   const admin = createAdminClient()

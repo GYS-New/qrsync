@@ -37,15 +37,35 @@ export async function POST(req: NextRequest) {
 
   for (const z of zamanlamalar ?? []) {
     try {
-      // Rapor tarih aralığı
+      // Rapor tarih aralığı — önceki dönem bazlı
       let baslangic: string, bitis: string
       if (z.tekrar_tipi === 'tek_sefer' && z.rapor_baslangic && z.rapor_bitis) {
         baslangic = z.rapor_baslangic
         bitis = z.rapor_bitis
+      } else if (z.tekrar_tipi === 'gunluk') {
+        // Önceki gün
+        const oncekiGun = new Date(now.getTime() - 86400000)
+        baslangic = oncekiGun.toISOString().slice(0, 10)
+        bitis = baslangic
+      } else if (z.tekrar_tipi === 'haftalik') {
+        // Önceki hafta (Pazartesi-Pazar)
+        const bugun = now.getDay() // 0=Pazar
+        const pazartesiOffset = bugun === 0 ? 6 : bugun - 1
+        const buPazartesi = new Date(now.getTime() - pazartesiOffset * 86400000)
+        const oncekiPazar = new Date(buPazartesi.getTime() - 86400000)
+        const oncekiPazartesi = new Date(oncekiPazar.getTime() - 6 * 86400000)
+        baslangic = oncekiPazartesi.toISOString().slice(0, 10)
+        bitis = oncekiPazar.toISOString().slice(0, 10)
+      } else if (z.tekrar_tipi === 'aylik') {
+        // Önceki ay (1. gün - son gün)
+        const oncekiAy = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        const oncekiAySon = new Date(now.getFullYear(), now.getMonth(), 0)
+        baslangic = oncekiAy.toISOString().slice(0, 10)
+        bitis = oncekiAySon.toISOString().slice(0, 10)
       } else {
-        const gunSayisi = z.rapor_gun_sayisi || 30
+        // Fallback: son 30 gün
         bitis = now.toISOString().slice(0, 10)
-        baslangic = new Date(now.getTime() - gunSayisi * 86400000).toISOString().slice(0, 10)
+        baslangic = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10)
       }
 
       // Kullanıcı adını çek
