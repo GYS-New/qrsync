@@ -58,6 +58,7 @@ export default function KullanicilarClient({
   const [filtreDurum, setFiltreDurum] = useState<'' | 'aktif' | 'pasif'>('')
   const [filtreRol, setFiltreRol] = useState('')
   const [users, setUsers] = useState<User[]>(initialUsers)
+  const [seciliIds, setSeciliIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [deviceTokenMap, setDeviceTokenMap] = useState<Record<string, {
     device_token: string
@@ -300,6 +301,43 @@ export default function KullanicilarClient({
     setLoading(false)
   }
 
+  const toggleSecim = (id: string) => setSeciliIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  const tumunuSec = () => {
+    if (seciliIds.size === filtered.length) setSeciliIds(new Set())
+    else setSeciliIds(new Set(filtered.map(u => u.id)))
+  }
+
+  async function topluSil() {
+    if (!seciliIds.size) return
+    const taSecili = filtered.filter(u => seciliIds.has(u.id) && u.rol === 'tenant_admin')
+    if (taSecili.length > 0) {
+      showErr(`${taSecili.length} TA kullanıcısı seçili — TA'lar toplu silinemez. Lütfen TA'ları seçimden çıkarın.`)
+      return
+    }
+    const ok = await confirm({
+      title: 'Toplu Silme Onayı',
+      message: `Seçili ${seciliIds.size} kullanıcı kalıcı olarak silinecek.\n\nBu işlem geri alınamaz!`,
+      confirmText: `${seciliIds.size} Kullanıcı Sil`,
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/users/toplu-sil', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(seciliIds) }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? 'Toplu silme başarısız')
+      showOk(`${j.silinen ?? seciliIds.size} kullanıcı silindi.`)
+      setSeciliIds(new Set())
+      await refresh()
+    } catch (e: any) { showErr(e.message) }
+    setLoading(false)
+  }
+
   const isTA = base === '/ta'
 
   return (
@@ -329,6 +367,12 @@ export default function KullanicilarClient({
             <option value="musteri">Müşteri</option>
           </select>
           <span style={{ fontSize: 12, color: '#7a907a' }}>{filtered.length}/{users.length}</span>
+          {canManage && seciliIds.size > 0 && (
+            <button onClick={topluSil} disabled={loading}
+              style={{ height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              🗑 {seciliIds.size} Seçili Sil
+            </button>
+          )}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <input ref={importInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={onImportFile} />
             <Button variant="ghost" size="sm" onClick={refresh} disabled={loading} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>
@@ -350,6 +394,12 @@ export default function KullanicilarClient({
         <table className="verde-table">
           <thead>
             <tr>
+              {canManage && (
+                <th style={{ width: 36 }}>
+                  <input type="checkbox" checked={filtered.length > 0 && seciliIds.size === filtered.length} onChange={tumunuSec}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                </th>
+              )}
               <th>Kullanıcı</th>
               <th>Rol</th>
               <th>Üst Lokasyon</th>
@@ -361,7 +411,13 @@ export default function KullanicilarClient({
           </thead>
           <tbody>
             {filtered.map(u => (
-              <tr key={u.id}>
+              <tr key={u.id} style={{ background: seciliIds.has(u.id) ? '#fef2f2' : undefined }}>
+                {canManage && (
+                  <td>
+                    <input type="checkbox" checked={seciliIds.has(u.id)} onChange={() => toggleSecim(u.id)}
+                      style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                  </td>
+                )}
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <UserAvatar name={u.isim_soyisim} photoUrl={u.profil_foto} size={28} />

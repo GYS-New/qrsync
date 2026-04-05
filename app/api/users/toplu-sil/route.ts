@@ -1,0 +1,61 @@
+import { NextResponse } from 'next/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+
+export async function POST(req: Request) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+
+  const { data: me } = await supabase.from('users').select('rol,firma_id').eq('id', user.id).single()
+  if (!me || !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol))
+    return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 })
+
+  const body = await req.json()
+  const ids: string[] = body.ids
+  if (!Array.isArray(ids) || ids.length === 0)
+    return NextResponse.json({ error: 'Silinecek kullanıcı ID listesi gerekli' }, { status: 400 })
+
+  if (ids.length > 500)
+    return NextResponse.json({ error: 'Tek seferde en fazla 500 kullanıcı silinebilir' }, { status: 400 })
+
+  const admin = createAdminClient()
+  const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
+
+  // Silinecek kullanıcıları çek — TA koruma
+  const { data: hedefler } = await admin.from('users').select('id,rol,firma_id').in('id', ids)
+  const silinecekIds = (hedefler ?? [])
+    .filter(u => {
+      if (u.rol === 'tenant_admin' || u.rol === 'super_admin' || u.rol === 'alt_super_admin') return false
+      if (!isSA && u.firma_id !== me.firma_id) return false
+      return true
+    })
+    .map(u => u.id)
+
+  if (silinecekIds.length === 0)
+    return NextResponse.json({ error: 'Silinebilecek kullanıcı bulunamadı (TA/SA korumalı)' }, { status: 400 })
+
+  // FK bağımlılıkları temizle
+  await admin.from('gorevler').delete().in('atanan_kullanici_id', silinecekIds)
+  await admin.from('gorevler_arsiv').delete().in('atanan_kullanici_id', silinecekIds)
+  await admin.from('personel_mesai_kayitlari').delete().in('user_id', silinecekIds)
+  await admin.from('personel_mesai_kayitlari_arsiv').delete().in('user_id', silinecekIds)
+  await admin.from('bildirimler').delete().in('alici_id', silinecekIds)
+  await admin.from('device_tokens').delete().in('user_id', silinecekIds)
+
+  // canli_gorevler atamalarını temizle (NULL yapılabilir)
+  await admin.from('canli_gorevler').update({ atanan_kullanici_id: null }).in('atanan_kullanici_id', silinecekIds)
+  await admin.from('canli_gorevler_arsiv').update({ atanan_kullanici_id: null }).in('atanan_kullanici_id', silinecekIds)
+
+  // users sil
+  const { error: usersErr } = await admin.from('users').delete().in('id', silinecekIds)
+  if (usersErr) return NextResponse.json({ error: usersErr.message }, { status: 500 })
+
+  // auth sil
+  let authSilinen = 0
+  for (const id of silinecekIds) {
+    const { error } = await admin.auth.admin.deleteUser(id)
+    if (!error) authSilinen++
+  }
+
+  return NextResponse.json({ ok: true, silinen: silinecekIds.length, auth_silinen: authSilinen })
+}
