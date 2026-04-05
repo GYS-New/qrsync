@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   })
   if (upload.error) return NextResponse.json({ error: upload.error.message }, { status: 400 })
 
-  const publicUrl = admin.storage.from('logos').getPublicUrl(path).data.publicUrl
+  const publicUrl = admin.storage.from('logos').getPublicUrl(path).data.publicUrl + '?t=' + Date.now()
   const { error } = await admin.from('firmalar').update({ logo_url: publicUrl }).eq('id', firmaId)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
