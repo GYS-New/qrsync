@@ -325,12 +325,12 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
       <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
         {/* Brand label — proje logosu varsa göster (tüm roller), yoksa ProATA fallback (TA/U) */}
         {projeLogo ? (
-          <div style={{ padding: '8px 14px', margin: '8px 2px 6px', borderRadius: 10, background: '#eaf6ea', border: '1px solid #d6e4d6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ padding: '8px 14px', margin: '8px 2px 6px', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={projeLogo} alt="Proje" style={{ height: 48, objectFit: 'contain' }} />
           </div>
         ) : !isSA ? (
-          <div style={{ padding: '10px 14px', margin: '8px 2px 6px', borderRadius: 10, background: '#eaf6ea', border: '1px solid #d6e4d6', fontWeight: 700, fontSize: 14, color: '#1f7a3f', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ padding: '10px 14px', margin: '8px 2px 6px', borderRadius: 10, fontWeight: 700, fontSize: 14, color: '#1f7a3f', display: 'flex', alignItems: 'center', gap: 10 }}>
             <ProataMark size={28} rounded={6} gap={2} />
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700 }}>
               <span style={{ fontWeight: 300, color: '#506050' }}>Pro</span>
