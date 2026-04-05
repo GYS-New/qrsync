@@ -25,7 +25,22 @@ export default function FirmaKullanicilariClient({
   const projeId = aktifProje?.id ?? null
 
   const [users, setUsers] = useState<User[]>(initialUsers)
+  const [ustLokasyonlar, setUstLokasyonlar] = useState<{ id: string; tanim: string }[]>([])
   useEffect(() => { setUsers(initialUsers) }, [initialUsers])
+
+  // Üst lokasyonları çek
+  useEffect(() => {
+    if (!firmaId) return
+    const q = new URLSearchParams({ firmaId })
+    if (projeId) q.set('projeId', projeId)
+    fetch(`/api/lokasyonlar-list?${q}`)
+      .then(r => r.json())
+      .then(j => {
+        const loks = Array.isArray(j) ? j : (j.lokasyonlar ?? j.data ?? [])
+        setUstLokasyonlar(loks.filter((l: any) => !l.parent_id))
+      })
+      .catch(() => {})
+  }, [firmaId, projeId])
 
   if (!firmaId) {
     return (
@@ -47,6 +62,7 @@ export default function FirmaKullanicilariClient({
       canCreate={true}
       canManage={true}
       enableBulkImport={true}
+      ustLokasyonlar={ustLokasyonlar}
     />
   )
 }

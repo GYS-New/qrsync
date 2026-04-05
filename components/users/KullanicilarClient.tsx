@@ -191,15 +191,6 @@ export default function KullanicilarClient({
     showOk('Durum güncellendi.')
   }
 
-  async function setRole(u: User, rol: UserRole) {
-    const ok = await confirm({ title: 'Rol Değişikliği', message: `${u.isim_soyisim} rolü "${ROL_LABEL[rol]}" yapılsın mı?`, confirmText: 'Değiştir', cancelText: 'İptal', variant: 'danger' })
-    if (!ok) return
-    const { error } = await supabase.from('users').update({ rol }).eq('id', u.id)
-    if (error) { showErr(error.message); return }
-    setUsers(prev => prev.map(x => x.id === u.id ? { ...x, rol } : x))
-    showOk('Rol güncellendi.')
-  }
-
   async function createUser() {
     if (!createForm.isim_soyisim || !createForm.email || !createForm.password) { showErr('İsim, email ve şifre zorunludur.'); return }
 
@@ -441,11 +432,17 @@ export default function KullanicilarClient({
                       value={(u as any).ust_lokasyon_id ?? ''}
                       onChange={async (e) => {
                         const val = e.target.value || null
-                        const { error } = await supabase.from('users').update({ ust_lokasyon_id: val }).eq('id', u.id)
-                        if (!error) {
+                        try {
+                          const res = await fetch(`/api/users/${u.id}/ust-lokasyon`, {
+                            method: 'PATCH',
+                            headers: { 'content-type': 'application/json' },
+                            body: JSON.stringify({ ust_lokasyon_id: val }),
+                          })
+                          const j = await res.json()
+                          if (!res.ok) throw new Error(j.error ?? 'Güncellenemedi')
                           setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ust_lokasyon_id: val } as any : x))
                           toast({ type: 'success', title: 'Güncellendi', message: `${u.isim_soyisim} üst lokasyonu değiştirildi.` })
-                        }
+                        } catch (err: any) { toast({ type: 'error', title: 'Hata', message: err.message }) }
                       }}
                       style={{ height: 30, padding: '0 6px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 12.5, maxWidth: 140 }}
                     >
@@ -496,8 +493,6 @@ export default function KullanicilarClient({
                       </RowActionButton>
                       {(isSA || isTA) && (
                         <>
-                          {isSA && <RowActionButton variant="base" onClick={() => setRole(u, 'tenant_admin')}>Admin Yap</RowActionButton>}
-                          {isSA && <RowActionButton variant="base" onClick={() => setRole(u, 'tenant_user')}>Kullanıcı Yap</RowActionButton>}
                           <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>
                           <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
                           {deviceTokenMap[u.id] && (
