@@ -376,7 +376,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#1f6b1f' }}>
-                    {['Tarih', 'Lokasyon', 'Kanal', 'Puan', 'Yorum', 'Ad Soyad', 'Fotoğraf', 'İşlemler'].map(h => (
+                    {['Tarih', 'Lokasyon (Üst > Alt)', 'Kanal', 'Puan', 'Yorum', 'Ad Soyad', 'Fotoğraf', 'İşlemler'].map(h => (
                       <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
