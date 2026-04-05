@@ -22,33 +22,24 @@ export default function FirmaYeniPage() {
     return setForm((f) => ({ ...f, [k]: v }))
   }
 
-  async function resizeToSquarePng(file: File, size: number) {
+  async function resizePng(file: File, maxW: number, maxH: number) {
     const img = document.createElement('img')
     const url = URL.createObjectURL(file)
     try {
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve()
-        img.onerror = () => reject(new Error('Görsel okunamadı'))
-        img.src = url
-      })
+      await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = () => reject(new Error('Görsel okunamadı')); img.src = url })
+      let w = img.width, h = img.height
+      if (w > maxW || h > maxH) {
+        const scale = Math.min(maxW / w, maxH / h)
+        w = Math.round(w * scale); h = Math.round(h * scale)
+      }
       const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
+      canvas.width = w; canvas.height = h
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Canvas başlatılamadı')
-      const scale = Math.max(size / img.width, size / img.height)
-      const w = img.width * scale
-      const h = img.height * scale
-      const x = (size - w) / 2
-      const y = (size - h) / 2
-      ctx.drawImage(img, x, y, w, h)
-      const blob: Blob = await new Promise((resolve, reject) => {
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Görsel dönüştürülemedi'))), 'image/png', 0.92)
-      })
+      ctx.drawImage(img, 0, 0, w, h)
+      const blob: Blob = await new Promise((resolve, reject) => { canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Görsel dönüştürülemedi'))), 'image/png', 0.92) })
       return blob
-    } finally {
-      URL.revokeObjectURL(url)
-    }
+    } finally { URL.revokeObjectURL(url) }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -59,7 +50,7 @@ export default function FirmaYeniPage() {
     const firmaId = (data as any)?.id as string
     if (logoFile && firmaId) {
       try {
-        const blob = await resizeToSquarePng(logoFile, 320)
+        const blob = await resizePng(logoFile, 480, 480)
         const resizedFile = new File([blob], 'logo.png', { type: 'image/png' })
         const fd = new FormData()
         fd.append('firmaId', firmaId)
