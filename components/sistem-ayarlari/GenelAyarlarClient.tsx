@@ -47,6 +47,97 @@ const BOOL_DEFAULTS: Record<string, boolean> = {
 }
 const ALL_DEFAULTS: AllValues = { ...NUM_DEFAULTS, ...BOOL_DEFAULTS }
 
+/** Üst lokasyon bazlı bildirim alıcıları bileşeni */
+function LokasyonBazliBildirimAlicilar({ firmaId, projeId, kullanicilar }: { firmaId: string; projeId?: string | null; kullanicilar: { id: string; isim_soyisim: string }[] }) {
+  const { toast } = useToast()
+  const [ustLoklar, setUstLoklar] = useState<{ id: string; tanim: string }[]>([])
+  const [aliciMap, setAliciMap] = useState<Record<string, string[]>>({}) // ust_lok_id → [user_id]
+  const [savingLok, setSavingLok] = useState<string | null>(null)
+
+  // Üst lokasyonlar + mevcut eşleştirmeler
+  useEffect(() => {
+    if (!firmaId) return
+    const q = new URLSearchParams({ firmaId })
+    if (projeId) q.set('projeId', projeId)
+
+    Promise.all([
+      fetch(`/api/lokasyonlar-list?${q}`).then(r => r.json()),
+      fetch(`/api/sistem-ayarlari/personel-takip-alicilar?${q}`).then(r => r.json()),
+    ]).then(([loks, alicilar]) => {
+      const lokList = (Array.isArray(loks) ? loks : (loks.lokasyonlar ?? loks.data ?? [])).filter((l: any) => !l.parent_id)
+      setUstLoklar(lokList)
+      const map: Record<string, string[]> = {}
+      for (const a of (Array.isArray(alicilar) ? alicilar : [])) {
+        if (!map[a.ust_lokasyon_id]) map[a.ust_lokasyon_id] = []
+        map[a.ust_lokasyon_id].push(a.alici_user_id)
+      }
+      setAliciMap(map)
+    }).catch(() => {})
+  }, [firmaId, projeId])
+
+  const saveAlicilar = async (lokId: string) => {
+    setSavingLok(lokId)
+    try {
+      const res = await fetch('/api/sistem-ayarlari/personel-takip-alicilar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firmaId, projeId, ust_lokasyon_id: lokId, alici_user_ids: aliciMap[lokId] ?? [] }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      toast({ type: 'success', title: 'Kaydedildi', message: 'Bildirim alıcıları güncellendi.' })
+    } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
+    setSavingLok(null)
+  }
+
+  if (!ustLoklar.length) return null
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4 }}>3. Bildirim Alıcıları (Üst Lokasyon Bazlı)</div>
+      <div style={{ fontSize: 12, color: T.textSoft, marginBottom: 10 }}>
+        Her üst lokasyonun personeli için 3. hatırlatmada bildirim alacak kişiyi belirleyin. TA otomatik alır.
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {ustLoklar.map(lok => {
+          const seciliIds = aliciMap[lok.id] ?? []
+          return (
+            <div key={lok.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: T.grayLight, borderRadius: 8, border: `1px solid ${T.border}` }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: T.text, minWidth: 120 }}>{lok.tanim}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, flexWrap: 'wrap' }}>
+                {/* Seçili alıcılar chip */}
+                {seciliIds.map(uid => {
+                  const u = kullanicilar.find(k => k.id === uid)
+                  return (
+                    <span key={uid} style={{ padding: '3px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: '#dcfce7', color: T.green, border: '1px solid #86efac', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {u?.isim_soyisim ?? uid.slice(0, 8)}
+                      <button onClick={() => setAliciMap(prev => ({ ...prev, [lok.id]: (prev[lok.id] ?? []).filter(x => x !== uid) }))}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: T.green, padding: 0 }}>×</button>
+                    </span>
+                  )
+                })}
+                {/* Ekle dropdown */}
+                <select value="" onChange={e => {
+                  const val = e.target.value
+                  if (val && !seciliIds.includes(val)) setAliciMap(prev => ({ ...prev, [lok.id]: [...(prev[lok.id] ?? []), val] }))
+                }} style={{ height: 28, padding: '0 6px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', fontSize: 12, minWidth: 140 }}>
+                  <option value="">Ekle...</option>
+                  {kullanicilar.filter(u => !seciliIds.includes(u.id)).map(u => (
+                    <option key={u.id} value={u.id}>{u.isim_soyisim}</option>
+                  ))}
+                </select>
+              </div>
+              <button onClick={() => saveAlicilar(lok.id)} disabled={savingLok === lok.id}
+                style={{ height: 28, padding: '0 12px', borderRadius: 6, background: T.green, color: '#fff', border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: savingLok === lok.id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                {savingLok === lok.id ? '...' : 'Kaydet'}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId, kullanicilar = [] }: Props) {
   const { toast } = useToast()
   const { firmaId: saFirmaId } = useFirma()
@@ -57,7 +148,6 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
   const [overrides, setOverrides]         = useState<Record<string, boolean>>({})
   const [loading, setLoading]             = useState(false)
   const [savingKey, setSavingKey]         = useState<string | null>(null)
-  const [bildirimAlicilar, setBildirimAlicilar] = useState<string[]>([])
 
   const fetchAyarlar = useCallback(async () => {
     if (!currentFirmaId) return
@@ -73,9 +163,6 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
         const ov: Record<string, boolean> = {}
         for (const k of Object.keys(ALL_DEFAULTS)) ov[k] = json.proje != null && json.proje[k] != null
         setOverrides(ov)
-        // Bildirim alıcılar
-        const alicilar = json.efektif?.personel_takip_bildirim_alicilar ?? json.firma?.personel_takip_bildirim_alicilar ?? []
-        setBildirimAlicilar(Array.isArray(alicilar) ? alicilar : [])
       }
     } catch {}
     setLoading(false)
@@ -292,66 +379,8 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
               <strong style={{ color: T.green }}> {(efektif.personel_takip_bildirim_dk as number) * 3} dk</strong> sonra 3. hatırlatma + aşağıdaki alıcılara bildirim gönderilir.
             </div>
 
-            {/* Bildirim alıcıları */}
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 6 }}>3. Bildirim Alıcıları</div>
-              <div style={{ fontSize: 12, color: T.textSoft, marginBottom: 8 }}>
-                3. hatırlatmada TA ile birlikte web bildirimi alacak kullanıcıları seçin. TA otomatik alır.
-              </div>
-
-              {/* Seçilen kullanıcılar chip'leri */}
-              {bildirimAlicilar.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                  {bildirimAlicilar.map(id => {
-                    const u = kullanicilar.find(k => k.id === id)
-                    return (
-                      <span key={id} style={{
-                        padding: '4px 10px', borderRadius: 14, fontSize: 12, fontWeight: 600,
-                        background: '#dcfce7', color: T.green, border: `1px solid #86efac`,
-                        display: 'flex', alignItems: 'center', gap: 6,
-                      }}>
-                        {u?.isim_soyisim ?? id.slice(0, 8)}
-                        <button onClick={() => setBildirimAlicilar(prev => prev.filter(x => x !== id))}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: T.green, padding: 0, lineHeight: 1 }}>
-                          ×
-                        </button>
-                      </span>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Dropdown ile kullanıcı ekle */}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-                <select
-                  value=""
-                  onChange={e => {
-                    const val = e.target.value
-                    if (val && !bildirimAlicilar.includes(val)) setBildirimAlicilar(prev => [...prev, val])
-                  }}
-                  style={{ height: 34, padding: '0 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 13, minWidth: 220 }}
-                >
-                  <option value="">Kullanıcı ekle...</option>
-                  {kullanicilar.filter(u => !bildirimAlicilar.includes(u.id)).map(u => (
-                    <option key={u.id} value={u.id}>{u.isim_soyisim}</option>
-                  ))}
-                </select>
-                <SaveBtn id="personel_takip_bildirim_alicilar" onClick={async () => {
-                  setSavingKey('personel_takip_bildirim_alicilar')
-                  try {
-                    const hedef = projeId ? 'proje' : 'firma'
-                    const res = await fetch('/api/sistem-ayarlari/genel', {
-                      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ firmaId: currentFirmaId, projeId, hedef, personel_takip_bildirim_alicilar: bildirimAlicilar }),
-                    })
-                    const json = await res.json()
-                    if (!res.ok) throw new Error(json.error)
-                    toast({ type: 'success', title: 'Başarılı', message: 'Alıcılar kaydedildi.' })
-                  } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }
-                  setSavingKey(null)
-                }} />
-              </div>
-            </div>
+            {/* Üst lokasyon bazlı bildirim alıcıları */}
+            <LokasyonBazliBildirimAlicilar firmaId={currentFirmaId} projeId={projeId} kullanicilar={kullanicilar} />
           </>
         )}
         <OverrideBadge ayarKey="personel_takip_bildirim_dk" />

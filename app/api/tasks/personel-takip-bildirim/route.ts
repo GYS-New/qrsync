@@ -29,20 +29,18 @@ export async function POST(req: NextRequest) {
   // Aktif firmalar (personel takip bildirimi açık olanlar)
   const { data: firmalar } = await admin
     .from('firmalar')
-    .select('id,personel_takip_bildirim_dk,personel_takip_bildirim_alicilar')
+    .select('id,personel_takip_bildirim_dk')
     .eq('aktif', true)
     .gt('personel_takip_bildirim_dk', 0)
 
   // Proje override'ları
   const { data: projeler } = await admin
     .from('projeler')
-    .select('id,firma_id,personel_takip_bildirim_dk,personel_takip_bildirim_alicilar')
+    .select('id,firma_id,personel_takip_bildirim_dk')
     .eq('aktif', true)
   const projeOverride = new Map<string, number>()
-  const projeAlicilar = new Map<string, string[]>()
   for (const p of projeler ?? []) {
     if (p.personel_takip_bildirim_dk != null) projeOverride.set(p.id, p.personel_takip_bildirim_dk)
-    if ((p as any).personel_takip_bildirim_alicilar) projeAlicilar.set(p.id, (p as any).personel_takip_bildirim_alicilar)
   }
 
   // TA kullanıcıları (3. bildirimde web bildirim gönderilecek)
@@ -125,16 +123,22 @@ export async function POST(req: NextRequest) {
       try {
         await sendFCMToUser(mesai.user_id, title, body, 'gorev_uyari')
 
-        // 3. bildirimde TA + seçilen kullanıcılara web bildirimi gönder
+        // 3. bildirimde TA + üst lokasyon bazlı alıcılara web bildirimi gönder
         if (bildirimNo >= 3) {
-          // TA'lar
           const taIds = taMap.get(firma.id) ?? []
-          // Ek alıcılar: proje override > firma ayarı
-          const ekAlicilar = mesai.proje_id && projeAlicilar.has(mesai.proje_id)
-            ? projeAlicilar.get(mesai.proje_id)!
-            : ((firma as any).personel_takip_bildirim_alicilar ?? []) as string[]
-          // Birleştir, tekrarları kaldır
-          const tumAlicilar = [...new Set([...taIds, ...ekAlicilar])]
+
+          // Personelin üst lokasyonuna göre alıcıları bul
+          const { data: personelRow } = await admin.from('users').select('ust_lokasyon_id').eq('id', mesai.user_id).single()
+          const ustLokId = (personelRow as any)?.ust_lokasyon_id
+          let lokAlicilar: string[] = []
+          if (ustLokId) {
+            let aQ = admin.from('personel_takip_alicilar').select('alici_user_id').eq('firma_id', firma.id).eq('ust_lokasyon_id', ustLokId)
+            if (mesai.proje_id) aQ = (aQ as any).eq('proje_id', mesai.proje_id)
+            const { data: aliciRows } = await aQ
+            lokAlicilar = (aliciRows ?? []).map((r: any) => r.alici_user_id)
+          }
+
+          const tumAlicilar = [...new Set([...taIds, ...lokAlicilar])]
 
           for (const aliciId of tumAlicilar) {
             await admin.from('bildirimler').insert({
