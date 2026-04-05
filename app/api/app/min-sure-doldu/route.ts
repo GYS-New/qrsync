@@ -31,7 +31,13 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const { lokasyonAdi } = body
+    const { lokasyonAdi, beklemeSaniye } = body
+
+    if (beklemeSaniye && beklemeSaniye > 0) {
+      // Belirtilen süre kadar bekleyip bildirim gönder
+      // Railway sunucusu bu isteği açık tutar (streaming response)
+      await new Promise(resolve => setTimeout(resolve, beklemeSaniye * 1000))
+    }
 
     await sendFCMToUser(
       user.id,
