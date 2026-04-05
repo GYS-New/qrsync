@@ -54,6 +54,9 @@ export default function KullanicilarClient({
   const apiBase = base === '/sa' ? '/api/sa' : base === '/ta' ? '/api/ta' : '/api'
 
   const [q, setQ] = useState('')
+  const [filtreLokasyon, setFiltreLokasyon] = useState('')
+  const [filtreDurum, setFiltreDurum] = useState<'' | 'aktif' | 'pasif'>('')
+  const [filtreRol, setFiltreRol] = useState('')
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [loading, setLoading] = useState(false)
   const [deviceTokenMap, setDeviceTokenMap] = useState<Record<string, {
@@ -109,14 +112,20 @@ export default function KullanicilarClient({
   }, [openCreate, isSA, firmaId, projeId])
 
   const filtered = useMemo(() => {
+    let list = users
     const s = q.trim().toLowerCase()
-    if (!s) return users
-    return users.filter(u =>
+    if (s) list = list.filter(u =>
       u.isim_soyisim?.toLowerCase().includes(s) ||
       u.email?.toLowerCase().includes(s) ||
       (u.telefon ?? '').toLowerCase().includes(s)
     )
-  }, [q, users])
+    if (filtreLokasyon) list = list.filter(u => (u as any).ust_lokasyon_id === filtreLokasyon)
+    if (filtreLokasyon === '__bos') list = users.filter(u => !(u as any).ust_lokasyon_id)
+    if (filtreDurum === 'aktif') list = list.filter(u => u.aktif)
+    if (filtreDurum === 'pasif') list = list.filter(u => !u.aktif)
+    if (filtreRol) list = list.filter(u => u.rol === filtreRol)
+    return list
+  }, [q, users, filtreLokasyon, filtreDurum, filtreRol])
 
   function showErr(msg: string) { toast({ type: 'error', title: 'Hata', message: msg }) }
   function showOk(msg: string)  { toast({ type: 'success', title: 'Başarılı', message: msg }) }
@@ -296,11 +305,30 @@ export default function KullanicilarClient({
   return (
     <div className="users-scale" style={{ padding: '24px 28px' }}>
       <div className="verde-card">
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
-            className="verde-input" placeholder="Kullanıcı ara (isim, email, telefon)"
-            value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 320 }} autoComplete="off"
+            className="verde-input" placeholder="Ara (isim, email, telefon)"
+            value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 220 }} autoComplete="off"
           />
+          {ustLokasyonlar.length > 0 && (
+            <select className="verde-select" value={filtreLokasyon} onChange={e => setFiltreLokasyon(e.target.value)} style={{ width: 148 }}>
+              <option value="">Lokasyon (Tümü)</option>
+              <option value="__bos">— Atanmamış —</option>
+              {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+            </select>
+          )}
+          <select className="verde-select" value={filtreDurum} onChange={e => setFiltreDurum(e.target.value as any)} style={{ width: 110 }}>
+            <option value="">Durum (Tümü)</option>
+            <option value="aktif">Aktif</option>
+            <option value="pasif">Pasif</option>
+          </select>
+          <select className="verde-select" value={filtreRol} onChange={e => setFiltreRol(e.target.value)} style={{ width: 120 }}>
+            <option value="">Rol (Tümü)</option>
+            <option value="tenant_admin">TA</option>
+            <option value="tenant_user">Kullanıcı</option>
+            <option value="musteri">Müşteri</option>
+          </select>
+          <span style={{ fontSize: 12, color: '#7a907a' }}>{filtered.length}/{users.length}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <input ref={importInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={onImportFile} />
             <Button variant="ghost" size="sm" onClick={refresh} disabled={loading} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>
@@ -328,7 +356,7 @@ export default function KullanicilarClient({
               <th>Telefon</th>
               <th>Cihaz Eşleşmesi</th>
               <th>Durum</th>
-              {canManage && <th>İşlem</th>}
+              {canManage && <th style={{ textAlign: 'right' }}>İşlem</th>}
             </tr>
           </thead>
           <tbody>
@@ -406,7 +434,7 @@ export default function KullanicilarClient({
                 </td>
                 {canManage && (
                   <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <RowActionButton variant={u.aktif ? 'warning' : 'success'} onClick={() => toggleAktif(u)}>
                         {u.aktif ? 'Pasif Yap' : 'Aktif Yap'}
                       </RowActionButton>
