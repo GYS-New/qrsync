@@ -328,10 +328,15 @@ export default function ProjelerClient({
               background: p.aktif ? '#fff' : '#fafafa',
               opacity: p.aktif ? 1 : 0.7,
             }}>
-              {/* Renk + ikon */}
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: `${p.renk}18`, border: `2px solid ${p.renk}40`, display: 'grid', placeItems: 'center' }}>
-                <div style={{ width: 12, height: 12, borderRadius: '50%', background: p.renk }} />
-              </div>
+              {/* Logo veya renk ikon */}
+              {p.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={p.logo_url} alt={p.ad} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'contain', border: '1px solid #e2e8f0', background: '#fff', flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${p.renk}18`, border: `2px solid ${p.renk}40`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: p.renk }} />
+                </div>
+              )}
 
               {/* Bilgi */}
               <div>
@@ -415,22 +420,7 @@ export default function ProjelerClient({
                   >
                     📶 NFC {p.nfc_sistemi_aktif ? 'Kapat' : 'Aç'}
                   </button>
-                  {/* Birim Fiyat AÇ/KAPAT — firma'da aktifse göster */}
-                  {firmaBirimFiyatAktif && (
-                    <button
-                      onClick={() => toggleBirimFiyat(p)}
-                      title="Proje için birim fiyat sistemini aç/kapat"
-                      style={{
-                        padding: '5px 12px', borderRadius: 6,
-                        border: p.birim_fiyat_aktif ? '1px solid #fbbf24' : '1px solid #d6e4d6',
-                        background: p.birim_fiyat_aktif ? '#fef9c3' : '#fff',
-                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        color: p.birim_fiyat_aktif ? '#92400e' : '#7a907a',
-                      }}
-                    >
-                      💰 Birim Fiyat {p.birim_fiyat_aktif ? 'Kapat' : 'Aç'}
-                    </button>
-                  )}
+                  {/* Birim Fiyat — kaldırıldı, Sistem Ayarları üzerinden yönetilir */}
                   {/* Süreli Görev AÇ/KAPAT */}
                   <button
                     onClick={() => toggleSureliGorevler(p)}
@@ -580,16 +570,7 @@ export default function ProjelerClient({
                 </div>
               </div>
 
-              {firmaBirimFiyatAktif && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: '#0f1a0f', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={form.birim_fiyat_aktif ?? false}
-                    onChange={e => setForm(p => ({ ...p, birim_fiyat_aktif: e.target.checked }))}
-                  />
-                  <span>💰 Birim Fiyat Sistemi</span>
-                </label>
-              )}
+              {/* Birim Fiyat Sistemi — Sistem Ayarları üzerinden yönetilir */}
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
