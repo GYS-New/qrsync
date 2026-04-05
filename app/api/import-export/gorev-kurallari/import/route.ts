@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.rows.length) return NextResponse.json({ error: 'Excel içinde veri bulunamadı' }, { status: 400 })
 
     const [{ data: locs, error: le }, { data: users, error: ue }] = await Promise.all([
-      scope.admin.from('lokasyonlar').select('id,parent_id,tanim').eq('firma_id', scope.firmaId),
+      scope.admin.from('lokasyonlar').select('id,parent_id,tanim,gunluk_frekans_sayisi').eq('firma_id', scope.firmaId),
       scope.admin.from('users').select('id,email').eq('firma_id', scope.firmaId),
     ])
     if (le) throw new Error(le.message)
@@ -46,7 +46,11 @@ export async function POST(req: NextRequest) {
       return parts.reverse().join(' / ')
     }
     const locPathMap = new Map<string, string>()
-    for (const l of locs ?? []) locPathMap.set(pathOf(l.id).toLowerCase(), l.id)
+    const locFrekansMap = new Map<string, number>()
+    for (const l of locs ?? []) {
+      locPathMap.set(pathOf(l.id).toLowerCase(), l.id)
+      locFrekansMap.set(l.id, (l as any).gunluk_frekans_sayisi ?? 1)
+    }
     const userMap = new Map((users ?? []).map((x: any) => [String(x.email).toLowerCase(), x.id]))
 
     let created = 0
@@ -63,8 +67,6 @@ export async function POST(req: NextRequest) {
       const saat        = normalizeText(row.aktif_olma_saati ?? '08:00')
       const baslangic   = normalizeText(row.baslangic_tarihi ?? new Date().toISOString().slice(0, 10))
       const bitis       = normalizeText(row.bitis_tarihi ?? '')
-      const frekans     = Math.max(1, Math.min(24, parseInt(String(row.gunluk_frekans_sayisi ?? '1')) || 1))
-
       if (!tanim || !lokYolu) {
         errors.push(`Satır ${rowNo}: tanim ve lokasyon_yolu zorunludur.`)
         continue
@@ -93,7 +95,7 @@ export async function POST(req: NextRequest) {
         lokasyon_id: lokId,
         tanim,
         aktif_gunler: gunler,
-        gunluk_frekans_sayisi: frekans,
+        gunluk_frekans_sayisi: locFrekansMap.get(lokId) ?? 1,
         aktif_olma_saati: saat.length === 5 ? saat + ':00' : saat,
         baslangic_tarihi: baslangic,
         bitis_tarihi: bitis || null,

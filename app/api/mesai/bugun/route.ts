@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
   // TA (tenant_admin) proje_id'ye bağlı olmayabileceği için proje filtresi TA'ya uygulanmaz
   let kulQ = admin
     .from('users')
-    .select('id,isim_soyisim,email,profil_foto,rol,last_seen_at')
+    .select('id,isim_soyisim,email,profil_foto,rol,last_seen_at,ust_lokasyon_id')
     .eq('firma_id', firmaId)
     .eq('aktif', true)
     .not('rol', 'in', '(super_admin,alt_super_admin)')
@@ -114,8 +114,17 @@ export async function GET(req: NextRequest) {
       cikis_saati:    kayit?.cikis_saati  ?? null,
       giris_tipi:     kayit?.giris_tipi   ?? null,
       cikis_tipi:     kayit?.cikis_tipi   ?? null,
+      ust_lokasyon_id: u.ust_lokasyon_id ?? null,
     }
   })
+
+  // Üst lokasyon ad map'i
+  const lokIds = [...new Set(liste.map((r: any) => r.ust_lokasyon_id).filter(Boolean))]
+  const lokMapData: Record<string, string> = {}
+  if (lokIds.length > 0) {
+    const { data: loks } = await admin.from('lokasyonlar').select('id,tanim').in('id', lokIds)
+    for (const l of loks ?? []) lokMapData[l.id] = l.tanim ?? ''
+  }
 
   const toplam = liste.length
   const aktif  = liste.filter(l => l.aktif).length
@@ -126,5 +135,6 @@ export async function GET(req: NextRequest) {
     personelTakibiAktif,
     kpi:      { toplam, aktif, pasif },
     kayitlar: liste,
+    lokMap: lokMapData,
   })
 }

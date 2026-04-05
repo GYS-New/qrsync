@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     .select(`
       id, user_id, firma_id, proje_id, kayit_tarihi,
       giris_saati, cikis_saati, giris_tipi, cikis_tipi, arsivlendi,
-      users!user_id(isim_soyisim, email, rol)
+      users!user_id(isim_soyisim, email, rol, ust_lokasyon_id)
     `)
     .eq('firma_id', firmaId)
     .order('kayit_tarihi', { ascending: false })
@@ -65,7 +65,16 @@ export async function GET(req: NextRequest) {
     cikis_tipi:   r.cikis_tipi,
     aktif:        r.cikis_saati === null,
     arsivlendi:   r.arsivlendi,
+    ust_lokasyon_id: (r.users as any)?.ust_lokasyon_id ?? null,
   }))
 
-  return NextResponse.json({ ok: true, data: liste })
+  // Üst lokasyon ad map'i
+  const lokIds = [...new Set(liste.map((r: any) => r.ust_lokasyon_id).filter(Boolean))]
+  const lokMap: Record<string, string> = {}
+  if (lokIds.length > 0) {
+    const { data: loks } = await admin.from('lokasyonlar').select('id,tanim').in('id', lokIds)
+    for (const l of loks ?? []) lokMap[l.id] = l.tanim ?? ''
+  }
+
+  return NextResponse.json({ ok: true, data: liste, lokMap })
 }

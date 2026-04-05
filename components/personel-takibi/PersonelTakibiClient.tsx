@@ -29,6 +29,7 @@ interface PersonelSatir {
   cikis_saati:  string | null
   giris_tipi:   string | null
   cikis_tipi:   string | null
+  ust_lokasyon_id?: string | null
 }
 
 interface MesaiKayit {
@@ -44,6 +45,7 @@ interface MesaiKayit {
   cikis_tipi:   string | null
   aktif:        boolean
   arsivlendi:   boolean
+  ust_lokasyon_id?: string | null
 }
 
 interface Kpi { toplam: number; aktif: number; pasif: number }
@@ -154,6 +156,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   const [filtreBitis,     setFiltreBitis]     = useState('')
   const [filtreArama,     setFiltreArama]     = useState('')
   const [kayitListe,      setKayitListe]      = useState<MesaiKayit[]>([])
+  const [lokMap,          setLokMap]          = useState<Record<string, string>>({})
   const [kayitLoading,    setKayitLoading]    = useState(false)
 
   const filtreAktif       = !!(filtreBaslangic || filtreBitis)
@@ -174,6 +177,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
       setPersonelTakibiAktif(json.personelTakibiAktif ?? false)
       setKpi(json.kpi)
       setListe(json.kayitlar ?? [])
+      if (json.lokMap) setLokMap(prev => ({ ...prev, ...json.lokMap }))
     } finally { setLoading(false) }
   }, [firmaId, projeId])
 
@@ -188,7 +192,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
       if (filtreBitis)     p.set('bitis', filtreBitis)
       const res  = await fetch(`/api/mesai/liste?${p}`)
       const json = await res.json()
-      if (json.ok) setKayitListe(json.data ?? [])
+      if (json.ok) { setKayitListe(json.data ?? []); setLokMap(json.lokMap ?? {}) }
       else setHata(json.error)
     } finally { setKayitLoading(false) }
   }, [firmaId, projeId, filtreBaslangic, filtreBitis])
@@ -513,7 +517,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                         <tr style={{ background: '#1f6b1f' }}>
-                          {['Personel', 'Rol', 'Tarih', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi'].map(h => (
+                          {['Personel', 'Üst Lokasyon', 'Rol', 'Tarih', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi'].map(h => (
                             <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap', background: '#1f6b1f' }}>{h}</th>
                           ))}
                         </tr>
@@ -525,6 +529,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                           return (
                             <tr key={k.id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
                               <td style={td()}>{personelHucresi(k.isim_soyisim, k.email, dim)}</td>
+                              <td style={td({ fontSize: 12, color: tc })}>{k.ust_lokasyon_id ? lokMap[k.ust_lokasyon_id] ?? '—' : '—'}</td>
                               <td style={td()}>{rolBadge(k.rol, dim)}</td>
                               <td style={td({ fontWeight: 600, color: tc })}>{tarihFormatla(k.kayit_tarihi)}</td>
                               <td style={td()}>{durumBadge(k.aktif)}</td>
@@ -549,7 +554,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                         <tr style={{ background: '#1f6b1f' }}>
-                          {['Personel', 'Rol', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi', 'Son Görülme'].map(h => (
+                          {['Personel', 'Üst Lokasyon', 'Rol', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi', 'Son Görülme'].map(h => (
                             <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap', background: '#1f6b1f' }}>{h}</th>
                           ))}
                         </tr>
@@ -561,6 +566,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                           return (
                             <tr key={p.user_id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
                               <td style={td()}>{personelHucresi(p.isim_soyisim, p.email, dim)}</td>
+                              <td style={td({ fontSize: 12, color: tc })}>{(p as any).ust_lokasyon_id ? lokMap[(p as any).ust_lokasyon_id] ?? '—' : '—'}</td>
                               <td style={td()}>{rolBadge(p.rol, dim)}</td>
                               <td style={td()}>{durumBadge(p.aktif)}</td>
                               <td style={td({ fontWeight: 600, color: p.giris_saati ? tc : '#cbd5e1' })}>{saat(p.giris_saati)}</td>

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useRef } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateTime, GOREV_DURUM_LABEL } from '@/lib/utils'
@@ -49,6 +49,19 @@ export default function GorevlerClient({
   const { firmaId: saFirmaId } = useFirma()
   const [tenantFirmaId] = useState<string | null>(initialFirmaId ?? null)
   const firmaId = base === '/sa' ? saFirmaId : tenantFirmaId
+
+  // Dış tıklamada details menüleri kapat
+  const containerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    function closeAllDetails(e: MouseEvent) {
+      if (!containerRef.current) return
+      containerRef.current.querySelectorAll('details[open]').forEach(d => {
+        if (!d.contains(e.target as Node)) d.removeAttribute('open')
+      })
+    }
+    document.addEventListener('click', closeAllDetails)
+    return () => document.removeEventListener('click', closeAllDetails)
+  }, [])
 
   const [gorevler, setGorevler]               = useState<any[]>(initialGorevler)
   const [lokasyonlar, setLokasyonlar]         = useState(initialLokasyonlar)
@@ -357,7 +370,7 @@ export default function GorevlerClient({
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: '24px 28px' }}>
+    <div ref={containerRef} style={{ padding: '24px 28px' }}>
       <div className="verde-card">
 
         {/* ── Satır 1: Arama + Yenile + Görev Ekle ── */}
