@@ -264,10 +264,10 @@ export default function LoginPage() {
               animation: 'fadeUp 700ms ease 60ms both',
             }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center">
               {appLogo ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={appLogo} alt={appName} style={{ maxHeight: 48, maxWidth: 200, objectFit: 'contain' }} />
+                <img src={appLogo} alt={appName} style={{ height: 52, objectFit: 'contain' }} />
               ) : (
                 <ProataLogo variant="full" scale={1} />
               )}
