@@ -103,6 +103,7 @@ interface SidebarProps {
   user: User
   firma?: { ticari_unvan: string; firma_adi?: string; logo_url?: string } | null
   projeAdi?: string | null
+  projeLogo?: string | null
 }
 
 type SidebarCounts = {
@@ -155,7 +156,7 @@ function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' |
   )
 }
 
-export default function Sidebar({ user, firma, projeAdi: projeAdiProp, birimFiyatAktifProp }: { user: User; firma: any; projeAdi?: string | null; birimFiyatAktifProp?: boolean }) {
+export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, birimFiyatAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; birimFiyatAktifProp?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeLoading = useRouteLoading()
@@ -345,22 +346,29 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, birimFiya
             </div>
           )}
 
-          {/* Company name + product */}
+          {/* Company name + proje logo + product */}
           <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.15 }}>
-            <div
-              style={{
-                fontSize: 17.5,
-                fontWeight: 800,
-                color: '#0f1a0f',
-                letterSpacing: '-0.4px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxWidth: 170,
-              }}
-              title={isSA ? 'ProATA' : firmaLabel || 'Firma'}
-            >
-              {isSA ? 'ProATA' : firmaLabel || 'Firma'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div
+                style={{
+                  fontSize: 17.5,
+                  fontWeight: 800,
+                  color: '#0f1a0f',
+                  letterSpacing: '-0.4px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: projeLogo ? 130 : 170,
+                }}
+                title={isSA ? 'ProATA' : firmaLabel || 'Firma'}
+              >
+                {isSA ? 'ProATA' : firmaLabel || 'Firma'}
+              </div>
+              {/* Proje logosu — firma adının yanında küçük */}
+              {projeLogo && !isSA && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={projeLogo} alt="Proje" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'contain', border: '1px solid #e2e8f0', background: '#fff', flexShrink: 0 }} />
+              )}
             </div>
             <div style={{ marginTop: 4, fontSize: 11.5, fontWeight: 700, letterSpacing: '1px', color: '#2d3f2d' }}>
               TASK MANAGEMENT

@@ -13,11 +13,12 @@ type Proje = {
   renk: string
   aktif: boolean
   personel_takibi_aktif: boolean
-  sureli_gorev_aktif?: boolean  // lokasyonlardan hesaplanan özet durum
+  sureli_gorev_aktif?: boolean
   qr_sistemi_aktif: boolean
   nfc_sistemi_aktif: boolean
   birim_fiyat_aktif: boolean
   kayit_tarihi: string
+  logo_url?: string | null
 }
 
 const RENKLER = ['#2e8b2e', '#1d6fa8', '#9333ea', '#c2410c', '#0e7490', '#be185d', '#b45309', '#374151']
@@ -45,6 +46,8 @@ export default function ProjelerClient({
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...BOSH })
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [silModal, setSilModal] = useState<Proje | null>(null)
   const [silSifre, setSilSifre] = useState('')
   const [silLoading, setSilLoading] = useState(false)
@@ -90,13 +93,14 @@ export default function ProjelerClient({
   useEffect(() => { fetchProjeler() }, [fetchProjeler])
 
   function openCreate() {
-    setForm({ ...BOSH })
+    setForm({ ...BOSH }); setLogoFile(null); setLogoPreview(null)
     setEditId(null)
     setModal('create')
   }
 
   function openEdit(p: Proje) {
     setForm({ ad: p.ad, aciklama: p.aciklama ?? '', renk: p.renk, aktif: p.aktif, personel_takibi_aktif: p.personel_takibi_aktif ?? false, qr_sistemi_aktif: p.qr_sistemi_aktif ?? true, nfc_sistemi_aktif: p.nfc_sistemi_aktif ?? true, birim_fiyat_aktif: p.birim_fiyat_aktif ?? false })
+    setLogoFile(null); setLogoPreview(p.logo_url ?? null)
     setEditId(p.id)
     setModal('edit')
   }
@@ -116,8 +120,17 @@ export default function ProjelerClient({
         const d = await res.json()
         throw new Error(d.error ?? 'Kayıt başarısız')
       }
+      const result = await res.json()
+      // Logo upload (oluşturma sonrası veya düzenleme)
+      const targetId = modal === 'edit' ? editId : result?.id
+      if (logoFile && targetId) {
+        const fd = new FormData()
+        fd.append('projeId', targetId)
+        fd.append('file', logoFile)
+        await fetch('/api/upload/proje-logo', { method: 'POST', body: fd })
+      }
       toast({ type: 'success', title: 'Kaydedildi', message: modal === 'edit' ? 'Proje güncellendi' : 'Proje oluşturuldu' })
-      setModal(null)
+      setModal(null); setLogoFile(null); setLogoPreview(null)
       fetchProjeler()
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
@@ -509,6 +522,41 @@ export default function ProjelerClient({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Proje Logosu */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#506050', marginBottom: 5 }}>Proje Logosu</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'contain', border: '1px solid #e2e8f0', background: '#fff' }} />
+                  ) : (
+                    <div style={{ width: 48, height: 48, borderRadius: 8, background: form.renk + '20', border: '1px dashed #d6e4d6', display: 'grid', placeItems: 'center', fontSize: 18, color: form.renk, fontWeight: 800 }}>
+                      {form.ad?.[0]?.toUpperCase() ?? '?'}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <label style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#fff', fontSize: 12.5, fontWeight: 600, color: '#506050', cursor: 'pointer' }}>
+                      {logoPreview ? 'Değiştir' : 'Logo Ekle'}
+                      <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={e => {
+                        const f = e.target.files?.[0]
+                        if (f) { setLogoFile(f); setLogoPreview(URL.createObjectURL(f)) }
+                      }} />
+                    </label>
+                    {logoPreview && (
+                      <button onClick={async () => {
+                        if (modal === 'edit' && editId) {
+                          const fd = new FormData(); fd.append('projeId', editId); fd.append('action', 'delete')
+                          await fetch('/api/upload/proje-logo', { method: 'POST', body: fd })
+                        }
+                        setLogoFile(null); setLogoPreview(null)
+                      }} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fff', fontSize: 12.5, fontWeight: 600, color: '#dc2626', cursor: 'pointer' }}>
+                        Sil
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, color: '#7a907a', marginTop: 4, display: 'block' }}>PNG veya JPEG, arka plansız logo önerilir. Otomatik boyutlandırılır.</span>
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#506050', marginBottom: 5 }}>Proje Adı *</label>
                 <input className="verde-input" value={form.ad} onChange={e => setForm(p => ({ ...p, ad: e.target.value }))} placeholder="Proje adını girin" />

@@ -1,7 +1,7 @@
 'use client'
 import ProataLogo from '@/components/brand/ProataLogo'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -143,6 +143,15 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [appLogo, setAppLogo] = useState<string | null>(null)
+  const [appName, setAppName] = useState('QR-Sync')
+
+  useEffect(() => {
+    fetch('/api/public/app-config')
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j) { setAppLogo(j.logo ?? null); setAppName(j.isim ?? 'QR-Sync') } })
+      .catch(() => {})
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -256,7 +265,12 @@ export default function LoginPage() {
             }}
           >
             <div className="flex items-center gap-3">
-              <ProataLogo variant="full" scale={1} />
+              {appLogo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={appLogo} alt={appName} style={{ maxHeight: 48, maxWidth: 200, objectFit: 'contain' }} />
+              ) : (
+                <ProataLogo variant="full" scale={1} />
+              )}
             </div>
 
             <div className="mt-6 text-[26px] font-black leading-[1.18] tracking-[-1.1px]">

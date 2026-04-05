@@ -10,7 +10,7 @@ const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: 
 const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/GorevKurallariClient'), { ssr: false })
 const GrupYetkileriClient = dynamic(() => import('@/components/ayarlar/GrupYetkileriClient'), { ssr: false })
 
-type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'smtp' | 'konfigurasyon' | 'dashboard'
+type Tab = 'genel' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'uygulama' | 'smtp' | 'konfigurasyon' | 'dashboard'
 
 const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'genel',          label: 'Genel Ayarlar'   },
@@ -18,6 +18,7 @@ const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'gorev-kurallari',label: 'Görev Kuralları'  },
   { key: 'gorev-sureleri', label: 'Görev Süreleri'   },
   { key: 'yetkiler',       label: 'Kullanıcı Yetkileri' },
+  { key: 'uygulama',       label: 'Uygulama Ayarları', saOnly: true },
   { key: 'smtp',           label: 'Mail Sunucusu', saOnly: true },
   { key: 'konfigurasyon',  label: 'Sistem Konfigürasyonu', saOnly: true },
   { key: 'dashboard',      label: 'Dashboard'        },
@@ -118,10 +119,123 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
           currentPath={`${base}/dashboard/sistem-ayarlari`}
         />
       )}
+      {aktifTab === 'uygulama' && isSA && <UygulamaAyarlariPanel />}
       {aktifTab === 'smtp' && isSA && <SmtpAyarlariPanel />}
       {aktifTab === 'konfigurasyon' && isSA && <SistemKonfigurasyonPanel />}
       {aktifTab === 'dashboard' && (
         <DashboardSettingsClient meId={meId} initialBloklar={initialBloklar} />
+      )}
+    </div>
+  )
+}
+
+function UygulamaAyarlariPanel() {
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [appName, setAppName] = useState('QR-Sync')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/sistem-ayarlari/konfigurasyon')
+      .then(r => r.json())
+      .then(j => { setLogoUrl(j.uygulama_logo_url ?? null); setAppName(j.uygulama_ismi ?? 'QR-Sync'); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const fd = new FormData(); fd.append('file', file)
+      const res = await fetch('/api/upload/uygulama-logo', { method: 'POST', body: fd })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error)
+      setLogoUrl(j.url); setMsg('Logo yüklendi.')
+    } catch (err: any) { setMsg('Hata: ' + err.message) }
+    setUploading(false)
+    e.target.value = ''
+  }
+
+  const handleLogoDelete = async () => {
+    const fd = new FormData(); fd.append('action', 'delete')
+    await fetch('/api/upload/uygulama-logo', { method: 'POST', body: fd })
+    setLogoUrl(null); setMsg('Logo silindi.')
+  }
+
+  const handleSaveName = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/sistem-ayarlari/konfigurasyon', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uygulama_ismi: appName }) })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error)
+      setMsg('Uygulama ismi kaydedildi.')
+    } catch (err: any) { setMsg('Hata: ' + err.message) }
+    setSaving(false)
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#7a907a' }}>Yükleniyor...</div>
+
+  return (
+    <div style={{ maxWidth: 560 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+        <div style={{ width: 4, height: 20, borderRadius: 2, background: '#1a5c2a' }} />
+        <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Uygulama Ayarları</h3>
+      </div>
+
+      <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, fontSize: 12.5, color: '#1a5c2a', lineHeight: 1.6, marginBottom: 16 }}>
+        Login sayfasında ve uygulama genelinde kullanılan logo ve isim ayarları. Logo arka plansız PNG formatında olmalıdır.
+      </div>
+
+      {/* Uygulama Logosu */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>Uygulama Logosu</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ width: 80, height: 80, borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            ) : (
+              <span style={{ fontSize: 28, color: '#cbd5e1' }}>🖼</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <label style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#fff', fontSize: 13, fontWeight: 600, color: '#506050', cursor: uploading ? 'not-allowed' : 'pointer' }}>
+                {uploading ? 'Yükleniyor...' : logoUrl ? 'Değiştir' : 'Logo Yükle'}
+                <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={handleLogoUpload} disabled={uploading} />
+              </label>
+              {logoUrl && (
+                <button onClick={handleLogoDelete} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fff', fontSize: 13, fontWeight: 600, color: '#dc2626', cursor: 'pointer' }}>
+                  Sil
+                </button>
+              )}
+            </div>
+            <span style={{ fontSize: 11, color: '#7a907a' }}>PNG (arka plansız), JPEG. Max 320x320px otomatik boyutlandırılır.</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Uygulama İsmi */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>Uygulama İsmi</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input value={appName} onChange={e => setAppName(e.target.value)}
+            style={{ height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 14, fontWeight: 700, flex: 1 }}
+            placeholder="QR-Sync" />
+          <button onClick={handleSaveName} disabled={saving}
+            style={{ height: 36, padding: '0 16px', borderRadius: 8, background: '#1a5c2a', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
+            {saving ? '...' : 'Kaydet'}
+          </button>
+        </div>
+        <span style={{ fontSize: 11, color: '#7a907a', marginTop: 4, display: 'block' }}>Login sayfasında, sayfa başlığında ve bildirimlerde kullanılır.</span>
+      </div>
+
+      {msg && (
+        <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 13, background: msg.includes('Hata') ? '#fef2f2' : '#f0fdf4', color: msg.includes('Hata') ? '#dc2626' : '#1a5c2a', fontWeight: 600 }}>
+          {msg}
+        </div>
       )}
     </div>
   )
