@@ -31,9 +31,17 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const { lokasyonAdi, minSureKaldi } = body
+    const { lokasyonAdi, minSureKaldi, maxSureUyari } = body
 
-    if (minSureKaldi && minSureKaldi > 0) {
+    if (maxSureUyari) {
+      // Max süreye 2 dakika kaldı — acil uyarı
+      await sendFCMToUser(
+        user.id,
+        '🚨 Görevi Hemen Tamamlayın!',
+        `${lokasyonAdi || 'Lokasyon'} için maksimum süreye 2 dakika kaldı. Hemen tamamlayın!`,
+        'gorev_uyari'
+      )
+    } else if (minSureKaldi && minSureKaldi > 0) {
       // Min süre dolmadan çıktı — vav sesiyle uyar
       const dakika = Math.floor(minSureKaldi / 60)
       const saniye = minSureKaldi % 60
