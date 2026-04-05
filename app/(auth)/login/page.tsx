@@ -143,14 +143,14 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [appLogo, setAppLogo] = useState<string | null>(null)
+  const [appLogo, setAppLogo] = useState<string | null | undefined>(undefined) // undefined = henüz yüklenmedi
   const [appName, setAppName] = useState('QR-Sync')
 
   useEffect(() => {
     fetch('/api/public/app-config')
       .then(r => r.ok ? r.json() : null)
-      .then(j => { if (j) { setAppLogo(j.logo ?? null); setAppName(j.isim ?? 'QR-Sync') } })
-      .catch(() => {})
+      .then(j => { setAppLogo(j?.logo ?? null); setAppName(j?.isim ?? 'QR-Sync') })
+      .catch(() => setAppLogo(null))
   }, [])
 
   async function handleLogin(e: React.FormEvent) {
@@ -264,8 +264,8 @@ export default function LoginPage() {
               animation: 'fadeUp 700ms ease 60ms both',
             }}
           >
-            <div className="flex items-center">
-              {appLogo ? (
+            <div className="flex items-center" style={{ minHeight: 52 }}>
+              {appLogo === undefined ? null : appLogo ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={appLogo} alt={appName} style={{ height: 'auto', maxHeight: 120, maxWidth: 420, objectFit: 'contain' }} />
               ) : (
