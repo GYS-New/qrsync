@@ -27,6 +27,7 @@ export async function POST(req: Request) {
   const rol           = String(body.rol ?? 'tenant_user')
   const firma_id      = body.firma_id ? String(body.firma_id) : null
   const body_proje_id = body.proje_id ? String(body.proje_id) : null
+  const ust_lokasyon_id = body.ust_lokasyon_id ? String(body.ust_lokasyon_id) : null
 
   if (!email || !password || !isim_soyisim) {
     return NextResponse.json({ error: 'Eksik alan: email, password, isim_soyisim' }, { status: 400 })
@@ -96,6 +97,7 @@ export async function POST(req: Request) {
       kayit_yapan_id: me.id,
       aktif: true,
       ...(!isAltSACreation && finalProjeId ? { proje_id: finalProjeId } : {}),
+      ...(ust_lokasyon_id ? { ust_lokasyon_id } : {}),
     })
 
   if (insertErr) {

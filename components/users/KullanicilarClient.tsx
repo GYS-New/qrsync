@@ -81,7 +81,7 @@ export default function KullanicilarClient({
 
   // Modal state'leri
   const [openCreate, setOpenCreate] = useState(false)
-  const [createForm, setCreateForm] = useState({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user' as string })
+  const [createForm, setCreateForm] = useState({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user' as string, ust_lokasyon_id: '' })
   const [openEdit, setOpenEdit] = useState(false)
   const [openPass, setOpenPass] = useState(false)
   const [target, setTarget] = useState<User | null>(null)
@@ -207,6 +207,7 @@ export default function KullanicilarClient({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           ...createForm,
+          ust_lokasyon_id: createForm.ust_lokasyon_id || null,
           firma_id: firmaId,
           ...(gonderilenProjeId ? { proje_id: gonderilenProjeId } : {}),
         }),
@@ -214,7 +215,7 @@ export default function KullanicilarClient({
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'Oluşturulamadı')
       showOk('Kullanıcı oluşturuldu.')
-      setCreateForm({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user' })
+      setCreateForm({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user', ust_lokasyon_id: '' })
       setFormProjeId('')
       setOpenCreate(false)
       await refresh()
@@ -499,6 +500,20 @@ export default function KullanicilarClient({
                   <div style={{ gridColumn: '1 / -1' }}>
                     <div style={{ fontSize: 13, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px' }}>
                       ⚠️ Aktif proje seçili değil. Üstten bir proje seçip tekrar deneyin.
+                    </div>
+                  </div>
+                )}
+
+                {/* Üst Lokasyon seçici */}
+                {ustLokasyonlar.length > 0 && createForm.rol !== 'alt_super_admin' && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label className="verde-label">Üst Lokasyon</label>
+                    <select className="verde-input" value={createForm.ust_lokasyon_id} onChange={e => setCreateForm(f => ({ ...f, ust_lokasyon_id: e.target.value }))}>
+                      <option value="">— Seçiniz —</option>
+                      {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                    </select>
+                    <div style={{ fontSize: 11.5, color: '#7a907a', marginTop: 4 }}>
+                      Bu kullanıcı hangi üst lokasyona bağlı çalışacak?
                     </div>
                   </div>
                 )}

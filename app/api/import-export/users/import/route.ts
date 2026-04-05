@@ -14,6 +14,13 @@ export async function POST(req: NextRequest) {
     const parsed = await readXlsxFromBuffer(Buffer.from(await file.arrayBuffer()))
     if (!parsed.rows.length) return NextResponse.json({ error: 'Excel içinde veri bulunamadı' }, { status: 400 })
 
+    // Üst lokasyon adı → ID map oluştur
+    let lokQ = scope.admin.from('lokasyonlar').select('id,tanim').eq('firma_id', scope.firmaId).is('parent_id', null).eq('aktif', true)
+    if (projeIdParam) lokQ = (lokQ as any).eq('proje_id', projeIdParam)
+    const { data: ustLoklar } = await lokQ
+    const lokAdToId = new Map<string, string>()
+    for (const l of ustLoklar ?? []) lokAdToId.set((l.tanim ?? '').toLocaleLowerCase('tr'), l.id)
+
     let created = 0
     const errors: string[] = []
     for (let i = 0; i < parsed.rows.length; i++) {
@@ -45,6 +52,10 @@ export async function POST(req: NextRequest) {
         continue
       }
       const newUserId = createdUser.user.id
+      // Üst lokasyon çözümle
+      const ustLokAd = normalizeText(row.ust_lokasyon)
+      const ustLokId = ustLokAd ? (lokAdToId.get(ustLokAd.toLocaleLowerCase('tr')) ?? null) : null
+
       const { error: insertErr } = await scope.admin.from('users').insert({
         id: newUserId,
         isim_soyisim,
@@ -55,6 +66,7 @@ export async function POST(req: NextRequest) {
         proje_id: projeIdParam ?? null,
         kayit_yapan_id: scope.me.id,
         aktif: true,
+        ...(ustLokId ? { ust_lokasyon_id: ustLokId } : {}),
       })
       if (insertErr) {
         await scope.admin.auth.admin.deleteUser(newUserId)
