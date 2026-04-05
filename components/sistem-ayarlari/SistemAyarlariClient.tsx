@@ -148,11 +148,18 @@ function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
   const toggle = async (field: string, current: boolean) => {
     setSavingKey(field)
     try {
-      const res = await fetch(`/api/projeler/${projeId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: !current }),
-      })
-      if (res.ok) setProje((p: any) => ({ ...p, [field]: !current }))
+      if (field === 'sureli_gorev_aktif') {
+        // Süreli görev özel endpoint — lokasyonları toplu günceller
+        const res = await fetch(`/api/projeler/${projeId}/toggle-sureli-gorev`, { method: 'POST' })
+        const j = await res.json()
+        if (res.ok) setProje((p: any) => ({ ...p, sureli_gorev_aktif: j.sureli_aktif ?? !current }))
+      } else {
+        const res = await fetch(`/api/projeler/${projeId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: !current }),
+        })
+        if (res.ok) setProje((p: any) => ({ ...p, [field]: !current }))
+      }
     } catch {}
     setSavingKey(null)
   }
@@ -166,6 +173,7 @@ function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
     { key: 'qr_sistemi_aktif', label: 'QR Sistemi', desc: 'QR kod ile görev başlatma, tamamlama ve mesai okutma.', icon: '📷' },
     { key: 'nfc_sistemi_aktif', label: 'NFC Sistemi', desc: 'NFC tag ile görev başlatma, tamamlama ve mesai okutma.', icon: '📶' },
     { key: 'birim_fiyat_aktif', label: 'Birim Fiyat Sistemi', desc: 'Lokasyon ve gruplar için birim fiyat tanımlama ve hakediş hesaplama.', icon: '💰' },
+    { key: 'sureli_gorev_aktif', label: 'Süreli Görev Takibi', desc: 'Projedeki tüm lokasyonlarda süreli görev takibini toplu aç/kapat. Aktif olduğunda görev başlatma ve tamamlanma süreleri ölçülür.', icon: '⚡' },
   ]
 
   return (
