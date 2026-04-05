@@ -33,6 +33,7 @@ export default function KullanicilarClient({
   initialUsers,
   canCreate,
   canManage,
+  canDelete = canManage,
   enableBulkImport = false,
   projeId,
   ustLokasyonlar = [],
@@ -42,6 +43,7 @@ export default function KullanicilarClient({
   initialUsers: User[]
   canCreate: boolean
   canManage: boolean
+  canDelete?: boolean
   enableBulkImport?: boolean
   projeId?: string | null
   ustLokasyonlar?: { id: string; tanim: string }[]
@@ -59,6 +61,7 @@ export default function KullanicilarClient({
   const [filtreRol, setFiltreRol] = useState('')
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [seciliIds, setSeciliIds] = useState<Set<string>>(new Set())
+  const [topluSilModu, setTopluSilModu] = useState(false)
   const [loading, setLoading] = useState(false)
   const [deviceTokenMap, setDeviceTokenMap] = useState<Record<string, {
     device_token: string
@@ -358,12 +361,6 @@ export default function KullanicilarClient({
             <option value="musteri">Müşteri</option>
           </select>
           <span style={{ fontSize: 12, color: '#7a907a' }}>{filtered.length}/{users.length}</span>
-          {canManage && seciliIds.size > 0 && (
-            <button onClick={topluSil} disabled={loading}
-              style={{ height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-              🗑 {seciliIds.size} Seçili Sil
-            </button>
-          )}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <input ref={importInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={onImportFile} />
             <Button variant="ghost" size="sm" onClick={refresh} disabled={loading} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>
@@ -376,8 +373,23 @@ export default function KullanicilarClient({
                 <Button variant="ghost" onClick={() => downloadExcel('export')} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}><FileSpreadsheet size={16} /> Dışa Aktar</Button>
               </>
             )}
-            {canCreate && (
+            {canCreate && !topluSilModu && (
               <Button variant="primary" onClick={() => setOpenCreate(true)} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>＋ Kullanıcı Ekle</Button>
+            )}
+            {canDelete && !topluSilModu && (
+              <Button variant="ghost" onClick={() => { setTopluSilModu(true); setSeciliIds(new Set()) }} className="text-[15px]" style={{ ...IMPORT_EXPORT_BUTTON_STYLE, color: '#dc2626', borderColor: '#fca5a5' }}>🗑 Toplu Sil</Button>
+            )}
+            {topluSilModu && (
+              <>
+                {seciliIds.size > 0 ? (
+                  <Button variant="ghost" onClick={topluSil} disabled={loading} className="text-[15px]" style={{ ...IMPORT_EXPORT_BUTTON_STYLE, background: '#dc2626', color: '#fff', borderColor: '#dc2626' }}>🗑 {seciliIds.size} Seçili Sil</Button>
+                ) : (
+                  <Button variant="ghost" onClick={() => { setTopluSilModu(false); setSeciliIds(new Set()) }} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>Vazgeç</Button>
+                )}
+                {seciliIds.size > 0 && (
+                  <Button variant="ghost" onClick={() => { setTopluSilModu(false); setSeciliIds(new Set()) }} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>Vazgeç</Button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -385,7 +397,7 @@ export default function KullanicilarClient({
         <table className="verde-table">
           <thead>
             <tr>
-              {canManage && (
+              {topluSilModu && (
                 <th style={{ width: 36 }}>
                   <input type="checkbox" checked={filtered.length > 0 && seciliIds.size === filtered.length} onChange={tumunuSec}
                     style={{ width: 16, height: 16, cursor: 'pointer' }} />
@@ -402,8 +414,8 @@ export default function KullanicilarClient({
           </thead>
           <tbody>
             {filtered.map(u => (
-              <tr key={u.id} style={{ background: seciliIds.has(u.id) ? '#fef2f2' : undefined }}>
-                {canManage && (
+              <tr key={u.id} style={{ background: topluSilModu && seciliIds.has(u.id) ? '#fef2f2' : undefined }}>
+                {topluSilModu && (
                   <td>
                     <input type="checkbox" checked={seciliIds.has(u.id)} onChange={() => toggleSecim(u.id)}
                       style={{ width: 16, height: 16, cursor: 'pointer' }} />
@@ -498,7 +510,7 @@ export default function KullanicilarClient({
                           {deviceTokenMap[u.id] && (
                             <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>
                           )}
-                          <RowActionButton variant="danger" onClick={() => deleteUser(u)}>Sil</RowActionButton>
+                          {canDelete && <RowActionButton variant="danger" onClick={() => deleteUser(u)}>Sil</RowActionButton>}
                         </>
                       )}
                     </div>

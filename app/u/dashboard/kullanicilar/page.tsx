@@ -38,7 +38,8 @@ export default async function UKullanicilarPage() {
         firmaId={firmaId}
         initialUsers={(users as any) ?? []}
         canCreate={yetki.ekleyebilir}
-        canManage={yetki.duzenleyebilir || yetki.silebilir}
+        canManage={yetki.duzenleyebilir}
+        canDelete={yetki.silebilir}
         projeId={projeId ?? undefined}
         ustLokasyonlar={(lokasyonlar as any) ?? []}
       />
