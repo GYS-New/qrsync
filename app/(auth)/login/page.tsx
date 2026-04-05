@@ -267,7 +267,7 @@ export default function LoginPage() {
             <div className="flex items-center">
               {appLogo ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={appLogo} alt={appName} style={{ height: 'auto', maxHeight: 80, maxWidth: 280, objectFit: 'contain' }} />
+                <img src={appLogo} alt={appName} style={{ height: 'auto', maxHeight: 120, maxWidth: 420, objectFit: 'contain' }} />
               ) : (
                 <ProataLogo variant="full" scale={1} />
               )}
