@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
 import { ProjeProvider } from '@/components/projeler/ProjeContext'
 import FirmaDurumBanner from '@/components/firmalar/FirmaDurumBanner'
+import { getAktifProje } from '@/lib/projeler/getAktifProje'
 
 function getFirmaDurum(firma: any): { durum: 'pasif' | 'lisans_doldu' | null; lisansTarihi: string | null } {
   if (!firma) return { durum: null, lisansTarihi: null }
@@ -40,10 +41,19 @@ export default async function TALayout({ children }: { children: React.ReactNode
 
   const { durum, lisansTarihi } = getFirmaDurum(firma)
 
+  // Aktif proje logosu
+  const aktifProje = user.firma_id ? await getAktifProje(user.firma_id) : null
+  let projeLogo: string | null = null
+  if (aktifProje) {
+    const admin = createAdminClient()
+    const { data: prj } = await admin.from('projeler').select('logo_url').eq('id', aktifProje.id).single()
+    projeLogo = (prj as any)?.logo_url ?? null
+  }
+
   return (
     <ProjeProvider firmaId={user.firma_id ?? null}>
       <div style={{ display: 'flex', minHeight: '100vh', background: '#f7f9f7' }}>
-        <Sidebar user={user} firma={firma} birimFiyatAktifProp={(firma as any)?.birim_fiyat_aktif === true} projeLogo={null} />
+        <Sidebar user={user} firma={firma} birimFiyatAktifProp={(firma as any)?.birim_fiyat_aktif === true} projeLogo={projeLogo} />
         <div style={{ marginLeft: 282, flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
           {/* Durum banner — pasif veya lisans dolmuşsa tüm sayfalarda görünür */}
           <FirmaDurumBanner durum={durum} lisansTarihi={lisansTarihi} />

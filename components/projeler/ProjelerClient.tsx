@@ -558,17 +558,7 @@ export default function ProjelerClient({
                   placeholder="Kısa açıklama (opsiyonel)" rows={2} style={{ resize: 'vertical' }} />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#506050', marginBottom: 8 }}>Renk</label>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {RENKLER.map(r => (
-                    <button key={r} onClick={() => setForm(p => ({ ...p, renk: r }))} style={{
-                      width: 32, height: 32, borderRadius: 8, background: r, border: form.renk === r ? '3px solid #0f1a0f' : '2px solid transparent',
-                      cursor: 'pointer', transition: 'border .1s',
-                    }} />
-                  ))}
-                </div>
-              </div>
+              {/* Renk seçici kaldırıldı — logo kullanılıyor */}
 
               {/* Birim Fiyat Sistemi — Sistem Ayarları üzerinden yönetilir */}
             </div>

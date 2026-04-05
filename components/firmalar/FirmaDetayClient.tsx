@@ -211,22 +211,24 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
                 if (e.currentTarget) e.currentTarget.value = ''
               }}
             />
-            {(firma as any).logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={(firma as any).logo_url} alt="Logo" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', border: '1px solid #d6e4d6' }} />
-            ) : (
-              <div style={{ width: 46, height: 46, borderRadius: 8, background: '#f0f9f0', border: '1px solid #d6e4d6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#2e8b2e' }}>
-                {(firma.firma_adi || firma.ticari_unvan)?.[0]?.toUpperCase()}
-              </div>
-            )}
-            <Button variant="ghost" type="button" onClick={() => fileRef.current?.click()} disabled={loading}>
-              {(firma as any).logo_url ? 'Düzenle' : 'Ekle'}
-            </Button>
-            {(firma as any).logo_url ? (
-              <Button variant="danger" type="button" onClick={removeLogo} disabled={loading}>
-                Sil
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 60, minWidth: 120 }}>
+              {(firma as any).logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={(firma as any).logo_url} alt="Logo" style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain' }} />
+              ) : (
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#cbd5e1' }}>
+                  {(firma.firma_adi || firma.ticari_unvan)?.[0]?.toUpperCase() ?? '?'}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button variant="ghost" type="button" onClick={() => fileRef.current?.click()} disabled={loading}>
+                {(firma as any).logo_url ? 'Değiştir' : 'Logo Ekle'}
               </Button>
-            ) : null}
+              {(firma as any).logo_url && (
+                <Button variant="danger" type="button" onClick={removeLogo} disabled={loading}>Sil</Button>
+              )}
+            </div>
           </div>
         </Row>
 
