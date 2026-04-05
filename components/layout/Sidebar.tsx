@@ -405,10 +405,10 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         {/* Brand label — SA: boş veya proje logosu, TA/U: ProATA */}
         {isSA ? (
           projeLogo || projeAdiProp ? (
-            <div style={{ padding: '10px 14px', margin: '8px 2px 6px', borderRadius: 10, background: '#eaf6ea', border: '1px solid #d6e4d6', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ padding: '8px 14px', margin: '8px 2px 6px', borderRadius: 10, background: '#eaf6ea', border: '1px solid #d6e4d6', display: 'flex', alignItems: 'center', gap: 10 }}>
               {projeLogo ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={projeLogo} alt="Proje" style={{ height: 28, objectFit: 'contain', borderRadius: 4 }} />
+                <img src={projeLogo} alt="Proje" style={{ height: 36, objectFit: 'contain', borderRadius: 4 }} />
               ) : null}
               {projeAdiProp && <span style={{ fontSize: 14, fontWeight: 700, color: '#1f6b1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{projeAdiProp}</span>}
             </div>
