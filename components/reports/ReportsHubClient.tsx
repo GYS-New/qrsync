@@ -99,7 +99,7 @@ function HubCard({
   onClick?: () => void
 }) {
   const p = {
-    green:  { iconBg: '#f0f9f0', iconColor: '#1f6b1f', chipBg: '#eef8ee', chipText: '#2f6a2f', border: '#d6e4d6' },
+    green:  { iconBg: '#fff7ed', iconColor: '#c45200', chipBg: '#eef8ee', chipText: '#2f6a2f', border: '#ffd9a0' },
     violet: { iconBg: '#f1edff', iconColor: '#5a46d1', chipBg: '#f1edff', chipText: '#5a46d1', border: '#ddd8f8' },
     amber:  { iconBg: '#fff4e2', iconColor: '#9a6712', chipBg: '#fff4e2', chipText: '#9a6712', border: '#f0dfc0' },
   }[tone]
@@ -125,7 +125,7 @@ function HubCard({
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 999, background: p.chipBg, color: p.chipText, letterSpacing: 0.3 }}>{eyebrow}</span>
-          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#f0f9f0', color: '#506050', border: '1px solid #d6e4d6' }}>{badge}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#fff7ed', color: '#6b4423', border: '1px solid #ffd9a0' }}>{badge}</span>
           {sureliGorevBadge === true && (
             <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#f3e8ff', color: '#7c3aed', border: '1px solid #c4b5fd' }}>⚡ Süreli Görev Takibi Aktif</span>
           )}
@@ -133,11 +133,11 @@ function HubCard({
             <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}>⚡ Süreli Görev Takibi Pasif</span>
           )}
         </div>
-        <div style={{ fontSize: 16, fontWeight: 800, color: '#0f1a0f', marginBottom: 4 }}>{title}</div>
-        <div style={{ fontSize: 13.5, color: '#506050', lineHeight: 1.5 }}>{description}</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#3d1c00', marginBottom: 4 }}>{title}</div>
+        <div style={{ fontSize: 13.5, color: '#6b4423', lineHeight: 1.5 }}>{description}</div>
         {disabled && <div style={{ fontSize: 12, color: '#a08040', marginTop: 6, fontStyle: 'italic' }}>Bu modül henüz tamamlanmadı — daha sonra düzenlenecek.</div>}
       </div>
-      <div style={{ color: disabled ? '#b0c0b0' : '#2e8b2e', flexShrink: 0 }}>
+      <div style={{ color: disabled ? '#d4b896' : '#ff7f00', flexShrink: 0 }}>
         {disabled ? <Sparkles size={18} /> : <ArrowRight size={20} />}
       </div>
     </div>
@@ -310,20 +310,20 @@ export default function ReportsHubClient({
       <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         <div className="verde-card" style={{ padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0f9f0', border: '1px solid #d6e4d6', display: 'grid', placeItems: 'center', color: '#1f6b1f', flexShrink: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fff7ed', border: '1px solid #ffd9a0', display: 'grid', placeItems: 'center', color: '#c45200', flexShrink: 0 }}>
             <FileBarChart2 size={20} />
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 900, color: '#0f1a0f' }}>RAPOR MERKEZİ</div>
-            <div style={{ fontSize: 13, color: '#7a907a', marginTop: 2 }}>
-              Ham veri, grafiksel özet ve şablon tabanlı raporlar • Firma: <strong style={{ color: '#2d3f2d' }}>{firmaLabel}</strong>
+            <div style={{ fontSize: 15, fontWeight: 900, color: '#3d1c00' }}>RAPOR MERKEZİ</div>
+            <div style={{ fontSize: 13, color: '#9a7b6a', marginTop: 2 }}>
+              Ham veri, grafiksel özet ve şablon tabanlı raporlar • Firma: <strong style={{ color: '#5c3a1e' }}>{firmaLabel}</strong>
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {showLoading ? (
-            <div style={{ textAlign: 'center', padding: 40, color: '#7a907a' }}>
+            <div style={{ textAlign: 'center', padding: 40, color: '#9a7b6a' }}>
               Rapor türleri yükleniyor…
             </div>
           ) : (

@@ -358,21 +358,21 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
   return (
     <div style={{ maxWidth: 920, margin: '0 auto', padding: '24px 16px 40px' }}>
       <div className="verde-card" style={{ overflow: 'hidden' }}>
-        <div style={{ padding: '18px 20px', borderBottom: '1px solid #e8f0e8', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid #ffe8c8', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#6f846f', letterSpacing: 0.3 }}>{kanal} GÖREV AKIŞI</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#0f1a0f' }}>{lokasyon?.tanim ?? 'Lokasyon yükleniyor…'}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#8b7355', letterSpacing: 0.3 }}>{kanal} GÖREV AKIŞI</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#3d1c00' }}>{lokasyon?.tanim ?? 'Lokasyon yükleniyor…'}</div>
             {!loading && !error ? <div style={{ marginTop: 6, fontSize: 12, color: '#2e6b2e', fontWeight: 700 }}>{timedTaskEnabled ? 'Süreli görev aktif' : 'Tek adımda tamamlama aktif'}</div> : null}
-            {lokasyon?.aciklama ? <div style={{ marginTop: 6, fontSize: 13, color: '#6f846f' }}>{lokasyon.aciklama}</div> : null}
+            {lokasyon?.aciklama ? <div style={{ marginTop: 6, fontSize: 13, color: '#8b7355' }}>{lokasyon.aciklama}</div> : null}
           </div>
-          <div style={{ fontSize: 12, color: '#6f846f', textAlign: 'right' }}>
+          <div style={{ fontSize: 12, color: '#8b7355', textAlign: 'right' }}>
             <div>Kullanıcı: {me?.isim_soyisim || '-'}</div>
             <div>Token: {token}</div>
           </div>
         </div>
 
         {loading ? (
-          <div style={{ padding: 28, color: '#6f846f' }}>{message}</div>
+          <div style={{ padding: 28, color: '#8b7355' }}>{message}</div>
         ) : error ? (
           <div style={{ padding: 28 }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#991b1b', marginBottom: 8 }}>İşlem başarısız</div>
@@ -387,29 +387,29 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
           <div style={{ padding: 20, display: 'grid', gap: 20 }}>
             {gorevler.length > 1 ? (
               /* ── Çoklu görev: seçim listesi ── */
-              <div style={{ background: '#fff', border: '1px solid #d6e4d6', borderRadius: 12, overflow: 'hidden' }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e8f0e8', background: '#f0f9f0' }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f1a0f' }}>Hangi görevi yapacaksınız?</div>
-                  <div style={{ fontSize: 12, color: '#6f846f', marginTop: 2 }}>Bu lokasyonda {gorevler.length} görev bulundu — birini seçin</div>
+              <div style={{ background: '#fff', border: '1px solid #ffd9a0', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #ffe8c8', background: '#fff7ed' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#3d1c00' }}>Hangi görevi yapacaksınız?</div>
+                  <div style={{ fontSize: 12, color: '#8b7355', marginTop: 2 }}>Bu lokasyonda {gorevler.length} görev bulundu — birini seçin</div>
                 </div>
                 <div style={{ padding: '10px 12px', display: 'grid', gap: 8 }}>
                   {gorevler.map(task => {
                     const selected = task.id === selectedTaskId
                     const tipRenk  = task.kaynak === 'gorevler'
                       ? { bg: '#eff6ff', color: '#1d4ed8', label: 'Spesifik' }
-                      : { bg: '#f0fdf4', color: '#15803d', label: 'Frekansiyel' }
+                      : { bg: '#fff7ed', color: '#15803d', label: 'Frekansiyel' }
                     return (
                       <button key={task.id} type="button" onClick={() => setSelectedTaskId(task.id)}
-                        style={{ textAlign: 'left', border: selected ? '2px solid #2e8b2e' : '1px solid #d6e4d6', background: selected ? '#f0f9f0' : '#fff', borderRadius: 10, padding: '12px 14px', cursor: 'pointer', transition: 'all .12s' }}>
+                        style={{ textAlign: 'left', border: selected ? '2px solid #ff7f00' : '1px solid #ffd9a0', background: selected ? '#fff7ed' : '#fff', borderRadius: 10, padding: '12px 14px', cursor: 'pointer', transition: 'all .12s' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                          <strong style={{ fontSize: 14, color: '#0f1a0f', lineHeight: 1.3 }}>{task.tanim}</strong>
+                          <strong style={{ fontSize: 14, color: '#3d1c00', lineHeight: 1.3 }}>{task.tanim}</strong>
                           <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
                             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: tipRenk.bg, color: tipRenk.color }}>{tipRenk.label}</span>
                             {selected && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#dcfce7', color: '#15803d' }}>✓ Seçili</span>}
                           </div>
                         </div>
                         {timedTaskEnabled && (
-                          <div style={{ marginTop: 6, fontSize: 12, color: '#6f846f' }}>
+                          <div style={{ marginTop: 6, fontSize: 12, color: '#8b7355' }}>
                             {task.baslatilma_tarihi ? `▶ ${new Date(task.baslatilma_tarihi).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : '○ Henüz başlatılmadı'}
                           </div>
                         )}
@@ -420,10 +420,10 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
               </div>
             ) : (
               /* ── Tek görev: bilgi bandı ── */
-              <div style={{ padding: '12px 16px', background: '#f0f9f0', border: '1px solid #d6e4d6', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ padding: '12px 16px', background: '#fff7ed', border: '1px solid #ffd9a0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, fontSize: 15, color: '#0f1a0f' }}>{gorevler[0]?.tanim}</div>
-                  <div style={{ fontSize: 12, color: '#6f846f', marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ fontWeight: 800, fontSize: 15, color: '#3d1c00' }}>{gorevler[0]?.tanim}</div>
+                  <div style={{ fontSize: 12, color: '#8b7355', marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 600, color: gorevler[0]?.kaynak === 'gorevler' ? '#1d4ed8' : '#15803d' }}>
                       {gorevler[0]?.kaynak === 'gorevler' ? 'Spesifik' : 'Frekansiyel'}
                     </span>
@@ -433,7 +433,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                   </div>
                 </div>
                 {!timedTaskEnabled && !sablon && (
-                  <span style={{ fontSize: 11, color: '#6f846f', fontStyle: 'italic' }}>otomatik işlenecek…</span>
+                  <span style={{ fontSize: 11, color: '#8b7355', fontStyle: 'italic' }}>otomatik işlenecek…</span>
                 )}
               </div>
             )}
@@ -442,8 +442,8 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
               <div className="verde-card" style={{ padding: 16 }}>
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 18, fontWeight: 800 }}>{sablon.baslik}</div>
-                  <div style={{ marginTop: 4, color: '#6f846f', fontSize: 13 }}>{sablon.tanim}</div>
-                  <div style={{ marginTop: 6, color: '#6f846f', fontSize: 12 }}>Şablon versiyonu: v{sablon.versiyon}</div>
+                  <div style={{ marginTop: 4, color: '#8b7355', fontSize: 13 }}>{sablon.tanim}</div>
+                  <div style={{ marginTop: 6, color: '#8b7355', fontSize: 12 }}>Şablon versiyonu: v{sablon.versiyon}</div>
                 </div>
 
                 <div style={{ display: 'grid', gap: 14 }}>
@@ -468,7 +468,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                       }}>
                         {/* Başlık + rozetler */}
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 14 }}>
-                          <div style={{ fontWeight: 700, fontSize: 14, color: '#0f1a0f', lineHeight: 1.4, flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: '#3d1c00', lineHeight: 1.4, flex: 1 }}>
                             {madde.sira_no}. {madde.baslik}
                           </div>
                           <div style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -493,7 +493,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                               style={{
                                 width: '100%', height: 46, padding: '0 12px', borderRadius: 10,
                                 border: `2px solid ${eksik && madde.zorunlu_cevap && !cevap.secenek ? '#dc2626' : '#e2e8f0'}`,
-                                fontSize: 15, background: '#fff', color: cevap.secenek ? '#0f1a0f' : '#9ca3af',
+                                fontSize: 15, background: '#fff', color: cevap.secenek ? '#3d1c00' : '#9ca3af',
                                 boxSizing: 'border-box',
                               }}
                             >
@@ -535,16 +535,16 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                               onChange={e => { void uploadGorsel(madde.id, e.target.files?.[0] ?? null); temizleEksik(madde.id) }}
                             />
                             {cevap.uploading ? (
-                              <div style={{ padding: '18px', background: '#f0f9f0', border: '2px dashed #d6e4d6', borderRadius: 10, textAlign: 'center', color: '#6f846f', fontSize: 13 }}>
+                              <div style={{ padding: '18px', background: '#fff7ed', border: '2px dashed #ffd9a0', borderRadius: 10, textAlign: 'center', color: '#8b7355', fontSize: 13 }}>
                                 <div style={{ fontSize: 20, marginBottom: 4 }}>⏳</div>
                                 Yükleniyor…
                               </div>
                             ) : cevap.gorselUrl ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: 10 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#fff7ed', border: '2px solid #bbf7d0', borderRadius: 10 }}>
                                 <img src={cevap.gorselUrl} alt="çekildi"
                                   style={{ width: 68, height: 68, objectFit: 'cover', borderRadius: 8, border: '2px solid #bbf7d0', flexShrink: 0 }} />
                                 <div>
-                                  <div style={{ fontSize: 13, color: '#1f6b1f', fontWeight: 700 }}>✓ Fotoğraf yüklendi</div>
+                                  <div style={{ fontSize: 13, color: '#c45200', fontWeight: 700 }}>✓ Fotoğraf yüklendi</div>
                                   <button type="button" onClick={() => { updateCevap(madde.id, { gorselUrl: '' }); temizleEksik(madde.id) }}
                                     style={{ marginTop: 6, fontSize: 12, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer', padding: '2px 10px', fontWeight: 600 }}>
                                     Kaldır
@@ -556,15 +556,15 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                                 type="button"
                                 onClick={() => fileInputRefs.current[madde.id]?.click()}
                                 style={{
-                                  display: 'block', width: '100%', border: `2px dashed ${eksik && madde.gorsel_gerekli ? '#dc2626' : '#d6e4d6'}`,
+                                  display: 'block', width: '100%', border: `2px dashed ${eksik && madde.gorsel_gerekli ? '#dc2626' : '#ffd9a0'}`,
                                   borderRadius: 12, padding: '22px 16px', textAlign: 'center', cursor: 'pointer',
                                   background: eksik && madde.gorsel_gerekli ? '#fff5f5' : '#f9fcf9',
                                   WebkitTapHighlightColor: 'rgba(0,0,0,0.05)',
                                 }}
                               >
                                 <div style={{ fontSize: 34, marginBottom: 6 }}>📷</div>
-                                <div style={{ fontSize: 14, fontWeight: 700, color: '#1f6b1f' }}>Fotoğraf Çek / Seç</div>
-                                <div style={{ fontSize: 12, color: '#6f846f', marginTop: 3 }}>Kameradan çek veya galeriden seç</div>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: '#c45200' }}>Fotoğraf Çek / Seç</div>
+                                <div style={{ fontSize: 12, color: '#8b7355', marginTop: 3 }}>Kameradan çek veya galeriden seç</div>
                               </button>
                             )}
                           </div>
@@ -575,7 +575,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
                 </div>
               </div>
             ) : (
-              <div className="verde-card" style={{ padding: 16, background: '#f9fcf9', color: '#6f846f' }}>
+              <div className="verde-card" style={{ padding: 16, background: '#f9fcf9', color: '#8b7355' }}>
                 Bu lokasyona bağlı checklist şablonu yok.{' '}
                 {timedTaskEnabled
                   ? 'Süreli görev aktif olduğu için önce başlatıp sonra tamamlamalısınız.'
@@ -585,7 +585,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
 
             {!completed && (
               <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 12, color: '#6f846f' }}>
+                <div style={{ fontSize: 12, color: '#8b7355' }}>
                   Mod: {timedTaskEnabled ? 'Süreli görev (Başlat → Tamamla)' : 'Tek adımda tamamlama'}
                   {timedTaskEnabled && selectedTask?.baslatilma_tarihi
                     ? ` · Geçen süre: ${formatDuration(Math.max(0, Math.floor((Date.now() - new Date(selectedTask.baslatilma_tarihi).getTime()) / 1000)))}`

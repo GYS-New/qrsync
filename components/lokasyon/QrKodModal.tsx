@@ -44,13 +44,13 @@ export default function QrKodModal({ lokasyon, onClose }: QrModalProps) {
       onClick={onClose}
     >
       <div
-        style={{ background:'#fff', borderRadius:7, border:'1px solid #d6e4d6', padding:28, minWidth:340, boxShadow:'0 20px 60px rgba(0,0,0,0.15)' }}
+        style={{ background:'#fff', borderRadius:7, border:'1px solid #ffd9a0', padding:28, minWidth:340, boxShadow:'0 20px 60px rgba(0,0,0,0.15)' }}
         onClick={e => e.stopPropagation()}
       >
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
           <div>
-            <div style={{ fontSize:15, fontWeight:700, color:'#0f1a0f' }}>QR Kod</div>
-            <div style={{ fontSize:12, color:'#7a907a', marginTop:2 }}>{lokasyon.tanim}</div>
+            <div style={{ fontSize:15, fontWeight:700, color:'#3d1c00' }}>QR Kod</div>
+            <div style={{ fontSize:12, color:'#9a7b6a', marginTop:2 }}>{lokasyon.tanim}</div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} style={{ padding:'4px 10px', fontSize:12 }}>✕</Button>
         </div>
@@ -59,16 +59,16 @@ export default function QrKodModal({ lokasyon, onClose }: QrModalProps) {
           <div style={{ padding:'32px 0', textAlign:'center' }}>
             <div style={{ fontSize:24, marginBottom:8 }}>⚠️</div>
             <div style={{ color:'#b91c1c', fontWeight:600, fontSize:13 }}>Lokasyon Pasif</div>
-            <div style={{ color:'#7a907a', fontSize:12, marginTop:4 }}>Pasif lokasyonların QR kodu gösterilmez.</div>
+            <div style={{ color:'#9a7b6a', fontSize:12, marginTop:4 }}>Pasif lokasyonların QR kodu gösterilmez.</div>
           </div>
         ) : loading ? (
-          <div style={{ padding:'48px 0', textAlign:'center', color:'#7a907a' }}>QR kod oluşturuluyor...</div>
+          <div style={{ padding:'48px 0', textAlign:'center', color:'#9a7b6a' }}>QR kod oluşturuluyor...</div>
         ) : (
           <div style={{ textAlign:'center' }}>
-            <div style={{ padding:16, background:'#f0f9f0', borderRadius:7, border:'1px solid #d6e4d6', display:'inline-block', marginBottom:16 }}>
+            <div style={{ padding:16, background:'#fff7ed', borderRadius:7, border:'1px solid #ffd9a0', display:'inline-block', marginBottom:16 }}>
               <img src={qrUrl} alt="QR Kod" style={{ width:220, height:220, display:'block' }} />
             </div>
-            <div style={{ fontSize:11, color:'#7a907a', marginBottom:16, fontFamily:'monospace', wordBreak:'break-all', padding:'8px 12px', background:'#f7f9f7', borderRadius:5, border:'1px solid #e8f0e8' }}>
+            <div style={{ fontSize:11, color:'#9a7b6a', marginBottom:16, fontFamily:'monospace', wordBreak:'break-all', padding:'8px 12px', background:'#fffbf5', borderRadius:5, border:'1px solid #ffe8c8' }}>
 {`${typeof window !== 'undefined' ? window.location.origin : ''}/qr/${lokasyon.qr_veri}`}
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'center' }}>

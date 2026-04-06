@@ -195,8 +195,8 @@ export default function DashboardSettingsClient({ meId, initialBloklar }: { meId
       <div className="verde-card" style={{ padding: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontWeight: 800, color: '#0f1a0f' }}>Dashboard Yapılandırması</div>
-            <div style={{ fontSize: 12, color: '#7a907a' }}>Blokları tut-çek-bırak ile düzenleyin. KPI satırı sabittir.</div>
+            <div style={{ fontWeight: 800, color: '#3d1c00' }}>Dashboard Yapılandırması</div>
+            <div style={{ fontSize: 12, color: '#9a7b6a' }}>Blokları tut-çek-bırak ile düzenleyin. KPI satırı sabittir.</div>
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -225,7 +225,7 @@ export default function DashboardSettingsClient({ meId, initialBloklar }: { meId
           </div>
         </div>
 
-        {msg && <div style={{ marginTop: 10, fontSize: 12, color: '#1f6b1f' }}>{msg}</div>}
+        {msg && <div style={{ marginTop: 10, fontSize: 12, color: '#c45200' }}>{msg}</div>}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
@@ -282,8 +282,8 @@ function Column({
     >
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '6px 6px 10px' }}>
         <div>
-          <div style={{ fontWeight: 800, color: '#0f1a0f' }}>{title}</div>
-          <div style={{ fontSize: 12, color: '#7a907a', marginTop: 2 }}>{hint}</div>
+          <div style={{ fontWeight: 800, color: '#3d1c00' }}>{title}</div>
+          <div style={{ fontSize: 12, color: '#9a7b6a', marginTop: 2 }}>{hint}</div>
         </div>
       </div>
 
@@ -296,7 +296,7 @@ function Column({
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => onDropOnItem(e, col, idx)}
             style={{
-              border: '1px solid #e8f0e8',
+              border: '1px solid #ffe8c8',
               borderRadius: 12,
               padding: 12,
               display: 'grid',
@@ -308,7 +308,7 @@ function Column({
             }}
             title="Tut-çek-bırak"
           >
-            <div style={{ fontWeight: 700, color: '#0f1a0f', fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontWeight: 700, color: '#3d1c00', fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {DASHBOARD_BLOK_LABEL[b.blok_turu] ?? b.blok_turu}
             </div>
             <button className="verde-btn-ghost" type="button" onClick={() => onRemove(col, idx)}>
@@ -318,7 +318,7 @@ function Column({
         ))}
 
         {!items.length && (
-          <div style={{ padding: '22px 10px', color: '#7a907a', textAlign: 'center' }}>
+          <div style={{ padding: '22px 10px', color: '#9a7b6a', textAlign: 'center' }}>
             Buraya blok bırakın
           </div>
         )}

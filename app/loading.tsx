@@ -18,13 +18,13 @@ export default function Loading() {
             width: 34,
             height: 34,
             borderRadius: 999,
-            border: '3px solid #d6e4d6',
-            borderTopColor: '#2e8b2e',
+            border: '3px solid #ffd9a0',
+            borderTopColor: '#ff7f00',
           }}
         />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0f1a0f' }}>Yükleniyor…</div>
-          <div style={{ fontSize: 12.5, color: '#7a907a', marginTop: 2 }}>Veriler hazırlanıyor, lütfen bekleyin.</div>
+          <div style={{ fontSize: 13.5, fontWeight: 800, color: '#3d1c00' }}>Yükleniyor…</div>
+          <div style={{ fontSize: 12.5, color: '#9a7b6a', marginTop: 2 }}>Veriler hazırlanıyor, lütfen bekleyin.</div>
         </div>
       </div>
     </div>

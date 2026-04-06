@@ -57,7 +57,7 @@ export default function AktifKullanicilarBlock({
       <div
         style={{
           padding: '16px 18px 12px',
-          borderBottom: '1px solid #e8f0e8',
+          borderBottom: '1px solid #ffe8c8',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
@@ -65,12 +65,12 @@ export default function AktifKullanicilarBlock({
         }}
       >
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#0f1a0f' }}>ONLİNE KULLANICILAR</div>
-          <div style={{ fontSize: 13, color: '#7a907a', marginTop: 1 }}>Son 2 dk içinde aktif</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#3d1c00' }}>ONLİNE KULLANICILAR</div>
+          <div style={{ fontSize: 13, color: '#9a7b6a', marginTop: 1 }}>Son 2 dk içinde aktif</div>
         </div>
         <Link
           href={basePath === '/sa' ? `${basePath}/dashboard/firma-kullanicilar` : `${basePath}/dashboard/kullanicilar`}
-          className="text-[13px] text-[#2e8b2e] hover:underline mt-[2px]"
+          className="text-[13px] text-[#ff7f00] hover:underline mt-[2px]"
         >
           Tümünü Gör
         </Link>
@@ -83,10 +83,10 @@ export default function AktifKullanicilarBlock({
           gridTemplateColumns: '44px 1fr 74px',
           gap: 10,
           padding: '10px 18px',
-          borderBottom: '1px solid #e2ece2',
+          borderBottom: '1px solid #ffe8cc',
           fontSize: 12,
           fontWeight: 800,
-          color: '#a0b4a0',
+          color: '#c4a882',
           textTransform: 'uppercase',
           letterSpacing: 0.8,
         }}
@@ -111,11 +111,11 @@ export default function AktifKullanicilarBlock({
                 gridTemplateColumns: '44px 1fr 74px',
                 gap: 10,
                 padding: '12px 18px',
-                borderBottom: '1px solid #e8f0e8',
+                borderBottom: '1px solid #ffe8c8',
                 alignItems: 'center',
               }}
             >
-              <div style={{ color: '#2e8b2e', fontWeight: 900 }}>{i + 1}</div>
+              <div style={{ color: '#ff7f00', fontWeight: 900 }}>{i + 1}</div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                 <div
@@ -123,7 +123,7 @@ export default function AktifKullanicilarBlock({
                     width: 32,
                     height: 32,
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg,#2e8b2e,#1f6b1f)',
+                    background: 'linear-gradient(135deg,#ff7f00,#c45200)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -137,10 +137,10 @@ export default function AktifKullanicilarBlock({
                   {initials}
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0f1a0f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#3d1c00', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {isEmpty ? '—' : u.isim_soyisim}
                   </div>
-                  <div style={{ fontSize: 11.5, color: '#7a907a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 11.5, color: '#9a7b6a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {isEmpty ? '—' : (u.firmalar?.firma_adi || u.firmalar?.ticari_unvan || 'Sistem')}
                   </div>
                 </div>
@@ -152,9 +152,9 @@ export default function AktifKullanicilarBlock({
                   fontWeight: 800,
                   padding: '2px 6px',
                   borderRadius: 3,
-                  background: '#dcf0dc',
-                  color: '#1f6b1f',
-                  border: '1px solid #b8e0b8',
+                  background: '#ffe4bc',
+                  color: '#c45200',
+                  border: '1px solid #ffc078',
                   justifySelf: 'start',
                   opacity: isEmpty ? 0.35 : 1,
                 }}

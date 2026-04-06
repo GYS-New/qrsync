@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useToast } from '@/components/ui/ToastProvider'
 
 const T = {
-  green: '#1a5c2a', greenMid: '#2e8b2e', border: '#e2e8f0', text: '#0f172a',
+  green: '#8b3a00', greenMid: '#ff7f00', border: '#e2e8f0', text: '#0f172a',
   textSoft: '#64748b', grayLight: '#f8fafc',
 }
 
@@ -128,7 +128,7 @@ export default function FrekansSayilariClient({ lokasyonlar }: Props) {
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
           paddingLeft: 12 + depth * 24,
-          background: isRoot ? '#f0fdf4' : depth % 2 === 0 ? '#fff' : T.grayLight,
+          background: isRoot ? '#fff7ed' : depth % 2 === 0 ? '#fff' : T.grayLight,
           borderBottom: `1px solid ${T.border}`,
           borderLeft: isRoot ? `3px solid ${T.greenMid}` : `3px solid transparent`,
         }}>
@@ -235,7 +235,7 @@ export default function FrekansSayilariClient({ lokasyonlar }: Props) {
     <div>
       {/* Bilgi bandı */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{ padding: '8px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.green }}>
+        <div style={{ padding: '8px 14px', background: '#fff7ed', border: '1px solid #86efac', borderRadius: 8, fontSize: 13, fontWeight: 700, color: T.green }}>
           {lokasyonlar.length} lokasyon
         </div>
         <div style={{ padding: '8px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, fontSize: 13, fontWeight: 700, color: '#1d4ed8' }}>

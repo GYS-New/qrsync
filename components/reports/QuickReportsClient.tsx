@@ -64,7 +64,7 @@ const TYPE_OPTIONS: { key: QuickType; title: string; desc: string; accent: strin
   { key: 'location_groups', title: 'Lokasyon grupları raporu', desc: 'Grup bazlı görev sayısı, başarı oranı ve trend analizi', accent: '#0891b2' },
 ]
 
-const BAR_PALETTE = ['#2e8b57', '#357f60', '#3d7369', '#456772', '#4c5b7a', '#5a5c88', '#686096', '#7664a3', '#8568b1', '#946dbf']
+const BAR_PALETTE = ['#e67e22', '#357f60', '#3d7369', '#456772', '#4c5b7a', '#5a5c88', '#686096', '#7664a3', '#8568b1', '#946dbf']
 
 function todayMinus(days: number) {
   const d = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
@@ -320,7 +320,7 @@ function FloatingBarLabel(props: any) {
 
   return (
     <g>
-      <rect x={bx} y={by} width={bubbleWidth} height={bubbleHeight} rx={11} fill="#ffffff" stroke="#dfe9df" />
+      <rect x={bx} y={by} width={bubbleWidth} height={bubbleHeight} rx={11} fill="#ffffff" stroke="#ffe0b2" />
       <text x={Number(x) + Number(width) / 2} y={by + 15} textAnchor="middle" fill="#223322" style={{ fontSize: 12, fontWeight: 800 }}>
         {label}
       </text>
@@ -335,7 +335,7 @@ function chartColor(type: QuickType, index = 0) {
     live_tasks: ['#16a34a', '#22c55e', '#4ade80', '#86efac'],
     manual_tasks: ['#ea580c', '#f97316', '#fb923c', '#fdba74'],
     location_groups: ['#0891b2', '#06b6d4', '#22d3ee', '#67e8f9'],
-  } as Record<QuickType, string[]>)[type] ?? ['#2e8b2e', '#4caf50', '#81c784', '#c8e6c9']
+  } as Record<QuickType, string[]>)[type] ?? ['#ff7f00', '#4caf50', '#81c784', '#c8e6c9']
   return palette[index % palette.length]
 }
 
@@ -394,12 +394,12 @@ function getChartFilterMeta(type: QuickType, key: string) {
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: '#fff', border: '1px solid #dfe9df', borderRadius: 12, padding: 12, boxShadow: '0 14px 28px rgba(15, 40, 15, 0.08)' }}>
+    <div style={{ background: '#fff', border: '1px solid #ffe0b2', borderRadius: 12, padding: 12, boxShadow: '0 14px 28px rgba(15, 40, 15, 0.08)' }}>
       {label ? <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1f2d1f', marginBottom: 8 }}>{String(label)}</div> : null}
       <div style={{ display: 'grid', gap: 6 }}>
         {payload.map((entry: any, index: number) => (
           <div key={`${entry?.name}-${index}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#425242' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 999, background: entry?.color || entry?.fill || '#2e8b57' }} />
+            <span style={{ width: 10, height: 10, borderRadius: 999, background: entry?.color || entry?.fill || '#e67e22' }} />
             <span style={{ fontWeight: 700 }}>{entry?.name || 'Değer'}:</span>
             <span>{entry?.value ?? 0}</span>
           </div>
@@ -425,7 +425,7 @@ function PointValueLabel(props: any) {
   if (value == null) return null
   return (
     <g>
-      <rect x={Number(x) - 14} y={Number(y) - 26} width={28} height={18} rx={9} fill="#ffffff" stroke="#dfe9df" />
+      <rect x={Number(x) - 14} y={Number(y) - 26} width={28} height={18} rx={9} fill="#ffffff" stroke="#ffe0b2" />
       <text x={x} y={Number(y) - 13} textAnchor="middle" fill="#223322" style={{ fontSize: 11, fontWeight: 800 }}>
         {String(value)}
       </text>
@@ -473,7 +473,7 @@ function ChartRenderer({ chart, type }: { chart: QuickPayload['charts'][number];
     width: 38,
     height: 38,
     borderRadius: 10,
-    border: '1px solid #dfe9df',
+    border: '1px solid #ffe0b2',
     background: disabled ? '#f3f6f3' : '#ffffff',
     color: disabled ? '#9aac9a' : '#1f3a1f',
     display: 'grid',
@@ -486,7 +486,7 @@ function ChartRenderer({ chart, type }: { chart: QuickPayload['charts'][number];
   return (
     <div style={{ width: '100%', height: '100%', minHeight: 100, display: 'flex', flexDirection: 'column' }}>
       {!chart.data?.length ? (
-        <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: '#7a907a', fontSize: 13.5, textAlign: 'center', padding: 24 }}>
+        <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: '#9a7b6a', fontSize: 13.5, textAlign: 'center', padding: 24 }}>
           {chart.emptyMessage ?? 'Veri bulunamadı.'}
         </div>
       ) : (
@@ -696,7 +696,7 @@ function ExportButton({
         width: 38,
         height: 38,
         borderRadius: 11,
-        border: '1px solid #dfe9df',
+        border: '1px solid #ffe0b2',
         background: disabled ? '#f3f6f3' : '#ffffff',
         color: disabled ? '#9aac9a' : '#1f3a1f',
         display: 'inline-flex',
@@ -846,9 +846,9 @@ function QuickChartCard({
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 0.95fr) minmax(0, 1.8fr)', gap: 18, alignItems: 'stretch', flex: 1 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingRight: 4 }}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7a907a', marginBottom: 6 }}>{chartKey.toUpperCase()}</div>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f1a0f', marginBottom: 6 }}>{chart?.title ?? 'Grafik yükleniyor'}</h3>
-            {chart?.subtitle ? <p style={{ fontSize: 13, color: '#7a907a', lineHeight: 1.5 }}>{chart.subtitle}</p> : null}
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a7b6a', marginBottom: 6 }}>{chartKey.toUpperCase()}</div>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#3d1c00', marginBottom: 6 }}>{chart?.title ?? 'Grafik yükleniyor'}</h3>
+            {chart?.subtitle ? <p style={{ fontSize: 13, color: '#9a7b6a', lineHeight: 1.5 }}>{chart.subtitle}</p> : null}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, padding: 14, borderRadius: 14, border: '1px solid #e5efe5', background: '#fbfdfb' }}>
@@ -932,9 +932,9 @@ function QuickChartCard({
             ) : null}
           </div>
 
-          <div style={{ display: 'grid', gap: 8, padding: 14, borderRadius: 14, border: '1px dashed #cfe0cf', background: 'linear-gradient(180deg, #fcfefc 0%, #f7fbf7 100%)' }}>
+          <div style={{ display: 'grid', gap: 8, padding: 14, borderRadius: 14, border: '1px dashed #cfe0cf', background: 'linear-gradient(180deg, #fcfefc 0%, #fffaf5 100%)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#284128' }}>
-              <span style={{ width: 28, height: 28, borderRadius: 999, background: '#ffffff', border: '1px solid #dfe9df', display: 'grid', placeItems: 'center', boxShadow: '0 6px 14px rgba(15,40,15,0.06)' }}>
+              <span style={{ width: 28, height: 28, borderRadius: 999, background: '#ffffff', border: '1px solid #ffe0b2', display: 'grid', placeItems: 'center', boxShadow: '0 6px 14px rgba(15,40,15,0.06)' }}>
                 <Download size={15} />
               </span>
               <div style={{ minWidth: 0 }}>
@@ -949,12 +949,12 @@ function QuickChartCard({
               <ExportButton label="SVG" icon={<FileCode2 size={16} />} onClick={() => handleExport('svg')} disabled={!chart || loading || exporting !== null} />
               <ExportButton label="CSV" icon={<Table2 size={16} />} onClick={() => handleExport('csv')} disabled={!chart || loading || exporting !== null} />
               <ExportButton label="XLSX" icon={<FileSpreadsheet size={16} />} onClick={() => handleExport('xlsx')} disabled={!chart || loading || exporting !== null} />
-              {exporting ? <span style={{ fontSize: 11.5, color: '#7a907a', fontWeight: 700 }}>{exporting.toUpperCase()} hazırlanıyor...</span> : null}
+              {exporting ? <span style={{ fontSize: 11.5, color: '#9a7b6a', fontWeight: 700 }}>{exporting.toUpperCase()} hazırlanıyor...</span> : null}
             </div>
           </div>
 
           {loading ? (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#2d3f2d', fontWeight: 700, fontSize: 13.5 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#5c3a1e', fontWeight: 700, fontSize: 13.5 }}>
               <Loader2 size={16} className="animate-spin" />
               Grafik hazırlanıyor...
             </div>
@@ -967,7 +967,7 @@ function QuickChartCard({
           ) : null}
         </div>
 
-        <div ref={chartCaptureRef} style={{ minHeight: 600, height: '100%', borderRadius: 18, border: '1px solid #e8f0e8', background: 'linear-gradient(180deg, #ffffff 0%, #fcfefc 100%)', padding: 18, display: 'flex', alignSelf: 'stretch' }}>
+        <div ref={chartCaptureRef} style={{ minHeight: 600, height: '100%', borderRadius: 18, border: '1px solid #ffe8c8', background: 'linear-gradient(180deg, #ffffff 0%, #fcfefc 100%)', padding: 18, display: 'flex', alignSelf: 'stretch' }}>
           {chart && !error ? <ChartRenderer chart={chart} type={type} /> : null}
         </div>
       </div>
@@ -1038,15 +1038,15 @@ export default function QuickReportsClient({
               {base ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                   <Link href={`${base}/dashboard/raporlar`} style={{ textDecoration: 'none' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 999, background: '#fff', border: '1px solid #e5efe5', color: '#2d3f2d', fontWeight: 800, fontSize: 12.5 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 999, background: '#fff', border: '1px solid #e5efe5', color: '#5c3a1e', fontWeight: 800, fontSize: 12.5 }}>
                       <ArrowLeft size={14} />
                       Raporlar sayfasına dön
                     </span>
                   </Link>
                 </div>
               ) : null}
-              <h2 style={{ fontSize: 24, fontWeight: 900, color: '#0f1a0f', marginBottom: 8 }}>Hızlı raporlar</h2>
-              <p style={{ fontSize: 14, color: '#506050', maxWidth: 900, lineHeight: 1.6 }}>
+              <h2 style={{ fontSize: 24, fontWeight: 900, color: '#3d1c00', marginBottom: 8 }}>Hızlı raporlar</h2>
+              <p style={{ fontSize: 14, color: '#6b4423', maxWidth: 900, lineHeight: 1.6 }}>
                 Görüntülemek istediğin rapor türünü seç. Her grafik kendi filtresiyle bağımsız çalışır.
               </p>
             </div>
@@ -1070,7 +1070,7 @@ export default function QuickReportsClient({
                     textAlign: 'left',
                     padding: 14,
                     borderRadius: 16,
-                    border: active ? `1px solid ${item.accent}` : '1px solid #dfe9df',
+                    border: active ? `1px solid ${item.accent}` : '1px solid #ffe0b2',
                     background: active ? 'rgba(255,255,255,0.97)' : '#ffffffd9',
                     boxShadow: active ? '0 12px 28px rgba(15,40,15,0.07)' : 'none',
                     transform: active ? 'translateY(-1px)' : 'none',
@@ -1081,8 +1081,8 @@ export default function QuickReportsClient({
                   <div style={{ width: 38, height: 38, borderRadius: 12, background: `${item.accent}15`, color: item.accent, display: 'grid', placeItems: 'center', marginBottom: 10 }}>
                     {item.key === 'locations' ? <BarChart3 size={18} /> : item.key === 'users' ? <LineChartIcon size={18} /> : <PieChartIcon size={18} />}
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#0f1a0f', marginBottom: 6 }}>{item.title}</div>
-                  <div style={{ fontSize: 12.5, color: '#7a907a', lineHeight: 1.45 }}>{item.desc}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#3d1c00', marginBottom: 6 }}>{item.title}</div>
+                  <div style={{ fontSize: 12.5, color: '#9a7b6a', lineHeight: 1.45 }}>{item.desc}</div>
                 </button>
               )
             })}
@@ -1095,7 +1095,7 @@ export default function QuickReportsClient({
       ) : null}
 
       {loading && !payload ? (
-        <div className="verde-card" style={{ padding: 24, display: 'inline-flex', alignItems: 'center', gap: 10, color: '#2d3f2d', fontWeight: 700 }}>
+        <div className="verde-card" style={{ padding: 24, display: 'inline-flex', alignItems: 'center', gap: 10, color: '#5c3a1e', fontWeight: 700 }}>
           <Loader2 size={18} className="animate-spin" />
           Rapor içeriği hazırlanıyor...
         </div>

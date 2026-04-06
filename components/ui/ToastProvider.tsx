@@ -46,9 +46,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               style={{
                 pointerEvents:'auto',
                 borderRadius:10,
-                border:'1px solid #dfe9df',
-                background: it.type === 'error' ? '#fef2f2' : it.type === 'success' ? '#f0f9f0' : '#f3f4f6',
-                color:'#0f1a0f',
+                border:'1px solid #ffe0b2',
+                background: it.type === 'error' ? '#fef2f2' : it.type === 'success' ? '#fff7ed' : '#f3f4f6',
+                color:'#3d1c00',
                 boxShadow:'0 8px 24px rgba(0,0,0,0.10)',
                 padding:'10px 12px',
                 display:'flex',

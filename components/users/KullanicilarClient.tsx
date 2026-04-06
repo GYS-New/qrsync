@@ -20,7 +20,7 @@ const ROL_LABEL: Record<UserRole, string> = {
 }
 
 const ROL_BADGE: Record<string, { bg: string; color: string; kisa: string }> = {
-  super_admin:     { bg: '#dcf0dc', color: '#1f6b1f', kisa: 'SA' },
+  super_admin:     { bg: '#ffe4bc', color: '#c45200', kisa: 'SA' },
   alt_super_admin: { bg: '#e8f4e8', color: '#2e7d32', kisa: '2.SA' },
   tenant_admin:    { bg: '#fff3e0', color: '#e65100', kisa: 'TA' },
   musteri:         { bg: '#e3f2fd', color: '#1565c0', kisa: 'M' },
@@ -337,7 +337,7 @@ export default function KullanicilarClient({
   return (
     <div className="users-scale" style={{ padding: '24px 28px' }}>
       <div className="verde-card">
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             className="verde-input" placeholder="Ara (isim, email, telefon)"
             value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 220 }} autoComplete="off"
@@ -360,7 +360,7 @@ export default function KullanicilarClient({
             <option value="tenant_user">Kullanıcı</option>
             <option value="musteri">Müşteri</option>
           </select>
-          <span style={{ fontSize: 12, color: '#7a907a' }}>{filtered.length}/{users.length}</span>
+          <span style={{ fontSize: 12, color: '#9a7b6a' }}>{filtered.length}/{users.length}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <input ref={importInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={onImportFile} />
             <Button variant="ghost" size="sm" onClick={refresh} disabled={loading} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>
@@ -425,8 +425,8 @@ export default function KullanicilarClient({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <UserAvatar name={u.isim_soyisim} photoUrl={u.profil_foto} size={28} />
                     <div>
-                      <div style={{ fontWeight: 600, color: '#0f1a0f' }}>{u.isim_soyisim}</div>
-                      <div style={{ fontSize: 13, color: '#7a907a' }}>{u.email}</div>
+                      <div style={{ fontWeight: 600, color: '#3d1c00' }}>{u.isim_soyisim}</div>
+                      <div style={{ fontSize: 13, color: '#9a7b6a' }}>{u.email}</div>
                     </div>
                   </div>
                 </td>
@@ -435,7 +435,7 @@ export default function KullanicilarClient({
                     const b = ROL_BADGE[u.rol]
                     return b
                       ? <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: b.bg, color: b.color }}>{b.kisa}</span>
-                      : <span style={{ color: '#506050', fontSize: 13 }}>{u.rol}</span>
+                      : <span style={{ color: '#6b4423', fontSize: 13 }}>{u.rol}</span>
                   })()}
                 </td>
                 <td>
@@ -462,10 +462,10 @@ export default function KullanicilarClient({
                       {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
                     </select>
                   ) : (
-                    <span style={{ fontSize: 12.5, color: '#506050' }}>{(u as any).ust_lokasyon_id ? lokMap.get((u as any).ust_lokasyon_id) ?? '—' : '—'}</span>
+                    <span style={{ fontSize: 12.5, color: '#6b4423' }}>{(u as any).ust_lokasyon_id ? lokMap.get((u as any).ust_lokasyon_id) ?? '—' : '—'}</span>
                   )}
                 </td>
-                <td style={{ color: '#506050' }}>{u.telefon ?? '—'}</td>
+                <td style={{ color: '#6b4423' }}>{u.telefon ?? '—'}</td>
                 <td>
                   {deviceTokenMap[u.id] ? (() => {
                     const d = deviceTokenMap[u.id]
@@ -519,7 +519,7 @@ export default function KullanicilarClient({
               </tr>
             ))}
             {!filtered.length && (
-              <tr><td colSpan={canManage ? 6 : 5} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>Kayıt bulunamadı</td></tr>
+              <tr><td colSpan={canManage ? 6 : 5} style={{ textAlign: 'center', color: '#9a7b6a', padding: '36px 0' }}>Kayıt bulunamadı</td></tr>
             )}
           </tbody>
         </table>
@@ -529,7 +529,7 @@ export default function KullanicilarClient({
       {openCreate && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setOpenCreate(false)}>
           <div className="verde-card" style={{ width: 520, padding: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Kullanıcı Ekle</div>
               <Button variant="ghost" size="sm" onClick={() => setOpenCreate(false)} style={{ padding: '4px 10px' }}>✕</Button>
             </div>
@@ -547,7 +547,7 @@ export default function KullanicilarClient({
                     <option value="musteri">M — Müşteri</option>
                     <option value="tenant_user">U — Kullanıcı</option>
                   </select>
-                  <div style={{ fontSize: 11.5, color: '#7a907a', marginTop: 4 }}>
+                  <div style={{ fontSize: 11.5, color: '#9a7b6a', marginTop: 4 }}>
                     SA: sisteme erişim tam yetki · TA: firma yönetimi · M: müşteri görüntüleme · U: operatör
                   </div>
                 </div>
@@ -572,7 +572,7 @@ export default function KullanicilarClient({
                         ))}
                       </select>
                     )}
-                    <div style={{ fontSize: 11.5, color: '#7a907a', marginTop: 4 }}>
+                    <div style={{ fontSize: 11.5, color: '#9a7b6a', marginTop: 4 }}>
                       Kullanıcı bu projeye atanacak. Sonradan değiştirilebilir.
                     </div>
                   </div>
@@ -582,7 +582,7 @@ export default function KullanicilarClient({
                 {!isSA && projeId && (
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label className="verde-label">Proje</label>
-                    <div style={{ fontSize: 13, color: '#0f1a0f', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 10px', fontWeight: 600 }}>
+                    <div style={{ fontSize: 13, color: '#3d1c00', background: '#fff7ed', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 10px', fontWeight: 600 }}>
                       ✓ Aktif proje'ye otomatik atanacak
                     </div>
                   </div>
@@ -603,7 +603,7 @@ export default function KullanicilarClient({
                       <option value="">— Seçiniz —</option>
                       {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
                     </select>
-                    <div style={{ fontSize: 11.5, color: '#7a907a', marginTop: 4 }}>
+                    <div style={{ fontSize: 11.5, color: '#9a7b6a', marginTop: 4 }}>
                       Bu kullanıcı hangi üst lokasyona bağlı çalışacak?
                     </div>
                   </div>
@@ -622,7 +622,7 @@ export default function KullanicilarClient({
       {openEdit && target && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { setOpenEdit(false); setTarget(null) }}>
           <div className="verde-card" style={{ width: 560, padding: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Kullanıcı Düzenle</div>
               <Button variant="ghost" size="sm" onClick={() => { setOpenEdit(false); setTarget(null) }} style={{ padding: '4px 10px' }}>✕</Button>
             </div>
@@ -631,7 +631,7 @@ export default function KullanicilarClient({
               {(() => {
                 const d = deviceTokenMap[target?.id ?? '']
                 return (
-                  <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: d ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${d ? '#86efac' : '#e2e8f0'}` }}>
+                  <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: d ? '#fff7ed' : '#f8fafc', border: `1.5px solid ${d ? '#86efac' : '#e2e8f0'}` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: d ? 8 : 0 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: d ? '#16a34a' : '#cbd5e1', flexShrink: 0 }} />
                       <span style={{ fontSize: 13, fontWeight: 700, color: d ? '#166534' : '#94a3b8' }}>
@@ -682,7 +682,7 @@ export default function KullanicilarClient({
       {openPass && target && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { setOpenPass(false); setTarget(null) }}>
           <div className="verde-card" style={{ width: 420, padding: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Şifre Değiştir — {target.isim_soyisim}</div>
               <Button variant="ghost" size="sm" onClick={() => { setOpenPass(false); setTarget(null) }} style={{ padding: '4px 10px' }}>✕</Button>
             </div>

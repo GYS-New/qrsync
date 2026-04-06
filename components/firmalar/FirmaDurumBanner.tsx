@@ -59,7 +59,7 @@ export default function FirmaDurumBanner({ durum, lisansTarihi }: Props) {
         {config.ikon}
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13.5, fontWeight: 700, color: config.renk }}>{config.baslik}</div>
-          <div style={{ fontSize: 12.5, color: '#506050', marginTop: 2 }}>{config.detay}</div>
+          <div style={{ fontSize: 12.5, color: '#6b4423', marginTop: 2 }}>{config.detay}</div>
         </div>
         <button
           onClick={() => router.push('/ta/dashboard/firma-ayarlar')}
@@ -94,7 +94,7 @@ export default function FirmaDurumBanner({ durum, lisansTarihi }: Props) {
               }}>
                 {config.ikon}
               </div>
-              <div style={{ fontSize: 19, fontWeight: 900, color: '#0f1a0f', lineHeight: 1.2 }}>
+              <div style={{ fontSize: 19, fontWeight: 900, color: '#3d1c00', lineHeight: 1.2 }}>
                 {config.baslik}
               </div>
             </div>

@@ -24,8 +24,8 @@ export default async function SACanliIslemlerPage() {
         <div style={{ padding: '24px 28px' }}>
           <div className="verde-card">
             <div style={{ padding: '18px' }}>
-              <div style={{ fontWeight: 700, color: '#0f1a0f', marginBottom: 6 }}>Firma seçimi gerekli</div>
-              <div style={{ color: '#7a907a', fontSize: 12.5 }}>Süper Admin olarak frekansiyel görev oluşturmak / düzenlemek için üstteki listeden bir firma seçin.</div>
+              <div style={{ fontWeight: 700, color: '#3d1c00', marginBottom: 6 }}>Firma seçimi gerekli</div>
+              <div style={{ color: '#9a7b6a', fontSize: 12.5 }}>Süper Admin olarak frekansiyel görev oluşturmak / düzenlemek için üstteki listeden bir firma seçin.</div>
             </div>
           </div>
         </div>

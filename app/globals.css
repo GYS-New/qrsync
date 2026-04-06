@@ -4,37 +4,37 @@
 @tailwind utilities;
 
 :root {
-  --bg: #f7f9f7;
+  --bg: #fffbf5;
   --white: #ffffff;
-  --border: #d6e4d6;
-  --border-light: #e8f0e8;
-  --border-table: #e2ece2;
+  --border: #ffd9a0;
+  --border-light: #ffe8c8;
+  --border-table: #ffe0b2;
 
-  --green-50:  #f0f9f0;
-  --green-100: #dcf0dc;
-  --green-200: #b8e0b8;
-  --green-500: #3d9c3d;
-  --green-600: #2e8b2e;
-  --green-700: #1f6b1f;
+  --green-50:  #fff7ed;
+  --green-100: #ffe4bc;
+  --green-200: #ffc078;
+  --green-500: #ff9a30;
+  --green-600: #ff7f00;
+  --green-700: #c45200;
 
-  --text-900: #0f1a0f;
-  --text-700: #2d3f2d;
-  --text-500: #506050;
-  --text-400: #7a907a;
-  --text-300: #a0b4a0;
+  --text-900: #3d1c00;
+  --text-700: #5c3a1e;
+  --text-500: #6b4423;
+  --text-400: #9a7b6a;
+  --text-300: #c4a882;
 
   --blue:     #2563eb;
   --blue-l:   #eff6ff;
-  --orange:   #c2610c;
+  --orange:   #ff7f00;
   --orange-l: #fff7ed;
   --red:      #b91c1c;
   --red-l:    #fef2f2;
   --purple:   #6d28d9;
   --purple-l: #f5f3ff;
 
-  --shadow-xs: 0 1px 2px rgba(15,40,15,0.05);
-  --shadow-sm: 0 1px 4px rgba(15,40,15,0.07), 0 1px 2px rgba(15,40,15,0.04);
-  --shadow:    0 4px 14px rgba(15,40,15,0.08), 0 1px 3px rgba(15,40,15,0.05);
+  --shadow-xs: 0 1px 2px rgba(60,30,0,0.05);
+  --shadow-sm: 0 1px 4px rgba(60,30,0,0.07), 0 1px 2px rgba(60,30,0,0.04);
+  --shadow:    0 4px 14px rgba(60,30,0,0.08), 0 1px 3px rgba(60,30,0,0.05);
 }
 
 * {
@@ -53,72 +53,63 @@ html, body {
   letter-spacing: -0.01em;
 }
 
-/* ── AUTH INPUTS (LOGIN) ──
-   Chrome/Edge autofill sometimes paints a bluish background. The login inputs
-   use transparent backgrounds inside a green-tinted wrapper, so we re-paint
-   the autofill to match the wrapper without changing the overall theme. */
+/* ── AUTH INPUTS (LOGIN) ── */
 .auth-input:-webkit-autofill,
 .auth-input:-webkit-autofill:hover,
 .auth-input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--text-900);
-  -webkit-box-shadow: 0 0 0px 1000px rgba(240, 249, 240, 0.9) inset;
-  box-shadow: 0 0 0px 1000px rgba(240, 249, 240, 0.9) inset;
+  -webkit-box-shadow: 0 0 0px 1000px rgba(255, 247, 237, 0.9) inset;
+  box-shadow: 0 0 0px 1000px rgba(255, 247, 237, 0.9) inset;
   caret-color: var(--text-900);
 }
 
-/* ── VERDE SCROLLBAR ── */
+/* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--green-200); }
 
-/* ── VERDE COMPONENTS ── */
+/* ── COMPONENTS ── */
 @layer components {
-  /* Card */
   .verde-card {
-    @apply bg-white border border-[#d6e4d6] rounded-[7px] shadow-[0_1px_2px_rgba(15,40,15,0.05)];
+    @apply bg-white border border-[#ffd9a0] rounded-[7px] shadow-[0_1px_2px_rgba(60,30,0,0.05)];
   }
 
-  /* Button Primary */
   .verde-btn-primary {
-    @apply bg-[#2e8b2e] text-white border-none rounded-[5px] px-4 py-2
+    @apply bg-[#ff7f00] text-white border-none rounded-[5px] px-4 py-2
            font-semibold text-[14.5px] cursor-pointer
            transition-all duration-150
-           hover:bg-[#1f6b1f] hover:shadow-[0_2px_8px_rgba(46,139,46,0.4)]
+           hover:bg-[#c45200] hover:shadow-[0_2px_8px_rgba(255,127,0,0.4)]
            hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.98]
-           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(46,139,46,0.28)]
+           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,127,0,0.28)]
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  /* Button Ghost */
   .verde-btn-ghost {
-    @apply bg-white text-[#506050] border border-[#d6e4d6] rounded-[5px] px-4 py-2
+    @apply bg-white text-[#6b4423] border border-[#ffd9a0] rounded-[5px] px-4 py-2
            font-semibold text-[14.5px] cursor-pointer
            transition-all duration-150
-           hover:border-[#2e8b2e] hover:text-[#2d3f2d]
+           hover:border-[#ff7f00] hover:text-[#5c3a1e]
            hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.98]
-           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(46,139,46,0.18)]
+           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,127,0,0.18)]
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  /* Button Outline Strong (used in canlı akış controls + links) */
   .verde-btn-outline-strong {
-    @apply bg-transparent text-[#2e8b2e] border-2 border-[#2e8b2e]
+    @apply bg-transparent text-[#ff7f00] border-2 border-[#ff7f00]
            rounded-[8px] px-4 py-[7px]
            font-semibold text-[14.5px] cursor-pointer
            transition-all duration-150
-           hover:bg-[#e9f6ea]
+           hover:bg-[#fff7ed]
            hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.99]
-           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(46,139,46,0.18)]
+           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,127,0,0.18)]
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  /* Active state for outline strong buttons */
   .verde-btn-outline-strong.is-active {
-    @apply bg-[#cfeccd];
+    @apply bg-[#ffe4bc];
   }
 
-  /* Button Danger */
   .verde-btn-danger {
     @apply bg-red-600 text-white border-none rounded-[5px] px-4 py-2
            font-semibold text-[14.5px] cursor-pointer
@@ -128,197 +119,69 @@ html, body {
            focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(220,38,38,0.22)];
   }
 
-  /* Button size helpers (for unified buttons) */
   .btn-sm {
     @apply px-3 py-[6px] text-[13.5px];
   }
 
-  /* Input */
   .verde-input {
-    @apply w-full bg-[#f0f9f0] border border-[#d6e4d6] rounded-[5px]
-           px-3 py-2 text-[15px] text-[#0f1a0f]
-           placeholder:text-[#a0b4a0]
+    @apply w-full bg-[#fff7ed] border border-[#ffd9a0] rounded-[5px]
+           px-3 py-2 text-[15px] text-[#3d1c00]
+           placeholder:text-[#c4a882]
            transition-colors duration-150
-           focus:outline-none focus:border-[#2e8b2e] focus:bg-white
+           focus:outline-none focus:border-[#ff7f00] focus:bg-white
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  /* Label */
   .verde-label {
-    @apply block text-[13px] font-bold text-[#506050] uppercase tracking-[0.8px] mb-1;
+    @apply block text-[13px] font-bold text-[#6b4423] uppercase tracking-[0.8px] mb-1;
   }
 
-  /* Badge */
   .verde-badge {
     @apply inline-flex items-center gap-1 px-2 py-[3px] rounded-[4px]
            text-[11px] font-bold border;
   }
 
-  /* Table */
   .verde-table {
     @apply w-full border-collapse;
   }
   .verde-table thead tr {
-    @apply bg-[#f0f9f0] border-b border-[#e2ece2];
+    @apply bg-[#fff7ed] border-b border-[#ffe0b2];
   }
   .verde-table thead th {
-    @apply px-4 py-2 text-left text-[13px] font-bold text-[#7a907a]
+    @apply px-4 py-2 text-left text-[13px] font-bold text-[#9a7b6a]
            uppercase tracking-[0.8px];
     position: sticky;
     top: 0;
     z-index: 2;
-    background: #f0f9f0;
+    background: #fff7ed;
   }
   .verde-table tbody tr {
-    @apply border-b border-[#e2ece2] transition-colors duration-100 cursor-pointer;
+    @apply border-b border-[#ffe0b2] transition-colors duration-100 cursor-pointer;
   }
-  .verde-table tbody tr:hover { @apply bg-[#f0f9f0]; }
+  .verde-table tbody tr:hover { @apply bg-[#fff7ed]; }
   .verde-table tbody tr:last-child { @apply border-b-0; }
   .verde-table tbody td {
-    @apply px-4 py-3 text-[13.5px] text-[#2d3f2d];
+    @apply px-4 py-3 text-[13.5px] text-[#5c3a1e];
   }
 
-  /* Users pages typography scale (SA Firma Adminleri/Kullanıcıları + TA/U Kullanıcılar) */
-  .users-scale .verde-table tbody td { @apply text-[15.5px]; }
-  .users-scale .verde-table thead th { @apply text-[14px]; }
-  .users-scale .verde-badge { @apply text-[13px]; }
-  .users-scale .verde-label { @apply text-[15px]; }
-  .users-scale .btn-sm { @apply text-[15.5px]; }
-  .users-scale .verde-btn-primary,
-  .users-scale .verde-btn-ghost,
-  .users-scale .verde-btn-danger { @apply text-[16.5px]; }
-
-  /* Sidebar nav item */
-  .nav-item {
-    @apply flex items-center gap-2 px-[10px] py-2 rounded-[5px]
-           text-[13px] font-medium text-[#506050] cursor-pointer
-           transition-all duration-150;
-  }
-  .nav-item:hover { @apply bg-[#f0f9f0] text-[#2d3f2d]; }
-  .nav-item.active { @apply bg-[#dcf0dc] text-[#1f6b1f] font-semibold; }
-
-  /* Status pills */
-  .status-acik      { @apply verde-badge bg-blue-50    text-blue-700    border-blue-200; }
-  .status-islemde   { @apply verde-badge bg-[#f0f9f0]  text-[#1f6b1f]   border-[#b8e0b8]; }
-  .status-iptal     { @apply verde-badge bg-red-50     text-red-700     border-red-200; }
-  .status-tamamlandi{ @apply verde-badge bg-green-50   text-green-700   border-green-200; }
-  .status-hazir     { @apply verde-badge bg-gray-50    text-gray-600    border-gray-200; }
-  .status-beklemede { @apply verde-badge bg-yellow-50  text-yellow-700  border-yellow-200; }
-  .status-zamaninda { @apply verde-badge bg-orange-50  text-orange-700  border-orange-200; }
-  .status-kapatildi { @apply verde-badge bg-slate-50   text-slate-700   border-slate-200; }
-  .status-silindi   { @apply verde-badge bg-pink-50    text-pink-700    border-pink-200; }
-
-  /* Live flow highlight */
-  .row-new { animation: rowNewFlash 3.5s ease-out; }
-  @keyframes rowNewFlash {
-    0% { background: #fff7cc; }
-    40% { background: #fff7cc; }
-    100% { background: transparent; }
+  .verde-select {
+    @apply bg-white border border-[#ffd9a0] rounded-[5px]
+           px-3 py-2 text-[15px] text-[#3d1c00]
+           cursor-pointer
+           focus:outline-none focus:border-[#ff7f00];
   }
 
-  /* KPI Card */
-  .kpi-card {
-    @apply verde-card p-5 transition-all duration-200 cursor-default relative;
+  .verde-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #ffe4bc;
+    border-top-color: #ff7f00;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
   }
-  .kpi-card:hover {
-    @apply shadow-[0_4px_14px_rgba(15,40,15,0.08)] -translate-y-px;
-  }
+
+  .status-islemde { @apply bg-[#fff7ed] border-[#ffd9a0] text-[#c45200]; }
+  .status-iptal   { @apply bg-gray-100 border-gray-200 text-gray-500; }
 }
 
-/* ── ANIMATIONS ── */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes slideIn {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(0); }
-}
-@keyframes pulse-green {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(46,139,46,0.4); }
-  50%       { box-shadow: 0 0 0 6px rgba(46,139,46,0); }
-}
-
-@keyframes verdeSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.verde-spinner {
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  border: 2px solid #d6e4d6;
-  border-top-color: #2e8b2e;
-  display: inline-block;
-  animation: verdeSpin 0.8s linear infinite;
-}
-
-.animate-fade-up   { animation: fadeUp 0.4s ease both; }
-.animate-fade-in   { animation: fadeIn 0.3s ease both; }
-.animate-slide-in  { animation: slideIn 0.3s ease both; }
-.animate-pulse-green { animation: pulse-green 2s infinite; }
-
-/* Staggered cards */
-.stagger-1 { animation-delay: 0.05s; }
-.stagger-2 { animation-delay: 0.10s; }
-.stagger-3 { animation-delay: 0.15s; }
-.stagger-4 { animation-delay: 0.20s; }
-
-
-@layer components {
-  .verde-chip {
-    @apply text-[11.5px] font-semibold px-3 py-2 rounded-full border border-[#d6e4d6] bg-white text-[#2d3f2d] cursor-pointer;
-  }
-  .verde-chip[data-active="true"] {
-    @apply bg-[#dcf0dc] border-[#b8e0b8] text-[#1f6b1f];
-  }
-}
-
-
-/* =========================================================
-   Typography Tweaks (Fix18)
-   - Table headers +1 size, darker color
-   - Dashboard block title/subtitle helper classes
-   - Form labels + muted text helpers
-========================================================= */
-
-/* ===== TABLE HEADERS ===== */
-table thead th {
-  font-size: 14.5px;
-  font-weight: 700;
-  color: #2f3a2f;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  padding-top: 12px;
-  padding-bottom: 12px;
-}
-
-/* ===== DASHBOARD BLOCK TITLES ===== */
-.dashboard-block-title {
-  font-size: 15.5px;
-  font-weight: 800;
-  color: #1f2d1f;
-}
-.dashboard-block-subtitle {
-  font-size: 13.5px;
-  color: #4b5f4b;
-}
-
-/* ===== FORM LABELS ===== */
-label {
-  font-size: 14.5px;
-  font-weight: 600;
-  color: #2f3a2f;
-}
-
-/* ===== MUTED TEXT HELPERS ===== */
-.table-muted,
-.text-muted {
-  font-size: 13.5px;
-  color: #5a6d5a;
-}
+@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }

@@ -22,7 +22,7 @@ export default async function SATumGorevlerPage() {
       <div>
         <Topbar title="Tüm Görevler" base="/sa" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Frekansiyel Görevler' }, { label: 'Tüm Görevler' }]} />
         <div className="verde-card" style={{ padding: 18 }}>
-          <div style={{ color: '#7a907a', fontSize: 14 }}>Önce firma seçmelisin (sağ üstten).</div>
+          <div style={{ color: '#9a7b6a', fontSize: 14 }}>Önce firma seçmelisin (sağ üstten).</div>
         </div>
       </div>
     )

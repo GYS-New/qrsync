@@ -25,7 +25,7 @@ const KANAL_RENK: Record<string, { bg: string; color: string }> = {
   WEB:    { bg: '#e0f2fe', color: '#0369a1' },
   QR:     { bg: '#ede9fe', color: '#5b21b6' },
   NFC:    { bg: '#fce7f3', color: '#9d174d' },
-  MOBİL:  { bg: '#f0fdf4', color: '#166534' },
+  MOBİL:  { bg: '#fff7ed', color: '#166534' },
 }
 
 function pct(dol: number, top: number) {
@@ -464,12 +464,12 @@ export default function CeklistRaporlariClient({
         <style>
           body{font-family:Arial,sans-serif;font-size:11px;padding:20px}
           table{width:100%;border-collapse:collapse}
-          th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left;font-size:10px}
-          td{padding:5px 8px;border:1px solid #d6e4d6;font-size:10px}
-          tr:nth-child(even) td{background:#f3faf3}
+          th{background:#ffe4bc;color:#c45200;font-weight:700;padding:6px 8px;border:1px solid #ffc078;text-align:left;font-size:10px}
+          td{padding:5px 8px;border:1px solid #ffd9a0;font-size:10px}
+          tr:nth-child(even) td{background:#fff9f0}
         </style>
         </head><body>
-        <h2 style="color:#1f6b1f">Çeklist Raporları</h2>
+        <h2 style="color:#c45200">Çeklist Raporları</h2>
         <table><thead><tr>
           <th>Kayıt Tarihi</th><th>Görev</th><th>Lokasyon</th><th>Şablon</th>
           <th>Durum</th><th>Kanal</th><th>Dolduran</th><th>Doldurulma</th>${segTh}${maddeSutunlari}<th>Görseller</th>
@@ -597,10 +597,10 @@ export default function CeklistRaporlariClient({
         <style>
           body{font-family:Arial,sans-serif;font-size:10px;padding:20px}
           table{width:100%;border-collapse:collapse}
-          th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:5px 6px;border:1px solid #b8e0b8;text-align:left;font-size:9px}
-          td{padding:4px 6px;border:1px solid #d6e4d6;font-size:8px;word-wrap:break-word}
-          tr:nth-child(even) td{background:#f3faf3}
-          h2{color:#1f6b1f;margin-bottom:15px;font-size:16px}
+          th{background:#ffe4bc;color:#c45200;font-weight:700;padding:5px 6px;border:1px solid #ffc078;text-align:left;font-size:9px}
+          td{padding:4px 6px;border:1px solid #ffd9a0;font-size:8px;word-wrap:break-word}
+          tr:nth-child(even) td{background:#fff9f0}
+          h2{color:#c45200;margin-bottom:15px;font-size:16px}
         </style>
         </head><body>
         <h2>Çeklist Raporları</h2>
@@ -656,7 +656,7 @@ export default function CeklistRaporlariClient({
     display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12,
   }
   const applyBtn: React.CSSProperties = {
-    ...inp, background: '#1f6b1f', color: '#fff', border: 'none',
+    ...inp, background: '#c45200', color: '#fff', border: 'none',
     fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
   }
   const spinning: React.CSSProperties = { animation: 'spin 0.9s linear infinite' }
@@ -669,10 +669,10 @@ export default function CeklistRaporlariClient({
         {/* Başlık */}
         <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: '#0f1a0f', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ClipboardCheck size={18} color="#1f6b1f" /> ÇEKLİST RAPORLARI
+            <div style={{ fontSize: 16, fontWeight: 900, color: '#3d1c00', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ClipboardCheck size={18} color="#c45200" /> ÇEKLİST RAPORLARI
             </div>
-            <div style={{ fontSize: 13, color: '#7a907a', marginTop: 2 }}>
+            <div style={{ fontSize: 13, color: '#9a7b6a', marginTop: 2 }}>
               Tamamlanan ve gecikmeli tamamlanan görevlere ait çeklist sonuçları
             </div>
           </div>
@@ -793,21 +793,21 @@ export default function CeklistRaporlariClient({
               }
             }}
               disabled={!filtreData.length || isDownloading}
-              className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
+              className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40">
               {isDownloading ? <RefreshCw size={13} style={spinning} /> : <Download size={13} />} {isDownloading ? 'Hazırlanıyor...' : 'CSV'}
             </button>
             <button onClick={excelIndir} disabled={!filtreData.length || isDownloading}
-              className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40"
+              className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40"
               style={{ color: '#1d6f42' }}>
               {isDownloading ? <RefreshCw size={13} style={spinning} /> : <FileSpreadsheet size={13} />} {isDownloading ? 'Hazırlanıyor...' : 'Excel'}
             </button>
             <button onClick={yazdir} disabled={!filtreData.length || isDownloading}
-              className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40"
+              className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40"
               style={{ color: '#185a9b' }}>
               {isDownloading ? <RefreshCw size={13} style={spinning} /> : <Printer size={13} />} {isDownloading ? 'Hazırlanıyor...' : 'Yazdır'}
             </button>
             <button onClick={pdfIndir} disabled={!filtreData.length || isDownloading}
-              className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40"
+              className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40"
               style={{ color: '#9d174d' }}>
               {isDownloading ? <RefreshCw size={13} style={spinning} /> : <Download size={13} />} {isDownloading ? 'Hazırlanıyor...' : 'PDF'}
             </button>
@@ -843,7 +843,7 @@ export default function CeklistRaporlariClient({
           </button>
           {filtreMod && (
             <button onClick={filtreTemizle}
-              className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3]">
+              className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0]">
               Temizle
             </button>
           )}
@@ -852,7 +852,7 @@ export default function CeklistRaporlariClient({
         {/* Özet sayaç */}
         <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <span>
-            <strong style={{ color: '#1f6b1f' }}>{filtreData.length}</strong> kayıt
+            <strong style={{ color: '#c45200' }}>{filtreData.length}</strong> kayıt
           </span>
           {filtreMod && (
             <>
@@ -886,7 +886,7 @@ export default function CeklistRaporlariClient({
             <tbody>
               {loading ? (
                 <tr><td colSpan={filtreMod ? 11 : 10} style={{ padding: 32, textAlign: 'center' }}>
-                  <RefreshCw size={20} style={{ ...spinning, color: '#1f6b1f', display: 'block', margin: '0 auto' }} />
+                  <RefreshCw size={20} style={{ ...spinning, color: '#c45200', display: 'block', margin: '0 auto' }} />
                 </td></tr>
               ) : isU && !projeId ? (
                 <tr><td colSpan={filtreMod ? 11 : 10} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
@@ -968,7 +968,7 @@ export default function CeklistRaporlariClient({
                           title="Çeklist Detayı"
                           style={{
                             width: 30, height: 30, border: 'none', borderRadius: 7,
-                            background: '#e8f4e8', color: '#2e8b2e',
+                            background: '#e8f4e8', color: '#ff7f00',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             cursor: 'pointer',
                           }}>
@@ -1045,7 +1045,7 @@ export default function CeklistRaporlariClient({
             boxShadow: '0 8px 32px rgba(0,0,0,0.18)', textAlign: 'center',
           }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>🗑️</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f1a0f', marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#3d1c00', marginBottom: 8 }}>
               Kaydı Sil
             </div>
             <div style={{ fontSize: 13.5, color: '#64748b', marginBottom: 24 }}>

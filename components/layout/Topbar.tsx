@@ -62,19 +62,19 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
 
   return (
     <header style={{
-      background:'#fff', borderBottom:'1px solid #d6e4d6',
+      background:'#fff', borderBottom:'1px solid #ffd9a0',
       height:69, padding:'0 28px',
       display:'flex', alignItems:'center', gap:16,
       position:'sticky', top:0, zIndex:10,
     }}>
       {/* Breadcrumb */}
       <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:15 }}>
-        <span style={{ color:'#7a907a' }}>QRSync</span>
+        <span style={{ color:'#9a7b6a' }}>QRSync</span>
         {breadcrumbs?.map((b, i) => (
           <span key={i} style={{ display:'flex', alignItems:'center', gap:5 }}>
-            <span style={{ color:'#a0b4a0', fontSize:15 }}>›</span>
+            <span style={{ color:'#c4a882', fontSize:15 }}>›</span>
             <span
-              style={{ color: i === (breadcrumbs.length - 1) ? '#2d3f2d' : '#7a907a', fontWeight: i === (breadcrumbs.length - 1) ? 600 : 400, cursor: b.href ? 'pointer' : 'default' }}
+              style={{ color: i === (breadcrumbs.length - 1) ? '#5c3a1e' : '#9a7b6a', fontWeight: i === (breadcrumbs.length - 1) ? 600 : 400, cursor: b.href ? 'pointer' : 'default' }}
               onClick={() => b.href && router.push(b.href)}
             >{b.label}</span>
           </span>
@@ -89,7 +89,7 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
         {/* Notifications (moved from sidebar) */}
         <div
           onClick={() => router.push(`${base}/dashboard/bildirimler`)}
-          style={{ width:34, height:34, border:'1px solid #d6e4d6', borderRadius:10, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', position:'relative', fontSize:20, color:'#506050' }}
+          style={{ width:34, height:34, border:'1px solid #ffd9a0', borderRadius:10, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', position:'relative', fontSize:20, color:'#6b4423' }}
           title="Bildirimler"
         >
           🔔
@@ -110,7 +110,7 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
         {/* Settings */}
         <div
           onClick={() => router.push(`${base}/dashboard/ayarlar`)}
-          style={{ width:34, height:34, border:'1px solid #d6e4d6', borderRadius:10, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', position:'relative', fontSize:20, color:'#506050' }}
+          style={{ width:34, height:34, border:'1px solid #ffd9a0', borderRadius:10, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', position:'relative', fontSize:20, color:'#6b4423' }}
           title="Ayarlar"
         >
           ⚙️

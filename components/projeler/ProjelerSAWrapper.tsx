@@ -13,12 +13,12 @@ export default function ProjelerSAWrapper() {
     <div style={{ padding: 24 }}>
       {/* İçerik */}
       {loading ? (
-        <div className="verde-card" style={{ padding: 20, color: '#7a907a', fontSize: 14 }}>
+        <div className="verde-card" style={{ padding: 20, color: '#9a7b6a', fontSize: 14 }}>
           Firmalar yükleniyor…
         </div>
       ) : null}
       {!firmaId ? (
-        <div className="verde-card" style={{ padding: 20, color: '#7a907a', fontSize: 14 }}>
+        <div className="verde-card" style={{ padding: 20, color: '#9a7b6a', fontSize: 14 }}>
           Proje yönetimi için bir firma seçin.
         </div>
       ) : (

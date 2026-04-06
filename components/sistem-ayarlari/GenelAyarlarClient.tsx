@@ -5,7 +5,7 @@ import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
 
 const T = {
-  green: '#1a5c2a', border: '#e2e8f0', text: '#0f172a', textSoft: '#64748b', grayLight: '#f8fafc',
+  green: '#8b3a00', border: '#e2e8f0', text: '#0f172a', textSoft: '#64748b', grayLight: '#f8fafc',
   blue: '#1d4ed8', purple: '#7c3aed',
 }
 

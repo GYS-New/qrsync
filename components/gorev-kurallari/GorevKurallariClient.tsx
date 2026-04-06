@@ -32,11 +32,11 @@ const BOSH_FORM = {
   bitis_tarihi: '',
 }
 
-const lbl: React.CSSProperties = { display: 'block', fontSize: 12.5, fontWeight: 700, color: '#506050', marginBottom: 5 }
+const lbl: React.CSSProperties = { display: 'block', fontSize: 12.5, fontWeight: 700, color: '#6b4423', marginBottom: 5 }
 const stepBtn: React.CSSProperties = {
-  width: 30, height: 30, borderRadius: 6, border: '1.5px solid #d6e4d6',
-  background: '#f7fbf7', cursor: 'pointer', fontSize: 18, fontWeight: 700,
-  color: '#2e8b2e', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  width: 30, height: 30, borderRadius: 6, border: '1.5px solid #ffd9a0',
+  background: '#fffaf5', cursor: 'pointer', fontSize: 18, fontWeight: 700,
+  color: '#ff7f00', display: 'flex', alignItems: 'center', justifyContent: 'center',
 }
 
 export default function GorevKurallariClient({
@@ -310,8 +310,8 @@ export default function GorevKurallariClient({
       {/* Üst bar */}
       <div className="verde-card" style={{ padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 900, color: '#0f1a0f' }}>GÖREV KURALLARI</div>
-          <div style={{ fontSize: 13, color: '#7a907a', marginTop: 2 }}>Seçilen günlerde gece 00:01'de otomatik görev üretilir</div>
+          <div style={{ fontSize: 15, fontWeight: 900, color: '#3d1c00' }}>GÖREV KURALLARI</div>
+          <div style={{ fontSize: 13, color: '#9a7b6a', marginTop: 2 }}>Seçilen günlerde gece 00:01'de otomatik görev üretilir</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input className="verde-input" placeholder="Ara…" value={q} onChange={e => setQ(e.target.value)} style={{ minWidth: 160 }} />
@@ -328,13 +328,13 @@ export default function GorevKurallariClient({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
         {[
           { label: 'Bugün Üretilen', val: genelOzet.uretilen, color: '#0f4c81' },
-          { label: 'Tamamlandı',     val: genelOzet.tamamlandi, color: '#2e8b2e' },
+          { label: 'Tamamlandı',     val: genelOzet.tamamlandi, color: '#ff7f00' },
           { label: 'Bekliyor',       val: genelOzet.bekliyor,   color: '#b45309' },
           { label: 'Kayıp / İptal',  val: genelOzet.kayip,      color: '#b91c1c' },
         ].map(({ label, val, color }) => (
           <div key={label} className="verde-card" style={{ padding: '12px 16px', textAlign: 'center' }}>
             <div style={{ fontSize: 28, fontWeight: 900, color }}>{val}</div>
-            <div style={{ fontSize: 12, color: '#7a907a', marginTop: 2 }}>{label}</div>
+            <div style={{ fontSize: 12, color: '#9a7b6a', marginTop: 2 }}>{label}</div>
           </div>
         ))}
       </div>
@@ -370,33 +370,33 @@ export default function GorevKurallariClient({
                         </div>
                       )}
                     </td>
-                    <td style={{ fontSize: 12, color: '#506050', maxWidth: 180 }}>{lokMap.get(k.lokasyon_id) ?? '—'}</td>
+                    <td style={{ fontSize: 12, color: '#6b4423', maxWidth: 180 }}>{lokMap.get(k.lokasyon_id) ?? '—'}</td>
                     <td style={{ whiteSpace: 'nowrap', fontSize: 12.5 }}>{gunEtiket(k.aktif_gunler ?? [])}</td>
                     <td style={{ textAlign: 'center' }}>
-                      <span style={{ fontWeight: 700, color: '#2e8b2e', fontSize: 14 }}>{k.gunluk_frekans_sayisi}×</span>
+                      <span style={{ fontWeight: 700, color: '#ff7f00', fontSize: 14 }}>{k.gunluk_frekans_sayisi}×</span>
                     </td>
                     <td style={{ fontSize: 12.5 }}>{k.aktif_olma_saati?.slice(0, 5) ?? '—'}</td>
-                    <td style={{ fontSize: 12, color: '#506050' }}>{k.baslangic_tarihi}</td>
-                    <td style={{ fontSize: 12, color: k.bitis_tarihi ? '#506050' : '#b0c0b0' }}>{k.bitis_tarihi ?? '∞'}</td>
+                    <td style={{ fontSize: 12, color: '#6b4423' }}>{k.baslangic_tarihi}</td>
+                    <td style={{ fontSize: 12, color: k.bitis_tarihi ? '#6b4423' : '#d4b896' }}>{k.bitis_tarihi ?? '∞'}</td>
                     {/* Bugünkü özet */}
                     <td style={{ textAlign: 'center', minWidth: 120 }}>
                       {o ? (
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
                           <span title="Üretilen" style={{ fontSize: 11, background: '#e8f0ff', color: '#0f4c81', padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>{o.uretilen} üretildi</span>
-                          {o.tamamlandi > 0 && <span style={{ fontSize: 11, background: '#e8f7e8', color: '#2e8b2e', padding: '2px 7px', borderRadius: 4 }}>✓ {o.tamamlandi}</span>}
+                          {o.tamamlandi > 0 && <span style={{ fontSize: 11, background: '#ffedd5', color: '#ff7f00', padding: '2px 7px', borderRadius: 4 }}>✓ {o.tamamlandi}</span>}
                           {o.bekliyor > 0   && <span style={{ fontSize: 11, background: '#fff7ed', color: '#b45309', padding: '2px 7px', borderRadius: 4 }}>⏳ {o.bekliyor}</span>}
                           {o.kayip > 0      && <span style={{ fontSize: 11, background: '#fef2f2', color: '#b91c1c', padding: '2px 7px', borderRadius: 4 }}>✗ {o.kayip}</span>}
                         </div>
                       ) : (
-                        <span style={{ fontSize: 11.5, color: '#b0c0b0' }}>—</span>
+                        <span style={{ fontSize: 11.5, color: '#d4b896' }}>—</span>
                       )}
                     </td>
                     {/* Toggle */}
                     <td style={{ textAlign: 'center' }}>
                       {!readonly ? (
                         <button onClick={() => toggleAktif(k)} title={k.aktif ? 'Pasife al' : 'Aktif et'}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', border: 'none', fontSize: 12, fontWeight: 700, background: k.aktif ? '#e8f7e8' : '#f3f4f6', color: k.aktif ? '#2e8b2e' : '#9ca3af' }}>
-                          <span style={{ width: 28, height: 16, borderRadius: 8, position: 'relative', background: k.aktif ? '#2e8b2e' : '#d1d5db', display: 'inline-block', transition: 'background 0.15s', flexShrink: 0 }}>
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', border: 'none', fontSize: 12, fontWeight: 700, background: k.aktif ? '#ffedd5' : '#f3f4f6', color: k.aktif ? '#ff7f00' : '#9ca3af' }}>
+                          <span style={{ width: 28, height: 16, borderRadius: 8, position: 'relative', background: k.aktif ? '#ff7f00' : '#d1d5db', display: 'inline-block', transition: 'background 0.15s', flexShrink: 0 }}>
                             <span style={{ position: 'absolute', top: 2, left: k.aktif ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
                           </span>
                           {k.aktif ? 'Açık' : 'Kapalı'}
@@ -428,7 +428,7 @@ export default function GorevKurallariClient({
               })}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={readonly ? 9 : 10} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0', fontSize: 14 }}>
+                  <td colSpan={readonly ? 9 : 10} style={{ textAlign: 'center', color: '#9a7b6a', padding: '36px 0', fontSize: 14 }}>
                     {q ? 'Arama kriterine uygun kural yok' : 'Henüz görev kuralı oluşturulmamış'}
                   </td>
                 </tr>
@@ -440,11 +440,11 @@ export default function GorevKurallariClient({
 
       {/* Sayfa altı özet satırı */}
       {kuralar.length > 0 && (
-        <div style={{ marginTop: 10, fontSize: 12.5, color: '#7a907a', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 10, fontSize: 12.5, color: '#9a7b6a', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
           <span>Toplam <strong>{kuralar.length}</strong> kural</span>
-          <span>Aktif <strong style={{ color: '#2e8b2e' }}>{kuralar.filter(k => k.aktif).length}</strong></span>
+          <span>Aktif <strong style={{ color: '#ff7f00' }}>{kuralar.filter(k => k.aktif).length}</strong></span>
           <span>Pasif <strong style={{ color: '#9ca3af' }}>{kuralar.filter(k => !k.aktif).length}</strong></span>
-          <span>Günlük üretim kapasitesi: <strong style={{ color: '#2e8b2e' }}>{kuralar.filter(k => k.aktif).reduce((s, k) => s + (k.gunluk_frekans_sayisi ?? 0), 0)} görev/gün</strong></span>
+          <span>Günlük üretim kapasitesi: <strong style={{ color: '#ff7f00' }}>{kuralar.filter(k => k.aktif).reduce((s, k) => s + (k.gunluk_frekans_sayisi ?? 0), 0)} görev/gün</strong></span>
         </div>
       )}
 
@@ -454,13 +454,13 @@ export default function GorevKurallariClient({
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onClick={() => setDuraklatModal(null)}>
           <div onClick={e => e.stopPropagation()} className="verde-card" style={{ width: 'min(400px, 96vw)', padding: 24 }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f1a0f', marginBottom: 6 }}>⏸ Görev Kuralını Duraklat</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#3d1c00', marginBottom: 6 }}>⏸ Görev Kuralını Duraklat</div>
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
               "<strong>{duraklatModal.tanim}</strong>" kuralı belirtilen süre boyunca yeni görev üretmeyecek. Süre dolunca otomatik devam eder.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#506050' }}>Duraklatma Süresi *</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#6b4423' }}>Duraklatma Süresi *</span>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {[6, 12, 24, 48, 72].map(s => (
                     <button key={s} onClick={() => setDuraklatSaat(s)}
@@ -477,7 +477,7 @@ export default function GorevKurallariClient({
                 </div>
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#506050' }}>Neden (opsiyonel)</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#6b4423' }}>Neden (opsiyonel)</span>
                 <input value={duraklatNeden} onChange={e => setDuraklatNeden(e.target.value)} placeholder="Neden duraklatılıyor?"
                   style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} />
               </label>
@@ -497,9 +497,9 @@ export default function GorevKurallariClient({
         <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(15,26,15,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onMouseDown={e => { if (e.target === e.currentTarget) setModal(null) }}>
           <div className="verde-card" style={{ width: 'min(560px, calc(100vw - 24px))', borderRadius: 12, boxShadow: '0 18px 50px rgba(0,0,0,0.2)', overflow: 'hidden', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto' }}>
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontWeight: 800, fontSize: 14 }}>{modal === 'create' ? '+ Yeni Görev Kuralı' : 'Kuralı Düzenle'}</div>
-              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#7a907a' }}>✕</button>
+              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#9a7b6a' }}>✕</button>
             </div>
             <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
@@ -518,7 +518,7 @@ export default function GorevKurallariClient({
                     return (
                       <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {level > 0 && (
-                          <span style={{ fontSize: 13, color: '#b0c8b0', flexShrink: 0 }}>{'└─'.repeat(level)}</span>
+                          <span style={{ fontSize: 13, color: '#d4b896', flexShrink: 0 }}>{'└─'.repeat(level)}</span>
                         )}
                         <select
                           className="verde-select"
@@ -542,7 +542,7 @@ export default function GorevKurallariClient({
                     if (!hasChildren) return null
                     return (
                       <div key={lokSec.length} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, color: '#b0c8b0', flexShrink: 0 }}>{'└─'.repeat(lokSec.length)}</span>
+                        <span style={{ fontSize: 13, color: '#d4b896', flexShrink: 0 }}>{'└─'.repeat(lokSec.length)}</span>
                         <select
                           className="verde-select"
                           style={{ flex: 1 }}
@@ -560,7 +560,7 @@ export default function GorevKurallariClient({
                 </div>
                 {/* Seçili lokasyon özeti */}
                 {form.lokasyon_id && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: '#2e8b2e', fontWeight: 600 }}>
+                  <div style={{ marginTop: 6, fontSize: 12, color: '#ff7f00', fontWeight: 600 }}>
                     ✓ {lokMap.get(form.lokasyon_id)}
                   </div>
                 )}
@@ -571,13 +571,13 @@ export default function GorevKurallariClient({
                   {GUN_TAM.map((label, i) => {
                     const sec = form.aktif_gunler.includes(i)
                     return (
-                      <button key={i} type="button" onClick={() => toggleGun(i)} style={{ padding: '5px 12px', borderRadius: 6, fontSize: 12.5, cursor: 'pointer', fontWeight: sec ? 700 : 400, border: sec ? '1.5px solid #2e8b2e' : '1.5px solid #d6e4d6', background: sec ? '#f0f9f0' : '#fff', color: sec ? '#2e8b2e' : '#506050' }}>{label}</button>
+                      <button key={i} type="button" onClick={() => toggleGun(i)} style={{ padding: '5px 12px', borderRadius: 6, fontSize: 12.5, cursor: 'pointer', fontWeight: sec ? 700 : 400, border: sec ? '1.5px solid #ff7f00' : '1.5px solid #ffd9a0', background: sec ? '#fff7ed' : '#fff', color: sec ? '#ff7f00' : '#6b4423' }}>{label}</button>
                     )
                   })}
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   {[{ label: 'Hafta içi', g: IS_GUNLERI }, { label: 'Her gün', g: TUM_GUNLER }, { label: 'Hafta sonu', g: [0, 6] }].map(({ label, g }) => (
-                    <button key={label} type="button" onClick={() => setForm(p => ({ ...p, aktif_gunler: g }))} style={{ fontSize: 11.5, padding: '3px 10px', borderRadius: 5, border: '1px solid #d6e4d6', background: '#f7fbf7', cursor: 'pointer', color: '#506050' }}>{label}</button>
+                    <button key={label} type="button" onClick={() => setForm(p => ({ ...p, aktif_gunler: g }))} style={{ fontSize: 11.5, padding: '3px 10px', borderRadius: 5, border: '1px solid #ffd9a0', background: '#fffaf5', cursor: 'pointer', color: '#6b4423' }}>{label}</button>
                   ))}
                 </div>
               </div>
@@ -585,15 +585,15 @@ export default function GorevKurallariClient({
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>Günlük Frekans</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 20, fontWeight: 900, color: '#2e8b2e', minWidth: 28, textAlign: 'center' }}>{form.gunluk_frekans_sayisi}</span>
-                    <span style={{ fontSize: 12, color: '#7a907a' }}>kez/gün</span>
+                    <span style={{ fontSize: 20, fontWeight: 900, color: '#ff7f00', minWidth: 28, textAlign: 'center' }}>{form.gunluk_frekans_sayisi}</span>
+                    <span style={{ fontSize: 12, color: '#9a7b6a' }}>kez/gün</span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#7a907a', marginTop: 3 }}>Lokasyonun frekans sayısı (Sistem Ayarları'ndan)</div>
+                  <div style={{ fontSize: 11, color: '#9a7b6a', marginTop: 3 }}>Lokasyonun frekans sayısı (Sistem Ayarları'ndan)</div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>Gün İçi Aktifleşme Saati *</label>
                   <input type="time" className="verde-input" style={{ width: '100%' }} value={form.aktif_olma_saati} onChange={e => setForm(p => ({ ...p, aktif_olma_saati: e.target.value }))} />
-                  <div style={{ fontSize: 11, color: '#7a907a', marginTop: 3 }}>Görev gece 00:01'de üretilir, bu saatte ACIK'a geçer</div>
+                  <div style={{ fontSize: 11, color: '#9a7b6a', marginTop: 3 }}>Görev gece 00:01'de üretilir, bu saatte ACIK'a geçer</div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
@@ -602,13 +602,13 @@ export default function GorevKurallariClient({
                   <input type="date" className="verde-input" style={{ width: '100%' }} value={form.baslangic_tarihi} onChange={e => setForm(p => ({ ...p, baslangic_tarihi: e.target.value }))} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={lbl}>Bitiş Tarihi <span style={{ fontSize: 11, color: '#7a907a' }}>(boş = süresiz)</span></label>
+                  <label style={lbl}>Bitiş Tarihi <span style={{ fontSize: 11, color: '#9a7b6a' }}>(boş = süresiz)</span></label>
                   <input type="date" className="verde-input" style={{ width: '100%' }} value={form.bitis_tarihi} onChange={e => setForm(p => ({ ...p, bitis_tarihi: e.target.value }))} />
                 </div>
               </div>
               {personelAtamaAktif && (
               <div>
-                <label style={lbl}>Atanan <span style={{ fontSize: 11, color: '#7a907a' }}>(opsiyonel)</span></label>
+                <label style={lbl}>Atanan <span style={{ fontSize: 11, color: '#9a7b6a' }}>(opsiyonel)</span></label>
                 <select className="verde-select" style={{ width: '100%' }} value={form.atanan_kullanici_id} onChange={e => setForm(p => ({ ...p, atanan_kullanici_id: e.target.value }))}>
                   <option value="">— Atanmamış —</option>
                   {kullanicilar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
@@ -616,13 +616,13 @@ export default function GorevKurallariClient({
               </div>
               )}
               {form.lokasyon_id && form.aktif_gunler.length > 0 && (
-                <div style={{ background: '#f0f9f0', border: '1px solid #c8e6c8', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#2a4a2a' }}>
+                <div style={{ background: '#fff7ed', border: '1px solid #ffd090', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#2a4a2a' }}>
                   <strong>Özet:</strong> {gunEtiket(form.aktif_gunler)}, saat {form.aktif_olma_saati}'de, günde <strong>{form.gunluk_frekans_sayisi}×</strong> "{form.tanim || '…'}" görevi üretilir.
                   {form.bitis_tarihi ? ` ${form.baslangic_tarihi} – ${form.bitis_tarihi}.` : ` ${form.baslangic_tarihi} tarihinden süresiz.`}
                 </div>
               )}
             </div>
-            <div style={{ padding: '12px 18px', borderTop: '1px solid #e8f0e8', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div style={{ padding: '12px 18px', borderTop: '1px solid #ffe8c8', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setModal(null)} className="verde-btn-outline-strong" disabled={saving}>İptal</button>
               <button onClick={handleSave} className="verde-btn-primary" disabled={saving}>{saving ? 'Kaydediliyor…' : modal === 'create' ? 'Kural Oluştur' : 'Güncelle'}</button>
             </div>
@@ -635,12 +635,12 @@ export default function GorevKurallariClient({
         <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(15,26,15,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onMouseDown={e => { if (e.target === e.currentTarget && !importing) setImportOpen(false) }}>
           <div className="verde-card" style={{ width: 'min(500px, calc(100vw - 24px))', borderRadius: 12, boxShadow: '0 18px 50px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontWeight: 800, fontSize: 14 }}>Excel ile Kural İçe Aktar</div>
-              <button onClick={() => !importing && setImportOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#7a907a' }}>✕</button>
+              <button onClick={() => !importing && setImportOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#9a7b6a' }}>✕</button>
             </div>
             <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ background: '#f6fbf6', border: '1px solid #d6e9d6', borderRadius: 8, padding: 12, fontSize: 12.5, color: '#506050', lineHeight: 1.7 }}>
+              <div style={{ background: '#f6fbf6', border: '1px solid #d6e9d6', borderRadius: 8, padding: 12, fontSize: 12.5, color: '#6b4423', lineHeight: 1.7 }}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Nasıl kullanılır?</div>
                 <ol style={{ margin: 0, paddingLeft: 16 }}>
                   <li>Önce <strong>Şablon</strong> düğmesiyle örnek dosyayı indirin.</li>

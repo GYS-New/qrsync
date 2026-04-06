@@ -835,7 +835,7 @@ async function del() {
         fontWeight: 800,
         fontSize: 14,
         textTransform: 'uppercase',
-        color: '#0f1a0f',
+        color: '#3d1c00',
       }}
     >
       {label}
@@ -849,16 +849,16 @@ async function del() {
     <div className="verde-card" style={{ padding: 16, overflowX: 'hidden' }}>
 
       {/* ── SEKME BAR ── */}
-      <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid #e8f0e8', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid #ffe8c8', marginBottom: 16 }}>
         {[
           { key: 'gorevler', label: '📋 Görev Listesi' },
         ].map(({ key, label }) => (
           <button key={key} onClick={() => setSekme(key as any)} style={{
             padding: '10px 18px', background: 'none', border: 'none',
-            borderBottom: sekme === key ? '2.5px solid #2e8b2e' : '2.5px solid transparent',
+            borderBottom: sekme === key ? '2.5px solid #ff7f00' : '2.5px solid transparent',
             cursor: 'pointer', fontSize: 13.5,
             fontWeight: sekme === key ? 800 : 500,
-            color: sekme === key ? '#0f1a0f' : '#7a907a',
+            color: sekme === key ? '#3d1c00' : '#9a7b6a',
             transition: 'all 0.15s', whiteSpace: 'nowrap', marginBottom: -1,
           }}>{label}</button>
         ))}
@@ -957,7 +957,7 @@ async function del() {
       </div>
 
       {/* ── SATIR 2: Filtreler ── */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center', padding: '10px 12px', background: '#f8fbf8', borderRadius: 8, border: '1px solid #e8f0e8' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center', padding: '10px 12px', background: '#f8fbf8', borderRadius: 8, border: '1px solid #ffe8c8' }}>
         {/* Lokasyon — 3 seviye */}
         <select className="verde-select" value={filterLoc1} onChange={e => { setFilterLoc1(e.target.value); setFilterLoc2(''); setFilterLoc3('') }} style={{ width: 148 }}>
           <option value="">Lokasyon (Tümü)</option>
@@ -998,28 +998,28 @@ async function del() {
           {actorOptions.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
 
-        <div style={{ width: 1, height: 24, background: '#d6e4d6', flexShrink: 0 }} />
+        <div style={{ width: 1, height: 24, background: '#ffd9a0', flexShrink: 0 }} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: '#7a907a', whiteSpace: 'nowrap' }}>Aktif:</span>
+          <span style={{ fontSize: 12, color: '#9a7b6a', whiteSpace: 'nowrap' }}>Aktif:</span>
           <input type="datetime-local" className="verde-input" style={{ width: 155 }} value={from} onChange={e => setFrom(e.target.value)} />
           <span style={{ fontSize: 12, color: '#9a9a9a' }}>—</span>
           <input type="datetime-local" className="verde-input" style={{ width: 155 }} value={to} onChange={e => setTo(e.target.value)} />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: '#7a907a', whiteSpace: 'nowrap' }}>İşlem:</span>
+          <span style={{ fontSize: 12, color: '#9a7b6a', whiteSpace: 'nowrap' }}>İşlem:</span>
           <input type="datetime-local" className="verde-input" style={{ width: 155 }} value={islemFrom} onChange={e => setIslemFrom(e.target.value)} />
           <span style={{ fontSize: 12, color: '#9a9a9a' }}>—</span>
           <input type="datetime-local" className="verde-input" style={{ width: 155 }} value={islemTo} onChange={e => setIslemTo(e.target.value)} />
         </div>
 
         <button type="button" onClick={uygula} disabled={arsivLoading}
-          style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: '#1f6b1f', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: arsivLoading ? 0.7 : 1 }}>
+          style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: '#c45200', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: arsivLoading ? 0.7 : 1 }}>
           {arsivLoading ? 'Yükleniyor…' : '▶ Uygula'}
         </button>
         <button type="button" onClick={clear}
-          style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#fff', fontSize: 13, color: '#506050', cursor: 'pointer' }}>
+          style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #ffd9a0', background: '#fff', fontSize: 13, color: '#6b4423', cursor: 'pointer' }}>
           Temizle
         </button>
       </div>
@@ -1080,7 +1080,7 @@ async function del() {
                     <span style={{
                       display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
                       background: isArsiv ? '#f1f5f9' : '#e7f9e7',
-                      color: isArsiv ? '#64748b' : '#1f6b1f',
+                      color: isArsiv ? '#64748b' : '#c45200',
                       border: `1px solid ${isArsiv ? '#cbd5e1' : '#bbf7d0'}`,
                     }}>
                       {isArsiv ? 'Arşiv' : 'Tablo'}
@@ -1088,10 +1088,10 @@ async function del() {
                   </td>
                 )}
                 <td style={{ fontWeight: 600, color: isArsiv ? '#475569' : undefined }}>{g.tanim}</td>
-                <td style={{ color: isArsiv ? '#64748b' : '#506050' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-                <td style={{ color: isArsiv ? '#64748b' : '#506050' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
-                <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', whiteSpace: 'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
-                <td style={{ color: isArsiv ? '#94a3b8' : '#7a907a', whiteSpace: 'nowrap', fontSize: 13 }}>
+                <td style={{ color: isArsiv ? '#64748b' : '#6b4423' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
+                <td style={{ color: isArsiv ? '#64748b' : '#6b4423' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                <td style={{ color: isArsiv ? '#94a3b8' : '#9a7b6a', whiteSpace: 'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
+                <td style={{ color: isArsiv ? '#94a3b8' : '#9a7b6a', whiteSpace: 'nowrap', fontSize: 13 }}>
                   {isArsiv
                     ? (g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—')
                     : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
@@ -1099,7 +1099,7 @@ async function del() {
                 <td>
                   <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
                 </td>
-                <td style={{ color: isArsiv ? '#94a3b8' : '#506050' }}>{getIslemiYapan(g)}
+                <td style={{ color: isArsiv ? '#94a3b8' : '#6b4423' }}>{getIslemiYapan(g)}
                   {!isArsiv && lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setChecklistGorev({ id: g.id, type: 'canli_gorevler' }) }}
@@ -1114,7 +1114,7 @@ async function del() {
             })}
             {!combinedRows.length && (
               <tr>
-                <td colSpan={(bulkMode || bulkDuzenleMode) ? (arsivAktif ? 9 : 8) : (arsivAktif ? 8 : 7)} style={{ textAlign: 'center', color: '#7a907a', padding: '26px 0', fontSize: 13 }}>
+                <td colSpan={(bulkMode || bulkDuzenleMode) ? (arsivAktif ? 9 : 8) : (arsivAktif ? 8 : 7)} style={{ textAlign: 'center', color: '#9a7b6a', padding: '26px 0', fontSize: 13 }}>
                   Kriterlere uygun görev bulunamadı
                 </td>
               </tr>
@@ -1133,7 +1133,7 @@ async function del() {
         >
           <div onClick={e => e.stopPropagation()} className="verde-card" style={{ width: 'min(460px, 96vw)', padding: 20 }}>
             <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6, color: '#b91c1c' }}>⚠️ Durum Değişimi Yapılamıyor</div>
-            <div style={{ fontSize: 13.5, color: '#506050', marginBottom: 12 }}>
+            <div style={{ fontSize: 13.5, color: '#6b4423', marginBottom: 12 }}>
               Aşağıdaki görevlerin durumu <strong>"Tamamlandı"</strong> yapılamaz.
               Lütfen tekrar düzenleyin:
             </div>
@@ -1144,7 +1144,7 @@ async function del() {
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 12.5, color: '#7a907a', marginBottom: 16 }}>
+            <div style={{ fontSize: 12.5, color: '#9a7b6a', marginBottom: 16 }}>
               "Hazır" durumundaki görevler önce sisteme göre "Açık" hale gelmelidir.
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -1166,14 +1166,14 @@ async function del() {
         >
           <div onClick={e => e.stopPropagation()} className="verde-card" style={{ width: 'min(400px, 96vw)', padding: 20 }}>
             <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 4 }}>Toplu Durum Değiştir</div>
-            <div style={{ fontSize: 13, color: '#7a907a', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: '#9a7b6a', marginBottom: 16 }}>
               {bulkDuzenleIds.size} görev seçildi. Yeni durum seçin:
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
               {(isU ? U_ALLOWED_STATUSES : ['TAMAMLANDI', 'IPTAL', 'KAPATILDI', 'SILINDI']).map(d => (
-                <label key={d} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, border: `2px solid ${bulkDuzenleDurum === d ? '#2e8b2e' : '#e0ece0'}`, cursor: 'pointer', background: bulkDuzenleDurum === d ? '#f0f9f0' : '#fff' }}>
+                <label key={d} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, border: `2px solid ${bulkDuzenleDurum === d ? '#ff7f00' : '#e0ece0'}`, cursor: 'pointer', background: bulkDuzenleDurum === d ? '#fff7ed' : '#fff' }}>
                   <input type="radio" name="bulkDurum" value={d} checked={bulkDuzenleDurum === d} onChange={() => setBulkDuzenleDurum(d)} style={{ width: 16, height: 16 }} />
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#0f1a0f' }}>{CANLI_DURUM_LABEL[d] ?? d}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#3d1c00' }}>{CANLI_DURUM_LABEL[d] ?? d}</span>
                 </label>
               ))}
             </div>
@@ -1204,7 +1204,7 @@ async function del() {
         >
           <div onClick={(e) => e.stopPropagation()} className="verde-card" style={{ width: 'min(680px, 96vw)', padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 900, color: '#0f1a0f' }}>{modal === 'create' ? 'Görev Ekle' : 'Görev Düzenle'}</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#3d1c00' }}>{modal === 'create' ? 'Görev Ekle' : 'Görev Düzenle'}</div>
               <button
                 type="button"
                 onClick={() => setModal(null)}
@@ -1218,7 +1218,7 @@ async function del() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
-                <div style={{ fontSize: 13, color: '#506050', marginBottom: 6 }}>Görev</div>
+                <div style={{ fontSize: 13, color: '#6b4423', marginBottom: 6 }}>Görev</div>
                 <input
                   className="verde-input"
                   value={form.tanim}
@@ -1229,7 +1229,7 @@ async function del() {
               </div>
 
               <div>
-                <div style={{ fontSize: 13, color: '#506050', marginBottom: 6 }}>
+                <div style={{ fontSize: 13, color: '#6b4423', marginBottom: 6 }}>
                   Aktif Olma Tarihi
                 </div>
                 <input
@@ -1244,7 +1244,7 @@ async function del() {
               </div>
 
               <div style={{ gridColumn: '1 / -1' }}>
-                <div style={{ fontSize: 13, color: '#506050', marginBottom: 6 }}>Lokasyon *</div>
+                <div style={{ fontSize: 13, color: '#6b4423', marginBottom: 6 }}>Lokasyon *</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <div>
                     <select
@@ -1326,7 +1326,7 @@ async function del() {
 
               {personelAtamaAktif && (
               <div>
-                <div style={{ fontSize: 13, color: '#506050', marginBottom: 6 }}>Atanan</div>
+                <div style={{ fontSize: 13, color: '#6b4423', marginBottom: 6 }}>Atanan</div>
                 <select
                   className="verde-input"
                   value={form.atanan_kullanici_id}
@@ -1344,7 +1344,7 @@ async function del() {
 
 
               <div style={{ gridColumn: '1 / -1' }}>
-                <div style={{ fontSize: 13, color: '#506050', marginBottom: 6 }}>Durum</div>
+                <div style={{ fontSize: 13, color: '#6b4423', marginBottom: 6 }}>Durum</div>
                 {modal === 'create' ? (
                   <input className="verde-input" value="Hazır" disabled />
                 ) : (

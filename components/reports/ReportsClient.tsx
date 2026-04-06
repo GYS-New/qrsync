@@ -67,16 +67,16 @@ function ReportCard({
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#f0f9f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1f6b1f' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c45200' }}>
               <FileText size={18} />
             </div>
             <div>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f1a0f' }}>{report.title}</h3>
-              <p style={{ fontSize: 13.5, color: '#506050', marginTop: 4 }}>{report.description}</p>
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#3d1c00' }}>{report.title}</h3>
+              <p style={{ fontSize: 13.5, color: '#6b4423', marginTop: 4 }}>{report.description}</p>
             </div>
           </div>
         </div>
-        <div style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid #d6e4d6', background: '#f8fbf8', fontSize: 12.5, fontWeight: 700, color: '#506050' }}>
+        <div style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid #ffd9a0', background: '#f8fbf8', fontSize: 12.5, fontWeight: 700, color: '#6b4423' }}>
           {selectedCountLabel}
         </div>
       </div>
@@ -94,11 +94,11 @@ function ReportCard({
         </div>
       ) : null}
 
-      <div style={{ border: '1px solid #e8f0e8', borderRadius: 10, padding: 14, background: '#fbfdfb' }}>
+      <div style={{ border: '1px solid #ffe8c8', borderRadius: 10, padding: 14, background: '#fbfdfb' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#2d3f2d', marginBottom: 4 }}>Rapor Parametreleri</div>
-            <div style={{ fontSize: 12.5, color: '#7a907a' }}>İstenen rapor kolonlarını seçin. Tüm kolonlar seçiliyse tam veri çıktısı alınır.</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#5c3a1e', marginBottom: 4 }}>Rapor Parametreleri</div>
+            <div style={{ fontSize: 12.5, color: '#9a7b6a' }}>İstenen rapor kolonlarını seçin. Tüm kolonlar seçiliyse tam veri çıktısı alınır.</div>
           </div>
           <Button
             type="button"
@@ -120,10 +120,10 @@ function ReportCard({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  border: checked ? '1px solid #2e8b2e' : '1px solid #d6e4d6',
+                  border: checked ? '1px solid #ff7f00' : '1px solid #ffd9a0',
                   borderRadius: 10,
                   padding: '10px 12px',
-                  background: checked ? '#f0f9f0' : '#fff',
+                  background: checked ? '#fff7ed' : '#fff',
                   cursor: 'pointer',
                 }}
               >
@@ -135,7 +135,7 @@ function ReportCard({
                     else setColumns((prev) => prev.filter((item) => item !== column.key))
                   }}
                 />
-                <span style={{ fontSize: 13.5, color: '#2d3f2d', fontWeight: 600 }}>{column.label}</span>
+                <span style={{ fontSize: 13.5, color: '#5c3a1e', fontWeight: 600 }}>{column.label}</span>
               </label>
             )
           })}
@@ -143,7 +143,7 @@ function ReportCard({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 12.5, color: '#7a907a' }}>
+        <div style={{ fontSize: 12.5, color: '#9a7b6a' }}>
           {isSA ? 'Süper Admin seçilen firma kapsamında rapor alır.' : 'Tenant Admin yalnızca kendi firmasının verisini raporlar.'}
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -197,15 +197,15 @@ export default function ReportsClient({
       <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div className="verde-card" style={{ padding: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f1a0f', marginBottom: 6 }}>Ham Veri Raporları</h2>
-            <p style={{ fontSize: 13.5, color: '#506050' }}>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#3d1c00', marginBottom: 6 }}>Ham Veri Raporları</h2>
+            <p style={{ fontSize: 13.5, color: '#6b4423' }}>
               Her rapor için önce parametreleri belirleyin, ardından PDF veya Excel çıktısı alın. Tüm başlıkları seçerek tam veri raporu üretebilirsiniz.
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, border: '1px solid #d6e4d6', background: '#f8fbf8' }}>
-              <Download size={16} color="#2e8b2e" />
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: '#2d3f2d' }}>{firmaLabel}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, border: '1px solid #ffd9a0', background: '#f8fbf8' }}>
+              <Download size={16} color="#ff7f00" />
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: '#5c3a1e' }}>{firmaLabel}</span>
             </div>
             <Button
               type="button"

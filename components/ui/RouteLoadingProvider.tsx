@@ -70,7 +70,7 @@ export function RouteLoadingOverlay() {
         style={{
           padding: '14px 16px',
           borderRadius: 14,
-          border: '1px solid #d6e4d6',
+          border: '1px solid #ffd9a0',
           background: '#fff',
           boxShadow: '0 14px 40px rgba(15,40,15,0.12)',
           display: 'flex',
@@ -79,7 +79,7 @@ export function RouteLoadingOverlay() {
         }}
       >
         <span className="verde-spinner" />
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#2d3f2d' }}>Yükleniyor…</div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5c3a1e' }}>Yükleniyor…</div>
       </div>
     </div>
   )

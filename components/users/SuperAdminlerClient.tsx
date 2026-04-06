@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 const ROL_BADGE: Record<string, { bg: string; color: string; label: string }> = {
-  super_admin:     { bg: '#dcf0dc', color: '#1f6b1f', label: 'SA — Süper Admin' },
+  super_admin:     { bg: '#ffe4bc', color: '#c45200', label: 'SA — Süper Admin' },
   alt_super_admin: { bg: '#e8f4e8', color: '#2e7d32', label: '2.SA — Alt Süper Admin' },
 }
 
@@ -193,7 +193,7 @@ export default function SuperAdminlerClient({
     <div className="users-scale" style={{ padding: '24px 28px' }}>
       <div className="verde-card">
         {/* Toolbar */}
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             className="verde-input"
             placeholder="Kullanıcı ara (isim, email, telefon)"
@@ -233,25 +233,25 @@ export default function SuperAdminlerClient({
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <UserAvatar name={u.isim_soyisim} photoUrl={u.profil_foto} size={28} />
                       <div>
-                        <div style={{ fontWeight: 600, color: '#0f1a0f' }}>
+                        <div style={{ fontWeight: 600, color: '#3d1c00' }}>
                           {u.isim_soyisim}
                           {isSelf && (
-                            <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: '#2e8b2e', background: '#dcf0dc', padding: '1px 6px', borderRadius: 4 }}>
+                            <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: '#ff7f00', background: '#ffe4bc', padding: '1px 6px', borderRadius: 4 }}>
                               Siz
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: 13, color: '#7a907a' }}>{u.email}</div>
+                        <div style={{ fontSize: 13, color: '#9a7b6a' }}>{u.email}</div>
                       </div>
                     </div>
                   </td>
                   <td>
                     {badge
                       ? <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: badge.bg, color: badge.color }}>{badge.label}</span>
-                      : <span style={{ color: '#506050', fontSize: 13 }}>{u.rol}</span>
+                      : <span style={{ color: '#6b4423', fontSize: 13 }}>{u.rol}</span>
                     }
                   </td>
-                  <td style={{ color: '#506050' }}>{u.telefon ?? '—'}</td>
+                  <td style={{ color: '#6b4423' }}>{u.telefon ?? '—'}</td>
                   <td>
                     <span className={`verde-badge ${u.aktif ? 'status-islemde' : 'status-iptal'}`}>
                       {u.aktif ? 'Aktif' : 'Pasif'}
@@ -283,7 +283,7 @@ export default function SuperAdminlerClient({
             })}
             {!filtered.length && (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', color: '#7a907a', padding: '36px 0' }}>
+                <td colSpan={5} style={{ textAlign: 'center', color: '#9a7b6a', padding: '36px 0' }}>
                   Kayıt bulunamadı
                 </td>
               </tr>
@@ -299,13 +299,13 @@ export default function SuperAdminlerClient({
           onClick={() => setOpenCreate(false)}
         >
           <div className="verde-card" style={{ width: 520, padding: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Süper Admin Ekle</div>
               <Button variant="ghost" size="sm" onClick={() => setOpenCreate(false)} style={{ padding: '4px 10px' }}>✕</Button>
             </div>
             <div style={{ padding: 18 }}>
               {/* Bilgi banner */}
-              <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: '#eaf6ea', border: '1px solid #c8e6c8', fontSize: 13, color: '#2e7d32' }}>
+              <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: '#fff3e0', border: '1px solid #ffd090', fontSize: 13, color: '#2e7d32' }}>
                 ℹ️ Bu kullanıcı sisteme tam erişim yetkisiyle oluşturulacaktır.
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -351,7 +351,7 @@ export default function SuperAdminlerClient({
           onClick={() => { setOpenEdit(false); setTarget(null) }}
         >
           <div className="verde-card" style={{ width: 520, padding: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Kullanıcı Düzenle</div>
               <Button variant="ghost" size="sm" onClick={() => { setOpenEdit(false); setTarget(null) }} style={{ padding: '4px 10px' }}>✕</Button>
             </div>
@@ -386,7 +386,7 @@ export default function SuperAdminlerClient({
           onClick={() => { setOpenPass(false); setTarget(null) }}
         >
           <div className="verde-card" style={{ width: 420, padding: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Şifre Değiştir — {target.isim_soyisim}</div>
               <Button variant="ghost" size="sm" onClick={() => { setOpenPass(false); setTarget(null) }} style={{ padding: '4px 10px' }}>✕</Button>
             </div>

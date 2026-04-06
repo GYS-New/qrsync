@@ -213,7 +213,7 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#2e8b2e',
+                color: '#ff7f00',
                 fontSize: 14,
                 fontWeight: 700,
                 flexShrink: 0,
@@ -303,8 +303,8 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
             disabled={isSaving}
             style={{
               padding: '6px 14px',
-              background: isSaved ? '#dcf0dc' : '#1a5c2a',
-              color: isSaved ? '#1a5c2a' : '#fff',
+              background: isSaved ? '#ffe4bc' : '#8b3a00',
+              color: isSaved ? '#8b3a00' : '#fff',
               border: 'none',
               borderRadius: 6,
               fontSize: 13,
@@ -375,7 +375,7 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
         alignItems: 'center',
         gap: 10,
         padding: '8px 14px',
-        background: '#1a5c2a',
+        background: '#8b3a00',
         borderRadius: '8px 8px 0 0',
         color: '#fff',
         fontSize: 12,

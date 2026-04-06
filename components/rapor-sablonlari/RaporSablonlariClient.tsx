@@ -215,7 +215,7 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
   if (loading) {
     return (
       <div className="verde-card" style={{ padding: 40, textAlign: 'center' }}>
-        <div style={{ color: '#7a907a', fontSize: 14 }}>Yükleniyor...</div>
+        <div style={{ color: '#9a7b6a', fontSize: 14 }}>Yükleniyor...</div>
       </div>
     )
   }
@@ -225,10 +225,10 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
       {/* Başlık ve Ekle Butonu */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h2 style={{ margin: 0, color: '#0f1a0f', fontSize: 20, fontWeight: 700 }}>
+          <h2 style={{ margin: 0, color: '#3d1c00', fontSize: 20, fontWeight: 700 }}>
             Rapor Şablonları
           </h2>
-          <p style={{ margin: '4px 0 0', color: '#7a907a', fontSize: 14 }}>
+          <p style={{ margin: '4px 0 0', color: '#9a7b6a', fontSize: 14 }}>
             Rapor şablonlarınızı yönetin. "Genel Rapor Şablonu" korunmaktadır.
           </p>
         </div>
@@ -236,7 +236,7 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
           onClick={() => setYeniSablonAcik(true)}
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
-            padding: '8px 16px', background: '#2e8b2e', color: 'white',
+            padding: '8px 16px', background: '#ff7f00', color: 'white',
             border: 'none', borderRadius: 8, cursor: 'pointer',
             fontSize: 14, fontWeight: 600
           }}
@@ -255,7 +255,7 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
               onClick={() => setYeniSablonAcik(false)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
             >
-              <X size={20} color="#7a907a" />
+              <X size={20} color="#9a7b6a" />
             </button>
           </div>
           
@@ -272,7 +272,7 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
               onClick={sablonEkle}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 12px', background: '#2e8b2e', color: 'white',
+                padding: '6px 12px', background: '#ff7f00', color: 'white',
                 border: 'none', borderRadius: 6, cursor: 'pointer',
                 fontSize: 13, fontWeight: 600
               }}
@@ -298,14 +298,14 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
       <div className="verde-card" style={{ padding: 0, overflow: 'hidden' }}>
         {sablonlar.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center' }}>
-            <FileText size={48} color="#d6e4d6" style={{ marginBottom: 16 }} />
-            <div style={{ color: '#7a907a', fontSize: 14, marginBottom: 8 }}>
+            <FileText size={48} color="#ffd9a0" style={{ marginBottom: 16 }} />
+            <div style={{ color: '#9a7b6a', fontSize: 14, marginBottom: 8 }}>
               Henüz şablon bulunmuyor
             </div>
             <button
               onClick={() => setYeniSablonAcik(true)}
               style={{
-                padding: '6px 12px', background: '#2e8b2e', color: 'white',
+                padding: '6px 12px', background: '#ff7f00', color: 'white',
                 border: 'none', borderRadius: 6, cursor: 'pointer',
                 fontSize: 13
               }}
@@ -315,7 +315,7 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
           </div>
         ) : (
           sablonlar.map((sablon) => (
-            <div key={sablon.id} style={{ borderBottom: '1px solid #e8f0e8' }}>
+            <div key={sablon.id} style={{ borderBottom: '1px solid #ffe8c8' }}>
               {editingId === sablon.id ? (
                 <div style={{ padding: 20 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -324,7 +324,7 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
                       onClick={() => setEditingId(null)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
                     >
-                      <X size={20} color="#7a907a" />
+                      <X size={20} color="#9a7b6a" />
                     </button>
                   </div>
                   
@@ -341,7 +341,7 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
                       onClick={() => sablonGuncelle(sablon.id)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '6px 12px', background: '#2e8b2e', color: 'white',
+                        padding: '6px 12px', background: '#ff7f00', color: 'white',
                         border: 'none', borderRadius: 6, cursor: 'pointer',
                         fontSize: 13, fontWeight: 600
                       }}
@@ -366,15 +366,15 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#0f1a0f' }}>
+                        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#3d1c00' }}>
                           {sablon.ad}
                         </h3>
                         {sablon.varsayilan && (
                           <span style={{
                             display: 'flex', alignItems: 'center', gap: 4,
-                            padding: '2px 8px', background: '#dcf0dc',
-                            border: '1px solid #b8e0b8', borderRadius: 12,
-                            fontSize: 11, fontWeight: 600, color: '#1f6b1f'
+                            padding: '2px 8px', background: '#ffe4bc',
+                            border: '1px solid #ffc078', borderRadius: 12,
+                            fontSize: 11, fontWeight: 600, color: '#c45200'
                           }}>
                             <Lock size={10} />
                             Varsayılan
@@ -382,11 +382,11 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
                         )}
                       </div>
                       {sablon.aciklama && (
-                        <p style={{ margin: '0 0 8px', color: '#7a907a', fontSize: 13 }}>
+                        <p style={{ margin: '0 0 8px', color: '#9a7b6a', fontSize: 13 }}>
                           {sablon.aciklama}
                         </p>
                       )}
-                      <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#a0b4a0' }}>
+                      <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#c4a882' }}>
                         <span>{sablon.icerik.alanlar.length} alan</span>
                         <span>Oluşturuldu: {new Date(sablon.kayit_tarihi).toLocaleDateString('tr-TR')}</span>
                         {sablon.guncelleme_tarihi && (
@@ -402,9 +402,9 @@ export default function RaporSablonlariClient({ base, projeId }: Props) {
                             onClick={() => duzenlemeyiBaslat(sablon)}
                             style={{
                               display: 'flex', alignItems: 'center', gap: 4,
-                              padding: '6px 10px', background: '#f0f9f0',
-                              border: '1px solid #d6e4d6', borderRadius: 6,
-                              cursor: 'pointer', fontSize: 13, color: '#2d3f2d'
+                              padding: '6px 10px', background: '#fff7ed',
+                              border: '1px solid #ffd9a0', borderRadius: 6,
+                              cursor: 'pointer', fontSize: 13, color: '#5c3a1e'
                             }}
                           >
                             <Edit2 size={14} />
@@ -453,7 +453,7 @@ function SablonForm({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: '#2d3f2d' }}>
+        <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: '#5c3a1e' }}>
           Şablon Adı *
         </label>
         <input
@@ -462,7 +462,7 @@ function SablonForm({
           onChange={(e) => setFormData((prev: any) => ({ ...prev, ad: e.target.value }))}
           style={{
             width: '100%', padding: '8px 12px',
-            border: '1px solid #d6e4d6', borderRadius: 6,
+            border: '1px solid #ffd9a0', borderRadius: 6,
             fontSize: 14
           }}
           placeholder="Rapor şablonu adını girin"
@@ -470,7 +470,7 @@ function SablonForm({
       </div>
       
       <div>
-        <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: '#2d3f2d' }}>
+        <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600, color: '#5c3a1e' }}>
           Açıklama
         </label>
         <textarea
@@ -478,7 +478,7 @@ function SablonForm({
           onChange={(e) => setFormData((prev: any) => ({ ...prev, aciklama: e.target.value }))}
           style={{
             width: '100%', padding: '8px 12px',
-            border: '1px solid #d6e4d6', borderRadius: 6,
+            border: '1px solid #ffd9a0', borderRadius: 6,
             fontSize: 14, minHeight: 60, resize: 'vertical'
           }}
           placeholder="Şablon açıklamasını girin"
@@ -487,14 +487,14 @@ function SablonForm({
 
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: '#2d3f2d' }}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#5c3a1e' }}>
             Rapor Alanları
           </label>
           <button
             onClick={alanEkle}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 8px', background: '#2e8b2e', color: 'white',
+              padding: '4px 8px', background: '#ff7f00', color: 'white',
               border: 'none', borderRadius: 4, cursor: 'pointer',
               fontSize: 12
             }}
@@ -509,7 +509,7 @@ function SablonForm({
             <div key={alan.id} style={{
               display: 'flex', gap: 8, alignItems: 'center',
               padding: 8, background: '#f8faf8',
-              border: '1px solid #e8f0e8', borderRadius: 6
+              border: '1px solid #ffe8c8', borderRadius: 6
             }}>
               <input
                 type="text"
@@ -517,7 +517,7 @@ function SablonForm({
                 onChange={(e) => alanGuncelle(alan.id, 'ad', e.target.value)}
                 style={{
                   flex: 1, padding: '4px 8px',
-                  border: '1px solid #d6e4d6', borderRadius: 4,
+                  border: '1px solid #ffd9a0', borderRadius: 4,
                   fontSize: 13
                 }}
                 placeholder="Alan adı"
@@ -526,7 +526,7 @@ function SablonForm({
                 value={alan.tip}
                 onChange={(e) => alanGuncelle(alan.id, 'tip', e.target.value)}
                 style={{
-                  padding: '4px 8px', border: '1px solid #d6e4d6',
+                  padding: '4px 8px', border: '1px solid #ffd9a0',
                   borderRadius: 4, fontSize: 13
                 }}
               >

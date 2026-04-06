@@ -22,7 +22,7 @@ export default async function URaporlarGrafikselPage() {
   if (!me.proje_id) return (
     <div>
       <Topbar title="Grafiksel Raporlar" base="/u" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Raporlar', href: '/u/dashboard/raporlar' }, { label: 'Grafiksel' }]} />
-      <div style={{ padding: '48px 28px', textAlign: 'center', color: '#7a907a' }}>Bu hesap bir projeye bağlı değil.</div>
+      <div style={{ padding: '48px 28px', textAlign: 'center', color: '#9a7b6a' }}>Bu hesap bir projeye bağlı değil.</div>
     </div>
   )
 

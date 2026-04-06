@@ -35,7 +35,7 @@ type SpesifikData = {
 // ── Design tokens ──────────────────────────────────────────────────────────
 const T = {
   blue:      '#1d4ed8', blueLight: '#eff6ff', blueMid: '#3b82f6',
-  green:     '#1a5c2a', greenMid:  '#2e8b2e', greenLight: '#f0fdf4',
+  green:     '#8b3a00', greenMid:  '#ff7f00', greenLight: '#fff7ed',
   amber:     '#d97706', amberLight: '#fef3c7',
   red:       '#dc2626', redLight:   '#fee2e2',
   gray:      '#475569', grayLight:  '#f8fafc',
@@ -323,7 +323,7 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
                 {loading ? 'Yükleniyor…' : 'Yenile'}
               </button>
               <button onClick={() => download('excel')} disabled={!data || dlLoading !== null}
-                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #d1fae5', background: '#f0fdf4', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #d1fae5', background: '#fff7ed', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
                 <FileSpreadsheet size={13} style={dlLoading === 'excel' ? spinning : {}} />
                 Excel İndir
               </button>

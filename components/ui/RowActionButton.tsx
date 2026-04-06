@@ -11,12 +11,12 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 const stylesByVariant: Record<RowActionButtonVariant, React.CSSProperties> = {
   base: {
     background: '#fff',
-    border: '1px solid #d6e4d6',
+    border: '1px solid #ffd9a0',
     color: '#111827',
   },
   success: {
-    background: '#f0f9f0',
-    border: '1px solid #d6e4d6',
+    background: '#fff7ed',
+    border: '1px solid #ffd9a0',
     color: '#166534',
   },
   warning: {

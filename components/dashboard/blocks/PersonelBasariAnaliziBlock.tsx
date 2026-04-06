@@ -81,29 +81,29 @@ export default function PersonelBasariAnaliziBlock({
 
   return (
     <div className="verde-card h-[420px] flex flex-col">
-      <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid #e8f0e8', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+      <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid #ffe8c8', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#0f1a0f' }}>PERSONEL BAŞARI ANALİZİ</div>
-          <div style={{ fontSize: 13, color: '#7a907a', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#3d1c00' }}>PERSONEL BAŞARI ANALİZİ</div>
+          <div style={{ fontSize: 13, color: '#9a7b6a', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             En çok tamamlayan 3 personel • canlı + arşiv
           </div>
         </div>
-        <Link href={`${basePath}/dashboard/canli-islemler`} className="text-[13px] text-[#2e8b2e] hover:underline mt-[2px]">Tümünü Gör</Link>
+        <Link href={`${basePath}/dashboard/canli-islemler`} className="text-[13px] text-[#ff7f00] hover:underline mt-[2px]">Tümünü Gör</Link>
       </div>
 
       <div className="flex-1 flex flex-col" style={{ padding: '12px 18px 16px' }}>
         <div className="flex gap-2 mb-3" style={{ flexWrap: 'wrap' }}>
           {[{ key: 'gunluk', label: 'GÜNLÜK' }, { key: 'haftalik', label: 'HAFTALIK' }, { key: 'aylik', label: 'AYLIK' }].map((m) => (
             <button key={m.key} onClick={() => setMode(m.key as Mode)}
-              className={`text-[12px] px-2 py-1 rounded-[10px] transition-colors ${mode === m.key ? 'bg-[#2e8b2e] text-white' : 'border border-[#d6e4d6] text-[#2d3f2d]'}`}>
+              className={`text-[12px] px-2 py-1 rounded-[10px] transition-colors ${mode === m.key ? 'bg-[#ff7f00] text-white' : 'border border-[#ffd9a0] text-[#5c3a1e]'}`}>
               {m.label}
             </button>
           ))}
-          {loading && <div style={{ fontSize: 12, color: '#7a907a', marginLeft: 4 }}>Yükleniyor…</div>}
+          {loading && <div style={{ fontSize: 12, color: '#9a7b6a', marginLeft: 4 }}>Yükleniyor…</div>}
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, border: '1px solid #e8f0e8', borderRadius: 12, background: 'linear-gradient(180deg, rgba(240,249,240,.85), rgba(255,255,255,.92))', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 54px', gap: 10, padding: '10px 14px', borderBottom: '1px solid #e2ece2', fontSize: 12, fontWeight: 800, color: '#a0b4a0', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+        <div style={{ flex: 1, minHeight: 0, border: '1px solid #ffe8c8', borderRadius: 12, background: 'linear-gradient(180deg, rgba(240,249,240,.85), rgba(255,255,255,.92))', overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 54px', gap: 10, padding: '10px 14px', borderBottom: '1px solid #ffe8cc', fontSize: 12, fontWeight: 800, color: '#c4a882', textTransform: 'uppercase', letterSpacing: 0.8 }}>
             <div>No</div><div>Personel</div><div style={{ textAlign: 'right' }}>Adet</div>
           </div>
           <div className="divide-y" style={{ height: '100%' }}>
@@ -115,16 +115,16 @@ export default function PersonelBasariAnaliziBlock({
               return (
                 <div key={i} style={{ padding: '12px 14px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 54px', gap: 10, alignItems: 'center' }}>
-                    <div style={{ color: '#2e8b2e', fontWeight: 900 }}>{i + 1}</div>
+                    <div style={{ color: '#ff7f00', fontWeight: 900 }}>{i + 1}</div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0f1a0f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: isEmpty ? 0.45 : 1 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#3d1c00', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: isEmpty ? 0.45 : 1 }}>
                         {isEmpty ? '—' : r.name}
                       </div>
-                      <div style={{ marginTop: 8, height: 10, borderRadius: 999, background: '#e8f0e8', overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.max(0, Math.min(100, pct))}%`, height: '100%', background: 'linear-gradient(90deg,#2e8b2e,#1f6b1f)', opacity: isEmpty ? 0 : 0.9 }} />
+                      <div style={{ marginTop: 8, height: 10, borderRadius: 999, background: '#ffe8c8', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.max(0, Math.min(100, pct))}%`, height: '100%', background: 'linear-gradient(90deg,#ff7f00,#c45200)', opacity: isEmpty ? 0 : 0.9 }} />
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: 14, fontWeight: 900, color: '#0f1a0f', opacity: isEmpty ? 0.45 : 1 }}>{val}</div>
+                    <div style={{ textAlign: 'right', fontSize: 14, fontWeight: 900, color: '#3d1c00', opacity: isEmpty ? 0.45 : 1 }}>{val}</div>
                   </div>
                 </div>
               )
@@ -133,7 +133,7 @@ export default function PersonelBasariAnaliziBlock({
         </div>
 
         {rows.length === 0 && !loading && (
-          <div style={{ textAlign: 'center', color: '#7a907a', paddingTop: 12, fontSize: 13.5 }}>Seçilen aralıkta tamamlanan görev bulunamadı</div>
+          <div style={{ textAlign: 'center', color: '#9a7b6a', paddingTop: 12, fontSize: 13.5 }}>Seçilen aralıkta tamamlanan görev bulunamadı</div>
         )}
       </div>
     </div>

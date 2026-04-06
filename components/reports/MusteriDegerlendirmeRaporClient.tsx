@@ -62,7 +62,7 @@ function OnayModal({ baslik, mesaj, onayMetin, iptalMetin, onayRenk, onOnayla, o
   return (
     <div onClick={onIptal} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', maxWidth: 400, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: '#0f1a0f', marginBottom: 8 }}>{baslik}</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#3d1c00', marginBottom: 8 }}>{baslik}</div>
         <div style={{ fontSize: 13.5, color: '#475569', lineHeight: 1.6, marginBottom: 22 }}>{mesaj}</div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button onClick={onIptal} disabled={loading}
@@ -103,7 +103,7 @@ function DuzenleModal({ kayit, onKaydet, onIptal }: {
     <div onClick={onIptal} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#0f1a0f' }}>Değerlendirmeyi Düzenle</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#3d1c00' }}>Değerlendirmeyi Düzenle</div>
           <button onClick={onIptal} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4 }}><X size={18} /></button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -142,7 +142,7 @@ function DuzenleModal({ kayit, onKaydet, onIptal }: {
             İptal
           </button>
           <button onClick={kaydet} disabled={loading}
-            style={{ height: 36, padding: '0 18px', borderRadius: 8, border: 'none', background: '#1f6b1f', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+            style={{ height: 36, padding: '0 18px', borderRadius: 8, border: 'none', background: '#c45200', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
             {loading ? <RefreshCw size={13} style={{ animation: 'spin 0.9s linear infinite' }} /> : <Check size={14} />}
             Kaydet
           </button>
@@ -251,7 +251,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
   }
 
   const td = (extra?: React.CSSProperties): React.CSSProperties => ({
-    padding: '10px 14px', borderBottom: '1px solid #e8f0e8', fontSize: 13, verticalAlign: 'top', ...extra,
+    padding: '10px 14px', borderBottom: '1px solid #ffe8c8', fontSize: 13, verticalAlign: 'top', ...extra,
   })
 
   const aksBtn = (color: string, borderColor: string): React.CSSProperties => ({
@@ -278,9 +278,9 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
         {/* Filtreler */}
         <div className="verde-card" style={{ padding: '14px 18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0f1a0f', margin: 0 }}>Müşteri Değerlendirmeleri</h2>
+            <h2 style={{ fontSize: 15, fontWeight: 900, color: '#3d1c00', margin: 0 }}>Müşteri Değerlendirmeleri</h2>
             <button onClick={yukle} disabled={loading || !firmaId}
-              style={{ height: 34, padding: '0 14px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#f0f9f0', color: '#1f6b1f', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
+              style={{ height: 34, padding: '0 14px', borderRadius: 8, border: '1px solid #ffd9a0', background: '#fff7ed', color: '#c45200', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
               <RefreshCw size={13} style={loading ? spinning : {}} />
               {loading ? 'Yükleniyor…' : 'Yenile'}
             </button>
@@ -312,7 +312,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
             ))}
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <button onClick={yukle} disabled={loading || !firmaId}
-                style={{ height: 34, padding: '0 16px', borderRadius: 8, border: 'none', background: '#1f6b1f', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, width: '100%' }}>
+                style={{ height: 34, padding: '0 16px', borderRadius: 8, border: 'none', background: '#c45200', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, width: '100%' }}>
                 Uygula
               </button>
             </div>
@@ -323,9 +323,9 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
         {ozet && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 10 }}>
             {[
-              { label: 'Toplam',     val: ozet.toplam,                    color: '#0f1a0f' },
+              { label: 'Toplam',     val: ozet.toplam,                    color: '#3d1c00' },
               { label: 'Ort. Puan', val: ozet.ortYildiz.toFixed(1) + ' ★', color: '#d97706' },
-              { label: 'Yorumlu',   val: ozet.yorumlu,                   color: '#1f6b1f' },
+              { label: 'Yorumlu',   val: ozet.yorumlu,                   color: '#c45200' },
               { label: 'Fotoğraflı', val: ozet.gorsellli,                color: '#5a46d1' },
             ].map(({ label, val, color }) => (
               <div key={label} className="verde-card" style={{ padding: '14px 16px' }}>
@@ -363,7 +363,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
             <div style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>Firma seçin</div>
           ) : loading ? (
             <div style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
-              <RefreshCw size={24} style={{ ...spinning, margin: '0 auto 12px', display: 'block', color: '#2e8b2e' }} />
+              <RefreshCw size={24} style={{ ...spinning, margin: '0 auto 12px', display: 'block', color: '#ff7f00' }} />
               Yükleniyor…
             </div>
           ) : filtreliKayitlar.length === 0 ? (
@@ -375,7 +375,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#1f6b1f' }}>
+                  <tr style={{ background: '#c45200' }}>
                     {['Tarih', 'Lokasyon (Üst > Alt)', 'Kanal', 'Puan', 'Yorum', 'Ad Soyad', 'Fotoğraf', 'İşlemler'].map(h => (
                       <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
@@ -387,9 +387,9 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                       <td style={td({ whiteSpace: 'nowrap', color: '#64748b' })}>
                         {new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td style={td({ fontWeight: 600, color: '#0f1a0f' })}>{k.lokasyon_tanim}</td>
+                      <td style={td({ fontWeight: 600, color: '#3d1c00' })}>{k.lokasyon_tanim}</td>
                       <td style={td()}>
-                        <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 700, background: k.kanal === 'QR' ? '#e0f2fe' : '#f0fdf4', color: k.kanal === 'QR' ? '#0369a1' : '#166534' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 700, background: k.kanal === 'QR' ? '#e0f2fe' : '#fff7ed', color: k.kanal === 'QR' ? '#0369a1' : '#166534' }}>
                           {k.kanal}
                         </span>
                       </td>
@@ -401,7 +401,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                           </span>
                         ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                       </td>
-                      <td style={td({ color: k.ad_soyad ? '#0f1a0f' : '#cbd5e1' })}>{k.ad_soyad || '—'}</td>
+                      <td style={td({ color: k.ad_soyad ? '#3d1c00' : '#cbd5e1' })}>{k.ad_soyad || '—'}</td>
                       <td style={td()}>
                         {k.gorsel_url ? (
                           <button onClick={() => setGorselModal(k.gorsel_url!)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>

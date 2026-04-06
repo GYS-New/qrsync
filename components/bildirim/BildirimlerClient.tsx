@@ -273,7 +273,7 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
         <div
           style={{
             padding: '14px 18px',
-            borderBottom: '1px solid #e8f0e8',
+            borderBottom: '1px solid #ffe8c8',
             display: 'flex',
             gap: 10,
             alignItems: 'center',
@@ -288,7 +288,7 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
             style={{ maxWidth: 260 }}
           />
 
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, color: '#506050' }}>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, color: '#6b4423' }}>
             <input type="checkbox" checked={showUnreadOnly} onChange={e => setShowUnreadOnly(e.target.checked)} />
             Okunmamışlar
           </label>
@@ -357,9 +357,9 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
               <div
                 key={n.id}
                 style={{
-                  border: '1px solid #e8f0e8',
+                  border: '1px solid #ffe8c8',
                   borderRadius: 8,
-                  background: n.okundu ? '#fff' : '#f0f9f0',
+                  background: n.okundu ? '#fff' : '#fff7ed',
                   marginBottom: 10,
                   overflow: 'hidden',
                 }}
@@ -394,7 +394,7 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
                         style={{
                           fontSize: 12.5,
                           fontWeight: 700,
-                          color: '#0f1a0f',
+                          color: '#3d1c00',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -410,7 +410,7 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
                             fontSize: 11,
                             padding: '2px 8px',
                             borderRadius: 999,
-                            border: '1px solid #dfe9df',
+                            border: '1px solid #ffe0b2',
                             background: decision === 'kabul' ? '#dff5e1' : '#fde2e2',
                             color: decision === 'kabul' ? '#1b5e20' : '#b71c1c',
                             whiteSpace: 'nowrap',
@@ -425,7 +425,7 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
                             fontSize: 11,
                             padding: '2px 8px',
                             borderRadius: 999,
-                            border: '1px solid #dfe9df',
+                            border: '1px solid #ffe0b2',
                             background: '#f2f4f2',
                             color: '#556655',
                             whiteSpace: 'nowrap',
@@ -439,7 +439,7 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
                     <div
                       style={{
                         fontSize: 11,
-                        color: '#7a907a',
+                        color: '#9a7b6a',
                         marginTop: 2,
                         display: 'flex',
                         gap: 10,
@@ -464,13 +464,13 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
                     </Button>
                   )}
 
-                  {!selectionMode && <div style={{ color: '#7a907a', fontSize: 12 }}>{expanded ? '▾' : '▸'}</div>}
+                  {!selectionMode && <div style={{ color: '#9a7b6a', fontSize: 12 }}>{expanded ? '▾' : '▸'}</div>}
                 </div>
 
                 {/* Details */}
                 {expanded && (
-                  <div style={{ padding: '12px 12px', borderTop: '1px solid #e8f0e8', background: '#fff' }}>
-                    <div style={{ fontSize: 12.5, color: '#506050', whiteSpace: 'pre-wrap' }}>{cleanMessage(n.mesaj ?? '')}</div>
+                  <div style={{ padding: '12px 12px', borderTop: '1px solid #ffe8c8', background: '#fff' }}>
+                    <div style={{ fontSize: 12.5, color: '#6b4423', whiteSpace: 'pre-wrap' }}>{cleanMessage(n.mesaj ?? '')}</div>
 
                     {/* Görev atama bildirimi: Kabul / Reddet (sadece okunmamış + karar yok) */}
                     {n.tip === 'gorev_atama' && gorevId && !n.okundu && !decision && (
@@ -490,7 +490,7 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
           })}
 
           {!filtered.length && (
-            <div style={{ padding: '40px 0', textAlign: 'center', color: '#7a907a' }}>
+            <div style={{ padding: '40px 0', textAlign: 'center', color: '#9a7b6a' }}>
               <div style={{ fontSize: 26, marginBottom: 8 }}>🔔</div>
               <div>Bildirim bulunamadı</div>
             </div>

@@ -25,7 +25,7 @@ export default async function UCeklistRaporPage() {
           base="/u"
           breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: '/u/dashboard/raporlar' }, { label: 'Çeklist Raporları' }]}
         />
-        <div style={{ padding: '48px 28px', textAlign: 'center', color: '#7a907a' }}>Bu hesap bir projeye bağlı değil.</div>
+        <div style={{ padding: '48px 28px', textAlign: 'center', color: '#9a7b6a' }}>Bu hesap bir projeye bağlı değil.</div>
       </div>
     )
   }

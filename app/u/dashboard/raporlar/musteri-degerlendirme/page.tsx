@@ -25,7 +25,7 @@ export default async function URaporlarMusteriDegerlendirmePage() {
     <div>
       <Topbar title="Müşteri Değerlendirmeleri" base="/u"
         breadcrumbs={[{ label: 'Yönetim' }, { label: 'Raporlar', href: '/u/dashboard/raporlar' }, { label: 'Müşteri Değerlendirmeleri' }]} />
-      <div style={{ padding: '48px 28px', textAlign: 'center', color: '#7a907a' }}>Bu hesap bir projeye bağlı değil.</div>
+      <div style={{ padding: '48px 28px', textAlign: 'center', color: '#9a7b6a' }}>Bu hesap bir projeye bağlı değil.</div>
     </div>
   )
 

@@ -63,29 +63,29 @@ export default function UserPanel({ base }: { base: string }) {
         onClick={() => setOpen(v => !v)}
         style={{
           display:'flex', alignItems:'center', gap:8,
-          border:'1px solid #d6e4d6', background:'#fff', borderRadius:10,
+          border:'1px solid #ffd9a0', background:'#fff', borderRadius:10,
           padding:'4px 10px', height:41, cursor:'pointer'
         }}
       >
         <UserAvatar name={displayName} photoUrl={photoUrl} size={32} />
         <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', lineHeight:1.1 }}>
-          <div style={{ fontSize:15, fontWeight:600, color:'#0f1a0f', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+          <div style={{ fontSize:15, fontWeight:600, color:'#3d1c00', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
             {displayName}
           </div>
-          <div style={{ fontSize:13, color:'#7a907a' }}>{me?.email ?? ''}</div>
+          <div style={{ fontSize:13, color:'#9a7b6a' }}>{me?.email ?? ''}</div>
         </div>
-        <span style={{ marginLeft:4, fontSize:15, color:'#7a907a' }}>▾</span>
+        <span style={{ marginLeft:4, fontSize:15, color:'#9a7b6a' }}>▾</span>
       </button>
 
       {open && (
         <div style={{
           position:'absolute', right:0, top:40, width:220,
-          background:'#fff', border:'1px solid #d6e4d6', borderRadius:12,
+          background:'#fff', border:'1px solid #ffd9a0', borderRadius:12,
           boxShadow:'0 12px 30px rgba(0,0,0,0.08)', overflow:'hidden', zIndex:50
         }}>
-          <div style={{ padding:'10px 12px', borderBottom:'1px solid #e8f0e8' }}>
-            <div style={{ fontSize:15, fontWeight:700, color:'#0f1a0f' }}>{displayName}</div>
-            <div style={{ fontSize:13, color:'#7a907a', overflow:'hidden', textOverflow:'ellipsis' }}>{me?.email ?? ''}</div>
+          <div style={{ padding:'10px 12px', borderBottom:'1px solid #ffe8c8' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'#3d1c00' }}>{displayName}</div>
+            <div style={{ fontSize:13, color:'#9a7b6a', overflow:'hidden', textOverflow:'ellipsis' }}>{me?.email ?? ''}</div>
           </div>
 
           <div style={{ padding:6 }}>
@@ -97,14 +97,14 @@ export default function UserPanel({ base }: { base: string }) {
                 style={{
                   width:'100%', textAlign:'left', padding:'8px 10px',
                   border:'none', background:'transparent', cursor:'pointer',
-                  borderRadius:8, fontSize:14.5, color:'#2d3f2d'
+                  borderRadius:8, fontSize:14.5, color:'#5c3a1e'
                 }}
                 onMouseDown={(e) => e.preventDefault()}
               >
                 {it.label}
               </button>
             ))}
-            <div style={{ height:1, background:'#e8f0e8', margin:'6px 6px' }} />
+            <div style={{ height:1, background:'#ffe8c8', margin:'6px 6px' }} />
             <button
               type="button"
               onClick={() => { setOpen(false); logout() }}

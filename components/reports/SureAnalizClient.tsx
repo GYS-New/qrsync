@@ -23,7 +23,7 @@ type SureData      = { ok: boolean; frekansiyel: Bolum; spesifik: Bolum; hedefTo
 
 // ── Tokens ────────────────────────────────────────────────────────────────
 const T = {
-  green: '#1a5c2a', greenMid: '#2e8b2e', greenLight: '#f0fdf4',
+  green: '#8b3a00', greenMid: '#ff7f00', greenLight: '#fff7ed',
   blue: '#1d4ed8', blueMid: '#3b82f6', blueLight: '#eff6ff',
   amber: '#d97706', amberLight: '#fef3c7',
   red: '#dc2626', redLight: '#fee2e2',

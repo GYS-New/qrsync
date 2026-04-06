@@ -22,7 +22,7 @@ export default async function UFrekansiyel() {
     <div>
       <Topbar title="Frekansiyel Görevler Raporu" base="/u"
         breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Özelleştir', href: '/u/dashboard/raporlar/ozellestir' }, { label: 'Frekansiyel' }]} />
-      <div style={{ padding: '48px 28px', textAlign: 'center', color: '#7a907a' }}>Bu hesap bir projeye bağlı değil.</div>
+      <div style={{ padding: '48px 28px', textAlign: 'center', color: '#9a7b6a' }}>Bu hesap bir projeye bağlı değil.</div>
     </div>
   )
 

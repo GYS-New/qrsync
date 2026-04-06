@@ -46,7 +46,7 @@ export default async function AktifGorevlerBlock({ firmaId, projeId,
       <div
         style={{
           padding: '16px 18px 12px',
-          borderBottom: '1px solid #e8f0e8',
+          borderBottom: '1px solid #ffe8c8',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
@@ -54,11 +54,11 @@ export default async function AktifGorevlerBlock({ firmaId, projeId,
         }}
       >
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#0f1a0f' }}>SPESİFİK SON GÖREVLER</div>
-          <div style={{ fontSize: 13, color: '#7a907a', marginTop: 1 }}>Son aktiviteler</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#3d1c00' }}>SPESİFİK SON GÖREVLER</div>
+          <div style={{ fontSize: 13, color: '#9a7b6a', marginTop: 1 }}>Son aktiviteler</div>
         </div>
 
-        <Link href={`${basePath}/dashboard/gorevler`} className="text-[13px] text-[#2e8b2e] hover:underline mt-[2px]">
+        <Link href={`${basePath}/dashboard/gorevler`} className="text-[13px] text-[#ff7f00] hover:underline mt-[2px]">
           Tümünü Gör
         </Link>
       </div>
@@ -70,10 +70,10 @@ export default async function AktifGorevlerBlock({ firmaId, projeId,
           gridTemplateColumns: GRID,
           gap: 10,
           padding: '10px 18px',
-          borderBottom: '1px solid #e2ece2',
+          borderBottom: '1px solid #ffe8cc',
           fontSize: 13,
           fontWeight: 800,
-          color: '#a0b4a0',
+          color: '#c4a882',
           textTransform: 'uppercase',
           letterSpacing: 0.8,
         }}
@@ -93,14 +93,14 @@ export default async function AktifGorevlerBlock({ firmaId, projeId,
           const pct = isEmpty ? 0 : progressForStatus(g.durum)
           const name = isEmpty ? null : (g.users?.isim_soyisim ?? null)
           const dotColor = isEmpty
-            ? '#a0b4a0'
+            ? '#c4a882'
             : g.durum === 'TAMAMLANDI'
-              ? '#2e8b2e'
+              ? '#ff7f00'
               : g.durum === 'ISLEMDE'
                 ? '#c2610c'
                 : g.durum === 'ACIK'
                   ? '#2563eb'
-                  : '#a0b4a0'
+                  : '#c4a882'
 
           return (
             <div
@@ -110,25 +110,25 @@ export default async function AktifGorevlerBlock({ firmaId, projeId,
                 gridTemplateColumns: GRID,
                 gap: 10,
                 padding: '12px 18px',
-                borderBottom: '1px solid #e8f0e8',
+                borderBottom: '1px solid #ffe8c8',
                 alignItems: 'center',
               }}
             >
               {/* NO */}
-              <div style={{ color: '#2e8b2e', fontWeight: 900 }}>{idx + 1}</div>
+              <div style={{ color: '#ff7f00', fontWeight: 900 }}>{idx + 1}</div>
 
               {/* GÖREV */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                 <div style={{ width: 10, height: 10, borderRadius: 999, background: dotColor, flexShrink: 0 }} />
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 400, color: '#0f1a0f', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <div style={{ fontWeight: 400, color: '#3d1c00', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                     <ClipboardList size={12} style={{ flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isEmpty ? '—' : g.tanim}</span>
                   </div>
                   <div
                     style={{
                       fontSize: 12,
-                      color: '#7a907a',
+                      color: '#9a7b6a',
                       marginTop: 2,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -163,22 +163,22 @@ export default async function AktifGorevlerBlock({ firmaId, projeId,
 
               {/* İLERLEME */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ fontWeight: 800, color: '#2d3f2d', width: 36 }}>{pct}%</div>
-                <div style={{ height: 8, background: '#e8f0e8', borderRadius: 999, overflow: 'hidden', flex: 1 }}>
+                <div style={{ fontWeight: 800, color: '#5c3a1e', width: 36 }}>{pct}%</div>
+                <div style={{ height: 8, background: '#ffe8c8', borderRadius: 999, overflow: 'hidden', flex: 1 }}>
                   <div style={{ width: `${pct}%`, height: '100%', background: dotColor }} />
                 </div>
               </div>
 
               {/* ATANAN */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#506050', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#6b4423', minWidth: 0 }}>
                 <div
                   style={{
                     width: 28,
                     height: 28,
                     borderRadius: 999,
-                    background: '#dcf0dc',
-                    border: '1px solid #b8e0b8',
-                    color: '#1f6b1f',
+                    background: '#ffe4bc',
+                    border: '1px solid #ffc078',
+                    color: '#c45200',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -195,7 +195,7 @@ export default async function AktifGorevlerBlock({ firmaId, projeId,
               </div>
 
               {/* TARİH */}
-              <div style={{ color: '#7a907a', whiteSpace: 'nowrap' }}>{isEmpty ? '—' : formatDateTime(g.olusturma_tarihi)}</div>
+              <div style={{ color: '#9a7b6a', whiteSpace: 'nowrap' }}>{isEmpty ? '—' : formatDateTime(g.olusturma_tarihi)}</div>
             </div>
           )
         })}

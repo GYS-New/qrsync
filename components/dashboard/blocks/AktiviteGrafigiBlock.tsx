@@ -126,7 +126,7 @@ export default function AktiviteGrafigiBlock({
           { key: "aylik", label: "AYLIK" },
         ].map((m) => (
           <button key={m.key} onClick={() => setMode(m.key as Mode)}
-            className={`text-xs px-2 py-1 rounded ${mode === m.key ? "bg-[#2e8b2e] text-white" : "border border-[#d6e4d6] text-[#2d3f2d]"}`}>
+            className={`text-xs px-2 py-1 rounded ${mode === m.key ? "bg-[#ff7f00] text-white" : "border border-[#ffd9a0] text-[#5c3a1e]"}`}>
             {m.label}
           </button>
         ))}

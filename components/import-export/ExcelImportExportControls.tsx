@@ -115,7 +115,7 @@ export default function ExcelImportExportControls({
           onClick={() => !loading && setOpen(false)}
         >
           <div className="verde-card" style={{ width: 640, maxWidth: 'calc(100vw - 32px)', padding: 0 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 14, fontWeight: 700 }}>{ENTITY_LABEL[entity]} Excel İçe Aktar</div>
               <Button variant="ghost" size="sm" type="button" onClick={() => setOpen(false)} disabled={loading}>✕</Button>
             </div>
@@ -148,7 +148,7 @@ export default function ExcelImportExportControls({
                   className="verde-input"
                   style={{ padding: 10, height: 'auto' }}
                 />
-                <div style={{ marginTop: 6, fontSize: 12, color: '#7a907a' }}>
+                <div style={{ marginTop: 6, fontSize: 12, color: '#9a7b6a' }}>
                   Desteklenen format: Excel 2003 XML (.xml)
                 </div>
               </div>

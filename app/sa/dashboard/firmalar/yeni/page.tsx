@@ -70,8 +70,8 @@ export default function FirmaYeniPage() {
       <Topbar title="Firma Ekle" base="/sa" breadcrumbs={[{label:'Firmalar',href:'/sa/dashboard/firmalar'},{label:'Yeni Firma'}]} />
       <div style={{padding:'24px 28px'}}>
         <div className="verde-card" style={{maxWidth:720}}>
-          <div style={{padding:'16px 18px', borderBottom:'1px solid #e8f0e8'}}>
-            <div style={{fontSize:13,fontWeight:700,color:'#0f1a0f'}}>Yeni Firma Bilgileri</div>
+          <div style={{padding:'16px 18px', borderBottom:'1px solid #ffe8c8'}}>
+            <div style={{fontSize:13,fontWeight:700,color:'#3d1c00'}}>Yeni Firma Bilgileri</div>
           </div>
           <form onSubmit={handleSave} style={{padding:20}}>
             {error && <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:5,padding:'10px 14px',marginBottom:16,fontSize:12.5,color:'#b91c1c'}}>{error}</div>}
@@ -80,7 +80,7 @@ export default function FirmaYeniPage() {
               <div>
                 <label className="verde-label">Firma Adı (Kısa) (Maks 7)</label>
                 <input className="verde-input" value={form.firma_adi} onChange={set('firma_adi')} maxLength={7} />
-                <div style={{ fontSize: 11.5, color: '#7a907a', marginTop: 6 }}>
+                <div style={{ fontSize: 11.5, color: '#9a7b6a', marginTop: 6 }}>
                   {form.firma_adi.length}/7 karakter
                 </div>
               </div>
@@ -98,24 +98,24 @@ export default function FirmaYeniPage() {
                 accept="image/png,image/jpeg"
                 onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
               />
-              <div style={{ fontSize: 11.5, color: '#7a907a', marginTop: 6 }}>Logo dosyası otomatik küçültülerek yüklenir.</div>
+              <div style={{ fontSize: 11.5, color: '#9a7b6a', marginTop: 6 }}>Logo dosyası otomatik küçültülerek yüklenir.</div>
             </div>
             <div style={{marginBottom:14}}>
               <div style={{fontSize:12,fontWeight:700,color:'#4a5e4a',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.5px'}}>Özellikler</div>
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#0f1a0f',cursor:'pointer'}}>
+                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#3d1c00',cursor:'pointer'}}>
                   <input type="checkbox" checked={form.qr_sablon_aktif} onChange={e => setForm(f => ({...f, qr_sablon_aktif: e.target.checked}))} />
                   <span>Şablonlu QR Kart İndirme — Lokasyon QR kodlarını şablona yerleştirerek PNG olarak indirir</span>
                 </label>
-                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#0f1a0f',cursor:'pointer'}}>
+                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#3d1c00',cursor:'pointer'}}>
                   <input type="checkbox" checked={form.rapor_ozellestir_aktif} onChange={e => setForm(f => ({...f, rapor_ozellestir_aktif: e.target.checked}))} />
                   <span>Rapor Özelleştir — Genel Rapor Şablonu sayfasına erişim</span>
                 </label>
-                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#0f1a0f',cursor:'pointer'}}>
+                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#3d1c00',cursor:'pointer'}}>
                   <input type="checkbox" checked={form.personel_takibi_aktif} onChange={e => setForm(f => ({...f, personel_takibi_aktif: e.target.checked}))} />
                   <span>Personel Takibi — QR/NFC ile iş başı ve iş bitimi takip sistemi</span>
                 </label>
-                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#0f1a0f',cursor:'pointer'}}>
+                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#3d1c00',cursor:'pointer'}}>
                   <input type="checkbox" checked={form.birim_fiyat_aktif} onChange={e => setForm(f => ({...f, birim_fiyat_aktif: e.target.checked}))} />
                   <span>Birim Fiyat Sistemi — Lokasyon grupları ve lokasyonlar için birim fiyat girişi</span>
                 </label>

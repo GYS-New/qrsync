@@ -460,9 +460,9 @@ export default function ArsivClient({
     if (!w) return
     w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Frekansiyel Arşiv</title>
       <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
-      th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
-      td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
-      </head><body><h2 style="color:#1f6b1f">Frekansiyel Görevler Arşivi</h2>
+      th{background:#ffe4bc;color:#c45200;font-weight:700;padding:6px 8px;border:1px solid #ffc078;text-align:left}
+      td{padding:5px 8px;border:1px solid #ffd9a0}tr:nth-child(even)td{background:#fff9f0}</style>
+      </head><body><h2 style="color:#c45200">Frekansiyel Görevler Arşivi</h2>
       <table><thead><tr><th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th><th>Arşiv Tarihi</th><th>Neden</th></tr></thead>
       <tbody>${rows}</tbody></table></body></html>`)
     w.document.close(); setTimeout(() => w.print(), 400)
@@ -472,12 +472,12 @@ export default function ArsivClient({
   const sekmeBtn = (id: Sekme): React.CSSProperties => ({
     height: 36, padding: '0 16px', border: 'none', cursor: 'pointer', fontWeight: 700,
     fontSize: 13, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6,
-    background: aktifSekme === id ? '#1f6b1f' : 'transparent',
+    background: aktifSekme === id ? '#c45200' : 'transparent',
     color:      aktifSekme === id ? '#fff'    : '#475569',
   })
 
   const td = (e?: React.CSSProperties): React.CSSProperties => ({
-    padding: '9px 13px', borderBottom: '1px solid #e8f0e8', fontSize: 13, verticalAlign: 'middle', ...e,
+    padding: '9px 13px', borderBottom: '1px solid #ffe8c8', fontSize: 13, verticalAlign: 'middle', ...e,
   })
 
   const aksBtn = (color: string, bg: string): React.CSSProperties => ({
@@ -493,11 +493,11 @@ export default function ArsivClient({
 
   const spinning: React.CSSProperties = { animation: 'spin 0.9s linear infinite' }
 
-  const applyBtn: React.CSSProperties = { ...inp, background: '#1f6b1f', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }
+  const applyBtn: React.CSSProperties = { ...inp, background: '#c45200', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }
 
   function YukleniyorSatir({ cols }: { cols: number }) {
     return <tr><td colSpan={cols} style={{ padding: 32, textAlign: 'center' }}>
-      <RefreshCw size={20} style={{ ...spinning, color: '#1f6b1f', display: 'block', margin: '0 auto' }} />
+      <RefreshCw size={20} style={{ ...spinning, color: '#c45200', display: 'block', margin: '0 auto' }} />
     </td></tr>
   }
   function BosKayit({ cols, mesaj }: { cols: number; mesaj: string }) {
@@ -509,8 +509,8 @@ export default function ArsivClient({
     <div className="verde-card" style={{ padding: 16 }}>
 
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 16, fontWeight: 900, color: '#0f1a0f' }}>ARŞİV YÖNETİMİ</div>
-        <div style={{ fontSize: 13, color: '#7a907a', marginTop: 2 }}>Arşivlenmiş kayıtları görüntüle, geri yükle veya kalıcı sil</div>
+        <div style={{ fontSize: 16, fontWeight: 900, color: '#3d1c00' }}>ARŞİV YÖNETİMİ</div>
+        <div style={{ fontSize: 13, color: '#9a7b6a', marginTop: 2 }}>Arşivlenmiş kayıtları görüntüle, geri yükle veya kalıcı sil</div>
       </div>
 
       {/* Sekme çubuğu */}
@@ -523,7 +523,7 @@ export default function ArsivClient({
       </div>
 
       {!firmaId && (
-        <div style={{ color: '#7a907a', fontSize: 14, padding: '28px 0', textAlign: 'center' }}>
+        <div style={{ color: '#9a7b6a', fontSize: 14, padding: '28px 0', textAlign: 'center' }}>
           Arşivi görüntülemek için önce firma seçin.
         </div>
       )}
@@ -534,19 +534,19 @@ export default function ArsivClient({
       {firmaId && aktifSekme === 'frekansiyel' && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-            <span style={{ fontSize: 13, color: '#64748b' }}><strong style={{ color: '#1f6b1f' }}>{filtreFrek.length}</strong> kayıt</span>
+            <span style={{ fontSize: 13, color: '#64748b' }}><strong style={{ color: '#c45200' }}>{filtreFrek.length}</strong> kayıt</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => csvIndir('frekansiyel', ['Görev','Lokasyon','Atanan','Durum','Arşiv Tarihi','Neden'],
                 filtreFrek.map((r:any) => [r.tanim,r.lokasyonlar?.tanim??'',r.atanan?.isim_soyisim??'',CANLI_DURUM_LABEL[r.durum]??r.durum,r.arsiv_tarihi?formatDateTime(r.arsiv_tarihi):'',ARSIV_NEDEN_LABEL[r.arsiv_nedeni]??r.arsiv_nedeni??'']))}
-                disabled={!filtreFrek.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
+                disabled={!filtreFrek.length} className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40">
                 <Download size={13} /> CSV
               </button>
               <button onClick={frekExcel} disabled={!filtreFrek.length}
-                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color: '#1d6f42' }}>
+                className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40" style={{ color: '#1d6f42' }}>
                 <FileSpreadsheet size={13} /> Excel
               </button>
               <button onClick={frekYazdir} disabled={!filtreFrek.length}
-                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color: '#185a9b' }}>
+                className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40" style={{ color: '#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
               <button onClick={() => { setTopluSilSekme('frekansiyel'); setTopluSilFrom(''); setTopluSilTo('') }}
@@ -570,7 +570,7 @@ export default function ArsivClient({
             <span style={{ color: '#94a3b8' }}>—</span>
             <input type="date" value={frekTo} onChange={e => setFrekTo(e.target.value)} style={inp} />
             <button onClick={() => { setFrekQ(''); setFrekDurum(''); setFrekNeden(''); setFrekFrom(''); setFrekTo('') }}
-              className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3]">
+              className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0]">
               Temizle
             </button>
           </div>
@@ -602,7 +602,7 @@ export default function ArsivClient({
                     </td>
                     <td style={{ color:'#64748b', fontSize:12 }}>{r.kural?.tanim ?? '—'}</td>
                     <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
-                      <button onClick={() => frekRestore(r)} title="Geri Yükle" style={aksBtn('#2e8b2e','#e8f4e8')}><RotateCcw size={13} /></button>
+                      <button onClick={() => frekRestore(r)} title="Geri Yükle" style={aksBtn('#ff7f00','#e8f4e8')}><RotateCcw size={13} /></button>
                       <button onClick={() => frekSil(r)}     title="Kalıcı Sil" style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>
                     </div></td>
                   </tr>
@@ -619,11 +619,11 @@ export default function ArsivClient({
       {firmaId && aktifSekme === 'personel' && (
         <>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
-            <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f6b1f' }}>{filtrePersonel.length}</strong> kayıt</span>
+            <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#c45200' }}>{filtrePersonel.length}</strong> kayıt</span>
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => csvIndir('personel', ['Personel','Email','Tarih','İş Başı','İş Bitimi','Çalışma Süresi'],
                 filtrePersonel.map((r:any) => [r.isim_soyisim,r.email,r.kayit_tarihi,saat(r.giris_saati),saat(r.cikis_saati),sureFmt(r.giris_saati,r.cikis_saati)]))}
-                disabled={!filtrePersonel.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
+                disabled={!filtrePersonel.length} className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40">
                 <Download size={13} /> CSV
               </button>
               <button onClick={async () => {
@@ -641,7 +641,7 @@ export default function ArsivClient({
                 a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
                 a.download = `personel-arsiv-${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(a.href)
               }} disabled={!filtrePersonel.length}
-                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#1d6f42' }}>
+                className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40" style={{ color:'#1d6f42' }}>
                 <FileSpreadsheet size={13} /> Excel
               </button>
               <button onClick={() => {
@@ -650,14 +650,14 @@ export default function ArsivClient({
                 const w = window.open('','_blank','width=1000,height=700'); if (!w) return
                 w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Personel Arşivi</title>
                   <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
-                  th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
-                  td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
-                  </head><body><h2 style="color:#1f6b1f">Personel Takibi Arşivi</h2>
+                  th{background:#ffe4bc;color:#c45200;font-weight:700;padding:6px 8px;border:1px solid #ffc078;text-align:left}
+                  td{padding:5px 8px;border:1px solid #ffd9a0}tr:nth-child(even)td{background:#fff9f0}</style>
+                  </head><body><h2 style="color:#c45200">Personel Takibi Arşivi</h2>
                   <table><thead><tr><th>Personel</th><th>Email</th><th>Tarih</th><th>İş Başı</th><th>İş Bitimi</th><th>Çalışma Süresi</th></tr></thead>
                   <tbody>${rows}</tbody></table></body></html>`)
                 w.document.close(); setTimeout(() => w.print(), 400)
               }} disabled={!filtrePersonel.length}
-                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
+                className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
               <button onClick={() => { setTopluSilSekme('personel'); setTopluSilFrom(''); setTopluSilTo('') }}
@@ -694,7 +694,7 @@ export default function ArsivClient({
                     </td>
                     <td style={{ color:'#64748b', whiteSpace:'nowrap' }}>{r.kayit_tarihi}</td>
                     <td style={{ fontWeight:600 }}>{saat(r.giris_saati)}</td>
-                    <td style={{ color: r.cikis_saati ? '#0f1a0f' : '#94a3b8' }}>{saat(r.cikis_saati)}</td>
+                    <td style={{ color: r.cikis_saati ? '#3d1c00' : '#94a3b8' }}>{saat(r.cikis_saati)}</td>
                     <td style={{ color:'#475569' }}>{sureFmt(r.giris_saati, r.cikis_saati)}</td>
                     <td style={{ fontSize:12, color:'#94a3b8' }}>{r.arsivleme_tarihi ? formatDateTime(r.arsivleme_tarihi) : '—'}</td>
                   </tr>
@@ -711,11 +711,11 @@ export default function ArsivClient({
       {firmaId && aktifSekme === 'musteri' && (
         <>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
-            <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f6b1f' }}>{filtreMusteri.length}</strong> kayıt</span>
+            <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#c45200' }}>{filtreMusteri.length}</strong> kayıt</span>
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => csvIndir('musteri', ['Tarih','Lokasyon','Kanal','Puan','Yorum','Ad Soyad'],
                 filtreMusteri.map((r:any) => [r.olusturma_tarihi,r.lokasyon_tanim,r.kanal,String(r.yildiz),r.yorum??'',r.ad_soyad??'']))}
-                disabled={!filtreMusteri.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
+                disabled={!filtreMusteri.length} className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40">
                 <Download size={13} /> CSV
               </button>
               <button onClick={async () => {
@@ -733,7 +733,7 @@ export default function ArsivClient({
                 a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
                 a.download = `musteri-degerlendirme-arsiv-${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(a.href)
               }} disabled={!filtreMusteri.length}
-                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#1d6f42' }}>
+                className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40" style={{ color:'#1d6f42' }}>
                 <FileSpreadsheet size={13} /> Excel
               </button>
               <button onClick={() => {
@@ -742,14 +742,14 @@ export default function ArsivClient({
                 const w = window.open('','_blank','width=1000,height=700'); if (!w) return
                 w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Müşteri Değerlendirme Arşivi</title>
                   <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
-                  th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
-                  td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
-                  </head><body><h2 style="color:#1f6b1f">Müşteri Değerlendirmeleri Arşivi</h2>
+                  th{background:#ffe4bc;color:#c45200;font-weight:700;padding:6px 8px;border:1px solid #ffc078;text-align:left}
+                  td{padding:5px 8px;border:1px solid #ffd9a0}tr:nth-child(even)td{background:#fff9f0}</style>
+                  </head><body><h2 style="color:#c45200">Müşteri Değerlendirmeleri Arşivi</h2>
                   <table><thead><tr><th>Tarih</th><th>Lokasyon</th><th>Kanal</th><th>Puan</th><th>Yorum</th><th>Ad Soyad</th></tr></thead>
                   <tbody>${rows}</tbody></table></body></html>`)
                 w.document.close(); setTimeout(() => w.print(), 400)
               }} disabled={!filtreMusteri.length}
-                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
+                className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
               <button onClick={() => { setTopluSilSekme('musteri'); setTopluSilFrom(''); setTopluSilTo('') }}
@@ -790,7 +790,7 @@ export default function ArsivClient({
                     <td style={{ fontWeight:600 }}>{r.lokasyon_tanim}</td>
                     <td>
                       <span style={{ padding:'2px 8px', borderRadius:12, fontSize:11.5, fontWeight:700,
-                        background: r.kanal==='QR'?'#e0f2fe':'#f0fdf4',
+                        background: r.kanal==='QR'?'#e0f2fe':'#fff7ed',
                         color:      r.kanal==='QR'?'#0369a1':'#166534' }}>{r.kanal}
                       </span>
                     </td>
@@ -802,7 +802,7 @@ export default function ArsivClient({
                         {r.yorum || <span style={{ color:'#cbd5e1' }}>—</span>}
                       </span>
                     </td>
-                    <td style={{ color: r.ad_soyad?'#0f1a0f':'#cbd5e1', fontSize:13 }}>{r.ad_soyad||'—'}</td>
+                    <td style={{ color: r.ad_soyad?'#3d1c00':'#cbd5e1', fontSize:13 }}>{r.ad_soyad||'—'}</td>
                     <td style={{ fontSize:12, color:'#94a3b8' }}>{r.arsivleme_tarihi ? formatDateTime(r.arsivleme_tarihi) : '—'}</td>
                     <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
                       <button onClick={() => musteriCikar(r)} title="Arşivden Çıkar" style={aksBtn('#d97706','#fef3c7')}><RotateCcw size={13} /></button>
@@ -822,11 +822,11 @@ export default function ArsivClient({
       {firmaId && aktifSekme === 'spesifik' && (
         <>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
-            <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f6b1f' }}>{filtreSpesifik.length}</strong> kayıt</span>
+            <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#c45200' }}>{filtreSpesifik.length}</strong> kayıt</span>
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => csvIndir('spesifik', ['Görev','Lokasyon','Atanan','Durum','Oluşturma','Tamamlanma'],
                 filtreSpesifik.map((r:any) => [r.tanim,r.lokasyonlar?.tanim??'',r.atanan?.isim_soyisim??'',r.durum,r.olusturma_tarihi,r.tamamlanma_tarihi??'']))}
-                disabled={!filtreSpesifik.length} className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
+                disabled={!filtreSpesifik.length} className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40">
                 <Download size={13} /> CSV
               </button>
               <button onClick={async () => {
@@ -844,7 +844,7 @@ export default function ArsivClient({
                 a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
                 a.download = `spesifik-arsiv-${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(a.href)
               }} disabled={!filtreSpesifik.length}
-                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#1d6f42' }}>
+                className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40" style={{ color:'#1d6f42' }}>
                 <FileSpreadsheet size={13} /> Excel
               </button>
               <button onClick={() => {
@@ -853,14 +853,14 @@ export default function ArsivClient({
                 const w = window.open('','_blank','width=1000,height=700'); if (!w) return
                 w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Spesifik Görevler Arşivi</title>
                   <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
-                  th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
-                  td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
-                  </head><body><h2 style="color:#1f6b1f">Spesifik Görevler Arşivi</h2>
+                  th{background:#ffe4bc;color:#c45200;font-weight:700;padding:6px 8px;border:1px solid #ffc078;text-align:left}
+                  td{padding:5px 8px;border:1px solid #ffd9a0}tr:nth-child(even)td{background:#fff9f0}</style>
+                  </head><body><h2 style="color:#c45200">Spesifik Görevler Arşivi</h2>
                   <table><thead><tr><th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th><th>Oluşturma</th><th>Tamamlanma</th></tr></thead>
                   <tbody>${rows}</tbody></table></body></html>`)
                 w.document.close(); setTimeout(() => w.print(), 400)
               }} disabled={!filtreSpesifik.length}
-                className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
+                className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
               <button onClick={() => { setTopluSilSekme('spesifik'); setTopluSilFrom(''); setTopluSilTo('') }}
@@ -909,7 +909,7 @@ export default function ArsivClient({
                         : r.durum_degisim_tarihi ? formatDateTime(r.durum_degisim_tarihi) : '—'}
                     </td>
                     <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
-                      <button onClick={() => spesifikRestore(r)} title="Geri Yükle" style={aksBtn('#2e8b2e','#e8f4e8')}><RotateCcw size={13} /></button>
+                      <button onClick={() => spesifikRestore(r)} title="Geri Yükle" style={aksBtn('#ff7f00','#e8f4e8')}><RotateCcw size={13} /></button>
                       <button onClick={() => spesifikSil(r)}     title="Kalıcı Sil" style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>
                     </div></td>
                   </tr>
@@ -1009,7 +1009,7 @@ const CEKLIST_KANAL_RENK: Record<string, { bg: string; color: string }> = {
   WEB:   { bg: '#e0f2fe', color: '#0369a1' },
   QR:    { bg: '#ede9fe', color: '#5b21b6' },
   NFC:   { bg: '#fce7f3', color: '#9d174d' },
-  MOBİL: { bg: '#f0fdf4', color: '#166534' },
+  MOBİL: { bg: '#fff7ed', color: '#166534' },
 }
 
 function ckPct(dol: number, top: number) {
@@ -1075,7 +1075,7 @@ function CeklistArsivSekme({
     border: '1px solid #e2e8f0', fontSize: 13, background: '#fff',
   }
   const applyBtn: React.CSSProperties = {
-    ...inp, background: '#1f6b1f', color: '#fff', border: 'none',
+    ...inp, background: '#c45200', color: '#fff', border: 'none',
     fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
   }
   const spinning: React.CSSProperties = { animation: 'spin 0.9s linear infinite' }
@@ -1241,9 +1241,9 @@ function CeklistArsivSekme({
       <title>Çeklist Raporları Arşivi</title>
       <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}
       table{width:100%;border-collapse:collapse}
-      th{background:#dcf0dc;color:#1f6b1f;font-weight:700;padding:6px 8px;border:1px solid #b8e0b8;text-align:left}
-      td{padding:5px 8px;border:1px solid #d6e4d6}tr:nth-child(even)td{background:#f3faf3}</style>
-      </head><body><h2 style="color:#1f6b1f">Çeklist Raporları Arşivi</h2>
+      th{background:#ffe4bc;color:#c45200;font-weight:700;padding:6px 8px;border:1px solid #ffc078;text-align:left}
+      td{padding:5px 8px;border:1px solid #ffd9a0}tr:nth-child(even)td{background:#fff9f0}</style>
+      </head><body><h2 style="color:#c45200">Çeklist Raporları Arşivi</h2>
       <table><thead><tr>
         <th>Kayıt Tarihi</th><th>Görev</th><th>Lokasyon</th><th>Şablon</th>
         <th>Durum</th><th>Kanal</th><th>Dolduran</th><th>Doldurulma</th>
@@ -1256,20 +1256,20 @@ function CeklistArsivSekme({
       {/* Üst bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <span style={{ fontSize: 13, color: '#64748b' }}>
-          <strong style={{ color: '#1f6b1f' }}>{filtre.length}</strong> kayıt
+          <strong style={{ color: '#c45200' }}>{filtre.length}</strong> kayıt
         </span>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={csvIndir2} disabled={!filtre.length}
-            className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40">
+            className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40">
             <Download size={13} /> CSV
           </button>
           <button onClick={excelIndir2} disabled={!filtre.length}
-            className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40"
+            className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40"
             style={{ color: '#1d6f42' }}>
             <FileSpreadsheet size={13} /> Excel
           </button>
           <button onClick={yazdir2} disabled={!filtre.length}
-            className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3] flex items-center gap-2 disabled:opacity-40"
+            className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0] flex items-center gap-2 disabled:opacity-40"
             style={{ color: '#185a9b' }}>
             <Printer size={13} /> Yazdır
           </button>
@@ -1320,7 +1320,7 @@ function CeklistArsivSekme({
         </button>
         <button
           onClick={() => { setAramaQ(''); setDurumF(''); setKanaliF(''); setFromD(''); setToD(''); yukle() }}
-          className="border border-[#d6e4d6] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#f3faf3]">
+          className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fff9f0]">
           Temizle
         </button>
       </div>
@@ -1344,7 +1344,7 @@ function CeklistArsivSekme({
           <tbody>
             {loading ? (
               <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center' }}>
-                <RefreshCw size={20} style={{ ...spinning, color: '#1f6b1f', display: 'block', margin: '0 auto' }} />
+                <RefreshCw size={20} style={{ ...spinning, color: '#c45200', display: 'block', margin: '0 auto' }} />
               </td></tr>
             ) : filtre.length === 0 ? (
               <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
@@ -1407,7 +1407,7 @@ function CeklistArsivSekme({
                           disabled={busy}
                           style={{
                             width: 30, height: 30, border: 'none', borderRadius: 7,
-                            background: '#e8f4e8', color: '#2e8b2e',
+                            background: '#e8f4e8', color: '#ff7f00',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             cursor: 'pointer',
                           }}>

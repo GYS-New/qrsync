@@ -19,7 +19,7 @@ export function ProataMark({
   size = 44,
   rounded = 8,
   gap = 3,
-  colors = { dark: '#1f6b1f', mid: '#2e8b2e', light: '#b8e0b8' },
+  colors = { dark: '#c45200', mid: '#ff7f00', light: '#ffc078' },
 }: ProataMarkProps) {
   const cell = (size - gap * 2) / 3
   return (
@@ -52,12 +52,12 @@ export default function ProataLogo({
 }) {
   const markSize  = Math.round(44 * scale)
   const markGap   = Math.round(3  * scale)
-  const taglineColor = inverse ? 'rgba(255,255,255,.65)' : '#506050'
-  const accentColor  = inverse ? '#b8e0b8' : '#1f6b1f'
-  const textColor    = inverse ? '#fff'    : '#0f1a0f'
+  const taglineColor = inverse ? 'rgba(255,255,255,.65)' : '#6b4423'
+  const accentColor  = inverse ? '#ffc078' : '#c45200'
+  const textColor    = inverse ? '#fff'    : '#3d1c00'
   const colors = inverse
-    ? { dark: '#dcf0dc', mid: '#a0c8a0', light: 'rgba(255,255,255,.2)' }
-    : { dark: '#1f6b1f', mid: '#2e8b2e', light: '#b8e0b8' }
+    ? { dark: '#ffe4bc', mid: '#a0c8a0', light: 'rgba(255,255,255,.2)' }
+    : { dark: '#c45200', mid: '#ff7f00', light: '#ffc078' }
 
   if (variant === 'mark') return (
     <ProataMark size={markSize} rounded={Math.round(8 * scale)} gap={markGap} colors={colors} />

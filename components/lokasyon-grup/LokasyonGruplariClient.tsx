@@ -238,15 +238,15 @@ export default function LokasyonGruplariClient({
       {/* HEADER */}
       <div className="verde-card" style={{ padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: '#0f1a0f' }}>LOKASYON GRUPLARI</div>
-          <div style={{ fontSize: 13, color: '#7a907a', marginTop: 2 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, color: '#3d1c00' }}>LOKASYON GRUPLARI</div>
+          <div style={{ fontSize: 13, color: '#9a7b6a', marginTop: 2 }}>
             {loading ? 'Yükleniyor…' : `${groupsFlat.length} grup, ${grouped.length} üst lokasyon · Lokasyonları gruplandırarak toplu atama ve raporlama yapın`}
           </div>
         </div>
         <button
           onClick={() => refresh(firmaId)}
           disabled={loading || saving}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #d6e4d6', background: '#f8fbf8', cursor: 'pointer', fontSize: 13, color: '#506050', fontWeight: 600 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #ffd9a0', background: '#f8fbf8', cursor: 'pointer', fontSize: 13, color: '#6b4423', fontWeight: 600 }}
         >
           <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Yenile
         </button>
@@ -259,13 +259,13 @@ export default function LokasyonGruplariClient({
         <div className="verde-card" style={{ padding: '18px 20px', position: 'sticky', top: 88 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 7, background: '#dcf0dc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {editingId ? <Pencil size={13} color="#1f6b1f" /> : <Plus size={13} color="#1f6b1f" />}
+              <div style={{ width: 28, height: 28, borderRadius: 7, background: '#ffe4bc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {editingId ? <Pencil size={13} color="#c45200" /> : <Plus size={13} color="#c45200" />}
               </div>
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#0f1a0f' }}>{editingId ? 'Grubu Düzenle' : 'Yeni Grup Oluştur'}</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#3d1c00' }}>{editingId ? 'Grubu Düzenle' : 'Yeni Grup Oluştur'}</span>
             </div>
             {editingId && (
-              <button onClick={resetForm} style={{ fontSize: 12, color: '#7a907a', border: 'none', background: 'none', cursor: 'pointer', padding: '4px 8px' }}>İptal</button>
+              <button onClick={resetForm} style={{ fontSize: 12, color: '#9a7b6a', border: 'none', background: 'none', cursor: 'pointer', padding: '4px 8px' }}>İptal</button>
             )}
           </div>
 
@@ -277,7 +277,7 @@ export default function LokasyonGruplariClient({
                 <option value="">En üst lokasyon seçin</option>
                 {topLocations.map((loc) => <option key={loc.id} value={loc.id}>{loc.tanim}</option>)}
               </select>
-              <div style={{ fontSize: 11.5, color: '#7a907a', marginTop: 4 }}>Grup üyeleri sadece seçilen üst lokasyonun altından seçilebilir.</div>
+              <div style={{ fontSize: 11.5, color: '#9a7b6a', marginTop: 4 }}>Grup üyeleri sadece seçilen üst lokasyonun altından seçilebilir.</div>
             </div>
 
             {/* Grup adı */}
@@ -293,32 +293,32 @@ export default function LokasyonGruplariClient({
             </div>
 
             {/* Kapsam özeti */}
-            <div style={{ padding: '10px 12px', borderRadius: 8, background: '#f0f9f0', border: '1px solid #d6e4d6', fontSize: 13 }}>
-              <div style={{ fontWeight: 700, color: '#1f6b1f', marginBottom: 2 }}>Seçili Kapsam</div>
-              <div style={{ color: '#506050' }}>{selectedTopPath || 'En üst lokasyon seçilmedi'}</div>
-              <div style={{ color: '#7a907a', marginTop: 2 }}>{selectedLocationIds.length} adet alt lokasyon bu gruba bağlı.</div>
+            <div style={{ padding: '10px 12px', borderRadius: 8, background: '#fff7ed', border: '1px solid #ffd9a0', fontSize: 13 }}>
+              <div style={{ fontWeight: 700, color: '#c45200', marginBottom: 2 }}>Seçili Kapsam</div>
+              <div style={{ color: '#6b4423' }}>{selectedTopPath || 'En üst lokasyon seçilmedi'}</div>
+              <div style={{ color: '#9a7b6a', marginTop: 2 }}>{selectedLocationIds.length} adet alt lokasyon bu gruba bağlı.</div>
             </div>
 
             {/* Lokasyon seçici */}
             <div>
               <label className="verde-label">Gruptaki Alt Lokasyonları Seç</label>
               <div style={{ position: 'relative', marginBottom: 8 }}>
-                <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#7a907a' }} />
+                <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9a7b6a' }} />
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Yol içinde ara" className="verde-input" style={{ paddingLeft: 30 }} disabled={!topLocationId} autoComplete="off" />
               </div>
               <div style={{ border: '1px solid #e0ece0', borderRadius: 8, overflow: 'hidden', maxHeight: 300, overflowY: 'auto' }}>
                 {!topLocationId ? (
-                  <div style={{ padding: '12px 14px', color: '#7a907a', fontSize: 13 }}>Önce en üst lokasyon seçin.</div>
+                  <div style={{ padding: '12px 14px', color: '#9a7b6a', fontSize: 13 }}>Önce en üst lokasyon seçin.</div>
                 ) : locationOptions.length === 0 ? (
-                  <div style={{ padding: '12px 14px', color: '#7a907a', fontSize: 13 }}>Bu kapsamda lokasyon bulunamadı.</div>
+                  <div style={{ padding: '12px 14px', color: '#9a7b6a', fontSize: 13 }}>Bu kapsamda lokasyon bulunamadı.</div>
                 ) : locationOptions.map((loc) => {
                   const checked = selectedLocationIds.includes(loc.id)
                   return (
-                    <label key={loc.id} style={{ display: 'flex', gap: 10, padding: '9px 12px', borderBottom: '1px solid #f0f4f0', cursor: 'pointer', alignItems: 'flex-start', background: checked ? '#f0f9f0' : '#fff' }}>
-                      <input type="checkbox" checked={checked} onChange={() => setSelectedLocationIds((prev) => checked ? prev.filter((x) => x !== loc.id) : [...prev, loc.id])} style={{ marginTop: 2, accentColor: '#2e8b2e' }} />
+                    <label key={loc.id} style={{ display: 'flex', gap: 10, padding: '9px 12px', borderBottom: '1px solid #f0f4f0', cursor: 'pointer', alignItems: 'flex-start', background: checked ? '#fff7ed' : '#fff' }}>
+                      <input type="checkbox" checked={checked} onChange={() => setSelectedLocationIds((prev) => checked ? prev.filter((x) => x !== loc.id) : [...prev, loc.id])} style={{ marginTop: 2, accentColor: '#ff7f00' }} />
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, color: '#0f1a0f', fontSize: 13 }}>{loc.tanim}</div>
-                        <div style={{ color: '#7a907a', fontSize: 12, marginTop: 1, wordBreak: 'break-word' }}>{loc.path}</div>
+                        <div style={{ fontWeight: 600, color: '#3d1c00', fontSize: 13 }}>{loc.tanim}</div>
+                        <div style={{ color: '#9a7b6a', fontSize: 12, marginTop: 1, wordBreak: 'break-word' }}>{loc.path}</div>
                       </div>
                     </label>
                   )
@@ -329,7 +329,7 @@ export default function LokasyonGruplariClient({
             <button
               onClick={onSubmit}
               disabled={saving || loading || !firmaId}
-              style={{ padding: '10px', borderRadius: 8, border: 'none', background: saving ? '#a0b4a0' : '#2e8b2e', color: '#fff', fontWeight: 700, fontSize: 14, cursor: saving || !firmaId ? 'not-allowed' : 'pointer' }}
+              style={{ padding: '10px', borderRadius: 8, border: 'none', background: saving ? '#c4a882' : '#ff7f00', color: '#fff', fontWeight: 700, fontSize: 14, cursor: saving || !firmaId ? 'not-allowed' : 'pointer' }}
             >
               {saving ? 'Kaydediliyor…' : editingId ? '✓ Grubu Güncelle' : '+ Grubu Kaydet'}
             </button>
@@ -340,14 +340,14 @@ export default function LokasyonGruplariClient({
         {/* SAĞ: GRUP LİSTESİ */}
         <div style={{ position: 'sticky', top: 88, maxHeight: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexShrink: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#0f1a0f' }}>Mevcut Gruplar</div>
-            <div style={{ fontSize: 12.5, color: '#7a907a' }}>{groupsFlat.length} grup · {grouped.length} üst lokasyon</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#3d1c00' }}>Mevcut Gruplar</div>
+            <div style={{ fontSize: 12.5, color: '#9a7b6a' }}>{groupsFlat.length} grup · {grouped.length} üst lokasyon</div>
           </div>
           <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, flex: 1, paddingRight: 4 }}>
 
           {grouped.length === 0 ? (
-            <div className="verde-card" style={{ padding: 32, textAlign: 'center', color: '#7a907a' }}>
-              <Layers size={32} style={{ margin: '0 auto 10px', color: '#b8e0b8' }} />
+            <div className="verde-card" style={{ padding: 32, textAlign: 'center', color: '#9a7b6a' }}>
+              <Layers size={32} style={{ margin: '0 auto 10px', color: '#ffc078' }} />
               <div style={{ fontWeight: 600, marginBottom: 4 }}>Henüz grup yok</div>
               <div style={{ fontSize: 13 }}>Sol formu kullanarak ilk lokasyon grubunu oluşturun.</div>
             </div>
@@ -361,24 +361,24 @@ export default function LokasyonGruplariClient({
                   <>
                     <div
                       onClick={() => toggleSection(section.topId)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: sectionExpanded ? '#f0f9f0' : '#f4f8f4', border: `1px solid ${sectionExpanded ? '#b8e0b8' : '#e2ece2'}`, transition: 'all .15s' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: sectionExpanded ? '#fff7ed' : '#f4f8f4', border: `1px solid ${sectionExpanded ? '#ffc078' : '#ffe8cc'}`, transition: 'all .15s' }}
                     >
-                      <div style={{ width: 28, height: 28, borderRadius: 7, background: '#1a5c2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: '#8b3a00', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Layers size={13} color="#fff" />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 900, color: '#1a5c2a', letterSpacing: 0.2 }}>
+                        <div style={{ fontSize: 13, fontWeight: 900, color: '#8b3a00', letterSpacing: 0.2 }}>
                           {section.topTanim}
                         </div>
                         {section.topPath !== section.topTanim && (
-                          <div style={{ fontSize: 11, color: '#7a907a' }}>{section.topPath}</div>
+                          <div style={{ fontSize: 11, color: '#9a7b6a' }}>{section.topPath}</div>
                         )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 11.5, color: '#7a907a', fontWeight: 600 }}>{section.items.length} grup</span>
+                        <span style={{ fontSize: 11.5, color: '#9a7b6a', fontWeight: 600 }}>{section.items.length} grup</span>
                         {sectionExpanded
-                          ? <ChevronDown size={15} color="#2e8b2e" />
-                          : <ChevronRight size={15} color="#7a907a" />}
+                          ? <ChevronDown size={15} color="#ff7f00" />
+                          : <ChevronRight size={15} color="#9a7b6a" />}
                       </div>
                     </div>
 
@@ -388,20 +388,20 @@ export default function LokasyonGruplariClient({
                 const isEditing = editingId === group.id
                 return (
                   <div key={group.id} className="verde-card"
-                    style={{ overflow: 'hidden', marginLeft: 20, border: isEditing ? '1.5px solid #2e8b2e' : '1px solid #e8f0e8' }}>
+                    style={{ overflow: 'hidden', marginLeft: 20, border: isEditing ? '1.5px solid #ff7f00' : '1px solid #ffe8c8' }}>
                     {/* Grup başlığı */}
                     <div style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer' }} onClick={() => toggleExpand(group.id)}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-                        <div style={{ width: 30, height: 30, borderRadius: 7, background: isEditing ? '#dcf0dc' : '#f4f8f4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Layers size={13} color={isEditing ? '#1f6b1f' : '#7a907a'} />
+                        <div style={{ width: 30, height: 30, borderRadius: 7, background: isEditing ? '#ffe4bc' : '#f4f8f4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Layers size={13} color={isEditing ? '#c45200' : '#9a7b6a'} />
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0f1a0f', display: 'flex', alignItems: 'center', gap: 7 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 800, color: '#3d1c00', display: 'flex', alignItems: 'center', gap: 7 }}>
                             {group.ad}
-                            {isEditing && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#dcf0dc', color: '#1f6b1f' }}>Düzenleniyor</span>}
+                            {isEditing && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#ffe4bc', color: '#c45200' }}>Düzenleniyor</span>}
                           </div>
-                          <div style={{ fontSize: 11.5, color: '#7a907a', marginTop: 1 }}>
-                            <span style={{ fontWeight: 600, color: '#2e8b2e' }}>{group.memberPaths.length} lokasyon</span>
+                          <div style={{ fontSize: 11.5, color: '#9a7b6a', marginTop: 1 }}>
+                            <span style={{ fontWeight: 600, color: '#ff7f00' }}>{group.memberPaths.length} lokasyon</span>
                             {group.aciklama && <span> · {group.aciklama}</span>}
                           </div>
                         </div>
@@ -410,7 +410,7 @@ export default function LokasyonGruplariClient({
                         {!readonly && (
                         <>
                         <button onClick={(e) => { e.stopPropagation(); startEdit(group) }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 6, border: '1px solid #d6e4d6', background: '#f8fbf8', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#506050' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 6, border: '1px solid #ffd9a0', background: '#f8fbf8', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#6b4423' }}>
                           <Pencil size={10} /> Düzenle
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); onDelete(group.id) }}
@@ -419,16 +419,16 @@ export default function LokasyonGruplariClient({
                         </button>
                         </>
                         )}
-                        {expanded ? <ChevronDown size={15} color="#7a907a" /> : <ChevronRight size={15} color="#7a907a" />}
+                        {expanded ? <ChevronDown size={15} color="#9a7b6a" /> : <ChevronRight size={15} color="#9a7b6a" />}
                       </div>
                     </div>
 
                     {/* Genişletilmiş lokasyon listesi */}
                     {expanded && (
-                      <div style={{ borderTop: '1px solid #e8f0e8', padding: '10px 14px' }}>
+                      <div style={{ borderTop: '1px solid #ffe8c8', padding: '10px 14px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 6 }}>
                           {group.memberPaths.length === 0 ? (
-                            <div style={{ fontSize: 13, color: '#7a907a' }}>Bu gruba henüz lokasyon eklenmemiş.</div>
+                            <div style={{ fontSize: 13, color: '#9a7b6a' }}>Bu gruba henüz lokasyon eklenmemiş.</div>
                           ) : group.memberPaths.map((path) => (
                             <div key={`${group.id}-${path}`} style={{ padding: '6px 10px', borderRadius: 6, background: '#f8fbf8', border: '1px solid #e1ece1', fontSize: 12, color: '#375137', wordBreak: 'break-word' }}>
                               {path}
