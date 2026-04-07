@@ -36,6 +36,32 @@ export async function GET(req: Request) {
       )
     }
 
+    // ── Mesai kontrolü (firma veya proje bazlı) ─────────────────────────────
+    {
+      const { data: firmaChk } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
+      let personelTakibiAktif = firmaChk?.personel_takibi_aktif === true
+      if (!personelTakibiAktif && personelProjeId) {
+        const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
+        if (proje?.personel_takibi_aktif === true) personelTakibiAktif = true
+      }
+      if (personelTakibiAktif) {
+        const bugun = new Date().toISOString().slice(0, 10)
+        const { data: mesai } = await admin
+          .from('personel_mesai_kayitlari')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('kayit_tarihi', bugun)
+          .is('cikis_saati', null)
+          .maybeSingle()
+        if (!mesai) {
+          return NextResponse.json(
+            { ok: false, error: 'Lütfen önce iş başı QR/NFC kodunu okutunuz.', code: 'MESAI_YOK' },
+            { status: 403 }
+          )
+        }
+      }
+    }
+
     // 24 saat öncesinin ISO tarihi — bu sınırdan yeni tamamlananlar hâlâ görevlerimde görünür
     const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 

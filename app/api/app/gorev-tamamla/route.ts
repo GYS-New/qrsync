@@ -43,21 +43,19 @@ export async function POST(req: Request) {
     }
 
     // ── Personel takibi aktifse mesai kontrolü ──────────────────────────────
-    // Önce proje bazlı kontrol, proje yoksa firma bazlı kontrol
+    // Firma VEYA proje'den herhangi birinde aktifse kontrol et
     {
-      let personelTakibiAktif = false
-      if (personelProjeId) {
+      const { data: firmaChk } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
+      let personelTakibiAktif = firmaChk?.personel_takibi_aktif === true
+      if (!personelTakibiAktif && personelProjeId) {
         const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
-        personelTakibiAktif = proje?.personel_takibi_aktif === true
-      } else {
-        const { data: firma } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
-        personelTakibiAktif = firma?.personel_takibi_aktif === true
+        if (proje?.personel_takibi_aktif === true) personelTakibiAktif = true
       }
       if (personelTakibiAktif) {
         const bugun = new Date().toISOString().slice(0, 10)
         const { data: mesai } = await admin
           .from('personel_mesai_kayitlari')
-          .select('id, cikis_saati')
+          .select('id')
           .eq('user_id', userId)
           .eq('kayit_tarihi', bugun)
           .is('cikis_saati', null)
