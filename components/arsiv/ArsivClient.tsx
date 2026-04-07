@@ -101,6 +101,7 @@ export default function ArsivClient({
   const [musteriFrom,    setMusteriFrom]    = useState('')
   const [musteriTo,      setMusteriTo]      = useState('')
   const [musteriYildiz,  setMusteriYildiz]  = useState(0)
+  const [musteriQ,       setMusteriQ]       = useState('')
 
   // ── Spesifik state ───────────────────────────────────────────────────────
   const [spesifikData,    setSpesifikData]    = useState<any[]>([])
@@ -412,9 +413,14 @@ export default function ArsivClient({
     )
   }, [personelData, personelQ])
 
-  const filtreMusteri = useMemo(() =>
-    musteriData.filter((r: any) => !musteriYildiz || r.yildiz === musteriYildiz)
-  , [musteriData, musteriYildiz])
+  const filtreMusteri = useMemo(() => {
+    const s = musteriQ.trim().toLowerCase()
+    return musteriData.filter((r: any) => {
+      if (musteriYildiz && r.yildiz !== musteriYildiz) return false
+      if (s && ![r.lokasyon_tanim, r.ad_soyad, r.yorum].join(' ').toLowerCase().includes(s)) return false
+      return true
+    })
+  }, [musteriData, musteriYildiz, musteriQ])
 
   const filtreSpesifik = useMemo(() => {
     const s = spesifikQ.trim().toLowerCase()
@@ -569,13 +575,16 @@ export default function ArsivClient({
             <input type="date" value={frekFrom} onChange={e => setFrekFrom(e.target.value)} style={inp} />
             <span style={{ color: '#94a3b8' }}>—</span>
             <input type="date" value={frekTo} onChange={e => setFrekTo(e.target.value)} style={inp} />
+            <button onClick={yukle_frekansiyel} disabled={frekLoading} style={applyBtn}>
+              <RefreshCw size={12} style={frekLoading ? spinning : {}} /> Uygula
+            </button>
             <button onClick={() => { setFrekQ(''); setFrekDurum(''); setFrekNeden(''); setFrekFrom(''); setFrekTo('') }}
               className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa]">
               Temizle
             </button>
           </div>
 
-          <div className="verde-table-wrap">
+          <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
             <table className="verde-table">
               <thead><tr>
                 <th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th>
@@ -675,9 +684,13 @@ export default function ArsivClient({
             <button onClick={yukle_personel} disabled={personelLoading} style={applyBtn}>
               <RefreshCw size={12} style={personelLoading ? spinning : {}} /> Uygula
             </button>
+            <button onClick={() => { setPersonelQ(''); setPersonelFrom(''); setPersonelTo('') }}
+              className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa]">
+              Temizle
+            </button>
           </div>
 
-          <div className="verde-table-wrap">
+          <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
             <table className="verde-table">
               <thead><tr>
                 <th>Personel</th><th>Tarih</th><th>İş Başı</th><th>İş Bitimi</th>
@@ -760,6 +773,7 @@ export default function ArsivClient({
           </div>
 
           <div style={filterRow}>
+            <input className="verde-input" placeholder="Lokasyon / yorum / ad ara…" value={musteriQ} onChange={e => setMusteriQ(e.target.value)} style={{ ...inp, flex:'1 1 180px' }} />
             <select value={musteriYildiz} onChange={e => setMusteriYildiz(Number(e.target.value))} style={{ ...inp, minWidth:140 }}>
               <option value={0}>Puan (Tümü)</option>
               {[5,4,3,2,1].map(n => <option key={n} value={n}>{'★'.repeat(n)} — {YILDIZ_ETIKET[n]}</option>)}
@@ -770,9 +784,13 @@ export default function ArsivClient({
             <button onClick={yukle_musteri} disabled={musteriLoading} style={applyBtn}>
               <RefreshCw size={12} style={musteriLoading ? spinning : {}} /> Uygula
             </button>
+            <button onClick={() => { setMusteriQ(''); setMusteriYildiz(0); setMusteriFrom(''); setMusteriTo('') }}
+              className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa]">
+              Temizle
+            </button>
           </div>
 
-          <div className="verde-table-wrap">
+          <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
             <table className="verde-table">
               <thead><tr>
                 <th>Tarih</th><th>Lokasyon</th><th>Kanal</th><th>Puan</th>
@@ -878,9 +896,13 @@ export default function ArsivClient({
             <button onClick={yukle_spesifik} disabled={spesifikLoading} style={applyBtn}>
               <RefreshCw size={12} style={spesifikLoading ? spinning : {}} /> Uygula
             </button>
+            <button onClick={() => { setSpesifikQ(''); setSpesifikFrom(''); setSpesifikTo('') }}
+              className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa]">
+              Temizle
+            </button>
           </div>
 
-          <div className="verde-table-wrap">
+          <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
             <table className="verde-table">
               <thead><tr>
                 <th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th>
@@ -1326,7 +1348,7 @@ function CeklistArsivSekme({
       </div>
 
       {/* Tablo */}
-      <div className="verde-table-wrap">
+      <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
         <table className="verde-table">
           <thead>
             <tr>
