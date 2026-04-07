@@ -14,10 +14,34 @@ export async function GET(req: NextRequest) {
 
     const { data: me } = await supabase
       .from('users')
-      .select('id,isim_soyisim,firma_id,rol')
+      .select('id,isim_soyisim,firma_id,rol,aktif')
       .eq('id', user.id)
       .single()
     if (!me) return NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 401 })
+
+    // Pasif kullanıcı kontrolü
+    if (me.aktif === false) {
+      return NextResponse.json({ ok: false, error: 'Pasif durumdasınız! Lütfen sistem yöneticiniz ile iletişime geçin.', code: 'USER_PASIF' }, { status: 403 })
+    }
+
+    // Mesai kontrolü — QR/NFC okutulduğu anda kontrol
+    {
+      const adminChk = createAdminClient()
+      const { data: firma } = await adminChk.from('firmalar').select('personel_takibi_aktif').eq('id', me.firma_id).single()
+      if (firma?.personel_takibi_aktif === true) {
+        const bugun = new Date().toISOString().slice(0, 10)
+        const { data: mesai } = await adminChk
+          .from('personel_mesai_kayitlari')
+          .select('id')
+          .eq('user_id', me.id)
+          .eq('kayit_tarihi', bugun)
+          .is('cikis_saati', null)
+          .maybeSingle()
+        if (!mesai) {
+          return NextResponse.json({ ok: false, error: 'Lütfen önce iş başı QR/NFC kodunu okutunuz.', code: 'MESAI_YOK' }, { status: 403 })
+        }
+      }
+    }
 
     const p     = new URL(req.url).searchParams
     const token = p.get('token')
