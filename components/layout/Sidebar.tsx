@@ -35,7 +35,8 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
         { label: 'Lokasyon Grupları', href: `${base}/dashboard/lokasyon-gruplari`, icon: '🗺️' },
         { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
         { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
-        { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler`, icon: '⚡' },
+        { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
+          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
         { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
         { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
         { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
@@ -49,7 +50,8 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Lokasyon Grupları', href: `${base}/dashboard/lokasyon-gruplari`, icon: '🗺️' },
           { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
           { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
-          { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler`, icon: '⚡' },
+          { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
+          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
@@ -63,7 +65,8 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Lokasyon Grupları', href: `${base}/dashboard/lokasyon-gruplari`, icon: '🗺️' },
           { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
           { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
-          { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler`, icon: '⚡' },
+          { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
+          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
@@ -76,7 +79,8 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Lokasyon Grupları', href: `${base}/dashboard/lokasyon-gruplari`, icon: '🗺️' },
           { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
           { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
-          { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler`, icon: '⚡' },
+          { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
+          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
@@ -262,7 +266,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
     // Locations / Tasks / Live
     map[`${base}/dashboard/lokasyonlar`] = { value: counts.locations_total, tone: 'blue' }
     map[`${base}/dashboard/gorevler`] = { value: counts.tasks_total, tone: 'yellow' }
-    map[`${base}/dashboard/canli-islemler`] = { value: counts.live_total, tone: 'orange' }
+    map[`${base}/dashboard/canli-islemler/tum-gorevler`] = { value: counts.live_total, tone: 'orange' }
     map[`${base}/dashboard/arsiv`] = { value: counts.arsiv_total, tone: 'blue' }
 
     // Additional counts for all roles

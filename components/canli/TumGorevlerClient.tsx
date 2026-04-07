@@ -879,9 +879,13 @@ async function del() {
           style={{ width: 240, flexShrink: 0 }}
         />
 
-        {/* Canlı Akış linki — her rol için görünür */}
+        {/* Canlı Akış linki — her rol için görünür, belirgin */}
         <a href={`${base}/dashboard/canli-islemler`} style={{ textDecoration: 'none', flexShrink: 0 }}>
-          <Button className="text-[13.5px]" variant="ghost" type="button" style={IMPORT_EXPORT_BUTTON_STYLE}>⚡ Canlı Akış</Button>
+          <button type="button" style={{
+            height: 36, padding: '0 16px', borderRadius: 8, border: 'none',
+            background: '#111827', color: '#fff', fontWeight: 800, fontSize: 13.5,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+          }}>📡 Canlı Görev Akışı</button>
         </a>
 
         {/* Toplu Düzenle — readonly olmayanlara göster */}
