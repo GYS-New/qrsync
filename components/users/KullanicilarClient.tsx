@@ -53,6 +53,20 @@ export default function KullanicilarClient({
   const { confirm } = useConfirm()
   const isSA = base === '/sa'
   const lokMap = useMemo(() => new Map(ustLokasyonlar.map(l => [l.id, l.tanim])), [ustLokasyonlar])
+
+  function sonGorulmeLabel(userId: string): string {
+    const dt = deviceTokenMap[userId]
+    if (!dt?.son_kullanim) return '—'
+    const farkMs = Date.now() - new Date(dt.son_kullanim).getTime()
+    if (farkMs < 0) return 'Şimdi'
+    const dk = Math.floor(farkMs / 60000)
+    if (dk < 1) return 'Şimdi'
+    if (dk < 60) return `${dk} dk önce`
+    const saat = Math.floor(dk / 60)
+    if (saat < 24) return `${saat} saat önce`
+    const gun = Math.floor(saat / 24)
+    return `${gun} gün önce`
+  }
   const apiBase = base === '/sa' ? '/api/sa' : base === '/ta' ? '/api/ta' : '/api'
 
   const [q, setQ] = useState('')
@@ -407,6 +421,7 @@ export default function KullanicilarClient({
               <th>Rol</th>
               <th>Üst Lokasyon</th>
               <th>Telefon</th>
+              <th>Son Görülme</th>
               <th>Cihaz Eşleşmesi</th>
               <th>Durum</th>
               {canManage && <th style={{ textAlign: 'right' }}>İşlem</th>}
@@ -466,6 +481,9 @@ export default function KullanicilarClient({
                   )}
                 </td>
                 <td style={{ color: '#4b5563' }}>{u.telefon ?? '—'}</td>
+                <td style={{ fontSize: 12.5, color: '#4b5563', whiteSpace: 'nowrap' }}>
+                  {sonGorulmeLabel(u.id)}
+                </td>
                 <td>
                   {deviceTokenMap[u.id] ? (() => {
                     const d = deviceTokenMap[u.id]
