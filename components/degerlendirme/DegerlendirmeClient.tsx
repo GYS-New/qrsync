@@ -173,7 +173,7 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
           {/* Görsel */}
           <div>
             <span style={S.label}>Fotoğraf <span style={{ fontWeight: 400, color: '#94a3b8' }}>(isteğe bağlı, maks 5MB)</span></span>
-            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" style={{ display: 'none' }}
               onChange={e => { const f = e.target.files?.[0]; if (f) gorselSec(f); e.target.value = '' }} />
             {gorselUrl ? (
               <div style={{ position: 'relative' as const }}>
