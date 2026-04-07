@@ -408,6 +408,7 @@ export default function KullanicilarClient({
           </div>
         </div>
 
+        <div style={{ maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
         <table className="verde-table">
           <thead>
             <tr>
@@ -541,6 +542,7 @@ export default function KullanicilarClient({
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Kullanıcı Ekle Modal */}
