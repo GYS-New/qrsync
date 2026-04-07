@@ -40,7 +40,14 @@ export default function KpiCard({
   return (
     <div
       className="kpi-card animate-fade-up"
-      style={{ animationDelay: `${delay}ms` }}
+      style={{
+        animationDelay: `${delay}ms`,
+        background: '#ffffff',
+        border: '1px solid #e5e7eb',
+        borderRadius: 10,
+        padding: '16px 18px',
+        position: 'relative',
+      }}
     >
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
