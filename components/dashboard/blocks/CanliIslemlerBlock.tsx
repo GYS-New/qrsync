@@ -46,10 +46,14 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
     gf(supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true })
       .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN']).gte('olusturma_tarihi', todayISO)),
 
-    // [6] Kullanıcılar toplam
-    ff(supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true)),
-    // [7] Online kullanıcılar
-    ff(supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true).gte('last_seen_at', onlineSince)),
+    // [6] Kullanıcılar toplam (proje filtreli)
+    firmaId
+      ? (projeId
+          ? supabase.from('users').select('*', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId).eq('aktif', true)
+          : supabase.from('users').select('*', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('aktif', true))
+      : supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true),
+    // [7] Online mobil kullanıcılar (device_tokens.son_kullanim son 5dk içinde)
+    gf(supabase.from('device_tokens').select('user_id').eq('aktif', true).gte('son_kullanim', new Date(Date.now() - 5 * 60 * 1000).toISOString())),
     // [8] Lokasyonlar toplam
     ff(supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true)),
     // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar)
@@ -69,7 +73,10 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
   const canliTamam   = n(results[3]) + n(results[5])
 
   const kullaniciToplam = n(results[6])
-  const kullaniciOnline = n(results[7])
+  // Online: unique user_id sayısı (bir kullanıcının birden fazla cihazı olabilir)
+  const kullaniciOnline = results[7].status === 'fulfilled' && Array.isArray(results[7].value?.data)
+    ? new Set(results[7].value.data.map((r: any) => r.user_id)).size
+    : 0
   const lokasyonToplam  = n(results[8])
   // Bugün görevi olan unique lokasyon sayısı (frekansiyel + spesifik birleşik)
   const lokIdSet = new Set<string>()
@@ -107,7 +114,7 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
         label="Kullanıcılar"
         value={kullaniciToplam}
         secondaryValue={kullaniciOnline}
-        secondaryLabel="Online"
+        secondaryLabel="Mobil Online"
         icon="👥"
         iconBg="#e5e7eb"
         percent={pct(kullaniciOnline, kullaniciToplam)}
