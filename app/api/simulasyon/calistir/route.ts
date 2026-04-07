@@ -82,7 +82,7 @@ async function simulasyonCalistir(admin: any, ayar: any) {
   if (toplamGorev === 0) return { tamamlanan: 0, mesaj: 'Bugünkü görev yok' }
 
   // Tamamlananları say (gerçek + simüle)
-  const tamamlananSayi = gorevler.filter(g =>
+  const tamamlananSayi = gorevler.filter((g: any) =>
     ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum)
   ).length
   const mevcutOran = toplamGorev > 0 ? (tamamlananSayi / toplamGorev) * 100 : 0
@@ -109,7 +109,7 @@ async function simulasyonCalistir(admin: any, ayar: any) {
   }
 
   // 4. Simüle edilecek ACIK görevleri al (zaten tamamlanmamış olanlar)
-  const acikGorevler = gorevler.filter(g => g.durum === 'ACIK')
+  const acikGorevler = gorevler.filter((g: any) => g.durum === 'ACIK')
   if (acikGorevler.length === 0) {
     return { tamamlanan: 0, mesaj: 'Tamamlanacak ACIK görev yok' }
   }
