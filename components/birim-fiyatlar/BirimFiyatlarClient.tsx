@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useToast } from '@/components/ui/ToastProvider'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 type Grup = { id: string; ad: string; ust_lokasyon_id: string | null; aktif: boolean }
 type Lokasyon = { id: string; tanim: string; parent_id: string | null; aktif: boolean }
@@ -18,6 +19,7 @@ const PARA_BIRIMLERI = ['TRY', 'USD', 'EUR', 'GBP']
 
 export default function BirimFiyatlarClient({ projeId, readonly = false }: Props) {
   const { toast } = useToast()
+  const { confirm } = useConfirm()
   const [gruplar, setGruplar]       = useState<Grup[]>([])
   const [lokasyonlar, setLokasyonlar] = useState<Lokasyon[]>([])
   const [grupUyeleri, setGrupUyeleri] = useState<GrupUye[]>([])
@@ -139,6 +141,46 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
       toast({ type: 'success', title: 'Kaydedildi', message: fiyatNum === 0 ? 'Fiyat silindi.' : 'Lokasyon fiyatı kaydedildi.' })
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message ?? 'Kaydedilemedi' })
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Üst lokasyonun altındaki tüm grup + lokasyon fiyatlarını sıfırla
+  async function temizleUstLok(ustLokId: string, ustLokTanim: string) {
+    const altGruplar = gruplar.filter(g => g.ust_lokasyon_id === ustLokId)
+    if (altGruplar.length === 0) return
+
+    const ok = await confirm({
+      title: 'Tüm Fiyatları Temizle',
+      message: `"${ustLokTanim}" altındaki tüm grup ve lokasyon fiyatları sıfırlanacak. Onaylıyor musunuz?`,
+      confirmText: 'Evet, Temizle',
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+
+    setSaving(`ust:${ustLokId}`)
+    try {
+      const items: any[] = []
+      for (const grup of altGruplar) {
+        items.push({ grup_id: grup.id, fiyat: 0, para_birimi: 'TRY' })
+        const memberLokIds = grupLokMap.get(grup.id) ?? []
+        for (const lokId of memberLokIds) {
+          items.push({ lokasyon_id: lokId, fiyat: 0, para_birimi: 'TRY' })
+        }
+      }
+      const res = await fetch('/api/birim-fiyatlar/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proje_id: projeId, items }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      await load()
+      toast({ type: 'success', title: 'Temizlendi', message: `"${ustLokTanim}" altındaki tüm fiyatlar sıfırlandı.` })
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message ?? 'Temizlenemedi' })
     } finally {
       setSaving(null)
     }
@@ -299,16 +341,29 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
         return (
           <div key={ustLok.id} style={{ border: '1px solid #c8dcc8', borderRadius: 10, overflow: 'hidden' }}>
             <div
-              onClick={() => toggleLok(ustLok.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#e8f5e8', cursor: 'pointer', userSelect: 'none' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#e8f5e8' }}
             >
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#1a3a1a', flex: 1 }}>
-                📍 {ustLok.tanim}
-                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 8 }}>
-                  ({altGruplar.length} grup)
+              <div
+                onClick={() => toggleLok(ustLok.id)}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}
+              >
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#1a3a1a', flex: 1 }}>
+                  📍 {ustLok.tanim}
+                  <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 8 }}>
+                    ({altGruplar.length} grup)
+                  </span>
                 </span>
-              </span>
-              <span style={{ fontSize: 12, color: '#2e6b2e' }}>{isAcik ? '▲' : '▼'}</span>
+                <span style={{ fontSize: 12, color: '#2e6b2e' }}>{isAcik ? '▲' : '▼'}</span>
+              </div>
+              {!readonly && (
+                <button
+                  disabled={saving === `ust:${ustLok.id}`}
+                  onClick={(e) => { e.stopPropagation(); temizleUstLok(ustLok.id, ustLok.tanim) }}
+                  style={{ padding: '4px 12px', borderRadius: 6, fontSize: 11.5, fontWeight: 700, border: '1px solid #fca5a5', background: saving === `ust:${ustLok.id}` ? '#f9fafb' : '#fef2f2', color: '#dc2626', cursor: saving === `ust:${ustLok.id}` ? 'default' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                >
+                  {saving === `ust:${ustLok.id}` ? '…' : 'Tüm Fiyatları Temizle'}
+                </button>
+              )}
             </div>
 
             {isAcik && (
