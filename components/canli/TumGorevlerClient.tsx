@@ -361,6 +361,32 @@ function openCreate() {
         islemi_yapan_id: meId,
       }
 
+      // ── Mesai kontrolü: personel takibi aktifse iş başı yapmamış personele görev atanamaz
+      if (payload.atanan_kullanici_id) {
+        let ptAktif = false
+        const { data: firmaChk } = await supabase.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
+        if (firmaChk?.personel_takibi_aktif === true) ptAktif = true
+        if (!ptAktif && projeId) {
+          const { data: projeChk } = await supabase.from('projeler').select('personel_takibi_aktif').eq('id', projeId).single()
+          if (projeChk?.personel_takibi_aktif === true) ptAktif = true
+        }
+        if (ptAktif) {
+          const bugun = new Date().toISOString().slice(0, 10)
+          const { data: mesai } = await supabase
+            .from('personel_mesai_kayitlari')
+            .select('id')
+            .eq('user_id', payload.atanan_kullanici_id)
+            .eq('kayit_tarihi', bugun)
+            .is('cikis_saati', null)
+            .maybeSingle()
+          if (!mesai) {
+            toast({ type: 'error', title: 'Görev Atanamaz', message: 'Personel henüz iş başı yapmamış. Personel takibi aktif olduğunda iş başı yapmayan personele görev atanamaz.' })
+            setSaving(false)
+            return
+          }
+        }
+      }
+
       // TA ve U durum kısıtı:
       // - Sistem durumlarına (HAZIR/ACIK/BEKLEMEDE/ZAMANI_GECMIS) manuel geçiş yapamaz.
       // - Yalnızca TAMAMLANDI / IPTAL / KAPATILDI / SILINDI hedeflerini seçebilir.
