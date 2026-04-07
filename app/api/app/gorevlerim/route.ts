@@ -45,7 +45,7 @@ export async function GET(req: Request) {
         if (proje?.personel_takibi_aktif === true) personelTakibiAktif = true
       }
       if (personelTakibiAktif) {
-        const bugun = new Date().toISOString().slice(0, 10)
+        const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
         const { data: mesai } = await admin
           .from('personel_mesai_kayitlari')
           .select('id')

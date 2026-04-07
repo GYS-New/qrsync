@@ -75,7 +75,7 @@ async function filtreliPersonelGetir(admin: any, firmaId: string, projeId: strin
   if (projeId) {
     const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', projeId).single()
     if (proje?.personel_takibi_aktif === true) {
-      const bugun = new Date().toISOString().slice(0, 10)
+      const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
       const { data: mesailar } = await admin
         .from('personel_mesai_kayitlari')
         .select('user_id')
@@ -94,7 +94,7 @@ async function filtreliPersonelGetir(admin: any, firmaId: string, projeId: strin
 async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygunPersonel: string[]) {
   const { firma_id } = ayar
   const { grup_id, hedef_oran, vardiya_suresi_saat } = grupAyar
-  const bugun = new Date().toISOString().slice(0, 10)
+  const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const now = Date.now()
 
   // Grubun üye lokasyonlarını bul

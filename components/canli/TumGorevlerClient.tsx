@@ -371,7 +371,7 @@ function openCreate() {
           if (projeChk?.personel_takibi_aktif === true) ptAktif = true
         }
         if (ptAktif) {
-          const bugun = new Date().toISOString().slice(0, 10)
+          const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
           const { data: mesai } = await supabase
             .from('personel_mesai_kayitlari')
             .select('id')

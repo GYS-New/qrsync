@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
   const now = Date.now()
-  const bugun = new Date().toISOString().slice(0, 10)
+  const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
   let toplam = 0
 
   // Aktif firmalar (personel takip bildirimi açık olanlar)
