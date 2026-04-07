@@ -1,13 +1,19 @@
 /**
  * POST /api/simulasyon/calistir
- * Simülasyon motoru — grup bazlı çalışır.
- * Her simülasyon ayarı için seçilen gruplar üzerinde,
- * seçilen personel ile görev tamamlama simülasyonu yapar.
+ * Simülasyon motoru v3 — vardiya bazlı, doğal akışlı
+ *
+ * Mantık:
+ * 1. Görev aktif olduktan sonra tamamlama aralığı = vardiya_suresi / görev_sayısı
+ * 2. Her cron (1dk) çalışmada, süresi dolmuş görevleri tamamlar
+ * 3. Hedef oranına göre bazı görevler tamamlanmaz (pas geçilir)
+ * 4. %1 iptal olasılığı
+ * 5. Personel tamamlamalarını SİM kontrol eder (gorev-tamamla bypass)
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
 const CORS = { 'Access-Control-Allow-Origin': '*' }
+const IPTAL_OLASILIK = 0.01 // %1
 
 export async function POST(req: Request) {
   const cronToken = req.headers.get('x-cron-token')
@@ -20,7 +26,6 @@ export async function POST(req: Request) {
   const sonuclar: any[] = []
 
   try {
-    // Aktif simülasyon ayarlarını çek
     const { data: ayarlar } = await admin
       .from('simulasyon_ayarlari')
       .select('*')
@@ -31,7 +36,6 @@ export async function POST(req: Request) {
     }
 
     for (const ayar of ayarlar) {
-      // Grup ayarlarını ve personelleri çek
       const [grupRes, personelRes] = await Promise.all([
         admin.from('simulasyon_grup_ayarlari').select('*').eq('simulasyon_id', ayar.id),
         admin.from('simulasyon_personeller').select('user_id').eq('simulasyon_id', ayar.id),
@@ -39,14 +43,11 @@ export async function POST(req: Request) {
 
       const grupAyarlari = grupRes.data ?? []
       const personelIdler = (personelRes.data ?? []).map((p: any) => p.user_id)
-
       if (grupAyarlari.length === 0 || personelIdler.length === 0) continue
 
-      // Personel takibi kontrolü: mesaisiz personelleri filtrele
       const uygunPersonel = await filtreliPersonelGetir(admin, ayar.firma_id, ayar.proje_id, personelIdler)
       if (uygunPersonel.length === 0) continue
 
-      // Her grup için ayrı çalıştır
       for (const ga of grupAyarlari) {
         const result = await grupSimulasyonCalistir(admin, ayar, ga, uygunPersonel)
         sonuclar.push({ ayar_id: ayar.id, grup_id: ga.grup_id, ...result })
@@ -60,9 +61,8 @@ export async function POST(req: Request) {
   }
 }
 
-// ── Personel filtresi: aktif + mesai kontrolü ───────────────────────────────
+// ── Personel filtresi ───────────────────────────────────────────────────────
 async function filtreliPersonelGetir(admin: any, firmaId: string, projeId: string | null, personelIdler: string[]): Promise<string[]> {
-  // Aktif kullanıcıları filtrele
   const { data: users } = await admin
     .from('users')
     .select('id')
@@ -72,7 +72,6 @@ async function filtreliPersonelGetir(admin: any, firmaId: string, projeId: strin
   let uygun = (users ?? []).map((u: any) => u.id)
   if (uygun.length === 0) return []
 
-  // Personel takibi aktifse mesai kontrolü
   if (projeId) {
     const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', projeId).single()
     if (proje?.personel_takibi_aktif === true) {
@@ -91,11 +90,12 @@ async function filtreliPersonelGetir(admin: any, firmaId: string, projeId: strin
   return uygun
 }
 
-// ── Tek grup için simülasyon ────────────────────────────────────────────────
+// ── Grup simülasyonu ────────────────────────────────────────────────────────
 async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygunPersonel: string[]) {
   const { firma_id } = ayar
-  const { grup_id, hedef_oran, gorev_suresi_dk } = grupAyar
+  const { grup_id, hedef_oran, vardiya_suresi_saat } = grupAyar
   const bugun = new Date().toISOString().slice(0, 10)
+  const now = Date.now()
 
   // Grubun üye lokasyonlarını bul
   const { data: uyeler } = await admin
@@ -104,9 +104,9 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     .eq('grup_id', grup_id)
 
   const lokIds = (uyeler ?? []).map((u: any) => u.lokasyon_id)
-  if (lokIds.length === 0) return { tamamlanan: 0, mesaj: 'Grupta lokasyon yok' }
+  if (lokIds.length === 0) return { tamamlanan: 0, iptal: 0, mesaj: 'Grupta lokasyon yok' }
 
-  // Lokasyon bilgileri (checklist, süre limitleri)
+  // Lokasyon bilgileri
   const { data: lokBilgi } = await admin
     .from('lokasyonlar')
     .select('id, checklist_sablon_id, sureli_gorev_aktif, min_sure_dakika, max_sure_dakika')
@@ -115,7 +115,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
   const lokMap = new Map<string, any>()
   for (const l of (lokBilgi ?? [])) lokMap.set(l.id, l)
 
-  // Bu lokasyonlardaki bugünkü canlı görevler
+  // Bugünkü canlı görevler
   const gunBaslangic = bugun + 'T00:00:00'
   const gunBitis = bugun + 'T23:59:59'
 
@@ -129,56 +129,81 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
 
   const tumGorevler = gorevler ?? []
   const toplamGorev = tumGorevler.length
-  if (toplamGorev === 0) return { tamamlanan: 0, mesaj: 'Bugünkü görev yok' }
+  if (toplamGorev === 0) return { tamamlanan: 0, iptal: 0, mesaj: 'Bugünkü görev yok' }
 
-  // Mevcut tamamlanma oranı
+  // ── Tamamlama aralığı hesabı ──────────────────────────────────────────
+  // vardiya_suresi_saat / görev_sayısı = görev başına dakika
+  const vardiyaDk = vardiya_suresi_saat * 60
+  const gorevArasiDk = toplamGorev > 0 ? vardiyaDk / toplamGorev : vardiyaDk
+
+  // Mevcut tamamlanma + iptal sayıları
+  const islemliSayi = tumGorevler.filter((g: any) =>
+    ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'IPTAL'].includes(g.durum)
+  ).length
   const tamamlananSayi = tumGorevler.filter((g: any) =>
     ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum)
   ).length
-  const mevcutOran = (tamamlananSayi / toplamGorev) * 100
 
-  if (mevcutOran >= hedef_oran) {
-    return { tamamlanan: 0, mesaj: `Hedef zaten sağlandı: %${Math.round(mevcutOran)}` }
-  }
+  // Hedef: toplam görevin hedef_oran%'ı kadar tamamlanmalı
+  const hedefMax = Math.ceil((hedef_oran / 100) * toplamGorev)
 
-  // 24 saate yayılmış orantılı hedef
-  const now = new Date()
-  const gunBasDate = new Date(bugun + 'T00:01:00')
-  const gunBitDate = new Date(bugun + 'T23:59:00')
-  const gecenDk = Math.max(0, (now.getTime() - gunBasDate.getTime()) / 60000)
-  const toplamDk = (gunBitDate.getTime() - gunBasDate.getTime()) / 60000
-  const zamanOrani = Math.min(1, gecenDk / toplamDk)
+  // ACIK görevlerden sırası gelmiş olanları bul
+  // Sıra: aktif_olma_tarihi'ne göre sırala, her görev arası gorevArasiDk
+  const acikGorevler = tumGorevler
+    .filter((g: any) => g.durum === 'ACIK')
+    .sort((a: any, b: any) => new Date(a.aktif_olma_tarihi).getTime() - new Date(b.aktif_olma_tarihi).getTime())
 
-  const hedefSayisi = Math.floor((hedef_oran / 100) * toplamGorev * zamanOrani)
-  const eksik = Math.max(0, hedefSayisi - tamamlananSayi)
+  if (acikGorevler.length === 0) return { tamamlanan: 0, iptal: 0, mesaj: 'ACIK görev yok' }
 
-  if (eksik === 0) return { tamamlanan: 0, mesaj: 'Zaman oranına göre eksik yok' }
-
-  // ACIK görevleri al
-  const acikGorevler = tumGorevler.filter((g: any) => g.durum === 'ACIK')
-  if (acikGorevler.length === 0) return { tamamlanan: 0, mesaj: 'ACIK görev yok' }
-
-  // Simüle et
-  const tamamlanacak = acikGorevler.slice(0, eksik)
+  // Her görevin "sırası gelme zamanı" = aktif_olma_tarihi + (kaçıncı görevse * gorevArasiDk)
+  // Ama aynı aktif_olma_tarihi grubundaki görevler de aralıklı tamamlanmalı
+  // Basit yaklaşım: görev aktif olduktan sonra gorevArasiDk geçmişse sırası gelmiş
   let tamamlananAdet = 0
+  let iptalAdet = 0
 
-  for (const gorev of tamamlanacak) {
+  for (const gorev of acikGorevler) {
+    // Hedef oranına ulaşıldıysa dur
+    if (tamamlananSayi + tamamlananAdet >= hedefMax) break
+
+    const aktifMs = new Date(gorev.aktif_olma_tarihi).getTime()
+
+    // Bu görevin aktif olma zamanından itibaren geçen süre
+    const gecenDk = (now - aktifMs) / 60000
+
+    // Sırası geldi mi? En az gorevArasiDk * (±%30 rastgele) kadar bekle
+    const rastgeleCarpan = 0.7 + Math.random() * 0.6 // 0.7 — 1.3 arası
+    const beklenmesiGerekenDk = gorevArasiDk * rastgeleCarpan
+
+    if (gecenDk < beklenmesiGerekenDk) continue // henüz sırası gelmedi
+
     const personelId = uygunPersonel[Math.floor(Math.random() * uygunPersonel.length)]
     const lok = lokMap.get(gorev.lokasyon_id)
 
-    // Süre hesabı
-    let sureSaniye: number = gorev_suresi_dk * 60
+    // %1 iptal olasılığı
+    if (Math.random() < IPTAL_OLASILIK) {
+      await admin.from('canli_gorevler').update({
+        durum: 'IPTAL',
+        durum_degisim_tarihi: new Date().toISOString(),
+        iptal_eden_id: personelId,
+        iptal_tarihi: new Date().toISOString(),
+        simule_tamamlandi: true,
+      } as any).eq('id', gorev.id)
+      iptalAdet++
+      continue
+    }
+
+    // Süre hesabı: süreli görev aktifse min/max arası rastgele
+    let sureSaniye: number = Math.round(gorevArasiDk * 60 * (0.5 + Math.random() * 0.5))
     if (lok?.sureli_gorev_aktif) {
       const minDk = lok.min_sure_dakika ?? 1
-      const maxDk = lok.max_sure_dakika ?? gorev_suresi_dk
+      const maxDk = lok.max_sure_dakika ?? Math.round(gorevArasiDk)
       const rastgeleDk = minDk + Math.random() * Math.max(0, maxDk - minDk)
       sureSaniye = Math.round(rastgeleDk * 60)
     }
 
-    const tamamlanmaMs = Date.now()
-    const baslatmaMs = tamamlanmaMs - sureSaniye * 1000
+    const tamamlanmaIso = new Date().toISOString()
+    const baslatmaMs = Date.now() - sureSaniye * 1000
     const baslatmaIso = new Date(baslatmaMs).toISOString()
-    const tamamlanmaIso = new Date(tamamlanmaMs).toISOString()
 
     const { error: updateErr } = await admin
       .from('canli_gorevler')
@@ -209,7 +234,14 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     tamamlananAdet++
   }
 
-  return { tamamlanan: tamamlananAdet, toplam: toplamGorev, mevcut_oran: Math.round(mevcutOran), hedef_oran, eksik }
+  return {
+    tamamlanan: tamamlananAdet,
+    iptal: iptalAdet,
+    toplam: toplamGorev,
+    gorev_arasi_dk: Math.round(gorevArasiDk),
+    mevcut_tamamlanan: tamamlananSayi,
+    hedef_max: hedefMax,
+  }
 }
 
 // ── Çeklist simüle tamamla ──────────────────────────────────────────────────

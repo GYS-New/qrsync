@@ -785,7 +785,7 @@ function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; p
 
   // Yeni ayar formu
   const [yeniUstLok, setYeniUstLok] = useState('')
-  const [seciliGruplar, setSeciliGruplar] = useState<Record<string, { hedef_oran: number; gorev_suresi_dk: number }>>({})
+  const [seciliGruplar, setSeciliGruplar] = useState<Record<string, { hedef_oran: number; vardiya_suresi_saat: number }>>({})
   const [seciliPersonel, setSeciliPersonel] = useState<Set<string>>(new Set())
 
   // Düzenleme
@@ -836,9 +836,9 @@ function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; p
     setYeniUstLok(a.ust_lokasyon_id)
     await ustLokasyonSecildi(a.ust_lokasyon_id)
     // Mevcut grup ayarlarını yükle
-    const ga: Record<string, { hedef_oran: number; gorev_suresi_dk: number }> = {}
+    const ga: Record<string, { hedef_oran: number; vardiya_suresi_saat: number }> = {}
     for (const g of (a.grup_ayarlari ?? [])) {
-      ga[g.grup_id] = { hedef_oran: g.hedef_oran, gorev_suresi_dk: g.gorev_suresi_dk }
+      ga[g.grup_id] = { hedef_oran: g.hedef_oran, vardiya_suresi_saat: g.vardiya_suresi_saat }
     }
     setSeciliGruplar(ga)
     setSeciliPersonel(new Set(a.personel_idler ?? []))
@@ -848,7 +848,7 @@ function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; p
     setSeciliGruplar(prev => {
       const n = { ...prev }
       if (n[grupId]) { delete n[grupId] }
-      else { n[grupId] = { hedef_oran: 100, gorev_suresi_dk: 10 } }
+      else { n[grupId] = { hedef_oran: 100, vardiya_suresi_saat: 8 } }
       return n
     })
   }
@@ -966,11 +966,11 @@ function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; p
                               <span style={{ fontSize: 10.5, color: '#64748b' }}>%</span>
                             </label>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                              <span style={{ fontSize: 10.5, color: '#64748b' }}>Süre:</span>
-                              <input type="number" min={1} value={seciliGruplar[g.id]?.gorev_suresi_dk ?? 10}
-                                onChange={e => grupAyarDegistir(g.id, 'gorev_suresi_dk', Number(e.target.value))}
+                              <span style={{ fontSize: 10.5, color: '#64748b' }}>Vardiya:</span>
+                              <input type="number" min={1} value={seciliGruplar[g.id]?.vardiya_suresi_saat ?? 10}
+                                onChange={e => grupAyarDegistir(g.id, 'vardiya_suresi_saat', Number(e.target.value))}
                                 style={{ ...inp, width: 52, height: 28, textAlign: 'center', fontSize: 12 }} />
-                              <span style={{ fontSize: 10.5, color: '#64748b' }}>dk</span>
+                              <span style={{ fontSize: 10.5, color: '#64748b' }}>saat</span>
                             </label>
                           </>
                         )}
@@ -1060,7 +1060,7 @@ function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; p
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginLeft: 56 }}>
                   {(a.grup_ayarlari ?? []).map((ga: any) => (
                     <span key={ga.grup_id} style={{ fontSize: 11.5, padding: '3px 10px', borderRadius: 6, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
-                      Grup · %{ga.hedef_oran} · {ga.gorev_suresi_dk}dk
+                      Grup · %{ga.hedef_oran} · {ga.vardiya_suresi_saat}sa
                     </span>
                   ))}
                 </div>

@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 012 — Simülasyon Modu (v2 — grup bazlı)
+-- 012 — Simülasyon Modu (v3 — vardiya bazlı, personel bypass)
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- 1. Ana simülasyon ayarları (üst lokasyon bazlı)
@@ -18,13 +18,13 @@ CREATE TABLE IF NOT EXISTS simulasyon_ayarlari (
 ALTER TABLE simulasyon_ayarlari ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "sa_full" ON simulasyon_ayarlari FOR ALL USING (true) WITH CHECK (true);
 
--- 2. Grup bazlı ayarlar (her grup için ayrı hedef ve süre)
+-- 2. Grup bazlı ayarlar
 CREATE TABLE IF NOT EXISTS simulasyon_grup_ayarlari (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  simulasyon_id   uuid NOT NULL REFERENCES simulasyon_ayarlari(id) ON DELETE CASCADE,
-  grup_id         uuid NOT NULL REFERENCES lokasyon_gruplari(id) ON DELETE CASCADE,
-  hedef_oran      integer NOT NULL DEFAULT 100 CHECK (hedef_oran BETWEEN 1 AND 100),
-  gorev_suresi_dk integer NOT NULL DEFAULT 10 CHECK (gorev_suresi_dk >= 1),
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  simulasyon_id       uuid NOT NULL REFERENCES simulasyon_ayarlari(id) ON DELETE CASCADE,
+  grup_id             uuid NOT NULL REFERENCES lokasyon_gruplari(id) ON DELETE CASCADE,
+  hedef_oran          integer NOT NULL DEFAULT 100 CHECK (hedef_oran BETWEEN 1 AND 100),
+  vardiya_suresi_saat integer NOT NULL DEFAULT 8 CHECK (vardiya_suresi_saat BETWEEN 1 AND 24),
   UNIQUE (simulasyon_id, grup_id)
 );
 

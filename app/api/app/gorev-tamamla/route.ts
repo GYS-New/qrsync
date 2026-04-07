@@ -79,6 +79,56 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Geçersiz gorev_tipi' }, { status: 400, headers: CORS })
     }
 
+    // ── SİMÜLASYON BYPASS: SİM aktifse ve görev kapsamındaysa VT'ye yazma ──
+    if (gorevTipi === 'canli_gorevler') {
+      const { data: gorevLok } = await admin
+        .from('canli_gorevler')
+        .select('lokasyon_id')
+        .eq('id', gorevId)
+        .single()
+      if (gorevLok?.lokasyon_id) {
+        // Görevin lokasyonunun üst lokasyonunu bul
+        const { data: lokasyon } = await admin
+          .from('lokasyonlar')
+          .select('id, parent_id')
+          .eq('id', gorevLok.lokasyon_id)
+          .single()
+        // Üst lokasyonu bul (root'a kadar çık)
+        let ustLokId = lokasyon?.id ?? null
+        if (lokasyon?.parent_id) {
+          let curId: string | null = lokasyon.parent_id
+          let guard = 0
+          while (curId && guard < 10) {
+            const { data: parent } = await admin.from('lokasyonlar').select('id, parent_id').eq('id', curId).single()
+            if (!parent) break
+            ustLokId = parent.id
+            curId = parent.parent_id
+            guard++
+          }
+        }
+        // Bu üst lokasyon için aktif simülasyon var mı?
+        if (ustLokId) {
+          const { data: simAyar } = await admin
+            .from('simulasyon_ayarlari')
+            .select('id')
+            .eq('firma_id', firmaId)
+            .eq('ust_lokasyon_id', ustLokId)
+            .eq('aktif', true)
+            .maybeSingle()
+          if (simAyar) {
+            // SİM aktif — personele başarılı response dön ama VT'ye yazma
+            return NextResponse.json({
+              ok: true,
+              mesaj: 'Görev başarıyla tamamlandı.',
+              gorev_id: gorevId,
+              gorev_tipi: gorevTipi,
+              tamamlanma_tarihi: new Date().toISOString(),
+            }, { headers: CORS })
+          }
+        }
+      }
+    }
+
     const nowIso = new Date().toISOString()
 
     const { data: gorev, error: gorevErr } = await admin
