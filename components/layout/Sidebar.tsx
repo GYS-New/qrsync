@@ -195,11 +195,14 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
       .catch(() => {})
   }, [isUOrM])
 
-  // SA: firma bazlı kontrol (FirmaContext); TA/U: layout'tan server-side geçilir
+  // Proje bazlı kontrol: aktifProje varsa proje ayarından, yoksa firma ayarından
   const aktifFirma = isSA ? firmalar.find(f => f.id === saFirmaId) : null
-  const birimFiyatAktif = isSA
-    ? aktifFirma?.birim_fiyat_aktif === true
-    : birimFiyatAktifProp === true
+  const birimFiyatAktif = aktifProje
+    ? aktifProje.birim_fiyat_aktif === true
+    : isSA ? aktifFirma?.birim_fiyat_aktif === true : birimFiyatAktifProp === true
+  const personelTakibiAktif = aktifProje
+    ? aktifProje.personel_takibi_aktif !== false
+    : true
 
   // Fetch sidebar badge counts
   useEffect(() => {
@@ -355,6 +358,8 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           ).filter(item => {
             // birim-fiyatlar: sadece aktif proje'de birim_fiyat_aktif=true ise göster
             if (item.href.includes('/birim-fiyatlar')) return birimFiyatAktif
+            // personel-takibi: sadece aktif proje'de personel_takibi_aktif=true ise göster
+            if (item.href.includes('/personel-takibi')) return personelTakibiAktif
             return true
           })
 

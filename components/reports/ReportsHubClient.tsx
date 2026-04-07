@@ -186,11 +186,13 @@ export default function ReportsHubClient({
   const { firmaId: saFirmaId, firmalar: saFirmalar } = useFirma()
   const { aktifProje } = useProje()
 
-  // SA: firma bazlı birim fiyat aktif mi?
+  // Hakediş görünürlüğü: aktifProje varsa proje ayarından, yoksa firma ayarından
   const saBirimFiyatAktif = isSA
     ? saFirmalar?.find(f => f.id === saFirmaId)?.birim_fiyat_aktif === true
     : false
-  const hakedisGoster = isSA ? saBirimFiyatAktif : birimFiyatAktif === true
+  const hakedisGoster = aktifProje
+    ? aktifProje.birim_fiyat_aktif === true
+    : isSA ? saBirimFiyatAktif : birimFiyatAktif === true
 
   // SA: dinamik firma değişimine göre yüklenen aktif türler
   // TA: hiç kullanılmaz — initialRaporTurleri prop'undan direkt hesaplanır

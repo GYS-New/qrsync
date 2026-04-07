@@ -10,6 +10,7 @@ export type Proje = {
   renk?: string
   aktif: boolean
   birim_fiyat_aktif?: boolean
+  personel_takibi_aktif?: boolean
 }
 
 type ProjeCtx = {
