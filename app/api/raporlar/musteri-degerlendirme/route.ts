@@ -31,13 +31,11 @@ export async function GET(req: NextRequest) {
   const baslangic = p.get('baslangic')
   const bitis     = p.get('bitis')
   const arsivlendi = p.get('arsivlendi') === 'true'
+  const birlesik   = p.get('birlesik')   === 'true'
 
   if (!firmaId) return NextResponse.json({ ok: true, data: [] })
   if (me.isTA && p.get('firma_id') && p.get('firma_id') !== me.firma_id)
     return NextResponse.json({ ok: false, error: 'Yetkisiz firma' }, { status: 403 })
-
-  // arsivlendi parametresine göre doğru tabloyu seç
-  const tableName = arsivlendi ? 'musteri_degerlendirmeleri_arsiv' : 'musteri_degerlendirmeleri'
 
   // Lokasyon yolu oluşturmak için tüm lokasyonları çek
   const { data: lokasyonlar } = await admin
@@ -65,6 +63,54 @@ export async function GET(req: NextRequest) {
     return parts.reverse().join(' > ') || '—'
   }
 
+  function mapRow(r: any, segment: 'tablo' | 'arsiv') {
+    return {
+      id:                r.id,
+      lokasyon_id:       r.lokasyon_id,
+      lokasyon_tanim:    getLocPath(r.lokasyon_id),
+      kanal:             r.kanal,
+      yildiz:            r.yildiz,
+      yorum:             r.yorum,
+      ad_soyad:          r.ad_soyad,
+      gorsel_url:        r.gorsel_url,
+      olusturma_tarihi:  r.olusturma_tarihi,
+      arsivlendi:        segment === 'arsiv',
+      arsivleme_tarihi:  r.arsivleme_tarihi ?? null,
+      segment,
+    }
+  }
+
+  // ── Birleşik mod: hem tablo hem arşiv ──────────────────────────────────
+  if (birlesik) {
+    const selectCols = `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gorsel_url, olusturma_tarihi, arsivleme_tarihi`
+
+    let qTablo = admin.from('musteri_degerlendirmeleri').select(selectCols + ', arsivlendi')
+      .eq('firma_id', firmaId).order('olusturma_tarihi', { ascending: false })
+    if (projeId)   qTablo = (qTablo as any).eq('proje_id', projeId)
+    if (baslangic) qTablo = (qTablo as any).gte('olusturma_tarihi', baslangic)
+    if (bitis)     qTablo = (qTablo as any).lte('olusturma_tarihi', bitis + 'T23:59:59')
+
+    let qArsiv = admin.from('musteri_degerlendirmeleri_arsiv').select(selectCols)
+      .eq('firma_id', firmaId).order('olusturma_tarihi', { ascending: false })
+    if (projeId)   qArsiv = (qArsiv as any).eq('proje_id', projeId)
+    if (baslangic) qArsiv = (qArsiv as any).gte('olusturma_tarihi', baslangic)
+    if (bitis)     qArsiv = (qArsiv as any).lte('olusturma_tarihi', bitis + 'T23:59:59')
+
+    const [resTablo, resArsiv] = await Promise.all([qTablo, qArsiv])
+    if (resTablo.error) return NextResponse.json({ ok: false, error: resTablo.error.message }, { status: 500 })
+    if (resArsiv.error) return NextResponse.json({ ok: false, error: resArsiv.error.message }, { status: 500 })
+
+    const all = [
+      ...(resTablo.data ?? []).map((r: any) => mapRow(r, 'tablo')),
+      ...(resArsiv.data ?? []).map((r: any) => mapRow(r, 'arsiv')),
+    ].sort((a, b) => new Date(b.olusturma_tarihi).getTime() - new Date(a.olusturma_tarihi).getTime())
+
+    return NextResponse.json({ ok: true, data: all })
+  }
+
+  // ── Tekli mod (mevcut davranış) ────────────────────────────────────────
+  const tableName = arsivlendi ? 'musteri_degerlendirmeleri_arsiv' : 'musteri_degerlendirmeleri'
+
   let q = admin
     .from(tableName)
     .select(
@@ -84,19 +130,8 @@ export async function GET(req: NextRequest) {
   const { data, error } = await q
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
-  const kayitlar = (data ?? []).map((r: any) => ({
-    id:                r.id,
-    lokasyon_id:       r.lokasyon_id,
-    lokasyon_tanim:    getLocPath(r.lokasyon_id),
-    kanal:             r.kanal,
-    yildiz:            r.yildiz,
-    yorum:             r.yorum,
-    ad_soyad:          r.ad_soyad,
-    gorsel_url:        r.gorsel_url,
-    olusturma_tarihi:  r.olusturma_tarihi,
-    arsivlendi:        arsivlendi,
-    arsivleme_tarihi:  r.arsivleme_tarihi,
-  }))
+  const segment = arsivlendi ? 'arsiv' : 'tablo'
+  const kayitlar = (data ?? []).map((r: any) => mapRow(r, segment as any))
 
   return NextResponse.json({ ok: true, data: kayitlar })
 }

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
-import { RefreshCw, Star, Pencil, Trash2, RotateCcw, X, Check } from 'lucide-react'
+import { RefreshCw, Star, Pencil, Trash2, RotateCcw, X, Check, Filter, XCircle } from 'lucide-react'
 
 interface Kayit {
   id: string
@@ -159,7 +159,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
   const firmaId = isSA ? saFirmaId : (initialFirmaId ?? null)
   const effectiveProjeId = isSA ? (aktifProje?.id ?? null) : (projeId ?? null)
 
-  const [kayitlar, setKayitlar]         = useState<Kayit[]>([])
+  const [kayitlar, setKayitlar]         = useState<any[]>([])
   const [loading, setLoading]           = useState(false)
   const [baslangic, setBaslangic]       = useState('')
   const [bitis, setBitis]               = useState('')
@@ -167,6 +167,8 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
   const [filtreKanal, setFiltreKanal]   = useState<'TUMU' | 'QR' | 'NFC'>('TUMU')
   const [gorselModal, setGorselModal]   = useState<string | null>(null)
   const [hata, setHata]                 = useState<string | null>(null)
+  const [filtreMod, setFiltreMod]       = useState(false)
+  const [aramaQ, setAramaQ]             = useState('')
 
   // Aksiyon state'leri
   const [duzenleKayit,   setDuzenleKayit]   = useState<Kayit | null>(null)
@@ -176,6 +178,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
 
   const spinning = { animation: 'spin 0.9s linear infinite' }
 
+  // Varsayılan yükleme: sadece aktif tablo
   async function yukle() {
     if (!firmaId) return
     setLoading(true)
@@ -183,8 +186,6 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     try {
       const p = new URLSearchParams({ firma_id: firmaId })
       if (effectiveProjeId) p.set('proje_id', effectiveProjeId)
-      if (baslangic) p.set('baslangic', baslangic)
-      if (bitis)     p.set('bitis', bitis)
       const res  = await fetch(`/api/raporlar/musteri-degerlendirme?${p}`, { cache: 'no-store' })
       const json = await res.json()
       if (json.ok) setKayitlar(json.data)
@@ -192,15 +193,40 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     } finally { setLoading(false) }
   }
 
+  // Filtrele: aktif + arşiv birleşik
+  async function filtreUygula() {
+    if (!firmaId) return
+    setLoading(true)
+    setHata(null)
+    try {
+      const p = new URLSearchParams({ firma_id: firmaId, birlesik: 'true' })
+      if (effectiveProjeId) p.set('proje_id', effectiveProjeId)
+      if (baslangic) p.set('baslangic', baslangic)
+      if (bitis)     p.set('bitis', bitis)
+      const res  = await fetch(`/api/raporlar/musteri-degerlendirme?${p}`, { cache: 'no-store' })
+      const json = await res.json()
+      if (json.ok) { setKayitlar(json.data); setFiltreMod(true) }
+      else setHata(json.error ?? 'Yüklenemedi')
+    } finally { setLoading(false) }
+  }
+
+  function filtreTemizle() {
+    setAramaQ(''); setBaslangic(''); setBitis(''); setFiltreYildiz(0); setFiltreKanal('TUMU')
+    setFiltreMod(false)
+    yukle()
+  }
+
   useEffect(() => { yukle() }, [firmaId, effectiveProjeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtreliKayitlar = useMemo(() => {
-    return kayitlar.filter(k => {
+    const s = aramaQ.trim().toLowerCase()
+    return kayitlar.filter((k: any) => {
       if (filtreYildiz && k.yildiz !== filtreYildiz) return false
       if (filtreKanal !== 'TUMU' && k.kanal !== filtreKanal) return false
+      if (s && ![k.lokasyon_tanim, k.ad_soyad, k.yorum].join(' ').toLowerCase().includes(s)) return false
       return true
     })
-  }, [kayitlar, filtreYildiz, filtreKanal])
+  }, [kayitlar, filtreYildiz, filtreKanal, aramaQ])
 
   const ozet = useMemo(() => {
     if (!filtreliKayitlar.length) return null
@@ -222,8 +248,11 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     const json = await res.json()
     if (!json.ok) throw new Error(json.error ?? 'Güncellenemedi')
     setDuzenleKayit(null)
-    yukle()
+    yenile()
   }
+
+  // Aksiyon sonrası yenile (filtre modundaysa filtreUygula, değilse yukle)
+  function yenile() { filtreMod ? filtreUygula() : yukle() }
 
   async function arsivle(kayit: Kayit) {
     setAksiyonLoading(true)
@@ -235,7 +264,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       const json = await res.json()
       if (!json.ok) { setHata(json.error ?? 'Arşivlenemedi'); return }
       setArsivleKayit(null)
-      yukle()
+      yenile()
     } finally { setAksiyonLoading(false) }
   }
 
@@ -246,18 +275,14 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       const json = await res.json()
       if (!json.ok) { setHata(json.error ?? 'Silinemedi'); return }
       setSilKayit(null)
-      yukle()
+      yenile()
     } finally { setAksiyonLoading(false) }
   }
 
-  const td = (extra?: React.CSSProperties): React.CSSProperties => ({
-    padding: '10px 14px', borderBottom: '1px solid #f3f4f6', fontSize: 13, verticalAlign: 'top', ...extra,
-  })
-
-  const aksBtn = (color: string, borderColor: string): React.CSSProperties => ({
+  const aksBtn = (color: string, bg: string, borderColor: string): React.CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    width: 30, height: 30, borderRadius: 7, border: `1px solid ${borderColor}`,
-    cursor: 'pointer', background: 'none', color,
+    width: 34, height: 34, borderRadius: 8, border: `1.5px solid ${borderColor}`,
+    cursor: 'pointer', background: bg, color, transition: 'opacity .15s',
   })
 
   return (
@@ -278,44 +303,49 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
         {/* Filtreler */}
         <div className="verde-card" style={{ padding: '14px 18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 900, color: '#111827', margin: 0 }}>Müşteri Değerlendirmeleri</h2>
-            <button onClick={yukle} disabled={loading || !firmaId}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 900, color: '#111827', margin: 0 }}>Müşteri Değerlendirmeleri</h2>
+              {filtreMod && (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: '#e0f2fe', color: '#0369a1' }}>
+                  Filtre Aktif — Tablo + Arşiv
+                </span>
+              )}
+            </div>
+            <button onClick={filtreMod ? filtreTemizle : yukle} disabled={loading || !firmaId}
               style={{ height: 34, padding: '0 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#1f2937', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
               <RefreshCw size={13} style={loading ? spinning : {}} />
               {loading ? 'Yükleniyor…' : 'Yenile'}
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
-            {[
-              { label: 'Başlangıç', node: <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)} style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, width: '100%' }} /> },
-              { label: 'Bitiş',     node: <input type="date" value={bitis}     onChange={e => setBitis(e.target.value)}     style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, width: '100%' }} /> },
-              { label: 'Yıldız', node: (
-                <select value={filtreYildiz} onChange={e => setFiltreYildiz(Number(e.target.value))}
-                  style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, width: '100%', background: '#fff' }}>
-                  <option value={0}>Tümü</option>
-                  {[5,4,3,2,1].map(n => <option key={n} value={n}>{'★'.repeat(n)} — {YILDIZ_ETIKET[n]}</option>)}
-                </select>
-              )},
-              { label: 'Kanal', node: (
-                <select value={filtreKanal} onChange={e => setFiltreKanal(e.target.value as any)}
-                  style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, width: '100%', background: '#fff' }}>
-                  <option value="TUMU">Tümü</option>
-                  <option value="QR">QR</option>
-                  <option value="NFC">NFC</option>
-                </select>
-              )},
-            ].map(({ label, node }) => (
-              <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
-                {node}
-              </label>
-            ))}
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button onClick={yukle} disabled={loading || !firmaId}
-                style={{ height: 34, padding: '0 16px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, width: '100%' }}>
-                Uygula
-              </button>
-            </div>
+
+          {/* Filtre satırı */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input placeholder="Lokasyon / yorum / ad ara…" value={aramaQ} onChange={e => setAramaQ(e.target.value)}
+              style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff', flex: '1 1 180px' }} />
+            <select value={filtreYildiz} onChange={e => setFiltreYildiz(Number(e.target.value))}
+              style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff', minWidth: 140 }}>
+              <option value={0}>Puan (Tümü)</option>
+              {[5,4,3,2,1].map(n => <option key={n} value={n}>{'★'.repeat(n)} — {YILDIZ_ETIKET[n]}</option>)}
+            </select>
+            <select value={filtreKanal} onChange={e => setFiltreKanal(e.target.value as any)}
+              style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff', minWidth: 100 }}>
+              <option value="TUMU">Kanal (Tümü)</option>
+              <option value="QR">QR</option>
+              <option value="NFC">NFC</option>
+            </select>
+            <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)}
+              style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} />
+            <span style={{ color: '#94a3b8' }}>—</span>
+            <input type="date" value={bitis} onChange={e => setBitis(e.target.value)}
+              style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} />
+            <button onClick={filtreUygula} disabled={loading || !firmaId}
+              style={{ height: 34, padding: '0 16px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Filter size={13} /> Filtrele
+            </button>
+            <button onClick={filtreTemizle}
+              style={{ height: 34, padding: '0 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <XCircle size={13} /> Temizle
+            </button>
           </div>
         </div>
 
@@ -357,6 +387,12 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
           </div>
         )}
 
+        {/* Kayıt sayısı */}
+        <div style={{ fontSize: 13, color: '#64748b' }}>
+          <strong style={{ color: '#1f2937' }}>{filtreliKayitlar.length}</strong> kayıt
+          {filtreMod && <span style={{ marginLeft: 6, fontSize: 11.5, color: '#0369a1' }}>(tablo + arşiv)</span>}
+        </div>
+
         {/* Tablo */}
         <div className="verde-card" style={{ overflow: 'hidden' }}>
           {!firmaId ? (
@@ -372,48 +408,69 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
               Henüz değerlendirme yok
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <div style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto', overflowX: 'auto' }}>
+              <table className="verde-table">
                 <thead>
-                  <tr style={{ background: '#1f2937' }}>
-                    {['Tarih', 'Lokasyon (Üst > Alt)', 'Kanal', 'Puan', 'Yorum', 'Ad Soyad', 'Fotoğraf', 'İşlemler'].map(h => (
-                      <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
+                  <tr>
+                    <th>Tarih</th>
+                    <th>Lokasyon (Üst &gt; Alt)</th>
+                    <th>Kanal</th>
+                    <th>Puan</th>
+                    <th>Yorum</th>
+                    <th>Ad Soyad</th>
+                    <th>Fotoğraf</th>
+                    {filtreMod && <th>Kaynak</th>}
+                    <th style={{ textAlign: 'center' }}>İşlemler</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtreliKayitlar.map((k, i) => (
-                    <tr key={k.id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
-                      <td style={td({ whiteSpace: 'nowrap', color: '#64748b' })}>
+                  {filtreliKayitlar.map((k: any) => (
+                    <tr key={k.id}>
+                      <td style={{ whiteSpace: 'nowrap', color: '#64748b', fontSize: 12 }}>
                         {new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td style={td({ fontWeight: 600, color: '#111827' })}>{k.lokasyon_tanim}</td>
-                      <td style={td()}>
+                      <td style={{ fontWeight: 600, color: '#111827' }}>{k.lokasyon_tanim}</td>
+                      <td>
                         <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 700, background: k.kanal === 'QR' ? '#e0f2fe' : '#f9fafb', color: k.kanal === 'QR' ? '#0369a1' : '#166534' }}>
                           {k.kanal}
                         </span>
                       </td>
-                      <td style={td()}><YildizRow yildiz={k.yildiz} /></td>
-                      <td style={td({ maxWidth: 280, color: '#334155' })}>
+                      <td><YildizRow yildiz={k.yildiz} /></td>
+                      <td style={{ maxWidth: 280, color: '#334155' }}>
                         {k.yorum ? (
                           <span title={k.yorum} style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
                             {k.yorum}
                           </span>
                         ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                       </td>
-                      <td style={td({ color: k.ad_soyad ? '#111827' : '#cbd5e1' })}>{k.ad_soyad || '—'}</td>
-                      <td style={td()}>
+                      <td style={{ color: k.ad_soyad ? '#111827' : '#cbd5e1' }}>{k.ad_soyad || '—'}</td>
+                      <td>
                         {k.gorsel_url ? (
                           <button onClick={() => setGorselModal(k.gorsel_url!)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                             <img src={k.gorsel_url} alt="Görsel" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
                           </button>
                         ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                       </td>
-                      <td style={td({ whiteSpace: 'nowrap' })}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <button onClick={() => setDuzenleKayit(k)} title="Düzenle"       style={aksBtn('#1d4ed8', '#bfdbfe')}><Pencil size={13} /></button>
-                          <button onClick={() => setArsivleKayit(k)} title="Arşivle"       style={aksBtn('#c2410c', '#fed7aa')}><RotateCcw size={13} /></button>
-                          <button onClick={() => setSilKayit(k)}      title="Kalıcı Sil"   style={aksBtn('#dc2626', '#fecaca')}><Trash2 size={13} /></button>
+                      {filtreMod && (
+                        <td>
+                          <span style={{
+                            padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+                            background: k.segment === 'arsiv' ? '#fef3c7' : '#e0f2fe',
+                            color:      k.segment === 'arsiv' ? '#92400e' : '#0369a1',
+                          }}>
+                            {k.segment === 'arsiv' ? 'Arşiv' : 'Tablo'}
+                          </span>
+                        </td>
+                      )}
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                          {!k.arsivlendi && (
+                            <button onClick={() => setDuzenleKayit(k)} title="Düzenle" style={aksBtn('#1d4ed8', '#eff6ff', '#bfdbfe')}><Pencil size={14} /></button>
+                          )}
+                          {!k.arsivlendi && (
+                            <button onClick={() => setArsivleKayit(k)} title="Arşivle" style={aksBtn('#c2410c', '#fff7ed', '#fed7aa')}><RotateCcw size={14} /></button>
+                          )}
+                          <button onClick={() => setSilKayit(k)} title="Kalıcı Sil" style={aksBtn('#dc2626', '#fef2f2', '#fecaca')}><Trash2 size={14} /></button>
                         </div>
                       </td>
                     </tr>
