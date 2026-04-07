@@ -52,8 +52,10 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
     ff(supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true).gte('last_seen_at', onlineSince)),
     // [8] Lokasyonlar toplam
     ff(supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true)),
-    // [9] Görevli lokasyonlar
-    ff(supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true).not('atanan_kullanici_id', 'is', null)),
+    // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar)
+    gf(supabase.from('canli_gorevler').select('lokasyon_id').gte('aktif_olma_tarihi', todayISO).limit(3000)),
+    // [10] Görevli lokasyonlar — spesifik (bugün tüm durumlar)
+    gf(supabase.from('gorevler').select('lokasyon_id').gte('olusturma_tarihi', todayISO).limit(3000)),
   ])
 
   const n = (r: PromiseSettledResult<any>): number =>
@@ -69,7 +71,13 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
   const kullaniciToplam = n(results[6])
   const kullaniciOnline = n(results[7])
   const lokasyonToplam  = n(results[8])
-  const lokasyonGorevli = n(results[9])
+  // Bugün görevi olan unique lokasyon sayısı (frekansiyel + spesifik birleşik)
+  const lokIdSet = new Set<string>()
+  if (results[9].status === 'fulfilled' && Array.isArray(results[9].value?.data))
+    results[9].value.data.forEach((r: any) => r.lokasyon_id && lokIdSet.add(r.lokasyon_id))
+  if (results[10].status === 'fulfilled' && Array.isArray(results[10].value?.data))
+    results[10].value.data.forEach((r: any) => r.lokasyon_id && lokIdSet.add(r.lokasyon_id))
+  const lokasyonGorevli = lokIdSet.size
 
   const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 100) : 0)
 
