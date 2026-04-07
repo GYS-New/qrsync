@@ -21,8 +21,32 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ ok: false, error: 'Oturum bulunamadı' }, { status: 401 })
 
     const { data: me } = await supabase
-      .from('users').select('id,firma_id,rol').eq('id', user.id).single()
+      .from('users').select('id,firma_id,rol,aktif').eq('id', user.id).single()
     if (!me) return NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 401 })
+
+    // Pasif kullanıcı kontrolü
+    if (me.aktif === false) {
+      return NextResponse.json({ ok: false, error: 'Pasif durumdasınız! Lütfen sistem yöneticiniz ile iletişime geçin.' }, { status: 403 })
+    }
+
+    // Mesai kontrolü (personel takibi aktifse)
+    {
+      const admin2 = createAdminClient()
+      const { data: firma } = await admin2.from('firmalar').select('personel_takibi_aktif').eq('id', me.firma_id).single()
+      if (firma?.personel_takibi_aktif === true) {
+        const bugun = new Date().toISOString().slice(0, 10)
+        const { data: mesai } = await admin2
+          .from('personel_mesai_kayitlari')
+          .select('id')
+          .eq('user_id', me.id)
+          .eq('kayit_tarihi', bugun)
+          .is('cikis_saati', null)
+          .maybeSingle()
+        if (!mesai) {
+          return NextResponse.json({ ok: false, error: 'Lütfen önce iş başı QR/NFC kodunu okutunuz.', code: 'MESAI_YOK' }, { status: 403 })
+        }
+      }
+    }
 
     let body: any
     try { body = await req.json() } catch { return NextResponse.json({ ok: false, error: 'Geçersiz JSON' }, { status: 400 }) }
