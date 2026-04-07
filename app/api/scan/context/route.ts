@@ -24,25 +24,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Pasif durumdasınız! Lütfen sistem yöneticiniz ile iletişime geçin.', code: 'USER_PASIF' }, { status: 403 })
     }
 
-    // Mesai kontrolü — QR/NFC okutulduğu anda kontrol
-    {
-      const adminChk = createAdminClient()
-      const { data: firma } = await adminChk.from('firmalar').select('personel_takibi_aktif').eq('id', me.firma_id).single()
-      if (firma?.personel_takibi_aktif === true) {
-        const bugun = new Date().toISOString().slice(0, 10)
-        const { data: mesai } = await adminChk
-          .from('personel_mesai_kayitlari')
-          .select('id')
-          .eq('user_id', me.id)
-          .eq('kayit_tarihi', bugun)
-          .is('cikis_saati', null)
-          .maybeSingle()
-        if (!mesai) {
-          return NextResponse.json({ ok: false, error: 'Lütfen önce iş başı QR/NFC kodunu okutunuz.', code: 'MESAI_YOK' }, { status: 403 })
-        }
-      }
-    }
-
     const p     = new URL(req.url).searchParams
     const token = p.get('token')
     const kanal = p.get('kanal') as 'QR' | 'NFC'
@@ -73,12 +54,36 @@ export async function GET(req: NextRequest) {
     }
 
     // Firma aktif + lisans kontrolü
-    const { data: firma } = await admin.from('firmalar').select('aktif,qr_sistemi_aktif,nfc_sistemi_aktif,lisans_gecerlilik_tarihi').eq('id', lokasyon.firma_id).single()
+    const { data: firma } = await admin.from('firmalar').select('aktif,qr_sistemi_aktif,nfc_sistemi_aktif,lisans_gecerlilik_tarihi,personel_takibi_aktif').eq('id', lokasyon.firma_id).single()
     if (!firma?.aktif) return NextResponse.json({ ok: false, error: 'Firma aktif değil' }, { status: 403 })
     if (kanal === 'QR'  && firma.qr_sistemi_aktif  === false) return NextResponse.json({ ok: false, error: 'QR sistemi aktif değil' }, { status: 403 })
     if (kanal === 'NFC' && firma.nfc_sistemi_aktif === false) return NextResponse.json({ ok: false, error: 'NFC sistemi aktif değil' }, { status: 403 })
     if (firma.lisans_gecerlilik_tarihi && new Date(firma.lisans_gecerlilik_tarihi) < new Date()) {
       return NextResponse.json({ ok: false, error: 'Firma lisansı süresi dolmuş' }, { status: 403 })
+    }
+
+    // ── Mesai kontrolü — firma veya proje bazlı ─────────────────────────────
+    // tenant_user ve musteri rolleri için kontrol (SA/TA muaf)
+    if (me.rol === 'tenant_user' || me.rol === 'musteri') {
+      let personelTakibiAktif = firma?.personel_takibi_aktif === true
+      // Proje bazlı override: lokasyonun proje_id'si varsa proje ayarını kontrol et
+      if (lokasyon.proje_id) {
+        const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', lokasyon.proje_id).single()
+        if (proje) personelTakibiAktif = proje.personel_takibi_aktif === true
+      }
+      if (personelTakibiAktif) {
+        const bugun = new Date().toISOString().slice(0, 10)
+        const { data: mesai } = await admin
+          .from('personel_mesai_kayitlari')
+          .select('id')
+          .eq('user_id', me.id)
+          .eq('kayit_tarihi', bugun)
+          .is('cikis_saati', null)
+          .maybeSingle()
+        if (!mesai) {
+          return NextResponse.json({ ok: false, error: 'Lütfen önce iş başı QR/NFC kodunu okutunuz.', code: 'MESAI_YOK' }, { status: 403 })
+        }
+      }
     }
 
     // ── Görevleri çek ────────────────────────────────────────────────────────

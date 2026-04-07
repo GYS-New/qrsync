@@ -29,11 +29,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Pasif durumdasınız! Lütfen sistem yöneticiniz ile iletişime geçin.' }, { status: 403 })
     }
 
-    // Mesai kontrolü (personel takibi aktifse)
-    {
+    // Mesai kontrolü (firma + proje bazlı)
+    if (me.rol === 'tenant_user' || me.rol === 'musteri') {
       const admin2 = createAdminClient()
       const { data: firma } = await admin2.from('firmalar').select('personel_takibi_aktif').eq('id', me.firma_id).single()
-      if (firma?.personel_takibi_aktif === true) {
+      let personelTakibiAktif = firma?.personel_takibi_aktif === true
+      try {
+        const bodyPeek = await req.clone().json()
+        if (bodyPeek?.lokasyon_id) {
+          const { data: lok } = await admin2.from('lokasyonlar').select('proje_id').eq('id', bodyPeek.lokasyon_id).single()
+          if (lok?.proje_id) {
+            const { data: proje } = await admin2.from('projeler').select('personel_takibi_aktif').eq('id', lok.proje_id).single()
+            if (proje) personelTakibiAktif = proje.personel_takibi_aktif === true
+          }
+        }
+      } catch {}
+      if (personelTakibiAktif) {
         const bugun = new Date().toISOString().slice(0, 10)
         const { data: mesai } = await admin2
           .from('personel_mesai_kayitlari')
