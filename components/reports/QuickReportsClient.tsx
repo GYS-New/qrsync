@@ -64,7 +64,7 @@ const TYPE_OPTIONS: { key: QuickType; title: string; desc: string; accent: strin
   { key: 'location_groups', title: 'Lokasyon grupları raporu', desc: 'Grup bazlı görev sayısı, başarı oranı ve trend analizi', accent: '#0891b2' },
 ]
 
-const BAR_PALETTE = ['#e67e22', '#357f60', '#3d7369', '#456772', '#4c5b7a', '#5a5c88', '#686096', '#7664a3', '#8568b1', '#946dbf']
+const BAR_PALETTE = ['#374151', '#4b5563', '#6b7280', '#1f2937', '#525e6b', '#3d4a58', '#596775', '#718096', '#2d3748', '#4a5568']
 
 function todayMinus(days: number) {
   const d = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
@@ -274,7 +274,7 @@ function XAxisTick(props: any) {
         x={0}
         y={14}
         textAnchor="middle"
-        fill="#5f715f"
+        fill="#4b5563"
         style={{ fontSize: 12, fontWeight: 600 }}
       >
         {lines.map((line, index) => (
@@ -321,7 +321,7 @@ function FloatingBarLabel(props: any) {
   return (
     <g>
       <rect x={bx} y={by} width={bubbleWidth} height={bubbleHeight} rx={11} fill="#ffffff" stroke="#e5e7eb" />
-      <text x={Number(x) + Number(width) / 2} y={by + 15} textAnchor="middle" fill="#223322" style={{ fontSize: 12, fontWeight: 800 }}>
+      <text x={Number(x) + Number(width) / 2} y={by + 15} textAnchor="middle" fill="#111827" style={{ fontSize: 12, fontWeight: 800 }}>
         {label}
       </text>
     </g>
@@ -426,7 +426,7 @@ function PointValueLabel(props: any) {
   return (
     <g>
       <rect x={Number(x) - 14} y={Number(y) - 26} width={28} height={18} rx={9} fill="#ffffff" stroke="#e5e7eb" />
-      <text x={x} y={Number(y) - 13} textAnchor="middle" fill="#223322" style={{ fontSize: 11, fontWeight: 800 }}>
+      <text x={x} y={Number(y) - 13} textAnchor="middle" fill="#111827" style={{ fontSize: 11, fontWeight: 800 }}>
         {String(value)}
       </text>
     </g>
@@ -551,10 +551,10 @@ function ChartRenderer({ chart, type }: { chart: QuickPayload['charts'][number];
                             position="center"
                             content={() => (
                               <g>
-                                <text x="50%" y="48%" textAnchor="middle" fill="#728672" style={{ fontSize: 12, fontWeight: 700 }}>
+                                <text x="50%" y="48%" textAnchor="middle" fill="#6b7280" style={{ fontSize: 12, fontWeight: 700 }}>
                                   Toplam
                                 </text>
-                                <text x="50%" y="56%" textAnchor="middle" fill="#162816" style={{ fontSize: 28, fontWeight: 900 }}>
+                                <text x="50%" y="56%" textAnchor="middle" fill="#111827" style={{ fontSize: 28, fontWeight: 900 }}>
                                   {total}
                                 </text>
                               </g>
@@ -575,7 +575,7 @@ function ChartRenderer({ chart, type }: { chart: QuickPayload['charts'][number];
                           key={`${String(rawName)}-${index}`}
                           onMouseEnter={() => setHoveredIndex(index)}
                           onMouseLeave={() => setHoveredIndex(null)}
-                          style={{ display: 'grid', gridTemplateColumns: '9px minmax(0, 1fr) auto', gap: 9, alignItems: 'center', padding: '10px 12px', borderRadius: 12, border: hoveredIndex === index ? `1px solid ${shiftHex(BAR_PALETTE[index % BAR_PALETTE.length], 26)}` : '1px solid #e7efe7', background: hoveredIndex === index ? '#fcfffc' : '#ffffff', boxShadow: hoveredIndex === index ? '0 10px 20px rgba(15,40,15,0.05)' : 'none', minHeight: 64 }}
+                          style={{ display: 'grid', gridTemplateColumns: '9px minmax(0, 1fr) auto', gap: 9, alignItems: 'center', padding: '10px 12px', borderRadius: 12, border: hoveredIndex === index ? `1px solid ${shiftHex(BAR_PALETTE[index % BAR_PALETTE.length], 26)}` : '1px solid #e5e7eb', background: hoveredIndex === index ? '#f9fafb' : '#ffffff', boxShadow: hoveredIndex === index ? '0 10px 20px rgba(15,40,15,0.05)' : 'none', minHeight: 64 }}
                         >
                           <span style={{ width: 9, height: 9, borderRadius: 999, background: BAR_PALETTE[index % BAR_PALETTE.length], alignSelf: 'start', marginTop: 6 }} />
                           <div style={{ minWidth: 0 }}>
@@ -623,9 +623,9 @@ function ChartRenderer({ chart, type }: { chart: QuickPayload['charts'][number];
                           )
                         })}
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e7efe7" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                       <XAxis dataKey={categoryKey} interval={0} height={64} tickMargin={8} tickLine={false} axisLine={{ stroke: '#9fb19f' }} tick={<XAxisTick />} />
-                      <YAxis allowDecimals={false} domain={[0, yAxisUpperBound]} tick={{ fontSize: 12, fill: '#5f715f' }} width={44} />
+                      <YAxis allowDecimals={false} domain={[0, yAxisUpperBound]} tick={{ fontSize: 12, fill: '#4b5563' }} width={44} />
                       <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(46, 139, 87, 0.05)' }} />
                       <Bar dataKey={valueKey} radius={[10, 10, 0, 0]} maxBarSize={56} minPointSize={12} onMouseEnter={(_, index) => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)} filter={hoveredIndex !== null ? `url(#barGlow-${type}-${chart.key})` : undefined}>
                         {visibleData.map((_, index) => (
@@ -636,9 +636,9 @@ function ChartRenderer({ chart, type }: { chart: QuickPayload['charts'][number];
                     </BarChart>
                   ) : displayType === 'grouped_bar' ? (
                     <BarChart data={visibleData} margin={chartMargins} barCategoryGap={18}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e7efe7" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                       <XAxis dataKey={categoryKey} interval={0} height={64} tickMargin={8} tickLine={false} axisLine={{ stroke: '#9fb19f' }} tick={<XAxisTick />} />
-                      <YAxis allowDecimals={false} domain={[0, yAxisUpperBound]} tick={{ fontSize: 12, fill: '#5f715f' }} width={44} />
+                      <YAxis allowDecimals={false} domain={[0, yAxisUpperBound]} tick={{ fontSize: 12, fill: '#4b5563' }} width={44} />
                       <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(46, 139, 87, 0.05)' }} />
                       <Bar dataKey="tamamlanan" name="Tamamlanan" fill={chartColor(type, 0)} radius={[8, 8, 0, 0]} maxBarSize={36} minPointSize={10}>
                         <LabelList dataKey="tamamlanan" content={<FloatingBarLabel />} />
@@ -655,9 +655,9 @@ function ChartRenderer({ chart, type }: { chart: QuickPayload['charts'][number];
                           <stop offset="100%" stopColor={shiftHex(accent, -12)} stopOpacity={0.04} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e7efe7" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                       <XAxis dataKey={categoryKey} interval={0} height={64} tickMargin={8} tickLine={false} axisLine={{ stroke: '#9fb19f' }} tick={<XAxisTick />} />
-                      <YAxis allowDecimals={false} domain={[0, yAxisUpperBound]} tick={{ fontSize: 12, fill: '#5f715f' }} width={44} />
+                      <YAxis allowDecimals={false} domain={[0, yAxisUpperBound]} tick={{ fontSize: 12, fill: '#4b5563' }} width={44} />
                       <Tooltip content={<ChartTooltip />} />
                       <Area type="monotone" dataKey={valueKey} stroke={shiftHex(accent, -24)} fill={`url(#areaGradient-${type}-${chart.key})`} strokeWidth={3} />
                       <Line type="monotone" dataKey={valueKey} stroke={shiftHex(accent, -30)} strokeWidth={2.5} dot={{ r: 4, fill: '#fff', stroke: shiftHex(accent, -30), strokeWidth: 2 }} activeDot={{ r: 6 }} label={<PointValueLabel />} />
@@ -933,13 +933,13 @@ function QuickChartCard({
           </div>
 
           <div style={{ display: 'grid', gap: 8, padding: 14, borderRadius: 14, border: '1px dashed #cfe0cf', background: 'linear-gradient(180deg, #fcfefc 0%, #fafafa 100%)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#284128' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1f2937' }}>
               <span style={{ width: 28, height: 28, borderRadius: 999, background: '#ffffff', border: '1px solid #e5e7eb', display: 'grid', placeItems: 'center', boxShadow: '0 6px 14px rgba(15,40,15,0.06)' }}>
                 <Download size={15} />
               </span>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase' }}>İndirme bağlantıları</div>
-                <div style={{ fontSize: 12, color: '#6e846e', lineHeight: 1.35 }}>
+                <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.35 }}>
                   {chart?.title ? `Dosya adı: ${chart.title}` : 'Grafik başlığıyla indir'}
                 </div>
               </div>

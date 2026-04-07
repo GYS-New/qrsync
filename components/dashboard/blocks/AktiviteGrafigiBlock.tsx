@@ -137,7 +137,7 @@ export default function AktiviteGrafigiBlock({
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
             <Tooltip />
-            <Area type="monotone" dataKey="value" stroke="#16a34a" fill="#bbf7d0" name="Görev Sayısı" />
+            <Area type="monotone" dataKey="value" stroke="#374151" fill="#e5e7eb" name="Görev Sayısı" />
           </AreaChart>
         ) : null}
       </div>
