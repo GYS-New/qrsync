@@ -52,6 +52,15 @@ export async function POST(req: Request) {
 
     const { user_id: userId, firma_id: firmaId, isim_soyisim: isim, proje_id: personelProjeId } = tokenData
 
+    // ── 1b. Kullanıcı aktif/pasif kontrolü ────────────────────────────────────
+    const { data: userData } = await admin.from('users').select('aktif').eq('id', userId).single()
+    if (!userData || userData.aktif === false) {
+      return NextResponse.json(
+        { ok: false, error: 'Pasif durumdasınız! Lütfen sistem yöneticiniz ile iletişime geçin.', code: 'USER_PASIF' },
+        { status: 403, headers: CORS }
+      )
+    }
+
     // ── 2. Body: mesai QR/NFC token ───────────────────────────────────────────
     let body: any
     try { body = await req.json() } catch {

@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
     const { data: tokenData, error: tokenErr } = await admin
       .from('device_tokens')
-      .select('user_id, firma_id, isim_soyisim')
+      .select('user_id, firma_id, isim_soyisim, proje_id')
       .eq('device_token', deviceToken)
       .single()
 
@@ -31,7 +31,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Geçersiz cihaz token' }, { status: 401, headers: CORS })
     }
 
-    const { user_id: userId, firma_id: firmaId } = tokenData
+    const { user_id: userId, firma_id: firmaId, proje_id: personelProjeId } = tokenData
+
+    // ── Kullanıcı aktif/pasif kontrolü ──────────────────────────────────────
+    const { data: userData } = await admin.from('users').select('aktif').eq('id', userId).single()
+    if (!userData || userData.aktif === false) {
+      return NextResponse.json(
+        { ok: false, error: 'Pasif durumdasınız! Lütfen sistem yöneticiniz ile iletişime geçin.', code: 'USER_PASIF' },
+        { status: 403, headers: CORS }
+      )
+    }
+
+    // ── Personel takibi aktifse mesai kontrolü ──────────────────────────────
+    if (personelProjeId) {
+      const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
+      if (proje?.personel_takibi_aktif === true) {
+        const bugun = new Date().toISOString().slice(0, 10)
+        const { data: mesai } = await admin
+          .from('personel_mesai_kayitlari')
+          .select('id, cikis_saati')
+          .eq('user_id', userId)
+          .eq('kayit_tarihi', bugun)
+          .is('cikis_saati', null)
+          .maybeSingle()
+        if (!mesai) {
+          return NextResponse.json(
+            { ok: false, error: 'Lütfen önce iş başı QR/NFC kodunu okutunuz.', code: 'MESAI_YOK' },
+            { status: 403, headers: CORS }
+          )
+        }
+      }
+    }
 
     let body: any
     try { body = await req.json() } catch {

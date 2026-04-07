@@ -17,7 +17,7 @@ export async function GET(req: Request) {
 
     const { data: tokenData, error: tokenErr } = await admin
       .from('device_tokens')
-      .select('user_id, firma_id, isim_soyisim')
+      .select('user_id, firma_id, isim_soyisim, proje_id')
       .eq('device_token', deviceToken)
       .single()
 
@@ -25,7 +25,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: 'Geçersiz cihaz token', kod: 'ESLESMEDI' }, { status: 401 })
     }
 
-    const { user_id: userId, firma_id: firmaId } = tokenData
+    const { user_id: userId, firma_id: firmaId, proje_id: personelProjeId } = tokenData
+
+    // ── Kullanıcı aktif/pasif kontrolü ──────────────────────────────────────
+    const { data: userData } = await admin.from('users').select('aktif').eq('id', userId).single()
+    if (!userData || userData.aktif === false) {
+      return NextResponse.json(
+        { ok: false, error: 'Pasif durumdasınız! Lütfen sistem yöneticiniz ile iletişime geçin.', code: 'USER_PASIF' },
+        { status: 403 }
+      )
+    }
 
     // 24 saat öncesinin ISO tarihi — bu sınırdan yeni tamamlananlar hâlâ görevlerimde görünür
     const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
