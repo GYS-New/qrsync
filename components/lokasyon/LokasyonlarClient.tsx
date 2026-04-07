@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
 import { useFirma } from '@/components/layout/FirmaContext'
+import { useProje } from '@/components/projeler/ProjeContext'
 
 export default function LokasyonlarClient({
   base,
@@ -31,6 +32,8 @@ export default function LokasyonlarClient({
   const { toast } = useToast()
   const { confirm } = useConfirm()
   const { firmaId: saFirmaId } = useFirma()
+  const { aktifProje } = useProje()
+  const projeSureliAktif = aktifProje?.sureli_gorev_aktif === true
   const [tenantFirmaId] = useState<string | null>(initialFirmaId ?? null)
   const firmaId = base === '/sa' ? saFirmaId : tenantFirmaId
   const [lokasyonlar, setLokasyonlar] = useState<Lokasyon[]>(initialLokasyonlar)
@@ -441,12 +444,17 @@ export default function LokasyonlarClient({
                     <Button variant="ghost" type="button" onClick={() => copyScanUrl('NFC')}>NFC Linki Kopyala</Button>
                   </div>
                 ) : null}
-                <div style={{ gridColumn:'1 / -1' }}>
-                  <label className="verde-label" style={{ display:'flex', alignItems:'center', gap:10 }}>
-                    <input type="checkbox" checked={form.sureli_gorev_aktif} onChange={e => setForm(f => ({ ...f, sureli_gorev_aktif: e.target.checked }))} />
+                <div style={{ gridColumn:'1 / -1', opacity: projeSureliAktif ? 1 : 0.5 }}>
+                  <label className="verde-label" style={{ display:'flex', alignItems:'center', gap:10, cursor: projeSureliAktif ? 'pointer' : 'not-allowed' }}>
+                    <input type="checkbox" checked={form.sureli_gorev_aktif} disabled={!projeSureliAktif}
+                      onChange={e => setForm(f => ({ ...f, sureli_gorev_aktif: e.target.checked }))} />
                     <span>Bu lokasyonda süreli görev aktif</span>
                   </label>
-                  <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Aktif ise personel görevi önce başlatır, sonra tamamlar. Pasif ise görev doğrudan tamamlanır.</div>
+                  {!projeSureliAktif ? (
+                    <div style={{ marginTop:6, fontSize:11, color:'#dc2626' }}>Önce Sistem Ayarları → Proje Ayarları'ndan "Süreli Görev Takibi" aktif edilmelidir.</div>
+                  ) : (
+                    <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Aktif ise personel görevi önce başlatır, sonra tamamlar. Pasif ise görev doğrudan tamamlanır.</div>
+                  )}
                 </div>
                 <div style={{ gridColumn:'1 / -1' }}>
                   <label className="verde-label">Checklist</label>

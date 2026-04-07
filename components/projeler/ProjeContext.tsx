@@ -11,6 +11,7 @@ export type Proje = {
   aktif: boolean
   birim_fiyat_aktif?: boolean
   personel_takibi_aktif?: boolean
+  sureli_gorev_aktif?: boolean
 }
 
 type ProjeCtx = {
