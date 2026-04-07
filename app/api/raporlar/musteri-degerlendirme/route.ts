@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 
 // ── yetki yardımcısı ──────────────────────────────────────────────────────────
 async function yetkiKontrol(supabase: any) {
@@ -33,9 +34,12 @@ export async function GET(req: NextRequest) {
   const arsivlendi = p.get('arsivlendi') === 'true'
   const birlesik   = p.get('birlesik')   === 'true'
 
-  if (!firmaId) return NextResponse.json({ ok: true, data: [] })
+  if (!firmaId) return NextResponse.json({ ok: true, data: [], yetkiler: { duzenleyebilir: false, silebilir: false } })
   if (me.isTA && p.get('firma_id') && p.get('firma_id') !== me.firma_id)
     return NextResponse.json({ ok: false, error: 'Yetkisiz firma' }, { status: 403 })
+
+  // Kullanıcı Grupları Yetkilerini al
+  const yetkiler = await sayfaYetkileri(me.isSA ? 'super_admin' : (me.isTA ? 'tenant_admin' : 'tenant_user'), 'musteri-degerlendirme', firmaId)
 
   // Lokasyon yolu oluşturmak için tüm lokasyonları çek
   const { data: lokasyonlar } = await admin
@@ -105,7 +109,7 @@ export async function GET(req: NextRequest) {
       ...(resArsiv.data ?? []).map((r: any) => mapRow(r, 'arsiv')),
     ].sort((a, b) => new Date(b.olusturma_tarihi).getTime() - new Date(a.olusturma_tarihi).getTime())
 
-    return NextResponse.json({ ok: true, data: all })
+    return NextResponse.json({ ok: true, data: all, yetkiler: { duzenleyebilir: yetkiler.duzenleyebilir, silebilir: yetkiler.silebilir } })
   }
 
   // ── Tekli mod (mevcut davranış) ────────────────────────────────────────
@@ -133,7 +137,7 @@ export async function GET(req: NextRequest) {
   const segment = arsivlendi ? 'arsiv' : 'tablo'
   const kayitlar = (data ?? []).map((r: any) => mapRow(r, segment as any))
 
-  return NextResponse.json({ ok: true, data: kayitlar })
+  return NextResponse.json({ ok: true, data: kayitlar, yetkiler: { duzenleyebilir: yetkiler.duzenleyebilir, silebilir: yetkiler.silebilir } })
 }
 
 // ── PATCH: düzenle veya arşivle/arşivden çıkar ────────────────────────────────

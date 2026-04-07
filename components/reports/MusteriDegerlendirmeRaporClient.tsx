@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
-import { RefreshCw, Star, Pencil, Trash2, RotateCcw, X, Check, Filter, XCircle } from 'lucide-react'
+import { RefreshCw, Star, Pencil, Trash2, RotateCcw, X, Check, Filter, XCircle, FileSpreadsheet, FileText, Download } from 'lucide-react'
 
 interface Kayit {
   id: string
@@ -170,6 +170,9 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
   const [filtreMod, setFiltreMod]       = useState(false)
   const [aramaQ, setAramaQ]             = useState('')
 
+  // Yetkiler
+  const [yetkiler, setYetkiler] = useState({ duzenleyebilir: false, silebilir: false })
+
   // Aksiyon state'leri
   const [duzenleKayit,   setDuzenleKayit]   = useState<Kayit | null>(null)
   const [silKayit,       setSilKayit]       = useState<Kayit | null>(null)
@@ -188,8 +191,10 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       if (effectiveProjeId) p.set('proje_id', effectiveProjeId)
       const res  = await fetch(`/api/raporlar/musteri-degerlendirme?${p}`, { cache: 'no-store' })
       const json = await res.json()
-      if (json.ok) setKayitlar(json.data)
-      else setHata(json.error ?? 'Yüklenemedi')
+      if (json.ok) {
+        setKayitlar(json.data)
+        if (json.yetkiler) setYetkiler(json.yetkiler)
+      } else setHata(json.error ?? 'Yüklenemedi')
     } finally { setLoading(false) }
   }
 
@@ -205,8 +210,10 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       if (bitis)     p.set('bitis', bitis)
       const res  = await fetch(`/api/raporlar/musteri-degerlendirme?${p}`, { cache: 'no-store' })
       const json = await res.json()
-      if (json.ok) { setKayitlar(json.data); setFiltreMod(true) }
-      else setHata(json.error ?? 'Yüklenemedi')
+      if (json.ok) {
+        setKayitlar(json.data); setFiltreMod(true)
+        if (json.yetkiler) setYetkiler(json.yetkiler)
+      } else setHata(json.error ?? 'Yüklenemedi')
     } finally { setLoading(false) }
   }
 
@@ -285,6 +292,83 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     cursor: 'pointer', background: bg, color, transition: 'opacity .15s',
   })
 
+  // ── Excel İndir ─────────────────────────────────────────────────────────
+  async function excelIndir() {
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+    const ws = wb.addWorksheet('Müşteri Değerlendirmeleri')
+    ws.columns = [
+      { header: 'Tarih',    key: 'tarih',    width: 20 },
+      { header: 'Lokasyon', key: 'lokasyon', width: 28 },
+      { header: 'Kanal',    key: 'kanal',    width: 10 },
+      { header: 'Puan',     key: 'puan',     width: 8 },
+      { header: 'Etiket',   key: 'etiket',   width: 14 },
+      { header: 'Yorum',    key: 'yorum',    width: 40 },
+      { header: 'Ad Soyad', key: 'ad',       width: 20 },
+    ]
+    const hr = ws.getRow(1)
+    hr.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } }
+    hr.height = 22
+    filtreliKayitlar.forEach((k: any) => ws.addRow({
+      tarih: new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }),
+      lokasyon: k.lokasyon_tanim, kanal: k.kanal, puan: k.yildiz,
+      etiket: YILDIZ_ETIKET[k.yildiz], yorum: k.yorum ?? '', ad: k.ad_soyad ?? '',
+    }))
+    const buf = await wb.xlsx.writeBuffer()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+    a.download = `musteri-degerlendirme-${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.click(); URL.revokeObjectURL(a.href)
+  }
+
+  // ── PDF (Yazdır) ────────────────────────────────────────────────────────
+  function pdfIndir() {
+    const rows = filtreliKayitlar.map((k: any) =>
+      `<tr>
+        <td>${new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</td>
+        <td>${k.lokasyon_tanim}</td>
+        <td>${k.kanal}</td>
+        <td>${'★'.repeat(k.yildiz)} ${YILDIZ_ETIKET[k.yildiz]}</td>
+        <td>${k.yorum ?? '—'}</td>
+        <td>${k.ad_soyad ?? '—'}</td>
+      </tr>`
+    ).join('')
+
+    const ozetHtml = ozet ? `
+      <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+        <div style="padding:8px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px"><strong>${ozet.toplam}</strong> Toplam</div>
+        <div style="padding:8px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px"><strong>${ozet.ortYildiz.toFixed(1)} ★</strong> Ortalama</div>
+        <div style="padding:8px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px"><strong>${ozet.yorumlu}</strong> Yorumlu</div>
+        <div style="padding:8px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px"><strong>${ozet.gorsellli}</strong> Fotoğraflı</div>
+      </div>
+    ` : ''
+
+    const w = window.open('', '_blank', 'width=1100,height=700')
+    if (!w) return
+    w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/>
+      <title>Müşteri Değerlendirmeleri</title>
+      <style>
+        body{font-family:Arial,sans-serif;font-size:11px;padding:20px;color:#111827}
+        h2{color:#1f2937;margin-bottom:8px}
+        table{width:100%;border-collapse:collapse;margin-top:8px}
+        th{background:#1f2937;color:#fff;font-weight:700;padding:7px 10px;text-align:left;font-size:11px}
+        td{padding:6px 10px;border:1px solid #e5e7eb;font-size:11px}
+        tr:nth-child(even) td{background:#f9fafb}
+      </style>
+    </head><body>
+      <h2>Müşteri Değerlendirmeleri Raporu</h2>
+      <div style="font-size:11px;color:#64748b;margin-bottom:12px">${new Date().toLocaleDateString('tr-TR')} — ${filtreliKayitlar.length} kayıt</div>
+      ${ozetHtml}
+      <table>
+        <thead><tr><th>Tarih</th><th>Lokasyon</th><th>Kanal</th><th>Puan</th><th>Yorum</th><th>Ad Soyad</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </body></html>`)
+    w.document.close()
+    setTimeout(() => w.print(), 400)
+  }
+
   return (
     <div>
       <Topbar title="Müşteri Değerlendirmeleri" base={base}
@@ -311,11 +395,23 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                 </span>
               )}
             </div>
-            <button onClick={filtreMod ? filtreTemizle : yukle} disabled={loading || !firmaId}
-              style={{ height: 34, padding: '0 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#1f2937', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
-              <RefreshCw size={13} style={loading ? spinning : {}} />
-              {loading ? 'Yükleniyor…' : 'Yenile'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button onClick={excelIndir} disabled={!filtreliKayitlar.length}
+                className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa] flex items-center gap-2 disabled:opacity-40"
+                style={{ color: '#1d6f42', fontWeight: 600 }}>
+                <FileSpreadsheet size={14} /> Excel
+              </button>
+              <button onClick={pdfIndir} disabled={!filtreliKayitlar.length}
+                className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa] flex items-center gap-2 disabled:opacity-40"
+                style={{ color: '#185a9b', fontWeight: 600 }}>
+                <FileText size={14} /> PDF
+              </button>
+              <button onClick={filtreMod ? filtreTemizle : yukle} disabled={loading || !firmaId}
+                style={{ height: 34, padding: '0 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#1f2937', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12.5 }}>
+                <RefreshCw size={13} style={loading ? spinning : {}} />
+                {loading ? 'Yükleniyor…' : 'Yenile'}
+              </button>
+            </div>
           </div>
 
           {/* Filtre satırı */}
@@ -420,7 +516,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                     <th>Ad Soyad</th>
                     <th>Fotoğraf</th>
                     {filtreMod && <th>Kaynak</th>}
-                    <th style={{ textAlign: 'center' }}>İşlemler</th>
+                    {(yetkiler.duzenleyebilir || yetkiler.silebilir) && <th style={{ textAlign: 'center' }}>İşlemler</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -462,17 +558,21 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                           </span>
                         </td>
                       )}
+                      {(yetkiler.duzenleyebilir || yetkiler.silebilir) && (
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                          {!k.arsivlendi && (
+                          {yetkiler.duzenleyebilir && !k.arsivlendi && (
                             <button onClick={() => setDuzenleKayit(k)} title="Düzenle" style={aksBtn('#1d4ed8', '#eff6ff', '#bfdbfe')}><Pencil size={14} /></button>
                           )}
-                          {!k.arsivlendi && (
+                          {yetkiler.duzenleyebilir && !k.arsivlendi && (
                             <button onClick={() => setArsivleKayit(k)} title="Arşivle" style={aksBtn('#c2410c', '#fff7ed', '#fed7aa')}><RotateCcw size={14} /></button>
                           )}
-                          <button onClick={() => setSilKayit(k)} title="Kalıcı Sil" style={aksBtn('#dc2626', '#fef2f2', '#fecaca')}><Trash2 size={14} /></button>
+                          {yetkiler.silebilir && (
+                            <button onClick={() => setSilKayit(k)} title="Kalıcı Sil" style={aksBtn('#dc2626', '#fef2f2', '#fecaca')}><Trash2 size={14} /></button>
+                          )}
                         </div>
                       </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
