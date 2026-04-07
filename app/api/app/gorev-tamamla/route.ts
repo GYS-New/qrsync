@@ -43,9 +43,17 @@ export async function POST(req: Request) {
     }
 
     // ── Personel takibi aktifse mesai kontrolü ──────────────────────────────
-    if (personelProjeId) {
-      const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
-      if (proje?.personel_takibi_aktif === true) {
+    // Önce proje bazlı kontrol, proje yoksa firma bazlı kontrol
+    {
+      let personelTakibiAktif = false
+      if (personelProjeId) {
+        const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
+        personelTakibiAktif = proje?.personel_takibi_aktif === true
+      } else {
+        const { data: firma } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
+        personelTakibiAktif = firma?.personel_takibi_aktif === true
+      }
+      if (personelTakibiAktif) {
         const bugun = new Date().toISOString().slice(0, 10)
         const { data: mesai } = await admin
           .from('personel_mesai_kayitlari')
