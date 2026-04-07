@@ -706,7 +706,7 @@ export default function ChecklistSablonlariClient({
                     <th style={{ padding: '10px 8px' }}>Lokasyon</th>
                     <th style={{ padding: '10px 8px' }}>Versiyon</th>
                     <th style={{ padding: '10px 8px' }}>Durum</th>
-                    <th style={{ padding: '10px 8px' }}>İşlemler</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right' }}>İşlemler</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -728,7 +728,7 @@ export default function ChecklistSablonlariClient({
                         }}>{item.aktif ? 'Aktif' : 'Pasif'}</span>
                       </td>
                       <td style={{ padding: '12px 8px' }}>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           <RowActionButton onClick={() => openEdit(item.id)}>Düzenle</RowActionButton>
                           <RowActionButton variant="success" onClick={() => duplicateItem(item)}>Kopyala</RowActionButton>
                           {!readonly && (
