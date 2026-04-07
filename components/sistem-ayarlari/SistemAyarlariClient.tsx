@@ -10,7 +10,7 @@ const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: 
 const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/GorevKurallariClient'), { ssr: false })
 const GrupYetkileriClient = dynamic(() => import('@/components/ayarlar/GrupYetkileriClient'), { ssr: false })
 
-type Tab = 'genel' | 'proje-ayarlari' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'uygulama' | 'mobil' | 'smtp' | 'konfigurasyon' | 'dashboard'
+type Tab = 'genel' | 'proje-ayarlari' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'simulasyon' | 'uygulama' | 'mobil' | 'smtp' | 'konfigurasyon' | 'dashboard'
 
 const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'genel',          label: 'Genel Ayarlar'   },
@@ -19,6 +19,7 @@ const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'gorev-kurallari',label: 'Görev Kuralları'  },
   { key: 'gorev-sureleri', label: 'Görev Süreleri'   },
   { key: 'yetkiler',       label: 'Kullanıcı Yetkileri' },
+  { key: 'simulasyon',     label: 'Simülasyon Modu'  },
   { key: 'uygulama',       label: 'Uygulama Ayarları', saOnly: true },
   { key: 'mobil',          label: 'Mobil Ayarlar', saOnly: true },
   { key: 'smtp',           label: 'Mail Sunucusu', saOnly: true },
@@ -122,6 +123,7 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
           currentPath={`${base}/dashboard/sistem-ayarlari`}
         />
       )}
+      {aktifTab === 'simulasyon' && firmaId && <SimulasyonPanel firmaId={firmaId} projeId={projeId ?? null} lokasyonlar={lokasyonlar as any} />}
       {aktifTab === 'uygulama' && isSA && <UygulamaAyarlariPanel />}
       {aktifTab === 'mobil' && isSA && <MobilAyarlariPanel />}
       {aktifTab === 'smtp' && isSA && <SmtpAyarlariPanel />}
@@ -765,6 +767,178 @@ function EmptyTab({ label }: { label: string }) {
       <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.4 }}>⚙</div>
       <div style={{ fontSize: 17, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>{label}</div>
       <div style={{ fontSize: 14 }}>Bu sekme yakında yapılandırılacak.</div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SİMÜLASYON MODU PANELİ
+// ═══════════════════════════════════════════════════════════════════════════════
+function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; projeId: string | null; lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[] }) {
+  const [ayarlar, setAyarlar] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  // Yeni ayar formu
+  const [yeniUstLok, setYeniUstLok] = useState('')
+  const [yeniOran, setYeniOran] = useState(100)
+  const [yeniSure, setYeniSure] = useState(10)
+
+  const ustLokasyonlar = lokasyonlar.filter(l => !l.parent_id).sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr'))
+
+  async function yukle() {
+    setLoading(true)
+    try {
+      const p = new URLSearchParams({ firma_id: firmaId })
+      if (projeId) p.set('proje_id', projeId)
+      const res = await fetch(`/api/simulasyon?${p}`)
+      const json = await res.json()
+      if (json.ok) setAyarlar(json.data ?? [])
+    } catch {}
+    setLoading(false)
+  }
+
+  useEffect(() => { yukle() }, [firmaId, projeId])
+
+  async function ekle() {
+    if (!yeniUstLok) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/simulasyon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firma_id: firmaId, proje_id: projeId, ust_lokasyon_id: yeniUstLok, hedef_oran: yeniOran, gorev_suresi_dk: yeniSure }),
+      })
+      const json = await res.json()
+      if (json.ok) { setYeniUstLok(''); await yukle() }
+    } catch {}
+    setSaving(false)
+  }
+
+  async function toggle(id: string, aktif: boolean) {
+    await fetch('/api/simulasyon', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, aktif: !aktif }),
+    })
+    await yukle()
+  }
+
+  async function guncelle(id: string, field: string, value: any) {
+    await fetch('/api/simulasyon', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, [field]: value }),
+    })
+    await yukle()
+  }
+
+  async function sil(id: string) {
+    if (!confirm('Bu simülasyon ayarını silmek istediğinize emin misiniz?')) return
+    await fetch(`/api/simulasyon?id=${id}`, { method: 'DELETE' })
+    await yukle()
+  }
+
+  const lokAdMap = new Map(lokasyonlar.map(l => [l.id, l.tanim]))
+
+  const inp: React.CSSProperties = { height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
+
+  return (
+    <div style={{ maxWidth: 860 }}>
+      {/* Bilgi bandı */}
+      <div style={{ padding: '12px 16px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 8, fontSize: 13, color: '#78350f', marginBottom: 18 }}>
+        <strong>Simülasyon Modu:</strong> Frekansiyel görevlerde belirli süre içinde personel tarafından tamamlanmayan görevleri,
+        personel yapmış gibi otomatik tamamlar. Tüm göstergelerde gerçek tamamlama olarak görünür.
+        Simüle edilen görevler SA/TA tarafında soluk renkte işaretlenir.
+      </div>
+
+      {/* Yeni Simülasyon Ekle */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#111827', marginBottom: 12 }}>Yeni Simülasyon Ekle</div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 200px' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Üst Lokasyon *</span>
+            <select value={yeniUstLok} onChange={e => setYeniUstLok(e.target.value)} style={{ ...inp, width: '100%' }}>
+              <option value="">Seçin…</option>
+              {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+            </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 120 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Hedef Oran %</span>
+            <input type="number" min={1} max={100} value={yeniOran} onChange={e => setYeniOran(Number(e.target.value))} style={{ ...inp, width: '100%' }} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 130 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Görev Süresi (dk)</span>
+            <input type="number" min={1} value={yeniSure} onChange={e => setYeniSure(Number(e.target.value))} style={{ ...inp, width: '100%' }} />
+          </label>
+          <button onClick={ekle} disabled={saving || !yeniUstLok}
+            style={{ height: 34, padding: '0 18px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            + Ekle
+          </button>
+        </div>
+      </div>
+
+      {/* Mevcut Ayarlar */}
+      {ayarlar.length === 0 ? (
+        <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+          Henüz simülasyon ayarı eklenmedi.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {ayarlar.map((a: any) => (
+            <div key={a.id} style={{ background: '#fff', border: `1.5px solid ${a.aktif ? '#86efac' : '#e2e8f0'}`, borderRadius: 10, padding: '14px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                {/* Aktif/Pasif Toggle */}
+                <button onClick={() => toggle(a.id, a.aktif)}
+                  style={{
+                    width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: a.aktif ? '#16a34a' : '#d1d5db', position: 'relative', transition: 'background .2s',
+                  }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                    position: 'absolute', top: 3, left: a.aktif ? 23 : 3, transition: 'left .2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  }} />
+                </button>
+
+                {/* Lokasyon adı */}
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', flex: 1 }}>
+                  📍 {lokAdMap.get(a.ust_lokasyon_id) ?? 'Bilinmeyen'}
+                  <span style={{ fontSize: 11.5, color: a.aktif ? '#16a34a' : '#94a3b8', marginLeft: 8, fontWeight: 600 }}>
+                    {a.aktif ? '● AKTİF' : '○ PASİF'}
+                  </span>
+                </span>
+
+                {/* Hedef Oran */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: '#64748b' }}>Hedef:</span>
+                  <input type="number" min={1} max={100} value={a.hedef_oran}
+                    onChange={e => guncelle(a.id, 'hedef_oran', Number(e.target.value))}
+                    style={{ ...inp, width: 60, textAlign: 'center' }} />
+                  <span style={{ fontSize: 11, color: '#64748b' }}>%</span>
+                </label>
+
+                {/* Görev Süresi */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: '#64748b' }}>Süre:</span>
+                  <input type="number" min={1} value={a.gorev_suresi_dk}
+                    onChange={e => guncelle(a.id, 'gorev_suresi_dk', Number(e.target.value))}
+                    style={{ ...inp, width: 60, textAlign: 'center' }} />
+                  <span style={{ fontSize: 11, color: '#64748b' }}>dk</span>
+                </label>
+
+                {/* Sil */}
+                <button onClick={() => sil(a.id)}
+                  style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -1091,7 +1091,12 @@ async function del() {
                     </span>
                   </td>
                 )}
-                <td style={{ fontWeight: 600, color: isArsiv ? '#475569' : undefined }}>{g.tanim}</td>
+                <td style={{ fontWeight: 600, color: isArsiv ? '#475569' : g.simule_tamamlandi && !isU ? '#9ca3af' : undefined }}>
+                  {g.tanim}
+                  {g.simule_tamamlandi && !isU && (
+                    <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: '#f3f4f6', color: '#9ca3af', verticalAlign: 'middle' }}>SİM</span>
+                  )}
+                </td>
                 <td style={{ color: isArsiv ? '#64748b' : '#4b5563' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
                 <td style={{ color: isArsiv ? '#64748b' : '#4b5563' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
                 <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>

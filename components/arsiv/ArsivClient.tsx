@@ -596,7 +596,10 @@ export default function ArsivClient({
                  filtreFrek.length === 0 ? <BosKayit cols={9} mesaj="Arşiv kaydı bulunamadı." /> :
                  filtreFrek.map((r: any) => (
                   <tr key={r.id}>
-                    <td style={{ fontWeight: 600 }}>{r.tanim}</td>
+                    <td style={{ fontWeight: 600, color: r.simule_tamamlandi ? '#9ca3af' : undefined }}>
+                      {r.tanim}
+                      {r.simule_tamamlandi && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: '#f3f4f6', color: '#9ca3af' }}>SİM</span>}
+                    </td>
                     <td style={td({ color:'#64748b' })}>{getLocPath(r.lokasyon_id)}</td>
                     <td style={td({ color:'#64748b' })}>{r.atanan?.isim_soyisim ?? '—'}</td>
                     <td><span className={`verde-badge ${DURUM_RENK[r.durum] ?? 'status-acik'}`}>{CANLI_DURUM_LABEL[r.durum] ?? r.durum}</span></td>
