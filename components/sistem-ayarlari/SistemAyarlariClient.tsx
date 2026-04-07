@@ -273,6 +273,15 @@ function MobilAyarlariPanel() {
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
 
+  // Mevcut değerlerle karşılaştır — değişiklik yoksa buton pasif
+  const degisiklikVar = mevcut != null && (
+    driveDirectLink(apkUrl.trim()) !== mevcut.apk_url ||
+    latestVersion !== mevcut.latest_version ||
+    minVersion !== mevcut.min_version ||
+    surecNotu !== mevcut.surec_notu ||
+    zorunlu !== mevcut.zorunlu
+  )
+
   const sinp: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, width: '100%' }
 
   return (
@@ -334,11 +343,11 @@ function MobilAyarlariPanel() {
             </label>
           </div>
 
-          <button onClick={handlePublish} disabled={saving}
+          <button onClick={handlePublish} disabled={saving || !degisiklikVar}
             style={{
               marginTop: 14, height: 40, padding: '0 20px', borderRadius: 8, border: 'none', width: '100%',
-              background: '#0d9488', color: '#fff', fontWeight: 800, fontSize: 13,
-              cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
+              background: degisiklikVar ? '#0d9488' : '#9ca3af', color: '#fff', fontWeight: 800, fontSize: 13,
+              cursor: (saving || !degisiklikVar) ? 'not-allowed' : 'pointer', opacity: (saving || !degisiklikVar) ? 0.6 : 1,
             }}>
             {saving ? 'Yayınlanıyor...' : '🚀 Güncellemeleri Yayınla'}
           </button>
