@@ -772,19 +772,28 @@ function EmptyTab({ label }: { label: string }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SİMÜLASYON MODU PANELİ
+// SİMÜLASYON MODU PANELİ (Grup bazlı)
 // ═══════════════════════════════════════════════════════════════════════════════
 function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; projeId: string | null; lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[] }) {
   const [ayarlar, setAyarlar] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  // Gruplar ve personeller (üst lokasyon seçince yüklenir)
+  const [gruplar, setGruplar] = useState<any[]>([])
+  const [personeller, setPersoneller] = useState<any[]>([])
+
   // Yeni ayar formu
   const [yeniUstLok, setYeniUstLok] = useState('')
-  const [yeniOran, setYeniOran] = useState(100)
-  const [yeniSure, setYeniSure] = useState(10)
+  const [seciliGruplar, setSeciliGruplar] = useState<Record<string, { hedef_oran: number; gorev_suresi_dk: number }>>({})
+  const [seciliPersonel, setSeciliPersonel] = useState<Set<string>>(new Set())
+
+  // Düzenleme
+  const [duzenleId, setDuzenleId] = useState<string | null>(null)
 
   const ustLokasyonlar = lokasyonlar.filter(l => !l.parent_id).sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr'))
+  const lokAdMap = new Map(lokasyonlar.map(l => [l.id, l.tanim]))
+  const inp: React.CSSProperties = { height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }
 
   async function yukle() {
     setLoading(true)
@@ -800,36 +809,97 @@ function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; p
 
   useEffect(() => { yukle() }, [firmaId, projeId])
 
-  async function ekle() {
-    if (!yeniUstLok) return
+  // Üst lokasyon seçilince grupları ve personelleri yükle
+  async function ustLokasyonSecildi(ustLokId: string) {
+    setYeniUstLok(ustLokId)
+    setSeciliGruplar({})
+    setSeciliPersonel(new Set())
+    setGruplar([])
+    setPersoneller([])
+    if (!ustLokId) return
+
+    // Grupları çek
+    const gRes = await fetch(`/api/location-groups?firmaId=${firmaId}${projeId ? `&projeId=${projeId}` : ''}`)
+    const gJson = await gRes.json()
+    const ustGruplar = (gJson.groups ?? []).filter((g: any) => g.ust_lokasyon_id === ustLokId && g.aktif)
+    setGruplar(ustGruplar)
+
+    // Üst lokasyon personellerini çek
+    const pRes = await fetch(`/api/simulasyon/personeller?firma_id=${firmaId}&ust_lokasyon_id=${ustLokId}`)
+    const pJson = await pRes.json()
+    setPersoneller(pJson.data ?? [])
+  }
+
+  // Düzenleme moduna geç
+  async function duzenleBasla(a: any) {
+    setDuzenleId(a.id)
+    setYeniUstLok(a.ust_lokasyon_id)
+    await ustLokasyonSecildi(a.ust_lokasyon_id)
+    // Mevcut grup ayarlarını yükle
+    const ga: Record<string, { hedef_oran: number; gorev_suresi_dk: number }> = {}
+    for (const g of (a.grup_ayarlari ?? [])) {
+      ga[g.grup_id] = { hedef_oran: g.hedef_oran, gorev_suresi_dk: g.gorev_suresi_dk }
+    }
+    setSeciliGruplar(ga)
+    setSeciliPersonel(new Set(a.personel_idler ?? []))
+  }
+
+  function grupToggle(grupId: string) {
+    setSeciliGruplar(prev => {
+      const n = { ...prev }
+      if (n[grupId]) { delete n[grupId] }
+      else { n[grupId] = { hedef_oran: 100, gorev_suresi_dk: 10 } }
+      return n
+    })
+  }
+
+  function grupAyarDegistir(grupId: string, field: string, value: number) {
+    setSeciliGruplar(prev => ({ ...prev, [grupId]: { ...prev[grupId], [field]: value } }))
+  }
+
+  function personelToggle(uid: string) {
+    setSeciliPersonel(prev => { const n = new Set(prev); n.has(uid) ? n.delete(uid) : n.add(uid); return n })
+  }
+
+  function tumPersonelSec() {
+    setSeciliPersonel(new Set(personeller.map((p: any) => p.id)))
+  }
+
+  async function kaydet() {
+    const grupIds = Object.keys(seciliGruplar)
+    if (!yeniUstLok || grupIds.length === 0 || seciliPersonel.size === 0) return
     setSaving(true)
     try {
-      const res = await fetch('/api/simulasyon', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firma_id: firmaId, proje_id: projeId, ust_lokasyon_id: yeniUstLok, hedef_oran: yeniOran, gorev_suresi_dk: yeniSure }),
-      })
-      const json = await res.json()
-      if (json.ok) { setYeniUstLok(''); await yukle() }
+      const grupAyar = grupIds.map(gid => ({ grup_id: gid, ...seciliGruplar[gid] }))
+      const personelIdler = Array.from(seciliPersonel)
+
+      if (duzenleId) {
+        // Güncelle
+        await fetch('/api/simulasyon', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: duzenleId, grup_ayarlari: grupAyar, personel_idler: personelIdler }),
+        })
+      } else {
+        // Yeni oluştur
+        await fetch('/api/simulasyon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firma_id: firmaId, proje_id: projeId, ust_lokasyon_id: yeniUstLok, grup_ayarlari: grupAyar, personel_idler: personelIdler }),
+        })
+      }
+      iptal()
+      await yukle()
     } catch {}
     setSaving(false)
   }
 
-  async function toggle(id: string, aktif: boolean) {
-    await fetch('/api/simulasyon', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, aktif: !aktif }),
-    })
-    await yukle()
+  function iptal() {
+    setDuzenleId(null); setYeniUstLok(''); setSeciliGruplar({}); setSeciliPersonel(new Set()); setGruplar([]); setPersoneller([])
   }
 
-  async function guncelle(id: string, field: string, value: any) {
-    await fetch('/api/simulasyon', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, [field]: value }),
-    })
+  async function toggle(id: string, aktif: boolean) {
+    await fetch('/api/simulasyon', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, aktif: !aktif }) })
     await yukle()
   }
 
@@ -839,102 +909,162 @@ function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; p
     await yukle()
   }
 
-  const lokAdMap = new Map(lokasyonlar.map(l => [l.id, l.tanim]))
-
-  const inp: React.CSSProperties = { height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }
-
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
 
+  const formAcik = !!yeniUstLok
+
   return (
-    <div style={{ maxWidth: 860 }}>
+    <div style={{ maxWidth: 960 }}>
       {/* Bilgi bandı */}
       <div style={{ padding: '12px 16px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 8, fontSize: 13, color: '#78350f', marginBottom: 18 }}>
         <strong>Simülasyon Modu:</strong> Frekansiyel görevlerde belirli süre içinde personel tarafından tamamlanmayan görevleri,
-        personel yapmış gibi otomatik tamamlar. Tüm göstergelerde gerçek tamamlama olarak görünür.
-        Simüle edilen görevler SA/TA tarafında soluk renkte işaretlenir.
+        personel yapmış gibi otomatik tamamlar. Grup bazlı hedef oran ve süre belirlenir. Seçilen personellerden rastgele atanır.
       </div>
 
-      {/* Yeni Simülasyon Ekle */}
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '16px 20px', marginBottom: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: '#111827', marginBottom: 12 }}>Yeni Simülasyon Ekle</div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 200px' }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Üst Lokasyon *</span>
-            <select value={yeniUstLok} onChange={e => setYeniUstLok(e.target.value)} style={{ ...inp, width: '100%' }}>
-              <option value="">Seçin…</option>
-              {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
-            </select>
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 120 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Hedef Oran %</span>
-            <input type="number" min={1} max={100} value={yeniOran} onChange={e => setYeniOran(Number(e.target.value))} style={{ ...inp, width: '100%' }} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 130 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Görev Süresi (dk)</span>
-            <input type="number" min={1} value={yeniSure} onChange={e => setYeniSure(Number(e.target.value))} style={{ ...inp, width: '100%' }} />
-          </label>
-          <button onClick={ekle} disabled={saving || !yeniUstLok}
-            style={{ height: 34, padding: '0 18px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            + Ekle
-          </button>
+      {/* ═══ Yeni / Düzenle Formu ═══ */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '16px 20px', marginBottom: 18 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#111827', marginBottom: 12 }}>
+          {duzenleId ? 'Simülasyon Düzenle' : 'Yeni Simülasyon'}
         </div>
+
+        {/* Üst Lokasyon Seçimi */}
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Üst Lokasyon *</span>
+          <select value={yeniUstLok} onChange={e => ustLokasyonSecildi(e.target.value)} disabled={!!duzenleId} style={{ ...inp, maxWidth: 360 }}>
+            <option value="">Seçin…</option>
+            {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+          </select>
+        </label>
+
+        {formAcik && (
+          <>
+            {/* Gruplar */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                Gruplar ve Ayarları
+              </div>
+              {gruplar.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#94a3b8', padding: 8 }}>Bu üst lokasyonda grup bulunamadı.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {gruplar.map((g: any) => {
+                    const secili = !!seciliGruplar[g.id]
+                    return (
+                      <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: secili ? '#f0fdf4' : '#fafafa', border: `1px solid ${secili ? '#86efac' : '#e5e7eb'}`, borderRadius: 8 }}>
+                        <input type="checkbox" checked={secili} onChange={() => grupToggle(g.id)} style={{ width: 16, height: 16 }} />
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#111827' }}>
+                          {g.ad}
+                          <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>({(g.lokasyonIds ?? []).length} lokasyon)</span>
+                        </span>
+                        {secili && (
+                          <>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                              <span style={{ fontSize: 10.5, color: '#64748b' }}>Hedef:</span>
+                              <input type="number" min={1} max={100} value={seciliGruplar[g.id]?.hedef_oran ?? 100}
+                                onChange={e => grupAyarDegistir(g.id, 'hedef_oran', Number(e.target.value))}
+                                style={{ ...inp, width: 52, height: 28, textAlign: 'center', fontSize: 12 }} />
+                              <span style={{ fontSize: 10.5, color: '#64748b' }}>%</span>
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                              <span style={{ fontSize: 10.5, color: '#64748b' }}>Süre:</span>
+                              <input type="number" min={1} value={seciliGruplar[g.id]?.gorev_suresi_dk ?? 10}
+                                onChange={e => grupAyarDegistir(g.id, 'gorev_suresi_dk', Number(e.target.value))}
+                                style={{ ...inp, width: 52, height: 28, textAlign: 'center', fontSize: 12 }} />
+                              <span style={{ fontSize: 10.5, color: '#64748b' }}>dk</span>
+                            </label>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Personeller */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                  Personeller ({seciliPersonel.size}/{personeller.length})
+                </span>
+                {personeller.length > 0 && (
+                  <button onClick={tumPersonelSec} style={{ fontSize: 11, color: '#1f2937', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }}>
+                    Tümünü Seç
+                  </button>
+                )}
+              </div>
+              {personeller.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#94a3b8', padding: 8 }}>Bu üst lokasyona atanmış personel yok.</div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {personeller.map((p: any) => {
+                    const secili = seciliPersonel.has(p.id)
+                    return (
+                      <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: secili ? '#eff6ff' : '#fafafa', border: `1px solid ${secili ? '#93c5fd' : '#e5e7eb'}`, borderRadius: 6, cursor: 'pointer', fontSize: 12.5 }}>
+                        <input type="checkbox" checked={secili} onChange={() => personelToggle(p.id)} style={{ width: 14, height: 14 }} />
+                        <span style={{ fontWeight: secili ? 600 : 400, color: secili ? '#1e40af' : '#374151' }}>{p.isim_soyisim}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Kaydet / İptal */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={kaydet}
+                disabled={saving || Object.keys(seciliGruplar).length === 0 || seciliPersonel.size === 0}
+                style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
+                {saving ? 'Kaydediliyor…' : duzenleId ? 'Güncelle' : 'Oluştur'}
+              </button>
+              {(duzenleId || yeniUstLok) && (
+                <button onClick={iptal} style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#475569', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                  İptal
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Mevcut Ayarlar */}
+      {/* ═══ Mevcut Simülasyonlar ═══ */}
       {ayarlar.length === 0 ? (
-        <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
-          Henüz simülasyon ayarı eklenmedi.
-        </div>
+        <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Henüz simülasyon ayarı eklenmedi.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {ayarlar.map((a: any) => (
             <div key={a.id} style={{ background: '#fff', border: `1.5px solid ${a.aktif ? '#86efac' : '#e2e8f0'}`, borderRadius: 10, padding: '14px 18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                {/* Aktif/Pasif Toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: (a.grup_ayarlari?.length > 0) ? 10 : 0 }}>
+                {/* Toggle */}
                 <button onClick={() => toggle(a.id, a.aktif)}
-                  style={{
-                    width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                    background: a.aktif ? '#16a34a' : '#d1d5db', position: 'relative', transition: 'background .2s',
-                  }}>
-                  <div style={{
-                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
-                    position: 'absolute', top: 3, left: a.aktif ? 23 : 3, transition: 'left .2s',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                  }} />
+                  style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: a.aktif ? '#16a34a' : '#d1d5db', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: a.aktif ? 23 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
                 </button>
 
-                {/* Lokasyon adı */}
                 <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', flex: 1 }}>
-                  📍 {lokAdMap.get(a.ust_lokasyon_id) ?? 'Bilinmeyen'}
+                  📍 {lokAdMap.get(a.ust_lokasyon_id) ?? '—'}
                   <span style={{ fontSize: 11.5, color: a.aktif ? '#16a34a' : '#94a3b8', marginLeft: 8, fontWeight: 600 }}>
                     {a.aktif ? '● AKTİF' : '○ PASİF'}
                   </span>
+                  <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 8 }}>
+                    {(a.grup_ayarlari?.length ?? 0)} grup · {(a.personel_idler?.length ?? 0)} personel
+                  </span>
                 </span>
 
-                {/* Hedef Oran */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 11, color: '#64748b' }}>Hedef:</span>
-                  <input type="number" min={1} max={100} value={a.hedef_oran}
-                    onChange={e => guncelle(a.id, 'hedef_oran', Number(e.target.value))}
-                    style={{ ...inp, width: 60, textAlign: 'center' }} />
-                  <span style={{ fontSize: 11, color: '#64748b' }}>%</span>
-                </label>
-
-                {/* Görev Süresi */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 11, color: '#64748b' }}>Süre:</span>
-                  <input type="number" min={1} value={a.gorev_suresi_dk}
-                    onChange={e => guncelle(a.id, 'gorev_suresi_dk', Number(e.target.value))}
-                    style={{ ...inp, width: 60, textAlign: 'center' }} />
-                  <span style={{ fontSize: 11, color: '#64748b' }}>dk</span>
-                </label>
-
-                {/* Sil */}
-                <button onClick={() => sil(a.id)}
-                  style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  ✕
-                </button>
+                <button onClick={() => duzenleBasla(a)} style={{ height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Düzenle</button>
+                <button onClick={() => sil(a.id)} style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
               </div>
+
+              {/* Grup detayları */}
+              {(a.grup_ayarlari ?? []).length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginLeft: 56 }}>
+                  {(a.grup_ayarlari ?? []).map((ga: any) => (
+                    <span key={ga.grup_id} style={{ fontSize: 11.5, padding: '3px 10px', borderRadius: 6, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
+                      Grup · %{ga.hedef_oran} · {ga.gorev_suresi_dk}dk
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
