@@ -31,30 +31,30 @@ export default function NfcBilgiModal({ lokasyon, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        style={{ background:'#fff', borderRadius:7, border:'1px solid #ffd9a0', padding:28, minWidth:420, maxWidth:620, boxShadow:'0 20px 60px rgba(0,0,0,0.15)' }}
+        style={{ background:'#fff', borderRadius:7, border:'1px solid #e5e7eb', padding:28, minWidth:420, maxWidth:620, boxShadow:'0 20px 60px rgba(0,0,0,0.15)' }}
         onClick={e => e.stopPropagation()}
       >
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
           <div>
-            <div style={{ fontSize:15, fontWeight:700, color:'#3d1c00' }}>NFC Bilgisi</div>
-            <div style={{ fontSize:12, color:'#9a7b6a', marginTop:2 }}>{lokasyon.tanim}</div>
+            <div style={{ fontSize:15, fontWeight:700, color:'#111827' }}>NFC Bilgisi</div>
+            <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{lokasyon.tanim}</div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} style={{ padding:'4px 10px', fontSize:12 }}>✕</Button>
         </div>
 
         {!token ? (
-          <div style={{ padding:'24px 0', textAlign:'center', color:'#9a7b6a' }}>
+          <div style={{ padding:'24px 0', textAlign:'center', color:'#6b7280' }}>
             Bu lokasyon için henüz NFC token tanımlanmamış.
           </div>
         ) : (
           <div style={{ display:'grid', gap:14 }}>
             <div>
               <div style={{ fontSize:12, fontWeight:700, color:'#395339', marginBottom:6 }}>NFC Token</div>
-              <div style={{ fontSize:12, fontFamily:'monospace', wordBreak:'break-all', padding:'10px 12px', background:'#fffbf5', border:'1px solid #ffe8c8', borderRadius:6 }}>{token}</div>
+              <div style={{ fontSize:12, fontFamily:'monospace', wordBreak:'break-all', padding:'10px 12px', background:'#fafafa', border:'1px solid #f3f4f6', borderRadius:6 }}>{token}</div>
             </div>
             <div>
               <div style={{ fontSize:12, fontWeight:700, color:'#395339', marginBottom:6 }}>NFC Linki</div>
-              <div style={{ fontSize:12, fontFamily:'monospace', wordBreak:'break-all', padding:'10px 12px', background:'#fffbf5', border:'1px solid #ffe8c8', borderRadius:6 }}>{nfcLink}</div>
+              <div style={{ fontSize:12, fontFamily:'monospace', wordBreak:'break-all', padding:'10px 12px', background:'#fafafa', border:'1px solid #f3f4f6', borderRadius:6 }}>{nfcLink}</div>
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
               <Button variant="primary" onClick={() => copyText(token, 'NFC token kopyalandı')}>Token Kopyala</Button>

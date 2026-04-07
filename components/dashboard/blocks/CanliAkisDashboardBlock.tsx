@@ -38,14 +38,14 @@ export default function CanliAkisDashboardBlock({ firmaId, projeId, basePath }: 
   }, [firmaId, projeId])
 
   const durumRenk: Record<string, string> = {
-    HAZIR:    '#9a7b6a',
-    ACIK:     '#ff7f00',
+    HAZIR:    '#6b7280',
+    ACIK:     '#374151',
     BEKLEMEDE:'#e6a817',
     TAMAMLANDI:'#185a9b',
     IPTAL:    '#c0392b',
     ZAMANI_GECMIS: '#c0392b',
     ZAMANINDA_YAPILAMAYAN: '#c0392b',
-    KAPATILDI: '#6b4423',
+    KAPATILDI: '#4b5563',
     SILINDI:  '#b0b0b0',
   }
 
@@ -60,10 +60,10 @@ export default function CanliAkisDashboardBlock({ firmaId, projeId, basePath }: 
           const r = rows[i]
           return (
             <div key={i} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid #f0f4f0', alignItems: 'center' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#c4a882', width: 18, flexShrink: 0 }}>{i + 1}</div>
-              <div style={{ flex: 1, fontSize: 13, color: '#3d1c00', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r?.tanim || ''}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', width: 18, flexShrink: 0 }}>{i + 1}</div>
+              <div style={{ flex: 1, fontSize: 13, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r?.tanim || ''}</div>
               {r?.durum && (
-                <div style={{ fontSize: 11, fontWeight: 700, color: durumRenk[r.durum] ?? '#6b4423', flexShrink: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: durumRenk[r.durum] ?? '#4b5563', flexShrink: 0 }}>
                   {CANLI_DURUM_LABEL[r.durum] ?? r.durum}
                 </div>
               )}

@@ -81,7 +81,7 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
         secondaryValue={anlikTamam}
         secondaryLabel="Tamamlanan"
         icon="✓"
-        iconBg="#ffe4bc"
+        iconBg="#e5e7eb"
         showToday
         percent={pct(anlikTamam, anlikToplam)}
       />
@@ -91,7 +91,7 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
         secondaryValue={canliTamam}
         secondaryLabel="Tamamlanan"
         icon="⚡"
-        iconBg="#ffe4bc"
+        iconBg="#e5e7eb"
         showToday
         percent={pct(canliTamam, canliToplam)}
       />
@@ -101,7 +101,7 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
         secondaryValue={kullaniciOnline}
         secondaryLabel="Online"
         icon="👥"
-        iconBg="#ffe4bc"
+        iconBg="#e5e7eb"
         percent={pct(kullaniciOnline, kullaniciToplam)}
       />
       <KpiCard
@@ -110,7 +110,7 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
         secondaryValue={lokasyonGorevli}
         secondaryLabel="Görevli"
         icon="📍"
-        iconBg="#ffe4bc"
+        iconBg="#e5e7eb"
         percent={pct(lokasyonGorevli, lokasyonToplam)}
       />
     </div>

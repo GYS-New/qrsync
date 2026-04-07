@@ -159,8 +159,8 @@ setForm((p) => ({ ...p, logo_url: null }))
       <div className="verde-card" style={{ padding: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#3d1c00' }}>Firma Ayarları</div>
-          <div style={{ fontSize: 12, color: '#9a7b6a', marginTop: 2 }}>Bazı alanlar (Ticari Ünvan / Vergi) değiştirilemez.</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>Firma Ayarları</div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Bazı alanlar (Ticari Ünvan / Vergi) değiştirilemez.</div>
         </div>
         <Button variant="primary" type="button" onClick={save} disabled={loading}>
           Kaydet
@@ -223,7 +223,7 @@ setForm((p) => ({ ...p, logo_url: null }))
               maxLength={7}
               onChange={(e) => setForm({ ...form, firma_adi: e.target.value.slice(0, 7) })}
             />
-            <div style={{ fontSize: 11.5, color: '#9a7b6a', marginTop: 6 }}>{form.firma_adi.length}/7 karakter</div>
+            <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 6 }}>{form.firma_adi.length}/7 karakter</div>
           </div>
         </Row>
         <Row label="Adres">
@@ -252,7 +252,7 @@ setForm((p) => ({ ...p, logo_url: null }))
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 12, alignItems: 'center' }}>
-      <div style={{ fontSize: 12, color: '#9a7b6a' }}>{label}</div>
+      <div style={{ fontSize: 12, color: '#6b7280' }}>{label}</div>
       <div>{children}</div>
     </div>
   )

@@ -154,7 +154,7 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
     const authRequired = data?.error === 'auth_required'
     return (
       <div className="verde-card" style={{ padding: 22, maxWidth: 720 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, color: '#3d1c00' }}>{kanal} İşlemi</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#111827' }}>{kanal} İşlemi</div>
         <div style={{ marginTop: 12, color: '#b91c1c' }}>{data?.error || 'İşlem başarısız'}</div>
         {authRequired ? (
           <div style={{ marginTop: 16 }}>
@@ -168,19 +168,19 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
   return (
     <div className="verde-card" style={{ padding: 22, maxWidth: 820 }}>
       <div style={{ display: 'grid', gap: 6 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, color: '#3d1c00' }}>{kanal} Görev Tamamlama</div>
-        <div style={{ fontSize: 13, color: '#6b4423' }}>Firma: {data.firma?.ad}</div>
-        <div style={{ fontSize: 13, color: '#6b4423' }}>Lokasyon: {data.lokasyon?.tanim}</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#111827' }}>{kanal} Görev Tamamlama</div>
+        <div style={{ fontSize: 13, color: '#4b5563' }}>Firma: {data.firma?.ad}</div>
+        <div style={{ fontSize: 13, color: '#4b5563' }}>Lokasyon: {data.lokasyon?.tanim}</div>
       </div>
 
       {message ? (
-        <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 8, background: '#f7faf7', border: '1px solid #ffd9a0', color: message.includes('başarısız') || message.includes('değil') || message.includes('zorunlu') ? '#b91c1c' : '#c45200' }}>
+        <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 8, background: '#f7faf7', border: '1px solid #e5e7eb', color: message.includes('başarısız') || message.includes('değil') || message.includes('zorunlu') ? '#b91c1c' : '#1f2937' }}>
           {message}
         </div>
       ) : null}
 
       {!data.tasks?.length ? (
-        <div style={{ marginTop: 18, color: '#9a7b6a' }}>Bu lokasyonda tamamlanabilir görev bulunamadı.</div>
+        <div style={{ marginTop: 18, color: '#6b7280' }}>Bu lokasyonda tamamlanabilir görev bulunamadı.</div>
       ) : (
         <>
           {(data.tasks?.length ?? 0) > 1 ? (
@@ -191,11 +191,11 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
                   const key = `${task.taskType}:${task.id}`
                   const active = key === selectedTaskKey
                   return (
-                    <label key={key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: 12, border: `1px solid ${active ? '#ff7f00' : '#ffd9a0'}`, borderRadius: 10, background: active ? '#f5fbf5' : '#fff', cursor: 'pointer' }}>
+                    <label key={key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: 12, border: `1px solid ${active ? '#374151' : '#e5e7eb'}`, borderRadius: 10, background: active ? '#f5fbf5' : '#fff', cursor: 'pointer' }}>
                       <input type="radio" checked={active} onChange={() => setSelectedTaskKey(key)} />
                       <div>
-                        <div style={{ fontWeight: 700, color: '#3d1c00' }}>{task.tanim}</div>
-                        <div style={{ fontSize: 12, color: '#9a7b6a' }}>{task.taskType === 'gorevler' ? 'Manuel görev' : 'Frekansiyel görev'}</div>
+                        <div style={{ fontWeight: 700, color: '#111827' }}>{task.tanim}</div>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>{task.taskType === 'gorevler' ? 'Manuel görev' : 'Frekansiyel görev'}</div>
                       </div>
                     </label>
                   )
@@ -203,9 +203,9 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
               </div>
             </div>
           ) : (
-            <div style={{ marginTop: 18, padding: 12, borderRadius: 10, background: '#f5fbf5', border: '1px solid #ffd9a0' }}>
-              <div style={{ fontSize: 12, color: '#9a7b6a' }}>Seçilen görev</div>
-              <div style={{ fontWeight: 700, color: '#3d1c00', marginTop: 4 }}>{singleTask?.tanim}</div>
+            <div style={{ marginTop: 18, padding: 12, borderRadius: 10, background: '#f5fbf5', border: '1px solid #e5e7eb' }}>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>Seçilen görev</div>
+              <div style={{ fontWeight: 700, color: '#111827', marginTop: 4 }}>{singleTask?.tanim}</div>
             </div>
           )}
 
@@ -218,10 +218,10 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
                   const secenekler = item.secenekler?.length ? item.secenekler : [{ deger: 'EVET', aciklama_gerekli: false }, { deger: 'HAYIR', aciklama_gerekli: false }]
                   const task = selectedTask ?? singleTask
                   return (
-                    <div key={item.id} style={{ border: `1px solid ${entry.secenek ? '#ff7f00' : '#ffd9a0'}`, borderRadius: 10, padding: 14, background: entry.secenek ? '#f5fbf5' : '#fff' }}>
+                    <div key={item.id} style={{ border: `1px solid ${entry.secenek ? '#374151' : '#e5e7eb'}`, borderRadius: 10, padding: 14, background: entry.secenek ? '#f5fbf5' : '#fff' }}>
                       {/* Madde başlığı + etiketler */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                        <span style={{ fontWeight: 600, color: '#3d1c00', flex: 1, minWidth: 120, lineHeight: 1.4 }}>{item.sira}. {item.madde}</span>
+                        <span style={{ fontWeight: 600, color: '#111827', flex: 1, minWidth: 120, lineHeight: 1.4 }}>{item.sira}. {item.madde}</span>
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                           {item.zorunlu && <span className="verde-badge status-acik">Zorunlu</span>}
                           {item.gorsel_gerekli && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>📷 Fotoğraf Zorunlu</span>}
@@ -237,9 +237,9 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
                             onClick={() => setEntry(item.id, { secenek: entry.secenek === sec.deger ? null : sec.deger })}
                             style={{
                               padding: '7px 18px', borderRadius: 20, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                              border: `2px solid ${entry.secenek === sec.deger ? '#ff7f00' : '#ffd9a0'}`,
-                              background: entry.secenek === sec.deger ? '#ff7f00' : '#fff',
-                              color: entry.secenek === sec.deger ? '#fff' : '#6b4423',
+                              border: `2px solid ${entry.secenek === sec.deger ? '#374151' : '#e5e7eb'}`,
+                              background: entry.secenek === sec.deger ? '#374151' : '#fff',
+                              color: entry.secenek === sec.deger ? '#fff' : '#4b5563',
                               transition: 'all 0.15s',
                             }}
                           >
@@ -262,7 +262,7 @@ export default function TokenTaskClient({ kanal, token }: { kanal: 'QR' | 'NFC';
                         <div style={{ marginTop: 4 }}>
                           {entry.gorsel_url ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <img src={entry.gorsel_url} alt="gorsel" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid #ffd9a0' }} />
+                              <img src={entry.gorsel_url} alt="gorsel" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} />
                               <button type="button" onClick={() => setEntry(item.id, { gorsel_url: null })} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>Kaldır</button>
                             </div>
                           ) : (

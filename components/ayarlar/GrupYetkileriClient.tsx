@@ -5,7 +5,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 
 const ROLLER = [
   { rol: 'alt_super_admin', label: '2.SA — Alt Süper Admin', renk: '#2e7d32', bg: '#e8f4e8' },
-  { rol: 'tenant_admin',    label: 'TA — Firma Admini',      renk: '#e65100', bg: '#fff3e0' },
+  { rol: 'tenant_admin',    label: 'TA — Firma Admini',      renk: '#e65100', bg: '#f3f4f6' },
   { rol: 'musteri',         label: 'M — Müşteri',            renk: '#1565c0', bg: '#e3f2fd' },
   { rol: 'tenant_user',     label: 'U — Kullanıcı',          renk: '#6a1b9a', bg: '#f3e5f5' },
 ]
@@ -178,15 +178,15 @@ export default function GrupYetkileriClient({
 
       {/* Firma seçici — SA için */}
       {firmalar && firmalar.length > 0 && currentPath && (
-        <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, background: '#fff7ed', border: '1px solid #ffd9a0', borderRadius: 10, padding: '12px 16px' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#c45200', whiteSpace: 'nowrap' }}>Firma Bazlı Yetki:</span>
+        <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 16px' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>Firma Bazlı Yetki:</span>
           <select
             defaultValue={firmaId ?? ''}
             onChange={e => {
               const val = e.target.value
               window.location.href = val ? `${currentPath}?firma_id=${val}` : currentPath
             }}
-            style={{ flex: 1, maxWidth: 320, height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #ffd9a0', fontSize: 13, background: '#fff' }}
+            style={{ flex: 1, maxWidth: 320, height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 13, background: '#fff' }}
           >
             <option value="">🌐 Global (tüm firmalar için varsayılan)</option>
             {firmalar.map(f => (
@@ -196,7 +196,7 @@ export default function GrupYetkileriClient({
             ))}
           </select>
           {firmaId && (
-            <span style={{ fontSize: 12, color: '#e65100', fontWeight: 700, background: '#fff3e0', padding: '3px 10px', borderRadius: 6, border: '1px solid #ffd0a0', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 12, color: '#e65100', fontWeight: 700, background: '#f3f4f6', padding: '3px 10px', borderRadius: 6, border: '1px solid #ffd0a0', whiteSpace: 'nowrap' }}>
               Firmaya Özel
             </span>
           )}
@@ -211,9 +211,9 @@ export default function GrupYetkileriClient({
             onClick={() => setAktifRol(r.rol)}
             style={{
               padding: '8px 18px', borderRadius: 8,
-              border: `2px solid ${aktifRol === r.rol ? r.renk : '#ffd9a0'}`,
+              border: `2px solid ${aktifRol === r.rol ? r.renk : '#e5e7eb'}`,
               background: aktifRol === r.rol ? r.bg : '#fff',
-              color: aktifRol === r.rol ? r.renk : '#6b4423',
+              color: aktifRol === r.rol ? r.renk : '#4b5563',
               fontWeight: aktifRol === r.rol ? 800 : 500,
               fontSize: 13.5, cursor: 'pointer',
             }}
@@ -225,13 +225,13 @@ export default function GrupYetkileriClient({
 
       {/* Yetki tablosu */}
       <div className="verde-card" style={{ overflow: 'hidden', marginBottom: 20 }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <span style={{ fontSize: 15, fontWeight: 900 }}>{aktifRolBilgi.label}</span>
-            <span style={{ fontSize: 12.5, color: '#9a7b6a', marginLeft: 10 }}>Sayfa bazlı erişim yetkileri</span>
+            <span style={{ fontSize: 12.5, color: '#6b7280', marginLeft: 10 }}>Sayfa bazlı erişim yetkileri</span>
           </div>
           {dirty && (
-            <span style={{ fontSize: 12, color: '#e65100', fontWeight: 700, background: '#fff3e0', padding: '3px 10px', borderRadius: 6, border: '1px solid #ffd0a0' }}>
+            <span style={{ fontSize: 12, color: '#e65100', fontWeight: 700, background: '#f3f4f6', padding: '3px 10px', borderRadius: 6, border: '1px solid #ffd0a0' }}>
               ● Kaydedilmemiş değişiklik
             </span>
           )}
@@ -251,8 +251,8 @@ export default function GrupYetkileriClient({
               <React.Fragment key={grup}>
                 <tr>
                   <td colSpan={5} style={{
-                    background: '#fff7ed', fontWeight: 800, fontSize: 11.5,
-                    color: '#ff7f00', padding: '8px 14px', letterSpacing: '0.8px', textTransform: 'uppercase',
+                    background: '#f9fafb', fontWeight: 800, fontSize: 11.5,
+                    color: '#374151', padding: '8px 14px', letterSpacing: '0.8px', textTransform: 'uppercase',
                   }}>
                     {grup}
                   </td>
@@ -282,7 +282,7 @@ export default function GrupYetkileriClient({
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 12, color: '#9a7b6a' }}>
+        <div style={{ fontSize: 12, color: '#6b7280' }}>
           {firmaId ? 'Bu firmaya özel yetki ayarları. Global ayarlar üzerine öncelik kazanır.' : 'Global yetki ayarları. Firma bazlı ayarlar bunların üzerine yazılabilir.'}
         </div>
         <button
@@ -290,7 +290,7 @@ export default function GrupYetkileriClient({
           disabled={saving}
           style={{
             padding: '10px 28px', borderRadius: 8, border: 'none',
-            background: saving ? '#c4a882' : dirty ? '#ff7f00' : '#7aaa7a',
+            background: saving ? '#9ca3af' : dirty ? '#374151' : '#7aaa7a',
             color: '#fff', fontSize: 14, fontWeight: 700,
             cursor: saving ? 'not-allowed' : 'pointer',
             transition: 'background 0.2s',

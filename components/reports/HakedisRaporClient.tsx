@@ -166,27 +166,27 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
         {/* Filtreler */}
         <div className="verde-card" style={{ padding: '14px 18px', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: '#6b4423' }}>BAŞLANGIÇ</label>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#4b5563' }}>BAŞLANGIÇ</label>
             <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)}
-              style={{ padding: '6px 10px', border: '1px solid #ffd9a0', borderRadius: 6, fontSize: 13 }} />
+              style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13 }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: '#6b4423' }}>BİTİŞ</label>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#4b5563' }}>BİTİŞ</label>
             <input type="date" value={bitis} onChange={e => setBitis(e.target.value)}
-              style={{ padding: '6px 10px', border: '1px solid #ffd9a0', borderRadius: 6, fontSize: 13 }} />
+              style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13 }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: '#6b4423' }}>LOKASYON GRUBU</label>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#4b5563' }}>LOKASYON GRUBU</label>
             <select value={grupFilter} onChange={e => setGrupFilter(e.target.value)}
-              style={{ padding: '6px 10px', border: '1px solid #ffd9a0', borderRadius: 6, fontSize: 13, minWidth: 160 }}>
+              style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, minWidth: 160 }}>
               <option value="">Tümü</option>
               {mergedGruplar.map(g => <option key={g.id} value={g.id}>{g.ad}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: '#6b4423' }}>LOKASYON</label>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#4b5563' }}>LOKASYON</label>
             <select value={lokasyonFilter} onChange={e => setLokasyonFilter(e.target.value)}
-              style={{ padding: '6px 10px', border: '1px solid #ffd9a0', borderRadius: 6, fontSize: 13, minWidth: 160 }}>
+              style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, minWidth: 160 }}>
               <option value="">Tümü</option>
               {lokasyonlar.map(l => (
                 <option key={l.id} value={l.id}>
@@ -219,18 +219,18 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
         {ozet && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
             {[
-              { label: 'Toplam Hakediş', value: ozet.toplam_hakedis, bg: '#fff7ed', border: '#ffd9a0', color: '#1a5c1a' },
-              { label: 'Tamamlanan Hakediş', value: ozet.tamamlanan_hakedis, bg: '#fff7ed', border: '#86efac', color: '#15803d' },
-              { label: 'Gecikmeli Hakediş', value: ozet.gecikmeli_hakedis, bg: '#fff7ed', border: '#fed7aa', color: '#c2410c' },
+              { label: 'Toplam Hakediş', value: ozet.toplam_hakedis, bg: '#f9fafb', border: '#e5e7eb', color: '#1a5c1a' },
+              { label: 'Tamamlanan Hakediş', value: ozet.tamamlanan_hakedis, bg: '#f9fafb', border: '#86efac', color: '#15803d' },
+              { label: 'Gecikmeli Hakediş', value: ozet.gecikmeli_hakedis, bg: '#f9fafb', border: '#fed7aa', color: '#c2410c' },
               { label: 'Kayıp Hakediş', value: ozet.kayip_hakedis, bg: '#fef2f2', border: '#fecaca', color: '#b91c1c' },
             ].map(card => (
               <div key={card.label} className="verde-card" style={{ padding: '14px 18px', background: card.bg, border: `1px solid ${card.border}` }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#9a7b6a', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{card.label}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{card.label}</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: card.color }}>
                   {cokluPb ? `${card.value.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}` : fmt(card.value, paraBirimi)}
                 </div>
                 {card.label === 'Toplam Hakediş' && (
-                  <div style={{ fontSize: 12, color: '#9a7b6a', marginTop: 4 }}>{ozet.toplam_gorev} görev</div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{ozet.toplam_gorev} görev</div>
                 )}
               </div>
             ))}
@@ -240,9 +240,9 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
         {/* Tablo */}
         <div className="verde-card" style={{ padding: 0, overflow: 'hidden' }}>
           {loading ? (
-            <div style={{ padding: 32, textAlign: 'center', color: '#9a7b6a', fontSize: 14 }}>Yükleniyor…</div>
+            <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Yükleniyor…</div>
           ) : rows.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: '#9a7b6a', fontSize: 14 }}>
+            <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>
               Seçilen tarih aralığında birim fiyatı olan lokasyonlara ait görev bulunamadı.
             </div>
           ) : (
@@ -255,7 +255,7 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
                       'Toplam', 'Tamamlanan', 'Gecikmeli', 'Kayıp', 'Aktif',
                       'Toplam Hakediş', 'Tamamlanan Hak.', 'Gecikmeli Hak.', 'Kayıp Hak.',
                     ].map(h => (
-                      <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: '#1a3a1a', borderBottom: '2px solid #ffd9a0', whiteSpace: 'nowrap', fontSize: 12 }}>
+                      <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, color: '#1a3a1a', borderBottom: '2px solid #e5e7eb', whiteSpace: 'nowrap', fontSize: 12 }}>
                         {h}
                       </th>
                     ))}
@@ -265,15 +265,15 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
                   {rows.map((r, i) => (
                     <tr key={r.lokasyon_id} style={{ background: i % 2 === 0 ? '#fff' : '#fafcfa', borderBottom: '1px solid #f0f7f0' }}>
                       <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1a3a1a' }}>{r.lokasyon_tanim}</td>
-                      <td style={{ padding: '8px 12px', color: '#6b4423' }}>{r.ust_tanim ?? '—'}</td>
-                      <td style={{ padding: '8px 12px', color: '#6b4423' }}>{r.grup_adi ?? '—'}</td>
+                      <td style={{ padding: '8px 12px', color: '#4b5563' }}>{r.ust_tanim ?? '—'}</td>
+                      <td style={{ padding: '8px 12px', color: '#4b5563' }}>{r.grup_adi ?? '—'}</td>
                       <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1a3a1a' }}>{r.birim_fiyat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
-                      <td style={{ padding: '8px 12px', color: '#6b4423' }}>{r.para_birimi}</td>
+                      <td style={{ padding: '8px 12px', color: '#4b5563' }}>{r.para_birimi}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>{r.toplam}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', color: '#15803d', fontWeight: 600 }}>{r.tamamlanan}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', color: '#c2410c', fontWeight: 600 }}>{r.gecikmeli}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', color: '#b91c1c', fontWeight: 600 }}>{r.kayip}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#9a7b6a' }}>{r.aktif_gorev}</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#6b7280' }}>{r.aktif_gorev}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#1a3a1a' }}>{r.toplam_hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'right', color: '#15803d', fontWeight: 600 }}>{r.tamamlanan_hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'right', color: '#c2410c', fontWeight: 600 }}>{r.gecikmeli_hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
@@ -283,13 +283,13 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
                 </tbody>
                 {ozet && (
                   <tfoot>
-                    <tr style={{ background: '#fff3e0', borderTop: '2px solid #ffd9a0' }}>
+                    <tr style={{ background: '#f3f4f6', borderTop: '2px solid #e5e7eb' }}>
                       <td colSpan={5} style={{ padding: '9px 12px', fontWeight: 800, color: '#1a3a1a', fontSize: 13 }}>TOPLAM</td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800 }}>{ozet.toplam_gorev}</td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: '#15803d' }}>{rows.reduce((s, r) => s + r.tamamlanan, 0)}</td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: '#c2410c' }}>{rows.reduce((s, r) => s + r.gecikmeli, 0)}</td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: '#b91c1c' }}>{rows.reduce((s, r) => s + r.kayip, 0)}</td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: '#9a7b6a' }}>{rows.reduce((s, r) => s + r.aktif_gorev, 0)}</td>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: '#6b7280' }}>{rows.reduce((s, r) => s + r.aktif_gorev, 0)}</td>
                       <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800 }}>{ozet.toplam_hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
                       <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#15803d' }}>{ozet.tamamlanan_hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
                       <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#c2410c' }}>{ozet.gecikmeli_hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>

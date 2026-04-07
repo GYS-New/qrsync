@@ -22,7 +22,7 @@ export default async function SAGorevKurallariPage() {
       <div>
         <Topbar title="Görev Kuralları" base="/sa" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Görev Kuralları' }]} />
         <div style={{ padding: '24px 28px' }}>
-          <div className="verde-card" style={{ padding: 20, color: '#9a7b6a', fontSize: 14 }}>Görüntülemek için üstten bir firma seçin.</div>
+          <div className="verde-card" style={{ padding: 20, color: '#6b7280', fontSize: 14 }}>Görüntülemek için üstten bir firma seçin.</div>
         </div>
       </div>
     )

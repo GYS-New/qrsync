@@ -45,7 +45,7 @@ type RaporData = {
 // ── Design tokens (SpesifikRaporKarti ile aynı) ────────────────────
 const T = {
   blue:      '#1d4ed8', blueLight: '#eff6ff', blueMid: '#3b82f6',
-  green:     '#8b3a00', greenMid:  '#ff7f00', greenLight: '#fff7ed',
+  green:     '#111827', greenMid:  '#374151', greenLight: '#f9fafb',
   amber:     '#d97706', amberLight: '#fef3c7',
   red:       '#dc2626', redLight:   '#fee2e2',
   gray:      '#475569', grayLight:  '#f8fafc',
@@ -408,7 +408,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 {loading ? 'Yükleniyor…' : 'Yenile'}
               </button>
               <button onClick={downloadExcel} disabled={!data || dlLoading}
-                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #d1fae5', background: '#fff7ed', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #d1fae5', background: '#f9fafb', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
                 <FileSpreadsheet size={13} style={dlLoading ? spinning : {}} />
                 Excel İndir
               </button>
@@ -535,7 +535,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                     {[
                       { label: 'Hedef Frekans',  value: toplamHedef,                   color: T.blue,    bg: T.blueLight },
                       { label: 'Tamamlanan',      value: data.toplamTamamlanan,         color: T.green,   bg: T.greenLight },
-                      { label: 'Gerçekleşen',     value: ozetData.toplamGerceklesen,    color: T.greenMid,bg: '#fff7ed' },
+                      { label: 'Gerçekleşen',     value: ozetData.toplamGerceklesen,    color: T.greenMid,bg: '#f9fafb' },
                       { label: 'Sapma',           value: data.toplamSapma,              color: T.amber,   bg: T.amberLight },
                       { label: 'Kayıp',           value: data.toplamKayip,              color: T.red,     bg: T.redLight },
                       { label: 'Frekans Dışı',    value: data.frekansDisiGorevler.length, color: T.gray,  bg: T.grayLight },

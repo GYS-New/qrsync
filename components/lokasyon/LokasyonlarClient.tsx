@@ -349,7 +349,7 @@ export default function LokasyonlarClient({
   return (
     <div style={{ padding:'24px 28px' }}>
       <div className="verde-card">
-        <div style={{ padding:'14px 18px', borderBottom:'1px solid #ffe8c8', display:'flex', gap:10, alignItems:'center' }}>
+        <div style={{ padding:'14px 18px', borderBottom:'1px solid #f3f4f6', display:'flex', gap:10, alignItems:'center' }}>
           <input className="verde-input" placeholder="Lokasyon ara..." value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth:260 }} />
           <div style={{ marginLeft:'auto', display:'flex', gap:8, justifyContent:'flex-end', flexWrap:'wrap' }}>
             <input ref={importInputRef} type="file" accept=".xlsx" style={{ display:'none' }} onChange={onImportFile} />
@@ -377,7 +377,7 @@ export default function LokasyonlarClient({
         </div>
         {/* Uyarılar toast olarak gösterilir */}
         {!firmaId && base === '/sa' ? (
-          <div style={{ padding:'48px', textAlign:'center', color:'#9a7b6a' }}>
+          <div style={{ padding:'48px', textAlign:'center', color:'#6b7280' }}>
             <div style={{ fontSize:28, marginBottom:8 }}>🏢</div>
             <div>Lokasyonları görmek için firma seçin.</div>
           </div>
@@ -413,8 +413,8 @@ export default function LokasyonlarClient({
             style={{ width:560, padding:0, overflow:'hidden' }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ padding:'16px 18px', borderBottom:'1px solid #ffe8c8', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#3d1c00' }}>{editing ? 'Lokasyon Düzenle' : 'Lokasyon Ekle'}</div>
+            <div style={{ padding:'16px 18px', borderBottom:'1px solid #f3f4f6', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#111827' }}>{editing ? 'Lokasyon Düzenle' : 'Lokasyon Ekle'}</div>
               <Button variant="ghost" size="sm" onClick={() => setOpenForm(false)} style={{ padding:'4px 10px', fontSize:12 }}>✕</Button>
             </div>
             <div style={{ padding:18 }}>
@@ -433,7 +433,7 @@ export default function LokasyonlarClient({
                     <input className="verde-input" value={form.nfc_token} onChange={e => setForm(f => ({...f, nfc_token:e.target.value}))} />
                     <Button variant="ghost" type="button" onClick={() => setForm(f => ({ ...f, nfc_token: crypto.randomUUID() }))}>Yenile</Button>
                   </div>
-                  <div style={{ marginTop:6, fontSize:11, color:'#9a7b6a' }}>NFC etiketi için kullanılacak benzersiz token.</div>
+                  <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>NFC etiketi için kullanılacak benzersiz token.</div>
                 </div>
                 {editing ? (
                   <div style={{ gridColumn:'1 / -1', display:'flex', gap:8, flexWrap:'wrap' }}>
@@ -446,7 +446,7 @@ export default function LokasyonlarClient({
                     <input type="checkbox" checked={form.sureli_gorev_aktif} onChange={e => setForm(f => ({ ...f, sureli_gorev_aktif: e.target.checked }))} />
                     <span>Bu lokasyonda süreli görev aktif</span>
                   </label>
-                  <div style={{ marginTop:6, fontSize:11, color:'#9a7b6a' }}>Aktif ise personel görevi önce başlatır, sonra tamamlar. Pasif ise görev doğrudan tamamlanır.</div>
+                  <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Aktif ise personel görevi önce başlatır, sonra tamamlar. Pasif ise görev doğrudan tamamlanır.</div>
                 </div>
                 <div style={{ gridColumn:'1 / -1' }}>
                   <label className="verde-label">Checklist</label>
@@ -456,14 +456,14 @@ export default function LokasyonlarClient({
                       <option key={tpl.id} value={tpl.id}>{tpl.baslik}</option>
                     ))}
                   </select>
-                  <div style={{ marginTop:6, fontSize:11, color:'#9a7b6a' }}>Checklist şablonlarını Yönetim → Checklist Şablonları ekranından oluşturabilirsiniz.</div>
+                  <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Checklist şablonlarını Yönetim → Checklist Şablonları ekranından oluşturabilirsiniz.</div>
                 </div>
               </div>
               <div style={{ display:'flex', gap:8, marginTop:16 }}>
                 <Button variant="primary" onClick={save} disabled={loading}>{loading ? 'Kaydediliyor…' : '✓ Kaydet'}</Button>
                 <Button variant="ghost" onClick={() => setOpenForm(false)}>İptal</Button>
               </div>
-              {parentId && <div style={{ marginTop:10, fontSize:11, color:'#9a7b6a' }}>Alt lokasyon olarak eklenecek.</div>}
+              {parentId && <div style={{ marginTop:10, fontSize:11, color:'#6b7280' }}>Alt lokasyon olarak eklenecek.</div>}
             </div>
           </div>
         </div>

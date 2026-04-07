@@ -30,7 +30,7 @@ export default async function SALayout({ children }: { children: React.ReactNode
 
   return (
     <SAProviders>
-      <div style={{ display:'flex', minHeight:'100vh', background:'#fffbf5' }}>
+      <div style={{ display:'flex', minHeight:'100vh', background:'#fafafa' }}>
         <Sidebar user={user} firma={null} sidebarLogo={sidebarLogo} projeLogo={projeLogo} projeAdi={projeAdi} />
         <div style={{ marginLeft:282, flex:1, minWidth:0, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:'100vh' }}>
           {children}

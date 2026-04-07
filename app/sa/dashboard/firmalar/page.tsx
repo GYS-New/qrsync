@@ -22,7 +22,7 @@ export default async function FirmalarPage() {
       </div>
 
         <div className="verde-card">
-          <div style={{ padding:'14px 18px', borderBottom:'1px solid #ffe8c8', display:'flex', gap:8 }}>
+          <div style={{ padding:'14px 18px', borderBottom:'1px solid #f3f4f6', display:'flex', gap:8 }}>
             <input className="verde-input" placeholder="Firma ara..." style={{ maxWidth:240 }} />
           </div>
           <table className="verde-table">
@@ -42,24 +42,24 @@ export default async function FirmalarPage() {
                 <tr key={f.id}>
                   <td>
                     <div style={{ display:'flex', alignItems:'center', gap:9 }}>
-                      <div style={{ width:28, height:28, borderRadius:5, background:'#fff7ed', border:'1px solid #ffd9a0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#ff7f00', flexShrink:0 }}>
+                      <div style={{ width:28, height:28, borderRadius:5, background:'#f9fafb', border:'1px solid #e5e7eb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#374151', flexShrink:0 }}>
                         {(f.firma_adi || f.ticari_unvan)?.[0]?.toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontWeight:600, color:'#3d1c00' }}>{f.firma_adi || f.ticari_unvan}</div>
-                        <div style={{ fontSize:10.5, color:'#9a7b6a' }}>{f.ticari_unvan}</div>
+                        <div style={{ fontWeight:600, color:'#111827' }}>{f.firma_adi || f.ticari_unvan}</div>
+                        <div style={{ fontSize:10.5, color:'#6b7280' }}>{f.ticari_unvan}</div>
                       </div>
                     </div>
                   </td>
-                  <td style={{ color:'#6b4423' }}>{f.vergi_no}</td>
+                  <td style={{ color:'#4b5563' }}>{f.vergi_no}</td>
                   <td>{f.yetkili_isim}</td>
-                  <td style={{ color:'#6b4423' }}>{f.yetkili_tel}</td>
+                  <td style={{ color:'#4b5563' }}>{f.yetkili_tel}</td>
                   <td>
                     <span className={`verde-badge ${f.aktif ? 'status-islemde' : 'status-iptal'}`}>
                       {f.aktif ? 'Aktif' : 'Pasif'}
                     </span>
                   </td>
-                  <td style={{ color:'#9a7b6a', whiteSpace:'nowrap' }}>{formatDate(f.kayit_tarihi)}</td>
+                  <td style={{ color:'#6b7280', whiteSpace:'nowrap' }}>{formatDate(f.kayit_tarihi)}</td>
                   <td>
                     <div style={{ display:'flex', gap:6 }}>
                       <a href={`/sa/dashboard/firmalar/${f.id}`}>
@@ -70,10 +70,10 @@ export default async function FirmalarPage() {
                 </tr>
               ))}
               {!firmalar?.length && (
-                <tr><td colSpan={7} style={{ textAlign:'center', color:'#9a7b6a', padding:'48px 0' }}>
+                <tr><td colSpan={7} style={{ textAlign:'center', color:'#6b7280', padding:'48px 0' }}>
                   <div style={{ fontSize:24, marginBottom:8 }}>🏢</div>
                   <div>Henüz firma eklenmemiş</div>
-                  <a href="/sa/dashboard/firmalar/yeni" style={{ color:'#ff7f00', fontWeight:600, fontSize:12.5, display:'block', marginTop:8 }}>+ İlk firmayı ekle</a>
+                  <a href="/sa/dashboard/firmalar/yeni" style={{ color:'#374151', fontWeight:600, fontSize:12.5, display:'block', marginTop:8 }}>+ İlk firmayı ekle</a>
                 </td></tr>
               )}
             </tbody>

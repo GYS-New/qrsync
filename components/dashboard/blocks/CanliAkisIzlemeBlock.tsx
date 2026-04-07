@@ -109,14 +109,14 @@ export default function CanliAkisIzlemeBlock({
   return (
     <div className="verde-card h-[420px] flex flex-col">
       <div style={{
-        padding: '16px 18px 12px', borderBottom: '1px solid #ffe8c8',
+        padding: '16px 18px 12px', borderBottom: '1px solid #f3f4f6',
         display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12,
       }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#3d1c00' }}>FREKANSİYEL GÖREV AKIŞI</div>
-          <div style={{ fontSize: 13, color: '#9a7b6a', marginTop: 1 }}>Son durum değişimleri</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>FREKANSİYEL GÖREV AKIŞI</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 1 }}>Son durum değişimleri</div>
         </div>
-        <Link href={`${basePath}/dashboard/canli-islemler`} className="text-[13px] text-[#ff7f00] hover:underline mt-[2px]">
+        <Link href={`${basePath}/dashboard/canli-islemler`} className="text-[13px] text-[#374151] hover:underline mt-[2px]">
           Tümünü Gör
         </Link>
       </div>
@@ -141,20 +141,20 @@ export default function CanliAkisIzlemeBlock({
               const css = DURUM_CSS[durum] ?? 'status-islemde'
               return (
                 <tr key={r?.id ?? `ph-${idx}`}>
-                  <td style={{ color: '#ff7f00', fontWeight: 900 }}>{idx + 1}</td>
+                  <td style={{ color: '#374151', fontWeight: 900 }}>{idx + 1}</td>
                   <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
                       <ClipboardList size={13} />
                       {isEmpty ? '—' : (r?.tanim ?? '—')}
                     </span>
                   </td>
-                  <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#6b4423' }}>
+                  <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#4b5563' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <MapPin size={13} />
                       {isEmpty ? '—' : ((r as any).lokasyonlar?.tanim ?? '—')}
                     </span>
                   </td>
-                  <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#6b4423' }}>
+                  <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#4b5563' }}>
                     {isEmpty ? '—' : ((r as any).users?.isim_soyisim ?? '—')}
                   </td>
                   <td>
@@ -163,7 +163,7 @@ export default function CanliAkisIzlemeBlock({
                       : <span className={`verde-badge ${css}`}>{DURUM_LABEL[durum] ?? durum}</span>
                     }
                   </td>
-                  <td style={{ color: '#9a7b6a', whiteSpace: 'nowrap', fontSize: 12 }}>
+                  <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: 12 }}>
                     {isEmpty ? '—' : formatDateTime((r?.durum_degisim_tarihi ?? r?.olusturma_tarihi) as string)}
                   </td>
                 </tr>

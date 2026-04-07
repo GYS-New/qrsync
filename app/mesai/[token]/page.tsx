@@ -129,7 +129,7 @@ export default function MesaiTokenPage() {
         {/* Hazır — yetkili kullanıcıya göster */}
         {durum === 'hazir' && bilgi && (
           <>
-            <div style={{ fontSize: 22, fontWeight: 900, color: '#3d1c00', marginBottom: 6 }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', marginBottom: 6 }}>
               {isGiris ? '🟢 İş Başı' : '🔴 İş Bitimi'}
             </div>
             <div style={{ fontSize: 14, color: '#475569', marginBottom: 4 }}>{bilgi.firma_adi}</div>

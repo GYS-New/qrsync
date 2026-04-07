@@ -46,26 +46,26 @@ function LokasyonNode({
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '9px 12px', borderRadius: 5,
-          background: isRoot ? '#fff7ed' : '#fff',
-          border: '1px solid #ffe8c8',
+          background: isRoot ? '#f9fafb' : '#fff',
+          border: '1px solid #f3f4f6',
           marginBottom: 4,
           transition: 'all 0.12s',
         }}
-        onMouseEnter={e => e.currentTarget.style.borderColor = '#ffd9a0'}
-        onMouseLeave={e => e.currentTarget.style.borderColor = '#ffe8c8'}
+        onMouseEnter={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+        onMouseLeave={e => e.currentTarget.style.borderColor = '#f3f4f6'}
       >
         {/* Expand/Collapse */}
         <button
           onClick={() => setOpen(o => !o)}
-          style={{ background: 'none', border: 'none', cursor: hasChildren ? 'pointer' : 'default', color: '#9a7b6a', fontSize: 11, width: 16, padding: 0 }}
+          style={{ background: 'none', border: 'none', cursor: hasChildren ? 'pointer' : 'default', color: '#6b7280', fontSize: 11, width: 16, padding: 0 }}
         >
           {hasChildren ? (open ? '▼' : '►') : '·'}
         </button>
 
         <span style={{ fontSize: 15 }}>📍</span>
 
-        <span style={{ flex: 1, fontSize: 14, fontWeight: isRoot ? 600 : 500, color: '#3d1c00' }}>{lok.tanim}</span>
-        {lok.aciklama && <span style={{ fontSize: 13, color: '#9a7b6a' }}>{lok.aciklama}</span>}
+        <span style={{ flex: 1, fontSize: 14, fontWeight: isRoot ? 600 : 500, color: '#111827' }}>{lok.tanim}</span>
+        {lok.aciklama && <span style={{ fontSize: 13, color: '#6b7280' }}>{lok.aciklama}</span>}
 
         <span className={`verde-badge ${lok.aktif ? 'status-islemde' : 'status-iptal'}`} style={{ fontSize: 13 }}>
           {lok.aktif ? 'Aktif' : 'Pasif'}
@@ -152,7 +152,7 @@ export default function LokasyonAgac({
 
   if (!roots.length) {
     return (
-      <div style={{ padding: '48px 0', textAlign: 'center', color: '#9a7b6a' }}>
+      <div style={{ padding: '48px 0', textAlign: 'center', color: '#6b7280' }}>
         <div style={{ fontSize: 24, marginBottom: 8 }}>📍</div>
         <div>Henüz lokasyon eklenmemiş</div>
       </div>

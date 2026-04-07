@@ -102,7 +102,7 @@ export default function GorevlerUserClient({
   return (
     <div style={{ padding: '24px 28px' }}>
       <div className="verde-card">
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 10, alignItems: 'center' }}>
           <input
             className="verde-input"
             placeholder="Görev ara (ad, lokasyon, atanan...)"
@@ -112,8 +112,8 @@ export default function GorevlerUserClient({
             autoComplete="off"
           />
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 12.5, color: '#9a7b6a' }}>
-              Toplam <strong style={{ color: '#ff7f00' }}>{filtered.length}</strong> görev
+            <span style={{ fontSize: 12.5, color: '#6b7280' }}>
+              Toplam <strong style={{ color: '#374151' }}>{filtered.length}</strong> görev
             </span>
             <Button variant="ghost" size="sm" onClick={refresh} disabled={loading}>
               {loading ? 'Yükleniyor…' : '↻ Yenile'}
@@ -142,19 +142,19 @@ export default function GorevlerUserClient({
                     {mine && (
                       <span style={{
                         marginLeft: 6, fontSize: 11, fontWeight: 700,
-                        background: '#ffe4bc', color: '#c45200',
+                        background: '#e5e7eb', color: '#1f2937',
                         borderRadius: 4, padding: '1px 5px',
                       }}>Bana Atandı</span>
                     )}
                   </td>
-                  <td style={{ color: '#6b4423' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-                  <td style={{ color: '#6b4423', fontSize: 13 }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                  <td style={{ color: '#4b5563' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
+                  <td style={{ color: '#4b5563', fontSize: 13 }}>{g.atanan?.isim_soyisim ?? '—'}</td>
                   <td>
                     <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>
                       {GOREV_DURUM_LABEL[g.durum] ?? g.durum}
                     </span>
                   </td>
-                  <td style={{ color: '#9a7b6a', fontSize: 11.5, whiteSpace: 'nowrap' }}>
+                  <td style={{ color: '#6b7280', fontSize: 11.5, whiteSpace: 'nowrap' }}>
                     {formatDateTime(g.olusturma_tarihi)}
                   </td>
                   <td>
@@ -165,7 +165,7 @@ export default function GorevlerUserClient({
                         </Button>
                       )}
                       {mine && g.durum === 'ACIK' && (
-                        <span style={{ fontSize: 11.5, color: '#9a7b6a' }}>Bildirimden kabul/ret</span>
+                        <span style={{ fontSize: 11.5, color: '#6b7280' }}>Bildirimden kabul/ret</span>
                       )}
                       {!mine && (
                         <span style={{ fontSize: 11.5, color: '#b0c4b0' }}>Sadece görüntüleme</span>
@@ -177,7 +177,7 @@ export default function GorevlerUserClient({
             })}
             {!filtered.length && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: '#9a7b6a', padding: '36px 0' }}>
+                <td colSpan={6} style={{ textAlign: 'center', color: '#6b7280', padding: '36px 0' }}>
                   Görev bulunamadı
                 </td>
               </tr>

@@ -81,8 +81,8 @@ export default function PasswordGate({ storageKey, ttlMs, title, description, ch
 
   return (
     <div className="verde-card" style={{ margin: '24px 28px', padding: 18, maxWidth: 620 }}>
-      <div style={{ fontSize: 16, fontWeight: 900, color: '#3d1c00' }}>{title}</div>
-      <div style={{ marginTop: 6, fontSize: 13.5, color: '#6b4423', lineHeight: 1.5 }}>{description}</div>
+      <div style={{ fontSize: 16, fontWeight: 900, color: '#111827' }}>{title}</div>
+      <div style={{ marginTop: 6, fontSize: 13.5, color: '#4b5563', lineHeight: 1.5 }}>{description}</div>
 
       <div style={{ marginTop: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
@@ -100,7 +100,7 @@ export default function PasswordGate({ storageKey, ttlMs, title, description, ch
           {loading ? 'Kontrol ediliyor…' : 'Onayla'}
         </Button>
       </div>
-      <div style={{ marginTop: 10, fontSize: 12, color: '#9a7b6a' }}>
+      <div style={{ marginTop: 10, fontSize: 12, color: '#6b7280' }}>
         Not: Bu onay tarayıcı oturumu içinde \(~{Math.round(ttlMs / 60000)} dk\) geçerlidir.
       </div>
     </div>

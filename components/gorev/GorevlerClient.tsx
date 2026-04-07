@@ -374,7 +374,7 @@ export default function GorevlerClient({
       <div className="verde-card">
 
         {/* ── Satır 1: Arama + Yenile + Görev Ekle ── */}
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #ffe8c8', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             className="verde-input"
             placeholder="Ara (görev, lokasyon, kişi…)"
@@ -393,7 +393,7 @@ export default function GorevlerClient({
         </div>
 
         {/* ── Satır 2: Yatay Filtre Çubuğu ── */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 16px 0', alignItems: 'center', padding: '10px 12px', background: '#f8fbf8', borderRadius: 8, border: '1px solid #ffe8c8' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 16px 0', alignItems: 'center', padding: '10px 12px', background: '#f8fbf8', borderRadius: 8, border: '1px solid #f3f4f6' }}>
 
           {/* Lokasyon — 3 kademe */}
           <select className="verde-select" value={floc1} onChange={e => { setFloc1(e.target.value); setFloc2(''); setFloc3('') }} style={{ width: 148 }}>
@@ -425,11 +425,11 @@ export default function GorevlerClient({
             {DURUM_SECENEKLER.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
           </select>
 
-          <div style={{ width: 1, height: 24, background: '#ffd9a0', flexShrink: 0 }} />
+          <div style={{ width: 1, height: 24, background: '#e5e7eb', flexShrink: 0 }} />
 
           {/* Oluşturma tarihi aralığı */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12, color: '#9a7b6a', whiteSpace: 'nowrap' }}>Oluşturma:</span>
+            <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>Oluşturma:</span>
             <input type="date" className="verde-input" style={{ width: 140 }} value={filtreOlusFrom} onChange={e => setFiltreOlusFrom(e.target.value)} />
             <span style={{ fontSize: 12, color: '#9a9a9a' }}>—</span>
             <input type="date" className="verde-input" style={{ width: 140 }} value={filtreOlusTo} onChange={e => setFiltreOlusTo(e.target.value)} />
@@ -437,7 +437,7 @@ export default function GorevlerClient({
 
           {/* İşlem tarihi aralığı */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12, color: '#9a7b6a', whiteSpace: 'nowrap' }}>İşlem:</span>
+            <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>İşlem:</span>
             <input type="date" className="verde-input" style={{ width: 140 }} value={filtreIslemFrom} onChange={e => setFiltreIslemFrom(e.target.value)} />
             <span style={{ fontSize: 12, color: '#9a9a9a' }}>—</span>
             <input type="date" className="verde-input" style={{ width: 140 }} value={filtreIslemTo} onChange={e => setFiltreIslemTo(e.target.value)} />
@@ -445,27 +445,27 @@ export default function GorevlerClient({
 
           {/* Uygula */}
           <button type="button" onClick={filtrele} disabled={loading || !firmaId}
-            style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: '#c45200', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: loading || !firmaId ? 0.7 : 1, whiteSpace: 'nowrap' }}>
+            style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: '#1f2937', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: loading || !firmaId ? 0.7 : 1, whiteSpace: 'nowrap' }}>
             {loading ? 'Yükleniyor…' : '▶ Uygula'}
           </button>
 
           {/* Temizle */}
           <button type="button" onClick={temizleFiltreler}
-            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #ffd9a0', background: '#fff', fontSize: 13, color: '#6b4423', cursor: 'pointer' }}>
+            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', fontSize: 13, color: '#4b5563', cursor: 'pointer' }}>
             Temizle
           </button>
         </div>
 
         {/* ── Tablo ── */}
         {!firmaId && base === '/sa' ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#9a7b6a' }}>
+          <div style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>🏢</div>
             <div>Görevleri görmek için firma seçin.</div>
           </div>
         ) : (
           <>
             <div style={{ padding: '6px 18px', fontSize: 12, color: '#94a3b8', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <span><strong style={{ color: '#c45200' }}>{combinedRows.length}</strong> kayıt</span>
+              <span><strong style={{ color: '#1f2937' }}>{combinedRows.length}</strong> kayıt</span>
               {arsivAktif && (
                 <>
                   <span style={{ color: '#475569' }}>Tablo: <strong>{combinedRows.filter(r => r._source === 'tablo').length}</strong></span>
@@ -505,7 +505,7 @@ export default function GorevlerClient({
                             display: 'inline-block', padding: '2px 8px', borderRadius: 6,
                             fontSize: 11, fontWeight: 700,
                             background: isArsiv ? '#f1f5f9' : '#e7f9e7',
-                            color: isArsiv ? '#64748b' : '#c45200',
+                            color: isArsiv ? '#64748b' : '#1f2937',
                             border: `1px solid ${isArsiv ? '#cbd5e1' : '#bbf7d0'}`,
                           }}>
                             {isArsiv ? 'Arşiv' : 'Tablo'}
@@ -513,14 +513,14 @@ export default function GorevlerClient({
                         </td>
                       )}
                       <td style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isArsiv ? '#475569' : undefined }} title={g.tanim ?? ''}>{g.tanim}</td>
-                      <td style={{ color: isArsiv ? '#64748b' : '#6b4423', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}>{getLocPath(g.lokasyon_id)}</td>
-                      <td style={{ color: isArsiv ? '#64748b' : '#6b4423', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={atananAd}>{atananAd}</td>
+                      <td style={{ color: isArsiv ? '#64748b' : '#4b5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}>{getLocPath(g.lokasyon_id)}</td>
+                      <td style={{ color: isArsiv ? '#64748b' : '#4b5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={atananAd}>{atananAd}</td>
                       <td>
                         <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>{GOREV_DURUM_LABEL[g.durum] ?? g.durum}</span>
                       </td>
-                      <td style={{ color: isArsiv ? '#94a3b8' : '#9a7b6a', fontSize: 13, whiteSpace: 'nowrap' }}>{g.olusturma_tarihi ? formatDateTime(g.olusturma_tarihi) : '—'}</td>
-                      <td style={{ color: isArsiv ? '#94a3b8' : '#6b4423', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={islemiYapanAd}>{islemiYapanAd}</td>
-                      <td style={{ color: isArsiv ? '#94a3b8' : '#9a7b6a', fontSize: 13, whiteSpace: 'nowrap' }}>
+                      <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', fontSize: 13, whiteSpace: 'nowrap' }}>{g.olusturma_tarihi ? formatDateTime(g.olusturma_tarihi) : '—'}</td>
+                      <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={islemiYapanAd}>{islemiYapanAd}</td>
+                      <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', fontSize: 13, whiteSpace: 'nowrap' }}>
                         {g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—'}
                       </td>
                       {canManage && (
@@ -537,11 +537,11 @@ export default function GorevlerClient({
                             {!isArsiv && (
                               <>
                                 <button onClick={() => openEdit(g)}
-                                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #ffd9a0', background: '#fff7ed', color: '#8b3a00', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#111827', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                   ✏️ Düzenle
                                 </button>
                                 <details style={{ position: 'relative', display: 'inline-block' }}>
-                                  <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '4px 10px', borderRadius: 6, border: '1px solid #ffd9a0', background: '#fff7ed', color: '#8b3a00', fontSize: 12, fontWeight: 600 }}>
+                                  <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '4px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#111827', fontSize: 12, fontWeight: 600 }}>
                                     İşlemler ▾
                                   </summary>
                                   <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 200, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '4px 0', minWidth: 155 }}
@@ -562,7 +562,7 @@ export default function GorevlerClient({
                   )
                 })}
                 {!combinedRows.length && (
-                  <tr><td colSpan={canManage ? (arsivAktif ? 9 : 8) : (arsivAktif ? 8 : 7)} style={{ textAlign: 'center', color: '#9a7b6a', padding: '36px 0' }}>
+                  <tr><td colSpan={canManage ? (arsivAktif ? 9 : 8) : (arsivAktif ? 8 : 7)} style={{ textAlign: 'center', color: '#6b7280', padding: '36px 0' }}>
                     Kriterlere uygun görev bulunamadı.
                   </td></tr>
                 )}
@@ -578,8 +578,8 @@ export default function GorevlerClient({
           onClick={() => setOpenForm(false)}>
           <div className="verde-card" style={{ width: 920, maxWidth: 'calc(100vw - 40px)', padding: 0, overflow: 'hidden' }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#3d1c00' }}>{editing ? 'Görev Düzenle' : 'Görev Ekle'}</div>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{editing ? 'Görev Düzenle' : 'Görev Ekle'}</div>
               <Button variant="ghost" size="sm" onClick={() => setOpenForm(false)} style={{ padding: '4px 10px', fontSize: 12 }}>✕</Button>
             </div>
             <div style={{ padding: 18 }}>

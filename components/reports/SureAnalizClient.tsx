@@ -23,7 +23,7 @@ type SureData      = { ok: boolean; frekansiyel: Bolum; spesifik: Bolum; hedefTo
 
 // ── Tokens ────────────────────────────────────────────────────────────────
 const T = {
-  green: '#8b3a00', greenMid: '#ff7f00', greenLight: '#fff7ed',
+  green: '#111827', greenMid: '#374151', greenLight: '#f9fafb',
   blue: '#1d4ed8', blueMid: '#3b82f6', blueLight: '#eff6ff',
   amber: '#d97706', amberLight: '#fef3c7',
   red: '#dc2626', redLight: '#fee2e2',
@@ -884,7 +884,7 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
 
         {/* Süreli Görev Takibi uyarısı */}
         {!sureliGorevAktif && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: '#f9fafb', border: '1px solid #fed7aa', borderRadius: 10 }}>
             <span style={{ fontSize: 22 }}>⏱️</span>
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 800, color: '#9a3412' }}>Süreli Görev Takibi Pasif</div>

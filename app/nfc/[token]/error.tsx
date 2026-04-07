@@ -7,7 +7,7 @@ export default function NfcError({ error, reset }: { error: Error & { digest?: s
       <div style={{ color: '#7f1d1d', marginBottom: 16, fontFamily: 'monospace', fontSize: 13, background: '#fee2e2', padding: 12, borderRadius: 8, wordBreak: 'break-all' }}>
         {error.message || 'Bilinmeyen hata'}
       </div>
-      <button onClick={reset} style={{ padding: '8px 16px', background: '#ff7f00', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
+      <button onClick={reset} style={{ padding: '8px 16px', background: '#374151', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
         Tekrar Dene
       </button>
     </div>

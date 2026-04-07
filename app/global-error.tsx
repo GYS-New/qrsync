@@ -12,7 +12,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           {error.digest && (
             <div style={{ color: '#64748b', fontSize: 12, marginBottom: 16 }}>Digest: {error.digest}</div>
           )}
-          <button onClick={reset} style={{ padding: '8px 16px', background: '#ff7f00', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
+          <button onClick={reset} style={{ padding: '8px 16px', background: '#374151', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
             Tekrar Dene
           </button>
         </div>

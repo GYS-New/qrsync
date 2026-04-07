@@ -114,13 +114,13 @@ export default function FrekansiyelGorevAnaliziBlock({
   return (
     <BlockWrapper title="FREKANSİYEL GÖREV ANALİZİ" size="big" href={`${basePath}/dashboard/canli-islemler`}>
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-        <div style={{ fontSize: 13, color: '#9a7b6a' }}>
+        <div style={{ fontSize: 13, color: '#6b7280' }}>
           {mode === 'gunluk' ? 'Son 24 saat' : mode === 'haftalik' ? 'Son 7 gün' : 'Son 30 gün'} • canlı + arşiv
         </div>
         <div className="flex gap-2">
           {[{ key: 'gunluk', label: 'GÜNLÜK' }, { key: 'haftalik', label: 'HAFTALIK' }, { key: 'aylik', label: 'AYLIK' }].map((m) => (
             <button key={m.key} onClick={() => setMode(m.key as Mode)}
-              className={`text-xs px-2 py-1 rounded ${mode === m.key ? 'bg-[#ff7f00] text-white' : 'border border-[#ffd9a0] text-[#5c3a1e]'}`}>
+              className={`text-xs px-2 py-1 rounded ${mode === m.key ? 'bg-[#374151] text-white' : 'border border-[#e5e7eb] text-[#374151]'}`}>
               {m.label}
             </button>
           ))}
@@ -128,12 +128,12 @@ export default function FrekansiyelGorevAnaliziBlock({
       </div>
 
       <div ref={wrapRef} style={{ width: '100%', minWidth: 0 }}>
-        {loading && <div style={{ fontSize: 12, color: '#9a7b6a', marginBottom: 10 }}>Yükleniyor...</div>}
+        {loading && <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>Yükleniyor...</div>}
 
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
           {/* Graf-1 */}
           <div className="verde-card overflow-hidden" style={{ padding: 12 }}>
-            <div style={{ fontWeight: 800, fontSize: 13, color: '#3d1c00', marginBottom: 8 }}>Graf-1</div>
+            <div style={{ fontWeight: 800, fontSize: 13, color: '#111827', marginBottom: 8 }}>Graf-1</div>
             <div className="h-[260px] lg:h-[300px]" style={{ width: '100%', minWidth: 0 }}>
               {w > 0 && <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={g1} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
@@ -150,7 +150,7 @@ export default function FrekansiyelGorevAnaliziBlock({
 
           {/* Graf-2 */}
           <div className="verde-card overflow-hidden" style={{ padding: 12 }}>
-            <div style={{ fontWeight: 800, fontSize: 13, color: '#3d1c00', marginBottom: 8 }}>Graf-2</div>
+            <div style={{ fontWeight: 800, fontSize: 13, color: '#111827', marginBottom: 8 }}>Graf-2</div>
             <div className="h-[260px] lg:h-[300px]" style={{ width: '100%', minWidth: 0 }}>
               {w > 0 && <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={g2} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
@@ -168,15 +168,15 @@ export default function FrekansiyelGorevAnaliziBlock({
           {/* Graf-3 */}
           <div className="verde-card overflow-hidden" style={{ padding: 12 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-              <div style={{ fontWeight: 800, fontSize: 13, color: '#3d1c00' }}>Graf-3</div>
-              <div style={{ fontSize: 13, color: '#ff7f00', fontWeight: 800 }}>%{success} başarı</div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: '#111827' }}>Graf-3</div>
+              <div style={{ fontSize: 13, color: '#374151', fontWeight: 800 }}>%{success} başarı</div>
             </div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ minWidth: 90 }}>
-                <div style={{ fontSize: 14, color: '#9a7b6a' }}>Toplam</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: '#3d1c00' }}>{counts.total}</div>
-                <div style={{ fontSize: 14, color: '#9a7b6a', marginTop: 6 }}>Tamamlanan</div>
-                <div style={{ fontSize: 18, fontWeight: 900, color: '#3d1c00' }}>{counts.completed}</div>
+                <div style={{ fontSize: 14, color: '#6b7280' }}>Toplam</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: '#111827' }}>{counts.total}</div>
+                <div style={{ fontSize: 14, color: '#6b7280', marginTop: 6 }}>Tamamlanan</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#111827' }}>{counts.completed}</div>
               </div>
               {w > 0 && (
                 <PieChart width={Math.max(170, Math.floor(w / 3) - 160)} height={190}>
@@ -192,7 +192,7 @@ export default function FrekansiyelGorevAnaliziBlock({
               <div style={{ height: 10, background: '#e7f2e7', borderRadius: 999, overflow: 'hidden' }}>
                 <div style={{ width: `${success}%`, height: 10, background: '#16a34a' }} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 13, color: '#9a7b6a' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 13, color: '#6b7280' }}>
                 <span>Tamamlanan: {counts.completed}</span>
                 <span>Kalan: {remain}</span>
               </div>

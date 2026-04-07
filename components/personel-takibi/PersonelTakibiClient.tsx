@@ -62,7 +62,7 @@ interface Props {
 async function qrDataUrl(url: string): Promise<string> {
   return QRCode.toDataURL(url, {
     width: 300, margin: 2,
-    color: { dark: '#c45200', light: '#ffffff' },
+    color: { dark: '#1f2937', light: '#ffffff' },
   })
 }
 
@@ -87,7 +87,7 @@ function tarihFormatla(kayitTarihi: string) {
 }
 
 const ROL_BADGE: Record<string, { label: string; bg: string; color: string }> = {
-  tenant_admin: { label: 'Firma Admin', bg: '#fff3e0', color: '#e65100' },
+  tenant_admin: { label: 'Firma Admin', bg: '#f3f4f6', color: '#e65100' },
   tenant_user:  { label: 'Kullanıcı',   bg: '#f3e5f5', color: '#6a1b9a' },
   musteri:      { label: 'Müşteri',      bg: '#e3f2fd', color: '#1565c0' },
 }
@@ -291,13 +291,13 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   const isLoading   = filtreAktif ? kayitLoading : loading
 
   const td = (e?: React.CSSProperties): React.CSSProperties => ({
-    padding: '10px 14px', borderBottom: '1px solid #ffe8c8', fontSize: 13, verticalAlign: 'middle', ...e,
+    padding: '10px 14px', borderBottom: '1px solid #f3f4f6', fontSize: 13, verticalAlign: 'middle', ...e,
   })
 
   const sekme = (id: 'bugun' | 'qr') => ({
     height: 36, padding: '0 18px', border: 'none', cursor: 'pointer', fontWeight: 700,
     fontSize: 13, borderRadius: 8,
-    background: aktifSekme === id ? '#c45200' : 'transparent',
+    background: aktifSekme === id ? '#1f2937' : 'transparent',
     color:      aktifSekme === id ? '#fff'    : '#475569',
   } as React.CSSProperties)
 
@@ -320,12 +320,12 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   // ── Personel avatar + isim hücresi ───────────────────────────────────────
   function personelHucresi(isim: string, email: string, dim: boolean) {
     const initials = isim?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-    const tc = dim ? '#94a3b8' : '#3d1c00'
+    const tc = dim ? '#94a3b8' : '#111827'
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
           width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-          background: dim ? '#e2e8f0' : 'linear-gradient(135deg,#ff7f00,#c45200)',
+          background: dim ? '#e2e8f0' : 'linear-gradient(135deg,#374151,#1f2937)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: dim ? '#94a3b8' : '#fff', fontSize: 12, fontWeight: 800,
         }}>{initials}</div>
@@ -385,14 +385,14 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
             {kpi && !filtreAktif && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
                 {[
-                  { label: 'Toplam Personel', val: kpi.toplam, icon: <Users size={20} color="#c45200" />,     bg: '#fff7ed' },
+                  { label: 'Toplam Personel', val: kpi.toplam, icon: <Users size={20} color="#1f2937" />,     bg: '#f9fafb' },
                   { label: 'Aktif',           val: kpi.aktif,  icon: <UserCheck size={20} color="#16a34a" />, bg: '#dcfce7' },
                   { label: 'Aktif Değil',     val: kpi.pasif,  icon: <UserX size={20} color="#dc2626" />,     bg: '#fef2f2' },
                 ].map(({ label, val, icon, bg }) => (
                   <div key={label} className="verde-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, background: bg }}>
                     <div style={{ width: 42, height: 42, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>{icon}</div>
                     <div>
-                      <div style={{ fontSize: 26, fontWeight: 900, color: '#3d1c00', lineHeight: 1 }}>{val}</div>
+                      <div style={{ fontSize: 26, fontWeight: 900, color: '#111827', lineHeight: 1 }}>{val}</div>
                       <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 3 }}>{label}</div>
                     </div>
                   </div>
@@ -404,14 +404,14 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
             {filtreAktif && siraliKayitlar.length > 0 && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
                 {[
-                  { label: 'Toplam Kayıt', val: siraliKayitlar.length,                          icon: <Users size={20} color="#c45200" />,     bg: '#fff7ed' },
+                  { label: 'Toplam Kayıt', val: siraliKayitlar.length,                          icon: <Users size={20} color="#1f2937" />,     bg: '#f9fafb' },
                   { label: 'Tamamlanan',   val: siraliKayitlar.filter(k => k.cikis_saati).length, icon: <UserCheck size={20} color="#16a34a" />, bg: '#dcfce7' },
                   { label: 'Eksik Çıkış',  val: siraliKayitlar.filter(k => !k.cikis_saati).length, icon: <UserX size={20} color="#f59e0b" />,   bg: '#fffbeb' },
                 ].map(({ label, val, icon, bg }) => (
                   <div key={label} className="verde-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, background: bg }}>
                     <div style={{ width: 42, height: 42, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>{icon}</div>
                     <div>
-                      <div style={{ fontSize: 26, fontWeight: 900, color: '#3d1c00', lineHeight: 1 }}>{val}</div>
+                      <div style={{ fontSize: 26, fontWeight: 900, color: '#111827', lineHeight: 1 }}>{val}</div>
                       <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 3 }}>{label}</div>
                     </div>
                   </div>
@@ -422,7 +422,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
             {/* Liste + araç çubuğu */}
             <div className="verde-card" style={{ overflow: 'hidden' }}>
               {/* Başlık + araçlar */}
-              <div style={{ padding: '12px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 800, fontSize: 14 }}>
                   {filtreAktif ? 'Filtreli Kayıtlar' : 'Personel Durumu — Bugün'}
                 </span>
@@ -438,20 +438,20 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                     style={{
                       height: 32, padding: '0 12px', borderRadius: 8, fontWeight: 700, fontSize: 12,
                       cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                      border: `1px solid ${filtreAcik || filtreAktif ? '#c45200' : '#e2e8f0'}`,
-                      background: filtreAcik || filtreAktif ? '#fff7ed' : '#fff',
-                      color: filtreAcik || filtreAktif ? '#c45200' : '#475569',
+                      border: `1px solid ${filtreAcik || filtreAktif ? '#1f2937' : '#e2e8f0'}`,
+                      background: filtreAcik || filtreAktif ? '#f9fafb' : '#fff',
+                      color: filtreAcik || filtreAktif ? '#1f2937' : '#475569',
                     }}>
                     <Filter size={12} /> Filtrele
                     {aktifFiltreSayisi > 0 && (
-                      <span style={{ background: '#c45200', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                      <span style={{ background: '#1f2937', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
                         {aktifFiltreSayisi}
                       </span>
                     )}
                   </button>
                   {!filtreAktif && (
                     <button onClick={yukle} disabled={loading || !firmaId}
-                      style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #ffd9a0', background: '#fff7ed', color: '#c45200', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                      style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#1f2937', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                       <RefreshCw size={12} style={loading ? spinning : {}} />
                       {loading ? 'Yükleniyor…' : 'Yenile'}
                     </button>
@@ -461,7 +461,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
 
               {/* Filtre paneli */}
               {filtreAcik && (
-                <div style={{ padding: '14px 18px', background: '#f8fafc', borderBottom: '1px solid #ffe8c8', display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ padding: '14px 18px', background: '#f8fafc', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Başlangıç Tarihi</div>
                     <input
@@ -483,7 +483,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                   <button
                     onClick={filtreleUygula}
                     disabled={kayitLoading}
-                    style={{ height: 32, padding: '0 16px', borderRadius: 8, border: 'none', background: '#c45200', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    style={{ height: 32, padding: '0 16px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Filter size={12} /> {kayitLoading ? 'Yükleniyor…' : 'Uygula'}
                   </button>
                   {filtreAktif && (
@@ -503,7 +503,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                 <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Firma seçin</div>
               ) : isLoading ? (
                 <div style={{ padding: 40, textAlign: 'center' }}>
-                  <RefreshCw size={22} style={{ ...spinning, color: '#c45200', display: 'block', margin: '0 auto 10px' }} />
+                  <RefreshCw size={22} style={{ ...spinning, color: '#1f2937', display: 'block', margin: '0 auto 10px' }} />
                 </div>
               ) : filtreAktif ? (
 
@@ -516,16 +516,16 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                   <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                        <tr style={{ background: '#c45200' }}>
+                        <tr style={{ background: '#1f2937' }}>
                           {['Personel', 'Üst Lokasyon', 'Rol', 'Tarih', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi'].map(h => (
-                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap', background: '#c45200' }}>{h}</th>
+                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap', background: '#1f2937' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {siraliKayitlar.map((k, i) => {
                           const dim = !k.aktif
-                          const tc  = dim ? '#94a3b8' : '#3d1c00'
+                          const tc  = dim ? '#94a3b8' : '#111827'
                           return (
                             <tr key={k.id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
                               <td style={td()}>{personelHucresi(k.isim_soyisim, k.email, dim)}</td>
@@ -553,16 +553,16 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                   <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                        <tr style={{ background: '#c45200' }}>
+                        <tr style={{ background: '#1f2937' }}>
                           {['Personel', 'Üst Lokasyon', 'Rol', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi', 'Son Görülme'].map(h => (
-                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap', background: '#c45200' }}>{h}</th>
+                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap', background: '#1f2937' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {siraliListe.map((p, i) => {
                           const dim = !p.aktif
-                          const tc  = dim ? '#94a3b8' : '#3d1c00'
+                          const tc  = dim ? '#94a3b8' : '#111827'
                           return (
                             <tr key={p.user_id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
                               <td style={td()}>{personelHucresi(p.isim_soyisim, p.email, dim)}</td>
@@ -596,7 +596,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
           <div className="verde-card" style={{ padding: '18px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
               <div>
-                <h2 style={{ fontSize: 15, fontWeight: 900, color: '#3d1c00', margin: 0 }}>Mesai QR / NFC Kodları</h2>
+                <h2 style={{ fontSize: 15, fontWeight: 900, color: '#111827', margin: 0 }}>Mesai QR / NFC Kodları</h2>
                 <p style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>
                   {projeAdi ? `Proje: ${projeAdi}` : 'Tüm Firma'} — Personeller bu QR kodlarını okutarak iş başı / bitimi yapar.
                 </p>
@@ -604,7 +604,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
               <div style={{ display: 'flex', gap: 8 }}>
                 {qrKodlar.length === 0
                   ? <button onClick={() => qrOlustur(false)} disabled={qrLoading || !firmaId}
-                      style={{ height: 36, padding: '0 16px', borderRadius: 8, border: 'none', background: '#c45200', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      style={{ height: 36, padding: '0 16px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                       <QrCode size={14} /> {qrLoading ? 'Oluşturuluyor…' : 'QR Kod Oluştur'}
                     </button>
                   : <button onClick={() => qrOlustur(true)} disabled={qrLoading}
@@ -618,7 +618,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
             {!firmaId ? (
               <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Firma seçin</div>
             ) : qrLoading ? (
-              <div style={{ padding: 32, textAlign: 'center' }}><RefreshCw size={22} style={{ ...spinning, color: '#c45200', display: 'block', margin: '0 auto' }} /></div>
+              <div style={{ padding: 32, textAlign: 'center' }}><RefreshCw size={22} style={{ ...spinning, color: '#1f2937', display: 'block', margin: '0 auto' }} /></div>
             ) : qrKodlar.length === 0 ? (
               <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
                 <QrCode size={36} style={{ margin: '0 auto 12px', display: 'block', color: '#cbd5e1' }} />
@@ -634,7 +634,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
 
             {/* NFC token bilgisi */}
             {qrKodlar.some(q => q.nfc_token) && (
-              <div style={{ marginTop: 16, background: '#fff7ed', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#166534' }}>
+              <div style={{ marginTop: 16, background: '#f9fafb', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#166534' }}>
                 <strong>NFC Token'ları:</strong>
                 {qrKodlar.filter(q => q.nfc_token).map(q => (
                   <div key={q.id} style={{ marginTop: 4, fontFamily: 'monospace', fontSize: 12 }}>

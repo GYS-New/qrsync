@@ -21,10 +21,10 @@ type Proje = {
   logo_url?: string | null
 }
 
-const RENKLER = ['#ff7f00', '#1d6fa8', '#9333ea', '#c2410c', '#0e7490', '#be185d', '#b45309', '#374151']
+const RENKLER = ['#374151', '#1d6fa8', '#9333ea', '#c2410c', '#0e7490', '#be185d', '#374151', '#374151']
 
 const BOSH: Omit<Proje, 'id' | 'firma_id' | 'kayit_tarihi'> = {
-  ad: '', aciklama: '', renk: '#ff7f00', aktif: true, personel_takibi_aktif: false, sureli_gorev_aktif: false, qr_sistemi_aktif: true, nfc_sistemi_aktif: true, birim_fiyat_aktif: false
+  ad: '', aciklama: '', renk: '#374151', aktif: true, personel_takibi_aktif: false, sureli_gorev_aktif: false, qr_sistemi_aktif: true, nfc_sistemi_aktif: true, birim_fiyat_aktif: false
 }
 
 export default function ProjelerClient({
@@ -286,12 +286,12 @@ export default function ProjelerClient({
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fff7ed', border: '1px solid #ffd9a0', display: 'grid', placeItems: 'center', color: '#c45200' }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f9fafb', border: '1px solid #e5e7eb', display: 'grid', placeItems: 'center', color: '#1f2937' }}>
           <Layers size={20} />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 900, color: '#3d1c00' }}>PROJELER</div>
-          <div style={{ fontSize: 13, color: '#9a7b6a', marginTop: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: '#111827' }}>PROJELER</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 1 }}>
             {aktifler.length} aktif • {pasifler.length} pasif
           </div>
         </div>
@@ -308,12 +308,12 @@ export default function ProjelerClient({
 
       {/* Liste */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#9a7b6a' }}>
+        <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
           <span className="verde-spinner" style={{ display: 'inline-block', marginBottom: 8 }} />
           <div>Yükleniyor…</div>
         </div>
       ) : projeler.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 48, color: '#9a7b6a' }}>
+        <div style={{ textAlign: 'center', padding: 48, color: '#6b7280' }}>
           <Layers size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
           <div style={{ fontSize: 15, fontWeight: 600 }}>Henüz proje yok</div>
           {!readonly && <div style={{ fontSize: 13, marginTop: 6 }}>İlk projeyi oluşturmak için "Yeni Proje" butonuna tıklayın</div>}
@@ -324,7 +324,7 @@ export default function ProjelerClient({
             <div key={p.id} style={{
               display: 'grid', gridTemplateColumns: 'auto 1fr auto',
               alignItems: 'center', gap: 14, padding: '12px 16px',
-              borderRadius: 10, border: `1px solid ${p.aktif ? '#ffd9a0' : '#e8e8e8'}`,
+              borderRadius: 10, border: `1px solid ${p.aktif ? '#e5e7eb' : '#e8e8e8'}`,
               background: p.aktif ? '#fff' : '#fafafa',
               opacity: p.aktif ? 1 : 0.7,
             }}>
@@ -341,7 +341,7 @@ export default function ProjelerClient({
               {/* Bilgi */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#3d1c00' }}>{p.ad}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{p.ad}</span>
                   {!p.aktif && (
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>Pasif</span>
                   )}
@@ -358,8 +358,8 @@ export default function ProjelerClient({
                     <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: '#e0f2fe', color: '#0369a1', fontWeight: 700 }}>📶 NFC Aktif</span>
                   )}
                 </div>
-                {p.aciklama && <div style={{ fontSize: 12.5, color: '#9a7b6a', marginTop: 2 }}>{p.aciklama}</div>}
-                <div style={{ fontSize: 11.5, color: '#c4a882', marginTop: 3 }}>
+                {p.aciklama && <div style={{ fontSize: 12.5, color: '#6b7280', marginTop: 2 }}>{p.aciklama}</div>}
+                <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 3 }}>
                   {new Date(p.kayit_tarihi).toLocaleDateString('tr-TR')} tarihinde oluşturuldu
                 </div>
               </div>
@@ -368,8 +368,8 @@ export default function ProjelerClient({
               {!readonly && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {/* Proje ayarları Sistem Ayarları > Proje Ayarları'na taşındı */}
-                  <button onClick={() => openEdit(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #ffd9a0', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                    <Pencil size={14} style={{ color: '#6b4423' }} />
+                  <button onClick={() => openEdit(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                    <Pencil size={14} style={{ color: '#4b5563' }} />
                   </button>
                   <button onClick={() => del(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                     <Trash2 size={14} style={{ color: '#dc2626' }} />
@@ -440,24 +440,24 @@ export default function ProjelerClient({
           <div onClick={e => e.stopPropagation()} className="verde-card"
             style={{ width: 'min(480px, 96vw)', padding: 24 }}>
 
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#3d1c00', marginBottom: 20 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#111827', marginBottom: 20 }}>
               {modal === 'edit' ? 'Projeyi Düzenle' : 'Yeni Proje'}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Proje Logosu */}
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#6b4423', marginBottom: 5 }}>Proje Logosu</label>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#4b5563', marginBottom: 5 }}>Proje Logosu</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   {logoPreview ? (
                     <img src={logoPreview} alt="Logo" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'contain', border: '1px solid #e2e8f0', background: '#fff' }} />
                   ) : (
-                    <div style={{ width: 48, height: 48, borderRadius: 8, background: form.renk + '20', border: '1px dashed #ffd9a0', display: 'grid', placeItems: 'center', fontSize: 18, color: form.renk, fontWeight: 800 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 8, background: form.renk + '20', border: '1px dashed #e5e7eb', display: 'grid', placeItems: 'center', fontSize: 18, color: form.renk, fontWeight: 800 }}>
                       {form.ad?.[0]?.toUpperCase() ?? '?'}
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <label style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #ffd9a0', background: '#fff', fontSize: 12.5, fontWeight: 600, color: '#6b4423', cursor: 'pointer' }}>
+                    <label style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', fontSize: 12.5, fontWeight: 600, color: '#4b5563', cursor: 'pointer' }}>
                       {logoPreview ? 'Değiştir' : 'Logo Ekle'}
                       <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={e => {
                         const f = e.target.files?.[0]
@@ -477,16 +477,16 @@ export default function ProjelerClient({
                     )}
                   </div>
                 </div>
-                <span style={{ fontSize: 11, color: '#9a7b6a', marginTop: 4, display: 'block' }}>PNG veya JPEG, arka plansız logo önerilir. Otomatik boyutlandırılır.</span>
+                <span style={{ fontSize: 11, color: '#6b7280', marginTop: 4, display: 'block' }}>PNG veya JPEG, arka plansız logo önerilir. Otomatik boyutlandırılır.</span>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#6b4423', marginBottom: 5 }}>Proje Adı *</label>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#4b5563', marginBottom: 5 }}>Proje Adı *</label>
                 <input className="verde-input" value={form.ad} onChange={e => setForm(p => ({ ...p, ad: e.target.value }))} placeholder="Proje adını girin" />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#6b4423', marginBottom: 5 }}>Açıklama</label>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#4b5563', marginBottom: 5 }}>Açıklama</label>
                 <textarea className="verde-input" value={form.aciklama ?? ''} onChange={e => setForm(p => ({ ...p, aciklama: e.target.value }))}
                   placeholder="Kısa açıklama (opsiyonel)" rows={2} style={{ resize: 'vertical' }} />
               </div>

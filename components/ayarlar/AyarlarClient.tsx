@@ -228,8 +228,8 @@ export default function AyarlarClient({
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <UserAvatar name={me.isim_soyisim} photoUrl={profilFoto ?? undefined} size={46} />
           <div>
-            <div style={{ fontWeight: 800, color: '#3d1c00' }}>{me.isim_soyisim}</div>
-            <div style={{ fontSize: 12, color: '#9a7b6a' }}>{me.email}</div>
+            <div style={{ fontWeight: 800, color: '#111827' }}>{me.isim_soyisim}</div>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>{me.email}</div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
@@ -280,8 +280,8 @@ export default function AyarlarClient({
         <div className="verde-card" style={{ padding: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div>
-              <div style={{ fontWeight: 800, color: '#3d1c00' }}>E-posta Değiştir</div>
-              <div style={{ fontSize: 12, color: '#9a7b6a' }}>Yeni e-posta ve mevcut şifreniz ile güncelleyin.</div>
+              <div style={{ fontWeight: 800, color: '#111827' }}>E-posta Değiştir</div>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>Yeni e-posta ve mevcut şifreniz ile güncelleyin.</div>
             </div>
           </div>
 
@@ -303,8 +303,8 @@ export default function AyarlarClient({
         <div className="verde-card" style={{ padding: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div>
-              <div style={{ fontWeight: 800, color: '#3d1c00' }}>Şifre Değiştir</div>
-              <div style={{ fontSize: 12, color: '#9a7b6a' }}>Yeni şifreniz en az 6 karakter olmalıdır.</div>
+              <div style={{ fontWeight: 800, color: '#111827' }}>Şifre Değiştir</div>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>Yeni şifreniz en az 6 karakter olmalıdır.</div>
             </div>
           </div>
 
@@ -325,10 +325,10 @@ export default function AyarlarClient({
           </form>
         </div>
         <div className="verde-card" style={{ padding: 18 }}>
-          <div style={{ fontWeight: 800, color: '#3d1c00', marginBottom: 4 }}>Cihaz Eşleşmesi</div>
-          <div style={{ fontSize: 12, color: '#9a7b6a', marginBottom: 12 }}>Mobil uygulamaya bağlı cihaz bilgisi.</div>
+          <div style={{ fontWeight: 800, color: '#111827', marginBottom: 4 }}>Cihaz Eşleşmesi</div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>Mobil uygulamaya bağlı cihaz bilgisi.</div>
           {cihaz === 'loading' ? (
-            <div style={{ fontSize: 13, color: '#9a7b6a' }}>Yükleniyor…</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Yükleniyor…</div>
           ) : cihaz ? (
             <div style={{ display: 'grid', gap: 8 }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -340,7 +340,7 @@ export default function AyarlarClient({
                 </div>
               </div>
               {cihaz.son_kullanim && (
-                <div style={{ fontSize: 11, color: '#9a7b6a' }}>
+                <div style={{ fontSize: 11, color: '#6b7280' }}>
                   Son kullanım: {new Date(cihaz.son_kullanim).toLocaleString('tr-TR')}
                 </div>
               )}
@@ -351,7 +351,7 @@ export default function AyarlarClient({
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: '#9a7b6a' }}>Eşleştirilmiş cihaz bulunamadı.</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Eşleştirilmiş cihaz bulunamadı.</div>
           )}
         </div>
       </div>
@@ -362,7 +362,7 @@ export default function AyarlarClient({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: 'grid', gap: 6 }}>
-      <span style={{ fontSize: 12, color: '#9a7b6a' }}>{label}</span>
+      <span style={{ fontSize: 12, color: '#6b7280' }}>{label}</span>
       {children}
     </label>
   )

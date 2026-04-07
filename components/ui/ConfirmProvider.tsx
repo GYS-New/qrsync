@@ -96,9 +96,9 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             className="verde-card"
             style={{ width: 'min(520px, calc(100vw - 24px))', borderRadius: 12, boxShadow: '0 18px 50px rgba(0,0,0,0.22)', overflow: 'hidden' }}
           >
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ fontSize: 18 }}>{confirmOpts.variant === 'danger' ? '⚠️' : '✅'}</div>
-              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#3d1c00' }}>{confirmOpts.title ?? 'Onay'}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#111827' }}>{confirmOpts.title ?? 'Onay'}</div>
               <button
                 onClick={() => closeConfirm(false)}
                 aria-label="Kapat"
@@ -106,7 +106,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               >✕</button>
             </div>
             <div style={{ padding: 16, fontSize: 12.8, color: '#2b3a2b', whiteSpace: 'pre-wrap' }}>{confirmOpts.message}</div>
-            <div style={{ padding: 14, borderTop: '1px solid #ffe8c8', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div style={{ padding: 14, borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <Button variant="ghost" type="button" onClick={() => closeConfirm(false)}>
                 {confirmOpts.cancelText ?? 'İptal'}
               </Button>
@@ -134,9 +134,9 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             className="verde-card"
             style={{ width: 'min(480px, calc(100vw - 24px))', borderRadius: 12, boxShadow: '0 18px 50px rgba(0,0,0,0.22)', overflow: 'hidden' }}
           >
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ fontSize: 18 }}>🗑️</div>
-              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#3d1c00' }}>{choiceOpts.title ?? 'Seçin'}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#111827' }}>{choiceOpts.title ?? 'Seçin'}</div>
               <button
                 onClick={() => closeChoice(null)}
                 aria-label="Kapat"
@@ -152,10 +152,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   style={{
                     textAlign: 'left', padding: '12px 16px', borderRadius: 8, cursor: 'pointer',
                     border: opt.value === 'hard' ? '1.5px solid #e53e3e' : '1.5px solid #c8d8c8',
-                    background: opt.value === 'hard' ? '#fff5f5' : '#fffaf5',
+                    background: opt.value === 'hard' ? '#fff5f5' : '#fafafa',
                   }}
                   onMouseEnter={e => (e.currentTarget.style.background = opt.value === 'hard' ? '#ffe4e4' : '#ecf5ec')}
-                  onMouseLeave={e => (e.currentTarget.style.background = opt.value === 'hard' ? '#fff5f5' : '#fffaf5')}
+                  onMouseLeave={e => (e.currentTarget.style.background = opt.value === 'hard' ? '#fff5f5' : '#fafafa')}
                 >
                   <div style={{ fontWeight: 700, fontSize: 13, color: opt.value === 'hard' ? '#c53030' : '#1a2e1a' }}>
                     {opt.value === 'hard' ? '⚠️ ' : '📋 '}{opt.label}
@@ -166,7 +166,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 </button>
               ))}
             </div>
-            <div style={{ padding: '10px 16px', borderTop: '1px solid #ffe8c8', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ padding: '10px 16px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end' }}>
               <Button variant="ghost" type="button" onClick={() => closeChoice(null)}>
                 {choiceOpts.cancelText ?? 'İptal'}
               </Button>

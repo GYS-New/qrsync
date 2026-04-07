@@ -83,12 +83,12 @@ export function ChecklistTablo({ sonuclar, mesaj, sablonBaslik }: {
       <div style={{ marginBottom: 14, padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, fontSize: 12.5 }}>
           <span style={{ fontWeight: 700, color: '#0f172a' }}>Doldurulma Oranı</span>
-          <span style={{ fontWeight: 700, color: basariPct === 100 ? '#8b3a00' : basariPct >= 50 ? '#d97706' : '#dc2626' }}>
+          <span style={{ fontWeight: 700, color: basariPct === 100 ? '#111827' : basariPct >= 50 ? '#d97706' : '#dc2626' }}>
             %{basariPct}
           </span>
         </div>
         <div style={{ height: 7, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${basariPct}%`, background: basariPct === 100 ? '#ff7f00' : basariPct >= 50 ? '#d97706' : '#dc2626', borderRadius: 4, transition: 'width .4s ease' }} />
+          <div style={{ height: '100%', width: `${basariPct}%`, background: basariPct === 100 ? '#374151' : basariPct >= 50 ? '#d97706' : '#dc2626', borderRadius: 4, transition: 'width .4s ease' }} />
         </div>
         <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 11.5, color: '#64748b' }}>
           <span>✅ {dolduruldu}/{toplam} madde dolduruldu</span>
@@ -102,7 +102,7 @@ export function ChecklistTablo({ sonuclar, mesaj, sablonBaslik }: {
           <div key={i} style={{
             border: `1px solid ${s.dolduruldu ? '#d1fae5' : s.zorunlu ? '#fecaca' : '#e2e8f0'}`,
             borderRadius: 8, overflow: 'hidden',
-            background: s.dolduruldu ? '#fff7ed' : '#fff',
+            background: s.dolduruldu ? '#f9fafb' : '#fff',
           }}>
             {/* Madde başlık satırı */}
             <div style={{ padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: s.dolduruldu || s.not || s.gorsel_url ? '1px solid #f1f5f9' : 'none' }}>
@@ -314,7 +314,7 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
         <div style={{ overflowY: 'auto', flex: 1, padding: '18px 22px' }}>
           {loading && (
             <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
-              <RefreshCw size={24} style={{ animation: 'spin 0.9s linear infinite', margin: '0 auto 10px', display: 'block', color: '#ff7f00' }} />
+              <RefreshCw size={24} style={{ animation: 'spin 0.9s linear infinite', margin: '0 auto 10px', display: 'block', color: '#374151' }} />
               Yükleniyor…
             </div>
           )}
@@ -343,7 +343,7 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
                   <div key={s.madde_id} style={{
                     border: `2px solid ${eksik ? '#dc2626' : dolu || gorsel ? '#bbf7d0' : s.zorunlu ? '#fecaca' : '#e2e8f0'}`,
                     borderRadius: 10, padding: '14px 16px',
-                    background: eksik ? '#fff5f5' : dolu || gorsel ? '#fff7ed' : '#fff',
+                    background: eksik ? '#fff5f5' : dolu || gorsel ? '#f9fafb' : '#fff',
                   }}>
                     {/* Başlık */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -392,15 +392,15 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
                       <div>
                         <label style={labelS}>Fotoğraf {s.gorsel_gerekli ? <span style={{ color: '#dc2626' }}>*</span> : opsStr}</label>
                         {gs?.uploading ? (
-                          <div style={{ padding: '14px', background: '#fff7ed', border: '2px dashed #ffd9a0', borderRadius: 8, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
+                          <div style={{ padding: '14px', background: '#f9fafb', border: '2px dashed #e5e7eb', borderRadius: 8, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
                             <RefreshCw size={16} style={{ animation: 'spin 0.9s linear infinite', marginBottom: 4, display: 'block', margin: '0 auto 4px' }} />
                             Yükleniyor…
                           </div>
                         ) : gorsel ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#fff7ed', border: '2px solid #bbf7d0', borderRadius: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f9fafb', border: '2px solid #bbf7d0', borderRadius: 8 }}>
                             <img src={gorsel} alt="görsel" onClick={() => {}} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid #bbf7d0', flexShrink: 0, cursor: 'zoom-in' }} />
                             <div>
-                              <div style={{ fontSize: 12, color: '#c45200', fontWeight: 700 }}>✓ Fotoğraf mevcut</div>
+                              <div style={{ fontSize: 12, color: '#1f2937', fontWeight: 700 }}>✓ Fotoğraf mevcut</div>
                               <button type="button" onClick={() => updateGorsel(s.madde_id, { url: '' })}
                                 style={{ marginTop: 4, fontSize: 11, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 5, cursor: 'pointer', padding: '1px 8px', fontWeight: 600 }}>
                                 Kaldır
@@ -409,12 +409,12 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
                           </div>
                         ) : (
                           <label style={{
-                            display: 'block', border: `2px dashed ${eksik && s.gorsel_gerekli ? '#dc2626' : '#ffd9a0'}`,
+                            display: 'block', border: `2px dashed ${eksik && s.gorsel_gerekli ? '#dc2626' : '#e5e7eb'}`,
                             borderRadius: 8, padding: '16px', textAlign: 'center', cursor: 'pointer',
                             background: eksik && s.gorsel_gerekli ? '#fff5f5' : '#f9fcf9',
                           }}>
                             <div style={{ fontSize: 26, marginBottom: 4 }}>📷</div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#c45200' }}>Fotoğraf Ekle</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#1f2937' }}>Fotoğraf Ekle</div>
                             <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Dosya seçmek için tıkla</div>
                             <input type="file" accept="image/*" style={{ display: 'none' }}
                               onChange={e => void uploadGorselWeb(s.madde_id, e.target.files?.[0] ?? null)} />
@@ -442,7 +442,7 @@ export default function ChecklistModal({ taskId, taskType, onKapat, duzenleme = 
                   Vazgeç
                 </button>
                 <button onClick={handleKaydet} disabled={kayit || loading}
-                  style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: '#c45200', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, opacity: (kayit || loading) ? 0.7 : 1 }}>
+                  style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, opacity: (kayit || loading) ? 0.7 : 1 }}>
                   {kayit ? 'Kaydediliyor…' : '💾 Kaydet'}
                 </button>
               </div>

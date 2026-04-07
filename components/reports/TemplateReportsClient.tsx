@@ -14,7 +14,7 @@ interface Props {
 }
 
 const T = {
-  green: '#8b3a00', greenMid: '#ff7f00', border: '#e2e8f0', text: '#0f172a',
+  green: '#111827', greenMid: '#374151', border: '#e2e8f0', text: '#0f172a',
   textSoft: '#64748b', grayLight: '#f8fafc',
 }
 
@@ -203,7 +203,7 @@ export default function TemplateReportsClient({ base, isSA, tenantFirmaId, proje
         {/* SOL: Genel Rapor */}
         <div className="verde-card" style={{ padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#fff7ed', display: 'grid', placeItems: 'center' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#f9fafb', display: 'grid', placeItems: 'center' }}>
               <FileSpreadsheet size={22} color={T.green} />
             </div>
             <div>

@@ -8,7 +8,7 @@ interface UserAvatarProps {
 }
 
 const COLORS = [
-  ['#ff7f00', '#c45200'],
+  ['#374151', '#1f2937'],
   ['#2563eb', '#1d4ed8'],
   ['#6d28d9', '#5b21b6'],
   ['#c2610c', '#9a4e0a'],

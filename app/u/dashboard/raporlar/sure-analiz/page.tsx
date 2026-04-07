@@ -21,7 +21,7 @@ export default async function URaporlarSureAnalizPage() {
   if (!me.proje_id) return (
     <div>
       <Topbar title="Süre Analiz Raporları" base="/u" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Raporlar', href: '/u/dashboard/raporlar' }, { label: 'Süre Analiz Raporları' }]} />
-      <div style={{ padding: '48px 28px', textAlign: 'center', color: '#9a7b6a' }}>Bu hesap bir projeye bağlı değil.</div>
+      <div style={{ padding: '48px 28px', textAlign: 'center', color: '#6b7280' }}>Bu hesap bir projeye bağlı değil.</div>
     </div>
   )
 

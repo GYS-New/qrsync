@@ -170,8 +170,8 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
     <div className="verde-card" style={{ padding: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#3d1c00' }}>{firma.firma_adi || firma.ticari_unvan}</div>
-          <div style={{ fontSize: 14, color: '#9a7b6a', marginTop: 2 }}>{firma.ticari_unvan}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>{firma.firma_adi || firma.ticari_unvan}</div>
+          <div style={{ fontSize: 14, color: '#6b7280', marginTop: 2 }}>{firma.ticari_unvan}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {!edit ? (
@@ -373,8 +373,8 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
           ) : (
             <span style={{ fontWeight: 600, color: (() => {
               const v = (firma as any).lisans_gecerlilik_tarihi
-              if (!v) return '#ff7f00'
-              return new Date() > new Date(v) ? '#c0392b' : '#ff7f00'
+              if (!v) return '#374151'
+              return new Date() > new Date(v) ? '#c0392b' : '#374151'
             })() }}>
               {(firma as any).lisans_gecerlilik_tarihi
                 ? new Date((firma as any).lisans_gecerlilik_tarihi).toLocaleDateString('tr-TR')
@@ -393,7 +393,7 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 12, alignItems: 'center' }}>
-      <div style={{ fontSize: 14, color: '#9a7b6a' }}>{label}</div>
+      <div style={{ fontSize: 14, color: '#6b7280' }}>{label}</div>
       <div>{children}</div>
     </div>
   )

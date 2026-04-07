@@ -18,7 +18,7 @@ export default function QRCodePng({ value, size = 220, className }: Props) {
       margin: 1,
       width: size,
       color: {
-        dark: '#c45200',
+        dark: '#1f2937',
         light: '#ffffff',
       },
     }),

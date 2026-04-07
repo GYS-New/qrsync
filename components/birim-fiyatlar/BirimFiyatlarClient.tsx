@@ -167,7 +167,7 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
   const gruplarSizUst = gruplar.filter(g => !g.ust_lokasyon_id)
 
   if (loading) {
-    return <div className="verde-card" style={{ padding: 20, color: '#9a7b6a', fontSize: 14 }}>Yükleniyor…</div>
+    return <div className="verde-card" style={{ padding: 20, color: '#6b7280', fontSize: 14 }}>Yükleniyor…</div>
   }
 
   const renderGrup = (grup: Grup) => {
@@ -195,7 +195,7 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
 
           <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>
             🗂 {grup.ad}
-            <span style={{ fontSize: 11, color: '#9a7b6a', fontWeight: 400, marginLeft: 6 }}>
+            <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>
               ({memberLoks.length} lokasyon)
             </span>
           </span>
@@ -206,13 +206,13 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
             value={grupDraft.fiyat}
             onChange={e => onGrupFiyatChange(grup.id, e.target.value)}
             placeholder="0.00"
-            style={{ width: 100, padding: '4px 8px', borderRadius: 6, fontSize: 13, border: '1px solid #ffd9a0', background: readonly ? '#f5f5f5' : '#fff', color: '#1a3a1a' }}
+            style={{ width: 100, padding: '4px 8px', borderRadius: 6, fontSize: 13, border: '1px solid #e5e7eb', background: readonly ? '#f5f5f5' : '#fff', color: '#1a3a1a' }}
           />
           <select
             disabled={readonly}
             value={grupDraft.para_birimi}
             onChange={e => onGrupPbChange(grup.id, e.target.value)}
-            style={{ padding: '4px 6px', borderRadius: 6, border: '1px solid #ffd9a0', fontSize: 12, background: readonly ? '#f5f5f5' : '#fff' }}
+            style={{ padding: '4px 6px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 12, background: readonly ? '#f5f5f5' : '#fff' }}
           >
             {PARA_BIRIMLERI.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
@@ -220,7 +220,7 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
             <button
               disabled={isSaving}
               onClick={() => kaydetGrup(grup.id)}
-              style={{ padding: '4px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: '1px solid #86efac', background: isSaving ? '#fff7ed' : '#dcfce7', color: '#15803d', cursor: isSaving ? 'default' : 'pointer', whiteSpace: 'nowrap' }}
+              style={{ padding: '4px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: '1px solid #86efac', background: isSaving ? '#f9fafb' : '#dcfce7', color: '#15803d', cursor: isSaving ? 'default' : 'pointer', whiteSpace: 'nowrap' }}
             >
               {isSaving ? '…' : 'Tümünü Kaydet'}
             </button>
@@ -241,8 +241,8 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
                   borderTop: '1px solid #f0f7f0',
                   background: idx % 2 === 0 ? '#fafcfa' : '#fff',
                 }}>
-                  <span style={{ flex: 1, fontSize: 12, color: '#6b4423', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ color: '#d4b896' }}>└─</span>
+                  <span style={{ flex: 1, fontSize: 12, color: '#4b5563', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ color: '#d1d5db' }}>└─</span>
                     {lok.tanim}
                   </span>
                   <input
@@ -251,13 +251,13 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
                     value={lokDraft.fiyat}
                     onChange={e => setDrafts(prev => ({ ...prev, [lokKey]: { ...getDraft(lokKey), fiyat: e.target.value } }))}
                     placeholder="0.00"
-                    style={{ width: 90, padding: '3px 7px', borderRadius: 6, fontSize: 12, border: '1px solid #ffd9a0', background: readonly ? '#f5f5f5' : '#fff', color: '#1a3a1a' }}
+                    style={{ width: 90, padding: '3px 7px', borderRadius: 6, fontSize: 12, border: '1px solid #e5e7eb', background: readonly ? '#f5f5f5' : '#fff', color: '#1a3a1a' }}
                   />
                   <select
                     disabled={readonly}
                     value={lokDraft.para_birimi}
                     onChange={e => setDrafts(prev => ({ ...prev, [lokKey]: { ...getDraft(lokKey), para_birimi: e.target.value } }))}
-                    style={{ padding: '3px 5px', borderRadius: 6, border: '1px solid #ffd9a0', fontSize: 11, background: readonly ? '#f5f5f5' : '#fff' }}
+                    style={{ padding: '3px 5px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 11, background: readonly ? '#f5f5f5' : '#fff' }}
                   >
                     {PARA_BIRIMLERI.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
@@ -265,7 +265,7 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
                     <button
                       disabled={isLokSaving}
                       onClick={() => kaydetLok(lok.id)}
-                      style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, border: '1px solid #86efac', background: isLokSaving ? '#fff7ed' : '#dcfce7', color: '#15803d', cursor: isLokSaving ? 'default' : 'pointer' }}
+                      style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, border: '1px solid #86efac', background: isLokSaving ? '#f9fafb' : '#dcfce7', color: '#15803d', cursor: isLokSaving ? 'default' : 'pointer' }}
                     >
                       {isLokSaving ? '…' : 'Kaydet'}
                     </button>
@@ -287,7 +287,7 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
       </div>
 
       {ustLokasyonlar.length === 0 && gruplarSizUst.length === 0 && (
-        <div className="verde-card" style={{ padding: 20, color: '#9a7b6a', fontSize: 14 }}>Bu projede lokasyon grubu bulunamadı.</div>
+        <div className="verde-card" style={{ padding: 20, color: '#6b7280', fontSize: 14 }}>Bu projede lokasyon grubu bulunamadı.</div>
       )}
 
       {/* Üst lokasyon bazlı gruplar */}
@@ -304,7 +304,7 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
             >
               <span style={{ fontSize: 14, fontWeight: 800, color: '#1a3a1a', flex: 1 }}>
                 📍 {ustLok.tanim}
-                <span style={{ fontSize: 11, color: '#9a7b6a', fontWeight: 400, marginLeft: 8 }}>
+                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 8 }}>
                   ({altGruplar.length} grup)
                 </span>
               </span>

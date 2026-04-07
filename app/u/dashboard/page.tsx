@@ -28,7 +28,7 @@ export default async function Dashboard() {
         base="/u"
         breadcrumbs={[{ label: 'Gösterge Paneli' }]}
         actions={
-          <span style={{ fontSize: 13, color: '#9a7b6a' }}>
+          <span style={{ fontSize: 13, color: '#6b7280' }}>
             {new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </span>
         }

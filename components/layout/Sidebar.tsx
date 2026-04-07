@@ -124,7 +124,7 @@ type SidebarCounts = {
 
 function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' | 'blue' | 'orange' }) {
   const palette = {
-    green: { bg: '#ffe4bc', border: '#ffc078', text: '#c45200' },
+    green: { bg: '#e5e7eb', border: '#d1d5db', text: '#1f2937' },
     yellow: { bg: '#fff2cc', border: '#ffe08a', text: '#7a5a00' },
     blue: { bg: '#e3f2ff', border: '#b7dcff', text: '#185a9b' },
     orange: { bg: '#ffe7d6', border: '#ffd0b0', text: '#8a3b00' },
@@ -293,7 +293,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         width: 282,
         minHeight: '100vh',
         background: '#fff',
-        borderRight: '1px solid #ffd9a0',
+        borderRight: '1px solid #e5e7eb',
         display: 'flex',
         flexDirection: 'column',
         position: 'fixed',
@@ -304,7 +304,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
       }}
     >
       {/* Logo */}
-      <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid #ffe8c8' }}>
+      <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid #f3f4f6' }}>
         <div
           style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
           onClick={() => go(`${base}/dashboard`)}
@@ -330,11 +330,11 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
             <img src={projeLogo} alt="Proje" style={{ height: 48, objectFit: 'contain' }} />
           </div>
         ) : !isSA ? (
-          <div style={{ padding: '10px 14px', margin: '8px 2px 6px', borderRadius: 10, fontWeight: 700, fontSize: 14, color: '#b45309', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ padding: '10px 14px', margin: '8px 2px 6px', borderRadius: 10, fontWeight: 700, fontSize: 14, color: '#374151', display: 'flex', alignItems: 'center', gap: 10 }}>
             <ProataMark size={28} rounded={6} gap={2} />
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700 }}>
-              <span style={{ fontWeight: 300, color: '#6b4423' }}>Pro</span>
-              <span style={{ fontWeight: 800, color: '#c45200' }}>ATA</span>
+              <span style={{ fontWeight: 300, color: '#4b5563' }}>Pro</span>
+              <span style={{ fontWeight: 800, color: '#1f2937' }}>ATA</span>
             </span>
           </div>
         ) : null}
@@ -364,7 +364,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
-                color: '#c4a882',
+                color: '#9ca3af',
                 padding: '10px 8px 4px',
               }}
             >
@@ -384,12 +384,12 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                   cursor: 'pointer',
                   fontSize: 16,
                   fontWeight: isActive(item.href) ? 800 : 650,
-                  color: isActive(item.href) ? '#c45200' : '#6b4423',
-                  background: isActive(item.href) ? '#ffe4bc' : 'transparent',
+                  color: isActive(item.href) ? '#1f2937' : '#4b5563',
+                  background: isActive(item.href) ? '#e5e7eb' : 'transparent',
                   transition: 'all 0.12s',
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActive(item.href)) e.currentTarget.style.background = '#fff7ed'
+                  if (!isActive(item.href)) e.currentTarget.style.background = '#f9fafb'
                 }}
                 onMouseLeave={(e) => {
                   if (!isActive(item.href)) e.currentTarget.style.background = 'transparent'
@@ -411,11 +411,11 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
       </nav>
 
       {/* Footer */}
-      <div style={{ padding: 12, borderTop: '1px solid #ffe8c8' }}>
+      <div style={{ padding: 12, borderTop: '1px solid #f3f4f6' }}>
         <div
           onClick={() => go(`${base}/dashboard/ayarlar`)}
           style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 6, cursor: 'pointer' }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#fff7ed')}
+          onMouseEnter={(e) => (e.currentTarget.style.background = '#f9fafb')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
         >
           <UserAvatar name={user.isim_soyisim} photoUrl={user.profil_foto} size={40} />
@@ -424,7 +424,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
               style={{
                 fontSize: 15,
                 fontWeight: 800,
-                color: '#3d1c00',
+                color: '#111827',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -435,7 +435,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
             <div
               style={{
                 fontSize: 13.5,
-                color: '#9a7b6a',
+                color: '#6b7280',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',

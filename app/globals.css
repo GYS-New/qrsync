@@ -4,37 +4,37 @@
 @tailwind utilities;
 
 :root {
-  --bg: #fffbf5;
+  --bg: #fafafa;
   --white: #ffffff;
-  --border: #ffd9a0;
-  --border-light: #ffe8c8;
-  --border-table: #ffe0b2;
+  --border: #e5e7eb;
+  --border-light: #f3f4f6;
+  --border-table: #e5e7eb;
 
-  --green-50:  #fff7ed;
-  --green-100: #ffe4bc;
-  --green-200: #ffc078;
-  --green-500: #ff9a30;
-  --green-600: #ff7f00;
-  --green-700: #c45200;
+  --green-50:  #f9fafb;
+  --green-100: #f3f4f6;
+  --green-200: #e5e7eb;
+  --green-500: #6b7280;
+  --green-600: #374151;
+  --green-700: #1f2937;
 
-  --text-900: #3d1c00;
-  --text-700: #5c3a1e;
-  --text-500: #6b4423;
-  --text-400: #9a7b6a;
-  --text-300: #c4a882;
+  --text-900: #111827;
+  --text-700: #374151;
+  --text-500: #4b5563;
+  --text-400: #6b7280;
+  --text-300: #9ca3af;
 
   --blue:     #2563eb;
   --blue-l:   #eff6ff;
-  --orange:   #ff7f00;
-  --orange-l: #fff7ed;
+  --orange:   #374151;
+  --orange-l: #f9fafb;
   --red:      #b91c1c;
   --red-l:    #fef2f2;
   --purple:   #6d28d9;
   --purple-l: #f5f3ff;
 
-  --shadow-xs: 0 1px 2px rgba(60,30,0,0.05);
-  --shadow-sm: 0 1px 4px rgba(60,30,0,0.07), 0 1px 2px rgba(60,30,0,0.04);
-  --shadow:    0 4px 14px rgba(60,30,0,0.08), 0 1px 3px rgba(60,30,0,0.05);
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow:    0 4px 14px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
 }
 
 * {
@@ -58,56 +58,56 @@ html, body {
 .auth-input:-webkit-autofill:hover,
 .auth-input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--text-900);
-  -webkit-box-shadow: 0 0 0px 1000px rgba(255, 247, 237, 0.9) inset;
-  box-shadow: 0 0 0px 1000px rgba(255, 247, 237, 0.9) inset;
+  -webkit-box-shadow: 0 0 0px 1000px rgba(249, 250, 251, 0.9) inset;
+  box-shadow: 0 0 0px 1000px rgba(249, 250, 251, 0.9) inset;
   caret-color: var(--text-900);
 }
 
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--green-200); }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
 /* ── COMPONENTS ── */
 @layer components {
   .verde-card {
-    @apply bg-white border border-[#ffd9a0] rounded-[7px] shadow-[0_1px_2px_rgba(60,30,0,0.05)];
+    @apply bg-white border border-[#e5e7eb] rounded-[7px] shadow-[0_1px_2px_rgba(0,0,0,0.05)];
   }
 
   .verde-btn-primary {
-    @apply bg-[#ff7f00] text-white border-none rounded-[5px] px-4 py-2
+    @apply bg-[#111827] text-white border-none rounded-[5px] px-4 py-2
            font-semibold text-[14.5px] cursor-pointer
            transition-all duration-150
-           hover:bg-[#c45200] hover:shadow-[0_2px_8px_rgba(255,127,0,0.4)]
+           hover:bg-[#374151] hover:shadow-[0_2px_8px_rgba(0,0,0,0.2)]
            hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.98]
-           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,127,0,0.28)]
+           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(55,65,81,0.28)]
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .verde-btn-ghost {
-    @apply bg-white text-[#6b4423] border border-[#ffd9a0] rounded-[5px] px-4 py-2
+    @apply bg-white text-[#374151] border border-[#e5e7eb] rounded-[5px] px-4 py-2
            font-semibold text-[14.5px] cursor-pointer
            transition-all duration-150
-           hover:border-[#ff7f00] hover:text-[#5c3a1e]
+           hover:border-[#9ca3af] hover:text-[#111827]
            hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.98]
-           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,127,0,0.18)]
+           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(107,114,128,0.18)]
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .verde-btn-outline-strong {
-    @apply bg-transparent text-[#ff7f00] border-2 border-[#ff7f00]
+    @apply bg-transparent text-[#374151] border-2 border-[#374151]
            rounded-[8px] px-4 py-[7px]
            font-semibold text-[14.5px] cursor-pointer
            transition-all duration-150
-           hover:bg-[#fff7ed]
+           hover:bg-[#f3f4f6]
            hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.99]
-           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,127,0,0.18)]
+           focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(107,114,128,0.18)]
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .verde-btn-outline-strong.is-active {
-    @apply bg-[#ffe4bc];
+    @apply bg-[#e5e7eb];
   }
 
   .verde-btn-danger {
@@ -124,16 +124,16 @@ html, body {
   }
 
   .verde-input {
-    @apply w-full bg-[#fff7ed] border border-[#ffd9a0] rounded-[5px]
-           px-3 py-2 text-[15px] text-[#3d1c00]
-           placeholder:text-[#c4a882]
+    @apply w-full bg-[#f9fafb] border border-[#e5e7eb] rounded-[5px]
+           px-3 py-2 text-[15px] text-[#111827]
+           placeholder:text-[#9ca3af]
            transition-colors duration-150
-           focus:outline-none focus:border-[#ff7f00] focus:bg-white
+           focus:outline-none focus:border-[#6b7280] focus:bg-white
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .verde-label {
-    @apply block text-[13px] font-bold text-[#6b4423] uppercase tracking-[0.8px] mb-1;
+    @apply block text-[13px] font-bold text-[#4b5563] uppercase tracking-[0.8px] mb-1;
   }
 
   .verde-badge {
@@ -145,42 +145,42 @@ html, body {
     @apply w-full border-collapse;
   }
   .verde-table thead tr {
-    @apply bg-[#fff7ed] border-b border-[#ffe0b2];
+    @apply bg-[#f9fafb] border-b border-[#e5e7eb];
   }
   .verde-table thead th {
-    @apply px-4 py-2 text-left text-[13px] font-bold text-[#9a7b6a]
+    @apply px-4 py-2 text-left text-[13px] font-bold text-[#6b7280]
            uppercase tracking-[0.8px];
     position: sticky;
     top: 0;
     z-index: 2;
-    background: #fff7ed;
+    background: #f9fafb;
   }
   .verde-table tbody tr {
-    @apply border-b border-[#ffe0b2] transition-colors duration-100 cursor-pointer;
+    @apply border-b border-[#e5e7eb] transition-colors duration-100 cursor-pointer;
   }
-  .verde-table tbody tr:hover { @apply bg-[#fff7ed]; }
+  .verde-table tbody tr:hover { @apply bg-[#f9fafb]; }
   .verde-table tbody tr:last-child { @apply border-b-0; }
   .verde-table tbody td {
-    @apply px-4 py-3 text-[13.5px] text-[#5c3a1e];
+    @apply px-4 py-3 text-[13.5px] text-[#374151];
   }
 
   .verde-select {
-    @apply bg-white border border-[#ffd9a0] rounded-[5px]
-           px-3 py-2 text-[15px] text-[#3d1c00]
+    @apply bg-white border border-[#e5e7eb] rounded-[5px]
+           px-3 py-2 text-[15px] text-[#111827]
            cursor-pointer
-           focus:outline-none focus:border-[#ff7f00];
+           focus:outline-none focus:border-[#6b7280];
   }
 
   .verde-spinner {
     width: 24px;
     height: 24px;
-    border: 3px solid #ffe4bc;
-    border-top-color: #ff7f00;
+    border: 3px solid #e5e7eb;
+    border-top-color: #374151;
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
   }
 
-  .status-islemde { @apply bg-[#fff7ed] border-[#ffd9a0] text-[#c45200]; }
+  .status-islemde { @apply bg-[#f3f4f6] border-[#e5e7eb] text-[#374151]; }
   .status-iptal   { @apply bg-gray-100 border-gray-200 text-gray-500; }
 }
 

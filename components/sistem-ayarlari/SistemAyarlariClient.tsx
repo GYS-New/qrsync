@@ -77,10 +77,10 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
               padding: '9px 18px',
               fontSize: 14,
               fontWeight: aktifTab === tab.key ? 700 : 500,
-              color: aktifTab === tab.key ? '#8b3a00' : '#6b7280',
+              color: aktifTab === tab.key ? '#111827' : '#6b7280',
               background: 'none',
               border: 'none',
-              borderBottom: aktifTab === tab.key ? '2px solid #8b3a00' : '2px solid transparent',
+              borderBottom: aktifTab === tab.key ? '2px solid #111827' : '2px solid transparent',
               marginBottom: -2,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
@@ -164,7 +164,7 @@ function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
     setSavingKey(null)
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#9a7b6a' }}>Yükleniyor...</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
   if (!proje) return <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>Proje bulunamadı.</div>
 
   const items: { key: string; label: string; desc: string; icon: string }[] = [
@@ -202,7 +202,7 @@ function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
                 style={{
                   width: 52, height: 28, borderRadius: 14, border: 'none',
                   cursor: busy ? 'not-allowed' : 'pointer', flexShrink: 0,
-                  background: val ? '#8b3a00' : '#cbd5e1', position: 'relative', transition: 'background .2s',
+                  background: val ? '#111827' : '#cbd5e1', position: 'relative', transition: 'background .2s',
                 }}
               >
                 <div style={{
@@ -210,7 +210,7 @@ function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
                   left: val ? 27 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
                 }} />
               </button>
-              <span style={{ fontSize: 12, fontWeight: 600, color: val ? '#8b3a00' : '#94a3b8', minWidth: 36 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: val ? '#111827' : '#94a3b8', minWidth: 36 }}>
                 {val ? 'Açık' : 'Kapalı'}
               </span>
             </div>
@@ -261,7 +261,7 @@ function MobilAyarlariPanel() {
     setSaving(false)
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#9a7b6a' }}>Yükleniyor...</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
 
   const sinp: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, width: '100%' }
 
@@ -407,16 +407,16 @@ function UygulamaAyarlariPanel() {
     setSaving(false)
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#9a7b6a' }}>Yükleniyor...</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
 
   return (
     <div style={{ maxWidth: 560 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-        <div style={{ width: 4, height: 20, borderRadius: 2, background: '#8b3a00' }} />
+        <div style={{ width: 4, height: 20, borderRadius: 2, background: '#111827' }} />
         <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Uygulama Ayarları</h3>
       </div>
 
-      <div style={{ padding: '10px 14px', background: '#fff7ed', border: '1px solid #86efac', borderRadius: 8, fontSize: 12.5, color: '#8b3a00', lineHeight: 1.6, marginBottom: 16 }}>
+      <div style={{ padding: '10px 14px', background: '#f9fafb', border: '1px solid #86efac', borderRadius: 8, fontSize: 12.5, color: '#111827', lineHeight: 1.6, marginBottom: 16 }}>
         Login sayfasında ve uygulama genelinde kullanılan logo ve isim ayarları. Logo arka plansız PNG formatında olmalıdır.
       </div>
 
@@ -432,7 +432,7 @@ function UygulamaAyarlariPanel() {
         {/* Logo önizleme */}
         <div style={{
           border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, marginBottom: 14,
-          background: 'linear-gradient(135deg, #f8fafc, #fff7ed)',
+          background: 'linear-gradient(135deg, #f8fafc, #f9fafb)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80,
         }}>
           {logoUrl ? (
@@ -447,7 +447,7 @@ function UygulamaAyarlariPanel() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ffd9a0', background: '#fff', fontSize: 13, fontWeight: 600, color: '#6b4423', cursor: uploading ? 'not-allowed' : 'pointer' }}>
+          <label style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontSize: 13, fontWeight: 600, color: '#4b5563', cursor: uploading ? 'not-allowed' : 'pointer' }}>
             {uploading ? 'Yükleniyor...' : logoUrl ? 'Değiştir' : 'Logo Yükle'}
             <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={handleLogoUpload} disabled={uploading} />
           </label>
@@ -467,11 +467,11 @@ function UygulamaAyarlariPanel() {
             style={{ height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 14, fontWeight: 700, flex: 1 }}
             placeholder="QR-Sync" />
           <button onClick={handleSaveName} disabled={saving}
-            style={{ height: 36, padding: '0 16px', borderRadius: 8, background: '#8b3a00', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
+            style={{ height: 36, padding: '0 16px', borderRadius: 8, background: '#111827', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
             {saving ? '...' : 'Kaydet'}
           </button>
         </div>
-        <span style={{ fontSize: 11, color: '#9a7b6a', marginTop: 4, display: 'block' }}>Login sayfasında, sayfa başlığında ve bildirimlerde kullanılır.</span>
+        <span style={{ fontSize: 11, color: '#6b7280', marginTop: 4, display: 'block' }}>Login sayfasında, sayfa başlığında ve bildirimlerde kullanılır.</span>
       </div>
 
       {/* Sidebar Logosu (SA/alt_SA üst sol köşe) */}
@@ -484,7 +484,7 @@ function UygulamaAyarlariPanel() {
         </div>
         <div style={{
           border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, marginBottom: 14,
-          background: 'linear-gradient(135deg, #f8fafc, #fff7ed)',
+          background: 'linear-gradient(135deg, #f8fafc, #f9fafb)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 64,
         }}>
           {sidebarLogoUrl ? (
@@ -495,7 +495,7 @@ function UygulamaAyarlariPanel() {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ffd9a0', background: '#fff', fontSize: 13, fontWeight: 600, color: '#6b4423', cursor: uploadingSidebar ? 'not-allowed' : 'pointer' }}>
+          <label style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontSize: 13, fontWeight: 600, color: '#4b5563', cursor: uploadingSidebar ? 'not-allowed' : 'pointer' }}>
             {uploadingSidebar ? 'Yükleniyor...' : sidebarLogoUrl ? 'Değiştir' : 'Logo Yükle'}
             <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={async (e) => {
               const file = e.target.files?.[0]; if (!file) return
@@ -523,7 +523,7 @@ function UygulamaAyarlariPanel() {
       </div>
 
       {msg && (
-        <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 13, background: msg.includes('Hata') ? '#fef2f2' : '#fff7ed', color: msg.includes('Hata') ? '#dc2626' : '#8b3a00', fontWeight: 600 }}>
+        <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 13, background: msg.includes('Hata') ? '#fef2f2' : '#f9fafb', color: msg.includes('Hata') ? '#dc2626' : '#111827', fontWeight: 600 }}>
           {msg}
         </div>
       )}
@@ -555,7 +555,7 @@ function SistemKonfigurasyonPanel() {
     setSaving(false)
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#9a7b6a' }}>Yükleniyor...</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
 
   const sinp: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, width: '100%' }
 
@@ -619,7 +619,7 @@ function SistemKonfigurasyonPanel() {
         </button>
       </div>
       {msg && (
-        <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, background: msg.includes('Hata') ? '#fef2f2' : '#fff7ed', color: msg.includes('Hata') ? '#dc2626' : '#8b3a00', fontWeight: 600 }}>
+        <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, background: msg.includes('Hata') ? '#fef2f2' : '#f9fafb', color: msg.includes('Hata') ? '#dc2626' : '#111827', fontWeight: 600 }}>
           {msg}
         </div>
       )}
@@ -664,7 +664,7 @@ function SmtpAyarlariPanel() {
     setTesting(false)
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#9a7b6a' }}>Yükleniyor...</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
 
   const sinp: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, width: '100%' }
 
@@ -712,7 +712,7 @@ function SmtpAyarlariPanel() {
         </label>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <button onClick={handleSave} disabled={saving}
-            style={{ height: 38, padding: '0 20px', borderRadius: 8, background: '#8b3a00', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
+            style={{ height: 38, padding: '0 20px', borderRadius: 8, background: '#111827', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
             {saving ? 'Kaydediliyor...' : 'Kaydet'}
           </button>
           <button onClick={handleTest} disabled={testing}
@@ -721,7 +721,7 @@ function SmtpAyarlariPanel() {
           </button>
         </div>
         {testResult && (
-          <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, background: testResult.includes('Hata') || testResult.includes('eksik') ? '#fef2f2' : '#fff7ed', color: testResult.includes('Hata') || testResult.includes('eksik') ? '#dc2626' : '#8b3a00', fontWeight: 600 }}>
+          <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, background: testResult.includes('Hata') || testResult.includes('eksik') ? '#fef2f2' : '#f9fafb', color: testResult.includes('Hata') || testResult.includes('eksik') ? '#dc2626' : '#111827', fontWeight: 600 }}>
             {testResult}
           </div>
         )}

@@ -148,12 +148,12 @@ export default function TumGorevlerClient({
     <div className="verde-card" style={{ padding: 16 }}>
       <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap: 12, flexWrap:'wrap', marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: '#3d1c00' }}>FREKANSİYEL GÖREV YÖNETİMİ</div>
-          <div style={{ fontSize: 14, color: '#9a7b6a', marginTop: 2 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, color: '#111827' }}>FREKANSİYEL GÖREV YÖNETİMİ</div>
+          <div style={{ fontSize: 14, color: '#6b7280', marginTop: 2 }}>
             Filtreleri seçip <strong>Uygula</strong>'ya basın — tablo ve arşiv kayıtları birlikte görünür
           </div>
         </div>
-        <a href={`${base}/dashboard/canli-islemler`} className="text-[14px] underline" style={{ color:'#ff7f00' }}>
+        <a href={`${base}/dashboard/canli-islemler`} className="text-[14px] underline" style={{ color:'#374151' }}>
           Canlı Görevler'e Dön
         </a>
       </div>
@@ -200,18 +200,18 @@ export default function TumGorevlerClient({
 
         <button
           type="button" onClick={uygula} disabled={loading}
-          style={{ height:36, padding:'0 16px', borderRadius:8, border:'none', background:'#c45200', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', opacity: loading ? 0.7 : 1 }}>
+          style={{ height:36, padding:'0 16px', borderRadius:8, border:'none', background:'#1f2937', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? 'Yükleniyor…' : '▶ Uygula'}
         </button>
         <button
           type="button" onClick={clear}
-          className="border border-[#ffd9a0] px-3 py-2 rounded-[10px] text-[14px] hover:bg-[#fff9f0]">
+          className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[14px] hover:bg-[#fafafa]">
           Temizle
         </button>
       </div>
 
       {/* ── Tablo — Aktif kayıtlar ── */}
-      <div style={{ fontSize:12, fontWeight:700, color:'#c45200', marginBottom:4 }}>
+      <div style={{ fontSize:12, fontWeight:700, color:'#1f2937', marginBottom:4 }}>
         TABLO ({displayRows.length} kayıt)
       </div>
       <div className="verde-table-wrap" style={{ marginBottom: filtered && displayArsiv.length > 0 ? 24 : 0 }}>
@@ -226,19 +226,19 @@ export default function TumGorevlerClient({
             {displayRows.map((g: any) => (
               <tr key={g.id}>
                 <td style={{ fontWeight: 600 }}>{g.tanim}</td>
-                <td style={{ color:'#6b4423' }}>{getLocPath(g.lokasyon_id)}</td>
-                <td style={{ color:'#6b4423' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
-                <td style={{ color:'#9a7b6a', whiteSpace:'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
+                <td style={{ color:'#4b5563' }}>{getLocPath(g.lokasyon_id)}</td>
+                <td style={{ color:'#4b5563' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                <td style={{ color:'#6b7280', whiteSpace:'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
                 <td>
                   <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>
                     {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
                   </span>
                 </td>
-                <td style={{ color:'#9a7b6a', fontSize:13 }}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
+                <td style={{ color:'#6b7280', fontSize:13 }}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
               </tr>
             ))}
             {!displayRows.length && (
-              <tr><td colSpan={6} style={{ textAlign:'center', color:'#9a7b6a', padding:'26px 0', fontSize: 14 }}>
+              <tr><td colSpan={6} style={{ textAlign:'center', color:'#6b7280', padding:'26px 0', fontSize: 14 }}>
                 {filtered ? 'Kriterlere uygun aktif kayıt bulunamadı.' : 'Görev bulunamadı.'}
               </td></tr>
             )}
@@ -276,7 +276,7 @@ export default function TumGorevlerClient({
                   </tr>
                 ))}
                 {!displayArsiv.length && (
-                  <tr><td colSpan={6} style={{ textAlign:'center', color:'#9a7b6a', padding:'20px 0', fontSize: 14 }}>
+                  <tr><td colSpan={6} style={{ textAlign:'center', color:'#6b7280', padding:'20px 0', fontSize: 14 }}>
                     Kriterlere uygun arşiv kaydı bulunamadı.
                   </td></tr>
                 )}

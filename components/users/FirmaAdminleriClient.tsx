@@ -26,7 +26,7 @@ export default function FirmaAdminleriClient({
   if (!firmaId) {
     return (
       <div style={{ padding: '24px 28px' }}>
-        <div className="verde-card" style={{ padding: '48px', textAlign: 'center', color: '#9a7b6a' }}>
+        <div className="verde-card" style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>
           <div style={{ fontSize: 28, marginBottom: 8 }}>🏢</div>
           <div>Firma adminlerini görmek için üstten bir firma seçin.</div>
         </div>

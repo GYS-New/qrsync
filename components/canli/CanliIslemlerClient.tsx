@@ -57,10 +57,10 @@ function LiveHeader({
     { key: 'BEKLEMEDE', label: 'Beklemede',       count: kpi.beklemede },
     { key: 'GECMİŞ',   label: 'Zamanı geçmiş',  count: kpi.gecmis },
   ]
-  const dotColor = streamState === 'running' ? '#ff7f00' : streamState === 'paused' ? '#d97706' : '#9ca3af'
+  const dotColor = streamState === 'running' ? '#374151' : streamState === 'paused' ? '#d97706' : '#9ca3af'
   const kpiCards = [
-    { label: 'Toplam',          val: kpi.toplam,      bg: 'transparent',  vColor: '#3d1c00',  lColor: '#9a7b6a' },
-    { label: 'Tamamlandı',      val: kpi.tamamlandi,  bg: '#fff7ed',      vColor: '#8b3a00',  lColor: '#3B6D11' },
+    { label: 'Toplam',          val: kpi.toplam,      bg: 'transparent',  vColor: '#111827',  lColor: '#6b7280' },
+    { label: 'Tamamlandı',      val: kpi.tamamlandi,  bg: '#f9fafb',      vColor: '#111827',  lColor: '#3B6D11' },
     { label: 'Açık',            val: kpi.acik,        bg: '#eff6ff',      vColor: '#1d4ed8',  lColor: '#185FA5' },
     { label: 'Beklemede',       val: kpi.beklemede,   bg: '#fffbeb',      vColor: '#92400e',  lColor: '#854F0B' },
     { label: 'Zamanı geçmiş',   val: kpi.gecmis,      bg: '#fef2f2',      vColor: '#991b1b',  lColor: '#A32D2D' },
@@ -69,21 +69,21 @@ function LiveHeader({
   return (
     <div className="verde-card" style={{ overflow: 'hidden', marginBottom: 0 }}>
       {/* ── BAŞLIK SATIRI ── */}
-      <div style={{ padding: '12px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
           {/* Tarayıcı animasyonu */}
-          <div style={{ width: 20, height: 20, border: '1.5px solid #ff7f00', borderRadius: 5, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+          <div style={{ width: 20, height: 20, border: '1.5px solid #374151', borderRadius: 5, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
             <div style={{
               position: 'absolute', left: 0, right: 0, height: 2,
               background: 'rgba(46,139,46,0.5)',
               animation: streamState === 'running' ? 'canliScan 1.8s linear infinite' : 'none',
             }} />
           </div>
-          <span style={{ fontSize: 14, fontWeight: 800, color: '#3d1c00', letterSpacing: '-0.2px' }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#111827', letterSpacing: '-0.2px' }}>
             Frekansiyel Görev Akışı
           </span>
           {/* Canlı badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 9px', borderRadius: 20, background: streamState === 'running' ? '#fff7ed' : '#f5f5f5', border: `1px solid ${streamState === 'running' ? '#ffc078' : '#e0e0e0'}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 9px', borderRadius: 20, background: streamState === 'running' ? '#f9fafb' : '#f5f5f5', border: `1px solid ${streamState === 'running' ? '#d1d5db' : '#e0e0e0'}` }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0,
               animation: streamState === 'running' ? 'canliPulse 1.4s ease-in-out infinite' : 'none' }} />
             <span style={{ fontSize: 11, fontWeight: 700, color: dotColor }}>
@@ -102,7 +102,7 @@ function LiveHeader({
             ].map(({ s, icon, title }) => (
               <button key={s} type="button" title={title}
                 onClick={() => setStreamState(s)}
-                style={{ width: 30, height: 30, borderRadius: 6, border: `1px solid ${streamState === s ? '#ff7f00' : '#ffd9a0'}`, background: streamState === s ? '#ffe4bc' : '#fff', cursor: 'pointer', fontSize: 11, color: streamState === s ? '#c45200' : '#9a7b6a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ width: 30, height: 30, borderRadius: 6, border: `1px solid ${streamState === s ? '#374151' : '#e5e7eb'}`, background: streamState === s ? '#e5e7eb' : '#fff', cursor: 'pointer', fontSize: 11, color: streamState === s ? '#1f2937' : '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {icon}
               </button>
             ))}
@@ -111,14 +111,14 @@ function LiveHeader({
 
         {showTumGorevler && (
           <Link href={`${pathname}/tum-gorevler`}
-            style={{ fontSize: 12.5, fontWeight: 700, color: '#ff7f00', textDecoration: 'none', border: '1px solid #ffc078', borderRadius: 7, padding: '5px 12px', background: '#fff7ed', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            style={{ fontSize: 12.5, fontWeight: 700, color: '#374151', textDecoration: 'none', border: '1px solid #d1d5db', borderRadius: 7, padding: '5px 12px', background: '#f9fafb', whiteSpace: 'nowrap', flexShrink: 0 }}>
             Tüm Görevler →
           </Link>
         )}
       </div>
 
       {/* ── KPI SATIRI ── */}
-      <div style={{ padding: '10px 18px', borderBottom: '1px solid #ffe8c8', display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
+      <div style={{ padding: '10px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
         {kpiCards.map(({ label, val, bg, vColor, lColor }) => (
           <div key={label} style={{ background: bg, borderRadius: 8, padding: '10px 12px', border: bg !== 'transparent' ? '1px solid rgba(0,0,0,.04)' : 'none' }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: vColor, lineHeight: 1 }}>{val}</div>
@@ -128,14 +128,14 @@ function LiveHeader({
       </div>
 
       {/* ── DURUM FİLTRE CHIP'LERİ ── */}
-      <div style={{ padding: '10px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ padding: '10px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         {FILTERS.map(({ key, label, count }) => {
           const active = durumFilter === key
           return (
             <button key={key} type="button" onClick={() => setDurumFilter(key)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, fontSize: 12, border: `1px solid ${active ? '#ff7f00' : '#ffd9a0'}`, background: active ? '#ffe4bc' : '#fff', color: active ? '#c45200' : '#6b4423', fontWeight: active ? 700 : 400, cursor: 'pointer', transition: 'all .12s' }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, fontSize: 12, border: `1px solid ${active ? '#374151' : '#e5e7eb'}`, background: active ? '#e5e7eb' : '#fff', color: active ? '#1f2937' : '#4b5563', fontWeight: active ? 700 : 400, cursor: 'pointer', transition: 'all .12s' }}>
               {label}
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '0 5px', borderRadius: 10, background: active ? '#ffc078' : '#f0f0f0', color: active ? '#8b3a00' : '#9a7b6a' }}>{count}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '0 5px', borderRadius: 10, background: active ? '#d1d5db' : '#f0f0f0', color: active ? '#111827' : '#6b7280' }}>{count}</span>
             </button>
           )
         })}
@@ -675,19 +675,19 @@ useEffect(() => {
           setSelectedGorev(g)
         }}
         className={highlight ? 'row-new' : ''}
-        style={{ cursor: 'pointer', background: isSel ? '#fff7ed' : undefined }}
+        style={{ cursor: 'pointer', background: isSel ? '#f9fafb' : undefined }}
       >
         <td style={{ fontWeight: 500, fontSize: fs }}>{g.tanim}</td>
-        <td style={{ color: '#6b4423', fontSize: fs }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-        <td style={{ color: '#6b4423', fontSize: fs }}>{g.atanan?.isim_soyisim ?? '—'}</td>
-        <td style={{ color: '#9a7b6a', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px' }}>{formatDateTime(g.aktif_olma_tarihi)}</td>
-        <td style={{ color: '#9a7b6a', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px' }}>{formatDateTime(g.durum_degisim_tarihi ?? g.olusturma_tarihi ?? g.aktif_olma_tarihi)}</td>
+        <td style={{ color: '#4b5563', fontSize: fs }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
+        <td style={{ color: '#4b5563', fontSize: fs }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px' }}>{formatDateTime(g.aktif_olma_tarihi)}</td>
+        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px' }}>{formatDateTime(g.durum_degisim_tarihi ?? g.olusturma_tarihi ?? g.aktif_olma_tarihi)}</td>
         <td style={{ fontSize: fs }}>
           <span style={{ fontSize: fs }} className={`verde-badge ${durumRenk[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
         </td>
         {/* "İşlemi Yapan" sadece canlı akış tablosunda gösterilsin */}
         {showActor && (
-          <td style={{ color: '#6b4423', fontSize: fs }}>
+          <td style={{ color: '#4b5563', fontSize: fs }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <span style={{ fontSize: fs, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>{getIslemiYapan()}</span>
 
@@ -712,7 +712,7 @@ useEffect(() => {
                         handleKapat(g.id)
                       }}
                       style={{
-                        background: '#fff7ed',
+                        background: '#f9fafb',
                         border: '1px solid #fed7aa',
                         borderRadius: 4,
                         padding: '3px 8px',
@@ -789,7 +789,7 @@ useEffect(() => {
                   <TableRow key={g.id} g={g} showOps={false} showActor={true} highlight={g.id === highlightId} fontSize={14} />
                 ))}
                 {!filteredLive.length && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', color: '#9a7b6a', padding: '28px 0', fontSize: 14 }}>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', color: '#6b7280', padding: '28px 0', fontSize: 14 }}>
                     {durumFilter === 'TÜMÜ' ? 'Aktif frekansiyel görev yok' : 'Bu filtrede görev yok'}
                   </td></tr>
                 )}
@@ -820,7 +820,7 @@ useEffect(() => {
                 <TableRow key={g.id} g={g} showOps={false} showActor fontSize={14} />
               ))}
               {!filteredLive.length && (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: '#9a7b6a', padding: '22px 0', fontSize: 14 }}>
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: '#6b7280', padding: '22px 0', fontSize: 14 }}>
                   {durumFilter === 'TÜMÜ' ? 'Liste boş' : 'Bu filtrede görev yok'}
                 </td></tr>
               )}

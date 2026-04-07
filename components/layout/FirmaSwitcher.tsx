@@ -28,8 +28,8 @@ export default function FirmaSwitcher() {
     : 'Firma Seçin'
 
   if (loading) return (
-    <div style={{ margin: '6px 10px', padding: '8px 10px', borderRadius: 8, background: '#fff7ed', border: '1px solid #e0ece0' }}>
-      <div style={{ fontSize: 12, color: '#9a7b6a' }}>Firmalar yükleniyor…</div>
+    <div style={{ margin: '6px 10px', padding: '8px 10px', borderRadius: 8, background: '#f9fafb', border: '1px solid #e0ece0' }}>
+      <div style={{ fontSize: 12, color: '#6b7280' }}>Firmalar yükleniyor…</div>
     </div>
   )
 
@@ -42,21 +42,21 @@ export default function FirmaSwitcher() {
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: 8,
           padding: '8px 10px', borderRadius: 8,
-          background: selectedFirma ? '#e8f4ff' : '#fff7ed',
-          border: `1px solid ${selectedFirma ? '#b0d4f0' : '#ffd9a0'}`,
+          background: selectedFirma ? '#e8f4ff' : '#f9fafb',
+          border: `1px solid ${selectedFirma ? '#b0d4f0' : '#e5e7eb'}`,
           cursor: 'pointer', textAlign: 'left',
         }}
       >
-        <Building2 size={14} style={{ color: selectedFirma ? '#185a9b' : '#ff7f00', flexShrink: 0 }} />
+        <Building2 size={14} style={{ color: selectedFirma ? '#185a9b' : '#374151', flexShrink: 0 }} />
         <span style={{
           flex: 1, fontSize: 12.5, fontWeight: 700,
-          color: selectedFirma ? '#185a9b' : '#c45200',
+          color: selectedFirma ? '#185a9b' : '#1f2937',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {label}
         </span>
         <ChevronDown size={13} style={{
-          color: '#9a7b6a', flexShrink: 0,
+          color: '#6b7280', flexShrink: 0,
           transform: open ? 'rotate(180deg)' : 'none',
           transition: 'transform .15s',
         }} />
@@ -65,7 +65,7 @@ export default function FirmaSwitcher() {
       {open && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
-          marginTop: 4, background: '#fff', border: '1px solid #ffd9a0',
+          marginTop: 4, background: '#fff', border: '1px solid #e5e7eb',
           borderRadius: 10, boxShadow: '0 8px 24px rgba(15,40,15,0.12)',
           overflow: 'hidden', maxHeight: 280, overflowY: 'auto',
         }}>
@@ -73,18 +73,18 @@ export default function FirmaSwitcher() {
             onClick={() => selectFirma(null)}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-              padding: '9px 12px', background: !selectedFirma ? '#fff7ed' : 'transparent',
+              padding: '9px 12px', background: !selectedFirma ? '#f9fafb' : 'transparent',
               border: 'none', cursor: 'pointer', textAlign: 'left',
               borderBottom: '1px solid #f0f4f0',
             }}
-            onMouseEnter={e => { if (selectedFirma) (e.currentTarget as HTMLElement).style.background = '#fffaf5' }}
+            onMouseEnter={e => { if (selectedFirma) (e.currentTarget as HTMLElement).style.background = '#fafafa' }}
             onMouseLeave={e => { if (selectedFirma) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
           >
-            <Building2 size={13} style={{ color: '#9a7b6a', flexShrink: 0 }} />
-            <span style={{ fontSize: 12.5, color: !selectedFirma ? '#c45200' : '#2b3a2b', fontWeight: !selectedFirma ? 700 : 400 }}>
+            <Building2 size={13} style={{ color: '#6b7280', flexShrink: 0 }} />
+            <span style={{ fontSize: 12.5, color: !selectedFirma ? '#1f2937' : '#2b3a2b', fontWeight: !selectedFirma ? 700 : 400 }}>
               Tüm Firmalar
             </span>
-            {!selectedFirma && <span style={{ marginLeft: 'auto', fontSize: 10, color: '#ff7f00', fontWeight: 700 }}>✓</span>}
+            {!selectedFirma && <span style={{ marginLeft: 'auto', fontSize: 10, color: '#374151', fontWeight: 700 }}>✓</span>}
           </button>
 
           {firmalar.map(f => {
@@ -101,10 +101,10 @@ export default function FirmaSwitcher() {
                   border: 'none', cursor: 'pointer', textAlign: 'left',
                   borderBottom: '1px solid #f0f4f0',
                 }}
-                onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#fffaf5' }}
+                onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#fafafa' }}
                 onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
               >
-                <Building2 size={13} style={{ color: isSelected ? '#185a9b' : '#9a7b6a', flexShrink: 0 }} />
+                <Building2 size={13} style={{ color: isSelected ? '#185a9b' : '#6b7280', flexShrink: 0 }} />
                 <span style={{
                   flex: 1, fontSize: 12.5, fontWeight: isSelected ? 700 : 400,
                   color: isSelected ? '#185a9b' : '#2b3a2b',

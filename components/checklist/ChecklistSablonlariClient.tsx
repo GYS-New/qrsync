@@ -680,7 +680,7 @@ export default function ChecklistSablonlariClient({
   return (
     <div style={{ padding: '24px 28px' }}>
       <div className="verde-card">
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input className="verde-input" placeholder="Şablon ara..." value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 240 }} />
           <select className="verde-input" value={durum} onChange={e => setDurum(e.target.value as any)} style={{ maxWidth: 180 }}>
             <option value="tum">Tüm Durumlar</option>
@@ -700,7 +700,7 @@ export default function ChecklistSablonlariClient({
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ textAlign: 'left', borderBottom: '1px solid #ffe8c8', color: '#557055' }}>
+                  <tr style={{ textAlign: 'left', borderBottom: '1px solid #f3f4f6', color: '#557055' }}>
                     <th style={{ padding: '10px 8px' }}>Şablon</th>
                     <th style={{ padding: '10px 8px' }}>Madde</th>
                     <th style={{ padding: '10px 8px' }}>Lokasyon</th>
@@ -714,7 +714,7 @@ export default function ChecklistSablonlariClient({
                     <tr key={item.id} style={{ borderBottom: '1px solid #edf3ed' }}>
                       <td style={{ padding: '12px 8px' }}>
                         <div style={{ fontWeight: 700, color: '#102110' }}>{item.baslik}</div>
-                        <div style={{ fontSize: 12, color: '#8b7355', marginTop: 4 }}>{item.tanim}</div>
+                        <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{item.tanim}</div>
                       </td>
                       <td style={{ padding: '12px 8px' }}>{item.madde_sayisi ?? 0}</td>
                       <td style={{ padding: '12px 8px' }}>{item.kullanim_sayisi ?? 0}</td>
@@ -722,8 +722,8 @@ export default function ChecklistSablonlariClient({
                       <td style={{ padding: '12px 8px' }}>
                         <span style={{
                           display: 'inline-flex', padding: '4px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700,
-                          background: item.aktif ? '#ecfdf3' : '#fff7ed',
-                          color:      item.aktif ? '#166534'  : '#b45309',
+                          background: item.aktif ? '#ecfdf3' : '#f9fafb',
+                          color:      item.aktif ? '#166534'  : '#374151',
                           border:     item.aktif ? '1px solid #bbf7d0' : '1px solid #fed7aa',
                         }}>{item.aktif ? 'Aktif' : 'Pasif'}</span>
                       </td>
@@ -758,7 +758,7 @@ export default function ChecklistSablonlariClient({
       {openForm && !readonly && (
         <div onClick={() => setOpenForm(false)} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.42)', overflowY: 'auto', padding: '40px 20px' }}>
           <div className="verde-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 980, margin: '0 auto', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#102110' }}>{editingId ? 'Şablon Düzenle' : 'Yeni Checklist Şablonu'}</div>
                 <div style={{ fontSize: 12, color: '#6b7f6b', marginTop: 4 }}>Başlık ve tanım zorunludur. İlk madde zorunludur. Her madde için dropdown seçenekleri yöneticiler tarafından tanımlanır.</div>
@@ -785,7 +785,7 @@ export default function ChecklistSablonlariClient({
                 </div>
               </div>
 
-              <div className="verde-card" style={{ border: '1px solid #ffe8c8' }}>
+              <div className="verde-card" style={{ border: '1px solid #f3f4f6' }}>
                 <div style={{ padding: '14px 16px', borderBottom: '1px solid #eef4ee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontWeight: 800 }}>Şablon Maddeleri</div>
@@ -891,7 +891,7 @@ export default function ChecklistSablonlariClient({
             style={{ width: '100%', maxWidth: 560, maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
             {/* Modal başlık */}
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: '#102110' }}>
                   {baglaInfo.asama === 'secim'   && 'Şablonu Bağla'}
@@ -912,14 +912,14 @@ export default function ChecklistSablonlariClient({
                   <div style={{ padding: 28, display: 'flex', gap: 16 }}>
                     <button
                       onClick={() => { setBaglaInfo(prev => prev ? { ...prev, asama: 'lokasyon' } : null); setLokUstFiltre(''); setLokArama('') }}
-                      style={{ flex: 1, padding: '20px 14px', borderRadius: 12, border: '2px solid #ffd9a0', background: '#fff7ed', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: '#c45200', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                      style={{ flex: 1, padding: '20px 14px', borderRadius: 12, border: '2px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: '#1f2937', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 30 }}>📍</span>
                       Lokasyona Bağla
                       <span style={{ fontSize: 11, fontWeight: 400, color: '#6b7f6b', textAlign: 'center' }}>Birden fazla lokasyon seçin</span>
                     </button>
                     <button
                       onClick={() => { setBaglaInfo(prev => prev ? { ...prev, asama: 'grup' } : null); setLokUstFiltre('') }}
-                      style={{ flex: 1, padding: '20px 14px', borderRadius: 12, border: '2px solid #ffd9a0', background: '#fff7ed', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: '#c45200', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                      style={{ flex: 1, padding: '20px 14px', borderRadius: 12, border: '2px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: '#1f2937', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 30 }}>🗂️</span>
                       Lokasyon Grubuna Bağla
                       <span style={{ fontSize: 11, fontWeight: 400, color: '#6b7f6b', textAlign: 'center' }}>Grup altındaki tüm lokasyonlar</span>
@@ -930,7 +930,7 @@ export default function ChecklistSablonlariClient({
                 {/* ── Lokasyon seçim aşaması ── */}
                 {baglaInfo.asama === 'lokasyon' && (
                   <>
-                    <div style={{ padding: '12px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+                    <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
                       <select
                         value={lokUstFiltre}
                         onChange={e => { setLokUstFiltre(e.target.value); setSecilenLok(new Set()) }}
@@ -955,7 +955,7 @@ export default function ChecklistSablonlariClient({
                         const zatenBagli = l.checklist_sablon_id === baglaInfo.sablon.id
                         const baskaBagli = !!l.checklist_sablon_id && l.checklist_sablon_id !== baglaInfo.sablon.id
                         return (
-                          <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', cursor: 'pointer', background: secilenLok.has(l.id) ? '#fff7ed' : 'transparent', borderBottom: '1px solid #f1f5f1' }}>
+                          <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', cursor: 'pointer', background: secilenLok.has(l.id) ? '#f9fafb' : 'transparent', borderBottom: '1px solid #f1f5f1' }}>
                             <input type="checkbox" checked={secilenLok.has(l.id)} onChange={() => toggleLokSec(l.id)} style={{ width: 16, height: 16, flexShrink: 0 }} />
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: 13, fontWeight: 600, color: '#102110' }}>
@@ -968,7 +968,7 @@ export default function ChecklistSablonlariClient({
                         )
                       })}
                     </div>
-                    <div style={{ padding: '12px 18px', borderTop: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                    <div style={{ padding: '12px 18px', borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                       <span style={{ fontSize: 12, color: '#64748b' }}>{secilenLok.size} lokasyon seçili</span>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <Button variant="ghost" size="sm" onClick={() => setBaglaInfo(prev => prev ? { ...prev, asama: 'secim' } : null)}>← Geri</Button>
@@ -983,7 +983,7 @@ export default function ChecklistSablonlariClient({
                 {/* ── Grup seçim aşaması ── */}
                 {baglaInfo.asama === 'grup' && (
                   <>
-                    <div style={{ padding: '12px 18px', borderBottom: '1px solid #ffe8c8', flexShrink: 0 }}>
+                    <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
                       <select
                         value={lokUstFiltre}
                         onChange={e => { setLokUstFiltre(e.target.value); setSecilenGrup('') }}
@@ -998,7 +998,7 @@ export default function ChecklistSablonlariClient({
                       {filteredGruplar.length === 0 ? (
                         <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Grup bulunamadı</div>
                       ) : filteredGruplar.map(g => (
-                        <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', cursor: 'pointer', background: secilenGrup === g.id ? '#fff7ed' : 'transparent', borderBottom: '1px solid #f1f5f1' }}>
+                        <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', cursor: 'pointer', background: secilenGrup === g.id ? '#f9fafb' : 'transparent', borderBottom: '1px solid #f1f5f1' }}>
                           <input type="radio" name="grup" checked={secilenGrup === g.id} onChange={() => setSecilenGrup(g.id)} style={{ width: 16, height: 16, flexShrink: 0 }} />
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 600, color: '#102110' }}>{g.ad}</div>
@@ -1007,7 +1007,7 @@ export default function ChecklistSablonlariClient({
                         </label>
                       ))}
                     </div>
-                    <div style={{ padding: '12px 18px', borderTop: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                    <div style={{ padding: '12px 18px', borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                       <span style={{ fontSize: 12, color: '#64748b' }}>
                         {secilenGrup
                           ? `${baglaGrupList.find(g => g.id === secilenGrup)?.lokasyon_ids.length ?? 0} lokasyon bağlanacak`

@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       firma_id: targetFirmaId,
       ad: ad.trim(),
       aciklama: aciklama?.trim() || null,
-      renk: renk || '#ff7f00',
+      renk: renk || '#374151',
       kayit_yapan_id: user.id,
       personel_takibi_aktif: body.personel_takibi_aktif === true,
       birim_fiyat_aktif: body.birim_fiyat_aktif === true,

@@ -68,12 +68,12 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
   const S = {
     page:   { minHeight: '100dvh', background: '#f0f4f0', display: 'flex' as const, justifyContent: 'center' as const, padding: '20px 16px 48px' },
     card:   { width: '100%', maxWidth: 440, background: '#fff', borderRadius: 20, boxShadow: '0 4px 24px rgba(0,0,0,0.10)', overflow: 'hidden' as const, alignSelf: 'flex-start' as const },
-    head:   (bg = '#c45200') => ({ background: bg, padding: '24px 22px 20px', color: '#fff' }),
+    head:   (bg = '#1f2937') => ({ background: bg, padding: '24px 22px 20px', color: '#fff' }),
     body:   { padding: '22px 22px 32px', display: 'flex' as const, flexDirection: 'column' as const, gap: 18 },
     label:  { fontSize: 13, fontWeight: 600 as const, color: '#334155', marginBottom: 5, display: 'block' as const },
     input:  { width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: 15, outline: 'none', boxSizing: 'border-box' as const, fontFamily: 'inherit' },
     ta:     { width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: 15, outline: 'none', resize: 'vertical' as const, minHeight: 96, boxSizing: 'border-box' as const, fontFamily: 'inherit' },
-    btn:    (dis: boolean) => ({ width: '100%', padding: 15, borderRadius: 12, border: 'none', background: '#c45200', color: '#fff', fontSize: 16, fontWeight: 700 as const, cursor: dis ? 'not-allowed' as const : 'pointer' as const, opacity: dis ? 0.55 : 1, marginTop: 4 }),
+    btn:    (dis: boolean) => ({ width: '100%', padding: 15, borderRadius: 12, border: 'none', background: '#1f2937', color: '#fff', fontSize: 16, fontWeight: 700 as const, cursor: dis ? 'not-allowed' as const : 'pointer' as const, opacity: dis ? 0.55 : 1, marginTop: 4 }),
     dashed: { width: '100%', padding: 14, borderRadius: 10, border: '1.5px dashed #d1d5db', background: '#f8fafc', color: '#64748b', fontSize: 14, cursor: 'pointer' as const, display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 8 },
   }
 

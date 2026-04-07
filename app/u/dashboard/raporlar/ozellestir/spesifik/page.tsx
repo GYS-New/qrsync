@@ -22,7 +22,7 @@ export default async function USpesifik() {
     <div>
       <Topbar title="Spesifik Görevler Raporu" base="/u"
         breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Özelleştir', href: '/u/dashboard/raporlar/ozellestir' }, { label: 'Spesifik' }]} />
-      <div style={{ padding: '48px 28px', textAlign: 'center', color: '#9a7b6a' }}>Bu hesap bir projeye bağlı değil.</div>
+      <div style={{ padding: '48px 28px', textAlign: 'center', color: '#6b7280' }}>Bu hesap bir projeye bağlı değil.</div>
     </div>
   )
 

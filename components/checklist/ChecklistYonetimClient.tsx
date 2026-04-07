@@ -230,7 +230,7 @@ export default function ChecklistYonetimClient({
   return (
     <div style={{ padding: '24px 28px' }}>
       <div className="verde-card">
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input className="verde-input" placeholder="Lokasyon veya checklist ara..." value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 280 }} />
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <Button variant="ghost" size="sm" onClick={() => firmaId && refresh(firmaId)} disabled={loading || !firmaId}>{loading ? 'Yükleniyor…' : '↻ Yenile'}</Button>
@@ -239,17 +239,17 @@ export default function ChecklistYonetimClient({
         </div>
 
         {!firmaId && base === '/sa' ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#9a7b6a' }}>Checklistleri görmek için firma seçin.</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>Checklistleri görmek için firma seçin.</div>
         ) : (
           <div style={{ padding: 18, display: 'grid', gap: 12 }}>
             {!rows.length ? (
-              <div style={{ color: '#9a7b6a' }}>Bu firmada henüz lokasyon veya checklist bulunamadı.</div>
+              <div style={{ color: '#6b7280' }}>Bu firmada henüz lokasyon veya checklist bulunamadı.</div>
             ) : rows.map(({ lokasyon, template }) => (
-              <div key={lokasyon.id} style={{ border: '1px solid #ffd9a0', borderRadius: 12, padding: 14, background: '#fff' }}>
+              <div key={lokasyon.id} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, background: '#fff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontWeight: 800, color: '#3d1c00' }}>{lokasyon.tanim}</div>
-                    <div style={{ fontSize: 12, color: '#9a7b6a', marginTop: 4 }}>{template ? `Checklist: ${template.isim}` : 'Checklist bağlı değil'}</div>
+                    <div style={{ fontWeight: 800, color: '#111827' }}>{lokasyon.tanim}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{template ? `Checklist: ${template.isim}` : 'Checklist bağlı değil'}</div>
                     {template?.checklist_items?.length ? (
                       <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
                         {template.checklist_items.map((item) => (
@@ -282,8 +282,8 @@ export default function ChecklistYonetimClient({
       {openForm ? (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setOpenForm(false)}>
           <div className="verde-card" style={{ width: 760, maxWidth: 'calc(100vw - 32px)', padding: 0, overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #ffe8c8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#3d1c00' }}>{editing ? 'Checklist Düzenle' : 'Checklist Ekle'}</div>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{editing ? 'Checklist Düzenle' : 'Checklist Ekle'}</div>
               <Button variant="ghost" size="sm" onClick={() => setOpenForm(false)}>✕</Button>
             </div>
             <div style={{ padding: 18, display: 'grid', gap: 14 }}>
@@ -310,9 +310,9 @@ export default function ChecklistYonetimClient({
                 </div>
                 <div style={{ display: 'grid', gap: 10 }}>
                   {items.map((item, index) => (
-                    <div key={item.id || index} style={{ border: '1px solid #ffd9a0', borderRadius: 10, padding: 12, display: 'grid', gap: 10 }}>
+                    <div key={item.id || index} style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12, display: 'grid', gap: 10 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                        <div style={{ fontSize: 12, color: '#9a7b6a' }}>Madde #{index + 1}</div>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>Madde #{index + 1}</div>
                         <Button variant="danger" size="sm" onClick={() => removeItem(index)} disabled={items.length === 1}>Sil</Button>
                       </div>
                       <input className="verde-input" placeholder="Madde açıklaması" value={item.madde} onChange={(e) => patchItem(index, { madde: e.target.value })} />

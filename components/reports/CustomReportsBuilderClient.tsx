@@ -263,7 +263,7 @@ function MiniTable({ preview, loading }: { preview?: TablePreview; loading?: boo
       <thead>
         <tr>
           {preview.columns.map((column) => (
-            <th key={column.key} style={{ textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid #ffe0b2', color: '#536553', fontWeight: 900, whiteSpace: 'nowrap' }}>
+            <th key={column.key} style={{ textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid #e5e7eb', color: '#536553', fontWeight: 900, whiteSpace: 'nowrap' }}>
               {column.label}
             </th>
           ))}
@@ -595,10 +595,10 @@ export default function CustomReportsBuilderClient({
               <h2 style={{ marginTop: 6, fontSize: 22, fontWeight: 900, color: '#122012' }}>Blokları yatay şeritten ekle</h2>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button type="button" onClick={() => loadPreset('blank')} style={{ padding: '10px 14px', borderRadius: 14, border: mode === 'blank' ? '1px solid #5c49db' : '1px solid #d7e2d7', background: mode === 'blank' ? '#f4f1ff' : '#fff', color: mode === 'blank' ? '#5c49db' : '#5c3a1e', fontWeight: 800, cursor: 'pointer' }}>Boş Tuval</button>
-              <button type="button" onClick={() => loadPreset('general')} style={{ padding: '10px 14px', borderRadius: 14, border: mode === 'general' ? '1px solid #e67e22' : '1px solid #d7e2d7', background: mode === 'general' ? '#eff8ef' : '#fff', color: mode === 'general' ? '#e67e22' : '#5c3a1e', fontWeight: 800, cursor: 'pointer' }}>Genel Şablon</button>
-              <button type="button" onClick={() => loadPreset(mode)} style={{ padding: '10px 14px', borderRadius: 14, border: '1px solid #d7e2d7', background: '#fff', color: '#5c3a1e', fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}><RefreshCcw size={15} />Sıfırla</button>
-              <button type="button" style={{ padding: '10px 14px', borderRadius: 14, border: '1px solid #d7e2d7', background: '#fff', color: '#5c3a1e', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 8 }}><Save size={15} />Taslağı Kaydet</button>
+              <button type="button" onClick={() => loadPreset('blank')} style={{ padding: '10px 14px', borderRadius: 14, border: mode === 'blank' ? '1px solid #5c49db' : '1px solid #d7e2d7', background: mode === 'blank' ? '#f4f1ff' : '#fff', color: mode === 'blank' ? '#5c49db' : '#374151', fontWeight: 800, cursor: 'pointer' }}>Boş Tuval</button>
+              <button type="button" onClick={() => loadPreset('general')} style={{ padding: '10px 14px', borderRadius: 14, border: mode === 'general' ? '1px solid #e67e22' : '1px solid #d7e2d7', background: mode === 'general' ? '#eff8ef' : '#fff', color: mode === 'general' ? '#e67e22' : '#374151', fontWeight: 800, cursor: 'pointer' }}>Genel Şablon</button>
+              <button type="button" onClick={() => loadPreset(mode)} style={{ padding: '10px 14px', borderRadius: 14, border: '1px solid #d7e2d7', background: '#fff', color: '#374151', fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}><RefreshCcw size={15} />Sıfırla</button>
+              <button type="button" style={{ padding: '10px 14px', borderRadius: 14, border: '1px solid #d7e2d7', background: '#fff', color: '#374151', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 8 }}><Save size={15} />Taslağı Kaydet</button>
             </div>
           </div>
 
@@ -608,7 +608,7 @@ export default function CustomReportsBuilderClient({
                 key={item.type}
                 type="button"
                 onClick={() => addWidget(item.type)}
-                style={{ borderRadius: 18, border: '1px solid #ffe0b2', background: '#fff', padding: 14, display: 'grid', gap: 10, textAlign: 'left', cursor: 'pointer', minHeight: 94 }}
+                style={{ borderRadius: 18, border: '1px solid #e5e7eb', background: '#fff', padding: 14, display: 'grid', gap: 10, textAlign: 'left', cursor: 'pointer', minHeight: 94 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                   <div style={{ width: 42, height: 42, borderRadius: 14, background: item.accent, color: '#fff', display: 'grid', placeItems: 'center' }}>{item.icon}</div>
@@ -627,8 +627,8 @@ export default function CustomReportsBuilderClient({
               <h2 style={{ marginTop: 6, fontSize: 22, fontWeight: 900, color: '#112011' }}>Görünen alan 1. sayfa</h2>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ padding: '9px 12px', borderRadius: 999, border: '1px solid #ffe0b2', background: '#fbfdfb', color: '#425242', fontSize: 12.5, fontWeight: 800 }}>Tut-çek: başlıktan taşı</div>
-              <div style={{ padding: '9px 12px', borderRadius: 999, border: '1px solid #ffe0b2', background: '#fbfdfb', color: '#425242', fontSize: 12.5, fontWeight: 800 }}>Sağ alttan boyutlandır</div>
+              <div style={{ padding: '9px 12px', borderRadius: 999, border: '1px solid #e5e7eb', background: '#fbfdfb', color: '#425242', fontSize: 12.5, fontWeight: 800 }}>Tut-çek: başlıktan taşı</div>
+              <div style={{ padding: '9px 12px', borderRadius: 999, border: '1px solid #e5e7eb', background: '#fbfdfb', color: '#425242', fontSize: 12.5, fontWeight: 800 }}>Sağ alttan boyutlandır</div>
             </div>
           </div>
 
@@ -642,7 +642,7 @@ export default function CustomReportsBuilderClient({
           <div ref={viewportRef} style={{ width: '100%', minHeight: 'calc(100vh - 360px)', overflow: 'auto', padding: 8, background: '#f6f9f6', borderRadius: 20 }}>
             <div style={{ width: PAGE_WIDTH * canvasScale, height: canvasHeight * canvasScale, position: 'relative', margin: '0 auto' }}>
               <div style={{ position: 'absolute', left: 0, top: 0, width: PAGE_WIDTH, height: canvasHeight, transform: `scale(${canvasScale})`, transformOrigin: 'top left' }}>
-                <div style={{ position: 'absolute', inset: 0, borderRadius: 28, background: '#fff', border: '1px solid #ffe0b2', boxShadow: '0 20px 40px rgba(15,26,15,0.08)' }} />
+                <div style={{ position: 'absolute', inset: 0, borderRadius: 28, background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 20px 40px rgba(15,26,15,0.08)' }} />
                 <div style={{ position: 'absolute', left: 18, top: 14, fontSize: 11.5, fontWeight: 900, color: '#829182' }}>1. SAYFA</div>
                 <div style={{ position: 'absolute', inset: CANVAS_PADDING, backgroundImage: `linear-gradient(rgba(127,103,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(127,103,255,0.08) 1px, transparent 1px)`, backgroundSize: `${CELL_W + GAP}px ${ROW_H + GAP}px`, borderRadius: 20 }} />
 
@@ -674,7 +674,7 @@ export default function CustomReportsBuilderClient({
                         width,
                         height,
                         borderRadius: 18,
-                        border: selectedWidgetId === widget.id ? '2px solid #5c49db' : '1px solid #ffe0b2',
+                        border: selectedWidgetId === widget.id ? '2px solid #5c49db' : '1px solid #e5e7eb',
                         background: '#fff',
                         padding: 14,
                         boxShadow: selectedWidgetId === widget.id ? '0 18px 30px rgba(92,73,219,0.12)' : '0 10px 20px rgba(15,26,15,0.05)',
@@ -691,7 +691,7 @@ export default function CustomReportsBuilderClient({
                           <div style={{ fontSize: 15, fontWeight: 900, color: '#142214' }}>{widget.title}</div>
                         </button>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                          {widget.type === 'table' ? <Database size={15} color="#7a6245" /> : <Grip size={15} color="#7a6245" />}
+                          {widget.type === 'table' ? <Database size={15} color="#4b5563" /> : <Grip size={15} color="#4b5563" />}
                           {widgets.length > 1 ? (
                             <button onClick={(e) => { e.stopPropagation(); removeWidget(widget.id) }} style={{ border: 0, background: 'transparent', display: 'grid', placeItems: 'center', cursor: 'pointer', color: '#6a7b6a' }}>
                               <Trash2 size={15} />
@@ -702,7 +702,7 @@ export default function CustomReportsBuilderClient({
                       <div style={{ minHeight: 0 }}>
                         <WidgetPreview widget={widget} preview={preview} loading={tableLoading[widget.id]} />
                       </div>
-                      <span onMouseDown={(event) => startResize(event, widget.id)} style={{ position: 'absolute', right: 10, bottom: 10, width: 18, height: 18, borderRadius: 6, border: '1px solid #ffe0b2', background: '#fff', display: 'grid', placeItems: 'center', color: '#6a7b6a', cursor: 'nwse-resize' }}>
+                      <span onMouseDown={(event) => startResize(event, widget.id)} style={{ position: 'absolute', right: 10, bottom: 10, width: 18, height: 18, borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', display: 'grid', placeItems: 'center', color: '#6a7b6a', cursor: 'nwse-resize' }}>
                         <LayoutGrid size={10} />
                       </span>
                     </div>
@@ -720,7 +720,7 @@ export default function CustomReportsBuilderClient({
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: selected?.type === 'table' ? '1.1fr 1fr 1.4fr' : '1fr 1fr', gap: 14 }}>
-            <div style={{ border: '1px solid #ffe0b2', borderRadius: 18, background: '#fff', padding: 14 }}>
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 18, background: '#fff', padding: 14 }}>
               <div style={{ fontSize: 12, color: '#789078', fontWeight: 900 }}>SEÇİLİ BLOK</div>
               {selected ? (
                 <>
@@ -741,7 +741,7 @@ export default function CustomReportsBuilderClient({
 
             {selected?.type === 'table' && selected.binding && selectedTableDef ? (
               <>
-                <div style={{ border: '1px solid #ffe0b2', borderRadius: 18, background: '#fff', padding: 14 }}>
+                <div style={{ border: '1px solid #e5e7eb', borderRadius: 18, background: '#fff', padding: 14 }}>
                   <div style={{ fontSize: 12, color: '#789078', fontWeight: 900, marginBottom: 10 }}>VERİ KAYNAĞI</div>
                   <label className="verde-label">Rapor Kaynağı</label>
                   <select className="verde-input" value={selected.binding.reportKey} onChange={(e) => updateSelectedTableBinding({ reportKey: e.target.value as ReportKey, columns: getReportDefinition(e.target.value as ReportKey).columns.slice(0, 5).map((item) => item.key), dateFrom: '', dateTo: '' })}>
@@ -763,7 +763,7 @@ export default function CustomReportsBuilderClient({
                   ) : null}
                 </div>
 
-                <div style={{ border: '1px solid #ffe0b2', borderRadius: 18, background: '#fff', padding: 14 }}>
+                <div style={{ border: '1px solid #e5e7eb', borderRadius: 18, background: '#fff', padding: 14 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
                     <div style={{ fontSize: 12, color: '#789078', fontWeight: 900 }}>SÜTUNLAR</div>
                     <div style={{ fontSize: 12, color: '#6d7d6d', fontWeight: 800 }}>{selected.binding.columns.length}/{selectedTableDef.columns.length}</div>
@@ -772,7 +772,7 @@ export default function CustomReportsBuilderClient({
                     {selectedTableDef.columns.map((column) => {
                       const checked = selected.binding?.columns.includes(column.key)
                       return (
-                        <label key={column.key} style={{ display: 'flex', alignItems: 'center', gap: 8, border: checked ? '1px solid #e67e22' : '1px solid #ffe0b2', borderRadius: 12, background: checked ? '#eff8ef' : '#fff', padding: '8px 10px', cursor: 'pointer' }}>
+                        <label key={column.key} style={{ display: 'flex', alignItems: 'center', gap: 8, border: checked ? '1px solid #e67e22' : '1px solid #e5e7eb', borderRadius: 12, background: checked ? '#eff8ef' : '#fff', padding: '8px 10px', cursor: 'pointer' }}>
                           <input
                             type="checkbox"
                             checked={!!checked}
@@ -790,7 +790,7 @@ export default function CustomReportsBuilderClient({
                 </div>
               </>
             ) : (
-              <div style={{ border: '1px solid #ffe0b2', borderRadius: 18, background: '#fff', padding: 14 }}>
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: 18, background: '#fff', padding: 14 }}>
                 <div style={{ fontSize: 12, color: '#789078', fontWeight: 900, marginBottom: 10 }}>BLOK DAVRANIŞI</div>
                 <div style={{ display: 'grid', gap: 10 }}>
                   {[
@@ -812,7 +812,7 @@ export default function CustomReportsBuilderClient({
               <div style={{ fontSize: 12, color: '#789078', fontWeight: 900, letterSpacing: 0.4 }}>SONRAKİ ADIM</div>
               <h2 style={{ marginTop: 6, fontSize: 22, fontWeight: 900, color: '#122012' }}>Grafik bloklarını da aynı veri modeline bağlayalım</h2>
             </div>
-            <a href={`${base}/dashboard/raporlar/grafiksel`} style={{ padding: '12px 16px', borderRadius: 16, border: '1px solid #ffe0b2', background: '#fff', color: '#5c3a1e', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+            <a href={`${base}/dashboard/raporlar/grafiksel`} style={{ padding: '12px 16px', borderRadius: 16, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
               Grafiksel raporlara dön
               <ArrowRight size={16} />
             </a>
