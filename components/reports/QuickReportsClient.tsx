@@ -57,11 +57,11 @@ type ChartFilters = {
 }
 
 const TYPE_OPTIONS: { key: QuickType; title: string; desc: string; accent: string }[] = [
-  { key: 'locations', title: 'Lokasyonlar raporu', desc: 'Ana/alt lokasyon hareketliliği ve başarı oranları', accent: '#2563eb' },
-  { key: 'users', title: 'Kullanıcılar raporu', desc: 'Personel aktivitesi, başarı ve görev dağılımı', accent: '#7c3aed' },
-  { key: 'live_tasks', title: 'Frekansiyel görevler raporu', desc: 'Canlı görevlerin durum ve tarih bazlı analizi', accent: '#16a34a' },
-  { key: 'manual_tasks', title: 'Spesifik görevler raporu', desc: 'Manuel görevlerin durum ve başarısızlık görünümü', accent: '#ea580c' },
-  { key: 'location_groups', title: 'Lokasyon grupları raporu', desc: 'Grup bazlı görev sayısı, başarı oranı ve trend analizi', accent: '#0891b2' },
+  { key: 'locations', title: 'Lokasyonlar raporu', desc: 'Ana/alt lokasyon hareketliliği ve başarı oranları', accent: '#1f2937' },
+  { key: 'users', title: 'Kullanıcılar raporu', desc: 'Personel aktivitesi, başarı ve görev dağılımı', accent: '#111827' },
+  { key: 'live_tasks', title: 'Frekansiyel görevler raporu', desc: 'Canlı görevlerin durum ve tarih bazlı analizi', accent: '#374151' },
+  { key: 'manual_tasks', title: 'Spesifik görevler raporu', desc: 'Manuel görevlerin durum ve başarısızlık görünümü', accent: '#1f2937' },
+  { key: 'location_groups', title: 'Lokasyon grupları raporu', desc: 'Grup bazlı görev sayısı, başarı oranı ve trend analizi', accent: '#111827' },
 ]
 
 const BAR_PALETTE = ['#374151', '#4b5563', '#6b7280', '#1f2937', '#525e6b', '#3d4a58', '#596775', '#718096', '#2d3748', '#4a5568']
@@ -330,12 +330,12 @@ function FloatingBarLabel(props: any) {
 
 function chartColor(type: QuickType, index = 0) {
   const palette = ({
-    locations: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd'],
-    users: ['#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd'],
-    live_tasks: ['#16a34a', '#22c55e', '#4ade80', '#86efac'],
-    manual_tasks: ['#ea580c', '#f97316', '#fb923c', '#fdba74'],
-    location_groups: ['#0891b2', '#06b6d4', '#22d3ee', '#67e8f9'],
-  } as Record<QuickType, string[]>)[type] ?? ['#374151', '#4caf50', '#81c784', '#c8e6c9']
+    locations: ['#1f2937', '#374151', '#4b5563', '#6b7280'],
+    users: ['#111827', '#1f2937', '#374151', '#4b5563'],
+    live_tasks: ['#374151', '#4b5563', '#6b7280', '#9ca3af'],
+    manual_tasks: ['#1f2937', '#374151', '#4b5563', '#6b7280'],
+    location_groups: ['#111827', '#1f2937', '#374151', '#4b5563'],
+  } as Record<QuickType, string[]>)[type] ?? ['#374151', '#4b5563', '#6b7280', '#9ca3af']
   return palette[index % palette.length]
 }
 
