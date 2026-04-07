@@ -245,17 +245,27 @@ function MobilAyarlariPanel() {
       .catch(() => setLoading(false))
   }, [])
 
+  // Google Drive paylaşım linkini doğrudan indirme linkine dönüştür
+  function driveDirectLink(url: string): string {
+    // drive.google.com/file/d/FILE_ID/... → drive.google.com/uc?export=download&id=FILE_ID
+    const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
+    if (m) return `https://drive.google.com/uc?export=download&id=${m[1]}`
+    return url
+  }
+
   const handlePublish = async () => {
     if (!apkUrl.trim()) { setMsg('APK linki boş olamaz.'); return }
+    const finalUrl = driveDirectLink(apkUrl.trim())
+    setApkUrl(finalUrl)
     setSaving(true); setMsg(null)
     try {
       const res = await fetch('/api/sistem-ayarlari/mobil', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apk_url: apkUrl.trim(), latest_version: latestVersion, min_version: minVersion, surec_notu: surecNotu, zorunlu }),
+        body: JSON.stringify({ apk_url: finalUrl, latest_version: latestVersion, min_version: minVersion, surec_notu: surecNotu, zorunlu }),
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error)
-      setMevcut({ apk_url: apkUrl.trim(), latest_version: latestVersion, min_version: minVersion, surec_notu: surecNotu, zorunlu })
+      setMevcut({ apk_url: finalUrl, latest_version: latestVersion, min_version: minVersion, surec_notu: surecNotu, zorunlu })
       setMsg('Güncelleme yayınlandı! Mobil kullanıcılar yeni sürümü görecek.')
     } catch (e: any) { setMsg('Hata: ' + e.message) }
     setSaving(false)
