@@ -82,28 +82,6 @@ export default function TumGorevlerClient({
   const { confirm, confirmChoice } = useConfirm()
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Mesai kontrolü: personel takibi aktifse mesaili personel id'leri
-  const [personelTakibiAktif, setPersonelTakibiAktif] = useState(false)
-  const [mesailiPersonelIds, setMesailiPersonelIds] = useState<Set<string>>(new Set())
-
-  useEffect(() => {
-    async function mesaiKontrolYukle() {
-      try {
-        // API üzerinden mesai durumunu çek (RLS sorunlarını bypass eder)
-        const p = new URLSearchParams({ firma_id: firmaId })
-        if (projeId) p.set('proje_id', projeId)
-        const res = await fetch(`/api/simulasyon/personeller/mesai-durum?${p}`)
-        const json = await res.json()
-        console.log('[MESAI-KONTROL]', { firmaId, projeId, response: json })
-        if (json.ok) {
-          setPersonelTakibiAktif(json.personel_takibi_aktif === true)
-          setMesailiPersonelIds(new Set(json.mesaili_ids ?? []))
-        }
-      } catch (err) { console.error('[MESAI-KONTROL] Hata:', err) }
-    }
-    mesaiKontrolYukle()
-  }, [firmaId, projeId])
-
   async function downloadExcel(kind: 'template' | 'export') {
     try {
       const query = firmaId ? `?firmaId=${encodeURIComponent(firmaId)}` : ''
@@ -381,32 +359,6 @@ function openCreate() {
         durum: modal === 'create' ? 'HAZIR' : form.durum,
         durum_degisim_tarihi: nowIso,
         islemi_yapan_id: meId,
-      }
-
-      // ── Mesai kontrolü: personel takibi aktifse iş başı yapmamış personele görev atanamaz
-      if (payload.atanan_kullanici_id) {
-        let ptAktif = false
-        const { data: firmaChk } = await supabase.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
-        if (firmaChk?.personel_takibi_aktif === true) ptAktif = true
-        if (!ptAktif && projeId) {
-          const { data: projeChk } = await supabase.from('projeler').select('personel_takibi_aktif').eq('id', projeId).single()
-          if (projeChk?.personel_takibi_aktif === true) ptAktif = true
-        }
-        if (ptAktif) {
-          const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
-          const { data: mesai } = await supabase
-            .from('personel_mesai_kayitlari')
-            .select('id')
-            .eq('user_id', payload.atanan_kullanici_id)
-            .eq('kayit_tarihi', bugun)
-            .is('cikis_saati', null)
-            .maybeSingle()
-          if (!mesai) {
-            toast({ type: 'error', title: 'Görev Atanamaz', message: 'Personel henüz iş başı yapmamış. Personel takibi aktif olduğunda iş başı yapmayan personele görev atanamaz.' })
-            setSaving(false)
-            return
-          }
-        }
       }
 
       // TA ve U durum kısıtı:
@@ -1385,14 +1337,9 @@ async function del() {
                   onChange={(e) => setForm({ ...form, atanan_kullanici_id: e.target.value })}
                 >
                   <option value="">Seçiniz</option>
-                  {kullanicilar.map((u) => {
-                    const mesaiYok = personelTakibiAktif && !mesailiPersonelIds.has(u.id)
-                    return (
-                      <option key={u.id} value={u.id} disabled={mesaiYok} style={mesaiYok ? { color: '#9ca3af' } : undefined}>
-                        {u.isim_soyisim}{mesaiYok ? ' (mesai yok)' : ''}
-                      </option>
-                    )
-                  })}
+                  {kullanicilar.map((u) => (
+                    <option key={u.id} value={u.id}>{u.isim_soyisim}</option>
+                  ))}
                 </select>
               </div>
               )}
