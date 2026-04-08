@@ -214,6 +214,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
           durum_degisim_tarihi: new Date().toISOString(),
           iptal_eden_id: personelId,
           iptal_tarihi: new Date().toISOString(),
+          islemi_yapan_id: personelId,
           simule_tamamlandi: true,
         } as any).eq('id', gorev.id)
         iptalAdet++
