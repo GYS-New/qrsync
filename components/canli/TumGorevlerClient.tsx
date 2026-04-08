@@ -82,6 +82,34 @@ export default function TumGorevlerClient({
   const { confirm, confirmChoice } = useConfirm()
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
+  // Mesai kontrolü: personel takibi aktifse mesaili personel id'leri
+  const [personelTakibiAktif, setPersonelTakibiAktif] = useState(false)
+  const [mesailiPersonelIds, setMesailiPersonelIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    async function mesaiKontrolYukle() {
+      // Firma kontrolü
+      const { data: firmaChk } = await supabase.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
+      let ptAktif = firmaChk?.personel_takibi_aktif === true
+      if (!ptAktif && projeId) {
+        const { data: projeChk } = await supabase.from('projeler').select('personel_takibi_aktif').eq('id', projeId).single()
+        if (projeChk?.personel_takibi_aktif === true) ptAktif = true
+      }
+      setPersonelTakibiAktif(ptAktif)
+      if (!ptAktif) return
+
+      const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const { data: mesailar } = await supabase
+        .from('personel_mesai_kayitlari')
+        .select('user_id')
+        .eq('firma_id', firmaId)
+        .eq('kayit_tarihi', bugun)
+        .is('cikis_saati', null)
+      setMesailiPersonelIds(new Set((mesailar ?? []).map((m: any) => m.user_id)))
+    }
+    mesaiKontrolYukle()
+  }, [firmaId, projeId])
+
   async function downloadExcel(kind: 'template' | 'export') {
     try {
       const query = firmaId ? `?firmaId=${encodeURIComponent(firmaId)}` : ''
@@ -1363,11 +1391,14 @@ async function del() {
                   onChange={(e) => setForm({ ...form, atanan_kullanici_id: e.target.value })}
                 >
                   <option value="">Seçiniz</option>
-                  {kullanicilar.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.isim_soyisim}
-                    </option>
-                  ))}
+                  {kullanicilar.map((u) => {
+                    const mesaiYok = personelTakibiAktif && !mesailiPersonelIds.has(u.id)
+                    return (
+                      <option key={u.id} value={u.id} disabled={mesaiYok} style={mesaiYok ? { color: '#9ca3af' } : undefined}>
+                        {u.isim_soyisim}{mesaiYok ? ' (mesai yok)' : ''}
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
               )}
