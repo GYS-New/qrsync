@@ -249,8 +249,24 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
 
   // ── ADIM 2: ACIK görevleri başlat veya direkt tamamla ────────────────
   if (maxIslem > 0 && acikGorevler.length > 0 && (tamamlananSayi + tamamlananAdet) < hedefMax) {
-    const karisik = acikGorevler.sort(() => Math.random() - 0.5)
-    const secilen = karisik.slice(0, maxIslem)
+    // Farklı lokasyonlardan dengeli seç (round-robin)
+    const lokGruplari = new Map<string, any[]>()
+    for (const g of acikGorevler) {
+      const arr = lokGruplari.get(g.lokasyon_id) ?? []
+      arr.push(g)
+      lokGruplari.set(g.lokasyon_id, arr)
+    }
+    const lokKeys = [...lokGruplari.keys()].sort(() => Math.random() - 0.5)
+    const secilen: any[] = []
+    let idx = 0
+    while (secilen.length < maxIslem && idx < acikGorevler.length) {
+      const key = lokKeys[idx % lokKeys.length]
+      const grp = lokGruplari.get(key)
+      if (grp && grp.length > 0) {
+        secilen.push(grp.splice(Math.floor(Math.random() * grp.length), 1)[0])
+      }
+      idx++
+    }
 
     for (const gorev of secilen) {
       if ((tamamlananSayi + tamamlananAdet + baslatmaAdet) >= hedefMax) break
