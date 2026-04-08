@@ -70,6 +70,26 @@ export default function GorevlerClient({
   const [error, setError]                     = useState('')
   const [checklistGorev, setChecklistGorev]   = useState<{ id: string; type: 'gorevler' | 'canli_gorevler' } | null>(null)
 
+  // Mesai kontrolü: personel takibi aktifse mesaili personel id'leri
+  const [personelTakibiAktif, setPersonelTakibiAktif] = useState(false)
+  const [mesailiPersonelIds, setMesailiPersonelIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    async function mesaiKontrolYukle() {
+      try {
+        const p = new URLSearchParams({ firma_id: firmaId })
+        if (projeId) p.set('proje_id', projeId)
+        const res = await fetch(`/api/simulasyon/personeller/mesai-durum?${p}`)
+        const json = await res.json()
+        if (json.ok) {
+          setPersonelTakibiAktif(json.personel_takibi_aktif === true)
+          setMesailiPersonelIds(new Set(json.mesaili_ids ?? []))
+        }
+      } catch {}
+    }
+    mesaiKontrolYukle()
+  }, [firmaId, projeId])
+
   // ── Filtre state ──────────────────────────────────────────────────────────
   const [filtreArama,    setFiltreArama]    = useState('')
   const [filtreDurum,    setFiltreDurum]    = useState('')
@@ -610,7 +630,14 @@ export default function GorevlerClient({
                   <label className="verde-label">Atanan Kullanıcı *</label>
                   <select className="verde-input" value={form.atanan_kullanici_id} onChange={e => setForm(f => ({ ...f, atanan_kullanici_id: e.target.value }))}>
                     <option value="">Seçin...</option>
-                    {kullanicilar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
+                    {kullanicilar.map(u => {
+                      const mesaiYok = personelTakibiAktif && !mesailiPersonelIds.has(u.id)
+                      return (
+                        <option key={u.id} value={u.id} disabled={mesaiYok}>
+                          {u.isim_soyisim}{mesaiYok ? ' (mesai yok)' : ''}
+                        </option>
+                      )
+                    })}
                   </select>
                 </div>
                 )}
