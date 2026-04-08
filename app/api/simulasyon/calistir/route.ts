@@ -277,16 +277,14 @@ async function simuleCeklistTamamla(admin: any, gorevId: string, sablonId: strin
 
     if (sonucErr || !sonucRow) return
 
-    // Her madde için rastgele seçenek işaretle (zorunlu olanlar dahil)
+    // Her maddenin 1. seçeneğini işaretle (genelde "Yapıldı" — açıklama/görsel gerekmez)
     const maddeRows = maddeler.map((m: any) => {
       const secenekler = secenekMap.get(m.id) ?? []
-      // Rastgele seçenek — daha doğal görünüm
-      const secilenIdx = secenekler.length > 0 ? Math.floor(Math.random() * secenekler.length) : -1
-      const secilen = secilenIdx >= 0 ? secenekler[secilenIdx] : null
+      const ilk = secenekler.length > 0 ? secenekler[0] : null
       return {
         sonuc_id: sonucRow.id,
         madde_id: m.id,
-        secenek_degeri: secilen?.deger ?? 'Yapıldı',
+        secenek_degeri: ilk?.deger ?? 'Yapıldı',
         aciklama: null,
         gorsel_url: null,
       }
