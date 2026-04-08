@@ -24,17 +24,20 @@ export default async function GunlukPerformansBlock({
   const supabase = createClient()
   const today = bugunTR()
 
-  let q = supabase
-    .from('gorevler')
-    .select('durum')
-    .gte('olusturma_tarihi', today.toISOString())
-  if (firmaId) q = q.eq('firma_id', firmaId)
-  if (projeId) q = (q as any).eq('proje_id', projeId)
+  // Spesifik görevler
+  let q1 = supabase.from('gorevler').select('durum').gte('olusturma_tarihi', today.toISOString())
+  if (firmaId) q1 = q1.eq('firma_id', firmaId)
+  if (projeId) q1 = (q1 as any).eq('proje_id', projeId)
 
-  const { data } = await q
+  // Frekansiyel görevler
+  let q2 = supabase.from('canli_gorevler').select('durum').gte('aktif_olma_tarihi', today.toISOString())
+  if (firmaId) q2 = q2.eq('firma_id', firmaId)
+  if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
+
+  const [{ data: d1 }, { data: d2 }] = await Promise.all([q1, q2])
 
   const counts: Record<string, number> = {}
-  ;(data ?? []).forEach((r: any) => {
+  ;[...(d1 ?? []), ...(d2 ?? [])].forEach((r: any) => {
     counts[r.durum] = (counts[r.durum] ?? 0) + 1
   })
 
@@ -49,7 +52,7 @@ export default async function GunlukPerformansBlock({
       }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>GÜNLÜK PERFORMANS</div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Spesifik görevler — bugün</div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Tüm görevler — bugün</div>
         </div>
         <Link href={`${basePath}/dashboard/gorevler`} className="text-[13px] text-[#374151] hover:underline mt-[2px]">
           Tümünü Gör

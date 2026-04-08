@@ -66,7 +66,7 @@ export default function AktifKullanicilarBlock({
       >
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>ONLİNE KULLANICILAR</div>
-          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 1 }}>Son 2 dk içinde aktif</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 1 }}>Son 10 dk içinde aktif</div>
         </div>
         <Link
           href={basePath === '/sa' ? `${basePath}/dashboard/firma-kullanicilar` : `${basePath}/dashboard/kullanicilar`}

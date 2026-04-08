@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 
-const ONLINE_WINDOW_SECONDS = 120 // 2 dakika
+const ONLINE_WINDOW_SECONDS = 600 // 10 dakika
 
 export async function GET(req: NextRequest) {
   const supabase = createClient()

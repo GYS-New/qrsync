@@ -30,15 +30,15 @@ export default function PersonelBasariAnaliziBlock({
     setLoading(true)
     try {
       const rangeISO = rangeStart.toISOString()
-      const sel = 'atanan_kullanici_id,olusturma_tarihi,durum,users!atanan_kullanici_id(isim_soyisim)'
+      const sel = 'islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id,olusturma_tarihi,durum,tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)'
 
       // Canlı tamamlananlar
       let qC = supabase.from('canli_gorevler').select(sel)
-        .gte('olusturma_tarihi', rangeISO).eq('durum', 'TAMAMLANDI')
+        .gte('olusturma_tarihi', rangeISO).in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
       if (firmaId) qC = qC.eq('firma_id', firmaId)
       if (projeId) qC = (qC as any).eq('proje_id', projeId)
 
-      // Arşiv tamamlananlar (TAMAMLANDI + ZAMANINDA_YAPILAMAYAN)
+      // Arşiv tamamlananlar
       let qA = supabase.from('canli_gorevler_arsiv').select(sel)
         .gte('olusturma_tarihi', rangeISO).in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
       if (firmaId) qA = qA.eq('firma_id', firmaId)
@@ -52,8 +52,9 @@ export default function PersonelBasariAnaliziBlock({
 
       const agg: Record<string, { id: string; name: string; value: number }> = {}
       ;[...(canli ?? []), ...(arsiv ?? [])].forEach((r: any) => {
-        const id = r.atanan_kullanici_id ?? 'unknown'
-        const name = r?.users?.isim_soyisim ?? '—'
+        // İşlemi yapan > tamamlayan > atanan sırasıyla personel belirle
+        const id = r.islemi_yapan_id ?? r.tamamlayan_kullanici_id ?? r.atanan_kullanici_id ?? 'unknown'
+        const name = r?.islemi_yapan?.isim_soyisim ?? r?.tamamlayan?.isim_soyisim ?? '—'
         if (!agg[id]) agg[id] = { id, name, value: 0 }
         agg[id].value += 1
       })
