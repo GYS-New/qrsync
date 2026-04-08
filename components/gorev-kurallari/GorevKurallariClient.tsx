@@ -171,7 +171,7 @@ export default function GorevKurallariClient({
   function openCreate() { setForm(BOSH_FORM); setEditId(null); setLokSec([null]); setModal('create') }
   function openEdit(k: any) {
     setForm({
-      tanim: k.tanim ?? '', lokasyon_id: k.lokasyon_id ?? '',
+      tanim: k.tanim ?? '', lokasyon_id: k.lokasyon_id ?? '', lokasyon_idler: [],
       atanan_kullanici_id: k.atanan_kullanici_id ?? '',
       gunluk_frekans_sayisi: k.gunluk_frekans_sayisi ?? 1,
       aktif_gunler: k.aktif_gunler ?? IS_GUNLERI,
