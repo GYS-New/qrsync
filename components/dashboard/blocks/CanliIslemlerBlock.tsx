@@ -52,8 +52,8 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
           ? supabase.from('users').select('*', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId).eq('aktif', true)
           : supabase.from('users').select('*', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('aktif', true))
       : supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true),
-    // [7] Online mobil kullanıcılar (device_tokens.son_kullanim son 5dk içinde)
-    gf(supabase.from('device_tokens').select('user_id').eq('aktif', true).gte('son_kullanim', new Date(Date.now() - 5 * 60 * 1000).toISOString())),
+    // [7] Online mobil kullanıcılar (device_tokens.son_kullanim son 2dk içinde)
+    gf(supabase.from('device_tokens').select('user_id').eq('aktif', true).gte('son_kullanim', new Date(Date.now() - 2 * 60 * 1000).toISOString())),
     // [8] Lokasyonlar toplam
     ff(supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true)),
     // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar)
