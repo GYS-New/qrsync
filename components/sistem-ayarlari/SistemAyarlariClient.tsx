@@ -1113,37 +1113,43 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
           Henüz simülasyon oluşturulmadı.
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {ayarlar.map((a: any) => (
             <div key={a.id} style={{
-              background: '#fff', borderRadius: 12, overflow: 'hidden',
-              border: a.aktif ? '2px solid #ef4444' : '1.5px solid #e5e7eb',
-              boxShadow: a.aktif ? '0 4px 20px rgba(239,68,68,0.1)' : '0 1px 4px rgba(0,0,0,0.04)',
+              background: '#fff', borderRadius: 14, overflow: 'hidden',
+              border: a.aktif ? '2.5px solid #ef4444' : '1.5px solid #e5e7eb',
+              boxShadow: a.aktif ? '0 4px 24px rgba(239,68,68,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
               transition: 'border-color .3s, box-shadow .3s',
             }}>
               {/* Kart başlık */}
-              <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button onClick={() => toggle(a.id, a.aktif)}
-                  style={{ width: 46, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer', background: a.aktif ? '#ef4444' : '#d1d5db', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: a.aktif ? 23 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-                </button>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>📍 {lokAdMap.get(a.ust_lokasyon_id) ?? '—'}</div>
-                  <div style={{ fontSize: 11.5, color: a.aktif ? '#dc2626' : '#94a3b8', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {a.aktif && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', animation: 'simPulse 1.5s ease-in-out infinite', display: 'inline-block' }} />}
-                    {a.aktif ? 'ÇALIŞIYOR' : 'DURDURULDU'}
-                    <span style={{ color: '#94a3b8', fontWeight: 400 }}>· {(a.grup_ayarlari?.length ?? 0)} grup · {(a.personel_idler?.length ?? 0)} personel</span>
+              <div style={{ padding: '18px 22px', borderBottom: '1px solid #f3f4f6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
+                  <button onClick={() => toggle(a.id, a.aktif)}
+                    style={{ width: 52, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer', background: a.aktif ? '#ef4444' : '#d1d5db', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: a.aktif ? 27 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                  </button>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>📍 {lokAdMap.get(a.ust_lokasyon_id) ?? '—'}</div>
                   </div>
                 </div>
-                <button onClick={() => duzenleBasla(a)} style={{ height: 30, padding: '0 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Düzenle</button>
-                <button onClick={() => sil(a.id)} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  {a.aktif && <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', animation: 'simPulse 1.5s ease-in-out infinite', display: 'inline-block', flexShrink: 0 }} />}
+                  <span style={{ fontSize: 13, color: a.aktif ? '#dc2626' : '#94a3b8', fontWeight: 700 }}>
+                    {a.aktif ? 'ÇALIŞIYOR' : 'DURDURULDU'}
+                  </span>
+                  <span style={{ fontSize: 12.5, color: '#94a3b8' }}>· {(a.grup_ayarlari?.length ?? 0)} grup · {(a.personel_idler?.length ?? 0)} personel</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => duzenleBasla(a)} style={{ flex: 1, height: 34, borderRadius: 8, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Düzenle</button>
+                  <button onClick={() => sil(a.id)} style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                </div>
               </div>
 
               {/* Grup detayları */}
               {(a.grup_ayarlari ?? []).length > 0 && (
-                <div style={{ padding: '10px 18px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ padding: '12px 22px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {(a.grup_ayarlari ?? []).map((ga: any) => (
-                    <span key={ga.grup_id} style={{ fontSize: 11.5, padding: '4px 12px', borderRadius: 8, background: '#fafafa', border: '1px solid #e5e7eb', color: '#374151', fontWeight: 600 }}>
+                    <span key={ga.grup_id} style={{ fontSize: 13, padding: '5px 14px', borderRadius: 8, background: '#fafafa', border: '1px solid #e5e7eb', color: '#374151', fontWeight: 600 }}>
                       %{ga.hedef_oran} · {ga.vardiya_suresi_saat}sa
                     </span>
                   ))}
