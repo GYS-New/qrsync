@@ -3,6 +3,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { resolveScanContext } from '@/lib/scan/core'
 import { completeTask } from '@/lib/tasks/completeTask'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
+import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
 
 async function getAuthUser(req: Request) {
   const deviceToken = req.headers.get('X-Device-Token')
@@ -24,6 +25,8 @@ async function getAuthUser(req: Request) {
 export async function GET(req: Request, { params }: { params: { token: string } }) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 })
+  const mesaiHata = await mesaiVePasifKontrol(createAdminClient(), user.id)
+  if (mesaiHata) return NextResponse.json(mesaiHata, { status: mesaiHata.status })
   try {
     const supabase = createAdminClient()
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'NFC', userId: user.id })
@@ -36,6 +39,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 export async function POST(req: Request, { params }: { params: { token: string } }) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 })
+  const mesaiHata2 = await mesaiVePasifKontrol(createAdminClient(), user.id)
+  if (mesaiHata2) return NextResponse.json(mesaiHata2, { status: mesaiHata2.status })
   try {
     const body = await req.json().catch(() => ({}))
     const action           = body?.action as string | undefined
