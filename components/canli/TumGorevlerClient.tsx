@@ -94,11 +94,12 @@ export default function TumGorevlerClient({
         if (projeId) p.set('proje_id', projeId)
         const res = await fetch(`/api/simulasyon/personeller/mesai-durum?${p}`)
         const json = await res.json()
+        console.log('[MESAI-KONTROL]', { firmaId, projeId, response: json })
         if (json.ok) {
           setPersonelTakibiAktif(json.personel_takibi_aktif === true)
           setMesailiPersonelIds(new Set(json.mesaili_ids ?? []))
         }
-      } catch {}
+      } catch (err) { console.error('[MESAI-KONTROL] Hata:', err) }
     }
     mesaiKontrolYukle()
   }, [firmaId, projeId])
