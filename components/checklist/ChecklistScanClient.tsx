@@ -288,7 +288,7 @@ export default function ChecklistScanClient({ token, kanal }: { token: string; k
       if (!json.ok) throw new Error(json.error ?? 'Görev başlatılamadı')
       const nowIso = json.baslatilma_tarihi
       setGorevler(prev => prev.map(task => task.id === selectedTask.id
-        ? { ...task, durum: task.kaynak === 'gorevler' ? 'ISLEMDE' : task.durum, baslatilma_tarihi: nowIso }
+        ? { ...task, durum: 'ISLEMDE', baslatilma_tarihi: nowIso }
         : task))
       showSuccess('Görev başlatıldı')
     } catch (err: any) {
