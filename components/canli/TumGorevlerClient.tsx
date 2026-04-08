@@ -88,12 +88,17 @@ export default function TumGorevlerClient({
 
   useEffect(() => {
     async function mesaiKontrolYukle() {
-      // Firma kontrolü
+      // Firma + proje kontrolü
       const { data: firmaChk } = await supabase.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
       let ptAktif = firmaChk?.personel_takibi_aktif === true
       if (!ptAktif && projeId) {
         const { data: projeChk } = await supabase.from('projeler').select('personel_takibi_aktif').eq('id', projeId).single()
         if (projeChk?.personel_takibi_aktif === true) ptAktif = true
+      }
+      if (!ptAktif) {
+        // Proje ID yoksa firmadaki tüm aktif projeleri kontrol et
+        const { data: projeler } = await supabase.from('projeler').select('personel_takibi_aktif').eq('firma_id', firmaId).eq('aktif', true)
+        if ((projeler ?? []).some((p: any) => p.personel_takibi_aktif === true)) ptAktif = true
       }
       setPersonelTakibiAktif(ptAktif)
       if (!ptAktif) return

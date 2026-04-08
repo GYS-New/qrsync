@@ -36,13 +36,20 @@ export async function GET(req: Request) {
       )
     }
 
-    // ── Mesai kontrolü (firma veya proje bazlı) ─────────────────────────────
+    // ── Mesai kontrolü (firma + tüm projeler) ──────────────────────────────
     {
+      let personelTakibiAktif = false
       const { data: firmaChk } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
-      let personelTakibiAktif = firmaChk?.personel_takibi_aktif === true
-      if (!personelTakibiAktif && personelProjeId) {
-        const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
-        if (proje?.personel_takibi_aktif === true) personelTakibiAktif = true
+      if (firmaChk?.personel_takibi_aktif === true) personelTakibiAktif = true
+      if (!personelTakibiAktif) {
+        if (personelProjeId) {
+          const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
+          if (proje?.personel_takibi_aktif === true) personelTakibiAktif = true
+        }
+        if (!personelTakibiAktif) {
+          const { data: projeler } = await admin.from('projeler').select('personel_takibi_aktif').eq('firma_id', firmaId).eq('aktif', true)
+          if ((projeler ?? []).some((p: any) => p.personel_takibi_aktif === true)) personelTakibiAktif = true
+        }
       }
       if (personelTakibiAktif) {
         const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
