@@ -5,7 +5,7 @@ import { buildXlsxBuffer } from '@/lib/import-export/xlsx'
 export async function GET(req: NextRequest) {
   try {
     const scope = await requireImportScope(req.nextUrl.searchParams.get('firmaId'))
-    const { data, error } = await scope.admin.from('users').select('isim_soyisim,email,telefon,aktif,ust_lokasyon_id').eq('firma_id', scope.firmaId).in('rol', ['tenant_user', 'tenant_admin']).order('kayit_tarihi', { ascending: false })
+    const { data, error } = await scope.admin.from('users').select('isim_soyisim,email,telefon,aktif,ust_lokasyon_id,cinsiyet').eq('firma_id', scope.firmaId).in('rol', ['tenant_user', 'tenant_admin']).order('kayit_tarihi', { ascending: false })
     if (error) throw new Error(error.message)
 
     // Üst lokasyon ID → ad map
@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
       { key: 'telefon', label: 'telefon', width: 18 },
       { key: 'aktif', label: 'aktif', width: 12 },
       { key: 'ust_lokasyon', label: 'ust_lokasyon', width: 24 },
-    ], rows: (data ?? []).map((x: any) => ({ ...x, aktif: x.aktif ? 'evet' : 'hayir', ust_lokasyon: x.ust_lokasyon_id ? lokMap.get(x.ust_lokasyon_id) ?? '' : '' })) }] })
+      { key: 'cinsiyet', label: 'cinsiyet', width: 12 },
+    ], rows: (data ?? []).map((x: any) => ({ ...x, aktif: x.aktif ? 'evet' : 'hayir', ust_lokasyon: x.ust_lokasyon_id ? lokMap.get(x.ust_lokasyon_id) ?? '' : '', cinsiyet: x.cinsiyet ?? '' })) }] })
     return new NextResponse(file, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="kullanicilar.xlsx"' } })
   } catch (e: any) {
     const status = e.message === 'Unauthorized' ? 401 : e.message.includes('Yetkisiz') ? 403 : 400

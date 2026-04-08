@@ -46,6 +46,20 @@ export async function POST(req: NextRequest) {
           continue
         }
       }
+      // Mevcut kullanıcı varsa güncelle (cinsiyet, telefon, üst lokasyon)
+      const { data: mevcutUser } = await scope.admin.from('users').select('id').eq('email', email).eq('firma_id', scope.firmaId).maybeSingle()
+      if (mevcutUser) {
+        const updatePayload: any = {}
+        if (telefon) updatePayload.telefon = telefon
+        if (ustLokId) updatePayload.ust_lokasyon_id = ustLokId
+        if (cinsiyetVal) updatePayload.cinsiyet = cinsiyetVal
+        if (Object.keys(updatePayload).length > 0) {
+          await scope.admin.from('users').update(updatePayload).eq('id', mevcutUser.id)
+        }
+        created++
+        continue
+      }
+
       const { data: createdUser, error: createErr } = await scope.admin.auth.admin.createUser({ email, password, email_confirm: true })
       if (createErr || !createdUser?.user) {
         errors.push(`Satır ${rowNo}: ${createErr?.message ?? 'Auth kullanıcı oluşturulamadı'}`)
@@ -55,6 +69,8 @@ export async function POST(req: NextRequest) {
       // Üst lokasyon çözümle
       const ustLokAd = normalizeText(row.ust_lokasyon)
       const ustLokId = ustLokAd ? (lokAdToId.get(ustLokAd.toLocaleLowerCase('tr')) ?? null) : null
+      const cinsiyet = normalizeText(row.cinsiyet).toUpperCase()
+      const cinsiyetVal = cinsiyet === 'E' || cinsiyet === 'K' ? cinsiyet : null
 
       const { error: insertErr } = await scope.admin.from('users').insert({
         id: newUserId,
@@ -67,6 +83,7 @@ export async function POST(req: NextRequest) {
         kayit_yapan_id: scope.me.id,
         aktif: true,
         ...(ustLokId ? { ust_lokasyon_id: ustLokId } : {}),
+        ...(cinsiyetVal ? { cinsiyet: cinsiyetVal } : {}),
       })
       if (insertErr) {
         await scope.admin.auth.admin.deleteUser(newUserId)
