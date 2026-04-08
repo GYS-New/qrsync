@@ -39,7 +39,7 @@ export default async function SATumGorevlerPage() {
     .eq('firma_id', firmaId)
     .in('durum', ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI', 'SILINDI'])
     .order('aktif_olma_tarihi', { ascending: false })
-    .limit(500)
+    .limit(2000)
   if (projeId) gorevQ = (gorevQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
 
   let lokQ = supabase

@@ -35,7 +35,7 @@ export default async function TATumGorevlerPage() {
       .or(`proje_id.eq.${aktifProje.id},proje_id.is.null`)
       .in('durum', ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI'])
       .order('aktif_olma_tarihi', { ascending: false })
-      .limit(500),
+      .limit(2000),
     supabase
       .from('lokasyonlar')
       .select('id,tanim,parent_id,checklist_sablon_id')

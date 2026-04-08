@@ -225,7 +225,7 @@ const getLocPath = useMemo(() => {
         .eq('firma_id', firmaId)
         .in('durum', durumlar)
         .order('aktif_olma_tarihi', { ascending: false })
-        .limit(500)
+        .limit(2000)
       if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
       const { data, error } = await q
 
