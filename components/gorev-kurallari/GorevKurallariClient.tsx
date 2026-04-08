@@ -435,8 +435,10 @@ export default function GorevKurallariClient({
         // Üst lokasyonlar (parent_id === null)
         const ustLokasyonlar2 = lokasyonlar.filter(l => !l.parent_id).sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr'))
 
-        // Kuralları üst lokasyon > grup > lokasyon olarak grupla
-        type HiyerarsiNode = { ustLok: string; ustLokTanim: string; gruplar: { grupId: string; grupAd: string; kurallar: any[] }[]; grupsuz: any[] }
+        // Kuralları üst lokasyon > grup > tanım > lokasyon olarak grupla
+        type TanimGrubu = { tanim: string; kurallar: any[] }
+        type GrupNode = { grupId: string; grupAd: string; tanimlar: TanimGrubu[] }
+        type HiyerarsiNode = { ustLok: string; ustLokTanim: string; gruplar: GrupNode[]; grupsuz: any[] }
         const hiyerarsi: HiyerarsiNode[] = []
 
         for (const ustLok of ustLokasyonlar2) {
@@ -447,7 +449,16 @@ export default function GorevKurallariClient({
             const lokIds = grupLokMap2.get(g.id) ?? []
             const grupKurallar = filtered.filter(k => lokIds.includes(k.lokasyon_id))
             if (grupKurallar.length > 0) {
-              node.gruplar.push({ grupId: g.id, grupAd: g.ad, kurallar: grupKurallar })
+              // Tanım bazlı alt gruplandırma
+              const tanimMap = new Map<string, any[]>()
+              for (const k of grupKurallar) {
+                const t = k.tanim ?? '—'
+                const arr = tanimMap.get(t) ?? []
+                arr.push(k)
+                tanimMap.set(t, arr)
+              }
+              const tanimlar: TanimGrubu[] = [...tanimMap.entries()].map(([tanim, kurallar]) => ({ tanim, kurallar }))
+              node.gruplar.push({ grupId: g.id, grupAd: g.ad, tanimlar })
             }
           }
 
@@ -522,7 +533,7 @@ export default function GorevKurallariClient({
 
             {hiyerarsi.map(h => {
               const ustAcik = acikUstLoklar.has(h.ustLok)
-              const toplamKural = h.gruplar.reduce((s, g) => s + g.kurallar.length, 0) + h.grupsuz.length
+              const toplamKural = h.gruplar.reduce((s, g) => s + g.tanimlar.reduce((ss, t) => ss + t.kurallar.length, 0), 0) + h.grupsuz.length
               return (
                 <div key={h.ustLok} style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
                   {/* Üst Lokasyon Başlığı */}
@@ -537,7 +548,8 @@ export default function GorevKurallariClient({
                     <div>
                       {h.gruplar.map(g => {
                         const gAcik = acikGruplar2.has(g.grupId)
-                        const aktifSayi = g.kurallar.filter(k => k.aktif).length
+                        const tumKurallar = g.tanimlar.flatMap(t => t.kurallar)
+                        const aktifSayi = tumKurallar.filter(k => k.aktif).length
                         return (
                           <div key={g.grupId}>
                             {/* Grup Başlığı */}
@@ -546,25 +558,40 @@ export default function GorevKurallariClient({
                               <span style={{ fontSize: 11, color: '#6b7280' }}>{gAcik ? '▼' : '▶'}</span>
                               <span style={{ fontSize: 13.5, fontWeight: 700, color: '#1f2937', flex: 1 }}>
                                 🗂 {g.grupAd}
-                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>{g.kurallar.length} lokasyon · {aktifSayi} aktif</span>
+                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>{g.tanimlar.length} kural tanımı · {tumKurallar.length} kural · {aktifSayi} aktif</span>
                               </span>
-                              {/* Grup tanım bilgisi */}
-                              {g.kurallar.length > 0 && (
-                                <span style={{ fontSize: 11.5, color: '#374151', fontWeight: 600 }}>
-                                  {g.kurallar[0]?.tanim}
-                                </span>
-                              )}
                               {!readonly && (
                                 <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
-                                  <button onClick={() => topluSilGrup(g.kurallar)}
+                                  <button onClick={() => topluSilGrup(tumKurallar)}
                                     style={{ padding: '3px 10px', fontSize: 11, borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
                                     Toplu Sil
                                   </button>
                                 </div>
                               )}
                             </div>
-                            {/* Lokasyon Kuralları */}
-                            {gAcik && g.kurallar.map(k => renderKuralSatir(k, 2))}
+                            {/* Tanım bazlı alt gruplar */}
+                            {gAcik && g.tanimlar.map((tg, ti) => (
+                              <div key={ti}>
+                                {/* Tanım başlığı */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px 8px 52px', background: '#fafafa', borderTop: '1px solid #f3f4f6' }}>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', flex: 1 }}>
+                                    📋 {tg.tanim}
+                                    <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>({tg.kurallar.length} lokasyon)</span>
+                                  </span>
+                                  <span style={{ fontSize: 11, color: '#6b7280' }}>
+                                    {tg.kurallar[0]?.aktif_olma_saati?.slice(0, 5) ?? ''} · {gunEtiket(tg.kurallar[0]?.aktif_gunler ?? [])}
+                                  </span>
+                                  {!readonly && (
+                                    <button onClick={() => topluSilGrup(tg.kurallar)}
+                                      style={{ padding: '2px 8px', fontSize: 10, borderRadius: 4, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
+                                      Sil
+                                    </button>
+                                  )}
+                                </div>
+                                {/* Lokasyonlar */}
+                                {tg.kurallar.map(k => renderKuralSatir(k, 3))}
+                              </div>
+                            ))}
                           </div>
                         )
                       })}
