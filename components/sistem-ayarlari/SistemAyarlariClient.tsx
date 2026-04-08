@@ -797,11 +797,11 @@ function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; p
   if (!yetkili) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
-        <div style={{ background: '#0f172a', borderRadius: 16, padding: '40px 44px', maxWidth: 400, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
-          <div style={{ fontSize: 18, fontWeight: 900, color: '#f1f5f9', marginBottom: 6 }}>Erişim Kısıtlı</div>
-          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 24, lineHeight: 1.5 }}>
-            Bu alan gizli ve yetkili erişim gerektirir.<br />Devam etmek için hesap şifrenizi girin.
+        <div style={{ background: '#fff', borderRadius: 16, padding: '44px 48px', maxWidth: 420, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.08)', border: '2px solid #e5e7eb', textAlign: 'center' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 14, background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, margin: '0 auto 16px' }}>🔐</div>
+          <div style={{ fontSize: 19, fontWeight: 900, color: '#111827', marginBottom: 6 }}>Erişim Kısıtlı</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 28, lineHeight: 1.6 }}>
+            Bu alan yetkili erişim gerektirir.<br />Devam etmek için hesap şifrenizi girin.
           </div>
           <input
             type="password"
@@ -809,11 +809,11 @@ function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; p
             onChange={e => { setSifreGirdi(e.target.value); setSifreHata(false) }}
             onKeyDown={e => e.key === 'Enter' && sifreDogrula()}
             placeholder="Şifre"
-            style={{ width: '100%', height: 42, padding: '0 14px', borderRadius: 10, border: `1.5px solid ${sifreHata ? '#ef4444' : '#334155'}`, background: '#1e293b', color: '#f1f5f9', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }}
+            style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: `1.5px solid ${sifreHata ? '#ef4444' : '#e5e7eb'}`, background: '#fafafa', color: '#111827', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }}
           />
           {sifreHata && <div style={{ fontSize: 12, color: '#ef4444', marginBottom: 10 }}>Şifre hatalı. Tekrar deneyin.</div>}
           <button onClick={sifreDogrula}
-            style={{ width: '100%', height: 42, borderRadius: 10, border: 'none', background: '#3b82f6', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', transition: 'background .2s' }}>
+            style={{ width: '100%', height: 44, borderRadius: 10, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
             Doğrula ve Giriş Yap
           </button>
         </div>
@@ -959,42 +959,55 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
     await yukle()
   }
 
+  const anyAktif = ayarlar.some((a: any) => a.aktif)
+
   if (loading) return (
-    <div style={{ padding: 60, textAlign: 'center', background: '#0f172a', borderRadius: 16, minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#64748b', fontSize: 14 }}>Yükleniyor...</div>
+    <div style={{ padding: 60, textAlign: 'center', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ color: '#6b7280', fontSize: 14 }}>Yükleniyor...</div>
     </div>
   )
 
   const formAcik = !!yeniUstLok
 
   return (
-    <div style={{ maxWidth: 960, background: '#0f172a', borderRadius: 16, padding: '28px 32px', boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}>
+    <div style={{ border: anyAktif ? '2px solid #ef4444' : '2px solid #e5e7eb', borderRadius: 14, padding: '28px 32px', position: 'relative', background: '#fff', transition: 'border-color .3s', boxShadow: anyAktif ? '0 0 30px rgba(239,68,68,0.08)' : 'none' }}>
+
+      {/* Aktif göstergesi — pulsating */}
+      {anyAktif && (
+        <div style={{ position: 'absolute', top: -12, right: 24, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', padding: '4px 14px', borderRadius: 20, border: '2px solid #ef4444' }}>
+          <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', animation: 'simPulse 1.5s ease-in-out infinite' }} />
+          <span style={{ fontSize: 12, fontWeight: 800, color: '#dc2626', textTransform: 'uppercase' as const, letterSpacing: '0.1em' }}>SİMÜLASYON AKTİF</span>
+        </div>
+      )}
+
       {/* Başlık */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>⚡</div>
-        <div>
-          <div style={{ fontSize: 17, fontWeight: 900, color: '#f1f5f9' }}>Simülasyon Kontrol Merkezi</div>
-          <div style={{ fontSize: 12, color: '#64748b' }}>Frekansiyel görev otomatik tamamlama sistemi</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 22 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f1f5f9', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>⚡</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 18, fontWeight: 900, color: '#111827' }}>Simülasyon Kontrol Merkezi</div>
+          <div style={{ fontSize: 12.5, color: '#6b7280' }}>Frekansiyel görev otomatik tamamlama sistemi</div>
         </div>
       </div>
 
       {/* Bilgi bandı */}
-      <div style={{ padding: '12px 16px', background: '#1e293b', border: '1px solid #334155', borderRadius: 10, fontSize: 12.5, color: '#94a3b8', marginBottom: 20, lineHeight: 1.6 }}>
+      <div style={{ padding: '14px 18px', background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 13, color: '#4b5563', marginBottom: 22, lineHeight: 1.7 }}>
         Simülasyon aktifken personelin mobil tamamlamaları devre dışı kalır. Görevler belirlenen hedefe göre otomatik olarak
         seçilen personeller adına tamamlanır. Tüm göstergelerde gerçek tamamlama olarak görünür.
       </div>
 
+      <style>{`@keyframes simPulse { 0%,100% { opacity:1; transform:scale(1) } 50% { opacity:0.4; transform:scale(1.3) } }`}</style>
+
       {/* ═══ Yeni / Düzenle Formu ═══ */}
-      <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 12, padding: '18px 22px', marginBottom: 18 }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0', marginBottom: 12 }}>
+      <div style={{ background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: 12, padding: '20px 24px', marginBottom: 22 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', marginBottom: 14 }}>
           {duzenleId ? '✏️ Simülasyon Düzenle' : '+ Yeni Simülasyon Oluştur'}
         </div>
 
         {/* Üst Lokasyon Seçimi */}
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase' as const }}>Üst Lokasyon *</span>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const }}>Üst Lokasyon *</span>
           <select value={yeniUstLok} onChange={e => ustLokasyonSecildi(e.target.value)} disabled={!!duzenleId}
-            style={{ ...inp, maxWidth: 360, background: '#0f172a', color: '#e2e8f0', border: '1px solid #475569' }}>
+            style={{ ...inp, maxWidth: 400 }}>
             <option value="">Seçin…</option>
             {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
           </select>
@@ -1003,38 +1016,38 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
         {formAcik && (
           <>
             {/* Gruplar */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
                 Gruplar ve Ayarları
               </div>
               {gruplar.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#475569', padding: 8 }}>Bu üst lokasyonda grup bulunamadı.</div>
+                <div style={{ fontSize: 13, color: '#94a3b8', padding: 8 }}>Bu üst lokasyonda grup bulunamadı.</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {gruplar.map((g: any) => {
                     const secili = !!seciliGruplar[g.id]
                     return (
-                      <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: secili ? '#172554' : '#0f172a', border: `1px solid ${secili ? '#3b82f6' : '#334155'}`, borderRadius: 8 }}>
-                        <input type="checkbox" checked={secili} onChange={() => grupToggle(g.id)} style={{ width: 16, height: 16 }} />
-                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>
+                      <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: secili ? '#fef2f2' : '#fff', border: `1.5px solid ${secili ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 10 }}>
+                        <input type="checkbox" checked={secili} onChange={() => grupToggle(g.id)} style={{ width: 17, height: 17 }} />
+                        <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: '#111827' }}>
                           {g.ad}
-                          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400, marginLeft: 6 }}>({(g.lokasyonIds ?? []).length} lokasyon)</span>
+                          <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>({(g.lokasyonIds ?? []).length} lokasyon)</span>
                         </span>
                         {secili && (
                           <>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                              <span style={{ fontSize: 10.5, color: '#94a3b8' }}>Hedef:</span>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ fontSize: 11, color: '#6b7280' }}>Hedef:</span>
                               <input type="number" min={1} max={100} value={seciliGruplar[g.id]?.hedef_oran ?? 100}
                                 onChange={e => grupAyarDegistir(g.id, 'hedef_oran', Number(e.target.value))}
-                                style={{ ...inp, width: 52, height: 28, textAlign: 'center', fontSize: 12, background: '#0f172a', color: '#e2e8f0', border: '1px solid #475569' }} />
-                              <span style={{ fontSize: 10.5, color: '#94a3b8' }}>%</span>
+                                style={{ ...inp, width: 56, height: 30, textAlign: 'center', fontSize: 13 }} />
+                              <span style={{ fontSize: 11, color: '#6b7280' }}>%</span>
                             </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                              <span style={{ fontSize: 10.5, color: '#94a3b8' }}>Vardiya:</span>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ fontSize: 11, color: '#6b7280' }}>Vardiya:</span>
                               <input type="number" min={1} value={seciliGruplar[g.id]?.vardiya_suresi_saat ?? 8}
                                 onChange={e => grupAyarDegistir(g.id, 'vardiya_suresi_saat', Number(e.target.value))}
-                                style={{ ...inp, width: 52, height: 28, textAlign: 'center', fontSize: 12, background: '#0f172a', color: '#e2e8f0', border: '1px solid #475569' }} />
-                              <span style={{ fontSize: 10.5, color: '#94a3b8' }}>sa</span>
+                                style={{ ...inp, width: 56, height: 30, textAlign: 'center', fontSize: 13 }} />
+                              <span style={{ fontSize: 11, color: '#6b7280' }}>sa</span>
                             </label>
                           </>
                         )}
@@ -1046,27 +1059,27 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
             </div>
 
             {/* Personeller */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
                   Personeller ({seciliPersonel.size}/{personeller.length})
                 </span>
                 {personeller.length > 0 && (
-                  <button onClick={tumPersonelSec} style={{ fontSize: 11, color: '#e2e8f0', background: '#334155', border: '1px solid #475569', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }}>
+                  <button onClick={tumPersonelSec} style={{ fontSize: 11, color: '#1f2937', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>
                     Tümünü Seç
                   </button>
                 )}
               </div>
               {personeller.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#475569', padding: 8 }}>Bu üst lokasyona atanmış personel yok.</div>
+                <div style={{ fontSize: 13, color: '#94a3b8', padding: 8 }}>Bu üst lokasyona atanmış personel yok.</div>
               ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {personeller.map((p: any) => {
                     const secili = seciliPersonel.has(p.id)
                     return (
-                      <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: secili ? '#172554' : '#0f172a', border: `1px solid ${secili ? '#3b82f6' : '#334155'}`, borderRadius: 6, cursor: 'pointer', fontSize: 12.5 }}>
-                        <input type="checkbox" checked={secili} onChange={() => personelToggle(p.id)} style={{ width: 14, height: 14 }} />
-                        <span style={{ fontWeight: secili ? 600 : 400, color: secili ? '#93c5fd' : '#94a3b8' }}>{p.isim_soyisim}</span>
+                      <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', background: secili ? '#fef2f2' : '#fff', border: `1.5px solid ${secili ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                        <input type="checkbox" checked={secili} onChange={() => personelToggle(p.id)} style={{ width: 15, height: 15 }} />
+                        <span style={{ fontWeight: secili ? 600 : 400, color: secili ? '#dc2626' : '#374151' }}>{p.isim_soyisim}</span>
                       </label>
                     )
                   })}
@@ -1075,14 +1088,14 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
             </div>
 
             {/* Kaydet / İptal */}
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={kaydet}
                 disabled={saving || Object.keys(seciliGruplar).length === 0 || seciliPersonel.size === 0}
-                style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
+                style={{ height: 38, padding: '0 24px', borderRadius: 10, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
                 {saving ? 'Kaydediliyor…' : duzenleId ? 'Güncelle' : 'Oluştur'}
               </button>
               {(duzenleId || yeniUstLok) && (
-                <button onClick={iptal} style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid #475569', background: '#1e293b', color: '#94a3b8', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                <button onClick={iptal} style={{ height: 38, padding: '0 18px', borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                   İptal
                 </button>
               )}
@@ -1091,43 +1104,47 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
         )}
       </div>
 
-      {/* ═══ Aktif Simülasyonlar ═══ */}
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 10 }}>
-        Aktif Simülasyonlar
+      {/* ═══ Simülasyon Kartları ═══ */}
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 12 }}>
+        Simülasyonlar
       </div>
       {ayarlar.length === 0 ? (
-        <div style={{ padding: 32, textAlign: 'center', color: '#475569', fontSize: 14, background: '#1e293b', borderRadius: 12, border: '1px solid #334155' }}>Henüz simülasyon oluşturulmadı.</div>
+        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14, background: '#fafafa', borderRadius: 12, border: '1px dashed #d1d5db' }}>
+          Henüz simülasyon oluşturulmadı.
+        </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
           {ayarlar.map((a: any) => (
-            <div key={a.id} style={{ background: '#1e293b', border: `1.5px solid ${a.aktif ? '#22c55e' : '#334155'}`, borderRadius: 12, padding: '14px 18px', boxShadow: a.aktif ? '0 0 20px rgba(34,197,94,0.1)' : 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: (a.grup_ayarlari?.length > 0) ? 10 : 0 }}>
-                {/* Toggle */}
+            <div key={a.id} style={{
+              background: '#fff', borderRadius: 12, overflow: 'hidden',
+              border: a.aktif ? '2px solid #ef4444' : '1.5px solid #e5e7eb',
+              boxShadow: a.aktif ? '0 4px 20px rgba(239,68,68,0.1)' : '0 1px 4px rgba(0,0,0,0.04)',
+              transition: 'border-color .3s, box-shadow .3s',
+            }}>
+              {/* Kart başlık */}
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <button onClick={() => toggle(a.id, a.aktif)}
-                  style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: a.aktif ? '#22c55e' : '#475569', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: a.aktif ? 23 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                  style={{ width: 46, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer', background: a.aktif ? '#ef4444' : '#d1d5db', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: a.aktif ? 23 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
                 </button>
-
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', flex: 1 }}>
-                  📍 {lokAdMap.get(a.ust_lokasyon_id) ?? '—'}
-                  <span style={{ fontSize: 11.5, color: a.aktif ? '#4ade80' : '#64748b', marginLeft: 8, fontWeight: 600 }}>
-                    {a.aktif ? '● ÇALIŞIYOR' : '○ DURDURULDU'}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#64748b', marginLeft: 8 }}>
-                    {(a.grup_ayarlari?.length ?? 0)} grup · {(a.personel_idler?.length ?? 0)} personel
-                  </span>
-                </span>
-
-                <button onClick={() => duzenleBasla(a)} style={{ height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid #475569', background: '#334155', color: '#e2e8f0', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Düzenle</button>
-                <button onClick={() => sil(a.id)} style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid #7f1d1d', background: '#1c1917', color: '#ef4444', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>📍 {lokAdMap.get(a.ust_lokasyon_id) ?? '—'}</div>
+                  <div style={{ fontSize: 11.5, color: a.aktif ? '#dc2626' : '#94a3b8', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {a.aktif && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', animation: 'simPulse 1.5s ease-in-out infinite', display: 'inline-block' }} />}
+                    {a.aktif ? 'ÇALIŞIYOR' : 'DURDURULDU'}
+                    <span style={{ color: '#94a3b8', fontWeight: 400 }}>· {(a.grup_ayarlari?.length ?? 0)} grup · {(a.personel_idler?.length ?? 0)} personel</span>
+                  </div>
+                </div>
+                <button onClick={() => duzenleBasla(a)} style={{ height: 30, padding: '0 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Düzenle</button>
+                <button onClick={() => sil(a.id)} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
               </div>
 
               {/* Grup detayları */}
               {(a.grup_ayarlari ?? []).length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginLeft: 56 }}>
+                <div style={{ padding: '10px 18px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {(a.grup_ayarlari ?? []).map((ga: any) => (
-                    <span key={ga.grup_id} style={{ fontSize: 11.5, padding: '3px 10px', borderRadius: 6, background: '#172554', border: '1px solid #1e40af', color: '#93c5fd' }}>
-                      %{ga.hedef_oran} hedef · {ga.vardiya_suresi_saat}sa vardiya
+                    <span key={ga.grup_id} style={{ fontSize: 11.5, padding: '4px 12px', borderRadius: 8, background: '#fafafa', border: '1px solid #e5e7eb', color: '#374151', fontWeight: 600 }}>
+                      %{ga.hedef_oran} · {ga.vardiya_suresi_saat}sa
                     </span>
                   ))}
                 </div>
