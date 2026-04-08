@@ -77,6 +77,7 @@ export default function GorevlerClient({
   useEffect(() => {
     async function mesaiKontrolYukle() {
       try {
+        if (!firmaId) return
         const p = new URLSearchParams({ firma_id: firmaId })
         if (projeId) p.set('proje_id', projeId)
         const res = await fetch(`/api/simulasyon/personeller/mesai-durum?${p}`)
