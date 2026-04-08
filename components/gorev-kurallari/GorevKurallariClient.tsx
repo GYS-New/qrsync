@@ -415,47 +415,50 @@ export default function GorevKurallariClient({
 
       {/* Hiyerarşik Kural Listesi: Üst Lokasyon > Grup > Lokasyon */}
       {(() => {
-        // Lokasyon → Grup mapping
-        const lokGrupMap = new Map<string, string>()
-        const grupLokMap2 = new Map<string, string[]>()
+        // Hiyerarşi hesaplama (useMemo benzeri — IIFE ile optimize)
+        const grupLokMap2 = new Map<string, Set<string>>()
         for (const u of grupUyeleri) {
-          lokGrupMap.set(u.lokasyon_id, u.grup_id)
-          const arr = grupLokMap2.get(u.grup_id) ?? []
-          arr.push(u.lokasyon_id)
-          grupLokMap2.set(u.grup_id, arr)
+          const s = grupLokMap2.get(u.grup_id) ?? new Set()
+          s.add(u.lokasyon_id)
+          grupLokMap2.set(u.grup_id, s)
         }
 
-        // Grup → Üst Lokasyon
-        const grupUstLokMap = new Map<string, string>()
-        for (const g of gruplar) { if (g.ust_lokasyon_id) grupUstLokMap.set(g.id, g.ust_lokasyon_id) }
+        // Kural lokasyon_id → Set (hızlı arama)
+        const kuralLokIdSet = new Map<string, any[]>()
+        for (const k of filtered) {
+          const arr = kuralLokIdSet.get(k.lokasyon_id) ?? []
+          arr.push(k)
+          kuralLokIdSet.set(k.lokasyon_id, arr)
+        }
 
-        const grupAdMap = new Map<string, string>()
-        for (const g of gruplar) grupAdMap.set(g.id, g.ad ?? '—')
-
-        // Üst lokasyonlar (parent_id === null)
         const ustLokasyonlar2 = lokasyonlar.filter(l => !l.parent_id).sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr'))
 
-        // Kuralları üst lokasyon > grup > tanım > lokasyon olarak grupla
         type TanimGrubu = { tanim: string; kurallar: any[] }
         type GrupNode = { grupId: string; grupAd: string; tanimlar: TanimGrubu[] }
         type HiyerarsiNode = { ustLok: string; ustLokTanim: string; gruplar: GrupNode[]; grupsuz: any[] }
         const hiyerarsi: HiyerarsiNode[] = []
+        const eslesmisKuralIds = new Set<string>()
 
         for (const ustLok of ustLokasyonlar2) {
           const altGruplar = gruplar.filter((g: any) => g.ust_lokasyon_id === ustLok.id)
           const node: HiyerarsiNode = { ustLok: ustLok.id, ustLokTanim: ustLok.tanim, gruplar: [], grupsuz: [] }
 
           for (const g of altGruplar) {
-            const lokIds = grupLokMap2.get(g.id) ?? []
-            const grupKurallar = filtered.filter(k => lokIds.includes(k.lokasyon_id))
+            const lokIdSet = grupLokMap2.get(g.id)
+            if (!lokIdSet || lokIdSet.size === 0) continue
+            const grupKurallar: any[] = []
+            lokIdSet.forEach(lokId => {
+              const kk = kuralLokIdSet.get(lokId)
+              if (kk) grupKurallar.push(...kk)
+            })
             if (grupKurallar.length > 0) {
-              // Tanım bazlı alt gruplandırma
               const tanimMap = new Map<string, any[]>()
               for (const k of grupKurallar) {
                 const t = k.tanim ?? '—'
                 const arr = tanimMap.get(t) ?? []
                 arr.push(k)
                 tanimMap.set(t, arr)
+                eslesmisKuralIds.add(k.id)
               }
               const tanimlar: TanimGrubu[] = [...tanimMap.entries()].map(([tanim, kurallar]) => ({ tanim, kurallar }))
               node.gruplar.push({ grupId: g.id, grupAd: g.ad, tanimlar })
@@ -463,23 +466,26 @@ export default function GorevKurallariClient({
           }
 
           // Gruba dahil olmayan kurallar
-          const tumGrupLokIds = new Set(altGruplar.flatMap((g: any) => grupLokMap2.get(g.id) ?? []))
+          const tumGrupLokIds = new Set<string>()
+          altGruplar.forEach((g: any) => { grupLokMap2.get(g.id)?.forEach(id => tumGrupLokIds.add(id)) })
           const altLokIds = new Set<string>()
-          const q2: string[] = [ustLok.id]
-          while (q2.length) { const cur = q2.shift()!; lokasyonlar.filter(l => l.parent_id === cur).forEach(l => { altLokIds.add(l.id); q2.push(l.id) }) }
-          const grupsuzKurallar = filtered.filter(k => altLokIds.has(k.lokasyon_id) && !tumGrupLokIds.has(k.lokasyon_id))
+          const queue: string[] = [ustLok.id]
+          while (queue.length) {
+            const cur = queue.shift()!
+            for (const l of lokasyonlar) { if (l.parent_id === cur) { altLokIds.add(l.id); queue.push(l.id) } }
+          }
+          const grupsuzKurallar: any[] = []
+          altLokIds.forEach(lokId => {
+            if (tumGrupLokIds.has(lokId)) return
+            const kk = kuralLokIdSet.get(lokId)
+            if (kk) { grupsuzKurallar.push(...kk); kk.forEach(k => eslesmisKuralIds.add(k.id)) }
+          })
           node.grupsuz = grupsuzKurallar
 
           if (node.gruplar.length > 0 || node.grupsuz.length > 0) hiyerarsi.push(node)
         }
 
-        // Hiçbir üst lokasyona girmeyen kurallar
-        const tumUstAltIds = new Set<string>()
-        for (const h of hiyerarsi) {
-          h.gruplar.forEach(g => g.tanimlar.forEach(t => t.kurallar.forEach(k => tumUstAltIds.add(k.id))))
-          h.grupsuz.forEach(k => tumUstAltIds.add(k.id))
-        }
-        const kalanKurallar = filtered.filter(k => !tumUstAltIds.has(k.id))
+        const kalanKurallar = filtered.filter(k => !eslesmisKuralIds.has(k.id))
 
         // Render helper: tek kural satırı
         const renderKuralSatir = (k: any, indent: number = 0) => {
