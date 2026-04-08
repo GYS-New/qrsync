@@ -62,14 +62,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Firma lisansı süresi dolmuş' }, { status: 403 })
     }
 
-    // ── Mesai kontrolü — firma veya proje bazlı ─────────────────────────────
+    // ── Mesai kontrolü — firma VEYA proje aktifse engelle ──────────────────
     // tenant_user ve musteri rolleri için kontrol (SA/TA muaf)
     if (me.rol === 'tenant_user' || me.rol === 'musteri') {
       let personelTakibiAktif = firma?.personel_takibi_aktif === true
-      // Proje bazlı override: lokasyonun proje_id'si varsa proje ayarını kontrol et
-      if (lokasyon.proje_id) {
+      // Firma'da kapalıysa proje bazlı kontrol (biri aktifse yeterli)
+      if (!personelTakibiAktif && lokasyon.proje_id) {
         const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', lokasyon.proje_id).single()
-        if (proje) personelTakibiAktif = proje.personel_takibi_aktif === true
+        if (proje?.personel_takibi_aktif === true) personelTakibiAktif = true
+      }
+      if (!personelTakibiAktif) {
+        // Firmadaki tüm projeleri tara
+        const { data: projeler } = await admin.from('projeler').select('personel_takibi_aktif').eq('firma_id', lokasyon.firma_id).eq('aktif', true)
+        if ((projeler ?? []).some((p: any) => p.personel_takibi_aktif === true)) personelTakibiAktif = true
       }
       if (personelTakibiAktif) {
         const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)

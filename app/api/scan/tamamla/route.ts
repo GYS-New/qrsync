@@ -32,18 +32,13 @@ export async function POST(req: Request) {
     // Mesai kontrolü (firma + proje bazlı)
     if (me.rol === 'tenant_user' || me.rol === 'musteri') {
       const admin2 = createAdminClient()
+      let personelTakibiAktif = false
       const { data: firma } = await admin2.from('firmalar').select('personel_takibi_aktif').eq('id', me.firma_id).single()
-      let personelTakibiAktif = firma?.personel_takibi_aktif === true
-      try {
-        const bodyPeek = await req.clone().json()
-        if (bodyPeek?.lokasyon_id) {
-          const { data: lok } = await admin2.from('lokasyonlar').select('proje_id').eq('id', bodyPeek.lokasyon_id).single()
-          if (lok?.proje_id) {
-            const { data: proje } = await admin2.from('projeler').select('personel_takibi_aktif').eq('id', lok.proje_id).single()
-            if (proje) personelTakibiAktif = proje.personel_takibi_aktif === true
-          }
-        }
-      } catch {}
+      if (firma?.personel_takibi_aktif === true) personelTakibiAktif = true
+      if (!personelTakibiAktif) {
+        const { data: projeler } = await admin2.from('projeler').select('personel_takibi_aktif').eq('firma_id', me.firma_id).eq('aktif', true)
+        if ((projeler ?? []).some((p: any) => p.personel_takibi_aktif === true)) personelTakibiAktif = true
+      }
       if (personelTakibiAktif) {
         const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
         const { data: mesai } = await admin2
