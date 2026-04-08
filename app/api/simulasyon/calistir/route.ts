@@ -231,7 +231,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     tamamlanan: tamamlananAdet,
     iptal: iptalAdet,
     toplam: toplamGorev,
-    gorev_arasi_dk: Math.round(gorevArasiDk),
+    gorev_arasi_dk: Math.round(vardiyaDk / Math.max(toplamGorev, 1)),
     mevcut_tamamlanan: tamamlananSayi,
     hedef_max: hedefMax,
   }
