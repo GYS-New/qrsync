@@ -90,15 +90,17 @@ export async function POST(req: Request) {
   }
 }
 
-// ── Personel filtresi ───────────────────────────────────────────────────────
-async function filtreliPersonelGetir(admin: any, firmaId: string, projeId: string | null, personelIdler: string[]): Promise<string[]> {
+// ── Personel filtresi (cinsiyet bilgisiyle) ─────────────────────────────────
+type PersonelBilgi = { id: string; cinsiyet: string | null }
+
+async function filtreliPersonelGetir(admin: any, firmaId: string, projeId: string | null, personelIdler: string[]): Promise<PersonelBilgi[]> {
   const { data: users } = await admin
     .from('users')
-    .select('id')
+    .select('id, cinsiyet')
     .in('id', personelIdler)
     .eq('aktif', true)
 
-  let uygun = (users ?? []).map((u: any) => u.id)
+  let uygun: PersonelBilgi[] = (users ?? []).map((u: any) => ({ id: u.id, cinsiyet: u.cinsiyet ?? null }))
   if (uygun.length === 0) return []
 
   if (projeId) {
@@ -112,7 +114,7 @@ async function filtreliPersonelGetir(admin: any, firmaId: string, projeId: strin
         .eq('kayit_tarihi', bugun)
         .is('cikis_saati', null)
       const mesailiSet = new Set((mesailar ?? []).map((m: any) => m.user_id))
-      uygun = uygun.filter((id: string) => mesailiSet.has(id))
+      uygun = uygun.filter(p => mesailiSet.has(p.id))
     }
   }
 
@@ -120,7 +122,26 @@ async function filtreliPersonelGetir(admin: any, firmaId: string, projeId: strin
 }
 
 // ── Grup simülasyonu ────────────────────────────────────────────────────────
-async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygunPersonel: string[]) {
+// Lokasyon adından cinsiyet gereksinimi belirle
+function lokasyonCinsiyetBelirle(lokTanim: string): 'E' | 'K' | null {
+  const upper = lokTanim.toUpperCase()
+  if (upper.includes('BAYAN')) return 'K'
+  if (upper.includes('BAY') && !upper.includes('BAYAN')) return 'E'
+  return null // cinsiyet belirtilmemiş lokasyon
+}
+
+// Cinsiyet eşleştirmesiyle personel seç
+function cinsiyetliPersonelSec(personeller: PersonelBilgi[], lokTanim: string): string {
+  const gerekliCinsiyet = lokasyonCinsiyetBelirle(lokTanim)
+  if (gerekliCinsiyet) {
+    const uygunlar = personeller.filter(p => p.cinsiyet === gerekliCinsiyet)
+    if (uygunlar.length > 0) return uygunlar[Math.floor(Math.random() * uygunlar.length)].id
+  }
+  // Cinsiyet eşleşmesi yoksa veya uygun personel yoksa rastgele seç
+  return personeller[Math.floor(Math.random() * personeller.length)].id
+}
+
+async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygunPersonel: PersonelBilgi[]) {
   const { firma_id } = ayar
   const { grup_id, hedef_oran, vardiya_suresi_saat } = grupAyar
   const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -138,7 +159,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
   // Lokasyon bilgileri
   const { data: lokBilgi } = await admin
     .from('lokasyonlar')
-    .select('id, checklist_sablon_id, sureli_gorev_aktif, min_sure_dakika, max_sure_dakika, hedef_sure_dakika')
+    .select('id, tanim, checklist_sablon_id, sureli_gorev_aktif, min_sure_dakika, max_sure_dakika, hedef_sure_dakika')
     .in('id', lokIds)
 
   const lokMap = new Map<string, any>()
@@ -206,7 +227,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
 
     const sureSaniye = Math.round(gecenDk * 60)
     const tamamlanmaIso = new Date().toISOString()
-    const personelId = gorev.baslatan_kullanici_id ?? uygunPersonel[Math.floor(Math.random() * uygunPersonel.length)]
+    const personelId = gorev.baslatan_kullanici_id ?? cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
 
     await admin.from('canli_gorevler').update({
       durum: 'TAMAMLANDI',
@@ -234,7 +255,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     for (const gorev of secilen) {
       if ((tamamlananSayi + tamamlananAdet + baslatmaAdet) >= hedefMax) break
 
-      const personelId = uygunPersonel[Math.floor(Math.random() * uygunPersonel.length)]
+      const personelId = cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
       const lok = lokMap.get(gorev.lokasyon_id)
 
       // %1 iptal olasılığı

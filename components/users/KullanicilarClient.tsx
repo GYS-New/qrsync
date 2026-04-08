@@ -102,11 +102,11 @@ export default function KullanicilarClient({
 
   // Modal state'leri
   const [openCreate, setOpenCreate] = useState(false)
-  const [createForm, setCreateForm] = useState({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user' as string, ust_lokasyon_id: '' })
+  const [createForm, setCreateForm] = useState({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user' as string, ust_lokasyon_id: '', cinsiyet: '' })
   const [openEdit, setOpenEdit] = useState(false)
   const [openPass, setOpenPass] = useState(false)
   const [target, setTarget] = useState<User | null>(null)
-  const [editForm, setEditForm] = useState({ isim_soyisim: '', email: '', telefon: '' })
+  const [editForm, setEditForm] = useState({ isim_soyisim: '', email: '', telefon: '', cinsiyet: '' })
   const [newPass, setNewPass] = useState('')
 
   // SA için form içi proje seçici
@@ -233,7 +233,7 @@ export default function KullanicilarClient({
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'Oluşturulamadı')
       showOk('Kullanıcı oluşturuldu.')
-      setCreateForm({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user', ust_lokasyon_id: '' })
+      setCreateForm({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user', ust_lokasyon_id: '', cinsiyet: '' })
       setFormProjeId('')
       setOpenCreate(false)
       await refresh()
@@ -247,7 +247,7 @@ export default function KullanicilarClient({
     try {
       const res = await fetch(`${apiBase}/users/${target.id}`, {
         method: 'PATCH', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ isim_soyisim: editForm.isim_soyisim, email: editForm.email, telefon: editForm.telefon }),
+        body: JSON.stringify({ isim_soyisim: editForm.isim_soyisim, email: editForm.email, telefon: editForm.telefon, cinsiyet: editForm.cinsiyet || null }),
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'Güncelleme başarısız')
@@ -524,7 +524,7 @@ export default function KullanicilarClient({
                       </RowActionButton>
                       {(isSA || isTA) && (
                         <>
-                          <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>
+                          <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '', cinsiyet: (u as any).cinsiyet ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>
                           <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
                           {deviceTokenMap[u.id] && (
                             <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>
@@ -559,6 +559,7 @@ export default function KullanicilarClient({
                 <div><label className="verde-label">Telefon</label><input className="verde-input" value={createForm.telefon} onChange={e => setCreateForm(f => ({ ...f, telefon: e.target.value }))} autoComplete="off" /></div>
                 <div><label className="verde-label">Email *</label><input className="verde-input" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))} autoComplete="off" /></div>
                 <div><label className="verde-label">Şifre *</label><input className="verde-input" type="password" value={createForm.password} onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))} autoComplete="new-password" /></div>
+                <div><label className="verde-label">Cinsiyet</label><select className="verde-input" value={createForm.cinsiyet} onChange={e => setCreateForm(f => ({ ...f, cinsiyet: e.target.value }))}><option value="">Seçiniz</option><option value="E">Erkek</option><option value="K">Kadın</option></select></div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label className="verde-label">Kullanıcı Grubu *</label>
                   <select className="verde-input" value={createForm.rol} onChange={e => setCreateForm(f => ({ ...f, rol: e.target.value }))}>
@@ -687,7 +688,8 @@ export default function KullanicilarClient({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div><label className="verde-label">İsim Soyisim</label><input className="verde-input" value={editForm.isim_soyisim} onChange={e => setEditForm(f => ({ ...f, isim_soyisim: e.target.value }))} autoComplete="off" /></div>
                 <div><label className="verde-label">Telefon</label><input className="verde-input" value={editForm.telefon} onChange={e => setEditForm(f => ({ ...f, telefon: e.target.value }))} autoComplete="off" /></div>
-                <div style={{ gridColumn: '1 / -1' }}><label className="verde-label">Email</label><input className="verde-input" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} autoComplete="off" /></div>
+                <div><label className="verde-label">Email</label><input className="verde-input" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} autoComplete="off" /></div>
+                <div><label className="verde-label">Cinsiyet</label><select className="verde-input" value={editForm.cinsiyet} onChange={e => setEditForm(f => ({ ...f, cinsiyet: e.target.value }))}><option value="">Seçiniz</option><option value="E">Erkek</option><option value="K">Kadın</option></select></div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <Button variant="primary" onClick={saveEdit} disabled={loading}>{loading ? 'Kaydediliyor…' : '✓ Kaydet'}</Button>

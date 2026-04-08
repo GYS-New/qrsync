@@ -23,6 +23,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   const aktif = body.aktif !== undefined ? Boolean(body.aktif) : undefined
   const rol = body.rol !== undefined ? String(body.rol) : undefined
   const email = body.email !== undefined ? String(body.email).trim().toLowerCase() : undefined
+  const cinsiyet = body.cinsiyet !== undefined ? (body.cinsiyet === 'E' || body.cinsiyet === 'K' ? body.cinsiyet : null) : undefined
 
   const admin = createAdminClient()
 
@@ -38,6 +39,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   if (aktif !== undefined) updatePayload.aktif = aktif
   if (rol !== undefined) updatePayload.rol = rol
   if (email !== undefined) updatePayload.email = email
+  if (cinsiyet !== undefined) updatePayload.cinsiyet = cinsiyet
 
   if (Object.keys(updatePayload).length) {
     const { error: upErr } = await admin.from('users').update(updatePayload).eq('id', userId)

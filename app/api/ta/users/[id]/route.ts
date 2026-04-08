@@ -21,6 +21,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   const telefon = body.telefon !== undefined ? (body.telefon ? String(body.telefon).trim() : null) : undefined
   const aktif = body.aktif !== undefined ? Boolean(body.aktif) : undefined
   const email = body.email !== undefined ? String(body.email).trim().toLowerCase() : undefined
+  const cinsiyet = body.cinsiyet !== undefined ? (body.cinsiyet === 'E' || body.cinsiyet === 'K' ? body.cinsiyet : null) : undefined
 
   const admin = createAdminClient()
 
@@ -41,6 +42,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   if (telefon !== undefined) updatePayload.telefon = telefon
   if (aktif !== undefined) updatePayload.aktif = aktif
   if (email !== undefined) updatePayload.email = email
+  if (cinsiyet !== undefined) updatePayload.cinsiyet = cinsiyet
 
   if (Object.keys(updatePayload).length) {
     const { error: upErr } = await admin.from('users').update(updatePayload).eq('id', userId)

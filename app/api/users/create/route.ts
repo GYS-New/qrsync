@@ -28,6 +28,7 @@ export async function POST(req: Request) {
   const firma_id      = body.firma_id ? String(body.firma_id) : null
   const body_proje_id = body.proje_id ? String(body.proje_id) : null
   const ust_lokasyon_id = body.ust_lokasyon_id ? String(body.ust_lokasyon_id) : null
+  const cinsiyet = body.cinsiyet === 'E' || body.cinsiyet === 'K' ? body.cinsiyet : null
 
   if (!email || !password || !isim_soyisim) {
     return NextResponse.json({ error: 'Eksik alan: email, password, isim_soyisim' }, { status: 400 })
@@ -98,6 +99,7 @@ export async function POST(req: Request) {
       aktif: true,
       ...(!isAltSACreation && finalProjeId ? { proje_id: finalProjeId } : {}),
       ...(ust_lokasyon_id ? { ust_lokasyon_id } : {}),
+      ...(cinsiyet ? { cinsiyet } : {}),
     })
 
   if (insertErr) {
