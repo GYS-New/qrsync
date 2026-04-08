@@ -185,10 +185,11 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     }
 
     // Süre hesabı: süreli görev aktifse min/max arası rastgele
-    let sureSaniye: number = Math.round(gorevArasiDk * 60 * (0.5 + Math.random() * 0.5))
+    const varsayilanSureDk = vardiyaDk / Math.max(toplamGorev, 1)
+    let sureSaniye: number = Math.round(varsayilanSureDk * 60 * (0.5 + Math.random() * 0.5))
     if (lok?.sureli_gorev_aktif) {
       const minDk = lok.min_sure_dakika ?? 1
-      const maxDk = lok.max_sure_dakika ?? Math.round(gorevArasiDk)
+      const maxDk = lok.max_sure_dakika ?? Math.round(varsayilanSureDk)
       const rastgeleDk = minDk + Math.random() * Math.max(0, maxDk - minDk)
       sureSaniye = Math.round(rastgeleDk * 60)
     }
