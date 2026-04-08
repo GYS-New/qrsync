@@ -51,6 +51,12 @@ export default function GorevKurallariClient({
   const [duraklatNeden, setDuraklatNeden] = useState('')
   const [duraklatSaving, setDuraklatSaving] = useState(false)
 
+  // Gruplar
+  const [gruplar, setGruplar] = useState<any[]>([])
+  const [grupUyeleri, setGrupUyeleri] = useState<any[]>([])
+  const [acikUstLoklar, setAcikUstLoklar] = useState<Set<string>>(new Set())
+  const [acikGruplar2, setAcikGruplar2] = useState<Set<string>>(new Set())
+
   // Sekme içinde (embedded=true) ilk yüklemede kuralları çek
   useEffect(() => {
     if (!embedded || !firmaId || initialKuralar.length > 0) return
@@ -59,6 +65,28 @@ export default function GorevKurallariClient({
     fetch(`/api/gorev-kurallari?${params.toString()}`)
       .then(r => r.json()).then(d => Array.isArray(d) && setKuralar(d)).catch(() => {})
   }, [embedded, firmaId])
+
+  // Grupları yükle
+  useEffect(() => {
+    if (!firmaId) return
+    const p = new URLSearchParams({ firmaId })
+    if (projeId) p.set('projeId', projeId)
+    fetch(`/api/location-groups?${p}`)
+      .then(r => r.json())
+      .then(j => {
+        if (j.ok !== false) {
+          setGruplar(j.groups ?? [])
+          // grup_uyeleri: { grup_id, lokasyonIds[] }
+          const uye: any[] = []
+          for (const g of (j.groups ?? [])) {
+            for (const lokId of (g.lokasyonIds ?? [])) {
+              uye.push({ grup_id: g.id, lokasyon_id: lokId })
+            }
+          }
+          setGrupUyeleri(uye)
+        }
+      }).catch(() => {})
+  }, [firmaId, projeId])
   const [ozet, setOzet]             = useState<Record<string, OzetRow>>({})
   const [modal, setModal]           = useState<null | 'create' | 'edit'>(null)
   const [editId, setEditId]         = useState<string | null>(null)
@@ -385,104 +413,185 @@ export default function GorevKurallariClient({
         ))}
       </div>
 
-      {/* Tablo */}
-      <div className="verde-card" style={{ overflow: 'hidden' }}>
-        <div className="verde-table-wrap">
-          <table className="verde-table">
-            <thead>
-              <tr>
-                <th>Tanım</th>
-                <th>Lokasyon</th>
-                <th>Günler</th>
-                <th style={{ textAlign: 'center' }}>Frekans</th>
-                <th title="Görev bu saatte ACIK'a geçer">Aktifleşme Saati</th>
-                <th>Başlangıç</th>
-                <th>Bitiş</th>
-                <th style={{ textAlign: 'center' }}>Bugünkü Durum</th>
-                <th style={{ textAlign: 'center' }}>Aktif</th>
-                {!readonly && <th>İşlem</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(k => {
-                const o = ozet[k.id]
-                return (
-                  <tr key={k.id} style={{ opacity: k.aktif ? 1 : 0.5, background: k.duraklatma_bitis && new Date(k.duraklatma_bitis).getTime() > Date.now() ? '#fffbeb' : undefined }}>
-                    <td style={{ fontWeight: 600, fontSize: 13 }}>
-                      {k.tanim}
-                      {k.duraklatma_bitis && new Date(k.duraklatma_bitis).getTime() > Date.now() && (
-                        <div style={{ fontSize: 11, color: '#92400e', marginTop: 2 }}>
-                          ⏸ Duraklatıldı — {new Date(k.duraklatma_bitis).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}'e kadar
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ fontSize: 12, color: '#4b5563', maxWidth: 180 }}>{lokMap.get(k.lokasyon_id) ?? '—'}</td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 12.5 }}>{gunEtiket(k.aktif_gunler ?? [])}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span style={{ fontWeight: 700, color: '#374151', fontSize: 14 }}>{k.gunluk_frekans_sayisi}×</span>
-                    </td>
-                    <td style={{ fontSize: 12.5 }}>{k.aktif_olma_saati?.slice(0, 5) ?? '—'}</td>
-                    <td style={{ fontSize: 12, color: '#4b5563' }}>{k.baslangic_tarihi}</td>
-                    <td style={{ fontSize: 12, color: k.bitis_tarihi ? '#4b5563' : '#d1d5db' }}>{k.bitis_tarihi ?? '∞'}</td>
-                    {/* Bugünkü özet */}
-                    <td style={{ textAlign: 'center', minWidth: 120 }}>
-                      {o ? (
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
-                          <span title="Üretilen" style={{ fontSize: 11, background: '#e8f0ff', color: '#0f4c81', padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>{o.uretilen} üretildi</span>
-                          {o.tamamlandi > 0 && <span style={{ fontSize: 11, background: '#f3f4f6', color: '#374151', padding: '2px 7px', borderRadius: 4 }}>✓ {o.tamamlandi}</span>}
-                          {o.bekliyor > 0   && <span style={{ fontSize: 11, background: '#f9fafb', color: '#374151', padding: '2px 7px', borderRadius: 4 }}>⏳ {o.bekliyor}</span>}
-                          {o.kayip > 0      && <span style={{ fontSize: 11, background: '#fef2f2', color: '#b91c1c', padding: '2px 7px', borderRadius: 4 }}>✗ {o.kayip}</span>}
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: 11.5, color: '#d1d5db' }}>—</span>
-                      )}
-                    </td>
-                    {/* Toggle */}
-                    <td style={{ textAlign: 'center' }}>
-                      {!readonly ? (
-                        <button onClick={() => toggleAktif(k)} title={k.aktif ? 'Pasife al' : 'Aktif et'}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', border: 'none', fontSize: 12, fontWeight: 700, background: k.aktif ? '#f3f4f6' : '#f3f4f6', color: k.aktif ? '#374151' : '#9ca3af' }}>
-                          <span style={{ width: 28, height: 16, borderRadius: 8, position: 'relative', background: k.aktif ? '#374151' : '#d1d5db', display: 'inline-block', transition: 'background 0.15s', flexShrink: 0 }}>
-                            <span style={{ position: 'absolute', top: 2, left: k.aktif ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
-                          </span>
-                          {k.aktif ? 'Açık' : 'Kapalı'}
-                        </button>
-                      ) : (
-                        <span className={`verde-badge ${k.aktif ? 'status-islemde' : 'status-iptal'}`}>{k.aktif ? 'Aktif' : 'Pasif'}</span>
-                      )}
-                    </td>
-                    {!readonly && (
-                      <td>
-                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                          {k.duraklatma_bitis && new Date(k.duraklatma_bitis).getTime() > Date.now() ? (
-                            <button onClick={() => handleDevam(k)} style={{ padding: '3px 9px', fontSize: 12, borderRadius: 6, border: '1px solid #86efac', background: '#dcfce7', color: '#15803d', fontWeight: 600, cursor: 'pointer' }}>
-                              ▶ Devam
-                            </button>
-                          ) : (
-                            <button onClick={() => { setDuraklatModal({ kuralId: k.id, tanim: k.tanim }); setDuraklatSaat(24); setDuraklatNeden('') }}
-                              style={{ padding: '3px 9px', fontSize: 12, borderRadius: 6, border: '1px solid #fbbf24', background: '#fef9c3', color: '#92400e', fontWeight: 600, cursor: 'pointer' }}>
-                              ⏸ Duraklat
-                            </button>
-                          )}
-                          <button onClick={() => openEdit(k)} className="verde-btn-outline-strong" style={{ padding: '3px 9px', fontSize: 12 }}>Düzenle</button>
-                          <button onClick={() => handleDelete(k)} className="verde-btn-outline-strong" style={{ padding: '3px 9px', fontSize: 12, color: '#b91c1c' }}>Sil</button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                )
-              })}
-              {!filtered.length && (
-                <tr>
-                  <td colSpan={readonly ? 9 : 10} style={{ textAlign: 'center', color: '#6b7280', padding: '36px 0', fontSize: 14 }}>
-                    {q ? 'Arama kriterine uygun kural yok' : 'Henüz görev kuralı oluşturulmamış'}
-                  </td>
-                </tr>
+      {/* Hiyerarşik Kural Listesi: Üst Lokasyon > Grup > Lokasyon */}
+      {(() => {
+        // Lokasyon → Grup mapping
+        const lokGrupMap = new Map<string, string>()
+        const grupLokMap2 = new Map<string, string[]>()
+        for (const u of grupUyeleri) {
+          lokGrupMap.set(u.lokasyon_id, u.grup_id)
+          const arr = grupLokMap2.get(u.grup_id) ?? []
+          arr.push(u.lokasyon_id)
+          grupLokMap2.set(u.grup_id, arr)
+        }
+
+        // Grup → Üst Lokasyon
+        const grupUstLokMap = new Map<string, string>()
+        for (const g of gruplar) { if (g.ust_lokasyon_id) grupUstLokMap.set(g.id, g.ust_lokasyon_id) }
+
+        const grupAdMap = new Map<string, string>()
+        for (const g of gruplar) grupAdMap.set(g.id, g.ad ?? '—')
+
+        // Üst lokasyonlar (parent_id === null)
+        const ustLokasyonlar2 = lokasyonlar.filter(l => !l.parent_id).sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr'))
+
+        // Kuralları üst lokasyon > grup > lokasyon olarak grupla
+        type HiyerarsiNode = { ustLok: string; ustLokTanim: string; gruplar: { grupId: string; grupAd: string; kurallar: any[] }[]; grupsuz: any[] }
+        const hiyerarsi: HiyerarsiNode[] = []
+
+        for (const ustLok of ustLokasyonlar2) {
+          const altGruplar = gruplar.filter((g: any) => g.ust_lokasyon_id === ustLok.id)
+          const node: HiyerarsiNode = { ustLok: ustLok.id, ustLokTanim: ustLok.tanim, gruplar: [], grupsuz: [] }
+
+          for (const g of altGruplar) {
+            const lokIds = grupLokMap2.get(g.id) ?? []
+            const grupKurallar = filtered.filter(k => lokIds.includes(k.lokasyon_id))
+            if (grupKurallar.length > 0) {
+              node.gruplar.push({ grupId: g.id, grupAd: g.ad, kurallar: grupKurallar })
+            }
+          }
+
+          // Gruba dahil olmayan kurallar
+          const tumGrupLokIds = new Set(altGruplar.flatMap((g: any) => grupLokMap2.get(g.id) ?? []))
+          const altLokIds = new Set<string>()
+          const q2: string[] = [ustLok.id]
+          while (q2.length) { const cur = q2.shift()!; lokasyonlar.filter(l => l.parent_id === cur).forEach(l => { altLokIds.add(l.id); q2.push(l.id) }) }
+          const grupsuzKurallar = filtered.filter(k => altLokIds.has(k.lokasyon_id) && !tumGrupLokIds.has(k.lokasyon_id))
+          node.grupsuz = grupsuzKurallar
+
+          if (node.gruplar.length > 0 || node.grupsuz.length > 0) hiyerarsi.push(node)
+        }
+
+        // Hiçbir üst lokasyona girmeyen kurallar
+        const tumUstAltIds = new Set<string>()
+        for (const h of hiyerarsi) {
+          h.gruplar.forEach(g => g.kurallar.forEach(k => tumUstAltIds.add(k.id)))
+          h.grupsuz.forEach(k => tumUstAltIds.add(k.id))
+        }
+        const kalanKurallar = filtered.filter(k => !tumUstAltIds.has(k.id))
+
+        // Render helper: tek kural satırı
+        const renderKuralSatir = (k: any, indent: number = 0) => {
+          const o = ozet[k.id]
+          const lokTanim = lokasyonlar.find(l => l.id === k.lokasyon_id)?.tanim ?? '—'
+          return (
+            <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', paddingLeft: 14 + indent * 20, borderTop: '1px solid #f3f4f6', opacity: k.aktif ? 1 : 0.5, background: k.duraklatma_bitis && new Date(k.duraklatma_bitis).getTime() > Date.now() ? '#fffbeb' : '#fff', fontSize: 13 }}>
+              <span style={{ color: '#d1d5db', flexShrink: 0 }}>└─</span>
+              <span style={{ flex: 1, fontWeight: 500, color: '#374151', minWidth: 0 }}>
+                {lokTanim}
+                {k.duraklatma_bitis && new Date(k.duraklatma_bitis).getTime() > Date.now() && (
+                  <span style={{ fontSize: 10, color: '#92400e', marginLeft: 6 }}>⏸</span>
+                )}
+              </span>
+              <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{k.gunluk_frekans_sayisi}× {k.aktif_olma_saati?.slice(0, 5) ?? ''}</span>
+              <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{gunEtiket(k.aktif_gunler ?? [])}</span>
+              {o && <span style={{ fontSize: 10, background: '#e8f0ff', color: '#0f4c81', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>{o.uretilen}↑ {o.tamamlandi}✓</span>}
+              {!readonly && (
+                <button onClick={() => toggleAktif(k)} style={{ width: 28, height: 16, borderRadius: 8, position: 'relative', background: k.aktif ? '#374151' : '#d1d5db', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                  <span style={{ position: 'absolute', top: 2, left: k.aktif ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+                </button>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              {!readonly && (
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <button onClick={() => openEdit(k)} style={{ padding: '2px 8px', fontSize: 11, borderRadius: 5, border: '1px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', color: '#374151' }}>Düzenle</button>
+                  <button onClick={() => handleDelete(k)} style={{ padding: '2px 8px', fontSize: 11, borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626' }}>Sil</button>
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        // Toplu sil fonksiyonu
+        async function topluSilGrup(kurallar: any[]) {
+          const ok = await confirm({ title: 'Toplu Sil', message: `${kurallar.length} kural silinecek. Onaylıyor musunuz?`, confirmText: 'Evet, Sil', variant: 'danger' })
+          if (!ok) return
+          for (const k of kurallar) {
+            await fetch(`/api/gorev-kurallari/${k.id}`, { method: 'DELETE' })
+          }
+          setKuralar(prev => prev.filter(k => !kurallar.some(kk => kk.id === k.id)))
+          toast({ type: 'success', title: 'Silindi', message: `${kurallar.length} kural silindi.` })
+        }
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {hiyerarsi.length === 0 && kalanKurallar.length === 0 && (
+              <div className="verde-card" style={{ padding: 36, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>
+                {q ? 'Arama kriterine uygun kural yok' : 'Henüz görev kuralı oluşturulmamış'}
+              </div>
+            )}
+
+            {hiyerarsi.map(h => {
+              const ustAcik = acikUstLoklar.has(h.ustLok)
+              const toplamKural = h.gruplar.reduce((s, g) => s + g.kurallar.length, 0) + h.grupsuz.length
+              return (
+                <div key={h.ustLok} style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                  {/* Üst Lokasyon Başlığı */}
+                  <div onClick={() => setAcikUstLoklar(prev => { const n = new Set(prev); n.has(h.ustLok) ? n.delete(h.ustLok) : n.add(h.ustLok); return n })}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f9fafb', cursor: 'pointer', userSelect: 'none' }}>
+                    <span style={{ fontSize: 12, color: '#374151' }}>{ustAcik ? '▼' : '▶'}</span>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: '#111827', flex: 1 }}>📍 {h.ustLokTanim}</span>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{toplamKural} kural · {h.gruplar.length} grup</span>
+                  </div>
+
+                  {ustAcik && (
+                    <div>
+                      {h.gruplar.map(g => {
+                        const gAcik = acikGruplar2.has(g.grupId)
+                        const aktifSayi = g.kurallar.filter(k => k.aktif).length
+                        return (
+                          <div key={g.grupId}>
+                            {/* Grup Başlığı */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 10px 36px', background: '#fff', borderTop: '1px solid #f3f4f6', cursor: 'pointer', userSelect: 'none' }}
+                              onClick={() => setAcikGruplar2(prev => { const n = new Set(prev); n.has(g.grupId) ? n.delete(g.grupId) : n.add(g.grupId); return n })}>
+                              <span style={{ fontSize: 11, color: '#6b7280' }}>{gAcik ? '▼' : '▶'}</span>
+                              <span style={{ fontSize: 13.5, fontWeight: 700, color: '#1f2937', flex: 1 }}>
+                                🗂 {g.grupAd}
+                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>{g.kurallar.length} lokasyon · {aktifSayi} aktif</span>
+                              </span>
+                              {/* Grup tanım bilgisi */}
+                              {g.kurallar.length > 0 && (
+                                <span style={{ fontSize: 11.5, color: '#374151', fontWeight: 600 }}>
+                                  {g.kurallar[0]?.tanim}
+                                </span>
+                              )}
+                              {!readonly && (
+                                <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                                  <button onClick={() => topluSilGrup(g.kurallar)}
+                                    style={{ padding: '3px 10px', fontSize: 11, borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
+                                    Toplu Sil
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            {/* Lokasyon Kuralları */}
+                            {gAcik && g.kurallar.map(k => renderKuralSatir(k, 2))}
+                          </div>
+                        )
+                      })}
+
+                      {/* Grupsuz kurallar */}
+                      {h.grupsuz.length > 0 && (
+                        <div>
+                          <div style={{ padding: '8px 16px 8px 36px', fontSize: 12, color: '#94a3b8', fontWeight: 600, borderTop: '1px solid #f3f4f6' }}>Grupsuz Lokasyonlar</div>
+                          {h.grupsuz.map(k => renderKuralSatir(k, 1))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Hiçbir üst lokasyona girmeyen kurallar */}
+            {kalanKurallar.length > 0 && (
+              <div style={{ border: '1px solid #e2d6f0', borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', background: '#f5f0ff', fontSize: 13, fontWeight: 700, color: '#4a3070' }}>Sınıflandırılmamış Kurallar</div>
+                {kalanKurallar.map(k => renderKuralSatir(k, 0))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Sayfa altı özet satırı */}
       {kuralar.length > 0 && (
