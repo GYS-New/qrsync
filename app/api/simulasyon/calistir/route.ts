@@ -132,50 +132,42 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
   if (toplamGorev === 0) return { tamamlanan: 0, iptal: 0, mesaj: 'Bugünkü görev yok' }
 
   // ── Tamamlama aralığı hesabı ──────────────────────────────────────────
-  // vardiya_suresi_saat / görev_sayısı = görev başına dakika
   const vardiyaDk = vardiya_suresi_saat * 60
-  const gorevArasiDk = toplamGorev > 0 ? vardiyaDk / toplamGorev : vardiyaDk
-
-  // Mevcut tamamlanma + iptal sayıları
-  const islemliSayi = tumGorevler.filter((g: any) =>
-    ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'IPTAL'].includes(g.durum)
-  ).length
   const tamamlananSayi = tumGorevler.filter((g: any) =>
     ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum)
   ).length
-
-  // Hedef: toplam görevin hedef_oran%'ı kadar tamamlanmalı
   const hedefMax = Math.ceil((hedef_oran / 100) * toplamGorev)
 
-  // ACIK görevlerden sırası gelmiş olanları bul
-  // Sıra: aktif_olma_tarihi'ne göre sırala, her görev arası gorevArasiDk
-  const acikGorevler = tumGorevler
-    .filter((g: any) => g.durum === 'ACIK')
-    .sort((a: any, b: any) => new Date(a.aktif_olma_tarihi).getTime() - new Date(b.aktif_olma_tarihi).getTime())
+  if (tamamlananSayi >= hedefMax) {
+    return { tamamlanan: 0, iptal: 0, mesaj: `Hedef zaten sağlandı: ${tamamlananSayi}/${hedefMax}` }
+  }
 
+  const acikGorevler = tumGorevler.filter((g: any) => g.durum === 'ACIK')
   if (acikGorevler.length === 0) return { tamamlanan: 0, iptal: 0, mesaj: 'ACIK görev yok' }
 
-  // Her görevin "sırası gelme zamanı" = aktif_olma_tarihi + (kaçıncı görevse * gorevArasiDk)
-  // Ama aynı aktif_olma_tarihi grubundaki görevler de aralıklı tamamlanmalı
-  // Basit yaklaşım: görev aktif olduktan sonra gorevArasiDk geçmişse sırası gelmiş
+  // ── Her cron çalışmasında en fazla 1-2 görev (doğal akış) ─────────────
+  // Vardiya boyunca kaç görev tamamlanmalı: hedefMax
+  // Cron aralığı: 1 dk. Vardiya: vardiyaDk dk.
+  // Dakika başına ortalama görev: hedefMax / vardiyaDk
+  // 1 cron'da tamamlanacak: max 1-2 görev (rastgele)
+  const gorevPerDk = hedefMax / vardiyaDk
+  const buCrondaTamamlanacak = Math.random() < gorevPerDk ? 1 : 0
+  // Bazen 2 görev de olabilir (%10 olasılık)
+  const ekGorev = Math.random() < 0.1 ? 1 : 0
+  const maxTamamlama = Math.min(buCrondaTamamlanacak + ekGorev, acikGorevler.length, hedefMax - tamamlananSayi)
+
+  if (maxTamamlama <= 0) {
+    return { tamamlanan: 0, iptal: 0, mesaj: 'Bu cron turunda sıra gelmedi' }
+  }
+
+  // Rastgele görevler seç
+  const karisik = acikGorevler.sort(() => Math.random() - 0.5)
+  const tamamlanacak = karisik.slice(0, maxTamamlama)
+
   let tamamlananAdet = 0
   let iptalAdet = 0
 
-  for (const gorev of acikGorevler) {
-    // Hedef oranına ulaşıldıysa dur
-    if (tamamlananSayi + tamamlananAdet >= hedefMax) break
-
-    const aktifMs = new Date(gorev.aktif_olma_tarihi).getTime()
-
-    // Bu görevin aktif olma zamanından itibaren geçen süre
-    const gecenDk = (now - aktifMs) / 60000
-
-    // Sırası geldi mi? En az gorevArasiDk * (±%30 rastgele) kadar bekle
-    const rastgeleCarpan = 0.7 + Math.random() * 0.6 // 0.7 — 1.3 arası
-    const beklenmesiGerekenDk = gorevArasiDk * rastgeleCarpan
-
-    if (gecenDk < beklenmesiGerekenDk) continue // henüz sırası gelmedi
-
+  for (const gorev of tamamlanacak) {
     const personelId = uygunPersonel[Math.floor(Math.random() * uygunPersonel.length)]
     const lok = lokMap.get(gorev.lokasyon_id)
 
@@ -250,9 +242,30 @@ async function simuleCeklistTamamla(admin: any, gorevId: string, sablonId: strin
     const { data: sablon } = await admin.from('checklist_sablonlari').select('id, baslik, versiyon').eq('id', sablonId).single()
     if (!sablon) return
 
-    const { data: maddeler } = await admin.from('checklist_maddeleri').select('id, baslik, secenekler').eq('sablon_id', sablonId).order('sira', { ascending: true })
+    // Maddeleri çek (doğru tablo: checklist_sablon_maddeleri)
+    const { data: maddeler } = await admin
+      .from('checklist_sablon_maddeleri')
+      .select('id, baslik, zorunlu_cevap, gorsel_gerekli')
+      .eq('sablon_id', sablonId)
+      .order('sira_no', { ascending: true })
     if (!maddeler || maddeler.length === 0) return
 
+    // Her madde için seçenekleri çek (ayrı tablo: checklist_madde_secenekleri)
+    const maddeIds = maddeler.map((m: any) => m.id)
+    const { data: tumSecenekler } = await admin
+      .from('checklist_madde_secenekleri')
+      .select('id, madde_id, deger, aciklama_gerekli, sira_no')
+      .in('madde_id', maddeIds)
+      .order('sira_no', { ascending: true })
+
+    const secenekMap = new Map<string, any[]>()
+    for (const s of (tumSecenekler ?? [])) {
+      const arr = secenekMap.get(s.madde_id) ?? []
+      arr.push(s)
+      secenekMap.set(s.madde_id, arr)
+    }
+
+    // Sonuç başlığı oluştur
     const { data: sonucRow, error: sonucErr } = await admin.from('checklist_sonuc_basliklari').insert({
       canli_gorev_id: gorevId,
       lokasyon_id: lokasyonId,
@@ -264,15 +277,16 @@ async function simuleCeklistTamamla(admin: any, gorevId: string, sablonId: strin
 
     if (sonucErr || !sonucRow) return
 
+    // Her maddenin ilk seçeneğini işaretle (zorunlu alanlar dahil)
     const maddeRows = maddeler.map((m: any) => {
-      const secenekler = m.secenekler ?? []
-      const ilk = secenekler.length > 0 ? secenekler[0] : null
+      const secenekler = secenekMap.get(m.id) ?? []
+      const ilkSecenek = secenekler.length > 0 ? secenekler[0] : null
       return {
         sonuc_id: sonucRow.id,
         madde_id: m.id,
-        secenek_degeri: ilk?.deger ?? ilk?.label ?? 'Evet',
-        aciklama: null,
-        gorsel_url: null,
+        secenek_degeri: ilkSecenek?.deger ?? 'Yapıldı',
+        aciklama: null,  // metin boş geçilebilir
+        gorsel_url: null, // görsel boş geçilebilir
       }
     })
 
