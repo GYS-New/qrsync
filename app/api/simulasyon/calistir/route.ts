@@ -17,7 +17,31 @@ const IPTAL_OLASILIK = 0.01 // %1
 
 // Personelin son aktivitesini güncelle (online görünsün)
 async function personelAktiviteGuncelle(admin: any, userId: string) {
-  await admin.from('device_tokens').update({ son_kullanim: new Date().toISOString() }).eq('user_id', userId).eq('aktif', true)
+  const nowIso = new Date().toISOString()
+  // Önce mevcut device_tokens kaydını güncelle
+  const { count } = await admin.from('device_tokens').update({ son_kullanim: nowIso }).eq('user_id', userId).eq('aktif', true)
+  // Kayıt yoksa SİM için sanal device_token oluştur
+  if (count === 0 || count === null) {
+    const { data: existing } = await admin.from('device_tokens').select('id').eq('user_id', userId).maybeSingle()
+    if (!existing) {
+      // Kullanıcı bilgilerini al
+      const { data: user } = await admin.from('users').select('firma_id, isim_soyisim').eq('id', userId).single()
+      if (user) {
+        await admin.from('device_tokens').insert({
+          device_id: `sim-${userId}`,
+          device_token: `sim-token-${userId}`,
+          user_id: userId,
+          firma_id: user.firma_id,
+          isim_soyisim: user.isim_soyisim,
+          aktif: true,
+          son_kullanim: nowIso,
+        })
+      }
+    } else {
+      // Kayıt var ama aktif değil, güncelle
+      await admin.from('device_tokens').update({ son_kullanim: nowIso, aktif: true }).eq('user_id', userId)
+    }
+  }
 }
 
 export async function POST(req: Request) {
