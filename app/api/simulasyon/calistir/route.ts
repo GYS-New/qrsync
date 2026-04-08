@@ -143,83 +143,51 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
   }
 
   const acikGorevler = tumGorevler.filter((g: any) => g.durum === 'ACIK')
-  if (acikGorevler.length === 0) return { tamamlanan: 0, iptal: 0, mesaj: 'ACIK görev yok' }
+  const islemdeGorevler = tumGorevler.filter((g: any) => g.durum === 'ISLEMDE' && g.simule_tamamlandi === true)
 
-  // ── Her cron çalışmasında en fazla 1-2 görev (doğal akış) ─────────────
-  // Vardiya boyunca kaç görev tamamlanmalı: hedefMax
-  // Cron aralığı: 1 dk. Vardiya: vardiyaDk dk.
-  // Dakika başına ortalama görev: hedefMax / vardiyaDk
-  // 1 cron'da tamamlanacak: max 1-2 görev (rastgele)
+  // ── Doğal akış: dakika başına görev oranı ─────────────────────────────
   const gorevPerDk = hedefMax / vardiyaDk
-  const buCrondaTamamlanacak = Math.random() < gorevPerDk ? 1 : 0
-  // Bazen 2 görev de olabilir (%10 olasılık)
-  const ekGorev = Math.random() < 0.1 ? 1 : 0
-  const maxTamamlama = Math.min(buCrondaTamamlanacak + ekGorev, acikGorevler.length, hedefMax - tamamlananSayi)
-
-  if (maxTamamlama <= 0) {
-    return { tamamlanan: 0, iptal: 0, mesaj: 'Bu cron turunda sıra gelmedi' }
-  }
-
-  // Rastgele görevler seç
-  const karisik = acikGorevler.sort(() => Math.random() - 0.5)
-  const tamamlanacak = karisik.slice(0, maxTamamlama)
+  const buCrondaIslem = Math.random() < gorevPerDk ? 1 : 0
+  const ekIslem = Math.random() < 0.1 ? 1 : 0
+  const maxIslem = buCrondaIslem + ekIslem
 
   let tamamlananAdet = 0
+  let baslatmaAdet = 0
   let iptalAdet = 0
 
-  for (const gorev of tamamlanacak) {
-    const personelId = uygunPersonel[Math.floor(Math.random() * uygunPersonel.length)]
+  // ── ADIM 1: ISLEMDE görevlerden süresi dolanları tamamla ──────────────
+  for (const gorev of islemdeGorevler) {
+    if (tamamlananSayi + tamamlananAdet >= hedefMax) break
+    if (!gorev.baslatilma_tarihi) continue
+
+    const baslatmaMs = new Date(gorev.baslatilma_tarihi).getTime()
     const lok = lokMap.get(gorev.lokasyon_id)
+    const minDk = lok?.min_sure_dakika ?? 5
+    const maxDk = lok?.max_sure_dakika ?? 10
+    // Bu görevin hedef süresi (başlatma anında rastgele belirlendi, simule_suresi olarak hesapla)
+    const gecenDk = (now - baslatmaMs) / 60000
 
-    // %1 iptal olasılığı
-    if (Math.random() < IPTAL_OLASILIK) {
-      await admin.from('canli_gorevler').update({
-        durum: 'IPTAL',
-        durum_degisim_tarihi: new Date().toISOString(),
-        iptal_eden_id: personelId,
-        iptal_tarihi: new Date().toISOString(),
-        simule_tamamlandi: true,
-      } as any).eq('id', gorev.id)
-      iptalAdet++
-      continue
-    }
+    // Min süre dolmadıysa bekle
+    if (gecenDk < minDk) continue
 
-    // Süre hesabı: süreli görev aktifse min/max arası rastgele
-    const varsayilanSureDk = vardiyaDk / Math.max(toplamGorev, 1)
-    let sureSaniye: number = Math.round(varsayilanSureDk * 60 * (0.5 + Math.random() * 0.5))
-    if (lok?.sureli_gorev_aktif) {
-      const minDk = lok.min_sure_dakika ?? 1
-      const maxDk = lok.max_sure_dakika ?? Math.round(varsayilanSureDk)
-      const rastgeleDk = minDk + Math.random() * Math.max(0, maxDk - minDk)
-      sureSaniye = Math.round(rastgeleDk * 60)
-    }
+    // Min-max arası rastgele tamamlanma noktası
+    const hedefDk = minDk + Math.random() * (maxDk - minDk)
+    if (gecenDk < hedefDk) continue
 
+    const sureSaniye = Math.round(gecenDk * 60)
     const tamamlanmaIso = new Date().toISOString()
-    const baslatmaMs = Date.now() - sureSaniye * 1000
-    const baslatmaIso = new Date(baslatmaMs).toISOString()
+    const personelId = gorev.baslatan_kullanici_id ?? uygunPersonel[Math.floor(Math.random() * uygunPersonel.length)]
 
-    const { error: updateErr } = await admin
-      .from('canli_gorevler')
-      .update({
-        durum: 'TAMAMLANDI',
-        durum_degisim_tarihi: tamamlanmaIso,
-        baslatilma_tarihi: baslatmaIso,
-        baslatan_kullanici_id: personelId,
-        tamamlanma_tarihi: tamamlanmaIso,
-        tamamlayan_kullanici_id: personelId,
-        islemi_yapan_id: personelId,
-        tamamlanma_suresi_saniye: sureSaniye,
-        son_tamamlama_kanali: 'MOBIL',
-        simule_tamamlandi: true,
-      } as any)
-      .eq('id', gorev.id)
+    await admin.from('canli_gorevler').update({
+      durum: 'TAMAMLANDI',
+      durum_degisim_tarihi: tamamlanmaIso,
+      tamamlanma_tarihi: tamamlanmaIso,
+      tamamlayan_kullanici_id: personelId,
+      islemi_yapan_id: personelId,
+      tamamlanma_suresi_saniye: sureSaniye,
+      son_tamamlama_kanali: 'MOBIL',
+    } as any).eq('id', gorev.id)
 
-    if (updateErr) {
-      console.error(`[SIMULASYON] Görev ${gorev.id} hata:`, updateErr.message)
-      continue
-    }
-
-    // Çeklist
     if (lok?.checklist_sablon_id) {
       await simuleCeklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)
     }
@@ -227,11 +195,74 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     tamamlananAdet++
   }
 
+  // ── ADIM 2: ACIK görevleri başlat veya direkt tamamla ────────────────
+  if (maxIslem > 0 && acikGorevler.length > 0 && (tamamlananSayi + tamamlananAdet) < hedefMax) {
+    const karisik = acikGorevler.sort(() => Math.random() - 0.5)
+    const secilen = karisik.slice(0, maxIslem)
+
+    for (const gorev of secilen) {
+      if ((tamamlananSayi + tamamlananAdet + baslatmaAdet) >= hedefMax) break
+
+      const personelId = uygunPersonel[Math.floor(Math.random() * uygunPersonel.length)]
+      const lok = lokMap.get(gorev.lokasyon_id)
+
+      // %1 iptal olasılığı
+      if (Math.random() < IPTAL_OLASILIK) {
+        await admin.from('canli_gorevler').update({
+          durum: 'IPTAL',
+          durum_degisim_tarihi: new Date().toISOString(),
+          iptal_eden_id: personelId,
+          iptal_tarihi: new Date().toISOString(),
+          simule_tamamlandi: true,
+        } as any).eq('id', gorev.id)
+        iptalAdet++
+        continue
+      }
+
+      if (lok?.sureli_gorev_aktif) {
+        // SG aktif → ISLEMDE yap, sonraki cron'larda süresi dolunca tamamlanacak
+        await admin.from('canli_gorevler').update({
+          durum: 'ISLEMDE',
+          durum_degisim_tarihi: new Date().toISOString(),
+          baslatilma_tarihi: new Date().toISOString(),
+          baslatan_kullanici_id: personelId,
+          simule_tamamlandi: true,
+        } as any).eq('id', gorev.id)
+        baslatmaAdet++
+      } else {
+        // SG pasif → direkt TAMAMLANDI
+        const varsayilanSureDk = vardiyaDk / Math.max(toplamGorev, 1)
+        const sureSaniye = Math.round(varsayilanSureDk * 60 * (0.5 + Math.random() * 0.5))
+        const tamamlanmaIso = new Date().toISOString()
+        const baslatmaIso = new Date(Date.now() - sureSaniye * 1000).toISOString()
+
+        await admin.from('canli_gorevler').update({
+          durum: 'TAMAMLANDI',
+          durum_degisim_tarihi: tamamlanmaIso,
+          baslatilma_tarihi: baslatmaIso,
+          baslatan_kullanici_id: personelId,
+          tamamlanma_tarihi: tamamlanmaIso,
+          tamamlayan_kullanici_id: personelId,
+          islemi_yapan_id: personelId,
+          tamamlanma_suresi_saniye: sureSaniye,
+          son_tamamlama_kanali: 'MOBIL',
+          simule_tamamlandi: true,
+        } as any).eq('id', gorev.id)
+
+        if (lok?.checklist_sablon_id) {
+          await simuleCeklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)
+        }
+
+        tamamlananAdet++
+      }
+    }
+  }
+
   return {
     tamamlanan: tamamlananAdet,
+    baslatilan: baslatmaAdet,
     iptal: iptalAdet,
     toplam: toplamGorev,
-    gorev_arasi_dk: Math.round(vardiyaDk / Math.max(toplamGorev, 1)),
     mevcut_tamamlanan: tamamlananSayi,
     hedef_max: hedefMax,
   }
