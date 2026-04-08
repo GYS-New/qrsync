@@ -43,17 +43,6 @@ export async function PATCH(
     if (k in body) update[k] = body[k]
   }
 
-  // Atanan kullanıcı değiştiriliyor/ekleniyorsa mesai kontrolü
-  if ('atanan_kullanici_id' in body && body.atanan_kullanici_id) {
-    const { data: kural2 } = await admin
-      .from('gorev_kurallari')
-      .select('firma_id, proje_id')
-      .eq('id', params.id)
-      .single()
-
-    }
-  }
-
   const { data, error } = await admin
     .from('gorev_kurallari').update(update).eq('id', params.id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
