@@ -25,7 +25,7 @@ type Props = {
 }
 
 const BOSH_FORM = {
-  tanim: '', lokasyon_id: '', atanan_kullanici_id: '',
+  tanim: '', lokasyon_id: '', lokasyon_idler: [] as string[], atanan_kullanici_id: '',
   gunluk_frekans_sayisi: 1, aktif_gunler: IS_GUNLERI,
   aktif_olma_saati: '08:00',
   baslangic_tarihi: new Date().toISOString().slice(0, 10),
@@ -90,14 +90,38 @@ export default function GorevKurallariClient({
     setLokSec(prev => {
       const next = prev.slice(0, level + 1)
       next[level] = id || null
-      // Alt seviyeleri sıfırla
       return next
     })
-    // Seçilen id'nin çocukları varsa lokasyon_id'yi boş bırak (ara seviye)
     const hasChildren = lokasyonlar.some(l => l.parent_id === id)
     const seciliLok = lokasyonlar.find(l => l.id === id)
     const lokFrekans = seciliLok?.gunluk_frekans_sayisi ?? 1
-    setForm(p => ({ ...p, lokasyon_id: hasChildren ? '' : id, gunluk_frekans_sayisi: hasChildren ? p.gunluk_frekans_sayisi : lokFrekans }))
+    // Toplu seçim modunda (create) alt lokasyonları checkbox ile seçilecek
+    if (modal === 'create' && hasChildren) {
+      setForm(p => ({ ...p, lokasyon_id: '', lokasyon_idler: [], gunluk_frekans_sayisi: p.gunluk_frekans_sayisi }))
+    } else {
+      setForm(p => ({ ...p, lokasyon_id: hasChildren ? '' : id, lokasyon_idler: [], gunluk_frekans_sayisi: hasChildren ? p.gunluk_frekans_sayisi : lokFrekans }))
+    }
+  }
+
+  // Yaprak lokasyonları bul (seçili parent'ın altındaki çocuksuz lokasyonlar)
+  function yaprakLokasyonlar(parentId: string): typeof lokasyonlar {
+    const direkt = lokasyonlar.filter(l => l.parent_id === parentId)
+    const result: typeof lokasyonlar = []
+    for (const child of direkt) {
+      const hasGrand = lokasyonlar.some(l => l.parent_id === child.id)
+      if (!hasGrand) result.push(child)
+      else result.push(...yaprakLokasyonlar(child.id))
+    }
+    return result
+  }
+
+  function toggleLokCheckbox(lokId: string) {
+    setForm(p => {
+      const idler = p.lokasyon_idler.includes(lokId)
+        ? p.lokasyon_idler.filter(id => id !== lokId)
+        : [...p.lokasyon_idler, lokId]
+      return { ...p, lokasyon_idler: idler, lokasyon_id: idler.length === 1 ? idler[0] : '' }
+    })
   }
 
   // level bazında gösterilecek çocuk listesi
@@ -169,25 +193,44 @@ export default function GorevKurallariClient({
 
   async function handleSave() {
     if (!form.tanim.trim()) return toast({ type: 'error', title: 'Hata', message: 'Tanım zorunlu' })
-    if (!form.lokasyon_id)  return toast({ type: 'error', title: 'Hata', message: 'Lokasyon seçin' })
     if (!form.aktif_gunler.length) return toast({ type: 'error', title: 'Hata', message: 'En az bir gün seçin' })
+
+    // Create modunda toplu lokasyon seçimi
+    const lokIdler = modal === 'create' && form.lokasyon_idler.length > 0
+      ? form.lokasyon_idler
+      : form.lokasyon_id ? [form.lokasyon_id] : []
+
+    if (lokIdler.length === 0) return toast({ type: 'error', title: 'Hata', message: 'En az bir lokasyon seçin' })
+
     setSaving(true)
     try {
-      const body = {
-        firma_id: firmaId, tanim: form.tanim.trim(), lokasyon_id: form.lokasyon_id,
-        atanan_kullanici_id: form.atanan_kullanici_id || null,
-        gunluk_frekans_sayisi: form.gunluk_frekans_sayisi,
-        aktif_gunler: form.aktif_gunler, aktif_olma_saati: form.aktif_olma_saati,
-        baslangic_tarihi: form.baslangic_tarihi, bitis_tarihi: form.bitis_tarihi || null,
-        ...(projeId ? { proje_id: projeId } : {}),
-      }
       if (modal === 'create') {
-        const res = await fetch('/api/gorev-kurallari', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error)
-        setKuralar(p => [data, ...p])
-        toast({ type: 'success', title: 'Başarılı', message: 'Kural oluşturuldu' })
+        const yeniKurallar: any[] = []
+        for (const lokId of lokIdler) {
+          const body = {
+            firma_id: firmaId, tanim: form.tanim.trim(), lokasyon_id: lokId,
+            atanan_kullanici_id: form.atanan_kullanici_id || null,
+            gunluk_frekans_sayisi: form.gunluk_frekans_sayisi,
+            aktif_gunler: form.aktif_gunler, aktif_olma_saati: form.aktif_olma_saati,
+            baslangic_tarihi: form.baslangic_tarihi, bitis_tarihi: form.bitis_tarihi || null,
+            ...(projeId ? { proje_id: projeId } : {}),
+          }
+          const res = await fetch('/api/gorev-kurallari', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error)
+          yeniKurallar.push(data)
+        }
+        setKuralar(p => [...yeniKurallar, ...p])
+        toast({ type: 'success', title: 'Başarılı', message: `${yeniKurallar.length} lokasyon için kural oluşturuldu` })
       } else if (modal === 'edit' && editId) {
+        const body = {
+          firma_id: firmaId, tanim: form.tanim.trim(), lokasyon_id: lokIdler[0],
+          atanan_kullanici_id: form.atanan_kullanici_id || null,
+          gunluk_frekans_sayisi: form.gunluk_frekans_sayisi,
+          aktif_gunler: form.aktif_gunler, aktif_olma_saati: form.aktif_olma_saati,
+          baslangic_tarihi: form.baslangic_tarihi, bitis_tarihi: form.bitis_tarihi || null,
+          ...(projeId ? { proje_id: projeId } : {}),
+        }
         const res = await fetch(`/api/gorev-kurallari/${editId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
@@ -558,8 +601,45 @@ export default function GorevKurallariClient({
                     )
                   })()}
                 </div>
-                {/* Seçili lokasyon özeti */}
-                {form.lokasyon_id && (
+                {/* Toplu lokasyon seçimi (create modunda) */}
+                {modal === 'create' && (() => {
+                  // Son seçili parent'ın yaprak çocuklarını bul
+                  const lastSelected = lokSec.filter(Boolean).pop()
+                  if (!lastSelected) return null
+                  const yapraklar = yaprakLokasyonlar(lastSelected)
+                  if (yapraklar.length === 0) return null
+                  const tumSecili = yapraklar.every(l => form.lokasyon_idler.includes(l.id))
+                  return (
+                    <div style={{ marginTop: 8, border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 12px', background: '#fafafa' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>Alt Lokasyonlar ({form.lokasyon_idler.length}/{yapraklar.length})</span>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button type="button" onClick={() => setForm(p => ({ ...p, lokasyon_idler: yapraklar.map(l => l.id), lokasyon_id: '' }))}
+                            style={{ fontSize: 11, color: '#1f2937', background: '#e5e7eb', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }}>
+                            Tümünü Seç
+                          </button>
+                          <button type="button" onClick={() => setForm(p => ({ ...p, lokasyon_idler: [], lokasyon_id: '' }))}
+                            style={{ fontSize: 11, color: '#6b7280', background: '#f3f4f6', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>
+                            Temizle
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+                        {yapraklar.map(l => {
+                          const secili = form.lokasyon_idler.includes(l.id)
+                          return (
+                            <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: secili ? '#eff6ff' : 'transparent', fontSize: 13 }}>
+                              <input type="checkbox" checked={secili} onChange={() => toggleLokCheckbox(l.id)} style={{ width: 15, height: 15 }} />
+                              <span style={{ fontWeight: secili ? 600 : 400, color: secili ? '#1e40af' : '#374151' }}>{l.tanim}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+                {/* Seçili lokasyon özeti (edit modunda) */}
+                {form.lokasyon_id && modal === 'edit' && (
                   <div style={{ marginTop: 6, fontSize: 12, color: '#374151', fontWeight: 600 }}>
                     ✓ {lokMap.get(form.lokasyon_id)}
                   </div>
