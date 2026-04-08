@@ -15,6 +15,11 @@ import { createAdminClient } from '@/lib/supabase/server'
 const CORS = { 'Access-Control-Allow-Origin': '*' }
 const IPTAL_OLASILIK = 0.01 // %1
 
+// Personelin son aktivitesini güncelle (online görünsün)
+async function personelAktiviteGuncelle(admin: any, userId: string) {
+  await admin.from('device_tokens').update({ son_kullanim: new Date().toISOString() }).eq('user_id', userId).eq('aktif', true)
+}
+
 export async function POST(req: Request) {
   const cronToken = req.headers.get('x-cron-token')
   const secret = process.env.CRON_SECRET
@@ -193,6 +198,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
       await simuleCeklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)
     }
 
+    await personelAktiviteGuncelle(admin, personelId)
     tamamlananAdet++
   }
 
@@ -217,6 +223,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
           islemi_yapan_id: personelId,
           simule_tamamlandi: true,
         } as any).eq('id', gorev.id)
+        await personelAktiviteGuncelle(admin, personelId)
         iptalAdet++
         continue
       }
@@ -231,6 +238,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
           islemi_yapan_id: personelId,
           simule_tamamlandi: true,
         } as any).eq('id', gorev.id)
+        await personelAktiviteGuncelle(admin, personelId)
         baslatmaAdet++
       } else {
         // SG pasif → direkt TAMAMLANDI
@@ -256,6 +264,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
           await simuleCeklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)
         }
 
+        await personelAktiviteGuncelle(admin, personelId)
         tamamlananAdet++
       }
     }
