@@ -109,7 +109,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
   // Lokasyon bilgileri
   const { data: lokBilgi } = await admin
     .from('lokasyonlar')
-    .select('id, checklist_sablon_id, sureli_gorev_aktif, min_sure_dakika, max_sure_dakika')
+    .select('id, checklist_sablon_id, sureli_gorev_aktif, min_sure_dakika, max_sure_dakika, hedef_sure_dakika')
     .in('id', lokIds)
 
   const lokMap = new Map<string, any>()
@@ -163,16 +163,17 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     const baslatmaMs = new Date(gorev.baslatilma_tarihi).getTime()
     const lok = lokMap.get(gorev.lokasyon_id)
     const minDk = lok?.min_sure_dakika ?? 5
-    const maxDk = lok?.max_sure_dakika ?? 10
-    // Bu görevin hedef süresi (başlatma anında rastgele belirlendi, simule_suresi olarak hesapla)
+    const hedefDk = lok?.hedef_sure_dakika ?? 10
     const gecenDk = (now - baslatmaMs) / 60000
 
-    // Min süre dolmadıysa bekle
+    // Min süreden önce asla tamamlama
     if (gecenDk < minDk) continue
 
-    // Min-max arası rastgele tamamlanma noktası
-    const hedefDk = minDk + Math.random() * (maxDk - minDk)
-    if (gecenDk < hedefDk) continue
+    // Hedef süre ± %50 arası rastgele tamamlanma noktası
+    const altSinir = Math.max(minDk, hedefDk * 0.5)
+    const ustSinir = hedefDk * 1.5
+    const tamamlanmaDk = altSinir + Math.random() * (ustSinir - altSinir)
+    if (gecenDk < tamamlanmaDk) continue
 
     const sureSaniye = Math.round(gecenDk * 60)
     const tamamlanmaIso = new Date().toISOString()
