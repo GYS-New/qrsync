@@ -33,11 +33,13 @@ export async function POST(req: Request) {
     if (me.rol === 'tenant_user' || me.rol === 'musteri') {
       const admin2 = createAdminClient()
       let personelTakibiAktif = false
-      const { data: firma } = await admin2.from('firmalar').select('personel_takibi_aktif').eq('id', me.firma_id).single()
-      if (firma?.personel_takibi_aktif === true) personelTakibiAktif = true
-      if (!personelTakibiAktif) {
-        const { data: projeler } = await admin2.from('projeler').select('personel_takibi_aktif').eq('firma_id', me.firma_id).eq('aktif', true)
-        if ((projeler ?? []).some((p: any) => p.personel_takibi_aktif === true)) personelTakibiAktif = true
+      const { data: meUser } = await admin2.from('users').select('proje_id').eq('id', me.id).single()
+      if (meUser?.proje_id) {
+        const { data: proje } = await admin2.from('projeler').select('personel_takibi_aktif').eq('id', meUser.proje_id).single()
+        personelTakibiAktif = proje?.personel_takibi_aktif === true
+      } else {
+        const { data: firma } = await admin2.from('firmalar').select('personel_takibi_aktif').eq('id', me.firma_id).single()
+        personelTakibiAktif = firma?.personel_takibi_aktif === true
       }
       if (personelTakibiAktif) {
         const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)

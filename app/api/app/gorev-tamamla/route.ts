@@ -43,23 +43,15 @@ export async function POST(req: Request) {
     }
 
     // ── Personel takibi aktifse mesai kontrolü ──────────────────────────────
-    // Firma + tüm aktif projelerde kontrol (device_tokens.proje_id güvenilmez olabilir)
+    // Proje varsa proje ayarı, yoksa firma ayarı (başka projeler karışmaz)
     {
       let personelTakibiAktif = false
-      // 1. Firma kontrolü
-      const { data: firmaChk } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
-      if (firmaChk?.personel_takibi_aktif === true) personelTakibiAktif = true
-      // 2. Proje kontrolü: device_tokens.proje_id veya firmanın tüm projeleri
-      if (!personelTakibiAktif) {
-        if (personelProjeId) {
-          const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
-          if (proje?.personel_takibi_aktif === true) personelTakibiAktif = true
-        }
-        if (!personelTakibiAktif) {
-          // Device token'da proje yoksa firmadaki tüm projeleri kontrol et
-          const { data: projeler } = await admin.from('projeler').select('personel_takibi_aktif').eq('firma_id', firmaId).eq('aktif', true)
-          if ((projeler ?? []).some((p: any) => p.personel_takibi_aktif === true)) personelTakibiAktif = true
-        }
+      if (personelProjeId) {
+        const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
+        personelTakibiAktif = proje?.personel_takibi_aktif === true
+      } else {
+        const { data: firmaChk } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
+        personelTakibiAktif = firmaChk?.personel_takibi_aktif === true
       }
       if (personelTakibiAktif) {
         const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)

@@ -3,16 +3,17 @@
  * Merkezi mesai + pasif kontrolü — TÜM QR/NFC/görev endpoint'lerinde kullanılır.
  * Admin client ile çalışır (RLS bypass).
  *
- * Kullanım:
- *   const hata = await mesaiVePasifKontrol(admin, userId)
- *   if (hata) return NextResponse.json(hata, { status: hata.status })
+ * Kontrol mantığı:
+ * - Kullanıcının kendi proje_id'si varsa → o projenin ayarına bak
+ * - Yoksa → firma ayarına bak
+ * - Başka projelerin ayarı karışmaz
  */
 
 type KontrolSonuc = { ok: false; error: string; code?: string; status: number } | null
 
 export async function mesaiVePasifKontrol(admin: any, userId: string): Promise<KontrolSonuc> {
   // 1. Kullanıcı aktif mi?
-  const { data: user } = await admin.from('users').select('aktif, firma_id, rol').eq('id', userId).single()
+  const { data: user } = await admin.from('users').select('aktif, firma_id, rol, proje_id').eq('id', userId).single()
   if (!user) return { ok: false, error: 'Kullanıcı bulunamadı', status: 401 }
 
   if (user.aktif === false) {
@@ -22,15 +23,15 @@ export async function mesaiVePasifKontrol(admin: any, userId: string): Promise<K
   // SA/TA mesai kontrolünden muaf
   if (['super_admin', 'alt_super_admin', 'tenant_admin'].includes(user.rol)) return null
 
-  // 2. Personel takibi aktif mi? (firma VEYA herhangi bir proje)
+  // 2. Personel takibi aktif mi? Kullanıcının projesi varsa proje ayarı, yoksa firma ayarı
   let personelTakibiAktif = false
 
-  const { data: firma } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', user.firma_id).single()
-  if (firma?.personel_takibi_aktif === true) personelTakibiAktif = true
-
-  if (!personelTakibiAktif) {
-    const { data: projeler } = await admin.from('projeler').select('personel_takibi_aktif').eq('firma_id', user.firma_id).eq('aktif', true)
-    if ((projeler ?? []).some((p: any) => p.personel_takibi_aktif === true)) personelTakibiAktif = true
+  if (user.proje_id) {
+    const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', user.proje_id).single()
+    personelTakibiAktif = proje?.personel_takibi_aktif === true
+  } else {
+    const { data: firma } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', user.firma_id).single()
+    personelTakibiAktif = firma?.personel_takibi_aktif === true
   }
 
   if (!personelTakibiAktif) return null
