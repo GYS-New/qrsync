@@ -111,6 +111,14 @@ export async function PATCH(req: NextRequest) {
   // Ana kayıt güncelle
   if (aktif !== undefined) {
     await admin.from('simulasyon_ayarlari').update({ aktif, guncelleme_tarihi: new Date().toISOString() }).eq('id', id)
+    // SİM durdurulduğunda sanal device_tokens kayıtlarını temizle
+    if (aktif === false) {
+      const { data: personeller } = await admin.from('simulasyon_personeller').select('user_id').eq('simulasyon_id', id)
+      if (personeller && personeller.length > 0) {
+        const simDeviceIds = personeller.map((p: any) => `sim-${p.user_id}`)
+        await admin.from('device_tokens').delete().in('device_id', simDeviceIds)
+      }
+    }
   }
 
   // Grup ayarları yeniden yaz
