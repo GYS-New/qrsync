@@ -476,7 +476,7 @@ export default function GorevKurallariClient({
         // Hiçbir üst lokasyona girmeyen kurallar
         const tumUstAltIds = new Set<string>()
         for (const h of hiyerarsi) {
-          h.gruplar.forEach(g => g.kurallar.forEach(k => tumUstAltIds.add(k.id)))
+          h.gruplar.forEach(g => g.tanimlar.forEach(t => t.kurallar.forEach(k => tumUstAltIds.add(k.id))))
           h.grupsuz.forEach(k => tumUstAltIds.add(k.id))
         }
         const kalanKurallar = filtered.filter(k => !tumUstAltIds.has(k.id))
