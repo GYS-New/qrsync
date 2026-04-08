@@ -4,9 +4,9 @@
  * Admin client ile çalışır (RLS bypass).
  *
  * Kontrol mantığı:
- * - Kullanıcının kendi proje_id'si varsa → o projenin ayarına bak
- * - Yoksa → firma ayarına bak
- * - Başka projelerin ayarı karışmaz
+ * - Firma seviyesi: özellik mevcuttur (her zaman true olabilir)
+ * - Proje seviyesi: açık/kapalı ayarlanır → SADECE proje ayarına bakılır
+ * - Kullanıcının proje_id'si yoksa mesai kontrolü yapılmaz
  */
 
 type KontrolSonuc = { ok: false; error: string; code?: string; status: number } | null
@@ -23,18 +23,11 @@ export async function mesaiVePasifKontrol(admin: any, userId: string): Promise<K
   // SA/TA mesai kontrolünden muaf
   if (['super_admin', 'alt_super_admin', 'tenant_admin'].includes(user.rol)) return null
 
-  // 2. Personel takibi aktif mi? Kullanıcının projesi varsa proje ayarı, yoksa firma ayarı
-  let personelTakibiAktif = false
+  // 2. Proje bazlı personel takibi kontrolü (firma ayarı karışmaz)
+  if (!user.proje_id) return null // proje yoksa mesai kontrolü yapılmaz
 
-  if (user.proje_id) {
-    const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', user.proje_id).single()
-    personelTakibiAktif = proje?.personel_takibi_aktif === true
-  } else {
-    const { data: firma } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', user.firma_id).single()
-    personelTakibiAktif = firma?.personel_takibi_aktif === true
-  }
-
-  if (!personelTakibiAktif) return null
+  const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', user.proje_id).single()
+  if (!proje || proje.personel_takibi_aktif !== true) return null
 
   // 3. Bugün açık mesai kaydı var mı? (TRT tarihi)
   const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)

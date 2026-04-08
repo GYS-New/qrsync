@@ -22,15 +22,12 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Personel takibi aktif mi? Kullanıcının projesi varsa proje, yoksa firma ayarı
+  // Personel takibi aktif mi? Sadece proje bazlı kontrol
   let personelTakibiAktif = false
   const { data: userChk } = await admin.from('users').select('proje_id').eq('id', userId).single()
   if (userChk?.proje_id) {
     const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', userChk.proje_id).single()
     personelTakibiAktif = proje?.personel_takibi_aktif === true
-  } else {
-    const { data: firma } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
-    personelTakibiAktif = firma?.personel_takibi_aktif === true
   }
 
   if (!personelTakibiAktif) {

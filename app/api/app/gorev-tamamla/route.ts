@@ -42,16 +42,12 @@ export async function POST(req: Request) {
       )
     }
 
-    // ── Personel takibi aktifse mesai kontrolü ──────────────────────────────
-    // Proje varsa proje ayarı, yoksa firma ayarı (başka projeler karışmaz)
+    // ── Personel takibi aktifse mesai kontrolü (sadece proje bazlı) ────────
     {
       let personelTakibiAktif = false
       if (personelProjeId) {
         const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
         personelTakibiAktif = proje?.personel_takibi_aktif === true
-      } else {
-        const { data: firmaChk } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
-        personelTakibiAktif = firmaChk?.personel_takibi_aktif === true
       }
       if (personelTakibiAktif) {
         const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
