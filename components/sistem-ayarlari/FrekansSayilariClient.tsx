@@ -163,7 +163,7 @@ export default function FrekansSayilariClient({ lokasyonlar, firmaId, projeId }:
                             🗂 {g.ad}
                             <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>({gLokIds.length} lokasyon)</span>
                           </span>
-                          {/* Grup frekans girişi */}
+                          {/* Grup frekans girişi — değeri tüm lokasyonlara uygula + kaydet */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
                             <input type="number" min={1} max={99} value={gLoklar.length > 0 ? (values[gLoklar[0].id] ?? 1) : 1}
                               onChange={e => {
@@ -173,7 +173,7 @@ export default function FrekansSayilariClient({ lokasyonlar, firmaId, projeId }:
                               style={{ width: 50, height: 28, textAlign: 'center', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 13, fontWeight: 700, color: '#374151' }} />
                             <button onClick={() => kaydetCoklu(gLokIds)} disabled={savingIds.size > 0}
                               style={{ height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid #111827', background: '#fff', color: '#111827', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                              Kaydet
+                              Gruba Uygula
                             </button>
                           </div>
                         </div>
