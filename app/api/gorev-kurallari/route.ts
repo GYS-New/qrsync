@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { mesaiKontrolEt } from '@/lib/mesai/kontrolEt'
 
 // ── GET: Firmanın tüm kurallarını listele ────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -83,14 +82,6 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient()
-
-  // Personel takibi kontrolü
-  const mesaiEngel = await mesaiKontrolEt(admin, {
-    firmaId,
-    projeId: proje_id ?? lok.proje_id,
-    atananUserId: atanan_kullanici_id,
-  })
-  if (mesaiEngel) return NextResponse.json({ error: mesaiEngel }, { status: 422 })
 
   const { data, error } = await admin
     .from('gorev_kurallari')

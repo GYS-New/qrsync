@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { mesaiKontrolEt } from '@/lib/mesai/kontrolEt'
 
 async function authorize(req: NextRequest) {
   const supabase = createClient()
@@ -52,13 +51,6 @@ export async function PATCH(
       .eq('id', params.id)
       .single()
 
-    if (kural2) {
-      const mesaiEngel = await mesaiKontrolEt(admin, {
-        firmaId: kural2.firma_id,
-        projeId: kural2.proje_id,
-        atananUserId: body.atanan_kullanici_id,
-      })
-      if (mesaiEngel) return NextResponse.json({ error: mesaiEngel }, { status: 422 })
     }
   }
 
