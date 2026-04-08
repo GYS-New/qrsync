@@ -207,10 +207,13 @@ export default function GorevKurallariClient({
       if (modal === 'create') {
         const yeniKurallar: any[] = []
         for (const lokId of lokIdler) {
+          // Her lokasyonun kendi günlük frekans sayısını kullan
+          const lok = lokasyonlar.find(l => l.id === lokId)
+          const lokFrekans = (lok as any)?.gunluk_frekans_sayisi ?? 1
           const body = {
             firma_id: firmaId, tanim: form.tanim.trim(), lokasyon_id: lokId,
             atanan_kullanici_id: form.atanan_kullanici_id || null,
-            gunluk_frekans_sayisi: form.gunluk_frekans_sayisi,
+            gunluk_frekans_sayisi: lokFrekans,
             aktif_gunler: form.aktif_gunler, aktif_olma_saati: form.aktif_olma_saati,
             baslangic_tarihi: form.baslangic_tarihi, bitis_tarihi: form.bitis_tarihi || null,
             ...(projeId ? { proje_id: projeId } : {}),
@@ -577,8 +580,8 @@ export default function GorevKurallariClient({
                       </div>
                     )
                   })}
-                  {/* Seçili lokasyonun çocukları varsa bir seviye daha ekle */}
-                  {(() => {
+                  {/* Edit modunda: alt lokasyon dropdown göster. Create modunda: checkbox listesi gösterilecek, dropdown yok */}
+                  {modal === 'edit' && (() => {
                     const last = lokSec[lokSec.length - 1]
                     if (!last) return null
                     const hasChildren = lokasyonlar.some(l => l.parent_id === last)
@@ -592,7 +595,7 @@ export default function GorevKurallariClient({
                           value=""
                           onChange={e => handleLokSec(lokSec.length, e.target.value)}
                         >
-                          <option value="">— Alt lokasyon seçin (opsiyonel) —</option>
+                          <option value="">— Alt lokasyon seçin —</option>
                           {childrenOf(last).map(l => (
                             <option key={l.id} value={l.id}>{l.tanim}</option>
                           ))}
@@ -661,20 +664,10 @@ export default function GorevKurallariClient({
                   ))}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={lbl}>Günlük Frekans</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 20, fontWeight: 900, color: '#374151', minWidth: 28, textAlign: 'center' }}>{form.gunluk_frekans_sayisi}</span>
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>kez/gün</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>Lokasyonun frekans sayısı (Sistem Ayarları'ndan)</div>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={lbl}>Gün İçi Aktifleşme Saati *</label>
-                  <input type="time" className="verde-input" style={{ width: '100%' }} value={form.aktif_olma_saati} onChange={e => setForm(p => ({ ...p, aktif_olma_saati: e.target.value }))} />
-                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>Görev gece 00:01'de üretilir, bu saatte ACIK'a geçer</div>
-                </div>
+              <div>
+                <label style={lbl}>Gün İçi Aktifleşme Saati *</label>
+                <input type="time" className="verde-input" style={{ width: '100%', maxWidth: 200 }} value={form.aktif_olma_saati} onChange={e => setForm(p => ({ ...p, aktif_olma_saati: e.target.value }))} />
+                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>Görev gece 00:01'de üretilir, bu saatte ACIK'a geçer</div>
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
