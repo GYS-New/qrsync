@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
       const telefon = normalizeText(row.telefon) || null
       const password = normalizeText(row.password)
       const rolRaw  = normalizeText(row.rol).toLowerCase() || 'tenant_user'
-      if (!isim_soyisim || !email || !password) {
-        errors.push(`Satır ${rowNo}: isim_soyisim, email ve password zorunludur.`)
+      if (!isim_soyisim || !email) {
+        errors.push(`Satır ${rowNo}: isim_soyisim ve email zorunludur.`)
         continue
       }
       const GECERLI_ROLLER = ['tenant_user', 'tenant_admin', 'musteri']
@@ -66,6 +66,11 @@ export async function POST(req: NextRequest) {
         continue
       }
 
+      // Yeni kullanıcı için password zorunlu
+      if (!password) {
+        errors.push(`Satır ${rowNo}: Yeni kullanıcı için password zorunludur.`)
+        continue
+      }
       const { data: createdUser, error: createErr } = await scope.admin.auth.admin.createUser({ email, password, email_confirm: true })
       if (createErr || !createdUser?.user) {
         errors.push(`Satır ${rowNo}: ${createErr?.message ?? 'Auth kullanıcı oluşturulamadı'}`)
