@@ -357,7 +357,7 @@ useEffect(() => {
       .from('canli_gorevler')
       .select(liveSelect)
       .eq('firma_id', firmaId)
-      .not('islemi_yapan_id', 'is', null)   // kullanıcı işlemi zorunlu
+      .not('durum', 'in', '(HAZIR,ACIK)')   // HAZIR/ACIK hariç tüm durum değişimleri
       .order('durum_degisim_tarihi', { ascending: false })
       .order('olusturma_tarihi', { ascending: false })
       .limit(100)
@@ -372,7 +372,7 @@ useEffect(() => {
         .from('canli_gorevler')
         .select(liveSelect)
         .eq('firma_id', firmaId)
-        .not('islemi_yapan_id', 'is', null)
+        .not('durum', 'in', '(HAZIR,ACIK)')
         .order('olusturma_tarihi', { ascending: false })
         .limit(100)
 
