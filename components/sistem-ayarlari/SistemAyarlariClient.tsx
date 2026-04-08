@@ -96,7 +96,7 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
       {/* Tab içerikleri */}
       {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} projeId={projeId} kullanicilar={kullanicilar} />}
       {aktifTab === 'proje-ayarlari' && projeId && <ProjeAyarlariPanel projeId={projeId} />}
-      {aktifTab === 'frekans' && <FrekansSayilariClient lokasyonlar={lokasyonlar as any} />}
+      {aktifTab === 'frekans' && <FrekansSayilariClient lokasyonlar={lokasyonlar as any} firmaId={firmaId ?? ''} projeId={projeId ?? null} />}
       {aktifTab === 'gorev-kurallari' && firmaId && (
         <GorevKurallariClient
           base={base}
