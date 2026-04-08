@@ -88,29 +88,17 @@ export default function TumGorevlerClient({
 
   useEffect(() => {
     async function mesaiKontrolYukle() {
-      // Firma + proje kontrolü
-      const { data: firmaChk } = await supabase.from('firmalar').select('personel_takibi_aktif').eq('id', firmaId).single()
-      let ptAktif = firmaChk?.personel_takibi_aktif === true
-      if (!ptAktif && projeId) {
-        const { data: projeChk } = await supabase.from('projeler').select('personel_takibi_aktif').eq('id', projeId).single()
-        if (projeChk?.personel_takibi_aktif === true) ptAktif = true
-      }
-      if (!ptAktif) {
-        // Proje ID yoksa firmadaki tüm aktif projeleri kontrol et
-        const { data: projeler } = await supabase.from('projeler').select('personel_takibi_aktif').eq('firma_id', firmaId).eq('aktif', true)
-        if ((projeler ?? []).some((p: any) => p.personel_takibi_aktif === true)) ptAktif = true
-      }
-      setPersonelTakibiAktif(ptAktif)
-      if (!ptAktif) return
-
-      const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
-      const { data: mesailar } = await supabase
-        .from('personel_mesai_kayitlari')
-        .select('user_id')
-        .eq('firma_id', firmaId)
-        .eq('kayit_tarihi', bugun)
-        .is('cikis_saati', null)
-      setMesailiPersonelIds(new Set((mesailar ?? []).map((m: any) => m.user_id)))
+      try {
+        // API üzerinden mesai durumunu çek (RLS sorunlarını bypass eder)
+        const p = new URLSearchParams({ firma_id: firmaId })
+        if (projeId) p.set('proje_id', projeId)
+        const res = await fetch(`/api/simulasyon/personeller/mesai-durum?${p}`)
+        const json = await res.json()
+        if (json.ok) {
+          setPersonelTakibiAktif(json.personel_takibi_aktif === true)
+          setMesailiPersonelIds(new Set(json.mesaili_ids ?? []))
+        }
+      } catch {}
     }
     mesaiKontrolYukle()
   }, [firmaId, projeId])
