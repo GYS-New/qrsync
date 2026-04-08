@@ -40,7 +40,7 @@ type BrowseFilter = 'ACIK' | 'IPTAL' | 'KAPALI' | 'TARIHI_GECMIS'
 function LiveHeader({
   kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly, showTumGorevler = true,
 }: {
-  kpi: { toplam: number; tamamlandi: number; acik: number; beklemede: number; gecmis: number }
+  kpi: { toplam: number; tamamlandi: number; islemde: number; beklemede: number; iptal: number; gecikmis: number; gecmis: number }
   durumFilter: string
   setDurumFilter: (v: string) => void
   clock: string
@@ -51,19 +51,23 @@ function LiveHeader({
   showTumGorevler?: boolean
 }) {
   const FILTERS = [
-    { key: 'TÜMÜ',      label: 'Tümü',          count: kpi.toplam },
-    { key: 'TAMAMLANDI',label: 'Tamamlandı',     count: kpi.tamamlandi },
-    { key: 'ACIK',      label: 'Açık',           count: kpi.acik },
-    { key: 'BEKLEMEDE', label: 'Beklemede',       count: kpi.beklemede },
-    { key: 'GECMİŞ',   label: 'Zamanı geçmiş',  count: kpi.gecmis },
+    { key: 'TÜMÜ',      label: 'Tümü',              count: kpi.toplam },
+    { key: 'TAMAMLANDI',label: 'Tamamlandı',       count: kpi.tamamlandi },
+    { key: 'ISLEMDE',   label: 'İşlemde',          count: kpi.islemde },
+    { key: 'BEKLEMEDE', label: 'Beklemede',         count: kpi.beklemede },
+    { key: 'IPTAL',     label: 'İptal',             count: kpi.iptal },
+    { key: 'GECİKMİŞ', label: 'Gecikmeli',         count: kpi.gecikmis },
+    { key: 'GECMİŞ',   label: 'Zamanı Geçmiş',    count: kpi.gecmis },
   ]
   const dotColor = streamState === 'running' ? '#374151' : streamState === 'paused' ? '#d97706' : '#9ca3af'
   const kpiCards = [
-    { label: 'Toplam',          val: kpi.toplam,      bg: 'transparent',  vColor: '#111827',  lColor: '#6b7280' },
-    { label: 'Tamamlandı',      val: kpi.tamamlandi,  bg: '#f9fafb',      vColor: '#111827',  lColor: '#3B6D11' },
-    { label: 'Açık',            val: kpi.acik,        bg: '#eff6ff',      vColor: '#1d4ed8',  lColor: '#185FA5' },
-    { label: 'Beklemede',       val: kpi.beklemede,   bg: '#fffbeb',      vColor: '#92400e',  lColor: '#854F0B' },
-    { label: 'Zamanı geçmiş',   val: kpi.gecmis,      bg: '#fef2f2',      vColor: '#991b1b',  lColor: '#A32D2D' },
+    { label: 'Toplam',             val: kpi.toplam,      bg: 'transparent',  vColor: '#111827',  lColor: '#6b7280' },
+    { label: 'Tamamlandı',       val: kpi.tamamlandi,  bg: '#f0fdf4',      vColor: '#166534',  lColor: '#3B6D11' },
+    { label: 'İşlemde',          val: kpi.islemde,     bg: '#eff6ff',      vColor: '#1d4ed8',  lColor: '#185FA5' },
+    { label: 'Beklemede',        val: kpi.beklemede,   bg: '#fffbeb',      vColor: '#92400e',  lColor: '#854F0B' },
+    { label: 'İptal',            val: kpi.iptal,       bg: '#f9fafb',      vColor: '#6b7280',  lColor: '#6b7280' },
+    { label: 'Gecikmeli',        val: kpi.gecikmis,    bg: '#fef9c3',      vColor: '#854d0e',  lColor: '#854d0e' },
+    { label: 'Zamanı Geçmiş',    val: kpi.gecmis,      bg: '#fef2f2',      vColor: '#991b1b',  lColor: '#A32D2D' },
   ]
 
   return (
@@ -414,18 +418,22 @@ useEffect(() => {
   const kpi = useMemo(() => ({
     toplam:     liveFlowGorevler.length,
     tamamlandi: liveFlowGorevler.filter((g:any) => g.durum === 'TAMAMLANDI').length,
-    acik:       liveFlowGorevler.filter((g:any) => ['HAZIR','ACIK','ISLEMDE'].includes(g.durum)).length,
+    islemde:    liveFlowGorevler.filter((g:any) => g.durum === 'ISLEMDE').length,
     beklemede:  liveFlowGorevler.filter((g:any) => g.durum === 'BEKLEMEDE').length,
-    gecmis:     liveFlowGorevler.filter((g:any) => ['ZAMANI_GECMIS','ZAMANINDA_YAPILAMAYAN'].includes(g.durum)).length,
+    iptal:      liveFlowGorevler.filter((g:any) => g.durum === 'IPTAL').length,
+    gecikmis:   liveFlowGorevler.filter((g:any) => g.durum === 'ZAMANINDA_YAPILAMAYAN').length,
+    gecmis:     liveFlowGorevler.filter((g:any) => g.durum === 'ZAMANI_GECMIS').length,
   }), [liveFlowGorevler])
 
   // Durum filtreli canlı liste
   const filteredLive = useMemo(() => {
     if (durumFilter === 'TÜMÜ') return liveFlowGorevler
     if (durumFilter === 'TAMAMLANDI') return liveFlowGorevler.filter((g:any) => g.durum === 'TAMAMLANDI')
-    if (durumFilter === 'ACIK') return liveFlowGorevler.filter((g:any) => ['HAZIR','ACIK','ISLEMDE'].includes(g.durum))
+    if (durumFilter === 'ISLEMDE') return liveFlowGorevler.filter((g:any) => g.durum === 'ISLEMDE')
     if (durumFilter === 'BEKLEMEDE') return liveFlowGorevler.filter((g:any) => g.durum === 'BEKLEMEDE')
-    if (durumFilter === 'GECMİŞ') return liveFlowGorevler.filter((g:any) => ['ZAMANI_GECMIS','ZAMANINDA_YAPILAMAYAN'].includes(g.durum))
+    if (durumFilter === 'IPTAL') return liveFlowGorevler.filter((g:any) => g.durum === 'IPTAL')
+    if (durumFilter === 'GECİKMİŞ') return liveFlowGorevler.filter((g:any) => g.durum === 'ZAMANINDA_YAPILAMAYAN')
+    if (durumFilter === 'GECMİŞ') return liveFlowGorevler.filter((g:any) => g.durum === 'ZAMANI_GECMIS')
     return liveFlowGorevler
   }, [liveFlowGorevler, durumFilter])
 
