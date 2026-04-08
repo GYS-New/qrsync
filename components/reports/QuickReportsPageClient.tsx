@@ -4,12 +4,13 @@ import { useMemo } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import QuickReportsClient from '@/components/reports/QuickReportsClient'
 import { useFirma } from '@/components/layout/FirmaContext'
+import { useProje } from '@/components/projeler/ProjeContext'
 
 export default function QuickReportsPageClient({
   base,
   title,
   isSA,
-  projeId,
+  projeId: propProjeId,
   initialFirmaId,
 }: {
   base: '/sa' | '/ta' | '/u'
@@ -19,7 +20,9 @@ export default function QuickReportsPageClient({
   initialFirmaId?: string | null
 }) {
   const { firmaId: saFirmaId } = useFirma()
+  const { aktifProje } = useProje()
   const firmaId = useMemo(() => (isSA ? saFirmaId : (initialFirmaId ?? null)), [isSA, saFirmaId, initialFirmaId])
+  const projeId = propProjeId ?? aktifProje?.id ?? null
 
   return (
     <div>
