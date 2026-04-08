@@ -161,17 +161,17 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
   const lokMap = new Map<string, any>()
   for (const l of (lokBilgi ?? [])) lokMap.set(l.id, l)
 
-  // Bugünkü canlı görevler
-  const gunBaslangic = bugun + 'T00:00:00'
-  const gunBitis = bugun + 'T23:59:59'
+  // Bugünkü canlı görevler (TRT tarih aralığı — UTC'ye çevir)
+  const gunBaslangicUTC = new Date(bugun + 'T00:00:00+03:00').toISOString()
+  const gunBitisUTC = new Date(bugun + 'T23:59:59+03:00').toISOString()
 
   const { data: gorevler } = await admin
     .from('canli_gorevler')
     .select('id, durum, lokasyon_id, tanim, aktif_olma_tarihi, baslatilma_tarihi, simule_tamamlandi')
     .eq('firma_id', firma_id)
     .in('lokasyon_id', lokIds)
-    .gte('aktif_olma_tarihi', gunBaslangic)
-    .lte('aktif_olma_tarihi', gunBitis)
+    .gte('aktif_olma_tarihi', gunBaslangicUTC)
+    .lte('aktif_olma_tarihi', gunBitisUTC)
 
   const tumGorevler = gorevler ?? []
   const toplamGorev = tumGorevler.length
