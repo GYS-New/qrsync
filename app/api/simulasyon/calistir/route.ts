@@ -255,8 +255,8 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     for (const gorev of secilen) {
       if ((tamamlananSayi + tamamlananAdet + baslatmaAdet) >= hedefMax) break
 
-      const personelId = cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
       const lok = lokMap.get(gorev.lokasyon_id)
+      const personelId = cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
 
       // %1 iptal olasılığı
       if (Math.random() < IPTAL_OLASILIK) {
