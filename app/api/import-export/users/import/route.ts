@@ -46,6 +46,12 @@ export async function POST(req: NextRequest) {
           continue
         }
       }
+      // Üst lokasyon ve cinsiyet çözümle
+      const ustLokAd = normalizeText(row.ust_lokasyon)
+      const ustLokId = ustLokAd ? (lokAdToId.get(ustLokAd.toLocaleLowerCase('tr')) ?? null) : null
+      const cinsiyet = normalizeText(row.cinsiyet).toUpperCase()
+      const cinsiyetVal = cinsiyet === 'E' || cinsiyet === 'K' ? cinsiyet : null
+
       // Mevcut kullanıcı varsa güncelle (cinsiyet, telefon, üst lokasyon)
       const { data: mevcutUser } = await scope.admin.from('users').select('id').eq('email', email).eq('firma_id', scope.firmaId).maybeSingle()
       if (mevcutUser) {
@@ -66,11 +72,6 @@ export async function POST(req: NextRequest) {
         continue
       }
       const newUserId = createdUser.user.id
-      // Üst lokasyon çözümle
-      const ustLokAd = normalizeText(row.ust_lokasyon)
-      const ustLokId = ustLokAd ? (lokAdToId.get(ustLokAd.toLocaleLowerCase('tr')) ?? null) : null
-      const cinsiyet = normalizeText(row.cinsiyet).toUpperCase()
-      const cinsiyetVal = cinsiyet === 'E' || cinsiyet === 'K' ? cinsiyet : null
 
       const { error: insertErr } = await scope.admin.from('users').insert({
         id: newUserId,
