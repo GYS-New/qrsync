@@ -63,8 +63,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, mesaj: 'Zaten başlatılmış', baslatilma_tarihi: gorev.baslatilma_tarihi })
     }
 
-    const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: me.id, durum_degisim_tarihi: nowIso }
-    if (kaynak === 'gorevler') updatePayload.durum = 'ISLEMDE'
+    const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: me.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
 
     const { error: updErr } = await admin.from(kaynak).update(updatePayload).eq('id', gorev_id)
     if (updErr) throw new Error(updErr.message)
