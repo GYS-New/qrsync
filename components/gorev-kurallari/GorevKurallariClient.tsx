@@ -663,97 +663,120 @@ export default function GorevKurallariClient({
               </div>
               <div>
                 <label style={lbl}>Lokasyon *</label>
-                {/* Kademeli lokasyon seçimi */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {lokSec.map((secili, level) => {
-                    const parent = level === 0 ? null : (lokSec[level - 1] ?? null)
-                    const secenek = childrenOf(parent)
-                    if (secenek.length === 0) return null
-                    const placeholder = level === 0 ? '— Üst lokasyon seçin —' : '— Alt lokasyon seçin —'
-                    return (
-                      <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {level > 0 && (
-                          <span style={{ fontSize: 13, color: '#d1d5db', flexShrink: 0 }}>{'└─'.repeat(level)}</span>
-                        )}
-                        <select
-                          className="verde-select"
-                          style={{ flex: 1 }}
-                          value={secili ?? ''}
-                          onChange={e => handleLokSec(level, e.target.value)}
-                        >
-                          <option value="">{placeholder}</option>
-                          {secenek.map(l => (
-                            <option key={l.id} value={l.id}>{l.tanim}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )
-                  })}
-                  {/* Edit modunda: alt lokasyon dropdown göster. Create modunda: checkbox listesi gösterilecek, dropdown yok */}
-                  {modal === 'edit' && (() => {
-                    const last = lokSec[lokSec.length - 1]
-                    if (!last) return null
-                    const hasChildren = lokasyonlar.some(l => l.parent_id === last)
-                    if (!hasChildren) return null
-                    return (
-                      <div key={lokSec.length} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, color: '#d1d5db', flexShrink: 0 }}>{'└─'.repeat(lokSec.length)}</span>
-                        <select
-                          className="verde-select"
-                          style={{ flex: 1 }}
-                          value=""
-                          onChange={e => handleLokSec(lokSec.length, e.target.value)}
-                        >
-                          <option value="">— Alt lokasyon seçin —</option>
-                          {childrenOf(last).map(l => (
-                            <option key={l.id} value={l.id}>{l.tanim}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )
-                  })()}
-                </div>
-                {/* Toplu lokasyon seçimi (create modunda) */}
-                {modal === 'create' && (() => {
-                  // Son seçili parent'ın yaprak çocuklarını bul
-                  const lastSelected = lokSec.filter(Boolean).pop()
-                  if (!lastSelected) return null
-                  const yapraklar = yaprakLokasyonlar(lastSelected)
-                  if (yapraklar.length === 0) return null
-                  const tumSecili = yapraklar.every(l => form.lokasyon_idler.includes(l.id))
-                  return (
-                    <div style={{ marginTop: 8, border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 12px', background: '#fafafa' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>Alt Lokasyonlar ({form.lokasyon_idler.length}/{yapraklar.length})</span>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button type="button" onClick={() => setForm(p => ({ ...p, lokasyon_idler: yapraklar.map(l => l.id), lokasyon_id: '' }))}
-                            style={{ fontSize: 11, color: '#1f2937', background: '#e5e7eb', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }}>
-                            Tümünü Seç
-                          </button>
-                          <button type="button" onClick={() => setForm(p => ({ ...p, lokasyon_idler: [], lokasyon_id: '' }))}
-                            style={{ fontSize: 11, color: '#6b7280', background: '#f3f4f6', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>
-                            Temizle
-                          </button>
+                {modal === 'edit' ? (
+                  /* Edit modunda mevcut kademeli seçim */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {lokSec.map((secili, level) => {
+                      const parent = level === 0 ? null : (lokSec[level - 1] ?? null)
+                      const secenek = childrenOf(parent)
+                      if (secenek.length === 0) return null
+                      return (
+                        <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {level > 0 && <span style={{ fontSize: 13, color: '#d1d5db', flexShrink: 0 }}>{'└─'.repeat(level)}</span>}
+                          <select className="verde-select" style={{ flex: 1 }} value={secili ?? ''} onChange={e => handleLokSec(level, e.target.value)}>
+                            <option value="">{level === 0 ? '— Üst lokasyon seçin —' : '— Alt lokasyon seçin —'}</option>
+                            {secenek.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                          </select>
                         </div>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
-                        {yapraklar.map(l => {
-                          const secili = form.lokasyon_idler.includes(l.id)
-                          return (
-                            <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: secili ? '#eff6ff' : 'transparent', fontSize: 13 }}>
-                              <input type="checkbox" checked={secili} onChange={() => toggleLokCheckbox(l.id)} style={{ width: 15, height: 15 }} />
-                              <span style={{ fontWeight: secili ? 600 : 400, color: secili ? '#1e40af' : '#374151' }}>{l.tanim}</span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })()}
-                {/* Seçili lokasyon özeti (edit modunda) */}
-                {form.lokasyon_id && modal === 'edit' && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: '#374151', fontWeight: 600 }}>
-                    ✓ {lokMap.get(form.lokasyon_id)}
+                      )
+                    })}
+                    {(() => {
+                      const last = lokSec[lokSec.length - 1]
+                      if (!last) return null
+                      const ch = childrenOf(last)
+                      if (ch.length === 0) return null
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13, color: '#d1d5db', flexShrink: 0 }}>{'└─'.repeat(lokSec.length)}</span>
+                          <select className="verde-select" style={{ flex: 1 }} value="" onChange={e => handleLokSec(lokSec.length, e.target.value)}>
+                            <option value="">— Alt lokasyon seçin —</option>
+                            {ch.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                          </select>
+                        </div>
+                      )
+                    })()}
+                    {form.lokasyon_id && <div style={{ marginTop: 6, fontSize: 12, color: '#374151', fontWeight: 600 }}>✓ {lokasyonlar.find(l => l.id === form.lokasyon_id)?.tanim}</div>}
+                  </div>
+                ) : (
+                  /* Create modunda: Üst Lokasyon > Grup > Lokasyon hiyerarşisi */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {/* Üst Lokasyon dropdown */}
+                    <select className="verde-select" value={lokSec[0] ?? ''} onChange={e => { handleLokSec(0, e.target.value); setForm(p => ({ ...p, lokasyon_idler: [], lokasyon_id: '' })) }}>
+                      <option value="">— Üst lokasyon seçin —</option>
+                      {lokasyonlar.filter(l => !l.parent_id).sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr')).map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                    </select>
+
+                    {/* Seçili üst lokasyonun grupları */}
+                    {lokSec[0] && (() => {
+                      const ustId = lokSec[0]!
+                      const ustGruplar = gruplar.filter((g: any) => g.ust_lokasyon_id === ustId && g.aktif)
+                      if (ustGruplar.length === 0) return <div style={{ fontSize: 12, color: '#94a3b8', padding: 6 }}>Bu üst lokasyonda grup yok</div>
+
+                      // Tüm grupların tüm lokasyonları
+                      const tumGrupLokIds = ustGruplar.flatMap((g: any) => g.lokasyonIds ?? [])
+                      const tumSecili = tumGrupLokIds.every((id: string) => form.lokasyon_idler.includes(id))
+
+                      return (
+                        <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                          {/* Tümünü Seç / Temizle (üst lokasyon seviyesi) */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                              Gruplar ({form.lokasyon_idler.length} lokasyon seçili)
+                            </span>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button type="button" onClick={() => setForm(p => ({ ...p, lokasyon_idler: tumGrupLokIds, lokasyon_id: '' }))}
+                                style={{ fontSize: 11, color: '#1f2937', background: '#e5e7eb', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }}>
+                                Tümünü Seç
+                              </button>
+                              <button type="button" onClick={() => setForm(p => ({ ...p, lokasyon_idler: [], lokasyon_id: '' }))}
+                                style={{ fontSize: 11, color: '#6b7280', background: '#f3f4f6', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>
+                                Temizle
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Her grup */}
+                          {ustGruplar.map((g: any) => {
+                            const gLokIds: string[] = g.lokasyonIds ?? []
+                            const gLoklar = gLokIds.map((id: string) => lokasyonlar.find(l => l.id === id)).filter(Boolean) as typeof lokasyonlar
+                            const gSecili = gLokIds.filter((id: string) => form.lokasyon_idler.includes(id)).length
+                            const gTumSecili = gLokIds.length > 0 && gLokIds.every((id: string) => form.lokasyon_idler.includes(id))
+
+                            return (
+                              <div key={g.id} style={{ borderTop: '1px solid #f3f4f6' }}>
+                                {/* Grup başlığı */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff' }}>
+                                  <input type="checkbox" checked={gTumSecili} onChange={() => {
+                                    setForm(p => {
+                                      const mevcut = new Set(p.lokasyon_idler)
+                                      if (gTumSecili) { gLokIds.forEach((id: string) => mevcut.delete(id)) }
+                                      else { gLokIds.forEach((id: string) => mevcut.add(id)) }
+                                      return { ...p, lokasyon_idler: [...mevcut], lokasyon_id: '' }
+                                    })
+                                  }} style={{ width: 16, height: 16 }} />
+                                  <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#1f2937' }}>
+                                    🗂 {g.ad}
+                                    <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>({gSecili}/{gLokIds.length})</span>
+                                  </span>
+                                </div>
+                                {/* Lokasyonlar */}
+                                <div style={{ paddingLeft: 32 }}>
+                                  {gLoklar.map(l => {
+                                    const sec = form.lokasyon_idler.includes(l.id)
+                                    return (
+                                      <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px', cursor: 'pointer', background: sec ? '#eff6ff' : 'transparent', fontSize: 12.5 }}>
+                                        <input type="checkbox" checked={sec} onChange={() => toggleLokCheckbox(l.id)} style={{ width: 14, height: 14 }} />
+                                        <span style={{ color: sec ? '#1e40af' : '#374151', fontWeight: sec ? 600 : 400 }}>{l.tanim}</span>
+                                      </label>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>
