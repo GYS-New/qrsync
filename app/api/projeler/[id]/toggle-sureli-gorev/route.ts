@@ -20,12 +20,16 @@ export async function POST(
   // Herhangi biri kapalıysa tümünü aç, hepsi açıksa tümünü kapat
   const enableAll = loks.some(l => !(l as any).sureli_gorev_aktif)
 
+  // Lokasyonları güncelle
   const { error: updateErr } = await admin
     .from('lokasyonlar')
     .update({ sureli_gorev_aktif: enableAll })
     .eq('proje_id', projeId)
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+
+  // Proje kaydını da güncelle
+  await admin.from('projeler').update({ sureli_gorev_aktif: enableAll }).eq('id', projeId)
 
   return NextResponse.json({
     ok: true,
