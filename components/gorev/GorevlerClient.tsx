@@ -631,10 +631,12 @@ export default function GorevlerClient({
                   <select className="verde-input" value={form.atanan_kullanici_id} onChange={e => setForm(f => ({ ...f, atanan_kullanici_id: e.target.value }))}>
                     <option value="">Seçin...</option>
                     {kullanicilar.map(u => {
-                      const mesaiYok = personelTakibiAktif && !mesailiPersonelIds.has(u.id)
+                      const pasif = u.aktif === false
+                      const mesaiYok = !pasif && personelTakibiAktif && !mesailiPersonelIds.has(u.id)
+                      const engelli = pasif || mesaiYok
                       return (
-                        <option key={u.id} value={u.id} disabled={mesaiYok}>
-                          {u.isim_soyisim}{mesaiYok ? ' (mesai yok)' : ''}
+                        <option key={u.id} value={u.id} disabled={engelli}>
+                          {u.isim_soyisim}{pasif ? ' (pasif)' : mesaiYok ? ' (mesai yok)' : ''}
                         </option>
                       )
                     })}
