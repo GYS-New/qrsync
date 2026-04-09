@@ -3,10 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import type { DashboardBlockProps } from '../types'
 
 const STAT = [
-  { key: 'TAMAMLANDI',           label: 'Tamamlandı', color: '#374151', bg: '#e5e7eb' },
-  { key: 'ISLEMDE',              label: 'İşlemde',    color: '#c2610c', bg: '#f9fafb' },
-  { key: 'ACIK',                 label: 'Açık',       color: '#2563eb', bg: '#eff6ff' },
-  { key: 'IPTAL',                label: 'İptal',      color: '#b91c1c', bg: '#fef2f2' },
+  { key: 'TAMAMLANDI',           label: 'Tamamlandı', color: '#10b981', bg: '#ecfdf5' },
+  { key: 'ISLEMDE',              label: 'İşlemde',    color: '#f59e0b', bg: '#fffbeb' },
+  { key: 'ACIK',                 label: 'Açık',       color: '#3b82f6', bg: '#eff6ff' },
+  { key: 'IPTAL',                label: 'İptal',      color: '#ef4444', bg: '#fef2f2' },
 ]
 
 /** Türkiye saatiyle bugünün UTC başlangıcını döndürür (UTC+3) */

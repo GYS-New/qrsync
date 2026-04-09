@@ -109,7 +109,7 @@ export default function FrekansiyelGorevAnaliziBlock({
     { name: 'Kalan', value: remain },
   ], [counts.completed, remain])
 
-  const COLORS = ['#374151', '#9ca3af']
+  const COLORS = ['#3b82f6', '#e5e7eb']
 
   return (
     <BlockWrapper title="FREKANSİYEL GÖREV ANALİZİ" size="big" href={`${basePath}/dashboard/canli-islemler`}>
@@ -142,7 +142,7 @@ export default function FrekansiyelGorevAnaliziBlock({
                     tickFormatter={(v) => typeof v === 'string' && v.length > 12 ? `${v.slice(0, 12)}…` : v} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 13 }} />
                   <Tooltip />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#374151" />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#3b82f6" />
                 </BarChart>
               </ResponsiveContainer>}
             </div>
@@ -159,7 +159,7 @@ export default function FrekansiyelGorevAnaliziBlock({
                     tickFormatter={(v) => typeof v === 'string' && v.length > 12 ? `${v.slice(0, 12)}…` : v} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#1f2937" />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#10b981" />
                 </BarChart>
               </ResponsiveContainer>}
             </div>

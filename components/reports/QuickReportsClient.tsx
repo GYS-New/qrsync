@@ -64,7 +64,7 @@ const TYPE_OPTIONS: { key: QuickType; title: string; desc: string; accent: strin
   { key: 'location_groups', title: 'Lokasyon grupları raporu', desc: 'Grup bazlı görev sayısı, başarı oranı ve trend analizi', accent: '#111827' },
 ]
 
-const BAR_PALETTE = ['#374151', '#4b5563', '#6b7280', '#1f2937', '#525e6b', '#3d4a58', '#596775', '#718096', '#2d3748', '#4a5568']
+const BAR_PALETTE = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6', '#e11d48', '#84cc16']
 
 function todayMinus(days: number) {
   const d = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
@@ -330,12 +330,12 @@ function FloatingBarLabel(props: any) {
 
 function chartColor(type: QuickType, index = 0) {
   const palette = ({
-    locations: ['#1f2937', '#374151', '#4b5563', '#6b7280'],
-    users: ['#111827', '#1f2937', '#374151', '#4b5563'],
-    live_tasks: ['#374151', '#4b5563', '#6b7280', '#9ca3af'],
-    manual_tasks: ['#1f2937', '#374151', '#4b5563', '#6b7280'],
-    location_groups: ['#111827', '#1f2937', '#374151', '#4b5563'],
-  } as Record<QuickType, string[]>)[type] ?? ['#374151', '#4b5563', '#6b7280', '#9ca3af']
+    locations: ['#3b82f6', '#ef4444', '#f59e0b', '#10b981'],
+    users: ['#8b5cf6', '#ec4899', '#06b6d4', '#f97316'],
+    live_tasks: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'],
+    manual_tasks: ['#6366f1', '#14b8a6', '#f97316', '#e11d48'],
+    location_groups: ['#3b82f6', '#ef4444', '#f59e0b', '#10b981'],
+  } as Record<QuickType, string[]>)[type] ?? ['#3b82f6', '#ef4444', '#f59e0b', '#10b981']
   return palette[index % palette.length]
 }
 

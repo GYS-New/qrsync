@@ -122,7 +122,7 @@ export default function LokasyonGorevAnaliziBlock({
                       {r?.parentName && <div style={{ fontSize: 11.5, fontWeight: 900, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: isEmpty ? 0.45 : 1 }}>{r.parentName}</div>}
                       <div style={{ fontSize: 13.5, fontWeight: 800, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: isEmpty ? 0.45 : 1 }}>{isEmpty ? '—' : r.name}</div>
                       <div style={{ marginTop: 8, height: 10, borderRadius: 999, background: '#f3f4f6', overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.max(0, Math.min(100, pct))}%`, height: '100%', background: 'linear-gradient(90deg,#374151,#1f2937)', opacity: isEmpty ? 0 : 0.9 }} />
+                        <div style={{ width: `${Math.max(0, Math.min(100, pct))}%`, height: '100%', background: `linear-gradient(90deg,${['#8b5cf6','#ec4899','#06b6d4','#f97316','#6366f1'][i % 5]},${['#7c3aed','#db2777','#0891b2','#ea580c','#4f46e5'][i % 5]})`, opacity: isEmpty ? 0 : 0.9 }} />
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', fontSize: 14, fontWeight: 900, color: '#111827', opacity: isEmpty ? 0.45 : 1 }}>{val}</div>

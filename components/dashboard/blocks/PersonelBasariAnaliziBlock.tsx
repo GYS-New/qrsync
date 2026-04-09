@@ -122,7 +122,7 @@ export default function PersonelBasariAnaliziBlock({
                         {isEmpty ? '—' : r.name}
                       </div>
                       <div style={{ marginTop: 8, height: 10, borderRadius: 999, background: '#f3f4f6', overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.max(0, Math.min(100, pct))}%`, height: '100%', background: 'linear-gradient(90deg,#374151,#1f2937)', opacity: isEmpty ? 0 : 0.9 }} />
+                        <div style={{ width: `${Math.max(0, Math.min(100, pct))}%`, height: '100%', background: `linear-gradient(90deg,${['#3b82f6','#10b981','#f59e0b'][i % 3]},${['#2563eb','#059669','#d97706'][i % 3]})`, opacity: isEmpty ? 0 : 0.9 }} />
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', fontSize: 14, fontWeight: 900, color: '#111827', opacity: isEmpty ? 0.45 : 1 }}>{val}</div>
