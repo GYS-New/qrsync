@@ -192,18 +192,25 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
   const islemdeGorevler = tumGorevler.filter((g: any) => g.durum === 'ISLEMDE' && g.simule_tamamlandi === true)
 
   // ── Doğal akış: dakika başına görev oranı ─────────────────────────────
+  // Toplam görev vardiya süresine yayılmalı: her cron'da max 1-2 işlem
   const gorevPerDk = hedefMax / vardiyaDk
   const buCrondaIslem = Math.random() < gorevPerDk ? 1 : 0
   const ekIslem = Math.random() < 0.1 ? 1 : 0
   const maxIslem = buCrondaIslem + ekIslem
 
+  if (maxIslem <= 0) {
+    return { tamamlanan: 0, baslatilan: 0, iptal: 0, mesaj: 'Bu cron turunda sıra gelmedi', toplam: toplamGorev, hedef_max: hedefMax, mevcut_tamamlanan: tamamlananSayi }
+  }
+
   let tamamlananAdet = 0
   let baslatmaAdet = 0
   let iptalAdet = 0
+  let islemSayaci = 0 // bu cron'da yapılan toplam işlem
 
-  // ── ADIM 1: ISLEMDE görevlerden süresi dolanları tamamla ──────────────
+  // ── ADIM 1: ISLEMDE görevlerden süresi dolanları tamamla (max 1 per cron) ──
   for (const gorev of islemdeGorevler) {
     if (tamamlananSayi + tamamlananAdet >= hedefMax) break
+    if (islemSayaci >= maxIslem) break
     if (!gorev.baslatilma_tarihi) continue
 
     const baslatmaMs = new Date(gorev.baslatilma_tarihi).getTime()
@@ -225,6 +232,18 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     const tamamlanmaIso = new Date().toISOString()
     const personelId = gorev.baslatan_kullanici_id ?? cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
 
+    // %1 iptal olasılığı
+    if (Math.random() < IPTAL_OLASILIK) {
+      await admin.from('canli_gorevler').update({
+        durum: 'IPTAL', durum_degisim_tarihi: tamamlanmaIso,
+        iptal_eden_id: personelId, iptal_tarihi: tamamlanmaIso,
+        islemi_yapan_id: personelId, simule_tamamlandi: true,
+      } as any).eq('id', gorev.id)
+      await personelAktiviteGuncelle(admin, personelId)
+      iptalAdet++; islemSayaci++
+      continue
+    }
+
     await admin.from('canli_gorevler').update({
       durum: 'TAMAMLANDI',
       durum_degisim_tarihi: tamamlanmaIso,
@@ -240,11 +259,12 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     }
 
     await personelAktiviteGuncelle(admin, personelId)
-    tamamlananAdet++
+    tamamlananAdet++; islemSayaci++
   }
 
   // ── ADIM 2: ACIK görevleri başlat veya direkt tamamla ────────────────
-  if (maxIslem > 0 && acikGorevler.length > 0 && (tamamlananSayi + tamamlananAdet) < hedefMax) {
+  const kalanIslem = maxIslem - islemSayaci
+  if (kalanIslem > 0 && acikGorevler.length > 0 && (tamamlananSayi + tamamlananAdet) < hedefMax) {
     // Farklı lokasyonlardan dengeli seç (round-robin)
     const lokGruplari = new Map<string, any[]>()
     for (const g of acikGorevler) {
@@ -255,7 +275,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     const lokKeys = [...lokGruplari.keys()].sort(() => Math.random() - 0.5)
     const secilen: any[] = []
     let idx = 0
-    while (secilen.length < maxIslem && idx < acikGorevler.length) {
+    while (secilen.length < kalanIslem && idx < acikGorevler.length) {
       const key = lokKeys[idx % lokKeys.length]
       const grp = lokGruplari.get(key)
       if (grp && grp.length > 0) {
