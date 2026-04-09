@@ -719,8 +719,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   headers={['SN', 'GRUP',
                     altAltLokasyonId ? 'ALT LOKASYON' : altLokasyonId ? 'ÜST LOKASYON' : 'ÜST LOKASYON',
                     altAltLokasyonId ? 'ALT-ALT LOKASYON' : altLokasyonId ? 'ALT LOKASYON' : 'LOKASYON',
-                    'VARDİYA FREKANS', 'GÜNLÜK VARDİYA', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
-                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, g.kuralSayisi, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
+                    'VARDİYA FREKANS', !ustLokasyonId ? 'VARDİYA SAYISI' : 'GÜNLÜK VARDİYA', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
+                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, !ustLokasyonId ? g.kuralSayisi * (data.gunSayisi || 1) : g.kuralSayisi, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
                   accentCol={10} accentColor={T.greenMid} leftCols={[1, 2, 3]}
                 />
               </div>
