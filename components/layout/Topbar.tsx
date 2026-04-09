@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import UserPanel from '@/components/layout/UserPanel'
 import DashboardScopeControls from '@/components/layout/DashboardScopeControls'
+import { useFirma } from '@/components/layout/FirmaContext'
 
 interface TopbarProps {
   title: string
@@ -20,6 +21,9 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [count, setCount] = useState<number>(notifCount ?? 0)
+  const { firmaId: saFirmaId, firmalar } = useFirma()
+  const aktifFirma = firmalar?.find((f: any) => f.id === saFirmaId)
+  const firmaAdi = aktifFirma?.firma_adi || aktifFirma?.ticari_unvan || 'QRSync'
 
   useEffect(() => {
     if (typeof notifCount === 'number') {
@@ -69,7 +73,7 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
     }}>
       {/* Breadcrumb */}
       <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:15 }}>
-        <span style={{ color:'#6b7280' }}>QRSync</span>
+        <span style={{ color:'#6b7280' }}>{firmaAdi}</span>
         {breadcrumbs?.map((b, i) => (
           <span key={i} style={{ display:'flex', alignItems:'center', gap:5 }}>
             <span style={{ color:'#9ca3af', fontSize:15 }}>›</span>
