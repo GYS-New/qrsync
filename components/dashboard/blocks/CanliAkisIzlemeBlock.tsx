@@ -42,7 +42,7 @@ const DURUM_LABEL: Record<string, string> = {
 }
 
 export default function CanliAkisIzlemeBlock({
-  firmaId, basePath, projeId,
+  firmaId, basePath, projeId, yetkiliLokIds,
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
   const supabase = createClient()
   const [rows, setRows] = useState<CanliGorevRow[]>([])
@@ -79,6 +79,7 @@ export default function CanliAkisIzlemeBlock({
       .limit(limit)
     if (firmaId) q = q.eq('firma_id', firmaId)
     if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)
 
     const { data, error } = await q
 
@@ -91,6 +92,7 @@ export default function CanliAkisIzlemeBlock({
         .limit(limit)
       if (firmaId) q2 = q2.eq('firma_id', firmaId)
       if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
+      if (yetkiliLokIds?.length) q2 = (q2 as any).in('lokasyon_id', yetkiliLokIds)
       const { data: d2 } = await q2
       if (d2) setRows(d2 as any)
       return

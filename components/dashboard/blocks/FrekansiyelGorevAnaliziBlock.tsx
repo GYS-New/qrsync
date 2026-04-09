@@ -21,7 +21,7 @@ function pct(num: number, den: number) {
 }
 
 export default function FrekansiyelGorevAnaliziBlock({
-  firmaId, projeId, basePath,
+  firmaId, projeId, basePath, yetkiliLokIds,
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
   const supabase = createClient()
   const [mode, setMode] = useState<Mode>('gunluk')
@@ -48,6 +48,7 @@ export default function FrekansiyelGorevAnaliziBlock({
     const ff = (q: any) => {
       let r = firmaId ? q.eq('firma_id', firmaId) : q
       if (projeId) r = r.eq('proje_id', projeId)
+      if (yetkiliLokIds?.length) r = r.in('lokasyon_id', yetkiliLokIds)
       return r
     }
     const base = (tablo: string, q?: any) =>

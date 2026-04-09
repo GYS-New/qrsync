@@ -20,7 +20,7 @@ function startOfDayTR(d: Date): Date {
 }
 
 export default function AktiviteGrafigiBlock({
-  firmaId, projeId, basePath,
+  firmaId, projeId, basePath, yetkiliLokIds,
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
   const supabase = createClient()
   const [mode, setMode] = useState<Mode>("gunluk")
@@ -57,11 +57,13 @@ export default function AktiviteGrafigiBlock({
     let qCanli = supabase.from("canli_gorevler").select("olusturma_tarihi").gte("olusturma_tarihi", rangeISO)
     if (firmaId) qCanli = qCanli.eq("firma_id", firmaId)
     if (projeId) qCanli = (qCanli as any).eq("proje_id", projeId)
+    if (yetkiliLokIds?.length) qCanli = (qCanli as any).in("lokasyon_id", yetkiliLokIds)
 
     // Arşiv görevler — aynı dönemde oluşturulup arşivlenenler
     let qArsiv = supabase.from("canli_gorevler_arsiv").select("olusturma_tarihi").gte("olusturma_tarihi", rangeISO)
     if (firmaId) qArsiv = qArsiv.eq("firma_id", firmaId)
     if (projeId) qArsiv = (qArsiv as any).eq("proje_id", projeId)
+    if (yetkiliLokIds?.length) qArsiv = (qArsiv as any).in("lokasyon_id", yetkiliLokIds)
 
     const [{ data: canliRows }, { data: arsivRows }] = await Promise.all([qCanli, qArsiv])
     const rows = [...(canliRows ?? []), ...(arsivRows ?? [])]

@@ -23,7 +23,7 @@ function progressForStatus(durum?: string | null) {
 const GRID = '44px minmax(200px, 2fr) 100px 150px 190px 140px'
 
 export default async function SonGorevlerBlock({ firmaId, projeId,
-  basePath,
+  basePath, yetkiliLokIds,
   limit = 8,
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null; limit?: number }) {
   const supabase = createClient()
@@ -35,7 +35,8 @@ export default async function SonGorevlerBlock({ firmaId, projeId,
     .limit(limit)
 
   if (firmaId) q = q.eq('firma_id', firmaId)
-    if (projeId) q = (q as any).eq('proje_id', projeId)
+  if (projeId) q = (q as any).eq('proje_id', projeId)
+  if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)
 
   const rows = (await q).data ?? []
   const padded = Array.from({ length: limit }).map((_, i) => rows[i] ?? null)

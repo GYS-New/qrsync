@@ -19,7 +19,7 @@ function bugunTR(): Date {
 }
 
 export default async function GunlukPerformansBlock({
-  firmaId, projeId, basePath,
+  firmaId, projeId, basePath, yetkiliLokIds,
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
   const supabase = createClient()
   const today = bugunTR()
@@ -28,11 +28,13 @@ export default async function GunlukPerformansBlock({
   let q1 = supabase.from('gorevler').select('durum').gte('olusturma_tarihi', today.toISOString())
   if (firmaId) q1 = q1.eq('firma_id', firmaId)
   if (projeId) q1 = (q1 as any).eq('proje_id', projeId)
+  if (yetkiliLokIds?.length) q1 = (q1 as any).in('lokasyon_id', yetkiliLokIds)
 
   // Frekansiyel görevler
   let q2 = supabase.from('canli_gorevler').select('durum').gte('aktif_olma_tarihi', today.toISOString())
   if (firmaId) q2 = q2.eq('firma_id', firmaId)
   if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
+  if (yetkiliLokIds?.length) q2 = (q2 as any).in('lokasyon_id', yetkiliLokIds)
 
   const [{ data: d1 }, { data: d2 }] = await Promise.all([q1, q2])
 

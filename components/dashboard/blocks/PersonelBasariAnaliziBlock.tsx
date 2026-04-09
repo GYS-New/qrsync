@@ -15,7 +15,7 @@ function rangeStartFor(mode: Mode) {
 }
 
 export default function PersonelBasariAnaliziBlock({
-  firmaId, projeId, basePath,
+  firmaId, projeId, basePath, yetkiliLokIds,
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
   const supabase = createClient()
   const [mode, setMode] = useState<Mode>('gunluk')
@@ -37,12 +37,14 @@ export default function PersonelBasariAnaliziBlock({
         .gte('olusturma_tarihi', rangeISO).in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
       if (firmaId) qC = qC.eq('firma_id', firmaId)
       if (projeId) qC = (qC as any).eq('proje_id', projeId)
+      if (yetkiliLokIds?.length) qC = (qC as any).in('lokasyon_id', yetkiliLokIds)
 
       // Arşiv tamamlananlar
       let qA = supabase.from('canli_gorevler_arsiv').select(sel)
         .gte('olusturma_tarihi', rangeISO).in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
       if (firmaId) qA = qA.eq('firma_id', firmaId)
       if (projeId) qA = (qA as any).eq('proje_id', projeId)
+      if (yetkiliLokIds?.length) qA = (qA as any).in('lokasyon_id', yetkiliLokIds)
 
       const [{ data: canli }, { data: arsiv }] = await Promise.all([
         qC.limit(5000),

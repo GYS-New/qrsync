@@ -17,7 +17,7 @@ function rangeStartFor(mode: Mode) {
 type Row = { id: string; parentName?: string | null; name: string; value: number }
 
 export default function LokasyonGorevAnaliziBlock({
-  firmaId, projeId, basePath,
+  firmaId, projeId, basePath, yetkiliLokIds,
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null }) {
   const supabase = createClient()
   const [mode, setMode] = useState<Mode>('gunluk')
@@ -38,11 +38,13 @@ export default function LokasyonGorevAnaliziBlock({
       let qC = supabase.from('canli_gorevler').select(sel).gte('olusturma_tarihi', rangeISO)
       if (firmaId) qC = qC.eq('firma_id', firmaId)
       if (projeId) qC = (qC as any).eq('proje_id', projeId)
+      if (yetkiliLokIds?.length) qC = (qC as any).in('lokasyon_id', yetkiliLokIds)
 
       // Arşiv
       let qA = supabase.from('canli_gorevler_arsiv').select(sel).gte('olusturma_tarihi', rangeISO)
       if (firmaId) qA = qA.eq('firma_id', firmaId)
       if (projeId) qA = (qA as any).eq('proje_id', projeId)
+      if (yetkiliLokIds?.length) qA = (qA as any).in('lokasyon_id', yetkiliLokIds)
 
       const [{ data: canli }, { data: arsiv }] = await Promise.all([
         qC.limit(5000),
