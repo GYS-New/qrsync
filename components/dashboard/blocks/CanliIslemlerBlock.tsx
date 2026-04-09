@@ -48,12 +48,14 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
     gf(supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true })
       .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN']).gte('olusturma_tarihi', todayISO)),
 
-    // [6] Kullanıcılar toplam (proje filtreli)
-    firmaId
-      ? (projeId
-          ? supabase.from('users').select('*', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('proje_id', projeId).eq('aktif', true)
-          : supabase.from('users').select('*', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('aktif', true))
-      : supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true),
+    // [6] Kullanıcılar toplam (proje + lokasyon yetki filtreli)
+    (() => {
+      let uq = supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true)
+      if (firmaId) uq = uq.eq('firma_id', firmaId)
+      if (projeId) uq = (uq as any).eq('proje_id', projeId)
+      if (yetkiliLokIds?.length) uq = (uq as any).in('ust_lokasyon_id', yetkiliLokIds)
+      return uq
+    })(),
     // [7] Online mobil kullanıcılar (device_tokens.son_kullanim son 10dk — sadece firma filtresi, proje filtresi yok)
     ff(supabase.from('device_tokens').select('user_id').eq('aktif', true).gte('son_kullanim', new Date(Date.now() - 10 * 60 * 1000).toISOString())),
     // [8] Lokasyonlar toplam (lokasyon yetki filtreli)
