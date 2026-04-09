@@ -23,7 +23,23 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
   const [count, setCount] = useState<number>(notifCount ?? 0)
   const { firmaId: saFirmaId, firmalar } = useFirma()
   const aktifFirma = firmalar?.find((f: any) => f.id === saFirmaId)
-  const firmaAdi = aktifFirma?.firma_adi || aktifFirma?.ticari_unvan || 'QRSync'
+
+  // TA/U/M rolleri için kendi firma adını çek
+  const [myFirmaAdi, setMyFirmaAdi] = useState<string | null>(null)
+  useEffect(() => {
+    if (aktifFirma) return // SA zaten FirmaContext'ten alıyor
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from('users').select('firma_id').eq('id', user.id).single().then(({ data: me }) => {
+        if (!me?.firma_id) return
+        supabase.from('firmalar').select('firma_adi,ticari_unvan').eq('id', me.firma_id).single().then(({ data: f }) => {
+          if (f) setMyFirmaAdi(f.firma_adi || f.ticari_unvan || null)
+        })
+      })
+    })
+  }, [])
+
+  const firmaAdi = aktifFirma?.firma_adi || aktifFirma?.ticari_unvan || myFirmaAdi || 'QRSync'
 
   useEffect(() => {
     if (typeof notifCount === 'number') {
