@@ -8,6 +8,7 @@ const GorevSureleriClient = dynamic(() => import('./GorevSureleriClient'), { ssr
 const FrekansSayilariClient = dynamic(() => import('./FrekansSayilariClient'), { ssr: false })
 const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: false })
 const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/GorevKurallariClient'), { ssr: false })
+const LokasyonYetkileriPanel = dynamic(() => import('@/components/ayarlar/LokasyonYetkileriPanel'), { ssr: false })
 const GrupYetkileriClient = dynamic(() => import('@/components/ayarlar/GrupYetkileriClient'), { ssr: false })
 
 type Tab = 'genel' | 'proje-ayarlari' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'simulasyon' | 'uygulama' | 'mobil' | 'smtp' | 'konfigurasyon' | 'dashboard'
@@ -122,6 +123,9 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
           firmalar={isSA ? firmalar : undefined}
           currentPath={`${base}/dashboard/sistem-ayarlari`}
         />
+      )}
+      {aktifTab === 'yetkiler' && firmaId && (
+        <LokasyonYetkileriPanel firmaId={firmaId} lokasyonlar={lokasyonlar as any} kullanicilar={kullanicilar as any} />
       )}
       {aktifTab === 'simulasyon' && firmaId && <SimulasyonPanel firmaId={firmaId} projeId={projeId ?? null} lokasyonlar={lokasyonlar as any} />}
       {aktifTab === 'uygulama' && isSA && <UygulamaAyarlariPanel />}
