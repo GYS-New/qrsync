@@ -429,8 +429,8 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     let qArsivGrp  = admin.from('canli_gorevler_arsiv').select(arsivCols)
     if (filters.firmaId) { qAktifGrp = qAktifGrp.eq('firma_id', filters.firmaId); qArsivGrp = qArsivGrp.eq('firma_id', filters.firmaId) }
     if (filters.projeId) { qAktifGrp = (qAktifGrp as any).eq('proje_id', filters.projeId); qArsivGrp = (qArsivGrp as any).eq('proje_id', filters.projeId) }
-    if (filters.dateFrom) { qAktifGrp = qAktifGrp.gte('aktif_olma_tarihi', filters.dateFrom); qArsivGrp = qArsivGrp.gte('aktif_olma_tarihi', filters.dateFrom) }
-    if (filters.dateTo)   { qAktifGrp = qAktifGrp.lte('aktif_olma_tarihi', filters.dateTo);   qArsivGrp = qArsivGrp.lte('aktif_olma_tarihi', filters.dateTo) }
+    if (filters.dateFrom) { const v = new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString(); qAktifGrp = qAktifGrp.gte('aktif_olma_tarihi', v); qArsivGrp = qArsivGrp.gte('aktif_olma_tarihi', v) }
+    if (filters.dateTo)   { const v = new Date(filters.dateTo + 'T23:59:59+03:00').toISOString(); qAktifGrp = qAktifGrp.lte('aktif_olma_tarihi', v);   qArsivGrp = qArsivGrp.lte('aktif_olma_tarihi', v) }
     if (activeLocIds.length > 0) {
       qAktifGrp = qAktifGrp.in('lokasyon_id', activeLocIds)
       qArsivGrp  = (qArsivGrp as any).in('lokasyon_id', activeLocIds)

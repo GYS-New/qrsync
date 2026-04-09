@@ -118,11 +118,11 @@ function withinRange(value: string | null | undefined, from?: string | null, to?
   const ts = new Date(value).getTime()
   if (Number.isNaN(ts)) return false
   if (from) {
-    const fromTs = new Date(`${from}T00:00:00`).getTime()
+    const fromTs = new Date(`${from}T00:00:00+03:00`).getTime()
     if (ts < fromTs) return false
   }
   if (to) {
-    const toTs = new Date(`${to}T23:59:59.999`).getTime()
+    const toTs = new Date(`${to}T23:59:59.999+03:00`).getTime()
     if (ts > toTs) return false
   }
   return true
@@ -254,14 +254,16 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     qArsiv = qArsiv.in('lokasyon_id', targetLokasyonIds)
   }
 
-  // Tarih aralığına göre DB tarafında filtrele (performans için)
+  // Tarih aralığına göre DB tarafında filtrele (TRT offset — UTC+3)
   if (filters.raporBaslangic) {
-    qAktif = qAktif.gte('aktif_olma_tarihi', filters.raporBaslangic)
-    qArsiv = qArsiv.gte('aktif_olma_tarihi', filters.raporBaslangic)
+    const baslangicUTC = new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString()
+    qAktif = qAktif.gte('aktif_olma_tarihi', baslangicUTC)
+    qArsiv = qArsiv.gte('aktif_olma_tarihi', baslangicUTC)
   }
   if (filters.raporBitis) {
-    qAktif = qAktif.lte('aktif_olma_tarihi', filters.raporBitis)
-    qArsiv = qArsiv.lte('aktif_olma_tarihi', filters.raporBitis)
+    const bitisUTC = new Date(filters.raporBitis + 'T23:59:59+03:00').toISOString()
+    qAktif = qAktif.lte('aktif_olma_tarihi', bitisUTC)
+    qArsiv = qArsiv.lte('aktif_olma_tarihi', bitisUTC)
   }
 
   const [{ data: aktifGorevler }, { data: arsivGorevler }] = await Promise.all([qAktif, qArsiv])

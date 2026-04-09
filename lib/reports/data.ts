@@ -309,8 +309,8 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     // Görev istatistikleri
     let gorevQ = admin.from('canli_gorevler').select('lokasyon_id,durum')
     if (lgFirmaId) gorevQ = gorevQ.eq('firma_id', lgFirmaId)
-    if (filters.dateFrom) gorevQ = gorevQ.gte('aktif_olma_tarihi', filters.dateFrom)
-    if (filters.dateTo) gorevQ = gorevQ.lte('aktif_olma_tarihi', filters.dateTo)
+    if (filters.dateFrom) gorevQ = gorevQ.gte('aktif_olma_tarihi', new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString())
+    if (filters.dateTo) gorevQ = gorevQ.lte('aktif_olma_tarihi', new Date(filters.dateTo + 'T23:59:59+03:00').toISOString())
     const { data: gorevler } = await gorevQ
     const locGorevMap: Record<string, { toplam: number; tamamlanan: number }> = {}
     for (const g of gorevler ?? []) {

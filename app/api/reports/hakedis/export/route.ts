@@ -85,8 +85,8 @@ export async function GET(req: NextRequest) {
     const buildQ = (table: string) => {
       let q = admin.from(table).select('lokasyon_id,durum')
         .eq('firma_id', firmaId).eq('proje_id', projeId).in('lokasyon_id', lokIds)
-      if (baslangic) q = (q as any).gte('aktif_olma_tarihi', baslangic)
-      if (bitis)     q = (q as any).lte('aktif_olma_tarihi', bitis + 'T23:59:59.999Z')
+      if (baslangic) q = (q as any).gte('aktif_olma_tarihi', new Date(baslangic + 'T00:00:00+03:00').toISOString())
+      if (bitis)     q = (q as any).lte('aktif_olma_tarihi', new Date(bitis + 'T23:59:59+03:00').toISOString())
       return q
     }
     const [{ data: aktif }, { data: arsiv }] = await Promise.all([buildQ('canli_gorevler'), buildQ('canli_gorevler_arsiv')])

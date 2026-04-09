@@ -72,8 +72,8 @@ export async function GET(req: NextRequest) {
   let sureLiveQ = admin.from('canli_gorevler').select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI')
   let sureArsivQ = admin.from('canli_gorevler_arsiv').select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI')
   if (projeId) { sureLiveQ = (sureLiveQ as any).eq('proje_id', projeId); sureArsivQ = (sureArsivQ as any).eq('proje_id', projeId) }
-  if (baslangic) { sureLiveQ = sureLiveQ.gte('aktif_olma_tarihi', baslangic); sureArsivQ = sureArsivQ.gte('aktif_olma_tarihi', baslangic) }
-  if (bitis) { sureLiveQ = sureLiveQ.lte('aktif_olma_tarihi', bitis + 'T23:59:59'); sureArsivQ = sureArsivQ.lte('aktif_olma_tarihi', bitis + 'T23:59:59') }
+  if (baslangic) { const v = new Date(baslangic + 'T00:00:00+03:00').toISOString(); sureLiveQ = sureLiveQ.gte('aktif_olma_tarihi', v); sureArsivQ = sureArsivQ.gte('aktif_olma_tarihi', v) }
+  if (bitis) { const v = new Date(bitis + 'T23:59:59+03:00').toISOString(); sureLiveQ = sureLiveQ.lte('aktif_olma_tarihi', v); sureArsivQ = sureArsivQ.lte('aktif_olma_tarihi', v) }
   const [{ data: sureLive }, { data: sureArsiv }] = await Promise.all([sureLiveQ, sureArsivQ])
 
   const sureMap = new Map<string, number>()
