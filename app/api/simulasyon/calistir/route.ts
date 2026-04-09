@@ -222,9 +222,23 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     // Min süreden önce asla tamamlama
     if (gecenDk < minDk) continue
 
-    // Hedef süre ± %50 arası rastgele tamamlanma noktası
+    // Hedef süre ± %50 arası rastgele tamamlanma noktası + sapma olasılıkları
     const altSinir = Math.max(minDk, hedefDk * 0.5)
-    const ustSinir = hedefDk * 1.5
+    let ustSinir = hedefDk * 1.5
+    // %3 ihtimalle +%50 fazla süre (hedef × 2.25)
+    // %2 ihtimalle +%100 fazla süre (hedef × 3)
+    // %2 ihtimalle -%50 erken tamamlama (hedef × 0.75, min süreden düşmez)
+    const sapmaRulet = Math.random()
+    if (sapmaRulet < 0.02) {
+      // %2 — çok erken tamamlama
+      ustSinir = Math.max(minDk + 1, hedefDk * 0.75)
+    } else if (sapmaRulet < 0.04) {
+      // %2 — çok geç tamamlama (+%100)
+      ustSinir = hedefDk * 3
+    } else if (sapmaRulet < 0.07) {
+      // %3 — geç tamamlama (+%50)
+      ustSinir = hedefDk * 2.25
+    }
     const tamamlanmaDk = altSinir + Math.random() * (ustSinir - altSinir)
     if (gecenDk < tamamlanmaDk) continue
 
