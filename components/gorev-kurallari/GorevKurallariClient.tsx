@@ -57,14 +57,14 @@ export default function GorevKurallariClient({
   const [acikUstLoklar, setAcikUstLoklar] = useState<Set<string>>(new Set())
   const [acikGruplar2, setAcikGruplar2] = useState<Set<string>>(new Set())
 
-  // Sekme içinde (embedded=true) ilk yüklemede kuralları çek
+  // Sekme içinde (embedded=true) kuralları API'den çek
   useEffect(() => {
-    if (!embedded || !firmaId || initialKuralar.length > 0) return
+    if (!embedded || !firmaId) return
     const params = new URLSearchParams({ firma_id: firmaId })
     if (projeId) params.set('proje_id', projeId)
     fetch(`/api/gorev-kurallari?${params.toString()}`)
       .then(r => r.json()).then(d => Array.isArray(d) && setKuralar(d)).catch(() => {})
-  }, [embedded, firmaId])
+  }, [embedded, firmaId, projeId])
 
   // Grupları yükle
   useEffect(() => {
