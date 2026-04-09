@@ -20,15 +20,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Yetkisiz firma' }, { status: 403 })
   }
 
-  let q = supabase
+  const admin = createAdminClient()
+  let q = admin
     .from('gorev_kurallari')
-    .select(`
-      *,
-      lokasyonlar ( id, tanim, parent_id ),
-      atanan_kullanici:users!gorev_kurallari_atanan_kullanici_id_fkey ( id, isim_soyisim )
-    `)
+    .select('*')
     .eq('firma_id', firmaId)
     .order('kayit_tarihi', { ascending: false })
+    .limit(2000)
 
   if (projeId) q = (q as any).eq('proje_id', projeId)
 
