@@ -12,6 +12,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
+import { useYetki } from '@/lib/yetki/useYetki'
 
 export default function LokasyonlarClient({
   base,
@@ -31,6 +32,7 @@ export default function LokasyonlarClient({
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
+  const yetki = useYetki('lokasyonlar')
   const { firmaId: saFirmaId } = useFirma()
   const { aktifProje } = useProje()
   const projeSureliAktif = aktifProje?.sureli_gorev_aktif === true
@@ -359,8 +361,8 @@ export default function LokasyonlarClient({
             <Button variant="ghost" size="sm" onClick={() => firmaId && refresh(firmaId)} disabled={loading || !firmaId} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>
               {loading ? 'Yükleniyor…' : '↻ Yenile'}
             </Button>
-            {!readonly && <Button variant="ghost" onClick={() => downloadExcel('template')} disabled={!firmaId} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}><Download size={16} /> Şablon İndir</Button>}
-            {!readonly && <Button variant="ghost" onClick={() => importInputRef.current?.click()} disabled={!firmaId} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}><Upload size={16} /> Excel ile Ekle</Button>}
+            {!readonly && yetki.ekleyebilir && <Button variant="ghost" onClick={() => downloadExcel('template')} disabled={!firmaId} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}><Download size={16} /> Şablon İndir</Button>}
+            {!readonly && yetki.ekleyebilir && <Button variant="ghost" onClick={() => importInputRef.current?.click()} disabled={!firmaId} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}><Upload size={16} /> Excel ile Ekle</Button>}
             {!readonly && <Button variant="ghost" onClick={() => downloadExcel('export')} disabled={!firmaId} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}><FileSpreadsheet size={16} /> Excel'e Aktar</Button>}
             {/* QR İndir ve Şablonlu QR butonları LokasyonAgac içinde her üst lokasyon satırında */}
             <input ref={sablonInputRef} type="file" accept=".png,.jpg,.jpeg" style={{ display: 'none' }}
@@ -373,7 +375,7 @@ export default function LokasyonlarClient({
                 }
                 e.target.value = ''
               }} />
-            {!readonly && (
+            {!readonly && yetki.ekleyebilir && (
               <Button variant="primary" onClick={() => openCreate(null)} disabled={!firmaId} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>＋ Lokasyon Ekle</Button>
             )}
           </div>
@@ -388,7 +390,7 @@ export default function LokasyonlarClient({
           <div style={{ padding:18 }}>
             <LokasyonAgac
               lokasyonlar={filtered}
-              readonly={readonly}
+              readonly={readonly || !yetki.duzenleyebilir}
               onEdit={openEdit}
               onDelete={del}
               onToggleAktif={toggle}
@@ -406,7 +408,7 @@ export default function LokasyonlarClient({
 
       <QrKodModal lokasyon={qrLok} onClose={() => setQrLok(null)} />
 
-      {openForm && !readonly && (
+      {openForm && !readonly && yetki.duzenleyebilir && (
         <div
           style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center' }}
           onClick={() => setOpenForm(false)}

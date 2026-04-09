@@ -11,6 +11,7 @@ const TÜM_SAYFA_KODLARI = [
   'firmalar', 'projeler', 'kullanicilar', 'lokasyonlar', 'lokasyon-gruplari',
   'gorevler', 'checklist-sablonlari', 'canli-islemler', 'tum-gorevler', 'arsiv',
   'personel-takibi', 'raporlar', 'musteri-degerlendirme', 'birim-fiyatlar',
+  'gorev-kurallari', 'ceklist-raporlari',
 ]
 
 type YetkiRow = { gorebilir: boolean; ekleyebilir: boolean; duzenleyebilir: boolean; silebilir: boolean }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { useYetki } from '@/lib/yetki/useYetki'
 import { Pencil, Trash2, Plus, Layers } from 'lucide-react'
 
 type Proje = {
@@ -40,6 +41,7 @@ export default function ProjelerClient({
 }) {
   const { toast } = useToast()
   const { confirm } = useConfirm()
+  const yetki = useYetki('projeler')
   const [projeler, setProjeler] = useState<Proje[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -295,7 +297,7 @@ export default function ProjelerClient({
             {aktifler.length} aktif • {pasifler.length} pasif
           </div>
         </div>
-        {!readonly && (
+        {!readonly && yetki.ekleyebilir && (
           <button
             onClick={openCreate}
             className="verde-btn-primary"
@@ -367,13 +369,16 @@ export default function ProjelerClient({
               {/* İşlemler */}
               {!readonly && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {/* Proje ayarları Sistem Ayarları > Proje Ayarları'na taşındı */}
-                  <button onClick={() => openEdit(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                    <Pencil size={14} style={{ color: '#4b5563' }} />
-                  </button>
-                  <button onClick={() => del(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                    <Trash2 size={14} style={{ color: '#dc2626' }} />
-                  </button>
+                  {yetki.duzenleyebilir && (
+                    <button onClick={() => openEdit(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                      <Pencil size={14} style={{ color: '#4b5563' }} />
+                    </button>
+                  )}
+                  {yetki.silebilir && (
+                    <button onClick={() => del(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                      <Trash2 size={14} style={{ color: '#dc2626' }} />
+                    </button>
+                  )}
                 </div>
               )}
             </div>

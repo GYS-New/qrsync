@@ -11,6 +11,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { createGorevAtamaNotification, notifyTenantAdminsOnGorevStatusChange, type GorevDurum } from '@/lib/notifications'
 import { useFirma } from '@/components/layout/FirmaContext'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
+import { useYetki } from '@/lib/yetki/useYetki'
 
 const DURUM_RENK: Record<string, string> = {
   ACIK: 'status-acik',
@@ -46,6 +47,7 @@ export default function GorevlerClient({
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm, confirmChoice } = useConfirm()
+  const yetki = useYetki('gorevler')
   const { firmaId: saFirmaId } = useFirma()
   const [tenantFirmaId] = useState<string | null>(initialFirmaId ?? null)
   const firmaId = base === '/sa' ? saFirmaId : tenantFirmaId
@@ -407,7 +409,7 @@ export default function GorevlerClient({
             <Button variant="ghost" size="sm" onClick={() => firmaId && refreshAll(firmaId)} disabled={loading || !firmaId}>
               {loading ? 'Yükleniyor…' : '↻ Yenile'}
             </Button>
-            {canManage && (
+            {canManage && yetki.ekleyebilir && (
               <Button variant="primary" onClick={openCreate} disabled={!firmaId}>＋ Görev Ekle</Button>
             )}
           </div>
@@ -557,10 +559,10 @@ export default function GorevlerClient({
                             {/* Arşiv satırlarında düzenle/sil işlemleri gösterilmez */}
                             {!isArsiv && (
                               <>
-                                <button onClick={() => openEdit(g)}
+                                {yetki.duzenleyebilir && <button onClick={() => openEdit(g)}
                                   style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#111827', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                   ✏️ Düzenle
-                                </button>
+                                </button>}
                                 <details style={{ position: 'relative', display: 'inline-block' }}>
                                   <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '4px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#111827', fontSize: 12, fontWeight: 600 }}>
                                     İşlemler ▾
@@ -571,7 +573,7 @@ export default function GorevlerClient({
                                     <button onClick={() => setDurum(g, 'TAMAMLANDI')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#15803d' }}>✅ Tamamla</button>
                                     <button onClick={() => setDurum(g, 'IPTAL')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#d97706' }}>⛔ İptal</button>
                                     <div style={{ borderTop: '1px solid #f1f5f9', margin: '4px 0' }} />
-                                    <button onClick={() => del(g.id)} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#dc2626' }}>🗑️ Sil</button>
+                                    {yetki.silebilir && <button onClick={() => del(g.id)} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#dc2626' }}>🗑️ Sil</button>}
                                   </div>
                                 </details>
                               </>

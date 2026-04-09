@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useToast } from '@/components/ui/ToastProvider'
+import { useYetki } from '@/lib/yetki/useYetki'
 
 const GUN_KISALT  = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
 const GUN_TAM     = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
@@ -44,6 +45,7 @@ export default function GorevKurallariClient({
 }: Props) {
   const { confirm } = useConfirm()
   const { toast }   = useToast()
+  const yetki = useYetki('gorev-kurallari')
 
   const [kuralar, setKuralar]       = useState<any[]>(initialKuralar)
   const [duraklatModal, setDuraklatModal] = useState<{ kuralId: string; tanim: string } | null>(null)
@@ -393,7 +395,7 @@ export default function GorevKurallariClient({
             <button className="verde-btn-outline-strong" style={{ fontSize: 12, padding: '5px 12px' }} onClick={handleTemplate}>⬇ Şablon</button>
             <button className="verde-btn-outline-strong" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setImportOpen(true)}>⬆ İçe Aktar</button>
             <button className="verde-btn-outline-strong" style={{ fontSize: 12, padding: '5px 12px' }} onClick={handleExport}>⇩ Dışa Aktar</button>
-            <button className="verde-btn-primary" onClick={openCreate}>+ Yeni Kural</button>
+            {yetki.ekleyebilir && <button className="verde-btn-primary" onClick={openCreate}>+ Yeni Kural</button>}
           </>)}
         </div>
       </div>
@@ -510,8 +512,8 @@ export default function GorevKurallariClient({
               )}
               {!readonly && (
                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  <button onClick={() => openEdit(k)} style={{ padding: '2px 8px', fontSize: 11, borderRadius: 5, border: '1px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', color: '#374151' }}>Düzenle</button>
-                  <button onClick={() => handleDelete(k)} style={{ padding: '2px 8px', fontSize: 11, borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626' }}>Sil</button>
+                  {yetki.duzenleyebilir && <button onClick={() => openEdit(k)} style={{ padding: '2px 8px', fontSize: 11, borderRadius: 5, border: '1px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', color: '#374151' }}>Düzenle</button>}
+                  {yetki.silebilir && <button onClick={() => handleDelete(k)} style={{ padding: '2px 8px', fontSize: 11, borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626' }}>Sil</button>}
                 </div>
               )}
             </div>
@@ -566,7 +568,7 @@ export default function GorevKurallariClient({
                                 🗂 {g.grupAd}
                                 <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>{g.tanimlar.length} kural tanımı · {tumKurallar.length} kural · {aktifSayi} aktif</span>
                               </span>
-                              {!readonly && (
+                              {!readonly && yetki.silebilir && (
                                 <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
                                   <button onClick={() => topluSilGrup(tumKurallar)}
                                     style={{ padding: '3px 10px', fontSize: 11, borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
@@ -587,7 +589,7 @@ export default function GorevKurallariClient({
                                   <span style={{ fontSize: 11, color: '#6b7280' }}>
                                     {tg.kurallar[0]?.aktif_olma_saati?.slice(0, 5) ?? ''} · {gunEtiket(tg.kurallar[0]?.aktif_gunler ?? [])}
                                   </span>
-                                  {!readonly && (
+                                  {!readonly && yetki.silebilir && (
                                     <button onClick={() => topluSilGrup(tg.kurallar)}
                                       style={{ padding: '2px 8px', fontSize: 10, borderRadius: 4, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
                                       Sil

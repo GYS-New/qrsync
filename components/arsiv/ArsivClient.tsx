@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
+import { useYetki } from '@/lib/yetki/useYetki'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import {
   Trash2, RotateCcw, Download, FileSpreadsheet, Printer,
@@ -70,6 +71,7 @@ export default function ArsivClient({
   const supabase    = createClient()
   const { toast }   = useToast()
   const { confirm } = useConfirm()
+  const yetki = useYetki('arsiv')
   const { firmaId: saFirmaId } = useFirma()
   const { aktifProje, loading: projeLoading } = useProje()
 
@@ -555,10 +557,10 @@ export default function ArsivClient({
                 className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa] flex items-center gap-2 disabled:opacity-40" style={{ color: '#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
-              <button onClick={() => { setTopluSilSekme('frekansiyel'); setTopluSilFrom(''); setTopluSilTo('') }}
+              {yetki.silebilir && <button onClick={() => { setTopluSilSekme('frekansiyel'); setTopluSilFrom(''); setTopluSilTo('') }}
                 className="border px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2" style={{ borderColor:'#fca5a5', background:'#fff1f2', color:'#dc2626', fontWeight:600 }}>
                 <Trash2 size={13} /> Kayıtları Sil
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -611,8 +613,8 @@ export default function ArsivClient({
                     </td>
                     <td style={{ color:'#64748b', fontSize:12 }}>{r.kural?.tanim ?? '—'}</td>
                     <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
-                      <button onClick={() => frekRestore(r)} title="Geri Yükle" style={aksBtn('#374151','#e8f4e8')}><RotateCcw size={13} /></button>
-                      <button onClick={() => frekSil(r)}     title="Kalıcı Sil" style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>
+                      {yetki.duzenleyebilir && <button onClick={() => frekRestore(r)} title="Geri Yükle" style={aksBtn('#374151','#e8f4e8')}><RotateCcw size={13} /></button>}
+                      {yetki.silebilir && <button onClick={() => frekSil(r)}     title="Kalıcı Sil" style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>}
                     </div></td>
                   </tr>
                 ))}
@@ -669,10 +671,10 @@ export default function ArsivClient({
                 className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
-              <button onClick={() => { setTopluSilSekme('personel'); setTopluSilFrom(''); setTopluSilTo('') }}
+              {yetki.silebilir && <button onClick={() => { setTopluSilSekme('personel'); setTopluSilFrom(''); setTopluSilTo('') }}
                 className="border px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2" style={{ borderColor:'#fca5a5', background:'#fff1f2', color:'#dc2626', fontWeight:600 }}>
                 <Trash2 size={13} /> Kayıtları Sil
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -765,10 +767,10 @@ export default function ArsivClient({
                 className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
-              <button onClick={() => { setTopluSilSekme('musteri'); setTopluSilFrom(''); setTopluSilTo('') }}
+              {yetki.silebilir && <button onClick={() => { setTopluSilSekme('musteri'); setTopluSilFrom(''); setTopluSilTo('') }}
                 className="border px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2" style={{ borderColor:'#fca5a5', background:'#fff1f2', color:'#dc2626', fontWeight:600 }}>
                 <Trash2 size={13} /> Kayıtları Sil
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -823,8 +825,8 @@ export default function ArsivClient({
                     <td style={{ color: r.ad_soyad?'#111827':'#cbd5e1', fontSize:13 }}>{r.ad_soyad||'—'}</td>
                     <td style={{ fontSize:12, color:'#94a3b8' }}>{r.arsivleme_tarihi ? formatDateTime(r.arsivleme_tarihi) : '—'}</td>
                     <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
-                      <button onClick={() => musteriCikar(r)} title="Arşivden Çıkar" style={aksBtn('#d97706','#fef3c7')}><RotateCcw size={13} /></button>
-                      <button onClick={() => musteriSil(r)}   title="Kalıcı Sil"    style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>
+                      {yetki.duzenleyebilir && <button onClick={() => musteriCikar(r)} title="Arşivden Çıkar" style={aksBtn('#d97706','#fef3c7')}><RotateCcw size={13} /></button>}
+                      {yetki.silebilir && <button onClick={() => musteriSil(r)}   title="Kalıcı Sil"    style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>}
                     </div></td>
                   </tr>
                 ))}
@@ -881,10 +883,10 @@ export default function ArsivClient({
                 className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa] flex items-center gap-2 disabled:opacity-40" style={{ color:'#185a9b' }}>
                 <Printer size={13} /> Yazdır
               </button>
-              <button onClick={() => { setTopluSilSekme('spesifik'); setTopluSilFrom(''); setTopluSilTo('') }}
+              {yetki.silebilir && <button onClick={() => { setTopluSilSekme('spesifik'); setTopluSilFrom(''); setTopluSilTo('') }}
                 className="border px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2" style={{ borderColor:'#fca5a5', background:'#fff1f2', color:'#dc2626', fontWeight:600 }}>
                 <Trash2 size={13} /> Kayıtları Sil
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -931,8 +933,8 @@ export default function ArsivClient({
                         : r.durum_degisim_tarihi ? formatDateTime(r.durum_degisim_tarihi) : '—'}
                     </td>
                     <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
-                      <button onClick={() => spesifikRestore(r)} title="Geri Yükle" style={aksBtn('#374151','#e8f4e8')}><RotateCcw size={13} /></button>
-                      <button onClick={() => spesifikSil(r)}     title="Kalıcı Sil" style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>
+                      {yetki.duzenleyebilir && <button onClick={() => spesifikRestore(r)} title="Geri Yükle" style={aksBtn('#374151','#e8f4e8')}><RotateCcw size={13} /></button>}
+                      {yetki.silebilir && <button onClick={() => spesifikSil(r)}     title="Kalıcı Sil" style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>}
                     </div></td>
                   </tr>
                 ))}
@@ -1050,6 +1052,7 @@ function CeklistArsivSekme({
 }) {
   const { toast } = useToast()
   const { confirm } = useConfirm()
+  const yetki = useYetki('arsiv')
   const [data,       setData]       = useState<any[]>([])
   const [loading,    setLoading]    = useState(false)
   const [islemId,    setIslemId]    = useState<string | null>(null) // satır bazı işlem yükleniyor
@@ -1296,7 +1299,7 @@ function CeklistArsivSekme({
             <Printer size={13} /> Yazdır
           </button>
           {/* Kayıtları Sil */}
-          <button
+          {yetki.silebilir && <button
             onClick={topluSil}
             disabled={topluSilYuk || data.length === 0}
             style={{
@@ -1309,7 +1312,7 @@ function CeklistArsivSekme({
             {topluSilYuk
               ? <><RefreshCw size={13} style={spinning} /> Siliniyor…</>
               : <><Trash2 size={13} /> Kayıtları Sil</>}
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -1436,7 +1439,7 @@ function CeklistArsivSekme({
                           <ExternalLink size={13} />
                         </button>
                         {/* Sil */}
-                        <button
+                        {yetki.silebilir && <button
                           onClick={() => tekSil(r)}
                           title="Sil"
                           disabled={busy}
@@ -1447,7 +1450,7 @@ function CeklistArsivSekme({
                             cursor: busy ? 'not-allowed' : 'pointer',
                           }}>
                           <Trash2 size={13} />
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>

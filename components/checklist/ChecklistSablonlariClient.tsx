@@ -7,6 +7,7 @@ import RowActionButton from '@/components/ui/RowActionButton'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useFirma } from '@/components/layout/FirmaContext'
+import { useYetki } from '@/lib/yetki/useYetki'
 
 type SablonOzet = {
   id: string
@@ -78,6 +79,7 @@ export default function ChecklistSablonlariClient({
 }) {
   const supabase = createClient()
   const { toast } = useToast()
+  const yetki = useYetki('checklist-sablonlari')
   const { confirm } = useConfirm()
 
   const { firmaId: saFirmaId } = useFirma()
@@ -689,7 +691,7 @@ export default function ChecklistSablonlariClient({
           </select>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <Button variant="ghost" size="sm" onClick={() => firmaId && refresh(firmaId)} disabled={!firmaId || loading}>↻ Yenile</Button>
-            {!readonly && <Button variant="primary" onClick={openCreate} disabled={!firmaId}>＋ Yeni Şablon</Button>}
+            {!readonly && yetki.ekleyebilir && <Button variant="primary" onClick={openCreate} disabled={!firmaId}>＋ Yeni Şablon</Button>}
           </div>
         </div>
 
@@ -729,7 +731,7 @@ export default function ChecklistSablonlariClient({
                       </td>
                       <td style={{ padding: '12px 8px' }}>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                          <RowActionButton onClick={() => openEdit(item.id)}>Düzenle</RowActionButton>
+                          {yetki.duzenleyebilir && <RowActionButton onClick={() => openEdit(item.id)}>Düzenle</RowActionButton>}
                           <RowActionButton variant="success" onClick={() => duplicateItem(item)}>Kopyala</RowActionButton>
                           {!readonly && (
                             <RowActionButton onClick={() => openBagla(item)}>Bağla</RowActionButton>
@@ -737,7 +739,7 @@ export default function ChecklistSablonlariClient({
                           <RowActionButton variant="warning" onClick={() => toggleAktif(item)}>
                             {item.aktif ? 'Pasife Al' : 'Aktifleştir'}
                           </RowActionButton>
-                          {!readonly && (
+                          {!readonly && yetki.silebilir && (
                             <RowActionButton variant="danger" onClick={() => deleteItem(item)}>Sil</RowActionButton>
                           )}
                         </div>

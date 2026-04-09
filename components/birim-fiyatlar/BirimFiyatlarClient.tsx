@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { useYetki } from '@/lib/yetki/useYetki'
 
 type Grup = { id: string; ad: string; ust_lokasyon_id: string | null; aktif: boolean }
 type Lokasyon = { id: string; tanim: string; parent_id: string | null; aktif: boolean }
@@ -20,6 +21,7 @@ const PARA_BIRIMLERI = ['TRY', 'USD', 'EUR', 'GBP']
 export default function BirimFiyatlarClient({ projeId, readonly = false }: Props) {
   const { toast } = useToast()
   const { confirm } = useConfirm()
+  const yetki = useYetki('birim-fiyatlar')
   const [gruplar, setGruplar]       = useState<Grup[]>([])
   const [lokasyonlar, setLokasyonlar] = useState<Lokasyon[]>([])
   const [grupUyeleri, setGrupUyeleri] = useState<GrupUye[]>([])
@@ -258,7 +260,7 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
           >
             {PARA_BIRIMLERI.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-          {!readonly && (
+          {!readonly && yetki.duzenleyebilir && (
             <button
               disabled={isSaving}
               onClick={() => kaydetGrup(grup.id)}
@@ -303,7 +305,7 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
                   >
                     {PARA_BIRIMLERI.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
-                  {!readonly && (
+                  {!readonly && yetki.duzenleyebilir && (
                     <button
                       disabled={isLokSaving}
                       onClick={() => kaydetLok(lok.id)}
@@ -355,7 +357,7 @@ export default function BirimFiyatlarClient({ projeId, readonly = false }: Props
                 </span>
                 <span style={{ fontSize: 12, color: '#2e6b2e' }}>{isAcik ? '▲' : '▼'}</span>
               </div>
-              {!readonly && (
+              {!readonly && yetki.silebilir && (
                 <button
                   disabled={saving === `ust:${ustLok.id}`}
                   onClick={(e) => { e.stopPropagation(); temizleUstLok(ustLok.id, ustLok.tanim) }}

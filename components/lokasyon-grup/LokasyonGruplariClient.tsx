@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { Pencil, Trash2, RefreshCw, Plus, ChevronDown, ChevronRight, Search, Layers } from 'lucide-react'
+import { useYetki } from '@/lib/yetki/useYetki'
 
 type GroupRow = {
   id: string
@@ -79,6 +80,7 @@ export default function LokasyonGruplariClient({
 }) {
   const { toast } = useToast()
   const { confirm } = useConfirm()
+  const yetki = useYetki('lokasyon-gruplari')
   const { firmaId: saFirmaId } = useFirma()
   const [taFirmaId] = useState<string | null>(initialFirmaId ?? null)
   const firmaId = base === '/sa' ? saFirmaId : taFirmaId
@@ -252,10 +254,10 @@ export default function LokasyonGruplariClient({
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: readonly ? '1fr' : 'minmax(320px, 380px) 1fr', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: (readonly || !yetki.ekleyebilir) ? '1fr' : 'minmax(320px, 380px) 1fr', gap: 20, alignItems: 'start' }}>
 
         {/* SOL: FORM — sadece readonly olmayanlarda */}
-        {!readonly && (
+        {!readonly && yetki.ekleyebilir && (
         <div className="verde-card" style={{ padding: '18px 20px', position: 'sticky', top: 88 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -409,14 +411,14 @@ export default function LokasyonGruplariClient({
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         {!readonly && (
                         <>
-                        <button onClick={(e) => { e.stopPropagation(); startEdit(group) }}
+                        {yetki.duzenleyebilir && <button onClick={(e) => { e.stopPropagation(); startEdit(group) }}
                           style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#f8fbf8', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#4b5563' }}>
                           <Pencil size={10} /> Düzenle
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); onDelete(group.id) }}
+                        </button>}
+                        {yetki.silebilir && <button onClick={(e) => { e.stopPropagation(); onDelete(group.id) }}
                           style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#dc2626' }}>
                           <Trash2 size={10} /> Sil
-                        </button>
+                        </button>}
                         </>
                         )}
                         {expanded ? <ChevronDown size={15} color="#6b7280" /> : <ChevronRight size={15} color="#6b7280" />}

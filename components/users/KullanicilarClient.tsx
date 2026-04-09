@@ -10,6 +10,7 @@ import RowActionButton from '@/components/ui/RowActionButton'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
+import { useYetki } from '@/lib/yetki/useYetki'
 
 const ROL_LABEL: Record<UserRole, string> = {
   super_admin: 'Süper Admin',
@@ -51,6 +52,7 @@ export default function KullanicilarClient({
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
+  const yetki = useYetki('kullanicilar')
   const isSA = base === '/sa'
   const lokMap = useMemo(() => new Map(ustLokasyonlar.map(l => [l.id, l.tanim])), [ustLokasyonlar])
 
@@ -387,10 +389,10 @@ export default function KullanicilarClient({
                 <Button variant="ghost" onClick={() => downloadExcel('export')} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}><FileSpreadsheet size={16} /> Dışa Aktar</Button>
               </>
             )}
-            {canCreate && !topluSilModu && (
+            {canCreate && yetki.ekleyebilir && !topluSilModu && (
               <Button variant="primary" onClick={() => setOpenCreate(true)} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>＋ Kullanıcı Ekle</Button>
             )}
-            {canDelete && !topluSilModu && (
+            {canDelete && yetki.silebilir && !topluSilModu && (
               <Button variant="ghost" onClick={() => { setTopluSilModu(true); setSeciliIds(new Set()) }} className="text-[15px]" style={{ ...IMPORT_EXPORT_BUTTON_STYLE, color: '#dc2626', borderColor: '#fca5a5' }}>🗑 Toplu Sil</Button>
             )}
             {topluSilModu && (
@@ -524,12 +526,12 @@ export default function KullanicilarClient({
                       </RowActionButton>
                       {(isSA || isTA) && (
                         <>
-                          <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '', cinsiyet: (u as any).cinsiyet ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>
+                          {yetki.duzenleyebilir && <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '', cinsiyet: (u as any).cinsiyet ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>}
                           <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
                           {deviceTokenMap[u.id] && (
                             <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>
                           )}
-                          {canDelete && <RowActionButton variant="danger" onClick={() => deleteUser(u)}>Sil</RowActionButton>}
+                          {canDelete && yetki.silebilir && <RowActionButton variant="danger" onClick={() => deleteUser(u)}>Sil</RowActionButton>}
                         </>
                       )}
                     </div>

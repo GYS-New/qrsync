@@ -11,6 +11,7 @@ import { useLicenseExpired } from '@/components/hooks/useLicense'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
+import { useYetki } from '@/lib/yetki/useYetki'
 
 type SortKey = 'tanim' | 'lokasyon' | 'atanan' | 'aktif' | 'islem' | 'durum' | 'actor'
 
@@ -69,6 +70,7 @@ export default function TumGorevlerClient({
   projeId?: string | null
   personelAtamaAktif?: boolean
 }) {
+  const yetki = useYetki('tum-gorevler')
   const isTA = base === '/ta'
   const isU = base === '/u'
   const [sekme, setSekme] = useState<'gorevler' | 'kurallar'>('gorevler')
@@ -889,7 +891,7 @@ async function del() {
         </a>
 
         {/* Toplu Düzenle — readonly olmayanlara göster */}
-        {!readonly && (
+        {!readonly && yetki.duzenleyebilir && (
         <Button
           className="text-[13.5px]"
           variant={bulkDuzenleMode ? (bulkDuzenleIds.size > 0 ? 'primary' : 'ghost') : 'ghost'}
@@ -927,13 +929,13 @@ async function del() {
 
         {/* CRUD — U sadece Düzenle görebilir, Ekle/Sil/Toplu Sil göremez */}
         <div style={{ width: 1, height: 28, background: '#e0ece0', flexShrink: 0 }} />
-        {!isU && (
+        {!isU && yetki.ekleyebilir && (
           <Button className="text-[13.5px]" variant="primary" disabled={readonly || saving || (!licenseLoading && licenseExpired)} onClick={openCreate} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}>+ Ekle</Button>
         )}
-        {!readonly && (
+        {!readonly && yetki.duzenleyebilir && (
           <Button className="text-[13.5px]" variant="primary" disabled={saving || !selected} onClick={openEdit} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}><Pencil size={14} /> Düzenle</Button>
         )}
-        {!isU && (<>
+        {!isU && yetki.silebilir && (<>
           <Button className="text-[13.5px]" variant="danger" disabled={readonly || saving || bulkMode} onClick={del} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}><Trash2 size={14} /> Sil</Button>
           <Button
             className="text-[13.5px]"
