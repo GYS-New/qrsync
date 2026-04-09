@@ -10,6 +10,11 @@
     "restartPolicyMaxRetries": 10,
     "cronJobs": [
       {
+        "name": "gece-dongu",
+        "schedule": "5 21 * * *",
+        "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/gece-dongu?secret=$CRON_SECRET"
+      },
+      {
         "name": "mesai-arsiv",
         "schedule": "59 20 * * *",
         "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/mesai-arsiv"
