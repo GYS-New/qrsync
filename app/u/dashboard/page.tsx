@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import DashboardRenderer from '@/components/dashboard/DashboardRenderer'
 import { ensureDashboardDefaults } from '@/lib/dashboard/ensureDefaults'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,10 @@ export default async function Dashboard() {
   const firmaId  = me?.firma_id  ?? null
   const projeId  = me?.proje_id  ?? null   // U kendi projesini görür
 
-  const bloklar = await ensureDashboardDefaults(user.id)
+  const [bloklar, yetkiliLokIds] = await Promise.all([
+    ensureDashboardDefaults(user.id),
+    firmaId ? getYetkiliLokasyonIds(supabase, firmaId, projeId) : null,
+  ])
 
   return (
     <div>
@@ -40,6 +44,7 @@ export default async function Dashboard() {
           projeId={projeId}
           isSuperAdmin={false}
           basePath="/u"
+          yetkiliLokIds={yetkiliLokIds}
         />
       </div>
     </div>

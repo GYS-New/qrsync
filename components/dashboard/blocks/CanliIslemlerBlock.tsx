@@ -10,20 +10,22 @@ function bugunTR(): Date {
   return new Date(trNow.getTime() - trOffset)
 }
 
-export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmin }: {
+export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmin, yetkiliLokIds }: {
   firmaId: string | null
   isSuperAdmin: boolean
   projeId?: string | null
+  yetkiliLokIds?: string[] | null
 }) {
   const supabase = createClient()
   const today = bugunTR()
   const todayISO = today.toISOString()
   const onlineSince = new Date(Date.now() - 120 * 1000).toISOString()
 
-  // Görev sorguları: firma + proje filtresi
+  // Görev sorguları: firma + proje + lokasyon yetki filtresi
   const gf = (q: any) => {
     let r = firmaId ? q.eq('firma_id', firmaId) : q
     if (projeId) r = r.eq('proje_id', projeId)
+    if (yetkiliLokIds && yetkiliLokIds.length > 0) r = r.in('lokasyon_id', yetkiliLokIds)
     return r
   }
   // Kullanıcı/Lokasyon: sadece firma filtresi
@@ -54,8 +56,8 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
       : supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true),
     // [7] Online mobil kullanıcılar (device_tokens.son_kullanim son 10dk — sadece firma filtresi, proje filtresi yok)
     ff(supabase.from('device_tokens').select('user_id').eq('aktif', true).gte('son_kullanim', new Date(Date.now() - 10 * 60 * 1000).toISOString())),
-    // [8] Lokasyonlar toplam
-    ff(supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true)),
+    // [8] Lokasyonlar toplam (lokasyon yetki filtreli)
+    (() => { let lq = supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true); if (firmaId) lq = lq.eq('firma_id', firmaId); if (yetkiliLokIds && yetkiliLokIds.length > 0) lq = lq.in('id', yetkiliLokIds); return lq })(),
     // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar)
     gf(supabase.from('canli_gorevler').select('lokasyon_id').gte('aktif_olma_tarihi', todayISO).limit(3000)),
     // [10] Görevli lokasyonlar — spesifik (bugün tüm durumlar)

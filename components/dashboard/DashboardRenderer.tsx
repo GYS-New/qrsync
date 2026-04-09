@@ -33,12 +33,14 @@ export default async function DashboardRenderer({
   isSuperAdmin,
   basePath,
   projeId,
+  yetkiliLokIds,
 }: {
   bloklar: any[]
   firmaId: string | null
   isSuperAdmin: boolean
   basePath: string
   projeId?: string | null
+  yetkiliLokIds?: string[] | null
 }) {
   const active = (bloklar ?? []).filter((b) => b.aktif).sort((a, b) => (a.sira ?? 0) - (b.sira ?? 0))
 
@@ -62,28 +64,28 @@ export default async function DashboardRenderer({
 
    
     if (t === 'son_gorevler') {
-      return <SonGorevlerBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} limit={Number(ayarlar.limit ?? 8)} />
+      return <SonGorevlerBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} yetkiliLokIds={yetkiliLokIds} limit={Number(ayarlar.limit ?? 8)} />
     }
     if (t === 'aktif_kullanicilar') {
-      return <AktifKullanicilarBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} limit={Number(ayarlar.limit ?? 6)} />
+      return <AktifKullanicilarBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} yetkiliLokIds={yetkiliLokIds} limit={Number(ayarlar.limit ?? 6)} />
     }
     if (t === 'gunluk_performans') {
-      return <GunlukPerformansBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} />
+      return <GunlukPerformansBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} yetkiliLokIds={yetkiliLokIds} />
     }
     if (t === 'personel_basari_analizi') {
-      return <PersonelBasariAnaliziBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} />
+      return <PersonelBasariAnaliziBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} yetkiliLokIds={yetkiliLokIds} />
     }
     if (t === 'canli_akis_izleme') {
-      return <CanliAkisIzlemeBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} />
+      return <CanliAkisIzlemeBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} yetkiliLokIds={yetkiliLokIds} />
     }
     if (t === 'aktivite_grafigi') {
-      return <AktiviteGrafigiBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} />
+      return <AktiviteGrafigiBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} yetkiliLokIds={yetkiliLokIds} />
     }
     if (t === 'frekansiyel_gorev_analizi') {
-      return <FrekansiyelGorevAnaliziBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} />
+      return <FrekansiyelGorevAnaliziBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} yetkiliLokIds={yetkiliLokIds} />
     }
     if (t === 'lokasyon_gorev_analizi') {
-      return <LokasyonGorevAnaliziBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} />
+      return <LokasyonGorevAnaliziBlock key={b.id} firmaId={firmaId} basePath={basePath} projeId={projeId} yetkiliLokIds={yetkiliLokIds} />
     }
     return null
   }
@@ -92,7 +94,7 @@ export default async function DashboardRenderer({
     <div className="space-y-4">
       {kpi && (
         <div className="mb-1">
-          <CanliIslemlerBlock firmaId={firmaId} isSuperAdmin={isSuperAdmin} projeId={projeId} />
+          <CanliIslemlerBlock firmaId={firmaId} isSuperAdmin={isSuperAdmin} projeId={projeId} yetkiliLokIds={yetkiliLokIds} />
         </div>
       )}
 
