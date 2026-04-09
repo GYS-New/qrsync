@@ -51,9 +51,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, users: [], since })
   }
 
-  // Kullanıcı detaylarını çek (user_id'ler zaten device_tokens'tan filtrelenmiş)
+  // Kullanıcı detaylarını çek (join yok — hızlı)
   const { data: users, error: uErr } = await admin.from('users')
-    .select('id,isim_soyisim,rol,profil_foto,firma_id,firmalar(firma_adi,ticari_unvan)')
+    .select('id,isim_soyisim,rol,profil_foto,firma_id')
     .in('id', uniqueUserIds.slice(0, limit))
     .eq('aktif', true)
   if (uErr) {

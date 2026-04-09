@@ -141,7 +141,7 @@ export default function AktifKullanicilarBlock({
                     {isEmpty ? '—' : u.isim_soyisim}
                   </div>
                   <div style={{ fontSize: 11.5, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {isEmpty ? '—' : (u.firmalar?.firma_adi || u.firmalar?.ticari_unvan || 'Sistem')}
+                    {isEmpty ? '—' : (u.rol === 'super_admin' ? 'SA' : u.rol === 'tenant_admin' ? 'Admin' : 'Personel')}
                   </div>
                 </div>
               </div>
