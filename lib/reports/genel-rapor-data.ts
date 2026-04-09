@@ -157,7 +157,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
 
   let lokQ = admin
     .from('lokasyonlar')
-    .select('id,tanim,parent_id,firma_id')
+    .select('id,tanim,parent_id,firma_id,gunluk_frekans_sayisi')
     .eq('firma_id', filters.firmaId)
   if (filters.projeId) lokQ = (lokQ as any).eq('proje_id', filters.projeId)
   const { data: lokasyonlar } = await lokQ
@@ -390,23 +390,26 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       sapma      += e.sapma
       kayip      += e.kayip
     }
-    const tanimGfs = new Map<string, number>()
-    for (const g of tumGorevler) {
-      if (!ids.includes((g as any).lokasyon_id)) continue
-      const gfs = (g as any).gunluk_frekans_sayisi ?? 0
-      if (gfs === 0) continue
-      const t = (g as any).tanim ?? ''
-      if (!tanimGfs.has(t)) tanimGfs.set(t, gfs)
+    // Vardiya frekans: lokasyonlar tablosundaki gunluk_frekans_sayisi toplamı
+    let gunlukFrekans = 0
+    for (const id of ids) {
+      const lok = lokMap.get(id) as any
+      if (lok?.gunluk_frekans_sayisi) gunlukFrekans += lok.gunluk_frekans_sayisi
     }
-    const gunlukFrekansToplamı = Array.from(tanimGfs.values()).reduce((s, v) => s + v, 0)
+    // Kural sayısı: frekansı > 0 olan lokasyon sayısı (unique görev noktası)
+    let kuralSayisi = 0
+    for (const id of ids) {
+      const lok = lokMap.get(id) as any
+      if (lok?.gunluk_frekans_sayisi > 0) kuralSayisi++
+    }
     const hazirAcik = (tumGorevler as any[]).filter((g: any) =>
       ids.includes(g.lokasyon_id) && (g.durum === 'HAZIR' || g.durum === 'ACIK' || g.durum === 'ISLEMDE')
     ).length
     const hedef = tamamlanan + sapma + kayip + hazirAcik
-    // Always return a row even when counts are zero (lokasyon exists in group but no tasks)
-    const gunlukFrekans = gunlukFrekansToplamı > 0
-      ? gunlukFrekansToplamı
-      : (gunSayisi > 0 ? Math.round(hedef / gunSayisi) : hedef)
+    // Fallback: lokasyonda frekans tanımlı değilse görevlerden hesapla
+    if (gunlukFrekans === 0 && hedef > 0) {
+      gunlukFrekans = gunSayisi > 0 ? Math.round(hedef / gunSayisi) : hedef
+    }
     const taninCounts = new Map<string, number>()
     for (const g of tumGorevler) {
       if (ids.includes((g as any).lokasyon_id)) {
@@ -420,7 +423,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     const genelOran  = hedef > 0 ? Math.round(((tamamlanan + sapma) / hedef) * 100) : 0
     return {
       grup: grupAd, ustLokasyon, lokasyon: lokTanim, gorevTanimi,
-      gunlukFrekans, kuralSayisi: tanimGfs.size, hedef, tamamlanan, sapma, kayip,
+      gunlukFrekans, kuralSayisi, hedef, tamamlanan, sapma, kayip,
       basariOrani: `%${basariOran}`, genelOran: `%${genelOran}`,
     }
   }
@@ -493,13 +496,19 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       // HAZIR, ACIK, ISLEMDE: hedefe girer ama kategoriye girmez
     }
     if (hedef > 0) {
-      const uniqueTanimlar = new Set(tumGorevler.map((g: any) => g.tanim).filter(Boolean))
+      // Lokasyonlar tablosundan frekans topla
+      const gorevLokIds = new Set(tumGorevler.map((g: any) => g.lokasyon_id).filter(Boolean))
+      let lokFrekTop = 0, lokFrekCount = 0
+      for (const lid of gorevLokIds) {
+        const lok = lokMap.get(lid) as any
+        if (lok?.gunluk_frekans_sayisi > 0) { lokFrekTop += lok.gunluk_frekans_sayisi; lokFrekCount++ }
+      }
       grupMetrikleri.push({
         grup: 'Genel',
         ustLokasyon: '',
         lokasyon: ustLokTanim || altLokTanim || 'Tüm Lokasyonlar',
-        gunlukFrekans: Math.round(hedef / gunSayisi),
-        kuralSayisi: uniqueTanimlar.size,
+        gunlukFrekans: lokFrekTop > 0 ? lokFrekTop : Math.round(hedef / gunSayisi),
+        kuralSayisi: lokFrekCount > 0 ? lokFrekCount : gorevLokIds.size,
         hedef,
         tamamlanan,
         sapma,
