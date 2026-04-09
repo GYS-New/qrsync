@@ -87,10 +87,10 @@ export default function FrekansSayilariClient({ lokasyonlar, firmaId, projeId }:
           {lokasyonlar.length} lokasyon
         </div>
         <div style={{ padding: '8px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, fontSize: 13, fontWeight: 700, color: '#1d4ed8' }}>
-          Toplam günlük frekans: {toplamFrekans}
+          Toplam vardiya frekans: {toplamFrekans}
         </div>
         <div style={{ fontSize: 12.5, color: '#6b7280', lineHeight: 1.5 }}>
-          Gruba girilen frekans tüm alt lokasyonlarına uygulanır. Lokasyonlar bireysel düzenlenebilir.
+          Gruba girilen vardiya frekans sayısı tüm alt lokasyonlarına uygulanır. Lokasyonlar bireysel düzenlenebilir. Günlük hedef = vardiya frekans × vardiya sayısı (kural sayısı).
         </div>
       </div>
 

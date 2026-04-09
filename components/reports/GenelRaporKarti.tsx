@@ -699,7 +699,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   return (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px,1fr))', gap: 8, marginBottom: 14, padding: '10px 12px', background: T.greenLight, borderRadius: 8, border: `1px solid #bbf7d0` }}>
                       {[
-                        { label: 'Günlük Frekans', value: tGunluk, color: T.blue },
+                        { label: 'Vardiya Frekans', value: tGunluk, color: T.blue },
                         { label: 'Hedef',          value: tHedef,  color: T.blue },
                         { label: 'Tamamlanan',     value: tTam,    color: T.green },
                         { label: 'Sapma',          value: tSap,    color: T.amber },
@@ -719,9 +719,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   headers={['SN', 'GRUP',
                     altAltLokasyonId ? 'ALT LOKASYON' : altLokasyonId ? 'ÜST LOKASYON' : 'ÜST LOKASYON',
                     altAltLokasyonId ? 'ALT-ALT LOKASYON' : altLokasyonId ? 'ALT LOKASYON' : 'LOKASYON',
-                    'GÜNLÜK FREKANS', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
-                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
-                  accentCol={9} accentColor={T.greenMid} leftCols={[1, 2, 3]}
+                    'GÜNLÜK FREKANS', 'GÜNLÜK VARDİYA', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
+                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, g.hedef > 0 && g.gunlukFrekans > 0 ? Math.round(g.hedef / g.gunlukFrekans) : 0, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
+                  accentCol={10} accentColor={T.greenMid} leftCols={[1, 2, 3]}
                 />
               </div>
             )}
