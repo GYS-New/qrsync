@@ -118,7 +118,7 @@ export async function GET(request: Request) {
       { col: 2,  text: 'GRUP',           width: 28 },
       { col: 3,  text: 'ÜST LOKASYON',  width: 20 },
       { col: 4,  text: 'LOKASYON',       width: 22 },
-      { col: 5,  text: 'GÜNLÜK FREKANS', width: 16 },
+      { col: 5,  text: 'VARDİYA FREKANS', width: 16 },
       { col: 6,  text: 'HEDEF',          width: 10 },
       { col: 7,  text: 'TAMAMLANAN',     width: 13 },
       { col: 8,  text: 'SAPMA',          width: 10 },

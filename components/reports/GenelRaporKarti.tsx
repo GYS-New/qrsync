@@ -19,7 +19,7 @@ interface Props {
 type Lokasyon = { id: string; tanim: string; parent_id: string | null }
 
 type GrupMetrik = {
-  grup: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gunlukFrekans: number
+  grup: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gunlukFrekans: number; kuralSayisi: number
   hedef: number; tamamlanan: number; sapma: number; kayip: number
   basariOrani: string; genelOran: string
 }
@@ -719,8 +719,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   headers={['SN', 'GRUP',
                     altAltLokasyonId ? 'ALT LOKASYON' : altLokasyonId ? 'ÜST LOKASYON' : 'ÜST LOKASYON',
                     altAltLokasyonId ? 'ALT-ALT LOKASYON' : altLokasyonId ? 'ALT LOKASYON' : 'LOKASYON',
-                    'GÜNLÜK FREKANS', 'GÜNLÜK VARDİYA', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
-                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, g.hedef > 0 && g.gunlukFrekans > 0 ? Math.round(g.hedef / g.gunlukFrekans) : 0, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
+                    'VARDİYA FREKANS', 'GÜNLÜK VARDİYA', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
+                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, g.kuralSayisi, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
                   accentCol={10} accentColor={T.greenMid} leftCols={[1, 2, 3]}
                 />
               </div>

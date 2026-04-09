@@ -17,6 +17,7 @@ export interface GrupMetrik {
   lokasyon: string
   gorevTanimi: string   // Gruba ait görev tanımı (varsa ilk eşleşen)
   gunlukFrekans: number
+  kuralSayisi: number   // Unique görev tanımı sayısı (kural sayısı)
   hedef: number
   tamamlanan: number
   sapma: number
@@ -419,7 +420,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     const genelOran  = hedef > 0 ? Math.round(((tamamlanan + sapma) / hedef) * 100) : 0
     return {
       grup: grupAd, ustLokasyon, lokasyon: lokTanim, gorevTanimi,
-      gunlukFrekans, hedef, tamamlanan, sapma, kayip,
+      gunlukFrekans, kuralSayisi: tanimGfs.size, hedef, tamamlanan, sapma, kayip,
       basariOrani: `%${basariOran}`, genelOran: `%${genelOran}`,
     }
   }
@@ -466,10 +467,11 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       } else {
         const yH = m.hedef + gm.hedef, yT = m.tamamlanan + gm.tamamlanan
         const yS = m.sapma + gm.sapma,  yK = m.kayip + gm.kayip, yG = m.gunlukFrekans + gm.gunlukFrekans
+        const yKS = m.kuralSayisi + gm.kuralSayisi
         birlesik.set(gm.grup, {
           grup: gm.grup, ustLokasyon: 'Tümü', lokasyon: 'Tümü',
           gorevTanimi: m.gorevTanimi || gm.gorevTanimi,
-          gunlukFrekans: yG, hedef: yH, tamamlanan: yT, sapma: yS, kayip: yK,
+          gunlukFrekans: yG, kuralSayisi: yKS, hedef: yH, tamamlanan: yT, sapma: yS, kayip: yK,
           basariOrani: `%${yH > 0 ? Math.round(yT / yH * 100) : 0}`,
           genelOran:   `%${yH > 0 ? Math.round((yT + yS) / yH * 100) : 0}`,
         })
@@ -491,11 +493,13 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       // HAZIR, ACIK, ISLEMDE: hedefe girer ama kategoriye girmez
     }
     if (hedef > 0) {
+      const uniqueTanimlar = new Set(tumGorevler.map((g: any) => g.tanim).filter(Boolean))
       grupMetrikleri.push({
         grup: 'Genel',
         ustLokasyon: '',
         lokasyon: ustLokTanim || altLokTanim || 'Tüm Lokasyonlar',
         gunlukFrekans: Math.round(hedef / gunSayisi),
+        kuralSayisi: uniqueTanimlar.size,
         hedef,
         tamamlanan,
         sapma,
