@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
 const CORS = { 'Access-Control-Allow-Origin': '*' }
-const IPTAL_OLASILIK = 0.01 // %1
+// İptal oranı artık DB'den (grupAyar.iptal_orani), fallback %1
 
 // Personelin son aktivitesini güncelle (online görünsün)
 async function personelAktiviteGuncelle(admin: any, userId: string) {
@@ -222,21 +222,18 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     // Min süreden önce asla tamamlama
     if (gecenDk < minDk) continue
 
-    // Hedef süre ± %50 arası rastgele tamamlanma noktası + sapma olasılıkları
+    // Hedef süre ± %50 arası rastgele tamamlanma noktası + sapma olasılıkları (DB'den)
+    const erkenOran = (grupAyar.erken_50_orani ?? 2) / 100
+    const gecCokOran = (grupAyar.gec_100_orani ?? 2) / 100
+    const gecOran = (grupAyar.gec_50_orani ?? 3) / 100
     const altSinir = Math.max(minDk, hedefDk * 0.5)
     let ustSinir = hedefDk * 1.5
-    // %3 ihtimalle +%50 fazla süre (hedef × 2.25)
-    // %2 ihtimalle +%100 fazla süre (hedef × 3)
-    // %2 ihtimalle -%50 erken tamamlama (hedef × 0.75, min süreden düşmez)
     const sapmaRulet = Math.random()
-    if (sapmaRulet < 0.02) {
-      // %2 — çok erken tamamlama
+    if (sapmaRulet < erkenOran) {
       ustSinir = Math.max(minDk + 1, hedefDk * 0.75)
-    } else if (sapmaRulet < 0.04) {
-      // %2 — çok geç tamamlama (+%100)
+    } else if (sapmaRulet < erkenOran + gecCokOran) {
       ustSinir = hedefDk * 3
-    } else if (sapmaRulet < 0.07) {
-      // %3 — geç tamamlama (+%50)
+    } else if (sapmaRulet < erkenOran + gecCokOran + gecOran) {
       ustSinir = hedefDk * 2.25
     }
     const tamamlanmaDk = altSinir + Math.random() * (ustSinir - altSinir)
@@ -247,7 +244,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     const personelId = gorev.baslatan_kullanici_id ?? cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
 
     // %1 iptal olasılığı
-    if (Math.random() < IPTAL_OLASILIK) {
+    if (Math.random() < (grupAyar.iptal_orani ?? 1) / 100) {
       await admin.from('canli_gorevler').update({
         durum: 'IPTAL', durum_degisim_tarihi: tamamlanmaIso,
         iptal_eden_id: personelId, iptal_tarihi: tamamlanmaIso,
@@ -305,7 +302,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
       const personelId = cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
 
       // %1 iptal olasılığı
-      if (Math.random() < IPTAL_OLASILIK) {
+      if (Math.random() < (grupAyar.iptal_orani ?? 1) / 100) {
         await admin.from('canli_gorevler').update({
           durum: 'IPTAL',
           durum_degisim_tarihi: new Date().toISOString(),

@@ -81,6 +81,10 @@ export async function POST(req: NextRequest) {
     grup_id: g.grup_id,
     hedef_oran: g.hedef_oran ?? 100,
     vardiya_suresi_saat: g.vardiya_suresi_saat ?? 8,
+    iptal_orani: g.iptal_orani ?? 1,
+    gec_50_orani: g.gec_50_orani ?? 3,
+    gec_100_orani: g.gec_100_orani ?? 2,
+    erken_50_orani: g.erken_50_orani ?? 2,
   }))
   await admin.from('simulasyon_grup_ayarlari').insert(grupRows)
 
@@ -130,6 +134,10 @@ export async function PATCH(req: NextRequest) {
         grup_id: g.grup_id,
         hedef_oran: g.hedef_oran ?? 100,
         vardiya_suresi_saat: g.vardiya_suresi_saat ?? 8,
+    iptal_orani: g.iptal_orani ?? 1,
+    gec_50_orani: g.gec_50_orani ?? 3,
+    gec_100_orani: g.gec_100_orani ?? 2,
+    erken_50_orani: g.erken_50_orani ?? 2,
       }))
       await admin.from('simulasyon_grup_ayarlari').insert(rows)
     }

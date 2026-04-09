@@ -842,7 +842,7 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
 
   // Yeni ayar formu
   const [yeniUstLok, setYeniUstLok] = useState('')
-  const [seciliGruplar, setSeciliGruplar] = useState<Record<string, { hedef_oran: number; vardiya_suresi_saat: number }>>({})
+  const [seciliGruplar, setSeciliGruplar] = useState<Record<string, any>>({})
   const [seciliPersonel, setSeciliPersonel] = useState<Set<string>>(new Set())
 
   // Düzenleme
@@ -893,9 +893,9 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
     setYeniUstLok(a.ust_lokasyon_id)
     await ustLokasyonSecildi(a.ust_lokasyon_id)
     // Mevcut grup ayarlarını yükle
-    const ga: Record<string, { hedef_oran: number; vardiya_suresi_saat: number }> = {}
+    const ga: Record<string, any> = {}
     for (const g of (a.grup_ayarlari ?? [])) {
-      ga[g.grup_id] = { hedef_oran: g.hedef_oran, vardiya_suresi_saat: g.vardiya_suresi_saat }
+      ga[g.grup_id] = { hedef_oran: g.hedef_oran, vardiya_suresi_saat: g.vardiya_suresi_saat, iptal_orani: g.iptal_orani ?? 1, gec_50_orani: g.gec_50_orani ?? 3, gec_100_orani: g.gec_100_orani ?? 2, erken_50_orani: g.erken_50_orani ?? 2 }
     }
     setSeciliGruplar(ga)
     setSeciliPersonel(new Set(a.personel_idler ?? []))
@@ -905,7 +905,7 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
     setSeciliGruplar(prev => {
       const n = { ...prev }
       if (n[grupId]) { delete n[grupId] }
-      else { n[grupId] = { hedef_oran: 100, vardiya_suresi_saat: 8 } }
+      else { n[grupId] = { hedef_oran: 100, vardiya_suresi_saat: 8, iptal_orani: 1, gec_50_orani: 3, gec_100_orani: 2, erken_50_orani: 2 } }
       return n
     })
   }
@@ -1057,6 +1057,24 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
                               <span style={{ fontSize: 11, color: '#6b7280' }}>sa</span>
                             </label>
                           </>
+                        )}
+                        {secili && (
+                          <div style={{ display: 'flex', gap: 8, marginTop: 6, paddingLeft: 28, flexWrap: 'wrap' }}>
+                            {[
+                              { key: 'iptal_orani', label: 'İptal', def: 1, max: 10 },
+                              { key: 'gec_50_orani', label: 'Geç +%50', def: 3, max: 20 },
+                              { key: 'gec_100_orani', label: 'Geç +%100', def: 2, max: 20 },
+                              { key: 'erken_50_orani', label: 'Erken -%50', def: 2, max: 20 },
+                            ].map(s => (
+                              <label key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10.5, color: '#6b7280' }}>
+                                {s.label}:
+                                <input type="number" min={0} max={s.max} value={(seciliGruplar[g.id] as any)?.[s.key] ?? s.def}
+                                  onChange={e => grupAyarDegistir(g.id, s.key, Number(e.target.value))}
+                                  style={{ ...inp, width: 40, height: 24, textAlign: 'center', fontSize: 11 }} />
+                                <span>%</span>
+                              </label>
+                            ))}
+                          </div>
                         )}
                       </div>
                     )
