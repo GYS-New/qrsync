@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
+import { useProje } from '@/components/projeler/ProjeContext'
 
 const DashboardSettingsClient = dynamic(() => import('@/components/dashboard/DashboardSettingsClient'), { ssr: false })
 const GorevSureleriClient = dynamic(() => import('./GorevSureleriClient'), { ssr: false })
@@ -58,6 +59,8 @@ interface Props {
 
 export default function SistemAyarlariClient({ meId, base, initialBloklar, lokasyonlar, kullanicilar, isSA = false, firmaId, projeId, readonly = false, personelAtamaAktif = true, initialYetkileri = [], firmalar = [], yetkilLimitRoller, yetkiGizliSayfalar, yetkiApiEndpoint }: Props) {
   const [aktifTab, setAktifTab] = useState<Tab>('genel')
+  const { aktifProje } = useProje()
+  const sureliGorevAktif = aktifProje?.sureli_gorev_aktif === true
 
   return (
     <div style={{ padding: '24px 28px' }}>
@@ -112,7 +115,7 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
           personelAtamaAktif={personelAtamaAktif}
         />
       )}
-      {aktifTab === 'gorev-sureleri' && <GorevSureleriClient lokasyonlar={lokasyonlar} />}
+      {aktifTab === 'gorev-sureleri' && <GorevSureleriClient lokasyonlar={lokasyonlar} sureliGorevAktif={sureliGorevAktif} />}
       {aktifTab === 'yetkiler' && (
         <GrupYetkileriClient
           initialYetkileri={initialYetkileri}

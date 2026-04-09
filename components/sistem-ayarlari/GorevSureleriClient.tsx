@@ -15,6 +15,7 @@ interface LokasyonRow {
 
 interface Props {
   lokasyonlar: LokasyonRow[]
+  sureliGorevAktif?: boolean
 }
 
 interface DraftValues {
@@ -65,7 +66,7 @@ async function saveSingle(id: string, d: DraftValues): Promise<void> {
   if (!res.ok || !json.ok) throw new Error(json.error ?? 'Kaydetme hatası')
 }
 
-export default function GorevSureleriClient({ lokasyonlar }: Props) {
+export default function GorevSureleriClient({ lokasyonlar, sureliGorevAktif = true }: Props) {
   const router = useRouter()
   const { roots, childrenOf } = useMemo(() => buildTree(lokasyonlar), [lokasyonlar])
 
@@ -348,7 +349,21 @@ export default function GorevSureleriClient({ lokasyonlar }: Props) {
   }
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
+      {/* SG kapalıysa pasif overlay */}
+      {!sureliGorevAktif && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.75)', zIndex: 5, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 60, borderRadius: 10 }}>
+          <div style={{ background: '#fff', border: '2px solid #fbbf24', borderRadius: 12, padding: '20px 28px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#92400e', marginBottom: 6 }}>Süreli Görev Takibi Kapalı</div>
+            <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+              Bu projenin süreli görev takibi kapalıdır. Görev süreleri etkisizdir.<br />
+              Aktif etmek için <strong>Proje Ayarları → Süreli Görev Takibi</strong> toggle'ını açın.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Açıklama */}
       <div style={{
         background: '#eff6ff',
