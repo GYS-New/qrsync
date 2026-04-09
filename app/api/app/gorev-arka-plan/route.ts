@@ -34,30 +34,27 @@ export async function POST(req: Request) {
     const { lokasyonAdi, minSureKaldi, maxSureUyari } = body
 
     if (maxSureUyari) {
-      // Max süreye 2 dakika kaldı — acil uyarı
       await sendFCMToUser(
         user.id,
-        '🚨 Görevi Hemen Tamamlayın!',
-        `${lokasyonAdi || 'Lokasyon'} için maksimum süreye 2 dakika kaldı. Hemen tamamlayın!`,
+        '🚨 Göreviniz Devam Ediyor!',
+        `${lokasyonAdi || 'Lokasyon'} için görev devam ediyor. En kısa sürede bitirmelisiniz. İşiniz bittiğinde buraya tıklayarak tamamlamayı unutmayın!`,
         'gorev_uyari'
       )
     } else if (minSureKaldi && minSureKaldi > 0) {
-      // Min süre dolmadan çıktı — vav sesiyle uyar
       const dakika = Math.floor(minSureKaldi / 60)
       const saniye = minSureKaldi % 60
       const kalan = dakika > 0 ? `${dakika} dk ${saniye} sn` : `${saniye} sn`
       await sendFCMToUser(
         user.id,
-        '⚠️ Görevi Tamamlayamazsınız!',
-        `${lokasyonAdi || 'Lokasyon'} için minimum süre dolmadı. Kalan süre: ${kalan}. Lütfen uygulamaya dönün.`,
+        '⏱ Göreviniz Devam Ediyor!',
+        `${lokasyonAdi || 'Lokasyon'} için görev devam ediyor. En erken ${kalan} içerisinde bitirmelisiniz. İşiniz bittiğinde buraya tıklayarak tamamlamayı unutmayın!`,
         'gorev_uyari'
       )
     } else {
-      // Normal arka plan bildirimi
       await sendFCMToUser(
         user.id,
-        '⏱ Göreviniz Devam Ediyor',
-        `${lokasyonAdi || 'Lokasyon'} için göreviniz hâlâ aktif. Lütfen uygulamaya dönün.`,
+        '⏱ Göreviniz Devam Ediyor!',
+        `${lokasyonAdi || 'Lokasyon'} için görev devam ediyor. En kısa sürede bitirmelisiniz. İşiniz bittiğinde buraya tıklayarak tamamlamayı unutmayın!`,
         'gorev_uyari'
       )
     }

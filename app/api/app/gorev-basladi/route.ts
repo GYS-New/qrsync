@@ -40,8 +40,8 @@ export async function POST(req: Request) {
     if (minSureDakika && minSureDakika > 0) {
       zamanlamalar.push({
         beklemeDk: minSureDakika,
-        baslik: '✅ Görevi Tamamlayabilirsiniz!',
-        mesaj: `${lokasyonAdi || 'Lokasyon'} için minimum süre doldu. Lütfen görevi tamamlayın.`,
+        baslik: '✅ Görevinizi Tamamlayabilirsiniz!',
+        mesaj: `${lokasyonAdi || 'Lokasyon'} için minimum süre doldu. Buraya tıklayarak tamamlamayı unutmayın!`,
         kanal: 'gorev_tamamla',
       })
     }
@@ -50,8 +50,8 @@ export async function POST(req: Request) {
     if (maxSureDakika && maxSureDakika > 2) {
       zamanlamalar.push({
         beklemeDk: maxSureDakika - 2,
-        baslik: '🚨 Görevi Hemen Tamamlayın!',
-        mesaj: `${lokasyonAdi || 'Lokasyon'} için maksimum süreye 2 dakika kaldı!`,
+        baslik: '🚨 Göreviniz Devam Ediyor!',
+        mesaj: `${lokasyonAdi || 'Lokasyon'} için görev devam ediyor. En kısa sürede bitirmelisiniz. Buraya tıklayarak tamamlamayı unutmayın!`,
         kanal: 'gorev_uyari',
       })
     }
@@ -64,8 +64,8 @@ export async function POST(req: Request) {
       if (maxKontrol && minKontrol) {
         zamanlamalar.push({
           beklemeDk: dk,
-          baslik: '⏱ Göreviniz Devam Ediyor',
-          mesaj: `${lokasyonAdi || 'Lokasyon'} için göreviniz hâlâ aktif. Lütfen tamamlayın.`,
+          baslik: '⏱ Göreviniz Devam Ediyor!',
+          mesaj: `${lokasyonAdi || 'Lokasyon'} için görev devam ediyor. En kısa sürede bitirmelisiniz. Buraya tıklayarak tamamlamayı unutmayın!`,
           kanal: 'gorev_uyari',
         })
       }
