@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 // ── GET: Firmanın tüm kurallarını listele ────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -21,18 +22,17 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = createAdminClient()
-  let q = admin
-    .from('gorev_kurallari')
-    .select('*')
-    .eq('firma_id', firmaId)
-    .order('kayit_tarihi', { ascending: false })
-    .limit(2000)
 
-  if (projeId) q = (q as any).eq('proje_id', projeId)
+  const data = await fetchAll(() => {
+    let q = admin
+      .from('gorev_kurallari')
+      .select('*')
+      .eq('firma_id', firmaId)
+      .order('kayit_tarihi', { ascending: false })
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    return q
+  })
 
-  const { data, error } = await q
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
 
