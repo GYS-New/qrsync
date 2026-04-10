@@ -40,6 +40,7 @@ const NUM_DEFAULTS: Record<string, number> = {
   gorev_suresi_hedef_orani: 10,
   ardisik_baslatma_suresi_dk: 0,
   personel_takip_bildirim_dk: 0,
+  acik_bekleme_saat: 8, bekleme_gecmis_saat: 12,
   arsiv_mesai_saat: 24, arsiv_musteri_saat: 24, arsiv_spesifik_saat: 48, arsiv_frekansiyel_saat: 24,
 }
 const BOOL_DEFAULTS: Record<string, boolean> = {
@@ -408,6 +409,43 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
           label="Personel Atama"
           desc="Pasif yapılırsa frekansiyel görev kuralı oluştururken personel atama alanı ve zorunluluğu kaldırılır."
         />
+      </div>
+
+      {/* Durum Geçiş Süreleri */}
+      <div style={{ fontSize: 13, fontWeight: 700, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Durum Geçiş Süreleri</div>
+      <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 20px', marginBottom: 28 }}>
+        <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.6, marginBottom: 16 }}>
+          Frekansiyel görevlerin otomatik durum geçiş süreleri. Görev aktif olduktan sonra belirtilen süreler sonunda durum otomatik değişir.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ background: T.grayLight, borderRadius: 8, padding: '14px 16px' }}>
+            <label style={{ fontSize: 14, fontWeight: 700, color: T.text, display: 'block', marginBottom: 4 }}>Açık → Beklemede</label>
+            <div style={{ fontSize: 12, color: T.textSoft, marginBottom: 10 }}>Görev aktif olduktan kaç saat sonra BEKLEMEDE durumuna geçsin?</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="number" min={1} max={48} value={efektif.acik_bekleme_saat as number}
+                onChange={e => setEfektif(prev => ({ ...prev, acik_bekleme_saat: Math.max(1, Math.min(48, Number(e.target.value) || 8)) }))}
+                style={{ ...inpStyle, width: 80 }} />
+              <span style={{ fontSize: 14, color: T.textSoft, fontWeight: 600 }}>saat</span>
+              <SaveBtn id="acik_bekleme_saat" onClick={() => handleSave('acik_bekleme_saat', efektif.acik_bekleme_saat)} />
+            </div>
+            <OverrideBadge ayarKey="acik_bekleme_saat" />
+          </div>
+          <div style={{ background: T.grayLight, borderRadius: 8, padding: '14px 16px' }}>
+            <label style={{ fontSize: 14, fontWeight: 700, color: T.text, display: 'block', marginBottom: 4 }}>Beklemede → Zamanı Geçmiş</label>
+            <div style={{ fontSize: 12, color: T.textSoft, marginBottom: 10 }}>BEKLEMEDE'ye geçtikten kaç saat sonra ZAMANI GEÇMİŞ olsun?</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="number" min={1} max={48} value={efektif.bekleme_gecmis_saat as number}
+                onChange={e => setEfektif(prev => ({ ...prev, bekleme_gecmis_saat: Math.max(1, Math.min(48, Number(e.target.value) || 12)) }))}
+                style={{ ...inpStyle, width: 80 }} />
+              <span style={{ fontSize: 14, color: T.textSoft, fontWeight: 600 }}>saat</span>
+              <SaveBtn id="bekleme_gecmis_saat" onClick={() => handleSave('bekleme_gecmis_saat', efektif.bekleme_gecmis_saat)} />
+            </div>
+            <OverrideBadge ayarKey="bekleme_gecmis_saat" />
+          </div>
+        </div>
+        <div style={{ marginTop: 12, padding: '10px 14px', background: '#eff6ff', borderRadius: 8, fontSize: 12.5, color: '#1e40af', lineHeight: 1.6 }}>
+          <strong>Toplam ömür:</strong> Bir görev aktif olduktan sonra en fazla <strong>{(efektif.acik_bekleme_saat as number) + (efektif.bekleme_gecmis_saat as number)} saat</strong> ({saatLabel((efektif.acik_bekleme_saat as number) + (efektif.bekleme_gecmis_saat as number))}) içinde ZAMANI GEÇMİŞ durumuna geçer.
+        </div>
       </div>
 
       {/* ═══ ARŞİV ═══ */}
