@@ -32,6 +32,7 @@ interface Props {
   readonly: boolean
   projeId?: string | null
   showTumGorevler?: boolean  // false yapılırsa "Tüm Görevler" linki gizlenir
+  yetkiliLokIds?: string[] | null
 }
 
 type BrowseFilter = 'ACIK' | 'IPTAL' | 'KAPALI' | 'TARIHI_GECMIS'
@@ -154,7 +155,7 @@ function LiveHeader({
   )
 }
 
-export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, readonly, projeId, showTumGorevler = true }: Props) {
+export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, readonly, projeId, showTumGorevler = true, yetkiliLokIds }: Props) {
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -327,6 +328,7 @@ useEffect(() => {
     // TA için "SILINDI" listeden kaldırılır
     if (isTA) q = q.neq('durum', 'SILINDI')
     if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+    if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
 
     const { data } = await q
 
@@ -367,18 +369,20 @@ useEffect(() => {
       .limit(100)
 
     if (projeId) liveQ = (liveQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+    if (yetkiliLokIds) liveQ = liveQ.in('lokasyon_id', yetkiliLokIds)
 
     const res = await liveQ
 
     if (res.error) {
       // durum_degisim_tarihi kolonu yoksa olusturma_tarihi ile fallback
-      const fallbackQ = supabase
+      let fallbackQ = supabase
         .from('canli_gorevler')
         .select(liveSelect)
         .eq('firma_id', firmaId)
         .not('durum', 'in', '(HAZIR,ACIK)')
         .order('olusturma_tarihi', { ascending: false })
         .limit(100)
+      if (yetkiliLokIds) fallbackQ = fallbackQ.in('lokasyon_id', yetkiliLokIds)
 
       const res2 = projeId
         ? await (fallbackQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)

@@ -3,6 +3,7 @@ import Topbar from '@/components/layout/Topbar'
 import CanliIslemlerClient from '@/components/canli/CanliIslemlerClient'
 import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,9 +29,13 @@ export default async function UserCanliIslemler() {
   ])
   if (!canliYetki.gorebilir) redirect('/u/dashboard')
 
+  // Yetkili lokasyon kısıtlaması
+  const yetkiliLokIds = firmaId ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
+
   let lokQ = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id')
     .eq('firma_id', firmaId).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+  if (yetkiliLokIds) lokQ = lokQ.in('id', yetkiliLokIds)
 
   let kulQ2 = supabase.from('users').select('id,isim_soyisim,profil_foto').eq('firma_id', firmaId).eq('aktif', true)
   if (projeId) kulQ2 = (kulQ2 as any).eq('proje_id', projeId)
@@ -40,6 +45,7 @@ export default async function UserCanliIslemler() {
     .select('*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)')
     .eq('firma_id', firmaId).order('olusturma_tarihi', { ascending: false }).limit(50)
   if (projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
+  if (yetkiliLokIds) gorevQ = gorevQ.in('lokasyon_id', yetkiliLokIds)
 
   const [{ data: lokasyonlar }, { data: canliGorevler }] = await Promise.all([lokQ, gorevQ])
 
@@ -57,6 +63,7 @@ export default async function UserCanliIslemler() {
         projeId={projeId ?? null}
         readonly={readonly}
         showTumGorevler={tumGorevlerYetki.gorebilir}
+        yetkiliLokIds={yetkiliLokIds}
       />
     </div>
   )
