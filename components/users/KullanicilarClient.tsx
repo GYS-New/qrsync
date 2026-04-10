@@ -524,16 +524,12 @@ export default function KullanicilarClient({
                       <RowActionButton variant={u.aktif ? 'warning' : 'success'} onClick={() => toggleAktif(u)}>
                         {u.aktif ? 'Pasif Yap' : 'Aktif Yap'}
                       </RowActionButton>
-                      {(isSA || isTA) && (
-                        <>
-                          {yetki.duzenleyebilir && <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '', cinsiyet: (u as any).cinsiyet ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>}
-                          <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
-                          {deviceTokenMap[u.id] && (
-                            <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>
-                          )}
-                          {canDelete && yetki.silebilir && <RowActionButton variant="danger" onClick={() => deleteUser(u)}>Sil</RowActionButton>}
-                        </>
+                      {yetki.duzenleyebilir && <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '', cinsiyet: (u as any).cinsiyet ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>}
+                      <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
+                      {deviceTokenMap[u.id] && (
+                        <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>
                       )}
+                      {canDelete && yetki.silebilir && <RowActionButton variant="danger" onClick={() => deleteUser(u)}>Sil</RowActionButton>}
                     </div>
                   </td>
                 )}

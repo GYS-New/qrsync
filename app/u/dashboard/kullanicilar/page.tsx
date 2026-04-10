@@ -27,7 +27,7 @@ export default async function UKullanicilarPage() {
 
   let users: any[] = []
   if (yetkiliUstLokIds) {
-    // Sadece yetkili üst lokasyonlara atanmış U/M kullanıcılarını getir
+    // Yetkili üst lokasyonlara atanmış TÜM kullanıcıları getir
     const admin = createAdminClient()
     const { data: yetkiliKayitlar } = await admin
       .from('kullanici_lokasyon_yetkileri')
@@ -40,7 +40,6 @@ export default async function UKullanicilarPage() {
         .select('*')
         .eq('firma_id', firmaId)
         .in('id', yetkiliUserIds)
-        .in('rol', ['tenant_user', 'musteri'])
         .order('isim_soyisim')
       users = data ?? []
     }
