@@ -10,8 +10,9 @@ function fmt(v: string | null | undefined) {
   if (!v) return '—'
   const d = new Date(v)
   if (isNaN(d.getTime())) return String(v)
+  const trt = new Date(d.getTime() + 3 * 60 * 60 * 1000)
   const p = (n: number) => String(n).padStart(2, '0')
-  return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return `${p(trt.getUTCDate())}.${p(trt.getUTCMonth()+1)}.${trt.getUTCFullYear()} ${p(trt.getUTCHours())}:${p(trt.getUTCMinutes())}`
 }
 
 function fmtSure(sn: number | null | undefined) {
