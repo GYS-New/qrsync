@@ -38,13 +38,14 @@ export async function POST(req: Request) {
   const isTA = me.rol === 'tenant_admin'
 
   const isU = me.rol === 'tenant_user'
-  if (!isSA && !isTA && !isU) {
+  const isM = me.rol === 'musteri'
+  if (!isSA && !isTA && !isU && !isM) {
     return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
   }
   if (isTA && !['tenant_user', 'musteri'].includes(rol)) {
     return NextResponse.json({ error: 'Firma admini sadece kullanıcı ve müşteri oluşturabilir' }, { status: 403 })
   }
-  if (isU && rol !== 'tenant_user') {
+  if ((isU || isM) && rol !== 'tenant_user') {
     return NextResponse.json({ error: 'Sadece kullanıcı oluşturabilirsiniz' }, { status: 403 })
   }
 
