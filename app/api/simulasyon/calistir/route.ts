@@ -182,24 +182,69 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
   const tamamlananSayi = tumGorevler.filter((g: any) =>
     ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum)
   ).length
+
+  // AÇIK ve İŞLEMDE görevler (SİM'in tamamlayabileceği)
+  const acikGorevler = tumGorevler.filter((g: any) => g.durum === 'ACIK')
+  const islemdeGorevler = tumGorevler.filter((g: any) => g.durum === 'ISLEMDE' && g.simule_tamamlandi === true)
+
+  // Vardiya bazlı hedef: sadece şu an AÇIK olan görevlerin ait olduğu vardiyayı hesapla
+  // Aktif görevlerin en erken aktif_olma_tarihi = bu vardiya başlangıcı
+  const acikVeIslemde = [...acikGorevler, ...islemdeGorevler]
+  if (acikVeIslemde.length === 0 && tamamlananSayi > 0) {
+    return { tamamlanan: 0, iptal: 0, mesaj: 'Tamamlanacak AÇIK görev yok' }
+  }
+
+  // Bu vardiya grubundaki görevler: aynı aktif_olma_tarihi olan görevler
+  // Her vardiya farklı aktif_olma_tarihi'ne sahip (00:05, 08:00, 16:00)
+  const vardiyaGruplari = new Map<string, any[]>()
+  for (const g of tumGorevler) {
+    const key = (g as any).aktif_olma_tarihi
+    if (!vardiyaGruplari.has(key)) vardiyaGruplari.set(key, [])
+    vardiyaGruplari.get(key)!.push(g)
+  }
+
+  // Aktif vardiya: AÇIK görevleri olan vardiyalar
+  let vardiyaGorevSayisi = 0
+  let vardiyaTamamlanan = 0
+  let vardiyaBaslangic: number | null = null
+  for (const [key, grp] of vardiyaGruplari) {
+    const acikVar = grp.some((g: any) => g.durum === 'ACIK' || (g.durum === 'ISLEMDE' && g.simule_tamamlandi))
+    if (acikVar) {
+      vardiyaGorevSayisi += grp.length
+      vardiyaTamamlanan += grp.filter((g: any) =>
+        ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum)
+      ).length
+      const t = new Date(key).getTime()
+      if (!vardiyaBaslangic || t < vardiyaBaslangic) vardiyaBaslangic = t
+    }
+  }
+
+  if (vardiyaGorevSayisi === 0) vardiyaGorevSayisi = toplamGorev
+  if (vardiyaBaslangic === null) vardiyaBaslangic = now
+
+  const vardiyaHedefMax = Math.ceil((hedef_oran / 100) * vardiyaGorevSayisi)
   const hedefMax = Math.ceil((hedef_oran / 100) * toplamGorev)
+
+  if (vardiyaTamamlanan >= vardiyaHedefMax) {
+    return { tamamlanan: 0, iptal: 0, mesaj: `Vardiya hedefe ulaştı: ${vardiyaTamamlanan}/${vardiyaHedefMax}` }
+  }
 
   if (tamamlananSayi >= hedefMax) {
     return { tamamlanan: 0, iptal: 0, mesaj: `Hedef zaten sağlandı: ${tamamlananSayi}/${hedefMax}` }
   }
 
-  const acikGorevler = tumGorevler.filter((g: any) => g.durum === 'ACIK')
-  const islemdeGorevler = tumGorevler.filter((g: any) => g.durum === 'ISLEMDE' && g.simule_tamamlandi === true)
-
-  // ── Doğal akış: dakika başına görev oranı ─────────────────────────────
-  // Toplam görev vardiya süresine yayılmalı: her cron'da max 1-2 işlem
-  const gorevPerDk = hedefMax / vardiyaDk
+  // ── Doğal akış: vardiya kalan süresine göre dakika başına görev oranı ──
+  // Kalan görev / kalan dakika — vardiya sonuna kadar tüm görevler tamamlanmalı
+  const kalanHedef = vardiyaHedefMax - vardiyaTamamlanan
+  const gecenDk = Math.max(1, Math.round((now - vardiyaBaslangic) / 60000))
+  const kalanDk = Math.max(1, vardiyaDk - gecenDk)
+  const gorevPerDk = kalanHedef / kalanDk
   const buCrondaIslem = Math.random() < gorevPerDk ? 1 : 0
-  const ekIslem = Math.random() < 0.1 ? 1 : 0
+  const ekIslem = Math.random() < 0.15 ? 1 : 0  // %15'e çıkarıldı — bitmeme riskini azalt
   const maxIslem = buCrondaIslem + ekIslem
 
   if (maxIslem <= 0) {
-    return { tamamlanan: 0, baslatilan: 0, iptal: 0, mesaj: 'Bu cron turunda sıra gelmedi', toplam: toplamGorev, hedef_max: hedefMax, mevcut_tamamlanan: tamamlananSayi }
+    return { tamamlanan: 0, baslatilan: 0, iptal: 0, mesaj: 'Bu cron turunda sıra gelmedi', toplam: toplamGorev, hedef_max: hedefMax, vardiya_hedef: vardiyaHedefMax, vardiya_tamamlanan: vardiyaTamamlanan, kalan_dk: kalanDk, gorev_per_dk: gorevPerDk }
   }
 
   let tamamlananAdet = 0
