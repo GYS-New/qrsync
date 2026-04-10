@@ -269,12 +269,15 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
 
   const [{ data: aktifGorevler }, { data: arsivGorevler }] = await Promise.all([qAktif.limit(10000), qArsiv.limit(10000)])
 
+  console.log('[genel-rapor] aktif:', (aktifGorevler ?? []).length, 'arsiv:', (arsivGorevler ?? []).length)
+
   // Birleştir, çakışan id varsa aktif tablosu öncelikli
   const arsivMap = new Map((arsivGorevler ?? []).map((g: any) => [g.id, g]))
   for (const g of (aktifGorevler ?? [])) arsivMap.set((g as any).id, g)
   const tumGorevler = Array.from(arsivMap.values()).filter((g: any) =>
     withinRange(g.aktif_olma_tarihi, filters.raporBaslangic, filters.raporBitis)
   )
+  console.log('[genel-rapor] birlesik:', arsivMap.size, 'withinRange:', tumGorevler.length)
 
   // 4. Kullanıcı isimleri + proje personel ID seti
   const userIds = Array.from(new Set(tumGorevler.flatMap((g: any) =>
