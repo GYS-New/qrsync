@@ -86,18 +86,22 @@ export async function POST(req: Request) {
 
     // ── QR/NFC TAMAMLAMA ZORUNLULUĞU (SİM bypass'tan önce çalışmalı) ──
     {
-      const { data: gorevLokBilgi } = await admin
+      console.log('[gorev-tamamla] QR/NFC kontrol başlıyor', { gorevId, gorevTipi, scanToken: scanToken ?? 'YOK' })
+      const { data: gorevLokBilgi, error: glErr } = await admin
         .from(gorevTipi)
         .select('lokasyon_id')
         .eq('id', gorevId)
         .single()
+      console.log('[gorev-tamamla] gorevLokBilgi:', { lokasyon_id: gorevLokBilgi?.lokasyon_id, err: glErr?.message })
       if (gorevLokBilgi?.lokasyon_id) {
         const { data: lokQr } = await admin
           .from('lokasyonlar')
           .select('tamamlama_qr_zorunlu, sureli_gorev_aktif, qr_veri, nfc_token')
           .eq('id', gorevLokBilgi.lokasyon_id)
           .single()
+        console.log('[gorev-tamamla] lokQr:', { tamamlama_qr_zorunlu: lokQr?.tamamlama_qr_zorunlu, sureli_gorev_aktif: lokQr?.sureli_gorev_aktif })
         if (lokQr?.tamamlama_qr_zorunlu && lokQr?.sureli_gorev_aktif) {
+          console.log('[gorev-tamamla] QR/NFC ZORUNLU — scanToken:', scanToken ?? 'YOK')
           if (!scanToken) {
             return NextResponse.json(
               { ok: false, error: 'Bu lokasyonda tamamlama için QR veya NFC okutmanız gerekiyor.', code: 'QR_NFC_ZORUNLU' },
