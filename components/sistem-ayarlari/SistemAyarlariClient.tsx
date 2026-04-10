@@ -1034,44 +1034,46 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
                   {gruplar.map((g: any) => {
                     const secili = !!seciliGruplar[g.id]
                     return (
-                      <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: secili ? '#fef2f2' : '#fff', border: `1.5px solid ${secili ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 10 }}>
-                        <input type="checkbox" checked={secili} onChange={() => grupToggle(g.id)} style={{ width: 17, height: 17 }} />
-                        <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: '#111827' }}>
-                          {g.ad}
-                          <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>({(g.lokasyonIds ?? []).length} lokasyon)</span>
-                        </span>
+                      <div key={g.id} style={{ padding: '12px 16px', background: secili ? '#fef2f2' : '#fff', border: `1.5px solid ${secili ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <input type="checkbox" checked={secili} onChange={() => grupToggle(g.id)} style={{ width: 18, height: 18 }} />
+                          <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#111827' }}>
+                            {g.ad}
+                            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400, marginLeft: 8 }}>({(g.lokasyonIds ?? []).length} lokasyon)</span>
+                          </span>
+                          {secili && (
+                            <>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Hedef:</span>
+                                <input type="number" min={1} max={100} value={seciliGruplar[g.id]?.hedef_oran ?? 100}
+                                  onChange={e => grupAyarDegistir(g.id, 'hedef_oran', Number(e.target.value))}
+                                  style={{ ...inp, width: 60, height: 32, textAlign: 'center', fontSize: 14, fontWeight: 700 }} />
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>%</span>
+                              </label>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Vardiya:</span>
+                                <input type="number" min={1} value={seciliGruplar[g.id]?.vardiya_suresi_saat ?? 8}
+                                  onChange={e => grupAyarDegistir(g.id, 'vardiya_suresi_saat', Number(e.target.value))}
+                                  style={{ ...inp, width: 60, height: 32, textAlign: 'center', fontSize: 14, fontWeight: 700 }} />
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>sa</span>
+                              </label>
+                            </>
+                          )}
+                        </div>
                         {secili && (
-                          <>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <span style={{ fontSize: 11, color: '#6b7280' }}>Hedef:</span>
-                              <input type="number" min={1} max={100} value={seciliGruplar[g.id]?.hedef_oran ?? 100}
-                                onChange={e => grupAyarDegistir(g.id, 'hedef_oran', Number(e.target.value))}
-                                style={{ ...inp, width: 56, height: 30, textAlign: 'center', fontSize: 13 }} />
-                              <span style={{ fontSize: 11, color: '#6b7280' }}>%</span>
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <span style={{ fontSize: 11, color: '#6b7280' }}>Vardiya:</span>
-                              <input type="number" min={1} value={seciliGruplar[g.id]?.vardiya_suresi_saat ?? 8}
-                                onChange={e => grupAyarDegistir(g.id, 'vardiya_suresi_saat', Number(e.target.value))}
-                                style={{ ...inp, width: 56, height: 30, textAlign: 'center', fontSize: 13 }} />
-                              <span style={{ fontSize: 11, color: '#6b7280' }}>sa</span>
-                            </label>
-                          </>
-                        )}
-                        {secili && (
-                          <div style={{ display: 'flex', gap: 8, marginTop: 6, paddingLeft: 28, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: 14, marginTop: 10, paddingLeft: 30, flexWrap: 'wrap' }}>
                             {[
                               { key: 'iptal_orani', label: 'İptal', def: 1, max: 10 },
                               { key: 'gec_50_orani', label: 'Geç +%50', def: 3, max: 20 },
                               { key: 'gec_100_orani', label: 'Geç +%100', def: 2, max: 20 },
                               { key: 'erken_50_orani', label: 'Erken -%50', def: 2, max: 20 },
                             ].map(s => (
-                              <label key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10.5, color: '#6b7280' }}>
+                              <label key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, color: '#374151' }}>
                                 {s.label}:
                                 <input type="number" min={0} max={s.max} value={(seciliGruplar[g.id] as any)?.[s.key] ?? s.def}
                                   onChange={e => grupAyarDegistir(g.id, s.key, Number(e.target.value))}
-                                  style={{ ...inp, width: 40, height: 24, textAlign: 'center', fontSize: 11 }} />
-                                <span>%</span>
+                                  style={{ ...inp, width: 52, height: 30, textAlign: 'center', fontSize: 13, fontWeight: 700 }} />
+                                <span style={{ fontSize: 13, color: '#6b7280' }}>%</span>
                               </label>
                             ))}
                           </div>
