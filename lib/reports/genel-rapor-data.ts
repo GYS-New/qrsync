@@ -267,7 +267,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     qArsiv = qArsiv.lte('aktif_olma_tarihi', bitisUTC)
   }
 
-  const [{ data: aktifGorevler }, { data: arsivGorevler }] = await Promise.all([qAktif, qArsiv])
+  const [{ data: aktifGorevler }, { data: arsivGorevler }] = await Promise.all([qAktif.limit(10000), qArsiv.limit(10000)])
 
   // Birleştir, çakışan id varsa aktif tablosu öncelikli
   const arsivMap = new Map((arsivGorevler ?? []).map((g: any) => [g.id, g]))

@@ -13,7 +13,7 @@ async function fetchCanliGorevlerMerged(admin: any, selectCols: string, filters:
   let qArsiv  = admin.from('canli_gorevler_arsiv').select(selectCols)
   if (filters.firmaId) { qAktif = qAktif.eq('firma_id', filters.firmaId); qArsiv = qArsiv.eq('firma_id', filters.firmaId) }
   if (filters.projeId) { qAktif = (qAktif as any).eq('proje_id', filters.projeId); qArsiv = (qArsiv as any).eq('proje_id', filters.projeId) }
-  const [{ data: aktif }, { data: arsiv }] = await Promise.all([qAktif, qArsiv])
+  const [{ data: aktif }, { data: arsiv }] = await Promise.all([qAktif.limit(10000), qArsiv.limit(10000)])
   const map = new Map<string, any>()
   for (const r of (arsiv  ?? [])) map.set(r.id, r)
   for (const r of (aktif  ?? [])) map.set(r.id, r)  // aktif üzerine yazar
@@ -436,7 +436,7 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
       qArsivGrp  = (qArsivGrp as any).in('lokasyon_id', activeLocIds)
     }
 
-    const [{ data: aktifGrp }, { data: arsivGrp }] = await Promise.all([qAktifGrp, qArsivGrp])
+    const [{ data: aktifGrp }, { data: arsivGrp }] = await Promise.all([qAktifGrp.limit(10000), qArsivGrp.limit(10000)])
     const gorevler = [...(arsivGrp ?? []), ...(aktifGrp ?? [])]
     const locGorevMap: Record<string, { toplam: number; tamamlanan: number }> = {}
     for (const g of gorevler ?? []) {

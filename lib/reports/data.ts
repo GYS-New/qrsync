@@ -160,8 +160,8 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     const liveSelect = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id'
 
     // Aktif tablo + arşiv tablosunu paralel çek, birleştir
-    let qAktif = admin.from('canli_gorevler').select(liveSelect).order('olusturma_tarihi', { ascending: false })
-    let qArsiv = admin.from('canli_gorevler_arsiv').select(liveSelect).order('olusturma_tarihi', { ascending: false })
+    let qAktif = admin.from('canli_gorevler').select(liveSelect).order('olusturma_tarihi', { ascending: false }).limit(10000)
+    let qArsiv = admin.from('canli_gorevler_arsiv').select(liveSelect).order('olusturma_tarihi', { ascending: false }).limit(10000)
     if (filters.firmaId) { qAktif = qAktif.eq('firma_id', filters.firmaId); qArsiv = qArsiv.eq('firma_id', filters.firmaId) }
     if (filters.projeId) { qAktif = (qAktif as any).eq('proje_id', filters.projeId); qArsiv = (qArsiv as any).eq('proje_id', filters.projeId) }
 
@@ -307,7 +307,7 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     }
 
     // Görev istatistikleri
-    let gorevQ = admin.from('canli_gorevler').select('lokasyon_id,durum')
+    let gorevQ = admin.from('canli_gorevler').select('lokasyon_id,durum').limit(10000)
     if (lgFirmaId) gorevQ = gorevQ.eq('firma_id', lgFirmaId)
     if (filters.dateFrom) gorevQ = gorevQ.gte('aktif_olma_tarihi', new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString())
     if (filters.dateTo) gorevQ = gorevQ.lte('aktif_olma_tarihi', new Date(filters.dateTo + 'T23:59:59+03:00').toISOString())

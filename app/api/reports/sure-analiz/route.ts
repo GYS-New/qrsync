@@ -292,8 +292,8 @@ export async function GET(req: Request) {
     const SEL_SPEC  = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'
 
     // ── Frekansiyel: aktif + arşiv ──────────────────────────────────────────
-    let qFreqA = admin.from('canli_gorevler').select(SEL_FREQ).eq('firma_id', firmaId)
-    let qFreqB = admin.from('canli_gorevler_arsiv').select(SEL_FREQ).eq('firma_id', firmaId)
+    let qFreqA = admin.from('canli_gorevler').select(SEL_FREQ).eq('firma_id', firmaId).limit(10000)
+    let qFreqB = admin.from('canli_gorevler_arsiv').select(SEL_FREQ).eq('firma_id', firmaId).limit(10000)
     if (projeId) { qFreqA = (qFreqA as any).eq('proje_id', projeId); qFreqB = (qFreqB as any).eq('proje_id', projeId) }
 
     const [{ data: freqA }, { data: freqB }] = await Promise.all([qFreqA, qFreqB])

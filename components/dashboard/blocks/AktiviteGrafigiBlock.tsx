@@ -65,7 +65,7 @@ export default function AktiviteGrafigiBlock({
     if (projeId) qArsiv = (qArsiv as any).eq("proje_id", projeId)
     if (yetkiliLokIds?.length) qArsiv = (qArsiv as any).in("lokasyon_id", yetkiliLokIds)
 
-    const [{ data: canliRows }, { data: arsivRows }] = await Promise.all([qCanli, qArsiv])
+    const [{ data: canliRows }, { data: arsivRows }] = await Promise.all([qCanli.limit(10000), qArsiv.limit(10000)])
     const rows = [...(canliRows ?? []), ...(arsivRows ?? [])]
 
     const grouped: Record<string, number> = {}

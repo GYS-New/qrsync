@@ -77,7 +77,8 @@ export async function GET(req: Request) {
         lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
       `).eq('firma_id', firmaId).eq('atanan_kullanici_id', userId)
         .or(`durum.in.(ACIK,ISLEMDE,BEKLEMEDE),and(durum.in.(TAMAMLANDI,ZAMANINDA_TAMAMLANDI),tamamlanma_tarihi.gt.${sinir24s})`)
-        .order('aktif_olma_tarihi', { ascending: false }),
+        .order('aktif_olma_tarihi', { ascending: false })
+        .limit(10000),
     ])
 
     const gorevler      = gorevlerRes.data ?? []

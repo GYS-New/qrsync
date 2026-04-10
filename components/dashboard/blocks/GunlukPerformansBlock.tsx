@@ -36,7 +36,7 @@ export default async function GunlukPerformansBlock({
   if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
   if (yetkiliLokIds?.length) q2 = (q2 as any).in('lokasyon_id', yetkiliLokIds)
 
-  const [{ data: d1 }, { data: d2 }] = await Promise.all([q1, q2])
+  const [{ data: d1 }, { data: d2 }] = await Promise.all([q1.limit(10000), q2.limit(10000)])
 
   const counts: Record<string, number> = {}
   ;[...(d1 ?? []), ...(d2 ?? [])].forEach((r: any) => {

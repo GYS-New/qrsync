@@ -210,6 +210,7 @@ export async function buildGeneralTemplateReport(filters: GeneralTemplateFilters
     .gte('olusturma_tarihi', dayStart)
     .lte('olusturma_tarihi', dayEnd)
   if (activeFirmaId) liveTaskQuery = liveTaskQuery.eq('firma_id', activeFirmaId)
+  liveTaskQuery = liveTaskQuery.limit(10000)
 
   let groupsQuery = admin
     .from('lokasyon_gruplari')

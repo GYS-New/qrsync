@@ -69,8 +69,8 @@ export async function GET(req: NextRequest) {
 
   // ── 4. Görev süre verileri ────────────────────────────────────────────
   const SEL_SURE = 'id,lokasyon_id,tamamlanma_suresi_saniye'
-  let sureLiveQ = admin.from('canli_gorevler').select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI')
-  let sureArsivQ = admin.from('canli_gorevler_arsiv').select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI')
+  let sureLiveQ = admin.from('canli_gorevler').select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI').limit(10000)
+  let sureArsivQ = admin.from('canli_gorevler_arsiv').select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI').limit(10000)
   if (projeId) { sureLiveQ = (sureLiveQ as any).eq('proje_id', projeId); sureArsivQ = (sureArsivQ as any).eq('proje_id', projeId) }
   if (baslangic) { const v = new Date(baslangic + 'T00:00:00+03:00').toISOString(); sureLiveQ = sureLiveQ.gte('aktif_olma_tarihi', v); sureArsivQ = sureArsivQ.gte('aktif_olma_tarihi', v) }
   if (bitis) { const v = new Date(bitis + 'T23:59:59+03:00').toISOString(); sureLiveQ = sureLiveQ.lte('aktif_olma_tarihi', v); sureArsivQ = sureArsivQ.lte('aktif_olma_tarihi', v) }

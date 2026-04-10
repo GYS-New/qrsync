@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
     let qA = admin.from('canli_gorevler').select(SEL).eq('firma_id', firmaId)
     let qB = admin.from('canli_gorevler_arsiv').select(SEL).eq('firma_id', firmaId)
     if (projeId) { qA = (qA as any).eq('proje_id', projeId); qB = (qB as any).eq('proje_id', projeId) }
-    const [{ data: a }, { data: b }] = await Promise.all([qA, qB])
+    const [{ data: a }, { data: b }] = await Promise.all([qA.limit(10000), qB.limit(10000)])
     const m = new Map<string, any>()
     for (const r of (b ?? [])) m.set(r.id, r)
     for (const r of (a ?? [])) m.set(r.id, r)
