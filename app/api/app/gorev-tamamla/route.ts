@@ -85,9 +85,9 @@ export async function POST(req: Request) {
     }
 
     // ── QR/NFC TAMAMLAMA ZORUNLULUĞU (SİM bypass'tan önce çalışmalı) ──
-    if (gorevTipi === 'canli_gorevler') {
+    {
       const { data: gorevLokBilgi } = await admin
-        .from('canli_gorevler')
+        .from(gorevTipi)
         .select('lokasyon_id')
         .eq('id', gorevId)
         .single()
