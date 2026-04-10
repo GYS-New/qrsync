@@ -3,6 +3,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import LokasyonGruplariClient from '@/components/lokasyon-grup/LokasyonGruplariClient'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
+import { getLokasyonYetki, getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,15 +26,21 @@ export default async function ULokasyonGruplariPage() {
 
   if (!firmaId) redirect('/u/dashboard')
 
+  // Yetkili lokasyon kısıtlaması
+  const yetkiliUstLokIds = await getLokasyonYetki(supabase)
+  const yetkiliLokIds = await getYetkiliLokasyonIds(supabase, firmaId, projeId)
+
   let groupQ = admin.from('lokasyon_gruplari')
     .select('id,firma_id,ad,aciklama,aktif,kayit_tarihi,guncelleme_tarihi,kayit_yapan_id,ust_lokasyon_id')
     .eq('firma_id', firmaId).order('ad')
   if (projeId) groupQ = (groupQ as any).eq('proje_id', projeId)
+  if (yetkiliUstLokIds) groupQ = groupQ.in('ust_lokasyon_id', yetkiliUstLokIds)
 
   let locQ = admin.from('lokasyonlar')
     .select('id,firma_id,parent_id,tanim,aktif,kayit_tarihi')
     .eq('firma_id', firmaId).eq('aktif', true).order('kayit_tarihi', { ascending: true })
   if (projeId) locQ = (locQ as any).eq('proje_id', projeId)
+  if (yetkiliLokIds) locQ = locQ.in('id', yetkiliLokIds)
 
   const [groupsRes, membersRes, locationsRes] = await Promise.all([
     groupQ,
