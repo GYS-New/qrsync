@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 import Topbar from '@/components/layout/Topbar'
 import TumGorevlerClient from '@/components/canli/TumGorevlerClient'
 import { redirect } from 'next/navigation'
@@ -27,7 +28,7 @@ export default async function TATumGorevlerPage() {
 
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
+  const gorevler = await fetchAll(() =>
     supabase
       .from('canli_gorevler')
       .select(sel)
@@ -35,7 +36,9 @@ export default async function TATumGorevlerPage() {
       .or(`proje_id.eq.${aktifProje.id},proje_id.is.null`)
       .in('durum', ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI'])
       .order('aktif_olma_tarihi', { ascending: false })
-      .limit(2000),
+  )
+
+  const [{ data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
     supabase
       .from('lokasyonlar')
       .select('id,tanim,parent_id,checklist_sablon_id')

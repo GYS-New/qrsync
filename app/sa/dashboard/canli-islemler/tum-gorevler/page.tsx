@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 import Topbar from '@/components/layout/Topbar'
 import TumGorevlerClient from '@/components/canli/TumGorevlerClient'
 import { redirect } from 'next/navigation'
@@ -33,14 +34,16 @@ export default async function SATumGorevlerPage() {
 
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  let gorevQ = supabase
-    .from('canli_gorevler')
-    .select(sel)
-    .eq('firma_id', firmaId)
-    .in('durum', ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI', 'SILINDI'])
-    .order('aktif_olma_tarihi', { ascending: false })
-    .limit(2000)
-  if (projeId) gorevQ = (gorevQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+  const gorevler = await fetchAll(() => {
+    let q = supabase
+      .from('canli_gorevler')
+      .select(sel)
+      .eq('firma_id', firmaId)
+      .in('durum', ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI', 'SILINDI'])
+      .order('aktif_olma_tarihi', { ascending: false })
+    if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+    return q
+  })
 
   let lokQ = supabase
     .from('lokasyonlar')
@@ -50,8 +53,7 @@ export default async function SATumGorevlerPage() {
     .order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
 
-  const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
-    gorevQ,
+  const [{ data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
     lokQ,
     (() => { let q = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true); if (projeId) q = (q as any).eq('proje_id', projeId); return q.order('isim_soyisim') })(),
     getEfektifAyar(firmaId, projeId),
