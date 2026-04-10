@@ -152,6 +152,26 @@ export async function POST(req: Request, { params }: { params: { token: string }
         if (maddeError) throw new Error(maddeError.message)
       }
     }
+    // ── QR/NFC tamamlama zorunluluğu: 2. QR okutma gerekli ──
+    if (context.lokasyon.sureli_gorev_aktif && (context.lokasyon as any).tamamlama_qr_zorunlu) {
+      const confirmToken = body?.confirm_scan_token as string | undefined
+      if (!confirmToken) {
+        return NextResponse.json(
+          { ok: false, error: 'Bu lokasyonda tamamlama için QR veya NFC okutmanız gerekiyor.', code: 'QR_NFC_ZORUNLU' },
+          { status: 403, headers: CORS_HEADERS }
+        )
+      }
+      // Token doğrulama
+      const qrOk = context.lokasyon.qr_veri && confirmToken === context.lokasyon.qr_veri
+      const nfcOk = (context.lokasyon as any).nfc_token && confirmToken === (context.lokasyon as any).nfc_token
+      if (!qrOk && !nfcOk) {
+        return NextResponse.json(
+          { ok: false, error: 'Okutulan QR/NFC kodu bu lokasyonla eşleşmiyor.', code: 'QR_NFC_ESLESMEDI' },
+          { status: 403, headers: CORS_HEADERS }
+        )
+      }
+    }
+
     // Ardışık başlatma kontrolü — görev henüz başlatılmamışsa (ACIK durumda tamamlanıyor)
     if (!task.baslatilma_tarihi) {
       const tablo = task.taskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'

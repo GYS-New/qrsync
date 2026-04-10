@@ -73,9 +73,12 @@ export async function resolveScanContext(opts: {
       firma_id,
       tanim,
       aktif,
+      qr_veri,
+      nfc_token,
       ${tokenColumn},
       checklist_sablon_id,
       sureli_gorev_aktif,
+      tamamlama_qr_zorunlu,
       min_sure_dakika,
       max_sure_dakika,
       firmalar(id, firma_adi, ticari_unvan, aktif, qr_sistemi_aktif, nfc_sistemi_aktif)
