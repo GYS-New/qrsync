@@ -382,12 +382,6 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       const lok = lokMap.get(id) as any
       if (lok?.gunluk_frekans_sayisi) gunlukFrekans += lok.gunluk_frekans_sayisi
     }
-    // Kural sayısı: frekansı > 0 olan lokasyon sayısı (unique görev noktası)
-    let kuralSayisi = 0
-    for (const id of ids) {
-      const lok = lokMap.get(id) as any
-      if (lok?.gunluk_frekans_sayisi > 0) kuralSayisi++
-    }
     const hazirAcik = (tumGorevler as any[]).filter((g: any) =>
       ids.includes(g.lokasyon_id) && (g.durum === 'HAZIR' || g.durum === 'ACIK' || g.durum === 'ISLEMDE')
     ).length
@@ -396,6 +390,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     if (gunlukFrekans === 0 && hedef > 0) {
       gunlukFrekans = gunSayisi > 0 ? Math.round(hedef / gunSayisi) : hedef
     }
+    // Unique görev tanımı sayısı (kural sayısı)
     const taninCounts = new Map<string, number>()
     for (const g of tumGorevler) {
       if (ids.includes((g as any).lokasyon_id)) {
@@ -403,6 +398,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         if (t) taninCounts.set(t, (taninCounts.get(t) ?? 0) + 1)
       }
     }
+    const kuralSayisi = taninCounts.size
     const gorevTanimi = taninCounts.size > 0
       ? Array.from(taninCounts.entries()).sort((a, b) => b[1] - a[1])[0][0] : ''
     const basariOran = hedef > 0 ? Math.round((tamamlanan / hedef) * 100) : 0
@@ -494,7 +490,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         ustLokasyon: '',
         lokasyon: ustLokTanim || altLokTanim || 'Tüm Lokasyonlar',
         gunlukFrekans: lokFrekTop > 0 ? lokFrekTop : Math.round(hedef / gunSayisi),
-        kuralSayisi: lokFrekCount > 0 ? lokFrekCount : gorevLokIds.size,
+        kuralSayisi: new Set(tumGorevler.map((g: any) => g.tanim).filter(Boolean)).size,
         hedef,
         tamamlanan,
         sapma,
