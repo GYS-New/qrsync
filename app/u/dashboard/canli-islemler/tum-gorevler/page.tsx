@@ -5,6 +5,7 @@ import TumGorevlerClient from '@/components/canli/TumGorevlerClient'
 import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,9 @@ export default async function UTumGorevlerPage() {
   // readonly: düzenleme/silme yetkisi yoksa
   const readonly = !yetki.duzenleyebilir && !yetki.silebilir
 
+  // Yetkili lokasyon kısıtlaması
+  const yetkiliLokIds = await getYetkiliLokasyonIds(supabase, firmaId, projeId)
+
   const plus24h = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   const minus7d  = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
@@ -42,6 +46,7 @@ export default async function UTumGorevlerPage() {
         .lte('aktif_olma_tarihi', plus24h)
         .order('aktif_olma_tarihi', { ascending: false })
       if (projeId) q = (q as any).eq('proje_id', projeId)
+      if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
       return q
     }),
     fetchAll(() => {
@@ -51,6 +56,7 @@ export default async function UTumGorevlerPage() {
         .gte('aktif_olma_tarihi', minus7d)
         .order('aktif_olma_tarihi', { ascending: false })
       if (projeId) q = (q as any).eq('proje_id', projeId)
+      if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
       return q
     }),
   ])
@@ -68,6 +74,7 @@ export default async function UTumGorevlerPage() {
     .from('lokasyonlar').select('id,tanim')
     .eq('firma_id', firmaId).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+  if (yetkiliLokIds) lokQ = lokQ.in('id', yetkiliLokIds)
 
   const { data: lokasyonlar } = await lokQ
   let kulQ = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true)

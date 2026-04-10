@@ -4,6 +4,7 @@ import GorevlerClient from '@/components/gorev/GorevlerClient'
 import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,9 @@ export default async function UGorevlerPage() {
 
   const readonly = !yetki.ekleyebilir && !yetki.duzenleyebilir && !yetki.silebilir
 
+  // Yetkili lokasyon kısıtlaması
+  const yetkiliLokIds = firmaId ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
+
   let gorevQ = supabase
     .from('gorevler')
     .select('*,lokasyonlar(id,tanim,parent_id),atanan:users!atanan_kullanici_id(isim_soyisim)')
@@ -35,6 +39,7 @@ export default async function UGorevlerPage() {
     .order('olusturma_tarihi', { ascending: false })
     .limit(500)
   if (projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
+  if (yetkiliLokIds) gorevQ = gorevQ.in('lokasyon_id', yetkiliLokIds)
   const { data: gorevler } = await gorevQ
 
   let lokQ = supabase
@@ -44,6 +49,7 @@ export default async function UGorevlerPage() {
     .eq('aktif', true)
     .order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+  if (yetkiliLokIds) lokQ = lokQ.in('id', yetkiliLokIds)
   const { data: lokasyonlar } = await lokQ
 
   const { data: kullanicilar } = await supabase
