@@ -21,6 +21,7 @@ export default function LokasyonlarClient({
   readonly,
   projeId,
   qrSablonAktif = true,
+  yetkiliLokIds,
 }: {
   base: '/sa' | '/ta' | '/u'
   initialFirmaId?: string | null
@@ -28,6 +29,7 @@ export default function LokasyonlarClient({
   readonly: boolean
   projeId?: string | null
   qrSablonAktif?: boolean
+  yetkiliLokIds?: string[] | null
 }) {
   const supabase = createClient()
   const { toast } = useToast()
@@ -182,6 +184,7 @@ export default function LokasyonlarClient({
       .eq('firma_id', fid)
       .order('kayit_tarihi', { ascending: true })
     if (projeId) lokQuery = (lokQuery as any).eq('proje_id', projeId)
+    if (yetkiliLokIds) lokQuery = lokQuery.in('id', yetkiliLokIds)
     let tplQuery = supabase
       .from('checklist_sablonlari')
       .select('id,baslik,aktif,firma_id')
