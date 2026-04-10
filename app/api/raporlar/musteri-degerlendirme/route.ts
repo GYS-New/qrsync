@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 // ── yetki yardımcısı ──────────────────────────────────────────────────────────
 async function yetkiKontrol(supabase: any) {
@@ -37,6 +38,9 @@ export async function GET(req: NextRequest) {
   if (!firmaId) return NextResponse.json({ ok: true, data: [], yetkiler: { duzenleyebilir: false, silebilir: false } })
   if (me.isTA && p.get('firma_id') && p.get('firma_id') !== me.firma_id)
     return NextResponse.json({ ok: false, error: 'Yetkisiz firma' }, { status: 403 })
+
+  const isUM = me.rol === 'tenant_user' || me.rol === 'musteri'
+  const yetkiliLokIds = isUM ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
 
   // Kullanıcı Grupları Yetkilerini al
   const yetkiler = await sayfaYetkileri(me.isSA ? 'super_admin' : (me.isTA ? 'tenant_admin' : 'tenant_user'), 'musteri-degerlendirme', firmaId)
@@ -93,12 +97,14 @@ export async function GET(req: NextRequest) {
     if (projeId)   qTablo = (qTablo as any).eq('proje_id', projeId)
     if (baslangic) qTablo = (qTablo as any).gte('olusturma_tarihi', baslangic)
     if (bitis)     qTablo = (qTablo as any).lte('olusturma_tarihi', bitis + 'T23:59:59')
+    if (yetkiliLokIds) qTablo = (qTablo as any).in('lokasyon_id', yetkiliLokIds)
 
     let qArsiv = admin.from('musteri_degerlendirmeleri_arsiv').select(selectCols)
       .eq('firma_id', firmaId).order('olusturma_tarihi', { ascending: false })
     if (projeId)   qArsiv = (qArsiv as any).eq('proje_id', projeId)
     if (baslangic) qArsiv = (qArsiv as any).gte('olusturma_tarihi', baslangic)
     if (bitis)     qArsiv = (qArsiv as any).lte('olusturma_tarihi', bitis + 'T23:59:59')
+    if (yetkiliLokIds) qArsiv = (qArsiv as any).in('lokasyon_id', yetkiliLokIds)
 
     const [resTablo, resArsiv] = await Promise.all([qTablo, qArsiv])
     if (resTablo.error) return NextResponse.json({ ok: false, error: resTablo.error.message }, { status: 500 })
@@ -130,6 +136,7 @@ export async function GET(req: NextRequest) {
   if (projeId)   q = (q as any).eq('proje_id', projeId)
   if (baslangic) q = (q as any).gte('olusturma_tarihi', baslangic)
   if (bitis)     q = (q as any).lte('olusturma_tarihi', bitis + 'T23:59:59')
+  if (yetkiliLokIds) q = (q as any).in('lokasyon_id', yetkiliLokIds)
 
   const { data, error } = await q
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })

@@ -4,6 +4,7 @@ import { buildXlsxBuffer } from '@/lib/import-export/xlsx'
 import { getReportDefinition, type ReportKey } from '@/lib/reports/config'
 import { buildReportData } from '@/lib/reports/data'
 import { buildSimplePdf } from '@/lib/reports/pdf'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 function slugify(value: string) {
   return value
@@ -52,11 +53,16 @@ export async function GET(request: Request) {
       .filter((x) => def.columns.some((c) => c.key === x))
 
     const firmaId = isSA ? requestedFirmaId : me.firma_id
+
+    const isUM = me.rol === 'tenant_user' || me.rol === 'musteri'
+    const yetkiliLokIds = isUM && firmaId ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
+
     const data = await buildReportData(def.key, selectedColumns.length ? selectedColumns : def.columns.map((c) => c.key), {
       firmaId,
       projeId,
       dateFrom,
       dateTo,
+      yetkiliLokIds,
     })
 
     const filenameBase = slugify(def.title)

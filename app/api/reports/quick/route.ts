@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { buildQuickReport, type QuickReportType } from '@/lib/reports/quick'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -36,6 +37,9 @@ export async function GET(req: NextRequest) {
     const firmaId = (me.rol === 'tenant_admin' || isTenantViewer) ? me.firma_id ?? null : requestedFirmaId
     const projeId = searchParams.get('projeId') || null
 
+    const isUM = me.rol === 'tenant_user' || me.rol === 'musteri'
+    const yetkiliLokIds = isUM ? await getYetkiliLokasyonIds(supabase, firmaId!, projeId) : null
+
     const payload = await buildQuickReport(type, {
       firmaId,
       projeId,
@@ -46,6 +50,7 @@ export async function GET(req: NextRequest) {
       status: searchParams.get('status'),
       groupId: searchParams.get('groupId'),
       parentLocationId: searchParams.get('parentLocationId'),
+      yetkiliLokIds,
     })
 
     return NextResponse.json(payload)

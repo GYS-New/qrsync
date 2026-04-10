@@ -30,6 +30,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { sayfaGorebilirMi, sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 type MeCeklist = {
   id: string
@@ -98,6 +99,7 @@ async function kayitlarGetir(
   baslangic: string | null,
   bitis: string | null,
   cikti: 'rapor' | 'arsiv' | 'birlesik',
+  yetkiliLokIds: string[] | null = null,
 ): Promise<any[]> {
   // 1. Firmaya ait lokasyonlar
   // Proje seçiliyken yalnızca proje_id = X demek, lokasyon kaydında proje_id NULL/yanlış
@@ -173,7 +175,11 @@ async function kayitlarGetir(
     }
   }
 
-  const lokIds = Object.keys(lokMap)
+  let lokIds = Object.keys(lokMap)
+  if (yetkiliLokIds) {
+    const yetkiliSet = new Set(yetkiliLokIds)
+    lokIds = lokIds.filter(id => yetkiliSet.has(id))
+  }
   if (!lokIds.length) return []
 
   // 2. Şablon başlıkları
@@ -455,7 +461,10 @@ export async function GET(req: NextRequest) {
 
     if (!firmaId) return NextResponse.json({ ok: true, data: [], yetkiler: { duzenleyebilir: false, silebilir: false } })
 
-    const data = await kayitlarGetir(admin, firmaId, projeId, baslangic, bitis, cikti)
+    const isUM = me.isU
+    const yetkiliLokIds = isUM ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
+
+    const data = await kayitlarGetir(admin, firmaId, projeId, baslangic, bitis, cikti, yetkiliLokIds)
     
     // Kullanıcı Grupları Yetkilerini ekle
     const yetkiler = await sayfaYetkileri(me.rol, 'ceklist-raporlari', firmaId ?? undefined)

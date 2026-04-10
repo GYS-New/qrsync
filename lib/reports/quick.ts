@@ -42,6 +42,7 @@ type Filters = {
   status?: string | null
   groupId?: string | null
   parentLocationId?: string | null
+  yetkiliLokIds?: string[] | null
 }
 
 type ChartDatum = Record<string, string | number>
@@ -186,7 +187,10 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
   if (locError) throw new Error(locError.message)
   if (userError) throw new Error(userError.message)
 
-  const locs = locations ?? []
+  const locsRaw = locations ?? []
+  const locs = filters.yetkiliLokIds
+    ? locsRaw.filter((x: any) => filters.yetkiliLokIds!.includes(x.id))
+    : locsRaw
   const userList = users ?? []
   const locMap = new Map<string, any>(locs.map((x: any) => [x.id, x]))
   const userMap = new Map<string, string>(userList.map((x: any) => [x.id, x.isim_soyisim ?? '-']))
@@ -205,7 +209,12 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
       })(),
     ])
     if (manualError) throw new Error(manualError.message)
-    const allTasks = [...liveTasks, ...(manualTasks ?? [])].filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
+    let allTasksRaw = [...liveTasks, ...(manualTasks ?? [])]
+    if (filters.yetkiliLokIds) {
+      const lokSet = new Set(filters.yetkiliLokIds)
+      allTasksRaw = allTasksRaw.filter((x: any) => x.lokasyon_id && lokSet.has(x.lokasyon_id))
+    }
+    const allTasks = allTasksRaw.filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
 
     const parentLocs = locs.filter((x: any) => !x.parent_id)
     const childCountMap: Record<string, number> = {}
@@ -384,6 +393,10 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     const { data: t, error: taskError } = await taskQuery
     if (taskError) throw new Error(taskError.message)
     tasks = t ?? []
+  }
+  if (filters.yetkiliLokIds) {
+    const lokSet = new Set(filters.yetkiliLokIds)
+    tasks = tasks.filter((x: any) => x.lokasyon_id && lokSet.has(x.lokasyon_id))
   }
   const rangedTasks = tasks.filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
 

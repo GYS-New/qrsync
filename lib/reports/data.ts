@@ -7,6 +7,7 @@ export type ReportFilters = {
   projeId?: string | null
   dateFrom?: string | null
   dateTo?: string | null
+  yetkiliLokIds?: string[] | null
 }
 
 export type PreparedReport = {
@@ -100,6 +101,7 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
       .order('kayit_tarihi', { ascending: true })
     if (filters.firmaId) query = query.eq('firma_id', filters.firmaId)
     if (filters.projeId) query = (query as any).eq('proje_id', filters.projeId)
+    if (filters.yetkiliLokIds) query = query.in('id', filters.yetkiliLokIds)
     const { data, error } = await query
     if (error) throw new Error(error.message)
     const locs = data ?? []
@@ -167,12 +169,14 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
         let q = admin.from('canli_gorevler').select(liveSelect).order('olusturma_tarihi', { ascending: false })
         if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
         if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+        if (filters.yetkiliLokIds) q = q.in('lokasyon_id', filters.yetkiliLokIds)
         return q
       }),
       fetchAll(() => {
         let q = admin.from('canli_gorevler_arsiv').select(liveSelect).order('olusturma_tarihi', { ascending: false })
         if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
         if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+        if (filters.yetkiliLokIds) q = q.in('lokasyon_id', filters.yetkiliLokIds)
         return q
       }),
     ])
@@ -218,6 +222,7 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
       .order('olusturma_tarihi', { ascending: false })
     if (filters.firmaId) query = query.eq('firma_id', filters.firmaId)
     if (filters.projeId) query = (query as any).eq('proje_id', filters.projeId)
+    if (filters.yetkiliLokIds) query = query.in('lokasyon_id', filters.yetkiliLokIds)
     const { data, error } = await query
     if (error) throw new Error(error.message)
     const filtered = (data ?? []).filter((row: any) => withinRange(row.olusturma_tarihi, filters.dateFrom, filters.dateTo))
