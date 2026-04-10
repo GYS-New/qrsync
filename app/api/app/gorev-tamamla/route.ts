@@ -75,6 +75,7 @@ export async function POST(req: Request) {
     const gorevId   = body?.gorev_id as string | undefined
     const gorevTipi = (body?.gorev_tipi as string | undefined) ?? 'gorevler'
     const maddeler  = body?.maddeler ?? []
+    const scanToken = body?.scan_token as string | undefined  // QR/NFC token (mobil gönderir)
 
     if (!gorevId) {
       return NextResponse.json({ ok: false, error: 'gorev_id gerekli' }, { status: 400, headers: CORS })
@@ -145,15 +146,36 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Görev bulunamadı' }, { status: 404, headers: CORS })
     }
 
-    // checklist_sablon_id lokasyondan okunur
+    // Lokasyon bilgileri: checklist, QR/NFC zorunluluk
     let checklistSablonId: string | null = null
-    if (gorev.lokasyon_id && maddeler?.length > 0) {
+    let lokBilgi: any = null
+    if (gorev.lokasyon_id) {
       const { data: lok } = await admin
         .from('lokasyonlar')
-        .select('checklist_sablon_id')
+        .select('checklist_sablon_id, tamamlama_qr_zorunlu, sureli_gorev_aktif, qr_veri, nfc_token')
         .eq('id', gorev.lokasyon_id)
         .single()
-      checklistSablonId = lok?.checklist_sablon_id ?? null
+      lokBilgi = lok
+      if (maddeler?.length > 0) checklistSablonId = lok?.checklist_sablon_id ?? null
+    }
+
+    // QR/NFC tamamlama zorunluluğu: lokasyonda aktifse VE süreli görev aktifse kontrol et
+    if (lokBilgi?.tamamlama_qr_zorunlu && lokBilgi?.sureli_gorev_aktif) {
+      if (!scanToken) {
+        return NextResponse.json(
+          { ok: false, error: 'Bu lokasyonda tamamlama için QR veya NFC okutmanız gerekiyor.', code: 'QR_NFC_ZORUNLU' },
+          { status: 403, headers: CORS }
+        )
+      }
+      // Token doğrulama: QR veri veya NFC token ile eşleşmeli
+      const qrMatch = lokBilgi.qr_veri && scanToken === lokBilgi.qr_veri
+      const nfcMatch = lokBilgi.nfc_token && scanToken === lokBilgi.nfc_token
+      if (!qrMatch && !nfcMatch) {
+        return NextResponse.json(
+          { ok: false, error: 'Okutulan QR/NFC kodu bu lokasyonla eşleşmiyor.', code: 'QR_NFC_ESLESMEDI' },
+          { status: 403, headers: CORS }
+        )
+      }
     }
 
     if (gorev.firma_id !== firmaId) {

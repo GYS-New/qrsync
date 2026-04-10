@@ -159,7 +159,7 @@ export default function LokasyonlarClient({
   const [openForm, setOpenForm] = useState(false)
   const [editing, setEditing] = useState<Lokasyon | null>(null)
   const [parentId, setParentId] = useState<string | null>(null)
-  const [form, setForm] = useState({ tanim:'', aciklama:'', nfc_token:'', checklist_sablon_id:'', sureli_gorev_aktif:false })
+  const [form, setForm] = useState({ tanim:'', aciklama:'', nfc_token:'', checklist_sablon_id:'', sureli_gorev_aktif:false, tamamlama_qr_zorunlu:false })
 
   useEffect(() => {
     // when firm changes, refresh
@@ -203,14 +203,14 @@ export default function LokasyonlarClient({
   function openCreate(pid?: string | null) {
     setEditing(null)
     setParentId(pid ?? null)
-    setForm({ tanim:'', aciklama:'', nfc_token: crypto.randomUUID(), checklist_sablon_id: '', sureli_gorev_aktif:false })
+    setForm({ tanim:'', aciklama:'', nfc_token: crypto.randomUUID(), checklist_sablon_id: '', sureli_gorev_aktif:false, tamamlama_qr_zorunlu:false })
     setOpenForm(true)
   }
 
   function openEdit(l: Lokasyon) {
     setEditing(l)
     setParentId(l.parent_id ?? null)
-    setForm({ tanim:l.tanim ?? '', aciklama:l.aciklama ?? '', nfc_token:(l as any).nfc_token ?? '', checklist_sablon_id:(l as any).checklist_sablon_id ?? '', sureli_gorev_aktif: !!(l as any).sureli_gorev_aktif })
+    setForm({ tanim:l.tanim ?? '', aciklama:l.aciklama ?? '', nfc_token:(l as any).nfc_token ?? '', checklist_sablon_id:(l as any).checklist_sablon_id ?? '', sureli_gorev_aktif: !!(l as any).sureli_gorev_aktif, tamamlama_qr_zorunlu: !!(l as any).tamamlama_qr_zorunlu })
     setOpenForm(true)
   }
 
@@ -239,7 +239,7 @@ export default function LokasyonlarClient({
     if (editing) {
       const { error: err } = await supabase
         .from('lokasyonlar')
-        .update({ tanim: form.tanim.trim(), aciklama: form.aciklama.trim() || null, parent_id: parentId, nfc_token: form.nfc_token.trim() || null, checklist_sablon_id: form.checklist_sablon_id.trim() || null, sureli_gorev_aktif: form.sureli_gorev_aktif })
+        .update({ tanim: form.tanim.trim(), aciklama: form.aciklama.trim() || null, parent_id: parentId, nfc_token: form.nfc_token.trim() || null, checklist_sablon_id: form.checklist_sablon_id.trim() || null, sureli_gorev_aktif: form.sureli_gorev_aktif, tamamlama_qr_zorunlu: form.tamamlama_qr_zorunlu })
         .eq('id', editing.id)
       if (err) showError(err.message)
       else {
@@ -259,6 +259,7 @@ export default function LokasyonlarClient({
           nfc_token: form.nfc_token.trim() || crypto.randomUUID(),
           checklist_sablon_id: form.checklist_sablon_id.trim() || null,
           sureli_gorev_aktif: form.sureli_gorev_aktif,
+          tamamlama_qr_zorunlu: form.tamamlama_qr_zorunlu,
           ...(projeId ? { proje_id: projeId } : {}),
         })
       if (err) showError(err.message)
@@ -457,6 +458,14 @@ export default function LokasyonlarClient({
                   ) : (
                     <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Aktif ise personel görevi önce başlatır, sonra tamamlar. Pasif ise görev doğrudan tamamlanır.</div>
                   )}
+                </div>
+                <div style={{ gridColumn:'1 / -1', opacity: projeSureliAktif && form.sureli_gorev_aktif ? 1 : 0.5 }}>
+                  <label className="verde-label" style={{ display:'flex', alignItems:'center', gap:10, cursor: projeSureliAktif && form.sureli_gorev_aktif ? 'pointer' : 'not-allowed' }}>
+                    <input type="checkbox" checked={form.tamamlama_qr_zorunlu} disabled={!projeSureliAktif || !form.sureli_gorev_aktif}
+                      onChange={e => setForm(f => ({ ...f, tamamlama_qr_zorunlu: e.target.checked }))} />
+                    <span>Tamamlama için QR/NFC okutma zorunlu</span>
+                  </label>
+                  <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Aktif ise personel görevi tamamlarken lokasyondaki QR veya NFC kodunu okutmalıdır. Süreli görev kapalıysa bu ayar devre dışıdır.</div>
                 </div>
                 <div style={{ gridColumn:'1 / -1' }}>
                   <label className="verde-label">Checklist</label>
