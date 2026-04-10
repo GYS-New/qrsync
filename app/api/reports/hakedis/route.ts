@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 export const dynamic = 'force-dynamic'
 
@@ -106,12 +107,12 @@ export async function GET(req: NextRequest) {
       .eq('firma_id', firmaId).eq('proje_id', projeId).in('lokasyon_id', lokIds)
     if (baslangic) q = (q as any).gte('aktif_olma_tarihi', new Date(baslangic + 'T00:00:00+03:00').toISOString())
     if (bitis)     q = (q as any).lte('aktif_olma_tarihi', new Date(bitis + 'T23:59:59+03:00').toISOString())
-    return q.limit(10000)
+    return q
   }
 
-  const [{ data: aktif }, { data: arsiv }] = await Promise.all([
-    buildQ('canli_gorevler'),
-    buildQ('canli_gorevler_arsiv'),
+  const [aktif, arsiv] = await Promise.all([
+    fetchAll(() => buildQ('canli_gorevler')),
+    fetchAll(() => buildQ('canli_gorevler_arsiv')),
   ])
 
   type Counts = { toplam: number; tamamlanan: number; gecikmeli: number; kayip: number; aktif_gorev: number }

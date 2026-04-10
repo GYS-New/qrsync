@@ -6,6 +6,21 @@ import { createClient } from "@/lib/supabase/client"
 import { AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts"
 import type { DashboardBlockProps } from '../types'
 
+/** Client-side pagination helper — PostgREST max_rows=1000 limitini aşmak için */
+async function fetchAllPages<T = any>(buildQuery: () => any): Promise<T[]> {
+  const PAGE = 1000
+  const all: T[] = []
+  let from = 0
+  while (true) {
+    const { data } = await buildQuery().range(from, from + PAGE - 1)
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < PAGE) break
+    from += PAGE
+  }
+  return all
+}
+
 type Mode = "gunluk" | "haftalik" | "aylik"
 
 function startOfHourTR(d: Date) {
@@ -54,19 +69,25 @@ export default function AktiviteGrafigiBlock({
     const rangeISO = rangeStart.toISOString()
 
     // Canlı görevler
-    let qCanli = supabase.from("canli_gorevler").select("olusturma_tarihi").gte("olusturma_tarihi", rangeISO)
-    if (firmaId) qCanli = qCanli.eq("firma_id", firmaId)
-    if (projeId) qCanli = (qCanli as any).eq("proje_id", projeId)
-    if (yetkiliLokIds?.length) qCanli = (qCanli as any).in("lokasyon_id", yetkiliLokIds)
+    const buildCanli = () => {
+      let q = supabase.from("canli_gorevler").select("olusturma_tarihi").gte("olusturma_tarihi", rangeISO)
+      if (firmaId) q = q.eq("firma_id", firmaId)
+      if (projeId) q = (q as any).eq("proje_id", projeId)
+      if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
+      return q
+    }
 
     // Arşiv görevler — aynı dönemde oluşturulup arşivlenenler
-    let qArsiv = supabase.from("canli_gorevler_arsiv").select("olusturma_tarihi").gte("olusturma_tarihi", rangeISO)
-    if (firmaId) qArsiv = qArsiv.eq("firma_id", firmaId)
-    if (projeId) qArsiv = (qArsiv as any).eq("proje_id", projeId)
-    if (yetkiliLokIds?.length) qArsiv = (qArsiv as any).in("lokasyon_id", yetkiliLokIds)
+    const buildArsiv = () => {
+      let q = supabase.from("canli_gorevler_arsiv").select("olusturma_tarihi").gte("olusturma_tarihi", rangeISO)
+      if (firmaId) q = q.eq("firma_id", firmaId)
+      if (projeId) q = (q as any).eq("proje_id", projeId)
+      if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
+      return q
+    }
 
-    const [{ data: canliRows }, { data: arsivRows }] = await Promise.all([qCanli.limit(10000), qArsiv.limit(10000)])
-    const rows = [...(canliRows ?? []), ...(arsivRows ?? [])]
+    const [canliRows, arsivRows] = await Promise.all([fetchAllPages(buildCanli), fetchAllPages(buildArsiv)])
+    const rows = [...canliRows, ...arsivRows]
 
     const grouped: Record<string, number> = {}
 

@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 import { buildGenelRaporData } from '@/lib/reports/genel-rapor-data'
 import { fillXlsxTemplate, type SheetData, type CellData } from '@/lib/reports/xlsx-template-filler'
 
@@ -69,16 +70,21 @@ export async function GET(req: NextRequest) {
 
   // ── 4. Görev süre verileri ────────────────────────────────────────────
   const SEL_SURE = 'id,lokasyon_id,tamamlanma_suresi_saniye'
-  let sureLiveQ = admin.from('canli_gorevler').select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI').limit(10000)
-  let sureArsivQ = admin.from('canli_gorevler_arsiv').select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI').limit(10000)
-  if (projeId) { sureLiveQ = (sureLiveQ as any).eq('proje_id', projeId); sureArsivQ = (sureArsivQ as any).eq('proje_id', projeId) }
-  if (baslangic) { const v = new Date(baslangic + 'T00:00:00+03:00').toISOString(); sureLiveQ = sureLiveQ.gte('aktif_olma_tarihi', v); sureArsivQ = sureArsivQ.gte('aktif_olma_tarihi', v) }
-  if (bitis) { const v = new Date(bitis + 'T23:59:59+03:00').toISOString(); sureLiveQ = sureLiveQ.lte('aktif_olma_tarihi', v); sureArsivQ = sureArsivQ.lte('aktif_olma_tarihi', v) }
-  const [{ data: sureLive }, { data: sureArsiv }] = await Promise.all([sureLiveQ, sureArsivQ])
+  function buildSureQ(table: string) {
+    let q = admin.from(table).select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI')
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (baslangic) { const v = new Date(baslangic + 'T00:00:00+03:00').toISOString(); q = q.gte('aktif_olma_tarihi', v) }
+    if (bitis) { const v = new Date(bitis + 'T23:59:59+03:00').toISOString(); q = q.lte('aktif_olma_tarihi', v) }
+    return q
+  }
+  const [sureLive, sureArsiv] = await Promise.all([
+    fetchAll(() => buildSureQ('canli_gorevler')),
+    fetchAll(() => buildSureQ('canli_gorevler_arsiv')),
+  ])
 
   const sureMap = new Map<string, number>()
   const gorevLokMap2 = new Map<string, string>()
-  for (const g of [...(sureLive ?? []), ...(sureArsiv ?? [])]) {
+  for (const g of [...sureLive, ...sureArsiv]) {
     if (g.tamamlanma_suresi_saniye) {
       sureMap.set(g.id, g.tamamlanma_suresi_saniye)
       sureMap.set(g.id.slice(-8).toUpperCase(), g.tamamlanma_suresi_saniye)

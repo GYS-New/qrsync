@@ -5,6 +5,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 export async function GET(req: Request) {
   try {
@@ -65,24 +66,24 @@ export async function GET(req: Request) {
     const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
     // Spesifik + canlı görevleri paralel çek
-    const [gorevlerRes, canliGorevlerRes] = await Promise.all([
-      admin.from('gorevler').select(`
-        id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
-        lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
-      `).eq('firma_id', firmaId).eq('atanan_kullanici_id', userId)
-        .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
-        .order('olusturma_tarihi', { ascending: false }),
-      admin.from('canli_gorevler').select(`
-        id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
-        lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
-      `).eq('firma_id', firmaId).eq('atanan_kullanici_id', userId)
-        .or(`durum.in.(ACIK,ISLEMDE,BEKLEMEDE),and(durum.in.(TAMAMLANDI,ZAMANINDA_TAMAMLANDI),tamamlanma_tarihi.gt.${sinir24s})`)
-        .order('aktif_olma_tarihi', { ascending: false })
-        .limit(10000),
+    const [gorevler, canliGorevler] = await Promise.all([
+      fetchAll(() =>
+        admin.from('gorevler').select(`
+          id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
+          lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
+        `).eq('firma_id', firmaId).eq('atanan_kullanici_id', userId)
+          .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
+          .order('olusturma_tarihi', { ascending: false })
+      ),
+      fetchAll(() =>
+        admin.from('canli_gorevler').select(`
+          id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
+          lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
+        `).eq('firma_id', firmaId).eq('atanan_kullanici_id', userId)
+          .or(`durum.in.(ACIK,ISLEMDE,BEKLEMEDE),and(durum.in.(TAMAMLANDI,ZAMANINDA_TAMAMLANDI),tamamlanma_tarihi.gt.${sinir24s})`)
+          .order('aktif_olma_tarihi', { ascending: false })
+      ),
     ])
-
-    const gorevler      = gorevlerRes.data ?? []
-    const canliGorevler = canliGorevlerRes.data ?? []
 
     // ── Çeklist şablonlarını batch yükle ────────────────────────────────────
     const tumGorevler = [...gorevler, ...canliGorevler] as any[]

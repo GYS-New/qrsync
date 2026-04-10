@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 import type { DashboardBlockProps } from '../types'
 
 const STAT = [
@@ -25,21 +26,27 @@ export default async function GunlukPerformansBlock({
   const today = bugunTR()
 
   // Spesifik görevler
-  let q1 = supabase.from('gorevler').select('durum').gte('olusturma_tarihi', today.toISOString())
-  if (firmaId) q1 = q1.eq('firma_id', firmaId)
-  if (projeId) q1 = (q1 as any).eq('proje_id', projeId)
-  if (yetkiliLokIds?.length) q1 = (q1 as any).in('lokasyon_id', yetkiliLokIds)
+  const buildQ1 = () => {
+    let q = supabase.from('gorevler').select('durum').gte('olusturma_tarihi', today.toISOString())
+    if (firmaId) q = q.eq('firma_id', firmaId)
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)
+    return q
+  }
 
   // Frekansiyel görevler
-  let q2 = supabase.from('canli_gorevler').select('durum').gte('aktif_olma_tarihi', today.toISOString())
-  if (firmaId) q2 = q2.eq('firma_id', firmaId)
-  if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
-  if (yetkiliLokIds?.length) q2 = (q2 as any).in('lokasyon_id', yetkiliLokIds)
+  const buildQ2 = () => {
+    let q = supabase.from('canli_gorevler').select('durum').gte('aktif_olma_tarihi', today.toISOString())
+    if (firmaId) q = q.eq('firma_id', firmaId)
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)
+    return q
+  }
 
-  const [{ data: d1 }, { data: d2 }] = await Promise.all([q1.limit(10000), q2.limit(10000)])
+  const [d1, d2] = await Promise.all([fetchAll(buildQ1), fetchAll(buildQ2)])
 
   const counts: Record<string, number> = {}
-  ;[...(d1 ?? []), ...(d2 ?? [])].forEach((r: any) => {
+  ;[...d1, ...d2].forEach((r: any) => {
     counts[r.durum] = (counts[r.durum] ?? 0) + 1
   })
 

@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 import { getReportDefinition, type ReportKey } from './config'
 
 export type ReportFilters = {
@@ -160,17 +161,25 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     const liveSelect = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id'
 
     // Aktif tablo + arşiv tablosunu paralel çek, birleştir
-    let qAktif = admin.from('canli_gorevler').select(liveSelect).order('olusturma_tarihi', { ascending: false }).limit(10000)
-    let qArsiv = admin.from('canli_gorevler_arsiv').select(liveSelect).order('olusturma_tarihi', { ascending: false }).limit(10000)
-    if (filters.firmaId) { qAktif = qAktif.eq('firma_id', filters.firmaId); qArsiv = qArsiv.eq('firma_id', filters.firmaId) }
-    if (filters.projeId) { qAktif = (qAktif as any).eq('proje_id', filters.projeId); qArsiv = (qArsiv as any).eq('proje_id', filters.projeId) }
-
-    const [{ data: aktifData }, { data: arsivData }] = await Promise.all([qAktif, qArsiv])
+    const [aktifData, arsivData] = await Promise.all([
+      fetchAll(() => {
+        let q = admin.from('canli_gorevler').select(liveSelect).order('olusturma_tarihi', { ascending: false })
+        if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+        return q
+      }),
+      fetchAll(() => {
+        let q = admin.from('canli_gorevler_arsiv').select(liveSelect).order('olusturma_tarihi', { ascending: false })
+        if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+        return q
+      }),
+    ])
 
     // id'ye göre deduplicate — aktif tablo öncelikli (daha güncel)
     const mergedMap = new Map<string, any>()
-    for (const r of (arsivData ?? [])) mergedMap.set(r.id, r)
-    for (const r of (aktifData  ?? [])) mergedMap.set(r.id, r)
+    for (const r of arsivData) mergedMap.set(r.id, r)
+    for (const r of aktifData) mergedMap.set(r.id, r)
 
     const filtered = Array.from(mergedMap.values()).filter((row: any) => withinRange(row.olusturma_tarihi, filters.dateFrom, filters.dateTo))
     const locIds = Array.from(new Set(filtered.map((x: any) => x.lokasyon_id).filter(Boolean)))
@@ -307,13 +316,15 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     }
 
     // Görev istatistikleri
-    let gorevQ = admin.from('canli_gorevler').select('lokasyon_id,durum').limit(10000)
-    if (lgFirmaId) gorevQ = gorevQ.eq('firma_id', lgFirmaId)
-    if (filters.dateFrom) gorevQ = gorevQ.gte('aktif_olma_tarihi', new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString())
-    if (filters.dateTo) gorevQ = gorevQ.lte('aktif_olma_tarihi', new Date(filters.dateTo + 'T23:59:59+03:00').toISOString())
-    const { data: gorevler } = await gorevQ
+    const gorevler = await fetchAll(() => {
+      let q = admin.from('canli_gorevler').select('lokasyon_id,durum')
+      if (lgFirmaId) q = q.eq('firma_id', lgFirmaId)
+      if (filters.dateFrom) q = q.gte('aktif_olma_tarihi', new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString())
+      if (filters.dateTo) q = q.lte('aktif_olma_tarihi', new Date(filters.dateTo + 'T23:59:59+03:00').toISOString())
+      return q
+    })
     const locGorevMap: Record<string, { toplam: number; tamamlanan: number }> = {}
-    for (const g of gorevler ?? []) {
+    for (const g of gorevler) {
       if (!g.lokasyon_id) continue
       if (!locGorevMap[g.lokasyon_id]) locGorevMap[g.lokasyon_id] = { toplam: 0, tamamlanan: 0 }
       locGorevMap[g.lokasyon_id].toplam++

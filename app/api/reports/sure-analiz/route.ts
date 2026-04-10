@@ -5,6 +5,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 function withinRange(v: string | null | undefined, from?: string | null, to?: string | null) {
   if (!v) return false
@@ -292,14 +293,14 @@ export async function GET(req: Request) {
     const SEL_SPEC  = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'
 
     // ── Frekansiyel: aktif + arşiv ──────────────────────────────────────────
-    let qFreqA = admin.from('canli_gorevler').select(SEL_FREQ).eq('firma_id', firmaId).limit(10000)
-    let qFreqB = admin.from('canli_gorevler_arsiv').select(SEL_FREQ).eq('firma_id', firmaId).limit(10000)
+    let qFreqA = admin.from('canli_gorevler').select(SEL_FREQ).eq('firma_id', firmaId)
+    let qFreqB = admin.from('canli_gorevler_arsiv').select(SEL_FREQ).eq('firma_id', firmaId)
     if (projeId) { qFreqA = (qFreqA as any).eq('proje_id', projeId); qFreqB = (qFreqB as any).eq('proje_id', projeId) }
 
-    const [{ data: freqA }, { data: freqB }] = await Promise.all([qFreqA, qFreqB])
+    const [freqA, freqB] = await Promise.all([fetchAll(() => qFreqA), fetchAll(() => qFreqB)])
     const freqMap = new Map<string, any>()
-    for (const r of (freqB ?? [])) freqMap.set(r.id, r)
-    for (const r of (freqA ?? [])) freqMap.set(r.id, r)
+    for (const r of freqB) freqMap.set(r.id, r)
+    for (const r of freqA) freqMap.set(r.id, r)
     const freqTum = Array.from(freqMap.values()).filter((g: any) =>
       !baslangic && !bitis ? true : withinRange(g.tamamlanma_tarihi ?? g.olusturma_tarihi, baslangic, bitis)
     )

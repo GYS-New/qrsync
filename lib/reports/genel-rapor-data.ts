@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 export interface GenelRaporFilters {
   firmaId: string
@@ -237,37 +238,22 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   // Arşiv tablosu terminal durumları (TAMAMLANDI, ZAMANI_GECMIS vb.) tutar
   const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,tamamlanma_tarihi,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi'
 
-  let qAktif = admin
-    .from('canli_gorevler')
-    .select(SELECT_COLS)
-    .eq('firma_id', filters.firmaId)
-  let qArsiv = admin
-    .from('canli_gorevler_arsiv')
-    .select(SELECT_COLS)
-    .eq('firma_id', filters.firmaId)
-  if (filters.projeId) {
-    qAktif = (qAktif as any).eq('proje_id', filters.projeId)
-    qArsiv = (qArsiv as any).eq('proje_id', filters.projeId)
+  const baslangicUTC = filters.raporBaslangic ? new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString() : null
+  const bitisUTC = filters.raporBitis ? new Date(filters.raporBitis + 'T23:59:59+03:00').toISOString() : null
+
+  function buildGorevQuery(table: string) {
+    let q = admin.from(table).select(SELECT_COLS).eq('firma_id', filters.firmaId)
+    if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+    if (targetLokasyonIds && targetLokasyonIds.length > 0) q = q.in('lokasyon_id', targetLokasyonIds)
+    if (baslangicUTC) q = q.gte('aktif_olma_tarihi', baslangicUTC)
+    if (bitisUTC) q = q.lte('aktif_olma_tarihi', bitisUTC)
+    return q
   }
 
-  if (targetLokasyonIds && targetLokasyonIds.length > 0) {
-    qAktif = qAktif.in('lokasyon_id', targetLokasyonIds)
-    qArsiv = qArsiv.in('lokasyon_id', targetLokasyonIds)
-  }
-
-  // Tarih aralığına göre DB tarafında filtrele (TRT offset — UTC+3)
-  if (filters.raporBaslangic) {
-    const baslangicUTC = new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString()
-    qAktif = qAktif.gte('aktif_olma_tarihi', baslangicUTC)
-    qArsiv = qArsiv.gte('aktif_olma_tarihi', baslangicUTC)
-  }
-  if (filters.raporBitis) {
-    const bitisUTC = new Date(filters.raporBitis + 'T23:59:59+03:00').toISOString()
-    qAktif = qAktif.lte('aktif_olma_tarihi', bitisUTC)
-    qArsiv = qArsiv.lte('aktif_olma_tarihi', bitisUTC)
-  }
-
-  const [{ data: aktifGorevler }, { data: arsivGorevler }] = await Promise.all([qAktif.limit(10000), qArsiv.limit(10000)])
+  const [aktifGorevler, arsivGorevler] = await Promise.all([
+    fetchAll(() => buildGorevQuery('canli_gorevler')),
+    fetchAll(() => buildGorevQuery('canli_gorevler_arsiv')),
+  ])
 
   // Birleştir, çakışan id varsa aktif tablosu öncelikli
   const arsivMap = new Map((arsivGorevler ?? []).map((g: any) => [g.id, g]))

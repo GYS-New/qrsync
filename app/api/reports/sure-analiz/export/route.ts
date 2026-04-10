@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 import ExcelJS from 'exceljs'
 
 export const dynamic = 'force-dynamic'
@@ -88,10 +89,10 @@ export async function GET(req: NextRequest) {
     let qA = admin.from('canli_gorevler').select(SEL).eq('firma_id', firmaId)
     let qB = admin.from('canli_gorevler_arsiv').select(SEL).eq('firma_id', firmaId)
     if (projeId) { qA = (qA as any).eq('proje_id', projeId); qB = (qB as any).eq('proje_id', projeId) }
-    const [{ data: a }, { data: b }] = await Promise.all([qA.limit(10000), qB.limit(10000)])
+    const [a, b] = await Promise.all([fetchAll(() => qA), fetchAll(() => qB)])
     const m = new Map<string, any>()
-    for (const r of (b ?? [])) m.set(r.id, r)
-    for (const r of (a ?? [])) m.set(r.id, r)
+    for (const r of b) m.set(r.id, r)
+    for (const r of a) m.set(r.id, r)
     gorevler = Array.from(m.values())
   } else {
     const SEL = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'

@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 export type GeneralTemplateFilters = {
   firmaId?: string | null
@@ -204,13 +205,15 @@ export async function buildGeneralTemplateReport(filters: GeneralTemplateFilters
   const scopeLocationIds = locationId ? collectDescendantIds(locationId, locMap) : availableLocationIds
   const location = locationId ? locMap.get(locationId) : null
 
-  let liveTaskQuery = admin
-    .from('canli_gorevler')
-    .select('id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id')
-    .gte('olusturma_tarihi', dayStart)
-    .lte('olusturma_tarihi', dayEnd)
-  if (activeFirmaId) liveTaskQuery = liveTaskQuery.eq('firma_id', activeFirmaId)
-  liveTaskQuery = liveTaskQuery.limit(10000)
+  const liveTaskQueryFn = () => {
+    let q = admin
+      .from('canli_gorevler')
+      .select('id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id')
+      .gte('olusturma_tarihi', dayStart)
+      .lte('olusturma_tarihi', dayEnd)
+    if (activeFirmaId) q = q.eq('firma_id', activeFirmaId)
+    return q
+  }
 
   let groupsQuery = admin
     .from('lokasyon_gruplari')
@@ -219,20 +222,19 @@ export async function buildGeneralTemplateReport(filters: GeneralTemplateFilters
   if (activeFirmaId) groupsQuery = groupsQuery.eq('firma_id', activeFirmaId)
   if (topLocationId) groupsQuery = groupsQuery.eq('ust_lokasyon_id', topLocationId)
 
-  const [{ data: liveTasks, error: liveError }, { data: groups, error: groupsError }, { data: groupMembers, error: groupMembersError }] = await Promise.all([
-    liveTaskQuery,
+  const [liveTasks, { data: groups, error: groupsError }, { data: groupMembers, error: groupMembersError }] = await Promise.all([
+    fetchAll(liveTaskQueryFn),
     groupsQuery,
     admin.from('lokasyon_grup_uyeleri').select('grup_id,lokasyon_id'),
   ])
 
-  if (liveError) throw new Error(liveError.message)
   if (groupsError) throw new Error(groupsError.message)
   if (groupMembersError) throw new Error(groupMembersError.message)
 
   const scopedUsers = (users ?? []).filter((item: any) => !activeFirmaId || item.firma_id === activeFirmaId)
   const userMap = new Map<string, string>(scopedUsers.map((item: any) => [item.id, item.isim_soyisim ?? '-']))
 
-  const scopedTasks = (liveTasks ?? []).filter((item: any) => item.lokasyon_id && scopeLocationIds.has(item.lokasyon_id))
+  const scopedTasks = liveTasks.filter((item: any) => item.lokasyon_id && scopeLocationIds.has(item.lokasyon_id))
 
   const memberMap = new Map<string, string[]>()
   for (const member of groupMembers ?? []) {
