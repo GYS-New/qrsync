@@ -49,6 +49,9 @@ export type ScanContext = {
     tanim: string
     aktif: boolean
     sureli_gorev_aktif: boolean
+    tamamlama_qr_zorunlu: boolean
+    qr_veri: string | null
+    nfc_token: string | null
     min_sure_dakika: number | null
     max_sure_dakika: number | null
   }
@@ -191,6 +194,9 @@ export async function resolveScanContext(opts: {
       tanim: loc.tanim,
       aktif: !!loc.aktif,
       sureli_gorev_aktif: !!(loc as any).sureli_gorev_aktif,
+      tamamlama_qr_zorunlu: !!(loc as any).tamamlama_qr_zorunlu,
+      qr_veri: (loc as any).qr_veri ?? null,
+      nfc_token: (loc as any).nfc_token ?? null,
       min_sure_dakika: (loc as any).min_sure_dakika ?? null,
       max_sure_dakika: (loc as any).max_sure_dakika ?? null,
     },

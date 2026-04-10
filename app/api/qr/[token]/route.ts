@@ -153,7 +153,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
       }
     }
     // ── QR/NFC tamamlama zorunluluğu: 2. QR okutma gerekli ──
-    if (context.lokasyon.sureli_gorev_aktif && (context.lokasyon as any).tamamlama_qr_zorunlu) {
+    if (context.lokasyon.sureli_gorev_aktif && context.lokasyon.tamamlama_qr_zorunlu) {
       const confirmToken = body?.confirm_scan_token as string | undefined
       if (!confirmToken) {
         return NextResponse.json(
@@ -161,9 +161,8 @@ export async function POST(req: Request, { params }: { params: { token: string }
           { status: 403, headers: CORS_HEADERS }
         )
       }
-      // Token doğrulama
       const qrOk = context.lokasyon.qr_veri && confirmToken === context.lokasyon.qr_veri
-      const nfcOk = (context.lokasyon as any).nfc_token && confirmToken === (context.lokasyon as any).nfc_token
+      const nfcOk = context.lokasyon.nfc_token && confirmToken === context.lokasyon.nfc_token
       if (!qrOk && !nfcOk) {
         return NextResponse.json(
           { ok: false, error: 'Okutulan QR/NFC kodu bu lokasyonla eşleşmiyor.', code: 'QR_NFC_ESLESMEDI' },
