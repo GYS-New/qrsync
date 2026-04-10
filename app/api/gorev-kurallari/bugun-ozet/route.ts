@@ -41,14 +41,16 @@ export async function GET(req: NextRequest) {
       .eq('firma_id', firmaId)
       .not('kural_id', 'is', null)
       .gte('aktif_olma_tarihi', bugunStart)
-      .lte('aktif_olma_tarihi', bugunEnd),
+      .lte('aktif_olma_tarihi', bugunEnd)
+      .limit(10000),
     admin
       .from('canli_gorevler_arsiv')
       .select('kural_id, durum')
       .eq('firma_id', firmaId)
       .not('kural_id', 'is', null)
       .gte('aktif_olma_tarihi', bugunStart)
-      .lte('aktif_olma_tarihi', bugunEnd),
+      .lte('aktif_olma_tarihi', bugunEnd)
+      .limit(10000),
   ])
 
   const tamamlandiDurumlar = new Set(['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])

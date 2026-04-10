@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
         .eq('firma_id', firmaId).eq('proje_id', projeId).in('lokasyon_id', lokIds)
       if (baslangic) q = (q as any).gte('aktif_olma_tarihi', new Date(baslangic + 'T00:00:00+03:00').toISOString())
       if (bitis)     q = (q as any).lte('aktif_olma_tarihi', new Date(bitis + 'T23:59:59+03:00').toISOString())
-      return q
+      return q.limit(10000)
     }
     const [{ data: aktif }, { data: arsiv }] = await Promise.all([buildQ('canli_gorevler'), buildQ('canli_gorevler_arsiv')])
 
