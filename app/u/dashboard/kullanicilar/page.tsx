@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import KullanicilarClient from '@/components/users/KullanicilarClient'
 import { redirect } from 'next/navigation'
-import { sayfaGorebilirMi, sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
+import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
+import { getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,9 @@ export default async function UKullanicilarPage() {
   const firmaId = me.firma_id
   const projeId = me.proje_id
 
+  // U/M lokasyon kısıtlaması
+  const yetkiliUstLokIds = await getLokasyonYetki(supabase)
+
   let q = supabase.from('users').select('*').eq('firma_id', firmaId).order('isim_soyisim')
   if (projeId) q = (q as any).or(`proje_id.eq.${projeId},rol.eq.tenant_admin`)
 
@@ -28,6 +32,7 @@ export default async function UKullanicilarPage() {
 
   let lokQ = supabase.from('lokasyonlar').select('id,tanim').eq('firma_id', firmaId).is('parent_id', null).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+  if (yetkiliUstLokIds) lokQ = lokQ.in('id', yetkiliUstLokIds)
   const { data: lokasyonlar } = await lokQ
 
   return (

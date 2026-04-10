@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 export async function GET(request: Request) {
   const supabase = createClient()
@@ -70,32 +71,33 @@ export async function GET(request: Request) {
     const isUserRole = me.rol === 'tenant_user' || me.rol === 'musteri'
     const effectiveProjeId = projeId || (isUserRole ? ((me as any).proje_id ?? null) : null)
 
+    // U/M lokasyon kısıtlaması
+    const yetkiliLokIds = isUserRole && firmaId
+      ? await getYetkiliLokasyonIds(supabase, firmaId, effectiveProjeId)
+      : null
+
     if (effectiveProjeId) {
-      // Proje seçiliyse: o projeye ait kullanıcılar
       usersQuery = supabase.from('users').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId!).eq('proje_id', effectiveProjeId)
     } else {
-      // Proje seçili değilse: firmaya ait kullanıcılar
       usersQuery = !firmaId ? usersBase : usersBase.eq('firma_id', firmaId)
     }
-    
+
     if (effectiveProjeId) {
-      // Proje seçiliyse: o projeye ait görevler ve canlı görevler
-      tasksQuery = supabase.from('gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
-      liveQuery = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+      let tQ = supabase.from('gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+      let lQ = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+      if (yetkiliLokIds) { tQ = tQ.in('lokasyon_id', yetkiliLokIds); lQ = lQ.in('lokasyon_id', yetkiliLokIds) }
+      tasksQuery = tQ; liveQuery = lQ
     } else {
-      // Proje seçili değilse: firmaya ait görevler
       tasksQuery = !firmaId ? tasksBase : tasksBase.eq('firma_id', firmaId)
       liveQuery = !firmaId ? liveBase : liveBase.eq('firma_id', firmaId)
     }
-    
+
     if (effectiveProjeId) {
-      // Proje seçiliyse o projeye ait lokasyonlar
-      locationsQuery = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+      let locQ = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+      if (yetkiliLokIds) locQ = locQ.in('id', yetkiliLokIds)
+      locationsQuery = locQ
     } else {
-      // Proje seçili değilse firma bazlı
-      locationsQuery = !firmaId 
-        ? locationsBase 
-        : locationsBase.eq('firma_id', firmaId)
+      locationsQuery = !firmaId ? locationsBase : locationsBase.eq('firma_id', firmaId)
     }
   }
 
