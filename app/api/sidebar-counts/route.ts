@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { getYetkiliLokasyonIds, getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
 
 export async function GET(request: Request) {
   const supabase = createClient()
@@ -75,8 +75,13 @@ export async function GET(request: Request) {
     const yetkiliLokIds = isUserRole && firmaId
       ? await getYetkiliLokasyonIds(supabase, firmaId, effectiveProjeId)
       : null
+    const yetkiliUstLokIds = isUserRole
+      ? await getLokasyonYetki(supabase)
+      : null
 
-    if (effectiveProjeId) {
+    if (yetkiliUstLokIds && firmaId) {
+      usersQuery = supabase.from('users').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).in('ust_lokasyon_id', yetkiliUstLokIds)
+    } else if (effectiveProjeId) {
       usersQuery = supabase.from('users').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId!).eq('proje_id', effectiveProjeId)
     } else {
       usersQuery = !firmaId ? usersBase : usersBase.eq('firma_id', firmaId)
