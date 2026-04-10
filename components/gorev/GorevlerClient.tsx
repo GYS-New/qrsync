@@ -31,7 +31,7 @@ const SEL = '*,lokasyonlar(id,tanim,parent_id,checklist_sablon_id),atanan:users!
 
 export default function GorevlerClient({
   base, meId, readonly, initialFirmaId, initialGorevler, initialLokasyonlar, initialKullanicilar, projeId,
-  personelAtamaAktif = true, ceklistAktif = true,
+  personelAtamaAktif = true, ceklistAktif = true, yetkiliLokIds,
 }: {
   base: '/sa' | '/ta' | '/u'
   meId: string
@@ -43,6 +43,7 @@ export default function GorevlerClient({
   projeId?: string | null
   personelAtamaAktif?: boolean
   ceklistAktif?: boolean
+  yetkiliLokIds?: string[] | null
 }) {
   const supabase = createClient()
   const { toast } = useToast()
@@ -196,9 +197,11 @@ export default function GorevlerClient({
       .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
       .order('olusturma_tarihi', { ascending: false }).limit(200)
     if (projeId) gorevQuery = (gorevQuery as any).eq('proje_id', projeId)
+    if (yetkiliLokIds) gorevQuery = gorevQuery.in('lokasyon_id', yetkiliLokIds)
     let lokQuery = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id')
       .eq('firma_id', fid).eq('aktif', true).order('tanim')
     if (projeId) lokQuery = (lokQuery as any).eq('proje_id', projeId)
+    if (yetkiliLokIds) lokQuery = lokQuery.in('id', yetkiliLokIds)
     const [gRes, lRes, uRes] = await Promise.all([
       gorevQuery, lokQuery,
       (() => { let q = supabase.from('users').select('id,isim_soyisim,aktif').eq('firma_id', fid).eq('aktif', true).order('isim_soyisim'); if (projeId) q = (q as any).eq('proje_id', projeId); return q })(),
@@ -219,6 +222,7 @@ export default function GorevlerClient({
     // ── Ana tablo: gorevler ───────────────────────────────────────────────────
     let query = supabase.from('gorevler').select(SEL).eq('firma_id', firmaId)
     if (projeId) query = (query as any).eq('proje_id', projeId)
+    if (yetkiliLokIds) query = query.in('lokasyon_id', yetkiliLokIds)
 
     if (filtreDurum) {
       query = (query as any).eq('durum', filtreDurum)

@@ -59,6 +59,7 @@ export default function TumGorevlerClient({
   initialGorevler,
   projeId,
   personelAtamaAktif = true,
+  yetkiliLokIds,
 }: {
   base: '/sa' | '/ta' | '/u'
   firmaId: string
@@ -69,6 +70,7 @@ export default function TumGorevlerClient({
   initialGorevler: any[]
   projeId?: string | null
   personelAtamaAktif?: boolean
+  yetkiliLokIds?: string[] | null
 }) {
   const yetki = useYetki('tum-gorevler')
   const isTA = base === '/ta'
@@ -690,6 +692,7 @@ async function del() {
       let q2 = supabase.from('canli_gorevler_arsiv').select(SEL_ARSIV + ',arsiv_tarihi,arsiv_nedeni')
         .eq('firma_id', firmaId).order('arsiv_tarihi', { ascending: false }).limit(500)
       if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
+      if (yetkiliLokIds) q2 = q2.in('lokasyon_id', yetkiliLokIds)
       if (lokasyonId) q2 = (q2 as any).eq('lokasyon_id', lokasyonId)
       if (atananId) q2 = (q2 as any).eq('atanan_kullanici_id', atananId)
       if (durum) q2 = (q2 as any).eq('durum', durum)

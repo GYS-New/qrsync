@@ -75,6 +75,7 @@ export default async function UGorevlerPage() {
         projeId={projeId ?? null}
         personelAtamaAktif={ayarlar.spesifik_personel_atama_aktif}
         ceklistAktif={ayarlar.spesifik_ceklist_aktif}
+        yetkiliLokIds={yetkiliLokIds}
       />
     </div>
   )

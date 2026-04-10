@@ -90,6 +90,7 @@ export default async function UTumGorevlerPage() {
         firmaId={firmaId}
         meId={me.id}
         readonly={readonly}
+        yetkiliLokIds={yetkiliLokIds}
         projeId={projeId ?? null}
         lokasyonlar={(lokasyonlar as any) ?? []}
         kullanicilar={(kullanicilar as any) ?? []}
