@@ -56,6 +56,7 @@ interface Props {
   initialFirmaId?: string | null
   initialProjeId?: string | null
   readonly?:       boolean   // M/U rolleri için QR sekme ve oluşturma gizlenir
+  yetkiliUstLokIds?: string[] | null
 }
 
 // ── QR görsel üretici ─────────────────────────────────────────────────────────
@@ -133,7 +134,7 @@ function QrKart({ qr, origin, projeAdi, onIndir }: {
 }
 
 // ── Ana bileşen ───────────────────────────────────────────────────────────────
-export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initialProjeId, readonly = false }: Props) {
+export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initialProjeId, readonly = false, yetkiliUstLokIds }: Props) {
   const { firmaId: saFirmaId } = useFirma()
   const { aktifProje } = useProje()
 
@@ -268,24 +269,34 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   const siraliListe = useMemo(() => {
     const q = filtreArama.trim().toLowerCase()
     return [...liste]
-      .filter(p => !q || p.isim_soyisim?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q))
+      .filter(p => {
+        if (yetkiliUstLokIds && !(p as any).ust_lokasyon_id) return false
+        if (yetkiliUstLokIds && !yetkiliUstLokIds.includes((p as any).ust_lokasyon_id)) return false
+        if (q && !p.isim_soyisim?.toLowerCase().includes(q) && !p.email?.toLowerCase().includes(q)) return false
+        return true
+      })
       .sort((a, b) => {
         if (a.aktif && !b.aktif) return -1
         if (!a.aktif && b.aktif) return 1
         return (a.isim_soyisim ?? '').localeCompare(b.isim_soyisim ?? '', 'tr')
       })
-  }, [liste, filtreArama])
+  }, [liste, filtreArama, yetkiliUstLokIds])
 
   // ── Filtreli / sıralı liste (kayıt modu) ─────────────────────────────────
   const siraliKayitlar = useMemo(() => {
     const q = filtreArama.trim().toLowerCase()
     return [...kayitListe]
-      .filter(k => !q || k.isim_soyisim?.toLowerCase().includes(q) || k.email?.toLowerCase().includes(q))
+      .filter(k => {
+        if (yetkiliUstLokIds && !(k as any).ust_lokasyon_id) return false
+        if (yetkiliUstLokIds && !yetkiliUstLokIds.includes((k as any).ust_lokasyon_id)) return false
+        if (q && !k.isim_soyisim?.toLowerCase().includes(q) && !k.email?.toLowerCase().includes(q)) return false
+        return true
+      })
       .sort((a, b) => {
         if (a.kayit_tarihi !== b.kayit_tarihi) return b.kayit_tarihi.localeCompare(a.kayit_tarihi)
         return (a.isim_soyisim ?? '').localeCompare(b.isim_soyisim ?? '', 'tr')
       })
-  }, [kayitListe, filtreArama])
+  }, [kayitListe, filtreArama, yetkiliUstLokIds])
 
   const spinning    = { animation: 'spin 0.9s linear infinite' }
   const isLoading   = filtreAktif ? kayitLoading : loading

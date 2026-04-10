@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import PersonelTakibiClient from '@/components/personel-takibi/PersonelTakibiClient'
 import { sayfaGorebilirMi } from '@/lib/yetki/sayfaYetkisi'
+import { getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,8 @@ export default async function UPersonelTakibiPage() {
   const gorebilir = await sayfaGorebilirMi(me.rol, 'personel-takibi', (me as any).firma_id ?? null)
   if (!gorebilir) redirect('/u/dashboard')
 
+  const yetkiliUstLokIds = await getLokasyonYetki(supabase)
+
   return (
     <PersonelTakibiClient
       base="/u"
@@ -27,6 +30,7 @@ export default async function UPersonelTakibiPage() {
       initialFirmaId={me.firma_id ?? null}
       initialProjeId={me.proje_id ?? null}
       readonly={true}
+      yetkiliUstLokIds={yetkiliUstLokIds}
     />
   )
 }

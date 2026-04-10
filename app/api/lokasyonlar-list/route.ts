@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 export async function GET(request: Request) {
   try {
@@ -20,8 +20,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const requestedFirmaId = searchParams.get('firmaId')
     const projeId = searchParams.get('projeId') || null
-    // SA: query param'dan firma; TA/M/U: kendi firma_id'si
     const firmaId = isSA ? requestedFirmaId : me.firma_id
+
+    // U/M lokasyon kısıtlaması
+    const yetkiliLokIds = isTenantViewer && firmaId
+      ? await getYetkiliLokasyonIds(supabase, firmaId, projeId)
+      : null
 
     const admin = createAdminClient()
     let query = admin
@@ -32,6 +36,7 @@ export async function GET(request: Request) {
 
     if (firmaId) query = query.eq('firma_id', firmaId)
     if (projeId) query = (query as any).eq('proje_id', projeId)
+    if (yetkiliLokIds) query = query.in('id', yetkiliLokIds)
 
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
