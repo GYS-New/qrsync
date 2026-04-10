@@ -220,6 +220,11 @@ export default function KullanicilarClient({
     // Hangi proje_id gönderilecek: SA → formProjeId, TA → projeId (API cookie fallback yapar)
     const gonderilenProjeId = isSA ? (isAltSA ? undefined : formProjeId) : (projeId ?? undefined)
 
+    // U rolü: tek lokasyon varsa otomatik ata
+    const ustLokId = (base === '/u' && ustLokasyonlar.length === 1)
+      ? ustLokasyonlar[0].id
+      : (createForm.ust_lokasyon_id || null)
+
     setLoading(true)
     try {
       const res = await fetch('/api/users/create', {
@@ -227,7 +232,7 @@ export default function KullanicilarClient({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           ...createForm,
-          ust_lokasyon_id: createForm.ust_lokasyon_id || null,
+          ust_lokasyon_id: ustLokId,
           firma_id: firmaId,
           ...(gonderilenProjeId ? { proje_id: gonderilenProjeId } : {}),
         }),
@@ -562,8 +567,8 @@ export default function KullanicilarClient({
                   <label className="verde-label">Kullanıcı Grubu *</label>
                   <select className="verde-input" value={createForm.rol} onChange={e => setCreateForm(f => ({ ...f, rol: e.target.value }))}>
                     {isSA && <option value="alt_super_admin">2.SA — Alt Süper Admin</option>}
-                    <option value="tenant_admin">TA — Firma Admini</option>
-                    <option value="musteri">M — Müşteri</option>
+                    {(isSA || isTA) && <option value="tenant_admin">TA — Firma Admini</option>}
+                    {(isSA || isTA) && <option value="musteri">M — Müşteri</option>}
                     <option value="tenant_user">U — Kullanıcı</option>
                   </select>
                   <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 4 }}>
@@ -617,13 +622,19 @@ export default function KullanicilarClient({
                 {/* Üst Lokasyon seçici */}
                 {ustLokasyonlar.length > 0 && createForm.rol !== 'alt_super_admin' && (
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <label className="verde-label">Üst Lokasyon</label>
-                    <select className="verde-input" value={createForm.ust_lokasyon_id} onChange={e => setCreateForm(f => ({ ...f, ust_lokasyon_id: e.target.value }))}>
-                      <option value="">— Seçiniz —</option>
-                      {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
-                    </select>
+                    <label className="verde-label">Üst Lokasyon {base === '/u' ? '*' : ''}</label>
+                    {base === '/u' && ustLokasyonlar.length === 1 ? (
+                      <div style={{ fontSize: 13, color: '#111827', background: '#f9fafb', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 10px', fontWeight: 600 }}>
+                        ✓ {ustLokasyonlar[0].tanim}
+                      </div>
+                    ) : (
+                      <select className="verde-input" value={createForm.ust_lokasyon_id} onChange={e => setCreateForm(f => ({ ...f, ust_lokasyon_id: e.target.value }))}>
+                        <option value="">— Seçiniz —</option>
+                        {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                      </select>
+                    )}
                     <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 4 }}>
-                      Bu kullanıcı hangi üst lokasyona bağlı çalışacak?
+                      {base === '/u' ? 'Kullanıcı yetkili olduğunuz üst lokasyona atanacak.' : 'Bu kullanıcı hangi üst lokasyona bağlı çalışacak?'}
                     </div>
                   </div>
                 )}

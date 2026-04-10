@@ -37,16 +37,21 @@ export async function POST(req: Request) {
   const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
   const isTA = me.rol === 'tenant_admin'
 
-  if (!isSA && !isTA) {
+  const isU = me.rol === 'tenant_user'
+  if (!isSA && !isTA && !isU) {
     return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
   }
-  if (isTA && rol !== 'tenant_user') {
-    return NextResponse.json({ error: 'Firma admini sadece kullanıcı oluşturabilir' }, { status: 403 })
+  if (isTA && !['tenant_user', 'musteri'].includes(rol)) {
+    return NextResponse.json({ error: 'Firma admini sadece kullanıcı ve müşteri oluşturabilir' }, { status: 403 })
+  }
+  if (isU && rol !== 'tenant_user') {
+    return NextResponse.json({ error: 'Sadece kullanıcı oluşturabilirsiniz' }, { status: 403 })
   }
 
   const isAltSACreation = isSA && rol === 'alt_super_admin'
 
   const finalFirmaId = isAltSACreation ? null : (isSA ? firma_id : me.firma_id)
+  // U rolü: kendi firma_id'si kullanılır
   if (!isAltSACreation && !finalFirmaId) {
     return NextResponse.json({ error: 'firma_id gerekli' }, { status: 400 })
   }
