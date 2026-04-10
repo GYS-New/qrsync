@@ -266,29 +266,13 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
     } else {
       map[`${base}/dashboard/kullanicilar`] = { value: counts.users_total, tone: 'green' }
     }
-    // Locations / Tasks / Live
+    // Tek kaynaklı, doğru count'lar
     map[`${base}/dashboard/lokasyonlar`] = { value: counts.locations_total, tone: 'blue' }
-    map[`${base}/dashboard/gorevler`] = { value: counts.tasks_total, tone: 'yellow' }
-    map[`${base}/dashboard/canli-islemler/tum-gorevler`] = { value: counts.live_total, tone: 'orange' }
-    map[`${base}/dashboard/arsiv`] = { value: counts.arsiv_total, tone: 'blue' }
-
-    // Additional counts for all roles
     map[`${base}/dashboard/projeler`] = { value: counts.projects_total, tone: 'blue' }
     map[`${base}/dashboard/lokasyon-gruplari`] = { value: counts.location_groups_total, tone: 'yellow' }
     map[`${base}/dashboard/checklist-sablonlari`] = { value: counts.checklist_templates_total, tone: 'orange' }
-
-    // SA specific counts
     if (isSA) {
       map[`${base}/dashboard/firmalar`] = { value: counts.firms_total, tone: 'green' }
-      map[`${base}/dashboard/personel-takibi`] = { value: counts.personnel_tracking_total, tone: 'green' }
-      map[`${base}/dashboard/raporlar`] = { value: counts.reports_total, tone: 'blue' }
-    } else {
-      // TA + musteri + tenant_user — hepsi personel-takibi badge'i alır
-      map[`${base}/dashboard/personel-takibi`] = { value: counts.personnel_tracking_total, tone: 'green' }
-      // TA ve musteri raporlar sayfasına sahip
-      if (isTA || user.rol === 'musteri') {
-        map[`${base}/dashboard/raporlar`] = { value: counts.reports_total, tone: 'blue' }
-      }
     }
 
     return map
