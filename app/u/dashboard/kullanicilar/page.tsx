@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import KullanicilarClient from '@/components/users/KullanicilarClient'
 import { redirect } from 'next/navigation'
@@ -25,10 +25,32 @@ export default async function UKullanicilarPage() {
   // U/M lokasyon kısıtlaması
   const yetkiliUstLokIds = await getLokasyonYetki(supabase)
 
-  let q = supabase.from('users').select('*').eq('firma_id', firmaId).order('isim_soyisim')
-  if (projeId) q = (q as any).or(`proje_id.eq.${projeId},rol.eq.tenant_admin`)
-
-  const { data: users } = await q
+  let users: any[] = []
+  if (yetkiliUstLokIds) {
+    // Sadece yetkili üst lokasyonlara atanmış U/M kullanıcılarını getir
+    const admin = createAdminClient()
+    const { data: yetkiliKayitlar } = await admin
+      .from('kullanici_lokasyon_yetkileri')
+      .select('user_id')
+      .in('ust_lokasyon_id', yetkiliUstLokIds)
+    const yetkiliUserIds = [...new Set((yetkiliKayitlar ?? []).map((r: any) => r.user_id))]
+    if (yetkiliUserIds.length > 0) {
+      const { data } = await admin
+        .from('users')
+        .select('*')
+        .eq('firma_id', firmaId)
+        .in('id', yetkiliUserIds)
+        .in('rol', ['tenant_user', 'musteri'])
+        .order('isim_soyisim')
+      users = data ?? []
+    }
+  } else {
+    // Kısıtlama yok — tüm proje kullanıcıları
+    let q = supabase.from('users').select('*').eq('firma_id', firmaId).order('isim_soyisim')
+    if (projeId) q = (q as any).or(`proje_id.eq.${projeId},rol.eq.tenant_admin`)
+    const { data } = await q
+    users = data ?? []
+  }
 
   let lokQ = supabase.from('lokasyonlar').select('id,tanim').eq('firma_id', firmaId).is('parent_id', null).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
@@ -41,7 +63,7 @@ export default async function UKullanicilarPage() {
       <KullanicilarClient
         base="/u"
         firmaId={firmaId}
-        initialUsers={(users as any) ?? []}
+        initialUsers={users as any}
         canCreate={yetki.ekleyebilir}
         canManage={yetki.duzenleyebilir}
         canDelete={yetki.silebilir}
