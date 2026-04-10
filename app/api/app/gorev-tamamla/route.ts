@@ -84,6 +84,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Geçersiz gorev_tipi' }, { status: 400, headers: CORS })
     }
 
+    // ── QR/NFC TAMAMLAMA ZORUNLULUĞU (SİM bypass'tan önce çalışmalı) ──
+    if (gorevTipi === 'canli_gorevler') {
+      const { data: gorevLokBilgi } = await admin
+        .from('canli_gorevler')
+        .select('lokasyon_id')
+        .eq('id', gorevId)
+        .single()
+      if (gorevLokBilgi?.lokasyon_id) {
+        const { data: lokQr } = await admin
+          .from('lokasyonlar')
+          .select('tamamlama_qr_zorunlu, sureli_gorev_aktif, qr_veri, nfc_token')
+          .eq('id', gorevLokBilgi.lokasyon_id)
+          .single()
+        if (lokQr?.tamamlama_qr_zorunlu && lokQr?.sureli_gorev_aktif) {
+          if (!scanToken) {
+            return NextResponse.json(
+              { ok: false, error: 'Bu lokasyonda tamamlama için QR veya NFC okutmanız gerekiyor.', code: 'QR_NFC_ZORUNLU' },
+              { status: 403, headers: CORS }
+            )
+          }
+          const qrOk = lokQr.qr_veri && scanToken === lokQr.qr_veri
+          const nfcOk = lokQr.nfc_token && scanToken === lokQr.nfc_token
+          if (!qrOk && !nfcOk) {
+            return NextResponse.json(
+              { ok: false, error: 'Okutulan QR/NFC kodu bu lokasyonla eşleşmiyor.', code: 'QR_NFC_ESLESMEDI' },
+              { status: 403, headers: CORS }
+            )
+          }
+        }
+      }
+    }
+
     // ── SİMÜLASYON BYPASS: SİM aktifse ve görev kapsamındaysa VT'ye yazma ──
     if (gorevTipi === 'canli_gorevler') {
       const { data: gorevLok } = await admin
