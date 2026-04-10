@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 function withinRange(v: string | null | undefined, from?: string | null, to?: string | null) {
   if (!v) return false
@@ -255,6 +256,8 @@ export async function GET(req: Request) {
     if (!firmaId) return NextResponse.json({ error: 'Firma ID gerekli' }, { status: 400 })
 
     const admin = createAdminClient()
+    const isUM = me.rol === 'tenant_user' || me.rol === 'musteri'
+    const yetkiliLokIds = isUM ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
 
     // Tolerans oranı: proje override > firma default
     const { data: firma } = await admin.from('firmalar').select('gorev_suresi_hedef_orani').eq('id', firmaId).single()
@@ -267,6 +270,7 @@ export async function GET(req: Request) {
     // Lokasyon ve kullanıcı map'leri
     let loksQ = admin.from('lokasyonlar').select('id,tanim,parent_id,hedef_sure_dakika').eq('firma_id', firmaId)
     if (projeId) loksQ = (loksQ as any).eq('proje_id', projeId)
+    if (yetkiliLokIds) loksQ = loksQ.in('id', yetkiliLokIds)
     const { data: loks } = await loksQ
     const { data: users } = await admin.from('users').select('id,isim_soyisim').eq('firma_id', firmaId)
 
@@ -296,6 +300,7 @@ export async function GET(req: Request) {
     let qFreqA = admin.from('canli_gorevler').select(SEL_FREQ).eq('firma_id', firmaId)
     let qFreqB = admin.from('canli_gorevler_arsiv').select(SEL_FREQ).eq('firma_id', firmaId)
     if (projeId) { qFreqA = (qFreqA as any).eq('proje_id', projeId); qFreqB = (qFreqB as any).eq('proje_id', projeId) }
+    if (yetkiliLokIds) { qFreqA = qFreqA.in('lokasyon_id', yetkiliLokIds); qFreqB = qFreqB.in('lokasyon_id', yetkiliLokIds) }
 
     const [freqA, freqB] = await Promise.all([fetchAll(() => qFreqA), fetchAll(() => qFreqB)])
     const freqMap = new Map<string, any>()
@@ -308,6 +313,7 @@ export async function GET(req: Request) {
     // ── Spesifik görevler ───────────────────────────────────────────────────
     let qSpec = admin.from('gorevler').select(SEL_SPEC).eq('firma_id', firmaId)
     if (projeId) qSpec = (qSpec as any).eq('proje_id', projeId)
+    if (yetkiliLokIds) qSpec = qSpec.in('lokasyon_id', yetkiliLokIds)
     const { data: specRaw } = await qSpec
     const specTum = (specRaw ?? []).filter((g: any) =>
       !baslangic && !bitis ? true : withinRange(g.tamamlanma_tarihi ?? g.olusturma_tarihi, baslangic, bitis)
