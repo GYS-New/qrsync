@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
 
 /**
  * GET /api/mesai/bugun?firma_id=...&proje_id=...
@@ -66,8 +67,10 @@ export async function GET(req: NextRequest) {
   const { data: mesaiKayitlar, error: mesaiErr } = await mesaiQ
   if (mesaiErr) return NextResponse.json({ ok: false, error: mesaiErr.message }, { status: 500 })
 
+  // U/M lokasyon kısıtlaması
+  const yetkiliUstLokIds = isTenantViewer ? await getLokasyonYetki(supabase) : null
+
   // Projedeki / firmadaki tüm aktif personel (SA ve alt_super_admin hariç)
-  // TA (tenant_admin) proje_id'ye bağlı olmayabileceği için proje filtresi TA'ya uygulanmaz
   let kulQ = admin
     .from('users')
     .select('id,isim_soyisim,email,profil_foto,rol,last_seen_at,ust_lokasyon_id')
@@ -76,13 +79,12 @@ export async function GET(req: NextRequest) {
     .not('rol', 'in', '(super_admin,alt_super_admin)')
     .order('isim_soyisim')
 
-  // Proje filtresi: tenant_admin hariç diğerlerine uygula
-  // (TA proje_id olmadan da listeye girmeli)
   if (projeId) {
     kulQ = (kulQ as any).or(
       `proje_id.eq.${projeId},rol.eq.tenant_admin`
     )
   }
+  if (yetkiliUstLokIds) kulQ = kulQ.in('ust_lokasyon_id', yetkiliUstLokIds)
 
   const { data: kullanicilar } = await kulQ
 

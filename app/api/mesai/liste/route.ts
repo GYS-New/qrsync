@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
 
 /**
  * GET /api/mesai/liste?firma_id=...&proje_id=...&baslangic=...&bitis=...
@@ -33,6 +34,14 @@ export async function GET(req: NextRequest) {
 
   if (!firmaId) return NextResponse.json({ ok: true, data: [] })
 
+  // U/M lokasyon kısıtlaması: yetkili üst lokasyondaki kullanıcı ID'leri
+  const yetkiliUstLokIds = isTenantViewer ? await getLokasyonYetki(supabase) : null
+  let yetkiliUserIds: string[] | null = null
+  if (yetkiliUstLokIds) {
+    const { data: uyeler } = await admin.from('users').select('id').eq('firma_id', firmaId).in('ust_lokasyon_id', yetkiliUstLokIds)
+    yetkiliUserIds = (uyeler ?? []).map((u: any) => u.id)
+  }
+
   let q = admin
     .from('personel_mesai_kayitlari')
     .select(`
@@ -48,6 +57,7 @@ export async function GET(req: NextRequest) {
   if (projeId) q = (q as any).eq('proje_id', projeId)
   if (bas)     q = (q as any).gte('kayit_tarihi', bas)
   if (bit)     q = (q as any).lte('kayit_tarihi', bit)
+  if (yetkiliUserIds) q = q.in('user_id', yetkiliUserIds)
 
   const { data, error } = await q
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
