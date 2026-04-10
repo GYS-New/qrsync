@@ -27,22 +27,15 @@ export default async function UKullanicilarPage() {
 
   let users: any[] = []
   if (yetkiliUstLokIds) {
-    // Yetkili üst lokasyonlara atanmış TÜM kullanıcıları getir
+    // Yetkili üst lokasyonlardaki kullanıcıları getir (users.ust_lokasyon_id bazlı)
     const admin = createAdminClient()
-    const { data: yetkiliKayitlar } = await admin
-      .from('kullanici_lokasyon_yetkileri')
-      .select('user_id')
+    const { data } = await admin
+      .from('users')
+      .select('*')
+      .eq('firma_id', firmaId)
       .in('ust_lokasyon_id', yetkiliUstLokIds)
-    const yetkiliUserIds = [...new Set((yetkiliKayitlar ?? []).map((r: any) => r.user_id))]
-    if (yetkiliUserIds.length > 0) {
-      const { data } = await admin
-        .from('users')
-        .select('*')
-        .eq('firma_id', firmaId)
-        .in('id', yetkiliUserIds)
-        .order('isim_soyisim')
-      users = data ?? []
-    }
+      .order('isim_soyisim')
+    users = data ?? []
   } else {
     // Kısıtlama yok — tüm proje kullanıcıları
     let q = supabase.from('users').select('*').eq('firma_id', firmaId).order('isim_soyisim')
