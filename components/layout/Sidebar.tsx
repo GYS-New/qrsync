@@ -266,8 +266,9 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
     } else {
       map[`${base}/dashboard/kullanicilar`] = { value: counts.users_total, tone: 'green' }
     }
-    // Tek kaynaklı, doğru count'lar
     map[`${base}/dashboard/lokasyonlar`] = { value: counts.locations_total, tone: 'blue' }
+    map[`${base}/dashboard/gorevler`] = { value: counts.tasks_total, tone: 'yellow' }
+    map[`${base}/dashboard/canli-islemler/tum-gorevler`] = { value: counts.live_total, tone: 'orange' }
     map[`${base}/dashboard/projeler`] = { value: counts.projects_total, tone: 'blue' }
     map[`${base}/dashboard/lokasyon-gruplari`] = { value: counts.location_groups_total, tone: 'yellow' }
     map[`${base}/dashboard/checklist-sablonlari`] = { value: counts.checklist_templates_total, tone: 'orange' }

@@ -38,7 +38,6 @@ export async function GET(request: Request) {
   const liveBase = supabase
     .from('canli_gorevler')
     .select('id', { count: 'exact', head: true })
-    .eq('durum', 'ACIK')
 
   // Query'leri filtrele
   let usersQuery, tasksQuery, locationsQuery, liveQuery
@@ -51,7 +50,7 @@ export async function GET(request: Request) {
     if (filterFirma && filterProje) {
       usersQuery = usersBase.eq('firma_id', filterFirma).eq('proje_id', filterProje)
       tasksQuery = tasksBase.eq('firma_id', filterFirma).eq('proje_id', filterProje)
-      liveQuery = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('durum', 'ACIK').eq('firma_id', filterFirma).eq('proje_id', filterProje)
+      liveQuery = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('firma_id', filterFirma).eq('proje_id', filterProje)
       locationsQuery = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('firma_id', filterFirma).eq('proje_id', filterProje)
     } else if (filterFirma) {
       usersQuery = usersBase.eq('firma_id', filterFirma)
@@ -82,7 +81,7 @@ export async function GET(request: Request) {
     if (effectiveProjeId) {
       // Proje seçiliyse: o projeye ait görevler ve canlı görevler
       tasksQuery = supabase.from('gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
-      liveQuery = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId).eq('durum', 'ACIK')
+      liveQuery = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
     } else {
       // Proje seçili değilse: firmaya ait görevler
       tasksQuery = !firmaId ? tasksBase : tasksBase.eq('firma_id', firmaId)
