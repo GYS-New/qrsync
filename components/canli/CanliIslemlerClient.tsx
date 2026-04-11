@@ -40,7 +40,7 @@ type BrowseFilter = 'ACIK' | 'IPTAL' | 'KAPALI' | 'TARIHI_GECMIS'
 
 // ── CANLI AKIŞ HEADER BİLEŞENİ ─────────────────────────────────────────
 function LiveHeader({
-  kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly, showTumGorevler = true,
+  kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly, showTumGorevler = true, canliAkisSureSaat = 8,
 }: {
   kpi: { toplam: number; tamamlandi: number; islemde: number; beklemede: number; iptal: number; gecikmis: number; gecmis: number }
   durumFilter: string
@@ -51,6 +51,7 @@ function LiveHeader({
   pathname: string | null
   readonly: boolean
   showTumGorevler?: boolean
+  canliAkisSureSaat?: number
 }) {
   const FILTERS = [
     { key: 'TÜMÜ',      label: 'Tümü',              count: kpi.toplam },
@@ -87,6 +88,9 @@ function LiveHeader({
           </div>
           <span style={{ fontSize: 14, fontWeight: 800, color: '#111827', letterSpacing: '-0.2px' }}>
             Frekansiyel Görev Akışı
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', padding: '2px 8px', borderRadius: 4 }}>
+            Son {canliAkisSureSaat} saat
           </span>
           {/* Canlı badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 9px', borderRadius: 20, background: streamState === 'running' ? '#f9fafb' : '#f5f5f5', border: `1px solid ${streamState === 'running' ? '#d1d5db' : '#e0e0e0'}` }}>
@@ -794,7 +798,7 @@ useEffect(() => {
   if (readonly) {
     return (
       <div style={{ padding: '24px 28px' }}>
-        {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: true, showTumGorevler })}
+        {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: true, showTumGorevler, canliAkisSureSaat })}
         <div className="verde-card" style={{ overflow: 'hidden', marginTop: 12 }}>
           <div className="verde-table-wrap">
             <table className="verde-table">
@@ -823,7 +827,7 @@ useEffect(() => {
     <div style={{ padding: '24px 28px' }}>
 
       {/* ── YENİ HEADER + KPI ── */}
-      {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: false, showTumGorevler })}
+      {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: false, showTumGorevler, canliAkisSureSaat })}
 
       {/* ── GÖREV TABLOSU ── */}
       <div className="verde-card" style={{ overflow: 'hidden', marginBottom: 16, marginTop: 12 }}>
