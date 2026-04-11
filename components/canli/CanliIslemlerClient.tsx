@@ -328,8 +328,8 @@ useEffect(() => {
       .from('canli_gorevler')
       .select('*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)')
       .eq('firma_id', firmaId)
-      .gte('aktif_olma_tarihi', sinceISO)
-      .order('olusturma_tarihi', { ascending: false })
+      .gte('durum_degisim_tarihi', sinceISO)
+      .order('durum_degisim_tarihi', { ascending: false })
       .limit(500)
 
     // TA için "SILINDI" listeden kaldırılır
@@ -372,9 +372,8 @@ useEffect(() => {
       .select(liveSelect)
       .eq('firma_id', firmaId)
       .not('durum', 'in', '(HAZIR,ACIK)')
-      .gte('aktif_olma_tarihi', liveSinceISO)
+      .gte('durum_degisim_tarihi', liveSinceISO)
       .order('durum_degisim_tarihi', { ascending: false })
-      .order('olusturma_tarihi', { ascending: false })
       .limit(500)
 
     if (projeId) liveQ = (liveQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
@@ -389,8 +388,8 @@ useEffect(() => {
         .select(liveSelect)
         .eq('firma_id', firmaId)
         .not('durum', 'in', '(HAZIR,ACIK)')
-        .gte('aktif_olma_tarihi', liveSinceISO)
-        .order('olusturma_tarihi', { ascending: false })
+        .gte('durum_degisim_tarihi', liveSinceISO)
+        .order('durum_degisim_tarihi', { ascending: false })
         .limit(500)
       if (yetkiliLokIds) fallbackQ = fallbackQ.in('lokasyon_id', yetkiliLokIds)
 
