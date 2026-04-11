@@ -56,12 +56,21 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
       if (yetkiliLokIds?.length) uq = (uq as any).in('ust_lokasyon_id', yetkiliLokIds)
       return uq
     })(),
-    // [7] Online kullanıcılar (SİM + gerçek — firma filtreli)
-    (() => {
+    // [7] Online kullanıcılar (SİM + gerçek — firma filtreli, proje filtresi users üzerinden)
+    (async () => {
       let oq = supabase.from('device_tokens').select('user_id').eq('aktif', true)
         .gte('son_kullanim', new Date(Date.now() - 10 * 60 * 1000).toISOString())
       if (firmaId) oq = oq.eq('firma_id', firmaId)
-      return oq
+      const { data: dtRows } = await oq
+      if (!dtRows?.length) return { data: [] }
+      const onlineUserIds = [...new Set(dtRows.map((r: any) => r.user_id))]
+      // Proje filtresi users tablosundan
+      if (projeId) {
+        let uq = supabase.from('users').select('id').in('id', onlineUserIds).eq('aktif', true).eq('proje_id', projeId)
+        const { data: filteredUsers } = await uq
+        return { data: (filteredUsers ?? []).map((u: any) => ({ user_id: u.id })) }
+      }
+      return { data: dtRows }
     })(),
     // [8] Lokasyonlar toplam (proje + lokasyon yetki filtreli)
     (() => { let lq = supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true); if (firmaId) lq = lq.eq('firma_id', firmaId); if (projeId) lq = (lq as any).eq('proje_id', projeId); if (yetkiliLokIds && yetkiliLokIds.length > 0) lq = lq.in('id', yetkiliLokIds); return lq })(),
