@@ -127,12 +127,13 @@ type SidebarCounts = {
 }
 
 /** Sidebar logo — boyut logoya göre dinamik, beyaz bg + gri border */
-function SidebarLogo({ src, alt }: { src: string; alt: string }) {
+function SidebarLogo({ src, alt, bordered = false }: { src: string; alt: string; bordered?: boolean }) {
   const imgRef = useRef<HTMLImageElement>(null)
   const [dims, setDims] = useState<{ w: number; h: number }>({ w: 200, h: 50 })
   return (
     <div style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      ...(bordered ? { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 8 } : {}),
     }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -342,7 +343,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         >
           {/* Logo alanı */}
           {isSA && sidebarLogo ? (
-            <SidebarLogo src={sidebarLogo} alt="Logo" />
+            <SidebarLogo src={sidebarLogo} alt="Logo" bordered />
           ) : !isSA && firma?.logo_url ? (
             <SidebarLogo src={firma.logo_url} alt="Firma Logo" />
           ) : null}
@@ -359,7 +360,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         {/* Brand label — proje logosu varsa göster (tüm roller), yoksa ProATA fallback (TA/U) */}
         {projeLogo ? (
           <div style={{ padding: '6px 14px', margin: '8px 6px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <SidebarLogo src={projeLogo} alt="Proje" />
+            <SidebarLogo src={projeLogo} alt="Proje" bordered />
           </div>
         ) : !isSA ? (
           <div style={{ padding: '10px 14px', margin: '8px 6px 6px', borderRadius: 10, background: '#f3f4f6', fontWeight: 700, fontSize: 14, color: '#374151', display: 'flex', alignItems: 'center', gap: 10 }}>
