@@ -148,33 +148,37 @@ export async function POST(req: NextRequest) {
         if (s.projeId) q = (q as any).eq('proje_id', s.projeId)
         const { data: gorevler } = await q
         if (gorevler?.length) {
-          const ids = gorevler.map(g => g.id)
+          // Batch halinde işle (URL limiti aşımını önle)
+          const BATCH = 100
+          let ceklistToplam = 0
+          for (let i = 0; i < gorevler.length; i += BATCH) {
+            const batch = gorevler.slice(i, i + BATCH)
+            const batchIds = batch.map(g => g.id)
 
-          // Çeklist sonuçlarını arşivle (başlık + maddeler)
-          try {
-            const { data: basliklar } = await admin.from('checklist_sonuc_basliklari').select('*').in('canli_gorev_id', ids)
-            if (basliklar?.length) {
-              const bIds = basliklar.map(b => b.id)
-              const { data: maddeler } = await admin.from('checklist_sonuc_maddeleri').select('*').in('sonuc_id', bIds)
-              if (maddeler?.length) {
-                await admin.from('checklist_sonuc_maddeleri_arsiv').upsert(maddeler, { onConflict: 'id', ignoreDuplicates: true })
-                await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', bIds)
+            // Çeklist sonuçlarını arşivle
+            try {
+              const { data: basliklar } = await admin.from('checklist_sonuc_basliklari').select('*').in('canli_gorev_id', batchIds)
+              if (basliklar?.length) {
+                const bIds = basliklar.map(b => b.id)
+                const { data: maddeler } = await admin.from('checklist_sonuc_maddeleri').select('*').in('sonuc_id', bIds)
+                if (maddeler?.length) {
+                  await admin.from('checklist_sonuc_maddeleri_arsiv').upsert(maddeler, { onConflict: 'id', ignoreDuplicates: true })
+                  await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', bIds)
+                }
+                const arsivBasliklar = basliklar.map(b => ({ ...b, arsiv_tarihi: new Date().toISOString() }))
+                await admin.from('checklist_sonuc_basliklari_arsiv').upsert(arsivBasliklar, { onConflict: 'id', ignoreDuplicates: true })
+                await admin.from('checklist_sonuc_basliklari').delete().in('id', bIds)
+                ceklistToplam += basliklar.length
               }
-              const arsivBasliklar = basliklar.map(b => ({ ...b, arsiv_tarihi: new Date().toISOString() }))
-              await admin.from('checklist_sonuc_basliklari_arsiv').upsert(arsivBasliklar, { onConflict: 'id', ignoreDuplicates: true })
-              await admin.from('checklist_sonuc_basliklari').delete().in('id', bIds)
-              r.ceklist = basliklar.length
-            }
-          } catch (e: any) { r.ceklist_err = e.message }
+            } catch (e: any) { r.ceklist_err = e.message }
 
-          const arsivRows = gorevler.map(g => ({
-            ...g,
-            arsiv_tarihi: new Date().toISOString(),
-            arsiv_nedeni: 'cron_saat',
-          }))
-          await admin.from('canli_gorevler_arsiv').upsert(arsivRows, { onConflict: 'id', ignoreDuplicates: true })
-          await admin.from('canli_gorevler').delete().in('id', ids)
-          r.frekansiyel = ids.length
+            // Görevleri arşivle
+            const arsivRows = batch.map(g => ({ ...g, arsiv_tarihi: new Date().toISOString(), arsiv_nedeni: 'cron_saat' }))
+            await admin.from('canli_gorevler_arsiv').upsert(arsivRows, { onConflict: 'id', ignoreDuplicates: true })
+            await admin.from('canli_gorevler').delete().in('id', batchIds)
+          }
+          r.frekansiyel = gorevler.length
+          if (ceklistToplam > 0) r.ceklist = ceklistToplam
         }
       } catch (e: any) { r.frekansiyel_err = e.message }
 
