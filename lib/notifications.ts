@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatDateTime, GOREV_DURUM_LABEL } from '@/lib/utils'
-import { sendFCMToUser } from '@/lib/fcm-sender'
 
 export type GorevDurum = 'ACIK' | 'ISLEMDE' | 'IPTAL' | 'TAMAMLANDI'
 
@@ -50,14 +49,18 @@ export async function createGorevAtamaNotification(opts: {
     tip: 'gorev_atama',
   })
 
-  // FCM push bildirim gönder
+  // FCM push bildirim gönder (server-side API üzerinden)
   try {
-    await sendFCMToUser(
-      aliciId,
-      '📋 Yeni Görev Ataması',
-      `${tanim}${lokasyonTanim ? ' — ' + lokasyonTanim : ''}`,
-      'default',
-    )
+    await fetch('/api/notifications/send-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        aliciId,
+        title: 'Yeni Görev Ataması',
+        message: `${tanim}${lokasyonTanim ? ' — ' + lokasyonTanim : ''}`,
+        channelId: 'gorev_uyari',
+      }),
+    })
   } catch {}
 }
 
