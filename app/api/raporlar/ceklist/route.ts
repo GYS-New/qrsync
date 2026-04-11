@@ -191,19 +191,21 @@ async function kayitlarGetir(
     for (const s of sablonlar ?? []) sablonMap[s.id] = s.baslik
   }
 
-  // 3. Çeklist başlıkları (BOTH cikti modes from archive table too)
-  let sbQ = admin.from('checklist_sonuc_basliklari')
-    .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
-    .in('lokasyon_id', lokIds)
-    .order('kayit_tarihi', { ascending: false })
-    .limit(2000)
-  if (baslangic) sbQ = sbQ.gte('kayit_tarihi', baslangic)
-  if (bitis)     sbQ = sbQ.lte('kayit_tarihi', bitis + 'T23:59:59')
+  // 3. Çeklist başlıkları
+  let basliklar: any[] = []
+  if (cikti !== 'arsiv') {
+    let sbQ = admin.from('checklist_sonuc_basliklari')
+      .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
+      .in('lokasyon_id', lokIds)
+      .order('kayit_tarihi', { ascending: false })
+      .limit(2000)
+    if (baslangic) sbQ = sbQ.gte('kayit_tarihi', baslangic)
+    if (bitis)     sbQ = sbQ.lte('kayit_tarihi', bitis + 'T23:59:59')
+    const { data: sbData } = await sbQ
+    basliklar = sbData ?? []
+  }
 
-  const { data: basliklar, error: sbErr } = await sbQ
-  console.log('[ceklist-rapor] sbErr:', sbErr?.message ?? null, '| basliklar:', basliklar?.length ?? 0, '| lokIds:', lokIds.length)
-
-  // Arşiv tablosundan da oku - cikti=arsiv veya birlesik için
+  // Arşiv tablosundan oku - cikti=arsiv veya birlesik için
   let arBasliklar: any[] = []
   if (cikti === 'arsiv' || cikti === 'birlesik') {
     let arSbQ = admin.from('checklist_sonuc_basliklari_arsiv')
