@@ -33,6 +33,7 @@ interface Props {
   projeId?: string | null
   showTumGorevler?: boolean  // false yapılırsa "Tüm Görevler" linki gizlenir
   yetkiliLokIds?: string[] | null
+  canliAkisSureSaat?: number  // canlı akış listeleme süresi (varsayılan 8)
 }
 
 type BrowseFilter = 'ACIK' | 'IPTAL' | 'KAPALI' | 'TARIHI_GECMIS'
@@ -155,7 +156,7 @@ function LiveHeader({
   )
 }
 
-export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, readonly, projeId, showTumGorevler = true, yetkiliLokIds }: Props) {
+export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, readonly, projeId, showTumGorevler = true, yetkiliLokIds, canliAkisSureSaat = 8 }: Props) {
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -318,12 +319,14 @@ useEffect(() => {
   async function refreshBrowse() {
     if (!firmaId) return
 
+    const sinceISO = new Date(Date.now() - canliAkisSureSaat * 60 * 60 * 1000).toISOString()
     let q = supabase
       .from('canli_gorevler')
       .select('*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)')
       .eq('firma_id', firmaId)
+      .gte('olusturma_tarihi', sinceISO)
       .order('olusturma_tarihi', { ascending: false })
-      .limit(100)
+      .limit(500)
 
     // TA için "SILINDI" listeden kaldırılır
     if (isTA) q = q.neq('durum', 'SILINDI')
@@ -359,14 +362,16 @@ useEffect(() => {
     const liveSelect =
       '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
+    const liveSinceISO = new Date(Date.now() - canliAkisSureSaat * 60 * 60 * 1000).toISOString()
     let liveQ = supabase
       .from('canli_gorevler')
       .select(liveSelect)
       .eq('firma_id', firmaId)
-      .not('durum', 'in', '(HAZIR,ACIK)')   // HAZIR/ACIK hariç tüm durum değişimleri
+      .not('durum', 'in', '(HAZIR,ACIK)')
+      .gte('olusturma_tarihi', liveSinceISO)
       .order('durum_degisim_tarihi', { ascending: false })
       .order('olusturma_tarihi', { ascending: false })
-      .limit(100)
+      .limit(500)
 
     if (projeId) liveQ = (liveQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
     if (yetkiliLokIds) liveQ = liveQ.in('lokasyon_id', yetkiliLokIds)
@@ -380,8 +385,9 @@ useEffect(() => {
         .select(liveSelect)
         .eq('firma_id', firmaId)
         .not('durum', 'in', '(HAZIR,ACIK)')
+        .gte('olusturma_tarihi', liveSinceISO)
         .order('olusturma_tarihi', { ascending: false })
-        .limit(100)
+        .limit(500)
       if (yetkiliLokIds) fallbackQ = fallbackQ.in('lokasyon_id', yetkiliLokIds)
 
       const res2 = projeId

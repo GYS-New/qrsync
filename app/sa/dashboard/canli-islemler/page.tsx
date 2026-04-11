@@ -4,6 +4,7 @@ import CanliIslemlerClient from '@/components/canli/CanliIslemlerClient'
 import { redirect } from 'next/navigation'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,6 +64,7 @@ export default async function SACanliIslemlerPage() {
         meId={me.id}
         projeId={projeId}
         readonly={false}
+        canliAkisSureSaat={firmaId ? (await getEfektifAyar(firmaId, projeId)).canli_akis_sure_saat : 8}
       />
     </div>
   )

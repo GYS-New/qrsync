@@ -4,6 +4,7 @@ import CanliIslemlerClient from '@/components/canli/CanliIslemlerClient'
 import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +65,7 @@ export default async function UserCanliIslemler() {
         readonly={readonly}
         showTumGorevler={tumGorevlerYetki.gorebilir}
         yetkiliLokIds={yetkiliLokIds}
+        canliAkisSureSaat={(await getEfektifAyar(firmaId!, projeId)).canli_akis_sure_saat}
       />
     </div>
   )

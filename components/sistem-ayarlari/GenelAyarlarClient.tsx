@@ -40,7 +40,7 @@ const NUM_DEFAULTS: Record<string, number> = {
   gorev_suresi_hedef_orani: 10,
   ardisik_baslatma_suresi_dk: 0,
   personel_takip_bildirim_dk: 0,
-  acik_bekleme_saat: 8, bekleme_gecmis_saat: 12,
+  acik_bekleme_saat: 8, bekleme_gecmis_saat: 12, canli_akis_sure_saat: 8,
   arsiv_mesai_saat: 24, arsiv_musteri_saat: 24, arsiv_spesifik_saat: 48, arsiv_frekansiyel_saat: 24,
 }
 const BOOL_DEFAULTS: Record<string, boolean> = {
@@ -351,6 +351,30 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
           </div>
         )}
         <OverrideBadge ayarKey="ardisik_baslatma_suresi_dk" />
+      </div>
+
+      {/* Canlı Akış Listeleme Süresi */}
+      <div style={{ background: '#fff', border: `1px solid ${overrides.canli_akis_sure_saat ? '#c4b5fd' : T.border}`, borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 14, fontWeight: 700, color: T.text, display: 'block', marginBottom: 4 }}>Canlı Görev Akışı Listeleme Süresi</label>
+          <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.5 }}>
+            Canlı görev akışı sayfasında gösterilecek görevlerin zaman aralığı. Seçilen süreden önceki görevler listelenmez.
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <select
+            value={efektif.canli_akis_sure_saat as number}
+            onChange={e => setEfektif(prev => ({ ...prev, canli_akis_sure_saat: Number(e.target.value) }))}
+            style={{ height: 38, padding: '0 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', fontSize: 15, fontWeight: 700, width: 200 }}
+          >
+            <option value={1}>Son 1 saat</option>
+            <option value={4}>Son 4 saat</option>
+            <option value={8}>Son 8 saat</option>
+            <option value={24}>Son 24 saat</option>
+          </select>
+          <SaveBtn id="canli_akis_sure_saat" onClick={() => handleSave('canli_akis_sure_saat', efektif.canli_akis_sure_saat)} />
+        </div>
+        <OverrideBadge ayarKey="canli_akis_sure_saat" />
       </div>
 
       {/* Personel Takip Bildirim Süresi */}
