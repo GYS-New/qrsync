@@ -296,7 +296,7 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
   }
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 900 }}>
 
       {/* ═══ GÖREVLER ═══ */}
       <SectionHead title="Görevler" color={T.green} />

@@ -62,82 +62,101 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
   const { aktifProje } = useProje()
   const sureliGorevAktif = aktifProje?.sureli_gorev_aktif === true
 
-  return (
-    <div style={{ padding: '24px 28px' }}>
-      {/* Tab bar */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 4,
-          borderBottom: '2px solid #e5e7eb',
-          marginBottom: 28,
-          overflowX: 'auto',
-        }}
-      >
-        {BASE_TABS.filter(tab => !tab.saOnly || isSA).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setAktifTab(tab.key)}
-            style={{
-              padding: '9px 18px',
-              fontSize: 14,
-              fontWeight: aktifTab === tab.key ? 700 : 500,
-              color: aktifTab === tab.key ? '#111827' : '#6b7280',
-              background: 'none',
-              border: 'none',
-              borderBottom: aktifTab === tab.key ? '2px solid #111827' : '2px solid transparent',
-              marginBottom: -2,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+  const TAB_ICONS: Record<Tab, string> = {
+    'genel': '⚙️', 'proje-ayarlari': '📂', 'frekans': '🔢', 'gorev-kurallari': '📋',
+    'gorev-sureleri': '⏱️', 'yetkiler': '🔐', 'simulasyon': '⚡', 'uygulama': '📱',
+    'mobil': '📲', 'smtp': '✉️', 'konfigurasyon': '🛠️', 'dashboard': '📊',
+  }
 
-      {/* Tab içerikleri */}
-      {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} projeId={projeId} kullanicilar={kullanicilar} />}
-      {aktifTab === 'proje-ayarlari' && projeId && <ProjeAyarlariPanel projeId={projeId} />}
-      {aktifTab === 'frekans' && <FrekansSayilariClient lokasyonlar={lokasyonlar as any} firmaId={firmaId ?? ''} projeId={projeId ?? null} />}
-      {aktifTab === 'gorev-kurallari' && firmaId && (
-        <GorevKurallariClient
-          base={base}
-          firmaId={firmaId}
-          meId={meId}
-          initialKuralar={[]}
-          lokasyonlar={lokasyonlar}
-          kullanicilar={kullanicilar}
-          readonly={readonly}
-          embedded={true}
-          projeId={projeId}
-          personelAtamaAktif={personelAtamaAktif}
-        />
-      )}
-      {aktifTab === 'gorev-sureleri' && <GorevSureleriClient lokasyonlar={lokasyonlar} sureliGorevAktif={sureliGorevAktif} />}
-      {aktifTab === 'yetkiler' && (
-        <GrupYetkileriClient
-          initialYetkileri={initialYetkileri}
-          firmaId={firmaId}
-          apiEndpoint={yetkiApiEndpoint}
-          limitRoller={yetkilLimitRoller}
-          gizliSayfalar={yetkiGizliSayfalar}
-          firmalar={isSA ? firmalar : undefined}
-          currentPath={`${base}/dashboard/sistem-ayarlari`}
-        />
-      )}
-      {aktifTab === 'yetkiler' && firmaId && (
-        <LokasyonYetkileriPanel firmaId={firmaId} lokasyonlar={lokasyonlar as any} kullanicilar={kullanicilar as any} />
-      )}
-      {aktifTab === 'simulasyon' && firmaId && <SimulasyonPanel firmaId={firmaId} projeId={projeId ?? null} lokasyonlar={lokasyonlar as any} />}
-      {aktifTab === 'uygulama' && isSA && <UygulamaAyarlariPanel />}
-      {aktifTab === 'mobil' && isSA && <MobilAyarlariPanel />}
-      {aktifTab === 'smtp' && isSA && <SmtpAyarlariPanel />}
-      {aktifTab === 'konfigurasyon' && isSA && <SistemKonfigurasyonPanel />}
-      {aktifTab === 'dashboard' && (
-        <DashboardSettingsClient meId={meId} initialBloklar={initialBloklar} />
-      )}
+  const visibleTabs = BASE_TABS.filter(tab => !tab.saOnly || isSA)
+
+  return (
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 64px)', background: '#f8fafc' }}>
+      {/* Sol sidebar — tab menü */}
+      <aside style={{
+        width: 220, flexShrink: 0, background: '#fff',
+        borderRight: '1px solid #e2e8f0', padding: '20px 0',
+        position: 'sticky', top: 64, height: 'calc(100vh - 64px)', overflowY: 'auto',
+      }}>
+        <div style={{ padding: '0 16px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Sistem Ayarları
+        </div>
+        {visibleTabs.map(tab => {
+          const active = aktifTab === tab.key
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setAktifTab(tab.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', padding: '10px 20px', border: 'none', cursor: 'pointer',
+                fontSize: 13.5, fontWeight: active ? 700 : 500, textAlign: 'left',
+                color: active ? '#1d4ed8' : '#374151',
+                background: active ? '#eff6ff' : 'transparent',
+                borderRight: active ? '3px solid #1d4ed8' : '3px solid transparent',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f1f5f9' }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+            >
+              <span style={{ fontSize: 16, width: 22, textAlign: 'center' }}>{TAB_ICONS[tab.key] ?? '•'}</span>
+              {tab.label}
+            </button>
+          )
+        })}
+      </aside>
+
+      {/* Sağ içerik — full width */}
+      <main style={{ flex: 1, padding: '28px 36px', minWidth: 0 }}>
+        <div style={{
+          fontSize: 20, fontWeight: 800, color: '#0f172a', marginBottom: 24,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span style={{ fontSize: 22 }}>{TAB_ICONS[aktifTab] ?? '•'}</span>
+          {visibleTabs.find(t => t.key === aktifTab)?.label}
+        </div>
+
+        {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} projeId={projeId} kullanicilar={kullanicilar} />}
+        {aktifTab === 'proje-ayarlari' && projeId && <ProjeAyarlariPanel projeId={projeId} />}
+        {aktifTab === 'frekans' && <FrekansSayilariClient lokasyonlar={lokasyonlar as any} firmaId={firmaId ?? ''} projeId={projeId ?? null} />}
+        {aktifTab === 'gorev-kurallari' && firmaId && (
+          <GorevKurallariClient
+            base={base}
+            firmaId={firmaId}
+            meId={meId}
+            initialKuralar={[]}
+            lokasyonlar={lokasyonlar}
+            kullanicilar={kullanicilar}
+            readonly={readonly}
+            embedded={true}
+            projeId={projeId}
+            personelAtamaAktif={personelAtamaAktif}
+          />
+        )}
+        {aktifTab === 'gorev-sureleri' && <GorevSureleriClient lokasyonlar={lokasyonlar} sureliGorevAktif={sureliGorevAktif} />}
+        {aktifTab === 'yetkiler' && (
+          <GrupYetkileriClient
+            initialYetkileri={initialYetkileri}
+            firmaId={firmaId}
+            apiEndpoint={yetkiApiEndpoint}
+            limitRoller={yetkilLimitRoller}
+            gizliSayfalar={yetkiGizliSayfalar}
+            firmalar={isSA ? firmalar : undefined}
+            currentPath={`${base}/dashboard/sistem-ayarlari`}
+          />
+        )}
+        {aktifTab === 'yetkiler' && firmaId && (
+          <LokasyonYetkileriPanel firmaId={firmaId} lokasyonlar={lokasyonlar as any} kullanicilar={kullanicilar as any} />
+        )}
+        {aktifTab === 'simulasyon' && firmaId && <SimulasyonPanel firmaId={firmaId} projeId={projeId ?? null} lokasyonlar={lokasyonlar as any} />}
+        {aktifTab === 'uygulama' && isSA && <UygulamaAyarlariPanel />}
+        {aktifTab === 'mobil' && isSA && <MobilAyarlariPanel />}
+        {aktifTab === 'smtp' && isSA && <SmtpAyarlariPanel />}
+        {aktifTab === 'konfigurasyon' && isSA && <SistemKonfigurasyonPanel />}
+        {aktifTab === 'dashboard' && (
+          <DashboardSettingsClient meId={meId} initialBloklar={initialBloklar} />
+        )}
+      </main>
     </div>
   )
 }
@@ -186,7 +205,7 @@ function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
   ]
 
   return (
-    <div style={{ maxWidth: 560 }}>
+    <div style={{ maxWidth: 900 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
         <div style={{ width: 4, height: 20, borderRadius: 2, background: '#1d4ed8' }} />
         <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Proje Ayarları — {proje.ad}</h3>
@@ -438,7 +457,7 @@ function UygulamaAyarlariPanel() {
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
 
   return (
-    <div style={{ maxWidth: 560 }}>
+    <div style={{ maxWidth: 900 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
         <div style={{ width: 4, height: 20, borderRadius: 2, background: '#111827' }} />
         <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Uygulama Ayarları</h3>
@@ -588,7 +607,7 @@ function SistemKonfigurasyonPanel() {
   const sinp: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, width: '100%' }
 
   return (
-    <div style={{ maxWidth: 640 }}>
+    <div style={{ maxWidth: 900 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
         <div style={{ width: 4, height: 20, borderRadius: 2, background: '#7c3aed' }} />
         <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Sistem Konfigürasyonu</h3>
@@ -697,7 +716,7 @@ function SmtpAyarlariPanel() {
   const sinp: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, width: '100%' }
 
   return (
-    <div style={{ maxWidth: 560 }}>
+    <div style={{ maxWidth: 900 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
         <div style={{ width: 4, height: 20, borderRadius: 2, background: '#1d4ed8' }} />
         <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Mail Sunucusu (SMTP)</h3>
