@@ -11,10 +11,10 @@ export async function sendFCMToUser(userId: string, title: string, body: string,
     if (!projectId || !clientEmail || !privateKey || !supabaseUrl || !supabaseKey) return
 
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/device_tokens?user_id=eq.${userId}&aktif=eq.true&fcm_token=not.is.null&select=fcm_token`,
+      `${supabaseUrl}/rest/v1/device_tokens?user_id=eq.${userId}&aktif=eq.true&fcm_token=not.is.null&select=fcm_token,ses_kanali`,
       { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
     )
-    const devices: { fcm_token: string }[] = await res.json()
+    const devices: { fcm_token: string; ses_kanali?: string }[] = await res.json()
     if (!devices?.length) return
 
     const now = Math.floor(Date.now() / 1000)
@@ -39,12 +39,23 @@ export async function sendFCMToUser(userId: string, title: string, body: string,
     })
     const { access_token } = await tokenRes.json()
 
-    const soundName = channelId === 'gorev_uyari' ? 'vav' 
-                    : channelId === 'gorev_tamamla' ? 'tamamla' 
-                    : 'default'
-
     for (const d of devices) {
       if (!d.fcm_token) continue
+      // ses_kanali bazlı channel_id ve sound seçimi
+      const useCustom = (d.ses_kanali ?? 'custom') === 'custom'
+      let effectiveChannelId: string
+      let soundName: string
+      if (useCustom) {
+        effectiveChannelId = channelId === 'gorev_uyari' ? 'vav'
+                           : channelId === 'gorev_tamamla' ? 'gorev_tamamla_v2'
+                           : channelId
+        soundName = channelId === 'gorev_uyari' ? 'vav'
+                  : channelId === 'gorev_tamamla' ? 'tamamla'
+                  : 'default'
+      } else {
+        effectiveChannelId = 'default'
+        soundName = 'default'
+      }
       try {
         await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
           method: 'POST',
@@ -57,7 +68,7 @@ export async function sendFCMToUser(userId: string, title: string, body: string,
                 priority: 'high',
                 notification: {
                   sound: soundName,
-                  channel_id: channelId,
+                  channel_id: effectiveChannelId,
                 },
               },
             },

@@ -15,11 +15,14 @@ export async function POST(req: Request) {
   const deviceToken = req.headers.get('X-Device-Token')
   if (!deviceToken) return NextResponse.json({ ok: false }, { status: 401, headers: CORS_HEADERS })
 
-  const { fcm_token } = await req.json().catch(() => ({}))
+  const body = await req.json().catch(() => ({}))
+  const { fcm_token, ses_kanali } = body
   if (!fcm_token) return NextResponse.json({ ok: false }, { status: 400, headers: CORS_HEADERS })
 
   const admin = createAdminClient()
-  await admin.from('device_tokens').update({ fcm_token }).eq('device_token', deviceToken)
+  const update: any = { fcm_token }
+  if (ses_kanali === 'custom' || ses_kanali === 'default') update.ses_kanali = ses_kanali
+  await admin.from('device_tokens').update(update).eq('device_token', deviceToken)
 
   return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
 }
