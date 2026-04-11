@@ -9,6 +9,7 @@ export type Proje = {
   aciklama?: string | null
   renk?: string
   aktif: boolean
+  logo_url?: string | null
   birim_fiyat_aktif?: boolean
   personel_takibi_aktif?: boolean
   sureli_gorev_aktif?: boolean

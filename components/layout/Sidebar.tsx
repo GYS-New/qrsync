@@ -332,10 +332,12 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           onClick={() => go(`${base}/dashboard`)}
           title="Gösterge Paneli"
         >
-          {/* Logo alanı — tüm roller için tek yapı */}
+          {/* Logo alanı — SA: uygulama logosu, diğerleri: proje logosu > firma logosu */}
           {isSA && sidebarLogo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={sidebarLogo} alt="Logo" style={{ height: 60, maxWidth: 230, objectFit: 'contain' }} />
+          ) : !isSA && aktifProje?.logo_url ? (
+            <SidebarLogo src={aktifProje.logo_url} alt={aktifProje.ad} />
           ) : !isSA && firma?.logo_url ? (
             <SidebarLogo src={firma.logo_url} alt="Firma Logo" />
           ) : null}
