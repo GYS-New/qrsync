@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest) {
   const { data: mevcut } = await admin.from('sistem_konfigurasyon').select('id').limit(1).single()
 
   const update: any = { guncelleme_tarihi: new Date().toISOString() }
-  const fields = ['uygulama_domain', 'uygulama_ismi', 'sidebar_logo_url', 'firebase_project_id', 'firebase_client_email', 'firebase_private_key', 'cron_secret']
+  const fields = ['uygulama_domain', 'uygulama_ismi', 'sidebar_logo_url', 'sidebar_altyazi', 'firebase_project_id', 'firebase_client_email', 'firebase_private_key', 'cron_secret']
   for (const f of fields) { if (body[f] !== undefined) update[f] = body[f] }
 
   if (mevcut) {

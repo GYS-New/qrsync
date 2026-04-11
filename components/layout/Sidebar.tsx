@@ -190,7 +190,7 @@ function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' |
   )
 }
 
-export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, birimFiyatAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; birimFiyatAktifProp?: boolean }) {
+export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, sidebarAltyazi, birimFiyatAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; sidebarAltyazi?: string | null; birimFiyatAktifProp?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeLoading = useRouteLoading()
@@ -200,6 +200,15 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
   // SA ve TA her ikisi de ProjeContext + FirmaContext kullanır
   const { aktifProje } = useProje()
   const { firmaId: saFirmaId, firmalar } = useFirma()
+
+  // Sidebar altyazı — prop veya API'den
+  const [altyazi, setAltyazi] = useState(sidebarAltyazi ?? 'GÖREV YÖNETİM SİSTEMİ')
+  useEffect(() => {
+    if (sidebarAltyazi) { setAltyazi(sidebarAltyazi); return }
+    fetch('/api/sistem-konfig?field=sidebar_altyazi').then(r => r.json()).then(j => {
+      if (j?.value) setAltyazi(j.value)
+    }).catch(() => {})
+  }, [sidebarAltyazi])
 
   const [counts, setCounts] = useState<SidebarCounts | null>(null)
   const [countsError, setCountsError] = useState(false)
@@ -339,6 +348,11 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
             <SidebarLogo src={firma.logo_url} alt="Firma Logo" />
           ) : null}
         </div>
+        {altyazi && (
+          <div style={{ textAlign: 'center', marginTop: 6, fontSize: 13, fontWeight: 700, color: '#4b5563', fontFamily: 'Inter, sans-serif', letterSpacing: '0.03em' }}>
+            {altyazi}
+          </div>
+        )}
       </div>
 
       {/* Nav */}
