@@ -132,8 +132,7 @@ function SidebarLogo({ src, alt }: { src: string; alt: string }) {
   const [dims, setDims] = useState<{ w: number; h: number }>({ w: 200, h: 50 })
   return (
     <div style={{
-      background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
-      padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
