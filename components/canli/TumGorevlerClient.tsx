@@ -807,11 +807,11 @@ async function del() {
 
   // Sayfalama
   const PAGE_SIZE = 50
-  const [sayfa, setSayfa] = React.useState(1)
+  const [sayfa, setSayfa] = useState(1)
   const toplamSayfa = Math.max(1, Math.ceil(combinedRows.length / PAGE_SIZE))
   const sayfaRows = combinedRows.slice((sayfa - 1) * PAGE_SIZE, sayfa * PAGE_SIZE)
   // Filtre değişince sayfa 1'e dön
-  React.useEffect(() => { setSayfa(1) }, [combinedRows.length])
+  useEffect(() => { setSayfa(1) }, [combinedRows.length])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
