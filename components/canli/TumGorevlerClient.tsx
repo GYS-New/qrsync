@@ -844,15 +844,20 @@ async function del() {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
-        fontWeight: 800,
-        fontSize: 14,
+        gap: 4,
+        fontWeight: 700,
+        fontSize: 12.5,
         textTransform: 'uppercase',
-        color: '#111827',
+        color: '#6b7280',
+        letterSpacing: '0.05em',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        padding: 0,
       }}
     >
       {label}
-      <span style={{ fontSize: 14, opacity: sortKey === key ? 1 : 0.35 }}>
+      <span style={{ fontSize: 11, opacity: sortKey === key ? 1 : 0.35 }}>
         {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}
       </span>
     </button>
