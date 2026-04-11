@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import UserPanel from '@/components/layout/UserPanel'
 import DashboardScopeControls from '@/components/layout/DashboardScopeControls'
@@ -17,8 +17,37 @@ interface TopbarProps {
   base: string
 }
 
+// Breadcrumb label → href mapping
+const BREADCRUMB_HREF_MAP: Record<string, string> = {
+  'Yönetim': '',
+  'Sistem': '',
+  'Gösterge Paneli': '/dashboard',
+  'Kullanıcılar': '/dashboard/kullanicilar',
+  'Lokasyonlar': '/dashboard/lokasyonlar',
+  'Lokasyon Grupları': '/dashboard/lokasyon-gruplari',
+  'Spesifik Görevler': '/dashboard/gorevler',
+  'Frekansiyel Görevler': '/dashboard/canli-islemler',
+  'Tüm Görevler': '/dashboard/canli-islemler/tum-gorevler',
+  'Canlı Görev Akışı': '/dashboard/canli-islemler',
+  'Checklist Şablonları': '/dashboard/checklist-sablonlari',
+  'Personel Takibi': '/dashboard/personel-takibi',
+  'Raporlar': '/dashboard/raporlar',
+  'Arşiv': '/dashboard/arsiv',
+  'Sistem Ayarları': '/dashboard/sistem-ayarlari',
+  'Görev Kuralları': '/dashboard/sistem-ayarlari',
+  'Bildirimler': '/dashboard/bildirimler',
+  'Projeler': '/dashboard/projeler',
+  'Firmalar': '/dashboard/firmalar',
+  'Birim Fiyatlar': '/dashboard/birim-fiyatlar',
+}
+
 export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCount, base }: TopbarProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const [navigating, setNavigating] = useState(false)
+
+  // Sayfa değişince loading'i kapat
+  useEffect(() => { setNavigating(false) }, [pathname])
   const supabase = useMemo(() => createClient(), [])
   const [count, setCount] = useState<number>(notifCount ?? 0)
   const { firmaId: saFirmaId, firmalar } = useFirma()
@@ -87,18 +116,42 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
       display:'flex', alignItems:'center', gap:16,
       position:'sticky', top:0, zIndex:10,
     }}>
-      {/* Breadcrumb */}
+      {/* Breadcrumb + Loading */}
       <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:15 }}>
-        <span style={{ color:'#6b7280' }}>{firmaAdi}</span>
-        {breadcrumbs?.map((b, i) => (
-          <span key={i} style={{ display:'flex', alignItems:'center', gap:5 }}>
-            <span style={{ color:'#9ca3af', fontSize:15 }}>›</span>
-            <span
-              style={{ color: i === (breadcrumbs.length - 1) ? '#374151' : '#6b7280', fontWeight: i === (breadcrumbs.length - 1) ? 600 : 400, cursor: b.href ? 'pointer' : 'default' }}
-              onClick={() => b.href && router.push(b.href)}
-            >{b.label}</span>
+        <span
+          style={{ color:'#6b7280', cursor:'pointer', transition:'color .15s' }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#111827')}
+          onMouseLeave={e => (e.currentTarget.style.color = '#6b7280')}
+          onClick={() => { setNavigating(true); router.push(`${base}/dashboard`) }}
+        >{firmaAdi}</span>
+        {breadcrumbs?.map((b, i) => {
+          const isLast = i === breadcrumbs.length - 1
+          const href = b.href || (isLast ? '' : BREADCRUMB_HREF_MAP[b.label] ? `${base}${BREADCRUMB_HREF_MAP[b.label]}` : '')
+          const clickable = !!href && !isLast
+          return (
+            <span key={i} style={{ display:'flex', alignItems:'center', gap:5 }}>
+              <span style={{ color:'#9ca3af', fontSize:15 }}>›</span>
+              <span
+                style={{
+                  color: isLast ? '#374151' : '#6b7280',
+                  fontWeight: isLast ? 600 : 400,
+                  cursor: clickable ? 'pointer' : 'default',
+                  transition: 'color .15s',
+                }}
+                onMouseEnter={e => { if (clickable) e.currentTarget.style.color = '#111827' }}
+                onMouseLeave={e => { if (clickable) e.currentTarget.style.color = '#6b7280' }}
+                onClick={() => { if (clickable) { setNavigating(true); router.push(href) } }}
+              >{b.label}</span>
+            </span>
+          )
+        })}
+        {navigating && (
+          <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" style={{ animation: 'spin 0.8s linear infinite' }}>
+              <circle cx="12" cy="12" r="10" stroke="#3b82f6" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" strokeLinecap="round" />
+            </svg>
           </span>
-        ))}
+        )}
       </div>
 
       {/* Right */}
