@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useProje } from '@/components/projeler/ProjeContext'
+import DynamicLogo from '@/components/ui/DynamicLogo'
 
 const DashboardSettingsClient = dynamic(() => import('@/components/dashboard/DashboardSettingsClient'), { ssr: false })
 const GorevSureleriClient = dynamic(() => import('./GorevSureleriClient'), { ssr: false })
@@ -464,8 +465,7 @@ function UygulamaAyarlariPanel() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80,
         }}>
           {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="Uygulama Logosu" style={{ height: 'auto', maxHeight: 100, maxWidth: '100%', objectFit: 'contain' }} />
+            <DynamicLogo src={logoUrl} alt="Uygulama Logosu" height={80} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#cbd5e1' }}>
               <span style={{ fontSize: 36 }}>🖼</span>
