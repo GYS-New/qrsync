@@ -345,9 +345,8 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
       <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
         {/* Brand label — proje logosu varsa göster (tüm roller), yoksa ProATA fallback (TA/U) */}
         {projeLogo ? (
-          <div style={{ padding: '10px 14px', margin: '8px 6px 6px', borderRadius: 10, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={projeLogo} alt="Proje" style={{ height: 48, objectFit: 'contain' }} />
+          <div style={{ padding: '6px 14px', margin: '8px 6px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SidebarLogo src={projeLogo} alt="Proje" />
           </div>
         ) : !isSA ? (
           <div style={{ padding: '10px 14px', margin: '8px 6px 6px', borderRadius: 10, background: '#f3f4f6', fontWeight: 700, fontSize: 14, color: '#374151', display: 'flex', alignItems: 'center', gap: 10 }}>
