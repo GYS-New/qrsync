@@ -28,12 +28,10 @@ export default async function TATumGorevlerPage() {
 
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  const son24saat = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const gorevler = await fetchAll(() =>
     supabase.from('canli_gorevler').select(sel)
       .eq('firma_id', firmaId)
       .or(`proje_id.eq.${aktifProje.id},proje_id.is.null`)
-      .gte('aktif_olma_tarihi', son24saat)
       .order('aktif_olma_tarihi', { ascending: false })
   )
 

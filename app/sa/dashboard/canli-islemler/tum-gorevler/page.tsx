@@ -34,12 +34,10 @@ export default async function SATumGorevlerPage() {
 
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  // Son 24 saatin görevlerini çek (bugün boş olabilir — tatil/pazar)
-  const son24saat = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  // Aktif tablodaki tüm görevleri çek (arşivlenmemiş olanlar)
   const gorevler = await fetchAll(() => {
     let q = supabase.from('canli_gorevler').select(sel)
       .eq('firma_id', firmaId)
-      .gte('aktif_olma_tarihi', son24saat)
       .order('aktif_olma_tarihi', { ascending: false })
     if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
     return q
