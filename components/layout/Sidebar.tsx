@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import UserAvatar from './UserAvatar'
 import type { User, UserRole } from '@/types'
@@ -124,6 +124,36 @@ type SidebarCounts = {
   personnel_tracking_total: number
   reports_total: number
   arsiv_total: number
+}
+
+/** Sidebar logo — boyut logoya göre dinamik, beyaz bg + gri border */
+function SidebarLogo({ src, alt }: { src: string; alt: string }) {
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [dims, setDims] = useState<{ w: number; h: number }>({ w: 200, h: 50 })
+  return (
+    <div style={{
+      background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+      padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={imgRef}
+        src={src}
+        alt={alt}
+        onLoad={() => {
+          const img = imgRef.current
+          if (!img) return
+          const ratio = img.naturalWidth / img.naturalHeight
+          const h = 50
+          setDims({ w: ratio < 1.2 ? h : Math.min(h * ratio, 220), h })
+        }}
+        style={{
+          width: dims.w, height: dims.h, objectFit: 'contain',
+          transition: 'width 0.2s ease',
+        }}
+      />
+    </div>
+  )
 }
 
 function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' | 'blue' | 'orange' }) {
@@ -307,8 +337,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
             // eslint-disable-next-line @next/next/no-img-element
             <img src={sidebarLogo} alt="Logo" style={{ height: 60, maxWidth: 230, objectFit: 'contain' }} />
           ) : !isSA && firma?.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={firma.logo_url} alt="Firma Logo" style={{ height: 60, maxWidth: 230, objectFit: 'contain' }} />
+            <SidebarLogo src={firma.logo_url} alt="Firma Logo" />
           ) : null}
         </div>
       </div>
