@@ -34,16 +34,18 @@ export default async function SATumGorevlerPage() {
 
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  const gorevler = await fetchAll(() => {
-    let q = supabase
-      .from('canli_gorevler')
-      .select(sel)
-      .eq('firma_id', firmaId)
-      .in('durum', ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI', 'SILINDI'])
-      .order('aktif_olma_tarihi', { ascending: false })
-    if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
-    return q
-  })
+  // Sadece bugünün görevlerini çek (TRT gün başlangıcı)
+  const bugunBaslangic = new Date(new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10) + 'T00:00:00+03:00').toISOString()
+  let gorevQ = supabase
+    .from('canli_gorevler')
+    .select(sel)
+    .eq('firma_id', firmaId)
+    .gte('aktif_olma_tarihi', bugunBaslangic)
+    .order('aktif_olma_tarihi', { ascending: false })
+    .limit(500)
+  if (projeId) gorevQ = (gorevQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+  const { data: gorevData } = await gorevQ
+  const gorevler = gorevData ?? []
 
   let lokQ = supabase
     .from('lokasyonlar')

@@ -805,6 +805,14 @@ async function del() {
     return all
   }, [arsivAktif, sorted, arsivRows, q, actor])
 
+  // Sayfalama
+  const PAGE_SIZE = 50
+  const [sayfa, setSayfa] = React.useState(1)
+  const toplamSayfa = Math.max(1, Math.ceil(combinedRows.length / PAGE_SIZE))
+  const sayfaRows = combinedRows.slice((sayfa - 1) * PAGE_SIZE, sayfa * PAGE_SIZE)
+  // Filtre değişince sayfa 1'e dön
+  React.useEffect(() => { setSayfa(1) }, [combinedRows.length])
+
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
     else {
@@ -1050,7 +1058,7 @@ async function del() {
             </tr>
           </thead>
           <tbody>
-            {combinedRows.map((g: any) => {
+            {sayfaRows.map((g: any) => {
               const isArsiv = g._source === 'arsiv'
               return (
               <tr key={`${g._source}-${g.id}`} onClick={() => {
@@ -1131,6 +1139,25 @@ async function del() {
           </tbody>
         </table>
       </div>
+
+      {/* Sayfalama */}
+      {toplamSayfa > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#f8fafc', borderRadius: 8, marginTop: 8 }}>
+          <span style={{ fontSize: 13, color: '#64748b' }}>
+            {combinedRows.length} kayıt — Sayfa {sayfa}/{toplamSayfa}
+          </span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={() => setSayfa(1)} disabled={sayfa === 1}
+              style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, cursor: sayfa === 1 ? 'default' : 'pointer', opacity: sayfa === 1 ? 0.4 : 1 }}>{'<<'}</button>
+            <button onClick={() => setSayfa(s => Math.max(1, s - 1))} disabled={sayfa === 1}
+              style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, cursor: sayfa === 1 ? 'default' : 'pointer', opacity: sayfa === 1 ? 0.4 : 1 }}>{'<'}</button>
+            <button onClick={() => setSayfa(s => Math.min(toplamSayfa, s + 1))} disabled={sayfa === toplamSayfa}
+              style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, cursor: sayfa === toplamSayfa ? 'default' : 'pointer', opacity: sayfa === toplamSayfa ? 0.4 : 1 }}>{'>'}</button>
+            <button onClick={() => setSayfa(toplamSayfa)} disabled={sayfa === toplamSayfa}
+              style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, cursor: sayfa === toplamSayfa ? 'default' : 'pointer', opacity: sayfa === toplamSayfa ? 0.4 : 1 }}>{'>>'}</button>
+          </div>
+        </div>
+      )}
 
       {/* ── TOPLU DÜZENLE UYARI POPUP ── */}
       {bulkDuzenleUyari.length > 0 && (

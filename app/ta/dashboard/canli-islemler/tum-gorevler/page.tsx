@@ -28,15 +28,17 @@ export default async function TATumGorevlerPage() {
 
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  const gorevler = await fetchAll(() =>
-    supabase
-      .from('canli_gorevler')
-      .select(sel)
-      .eq('firma_id', firmaId)
-      .or(`proje_id.eq.${aktifProje.id},proje_id.is.null`)
-      .in('durum', ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI'])
-      .order('aktif_olma_tarihi', { ascending: false })
-  )
+  // Sadece bugünün görevlerini çek (TRT gün başlangıcı)
+  const bugunBaslangic = new Date(new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10) + 'T00:00:00+03:00').toISOString()
+  const { data: gorevData } = await supabase
+    .from('canli_gorevler')
+    .select(sel)
+    .eq('firma_id', firmaId)
+    .or(`proje_id.eq.${aktifProje.id},proje_id.is.null`)
+    .gte('aktif_olma_tarihi', bugunBaslangic)
+    .order('aktif_olma_tarihi', { ascending: false })
+    .limit(500)
+  const gorevler = gorevData ?? []
 
   const [{ data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
     supabase

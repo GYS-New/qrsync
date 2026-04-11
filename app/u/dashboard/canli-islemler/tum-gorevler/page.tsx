@@ -35,40 +35,20 @@ export default async function UTumGorevlerPage() {
   // Yetkili lokasyon kısıtlaması
   const yetkiliLokIds = await getYetkiliLokasyonIds(supabase, firmaId, projeId)
 
-  const plus24h = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-  const minus7d  = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  // Sadece bugünün görevlerini çek (TRT gün başlangıcı)
+  const bugunBaslangic = new Date(new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10) + 'T00:00:00+03:00').toISOString()
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  const [q1, q2] = await Promise.all([
-    fetchAll(() => {
-      let q = supabase.from('canli_gorevler').select(sel)
-        .eq('firma_id', firmaId)
-        .lte('aktif_olma_tarihi', plus24h)
-        .order('aktif_olma_tarihi', { ascending: false })
-      if (projeId) q = (q as any).eq('proje_id', projeId)
-      if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
-      return q
-    }),
-    fetchAll(() => {
-      let q = supabase.from('canli_gorevler').select(sel)
-        .eq('firma_id', firmaId)
-        .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI'])
-        .gte('aktif_olma_tarihi', minus7d)
-        .order('aktif_olma_tarihi', { ascending: false })
-      if (projeId) q = (q as any).eq('proje_id', projeId)
-      if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
-      return q
-    }),
-  ])
+  let gorevQ = supabase.from('canli_gorevler').select(sel)
+    .eq('firma_id', firmaId)
+    .gte('aktif_olma_tarihi', bugunBaslangic)
+    .order('aktif_olma_tarihi', { ascending: false })
+    .limit(500)
+  if (projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
+  if (yetkiliLokIds) gorevQ = gorevQ.in('lokasyon_id', yetkiliLokIds)
+  const { data: gorevData } = await gorevQ
 
-  const seen = new Set<string>()
-  const gorevler: any[] = []
-  for (const row of [...(q1 ?? []), ...(q2 ?? [])]) {
-    if (!seen.has(row.id)) { seen.add(row.id); gorevler.push(row) }
-  }
-  gorevler.sort((a, b) =>
-    new Date(b.aktif_olma_tarihi).getTime() - new Date(a.aktif_olma_tarihi).getTime()
-  )
+  const gorevler = gorevData ?? []
 
   let lokQ = supabase
     .from('lokasyonlar').select('id,tanim')
