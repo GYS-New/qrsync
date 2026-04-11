@@ -333,10 +333,10 @@ export default function ProjelerClient({
               {/* Logo veya renk ikon */}
               {p.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.logo_url} alt={p.ad} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'contain', border: '1px solid #e2e8f0', background: '#fff', flexShrink: 0 }} />
+                <img src={p.logo_url} alt={p.ad} style={{ width: 72, height: 48, borderRadius: 8, objectFit: 'contain', border: '1px solid #e2e8f0', background: '#fff', flexShrink: 0, padding: 2 }} />
               ) : (
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${p.renk}18`, border: `2px solid ${p.renk}40`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: p.renk }} />
+                <div style={{ width: 72, height: 48, borderRadius: 10, background: `${p.renk}18`, border: `2px solid ${p.renk}40`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: p.renk }} />
                 </div>
               )}
 
@@ -455,7 +455,7 @@ export default function ProjelerClient({
                 <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#4b5563', marginBottom: 5 }}>Proje Logosu</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   {logoPreview ? (
-                    <img src={logoPreview} alt="Logo" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'contain', border: '1px solid #e2e8f0', background: '#fff' }} />
+                    <img src={logoPreview} alt="Logo" style={{ width: 96, height: 64, borderRadius: 8, objectFit: 'contain', border: '1px solid #e2e8f0', background: '#fff', padding: 2 }} />
                   ) : (
                     <div style={{ width: 48, height: 48, borderRadius: 8, background: form.renk + '20', border: '1px dashed #e5e7eb', display: 'grid', placeItems: 'center', fontSize: 18, color: form.renk, fontWeight: 800 }}>
                       {form.ad?.[0]?.toUpperCase() ?? '?'}
