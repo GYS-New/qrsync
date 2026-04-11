@@ -47,7 +47,7 @@ const inp: React.CSSProperties = {
   border: `1px solid ${T.border}`, background: '#fff', fontSize: 14, width: '100%',
 }
 
-// ── Yatay bar chart (horizontal) ──────────────────────────────────────────
+// ── Yatay bar chart (horizontal) — hover tooltip ─────────────────────────
 function BarChart({
   data, valueKey, labelKey, color,
 }: {
@@ -59,19 +59,21 @@ function BarChart({
   if (!data.length) return <div style={{ color: T.textSoft, fontSize: 14, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
   const barClr = color ?? T.blueMid
   const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
+  const total = data.reduce((s, d) => s + (Number(d[valueKey]) || 0), 0)
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       {data.map((d, i) => {
         const val = Number(d[valueKey]) || 0
         const pct = (val / max) * 100
+        const totalPct = total > 0 ? Math.round(val / total * 100) : 0
         const label = String(d[labelKey] ?? '')
         return (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }} title={`${label}: ${val} (%${totalPct})`}>
             <div style={{ width: 130, fontSize: 13, fontWeight: 600, color: T.text, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>{label}</div>
-            <div style={{ flex: 1, height: 26, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
-              <div style={{ height: '100%', width: `${Math.max(pct, 2)}%`, background: `linear-gradient(90deg, ${barClr}cc, ${barClr})`, borderRadius: 6, transition: 'width 0.5s ease' }} />
-              <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 12, fontWeight: 800, color: pct > 40 ? '#fff' : T.text }}>{val}</span>
+            <div style={{ flex: 1, height: 28, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.max(pct, 2)}%`, background: `linear-gradient(90deg, ${barClr}99, ${barClr})`, borderRadius: 6, transition: 'width 0.5s ease' }} />
             </div>
+            <div style={{ width: 50, fontSize: 13, fontWeight: 800, color: T.text, textAlign: 'right', flexShrink: 0 }}>{val}</div>
           </div>
         )
       })}
@@ -79,7 +81,7 @@ function BarChart({
   )
 }
 
-// ── Donut grafik (halka) ──────────────────────────────────────────────────
+// ── Donut grafik (halka) — hover tooltip ─────────────────────────────────
 function PieChart({ slices }: { slices: { label: string; value: number; color: string }[] }) {
   const total = slices.reduce((s, x) => s + x.value, 0)
   if (!total) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
@@ -101,9 +103,15 @@ function PieChart({ slices }: { slices: { label: string; value: number; color: s
     <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
       <div style={{ position: 'relative', width: 160, height: 160, flexShrink: 0 }}>
         <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
-          {arcs.map((p, i) => <path key={i} d={p.d} fill={p.color} stroke="#fff" strokeWidth={1.2} />)}
+          {arcs.map((p, i) => (
+            <path key={i} d={p.d} fill={p.color} stroke="#fff" strokeWidth={1.2} style={{ cursor: 'pointer', opacity: 0.9, transition: 'opacity 0.15s' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '0.9')}>
+              <title>{`${p.label}: ${p.value} (%${p.pct})`}</title>
+            </path>
+          ))}
         </svg>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
           <span style={{ fontSize: 22, fontWeight: 900, color: T.text, lineHeight: 1 }}>%{mainPct}</span>
           <span style={{ fontSize: 10, color: T.textSoft, fontWeight: 600 }}>{arcs[0]?.label ?? ''}</span>
         </div>
