@@ -463,6 +463,74 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
         desc="Personel giriş/çıkış kayıtlarının kaç saat sonra arşive taşınacağını belirler." />
       <AyarSaatKart ayarKey="arsiv_musteri_saat" label="Müşteri Değerlendirme Arşiv Süresi"
         desc="Müşteri memnuniyet değerlendirmelerinin kaç saat sonra arşive taşınacağını belirler." />
+
+      {/* Arşiv Temizleme */}
+      <ArsivTemizlemePanel firmaId={currentFirmaId} />
+    </div>
+  )
+}
+
+/** Arşiv temizleme paneli — girilen tarihten eski arşiv kayıtlarını kalıcı siler */
+function ArsivTemizlemePanel({ firmaId }: { firmaId: string | null }) {
+  const [tarih, setTarih] = useState('')
+  const [onay, setOnay] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [sonuc, setSonuc] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  const temizle = async () => {
+    if (!firmaId || !tarih || !onay) return
+    setLoading(true); setSonuc(null)
+    try {
+      const res = await fetch('/api/tasks/arsiv-temizle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firmaId, tarihOncesi: tarih }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? 'Hata')
+      setSonuc(`${j.silinen ?? 0} arşiv kaydı kalıcı olarak silindi.`)
+      toast({ type: 'success', title: 'Temizlendi', message: `${j.silinen ?? 0} kayıt silindi.` })
+      setOnay(false)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #fecaca', borderRadius: 10, padding: '18px 20px', marginTop: 20 }}>
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 14, fontWeight: 700, color: '#991b1b', display: 'block', marginBottom: 4 }}>Arşiv Temizleme (Kalıcı Silme)</label>
+        <div style={{ fontSize: 12.5, color: '#64748b', lineHeight: 1.6 }}>
+          Girilen tarihten önceki tüm arşiv kayıtları <strong style={{ color: '#dc2626' }}>kalıcı olarak silinir</strong>. Bu işlem geri alınamaz.
+          Frekansiyel görev arşivi, spesifik görev arşivi, mesai arşivi ve müşteri değerlendirme arşivi temizlenir.
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4, fontWeight: 600 }}>Bu tarihten öncesini sil:</div>
+          <input type="date" value={tarih} onChange={e => { setTarih(e.target.value); setOnay(false); setSonuc(null) }}
+            style={{ height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 600 }} />
+        </div>
+        {tarih && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#991b1b', fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>
+            <input type="checkbox" checked={onay} onChange={e => setOnay(e.target.checked)} style={{ width: 16, height: 16 }} />
+            Bu işlemin geri alınamayacağını onaylıyorum
+          </label>
+        )}
+        {tarih && onay && (
+          <button onClick={temizle} disabled={loading}
+            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 13, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+            {loading ? 'Siliniyor...' : 'Kalıcı Olarak Sil'}
+          </button>
+        )}
+      </div>
+      {sonuc && (
+        <div style={{ marginTop: 10, padding: '8px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, fontSize: 13, color: '#166534', fontWeight: 600 }}>
+          {sonuc}
+        </div>
+      )}
     </div>
   )
 }
