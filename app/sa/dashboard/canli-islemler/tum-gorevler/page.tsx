@@ -36,16 +36,14 @@ export default async function SATumGorevlerPage() {
 
   // Son 24 saatin görevlerini çek (bugün boş olabilir — tatil/pazar)
   const son24saat = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  let gorevQ = supabase
-    .from('canli_gorevler')
-    .select(sel)
-    .eq('firma_id', firmaId)
-    .gte('aktif_olma_tarihi', son24saat)
-    .order('aktif_olma_tarihi', { ascending: false })
-    .limit(500)
-  if (projeId) gorevQ = (gorevQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
-  const { data: gorevData } = await gorevQ
-  const gorevler = gorevData ?? []
+  const gorevler = await fetchAll(() => {
+    let q = supabase.from('canli_gorevler').select(sel)
+      .eq('firma_id', firmaId)
+      .gte('aktif_olma_tarihi', son24saat)
+      .order('aktif_olma_tarihi', { ascending: false })
+    if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+    return q
+  })
 
   let lokQ = supabase
     .from('lokasyonlar')

@@ -39,16 +39,15 @@ export default async function UTumGorevlerPage() {
   const son24saat = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  let gorevQ = supabase.from('canli_gorevler').select(sel)
-    .eq('firma_id', firmaId)
-    .gte('aktif_olma_tarihi', son24saat)
-    .order('aktif_olma_tarihi', { ascending: false })
-    .limit(500)
-  if (projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
-  if (yetkiliLokIds) gorevQ = gorevQ.in('lokasyon_id', yetkiliLokIds)
-  const { data: gorevData } = await gorevQ
-
-  const gorevler = gorevData ?? []
+  const gorevler = await fetchAll(() => {
+    let q = supabase.from('canli_gorevler').select(sel)
+      .eq('firma_id', firmaId)
+      .gte('aktif_olma_tarihi', son24saat)
+      .order('aktif_olma_tarihi', { ascending: false })
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
+    return q
+  })
 
   let lokQ = supabase
     .from('lokasyonlar').select('id,tanim')
