@@ -516,8 +516,7 @@ function UygulamaAyarlariPanel() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 64,
         }}>
           {sidebarLogoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={sidebarLogoUrl} alt="Sidebar Logo" style={{ height: 'auto', maxHeight: 48, maxWidth: '100%', objectFit: 'contain' }} />
+            <DynamicLogo src={sidebarLogoUrl} alt="Sidebar Logo" height={48} />
           ) : (
             <span style={{ fontSize: 12, color: '#94a3b8' }}>Henüz sidebar logosu yüklenmedi</span>
           )}
