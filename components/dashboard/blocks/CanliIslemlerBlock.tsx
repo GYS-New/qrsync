@@ -56,11 +56,10 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
       if (yetkiliLokIds?.length) uq = (uq as any).in('ust_lokasyon_id', yetkiliLokIds)
       return uq
     })(),
-    // [7] Online mobil kullanıcılar (SİM hariç, firma filtreli — proje_id çoğu cihazda null)
+    // [7] Online kullanıcılar (SİM + gerçek — firma filtreli)
     (() => {
       let oq = supabase.from('device_tokens').select('user_id').eq('aktif', true)
         .gte('son_kullanim', new Date(Date.now() - 10 * 60 * 1000).toISOString())
-        .not('device_token', 'like', 'sim-%')
       if (firmaId) oq = oq.eq('firma_id', firmaId)
       return oq
     })(),

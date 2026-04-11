@@ -19,11 +19,10 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - ONLINE_WINDOW_SECONDS * 1000).toISOString()
   const admin = createAdminClient()
 
-  // device_tokens'tan son 10dk içinde aktif olan user_id'leri bul (SİM token'ları hariç)
-  let dtQ = admin.from('device_tokens').select('user_id, son_kullanim, isim_soyisim, firma_id, device_token')
+  // device_tokens'tan son 10dk içinde aktif olan user_id'leri bul (SİM dahil)
+  let dtQ = admin.from('device_tokens').select('user_id, son_kullanim, isim_soyisim, firma_id')
     .eq('aktif', true)
     .gte('son_kullanim', since)
-    .not('device_token', 'like', 'sim-%')
     .order('son_kullanim', { ascending: false })
     .limit(limit * 2)
 
