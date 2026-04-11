@@ -57,75 +57,70 @@ const inp: React.CSSProperties = {
   border: `1px solid ${T.border}`, background: '#fff', fontSize: 14, width: '100%',
 }
 
-// ── Mini bar chart ─────────────────────────────────────────────────
+// ── Yatay bar chart (horizontal) ──────────────────────────────────
 function BarChart({ data, valueKey, labelKey, color }: {
   data: Record<string, any>[]; valueKey: string; labelKey: string; color?: string
 }) {
   if (!data.length) return <div style={{ color: T.textSoft, fontSize: 14, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
   const barClr = color ?? T.blueMid
-  const chartH = 280, barArea = 160, topPad = 24
-  const barW = 44, gap = 20
-  const totalW = data.length * (barW + gap) + gap
   const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
   return (
-    <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
-      <svg width={totalW} height={chartH} style={{ display: 'block' }}>
-        {[0.25, 0.5, 0.75, 1].map(ratio => {
-          const y = topPad + barArea * (1 - ratio)
-          return (
-            <g key={ratio}>
-              <line x1={0} y1={y} x2={totalW} y2={y} stroke="#e2e8f0" strokeWidth={0.5} />
-              <text x={2} y={y - 3} fontSize={10} fill={T.textSoft}>{Math.round(max * ratio)}</text>
-            </g>
-          )
-        })}
-        {data.map((d, i) => {
-          const val = Number(d[valueKey]) || 0
-          const barH = (val / max) * barArea
-          const x = gap + i * (barW + gap)
-          const y = topPad + barArea - barH
-          const label = String(d[labelKey] ?? '').slice(0, 14)
-          return (
-            <g key={i}>
-              <rect x={x} y={y} width={barW} height={barH} fill={barClr} rx={3} opacity={0.9} />
-              <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={11} fontWeight="bold" fill={T.gray}>{val}</text>
-              <text x={x + barW / 2} y={topPad + barArea + 10} textAnchor="end" fontSize={11} fill={T.textSoft}
-                transform={`rotate(-40, ${x + barW / 2}, ${topPad + barArea + 10})`}>{label}</text>
-            </g>
-          )
-        })}
-        <line x1={0} y1={topPad + barArea} x2={totalW} y2={topPad + barArea} stroke={T.border} strokeWidth={1} />
-      </svg>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {data.map((d, i) => {
+        const val = Number(d[valueKey]) || 0
+        const pct = (val / max) * 100
+        const label = String(d[labelKey] ?? '')
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 130, fontSize: 13, fontWeight: 600, color: T.text, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>{label}</div>
+            <div style={{ flex: 1, height: 26, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
+              <div style={{ height: '100%', width: `${Math.max(pct, 2)}%`, background: `linear-gradient(90deg, ${barClr}cc, ${barClr})`, borderRadius: 6, transition: 'width 0.5s ease' }} />
+              <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 12, fontWeight: 800, color: pct > 40 ? '#fff' : T.text }}>{val}</span>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-// ── Pasta grafik ───────────────────────────────────────────────────
+// ── Donut grafik (halka) ──────────────────────────────────────────
 function PieChart({ slices, size = 120 }: { slices: { label: string; value: number; color: string }[]; size?: number }) {
   const total = slices.reduce((s, x) => s + x.value, 0)
   if (!total) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
-  const cx = 50, cy = 50, r = 40
+  const cx = 50, cy = 50, R = 42, r = 26
   let angle = -Math.PI / 2
-  const paths = slices.filter(s => s.value > 0).map(s => {
+  const arcs = slices.filter(s => s.value > 0).map(s => {
     const a = (s.value / total) * Math.PI * 2
-    const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle)
+    const ox1 = cx + R * Math.cos(angle), oy1 = cy + R * Math.sin(angle)
+    const ix1 = cx + r * Math.cos(angle), iy1 = cy + r * Math.sin(angle)
     angle += a
-    const x2 = cx + r * Math.cos(angle), y2 = cy + r * Math.sin(angle)
+    const ox2 = cx + R * Math.cos(angle), oy2 = cy + R * Math.sin(angle)
+    const ix2 = cx + r * Math.cos(angle), iy2 = cy + r * Math.sin(angle)
     const large = a > Math.PI ? 1 : 0
-    return { d: `M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z`, color: s.color, label: s.label, value: s.value, pct: Math.round(s.value / total * 100) }
+    const d = `M${ox1.toFixed(2)},${oy1.toFixed(2)} A${R},${R} 0 ${large} 1 ${ox2.toFixed(2)},${oy2.toFixed(2)} L${ix2.toFixed(2)},${iy2.toFixed(2)} A${r},${r} 0 ${large} 0 ${ix1.toFixed(2)},${iy1.toFixed(2)} Z`
+    return { d, color: s.color, label: s.label, value: s.value, pct: Math.round(s.value / total * 100) }
   })
+  const mainPct = arcs.length > 0 ? arcs[0].pct : 0
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-      <svg viewBox="0 0 100 100" style={{ width: size, height: size, flexShrink: 0 }}>
-        {paths.map((p, i) => <path key={i} d={p.d} fill={p.color} stroke="#fff" strokeWidth={0.8} />)}
-      </svg>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {paths.map((p, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
-            <div style={{ width: 12, height: 12, borderRadius: 3, background: p.color, flexShrink: 0 }} />
-            <span style={{ color: T.textSoft }}>{p.label}</span>
-            <span style={{ fontWeight: 700, color: T.text, marginLeft: 4 }}>{p.value}</span>
-            <span style={{ color: T.textSoft, fontSize: 12 }}>(%{p.pct})</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+      <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+        <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
+          {arcs.map((p, i) => <path key={i} d={p.d} fill={p.color} stroke="#fff" strokeWidth={1.2} />)}
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: size * 0.14, fontWeight: 900, color: T.text, lineHeight: 1 }}>%{mainPct}</span>
+          <span style={{ fontSize: size * 0.06, color: T.textSoft, fontWeight: 600 }}>{arcs[0]?.label ?? ''}</span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {arcs.map((p, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 14, height: 14, borderRadius: 4, background: p.color, flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>{p.value} <span style={{ fontSize: 12, color: T.textSoft, fontWeight: 500 }}>(%{p.pct})</span></div>
+              <div style={{ fontSize: 12, color: T.textSoft }}>{p.label}</div>
+            </div>
           </div>
         ))}
       </div>
