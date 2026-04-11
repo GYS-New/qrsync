@@ -328,7 +328,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
       {/* Logo */}
       <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid #f3f4f6' }}>
         <div
-          style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, cursor: 'pointer' }}
           onClick={() => go(`${base}/dashboard`)}
           title="Gösterge Paneli"
         >
