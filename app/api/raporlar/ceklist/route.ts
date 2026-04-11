@@ -196,29 +196,31 @@ async function kayitlarGetir(
   if (cikti !== 'arsiv') {
     let sbQ = admin.from('checklist_sonuc_basliklari')
       .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
-      .in('lokasyon_id', lokIds)
       .order('kayit_tarihi', { ascending: false })
-      .limit(2000)
+      .limit(5000)
     if (baslangic) sbQ = sbQ.gte('kayit_tarihi', baslangic)
     if (bitis)     sbQ = sbQ.lte('kayit_tarihi', bitis + 'T23:59:59')
     const { data: sbData } = await sbQ
-    basliklar = sbData ?? []
+    const lokSet = new Set(lokIds)
+    basliklar = (sbData ?? []).filter((b: any) => lokSet.has(b.lokasyon_id))
   }
 
   // Arşiv tablosundan oku - cikti=arsiv veya birlesik için
   let arBasliklar: any[] = []
   if (cikti === 'arsiv' || cikti === 'birlesik') {
+    // lokIds çok fazla olduğunda URL limiti aşılabilir — firmaId ile çekip sonra filtrele
     let arSbQ = admin.from('checklist_sonuc_basliklari_arsiv')
       .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
-      .in('lokasyon_id', lokIds)
       .order('kayit_tarihi', { ascending: false })
-      .limit(2000)
+      .limit(5000)
     if (baslangic) arSbQ = arSbQ.gte('kayit_tarihi', baslangic)
     if (bitis)     arSbQ = arSbQ.lte('kayit_tarihi', bitis + 'T23:59:59')
 
     const { data: arData, error: arErr } = await arSbQ
-    console.log('[ceklist-rapor] arsiv basliklar:', arData?.length ?? 0, 'err:', arErr?.message ?? null, 'lokIds:', lokIds.length, 'cikti:', cikti)
-    if (!arErr && arData) arBasliklar = arData
+    if (!arErr && arData) {
+      const lokSet = new Set(lokIds)
+      arBasliklar = arData.filter((b: any) => lokSet.has(b.lokasyon_id))
+    }
   }
 
   // Birleştir — fiziksel tabloyu etiketle
