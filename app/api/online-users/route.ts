@@ -19,12 +19,13 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - ONLINE_WINDOW_SECONDS * 1000).toISOString()
   const admin = createAdminClient()
 
-  // device_tokens'tan son 2dk içinde aktif olan user_id'leri bul
-  let dtQ = admin.from('device_tokens').select('user_id, son_kullanim, isim_soyisim, firma_id')
+  // device_tokens'tan son 10dk içinde aktif olan user_id'leri bul (SİM token'ları hariç)
+  let dtQ = admin.from('device_tokens').select('user_id, son_kullanim, isim_soyisim, firma_id, device_token')
     .eq('aktif', true)
     .gte('son_kullanim', since)
+    .not('device_token', 'like', 'sim-%')
     .order('son_kullanim', { ascending: false })
-    .limit(limit * 2) // birden fazla cihaz olabilir
+    .limit(limit * 2)
 
   if (me.rol !== 'super_admin' && me.rol !== 'alt_super_admin') {
     if (me.firma_id) dtQ = (dtQ as any).eq('firma_id', me.firma_id)
@@ -51,11 +52,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, users: [], since })
   }
 
-  // Kullanıcı detaylarını çek (join yok — hızlı)
-  const { data: users, error: uErr } = await admin.from('users')
+  // Kullanıcı detaylarını çek (proje filtresi dahil)
+  let uQ = admin.from('users')
     .select('id,isim_soyisim,rol,profil_foto,firma_id')
     .in('id', uniqueUserIds.slice(0, limit))
     .eq('aktif', true)
+  if (projeId) uQ = (uQ as any).eq('proje_id', projeId)
+  const { data: users, error: uErr } = await uQ
   if (uErr) {
     return NextResponse.json({ ok: true, users: [], since, _error: uErr.message })
   }

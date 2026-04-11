@@ -56,8 +56,15 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
       if (yetkiliLokIds?.length) uq = (uq as any).in('ust_lokasyon_id', yetkiliLokIds)
       return uq
     })(),
-    // [7] Online mobil kullanıcılar (device_tokens.son_kullanim son 10dk — sadece firma filtresi, proje filtresi yok)
-    ff(supabase.from('device_tokens').select('user_id').eq('aktif', true).gte('son_kullanim', new Date(Date.now() - 10 * 60 * 1000).toISOString())),
+    // [7] Online mobil kullanıcılar (SİM hariç, proje filtreli)
+    (() => {
+      let oq = supabase.from('device_tokens').select('user_id').eq('aktif', true)
+        .gte('son_kullanim', new Date(Date.now() - 10 * 60 * 1000).toISOString())
+        .not('device_token', 'like', 'sim-%')
+      if (firmaId) oq = oq.eq('firma_id', firmaId)
+      if (projeId) oq = (oq as any).eq('proje_id', projeId)
+      return oq
+    })(),
     // [8] Lokasyonlar toplam (lokasyon yetki filtreli)
     (() => { let lq = supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true); if (firmaId) lq = lq.eq('firma_id', firmaId); if (yetkiliLokIds && yetkiliLokIds.length > 0) lq = lq.in('id', yetkiliLokIds); return lq })(),
     // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar)
