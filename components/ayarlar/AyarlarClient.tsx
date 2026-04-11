@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import UserAvatar from '@/components/layout/UserAvatar'
 import type { User } from '@/types'
@@ -15,6 +16,7 @@ export default function AyarlarClient({
   initialMe: User
 }) {
   const supabase = createClient()
+  const router = useRouter()
   const { toast } = useToast()
   const [me, setMe] = useState<User>(initialMe)
   const [form, setForm] = useState({
@@ -98,6 +100,7 @@ export default function AyarlarClient({
       setProfilFoto(publicUrl)
       setAvatarKey(k => k + 1)
       setMe((prev) => ({ ...(prev as any), profil_foto: publicUrl } as any))
+      router.refresh() // Sidebar avatar güncelle
       toast({ type: 'success', title: 'Başarılı', message: 'Profil fotoğrafı güncellendi.' })
     } catch (e: any) {
       toast({ type: 'error', title: 'Yüklenemedi', message: e?.message ?? 'Fotoğraf yüklenemedi' })
@@ -255,6 +258,7 @@ export default function AyarlarClient({
                   await supabase.from('users').update({ profil_foto: null }).eq('id', meId)
                   setProfilFoto(null)
                   setMe((prev) => ({ ...(prev as any), profil_foto: null } as any))
+                  router.refresh() // Sidebar avatar güncelle
                   toast({ type: 'success', title: 'Başarılı', message: 'Profil fotoğrafı kaldırıldı.' })
                 } catch (e: any) {
                   toast({ type: 'error', title: 'Hata', message: e?.message ?? 'Fotoğraf kaldırılamadı' })
