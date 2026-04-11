@@ -26,6 +26,7 @@ export default function AyarlarClient({
   const [profilFoto, setProfilFoto] = useState<string | null>(initialMe.profil_foto ?? null)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [loading, setLoading] = useState(false)
+  const [avatarKey, setAvatarKey] = useState(0) // cache-bust for avatar
   const [emailValue, setEmailValue] = useState(initialMe.email ?? '')
   const [currentPassword, setCurrentPassword] = useState('')
   const [emailLoading, setEmailLoading] = useState(false)
@@ -95,6 +96,7 @@ export default function AyarlarClient({
       if (!res.ok) throw new Error(json?.error || 'Fotoğraf yüklenemedi')
       const publicUrl = json.publicUrl as string
       setProfilFoto(publicUrl)
+      setAvatarKey(k => k + 1)
       setMe((prev) => ({ ...(prev as any), profil_foto: publicUrl } as any))
       toast({ type: 'success', title: 'Başarılı', message: 'Profil fotoğrafı güncellendi.' })
     } catch (e: any) {
@@ -226,7 +228,7 @@ export default function AyarlarClient({
     <div style={{ display: 'grid', gap: 16 }}>
       <div className="verde-card" style={{ padding: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <UserAvatar name={me.isim_soyisim} photoUrl={profilFoto ?? undefined} size={46} />
+          <UserAvatar name={me.isim_soyisim} photoUrl={profilFoto ? `${profilFoto}?v=${avatarKey}` : undefined} size={46} />
           <div>
             <div style={{ fontWeight: 800, color: '#111827' }}>{me.isim_soyisim}</div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>{me.email}</div>
@@ -244,8 +246,23 @@ export default function AyarlarClient({
               }}
             />
             <Button variant="ghost" type="button" onClick={() => fileRef.current?.click()} disabled={loading}>
-              Fotoğraf Ekle
+              {profilFoto ? 'Fotoğraf Değiştir' : 'Fotoğraf Ekle'}
             </Button>
+            {profilFoto && (
+              <Button variant="danger" type="button" disabled={loading} onClick={async () => {
+                setLoading(true)
+                try {
+                  await supabase.from('users').update({ profil_foto: null }).eq('id', meId)
+                  setProfilFoto(null)
+                  setMe((prev) => ({ ...(prev as any), profil_foto: null } as any))
+                  toast({ type: 'success', title: 'Başarılı', message: 'Profil fotoğrafı kaldırıldı.' })
+                } catch (e: any) {
+                  toast({ type: 'error', title: 'Hata', message: e?.message ?? 'Fotoğraf kaldırılamadı' })
+                } finally { setLoading(false) }
+              }}>
+                Temizle
+              </Button>
+            )}
           </div>
         </div>
 
