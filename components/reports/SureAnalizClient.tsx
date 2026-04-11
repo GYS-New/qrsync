@@ -228,11 +228,11 @@ function PercentileCard({ analiz }: { analiz: Analiz }) {
 // ── Tablo ─────────────────────────────────────────────────────────────────
 function Tablo({ headers, rows, color }: { headers: string[]; rows: (string|number)[][]; color: string }) {
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+    <div style={{ overflowX: 'auto', maxHeight: 420, overflowY: 'auto', border: `1px solid ${T.border}`, borderRadius: 8 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
           <tr>{headers.map((h, i) => (
-            <th key={i} style={{ padding: '7px 10px', background: color, color: '#fff', fontWeight: 700, fontSize: 11, textAlign: i === 0 ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
+            <th key={i} style={{ padding: '9px 12px', background: color, color: '#fff', fontWeight: 700, fontSize: 12, textAlign: i === 0 ? 'left' : 'center', whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1 }}>{h}</th>
           ))}</tr>
         </thead>
         <tbody>
@@ -241,13 +241,18 @@ function Tablo({ headers, rows, color }: { headers: string[]; rows: (string|numb
             : rows.map((row, ri) => (
               <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : '#fff' }}>
                 {row.map((cell, ci) => (
-                  <td key={ci} style={{ padding: '6px 10px', borderBottom: `1px solid ${T.border}`, textAlign: ci === 0 ? 'left' : 'center', fontSize: 12.5, fontWeight: ci === 0 ? 600 : 400 }}>{String(cell ?? '')}</td>
+                  <td key={ci} style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: ci === 0 ? 'left' : 'center', fontSize: 13, fontWeight: ci === 0 ? 600 : 400 }}>{String(cell ?? '')}</td>
                 ))}
               </tr>
             ))
           }
         </tbody>
       </table>
+      {rows.length > 10 && (
+        <div style={{ padding: '6px 12px', fontSize: 12, color: T.textSoft, textAlign: 'center', background: T.grayLight, borderTop: `1px solid ${T.border}` }}>
+          {rows.length} kayıt
+        </div>
+      )}
     </div>
   )
 }
@@ -290,10 +295,10 @@ function LokasyonKarsilastirma({ data, renk, tolerans = 10 }: { data: LokasyonRo
   const maxVal = Math.max(...data.flatMap(r => [r.ort_sure, r.hedef_sure ?? 0]), 1)
   const hasHedef = data.some(r => r.hedef_sure != null)
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 400, overflowY: 'auto' }}>
       {/* Lejant */}
       {hasHedef && (
-        <div style={{ display: 'flex', gap: 16, marginBottom: 6, fontSize: 12, color: T.textSoft }}>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 6, fontSize: 12, color: T.textSoft, position: 'sticky', top: 0, background: '#fff', padding: '4px 0', zIndex: 1 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: renk, display: 'inline-block' }} /> Ort. Süre</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: '#cbd5e1', display: 'inline-block' }} /> Hedef Süre</span>
         </div>
@@ -339,10 +344,10 @@ function PersonelKarsilastirma({ data, renk, tolerans = 10 }: { data: PersonelRo
   const maxVal = Math.max(...data.flatMap(r => [r.ort_sure, r.ort_hedef_sure ?? 0]), 1)
   const hasHedef = data.some(r => r.ort_hedef_sure != null)
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 400, overflowY: 'auto' }}>
       {/* Lejant */}
       {hasHedef && (
-        <div style={{ display: 'flex', gap: 16, marginBottom: 6, fontSize: 12, color: T.textSoft }}>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 6, fontSize: 12, color: T.textSoft, position: 'sticky', top: 0, background: '#fff', padding: '4px 0', zIndex: 1 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: renk, display: 'inline-block' }} /> Ort. Süre</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: '#cbd5e1', display: 'inline-block' }} /> Hedef Süre</span>
         </div>
