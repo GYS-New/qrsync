@@ -208,17 +208,18 @@ function DagilimBar({ data, color }: { data: DagilimRow[]; color: string }) {
 // ── Yüzdelik dilim göstergesi ─────────────────────────────────────────────
 function PercentileCard({ analiz }: { analiz: Analiz }) {
   const items = [
-    { label: 'Medyan (P50)', val: analiz.p50, color: T.green },
-    { label: 'P75', val: analiz.p75, color: T.amber },
-    { label: 'P90', val: analiz.p90, color: T.red },
-    { label: 'P95', val: analiz.p95, color: '#9f1239' },
+    { label: 'Medyan (P50)', val: analiz.p50, color: T.green, desc: 'Görevlerin yarısı bu sürede veya daha hızlı tamamlandı' },
+    { label: 'P75', val: analiz.p75, color: T.amber, desc: 'Görevlerin %75\'i bu sürede veya daha hızlı tamamlandı' },
+    { label: 'P90', val: analiz.p90, color: T.red, desc: 'Görevlerin %90\'ı bu sürede veya daha hızlı tamamlandı' },
+    { label: 'P95', val: analiz.p95, color: '#9f1239', desc: 'Görevlerin %95\'i bu sürede veya daha hızlı — geri kalan %5 aşırı yavaş' },
   ]
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-      {items.map(({ label, val, color }) => (
-        <div key={label} style={{ padding: '10px 12px', background: color + '10', border: `1px solid ${color}30`, borderRadius: 8, borderLeft: `3px solid ${color}` }}>
+      {items.map(({ label, val, color, desc }) => (
+        <div key={label} style={{ padding: '12px 14px', background: color + '10', border: `1px solid ${color}30`, borderRadius: 8, borderLeft: `3px solid ${color}` }}>
           <div style={{ fontSize: 12, color, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{label}</div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: T.text, marginTop: 4 }}>{fmtS(val)}</div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: T.text, marginTop: 4 }}>{fmtS(val)}</div>
+          <div style={{ fontSize: 12, color: T.textSoft, marginTop: 4, lineHeight: 1.4 }}>{desc}</div>
         </div>
       ))}
     </div>
