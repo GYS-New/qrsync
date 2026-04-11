@@ -217,6 +217,7 @@ async function kayitlarGetir(
     if (bitis)     arSbQ = arSbQ.lte('kayit_tarihi', bitis + 'T23:59:59')
 
     const { data: arData, error: arErr } = await arSbQ
+    console.log('[ceklist-rapor] arsiv basliklar:', arData?.length ?? 0, 'err:', arErr?.message ?? null, 'lokIds:', lokIds.length, 'cikti:', cikti)
     if (!arErr && arData) arBasliklar = arData
   }
 
@@ -225,6 +226,7 @@ async function kayitlarGetir(
     ...(basliklar ?? []).map((b: any) => ({ ...b, _fromArsiv: false })),
     ...arBasliklar.map((b: any) => ({ ...b, _fromArsiv: true })),
   ]
+  console.log('[ceklist-rapor] allBasliklar:', allBasliklar.length, 'basliklar:', basliklar.length, 'arBasliklar:', arBasliklar.length)
   if (!allBasliklar?.length) return []
 
   const canliGorevIds = [...new Set(
