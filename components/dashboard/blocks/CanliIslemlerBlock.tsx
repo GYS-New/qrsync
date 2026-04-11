@@ -65,8 +65,8 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
       if (projeId) oq = (oq as any).eq('proje_id', projeId)
       return oq
     })(),
-    // [8] Lokasyonlar toplam (lokasyon yetki filtreli)
-    (() => { let lq = supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true); if (firmaId) lq = lq.eq('firma_id', firmaId); if (yetkiliLokIds && yetkiliLokIds.length > 0) lq = lq.in('id', yetkiliLokIds); return lq })(),
+    // [8] Lokasyonlar toplam (proje + lokasyon yetki filtreli)
+    (() => { let lq = supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true); if (firmaId) lq = lq.eq('firma_id', firmaId); if (projeId) lq = (lq as any).eq('proje_id', projeId); if (yetkiliLokIds && yetkiliLokIds.length > 0) lq = lq.in('id', yetkiliLokIds); return lq })(),
     // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar)
     gf(supabase.from('canli_gorevler').select('lokasyon_id').gte('aktif_olma_tarihi', todayISO).limit(3000)),
     // [10] Görevli lokasyonlar — spesifik (bugün tüm durumlar)
