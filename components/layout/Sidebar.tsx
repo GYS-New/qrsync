@@ -81,6 +81,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
           { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
           { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
+          { label: 'Görev Duraklatmaları', href: `${base}/dashboard/gorev-duraklatmalari`, icon: '⏸' },
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },

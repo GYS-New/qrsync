@@ -16,8 +16,8 @@ export async function GET(req: NextRequest) {
   const firmaId = url.searchParams.get('firma_id') ?? me.firma_id
   const projeId = url.searchParams.get('proje_id') ?? null
 
-  // SA tüm firmaları görebilir, TA yalnızca kendi firmasını
-  if (me.rol === 'tenant_admin' && firmaId !== me.firma_id) {
+  // SA tüm firmaları görebilir, TA/U yalnızca kendi firmasını
+  if ((me.rol === 'tenant_admin' || me.rol === 'tenant_user' || me.rol === 'musteri') && firmaId !== me.firma_id) {
     return NextResponse.json({ error: 'Yetkisiz firma' }, { status: 403 })
   }
 

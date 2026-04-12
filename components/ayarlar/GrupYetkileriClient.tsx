@@ -24,6 +24,7 @@ const SAYFALAR = [
   { kod: 'tum-gorevler',          label: 'Tüm Görevler',               grup: 'Görevler' },
   { kod: 'checklist-sablonlari',  label: 'Checklist Şablonları',       grup: 'Görevler' },
   { kod: 'arsiv',                 label: 'Arşiv',                      grup: 'Görevler' },
+  { kod: 'gorev-duraklatmalari',  label: 'Görev Duraklatmaları',       grup: 'Görevler' },
   // Raporlama
   { kod: 'musteri-degerlendirme', label: 'Müşteri Değerlendirmeleri',  grup: 'Raporlama' },
   { kod: 'personel-takibi',       label: 'Personel Takibi',            grup: 'Raporlama' },
