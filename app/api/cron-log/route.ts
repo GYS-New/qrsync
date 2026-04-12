@@ -17,13 +17,13 @@ export async function GET(req: NextRequest) {
     .order('tarih', { ascending: false })
     .limit(20)
 
-  // Firma filtresi: firma_id eşleşen VEYA firma_id null (global loglar)
+  // Firma filtresi: sadece bu firmaya ait loglar
   if (firmaId) {
-    q = q.or(`firma_id.eq.${firmaId},firma_id.is.null`)
+    q = q.eq('firma_id', firmaId)
   }
-  // Proje filtresi: proje_id eşleşen VEYA proje_id null
+  // Proje filtresi: sadece bu projeye ait loglar
   if (projeId) {
-    q = q.or(`proje_id.eq.${projeId},proje_id.is.null`)
+    q = q.eq('proje_id', projeId)
   }
 
   const { data } = await q
