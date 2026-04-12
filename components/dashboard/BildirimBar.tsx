@@ -1,19 +1,36 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 
 type Bildirim = { id: string; mesaj: string; tip: string }
 
-export default function BildirimBar({ rol, propFirmaId, propProjeId }: { rol: string; propFirmaId?: string | null; propProjeId?: string | null }) {
+export default function BildirimBar({ rol }: { rol: string }) {
   const [bildirimler, setBildirimler] = useState<Bildirim[]>([])
   const [aktifIdx, setAktifIdx] = useState(0)
+  const [meInfo, setMeInfo] = useState<{ firma_id: string | null; proje_id: string | null } | null>(null)
+  const supabase = useMemo(() => createClient(), [])
+
+  // Context'lerden al (SA'da çalışır, TA/U'da null dönebilir)
   const { firmaId: ctxFirmaId } = useFirma()
   const { aktifProje } = useProje()
-  const firmaId = propFirmaId || ctxFirmaId
-  const projeId = propProjeId || aktifProje?.id || null
+
   const isMusteriRol = rol === 'musteri'
+
+  // TA/U için kendi user bilgisini çek
+  useEffect(() => {
+    if (ctxFirmaId) return // SA context'ten alıyor
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from('users').select('firma_id,proje_id').eq('id', user.id).single()
+        .then(({ data }) => { if (data) setMeInfo(data as any) })
+    })
+  }, [ctxFirmaId, supabase])
+
+  const firmaId = ctxFirmaId || meInfo?.firma_id || null
+  const projeId = aktifProje?.id || meInfo?.proje_id || null
 
   useEffect(() => {
     if (isMusteriRol) return
