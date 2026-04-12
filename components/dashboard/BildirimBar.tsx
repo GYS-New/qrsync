@@ -69,8 +69,8 @@ export default function BildirimBar({ rol }: { rol: 'super_admin' | 'alt_super_a
           }
         }
 
-        // Cron logları
-        try {
+        // Cron logları — firma bazlı değil, sadece SA/TA görsün
+        if (isSA || isTA) try {
           const cronRes = await fetch('/api/cron-log')
           const cronJ = await cronRes.json()
           const CRON_MESAJLAR: Record<string, (s: any) => string> = {
