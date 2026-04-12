@@ -26,7 +26,14 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data: data ?? [] })
+
+  // Her kayıt için personel listesini ekle
+  const enriched = []
+  for (const row of (data ?? [])) {
+    const { data: pers } = await admin.from('personel_destek_personeller').select('user_id').eq('destek_id', row.id)
+    enriched.push({ ...row, personel_idler: (pers ?? []).map((p: any) => p.user_id) })
+  }
+  return NextResponse.json({ data: enriched })
 }
 
 export async function POST(req: NextRequest) {
@@ -72,6 +79,16 @@ export async function PATCH(req: NextRequest) {
   const admin = createAdminClient()
   const { error } = await admin.from('personel_gorev_destegi').update(allowed).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Personel listesi güncelle
+  if (Array.isArray(updates.personel_idler)) {
+    await admin.from('personel_destek_personeller').delete().eq('destek_id', id)
+    if (updates.personel_idler.length > 0) {
+      const rows = updates.personel_idler.map((uid: string) => ({ destek_id: id, user_id: uid }))
+      await admin.from('personel_destek_personeller').insert(rows)
+    }
+  }
+
   return NextResponse.json({ ok: true })
 }
 

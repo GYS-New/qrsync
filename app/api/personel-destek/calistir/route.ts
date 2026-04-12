@@ -46,6 +46,26 @@ export async function POST(req: Request) {
   }
 }
 
+// ── Cinsiyet eşleştirmesi ────────────────────────────────────────────────
+type PersonelBilgi = { id: string; cinsiyet: string | null }
+
+function lokasyonCinsiyetBelirle(lokTanim: string): 'E' | 'K' | null {
+  const upper = lokTanim.toUpperCase()
+  if (upper.includes('BAYAN')) return 'K'
+  if (upper.includes('BAY') && !upper.includes('BAYAN')) return 'E'
+  return null
+}
+
+function cinsiyetliPersonelSec(personeller: PersonelBilgi[], lokTanim: string): string | null {
+  if (personeller.length === 0) return null
+  const gerekliCinsiyet = lokasyonCinsiyetBelirle(lokTanim)
+  if (gerekliCinsiyet) {
+    const uygunlar = personeller.filter(p => p.cinsiyet === gerekliCinsiyet)
+    if (uygunlar.length > 0) return uygunlar[Math.floor(Math.random() * uygunlar.length)].id
+  }
+  return personeller[Math.floor(Math.random() * personeller.length)].id
+}
+
 async function destekCalistir(admin: any, ayar: any) {
   const { firma_id, proje_id, ust_lokasyon_id, hedef_oran } = ayar
   const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -103,15 +123,44 @@ async function destekCalistir(admin: any, ayar: any) {
   const acikGorevler = tumGorevler.filter((g: any) => g.durum === 'ACIK' || g.durum === 'ISLEMDE' || g.durum === 'BEKLEMEDE')
   const kalanHedef = hedefMax - tamamlananSayi
 
-  // Firma personellerini çek (atanan kullanıcı öncelikli)
-  const { data: personeller } = await admin
+  // ── Personel seçimi: tanımlı personeller + cinsiyet + mesai kontrolü (SİM ile aynı) ──
+  // Önce bu destek kaydına atanmış personelleri çek
+  const { data: destekPersoneller } = await admin
+    .from('personel_destek_personeller')
+    .select('user_id')
+    .eq('destek_id', ayar.id)
+  const destekPersonelIds = (destekPersoneller ?? []).map((p: any) => p.user_id)
+
+  // Atanmış personel yoksa çalışma
+  if (destekPersonelIds.length === 0) return { tamamlanan: 0, mesaj: 'Personel atanmamış' }
+
+  const { data: tumPersoneller } = await admin
     .from('users')
-    .select('id')
-    .eq('firma_id', firma_id)
+    .select('id, cinsiyet')
+    .in('id', destekPersonelIds)
     .eq('aktif', true)
-    .in('rol', ['tenant_user'])
-    .limit(50)
-  const personelIds = (personeller ?? []).map((p: any) => p.id)
+
+  let uygunPersonel: PersonelBilgi[] = (tumPersoneller ?? []).map((u: any) => ({
+    id: u.id,
+    cinsiyet: u.cinsiyet ?? null,
+  }))
+
+  // Mesai kontrolü: personel takibi aktifse sadece mesaide olanları al
+  if (proje_id) {
+    const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', proje_id).single()
+    if (proje?.personel_takibi_aktif === true) {
+      const { data: mesailar } = await admin
+        .from('personel_mesai_kayitlari')
+        .select('user_id')
+        .eq('firma_id', firma_id)
+        .eq('kayit_tarihi', bugun)
+        .is('cikis_saati', null)
+      const mesailiSet = new Set((mesailar ?? []).map((m: any) => m.user_id))
+      uygunPersonel = uygunPersonel.filter(p => mesailiSet.has(p.id))
+    }
+  }
+
+  if (uygunPersonel.length === 0) return { tamamlanan: 0, mesaj: 'Uygun personel yok' }
 
   // Rastgele sırala ve hedef kadar tamamla
   const shuffled = acikGorevler.sort(() => Math.random() - 0.5).slice(0, kalanHedef)
@@ -121,8 +170,9 @@ async function destekCalistir(admin: any, ayar: any) {
 
   for (const gorev of shuffled) {
     const lok = lokMap.get(gorev.lokasyon_id)
+    // Öncelik: atanan personel, yoksa cinsiyet eşleştirmeli rastgele seç
     const personelId = gorev.atanan_kullanici_id
-      || (personelIds.length > 0 ? personelIds[Math.floor(Math.random() * personelIds.length)] : null)
+      || cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
     if (!personelId) continue
 
     // %1 iptal olasılığı (doğallık)
