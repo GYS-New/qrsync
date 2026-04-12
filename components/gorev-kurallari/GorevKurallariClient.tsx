@@ -177,11 +177,18 @@ export default function GorevKurallariClient({
     setLokSec(chain.map(id => id))
   }
 
+  const [duraklatmalar, setDuraklatmalar] = useState<any[]>([])
+
   useEffect(() => {
     if (!firmaId) return
     fetch(`/api/gorev-kurallari/bugun-ozet?firma_id=${firmaId}`)
       .then(r => r.json()).then(setOzet).catch(() => {})
-  }, [firmaId])
+    // Aktif duraklatmaları çek
+    const dp = new URLSearchParams({ firmaId })
+    if (projeId) dp.set('projeId', projeId)
+    fetch(`/api/gorev-kurallari/duraklat-vardiya?${dp}`)
+      .then(r => r.json()).then(j => setDuraklatmalar(j.data ?? [])).catch(() => {})
+  }, [firmaId, projeId])
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
@@ -492,6 +499,12 @@ export default function GorevKurallariClient({
         const kalanKurallar = filtered.filter(k => !eslesmisKuralIds.has(k.id))
 
         // Render helper: tek kural satırı
+        // Duraklatma helper: tanım adına göre aktif duraklatma sayısı
+        const duraklatmaSayisi = (tanim: string) => duraklatmalar.filter(d => d.tanim === tanim).length
+        // Grup altındaki tüm tanımların duraklatma toplamı
+        const grupDuraklatmaSayisi = (tanimlar: { tanim: string }[]) =>
+          tanimlar.reduce((s, t) => s + duraklatmaSayisi(t.tanim), 0)
+
         const renderKuralSatir = (k: any, indent: number = 0) => {
           const o = ozet[k.id]
           const lokTanim = lokasyonlar.find(l => l.id === k.lokasyon_id)?.tanim ?? '—'
@@ -544,13 +557,15 @@ export default function GorevKurallariClient({
             {hiyerarsi.map(h => {
               const ustAcik = acikUstLoklar.has(h.ustLok)
               const toplamKural = h.gruplar.reduce((s, g) => s + g.tanimlar.reduce((ss, t) => ss + t.kurallar.length, 0), 0) + h.grupsuz.length
+              const ustDuraklat = h.gruplar.reduce((s, g) => s + grupDuraklatmaSayisi(g.tanimlar), 0)
               return (
-                <div key={h.ustLok} style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                <div key={h.ustLok} style={{ border: `1px solid ${ustDuraklat > 0 ? '#fbbf24' : '#e5e7eb'}`, borderRadius: 10, overflow: 'hidden' }}>
                   {/* Üst Lokasyon Başlığı */}
                   <div onClick={() => setAcikUstLoklar(prev => { const n = new Set(prev); n.has(h.ustLok) ? n.delete(h.ustLok) : n.add(h.ustLok); return n })}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f9fafb', cursor: 'pointer', userSelect: 'none' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: ustDuraklat > 0 ? '#fffdf5' : '#f9fafb', cursor: 'pointer', userSelect: 'none' }}>
                     <span style={{ fontSize: 12, color: '#374151' }}>{ustAcik ? '▼' : '▶'}</span>
                     <span style={{ fontSize: 15, fontWeight: 800, color: '#111827', flex: 1 }}>📍 {h.ustLokTanim}</span>
+                    {ustDuraklat > 0 && <span style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>⏸ {ustDuraklat} duraklatma</span>}
                     <span style={{ fontSize: 12, color: '#6b7280' }}>{toplamKural} kural · {h.gruplar.length} grup</span>
                   </div>
 
@@ -560,15 +575,17 @@ export default function GorevKurallariClient({
                         const gAcik = acikGruplar2.has(g.grupId)
                         const tumKurallar = g.tanimlar.flatMap(t => t.kurallar)
                         const aktifSayi = tumKurallar.filter(k => k.aktif).length
+                        const grupDuraklat = grupDuraklatmaSayisi(g.tanimlar)
                         return (
                           <div key={g.grupId}>
                             {/* Grup Başlığı */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 10px 36px', background: '#fff', borderTop: '1px solid #f3f4f6', cursor: 'pointer', userSelect: 'none' }}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 10px 36px', background: grupDuraklat > 0 ? '#fffdf5' : '#fff', borderTop: '1px solid #f3f4f6', cursor: 'pointer', userSelect: 'none' }}
                               onClick={() => setAcikGruplar2(prev => { const n = new Set(prev); n.has(g.grupId) ? n.delete(g.grupId) : n.add(g.grupId); return n })}>
                               <span style={{ fontSize: 11, color: '#6b7280' }}>{gAcik ? '▼' : '▶'}</span>
                               <span style={{ fontSize: 13.5, fontWeight: 700, color: '#1f2937', flex: 1 }}>
                                 🗂 {g.grupAd}
                                 <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>{g.tanimlar.length} kural tanımı · {tumKurallar.length} kural · {aktifSayi} aktif</span>
+                                {grupDuraklat > 0 && <span style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 4, fontWeight: 700, marginLeft: 6 }}>⏸ {grupDuraklat}</span>}
                               </span>
                               {!readonly && yetki.silebilir && (
                                 <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
@@ -583,15 +600,17 @@ export default function GorevKurallariClient({
                             {gAcik && g.tanimlar.map((tg, ti) => {
                               const tanimKey = `${g.grupId}::${tg.tanim}`
                               const tanimAcik = acikTanimlar.has(tanimKey)
+                              const tanimDuraklat = duraklatmaSayisi(tg.tanim)
                               return (
                               <div key={ti}>
                                 {/* Tanım başlığı — tıkla aç/kapa */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px 8px 52px', background: '#fafafa', borderTop: '1px solid #f3f4f6', cursor: 'pointer', userSelect: 'none' }}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px 8px 52px', background: tanimDuraklat > 0 ? '#fffbeb' : '#fafafa', borderTop: '1px solid #f3f4f6', cursor: 'pointer', userSelect: 'none', borderLeft: tanimDuraklat > 0 ? '3px solid #f59e0b' : 'none' }}
                                   onClick={() => setAcikTanimlar(prev => { const n = new Set(prev); n.has(tanimKey) ? n.delete(tanimKey) : n.add(tanimKey); return n })}>
                                   <span style={{ fontSize: 11, color: '#6b7280' }}>{tanimAcik ? '▼' : '▶'}</span>
                                   <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', flex: 1 }}>
-                                    📋 {tg.tanim}
+                                    {tanimDuraklat > 0 ? '⏸ ' : '📋 '}{tg.tanim}
                                     <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>({tg.kurallar.length} lokasyon)</span>
+                                    {tanimDuraklat > 0 && <span style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 4, fontWeight: 700, marginLeft: 6 }}>{tanimDuraklat} duraklatma</span>}
                                   </span>
                                   <span style={{ fontSize: 11, color: '#6b7280' }}>
                                     {tg.kurallar[0]?.aktif_olma_saati?.slice(0, 5) ?? ''} · {gunEtiket(tg.kurallar[0]?.aktif_gunler ?? [])}
@@ -706,7 +725,14 @@ export default function GorevKurallariClient({
           firmaId={duraklatVardiyaModal.firmaId}
           projeId={duraklatVardiyaModal.projeId}
           aktifOlmaSaati={duraklatVardiyaModal.aktifOlmaSaati}
-          onClose={() => setDuraklatVardiyaModal(null)}
+          onClose={() => {
+            setDuraklatVardiyaModal(null)
+            // Duraklatmaları yenile
+            const dp = new URLSearchParams({ firmaId: firmaId! })
+            if (projeId) dp.set('projeId', projeId)
+            fetch(`/api/gorev-kurallari/duraklat-vardiya?${dp}`)
+              .then(r => r.json()).then(j => setDuraklatmalar(j.data ?? [])).catch(() => {})
+          }}
         />
       )}
 
