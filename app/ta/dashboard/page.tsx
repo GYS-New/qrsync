@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import DashboardRenderer from '@/components/dashboard/DashboardRenderer'
+import DashboardRefresher from '@/components/dashboard/DashboardRefresher'
 import { ensureDashboardDefaults } from '@/lib/dashboard/ensureDefaults'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 
@@ -30,6 +31,7 @@ export default async function Dashboard() {
       <div style={{ padding: '24px 28px' }}>
         <DashboardRenderer bloklar={bloklar} firmaId={firmaId} isSuperAdmin={false} basePath="/ta" projeId={aktifProje?.id ?? null} />
       </div>
+      <DashboardRefresher />
     </div>
   )
 }

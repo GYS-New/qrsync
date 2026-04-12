@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import DashboardRenderer from '@/components/dashboard/DashboardRenderer'
+import DashboardRefresher from '@/components/dashboard/DashboardRefresher'
 import { ensureDashboardDefaults } from '@/lib/dashboard/ensureDefaults'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
@@ -32,6 +33,7 @@ export default async function SADashboard() {
           basePath="/sa"
         />
       </div>
+      <DashboardRefresher />
     </div>
   )
 }

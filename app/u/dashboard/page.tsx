@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import DashboardRenderer from '@/components/dashboard/DashboardRenderer'
+import DashboardRefresher from '@/components/dashboard/DashboardRefresher'
 import { ensureDashboardDefaults } from '@/lib/dashboard/ensureDefaults'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
@@ -47,6 +48,7 @@ export default async function Dashboard() {
           yetkiliLokIds={yetkiliLokIds}
         />
       </div>
+      <DashboardRefresher />
     </div>
   )
 }
