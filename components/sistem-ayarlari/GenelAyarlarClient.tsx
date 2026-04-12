@@ -379,7 +379,7 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
       </div>
 
       {/* Vardiya Tanımları */}
-      <VardiyaAyarlariPanel />
+      <VardiyaAyarlariPanel firmaId={currentFirmaId} />
 
       {/* Personel Takip Bildirim Süresi */}
       <div style={{ background: '#fff', border: `1px solid ${overrides.personel_takip_bildirim_dk ? '#c4b5fd' : T.border}`, borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>

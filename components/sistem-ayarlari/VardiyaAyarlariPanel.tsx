@@ -14,8 +14,9 @@ const VARSAYILAN = [
 
 type Vardiya = { no: number; baslangic: string; bitis: string }
 
-export default function VardiyaAyarlariPanel() {
-  const { firmaId: saFirmaId } = useFirma()
+export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId?: string | null }) {
+  const { firmaId: firmaIdEfektif } = useFirma()
+  const firmaIdEfektif = propFirmaId || firmaIdEfektif
   const { toast } = useToast()
   const [sayisi, setSayisi] = useState(3)
   const [saatler, setSaatler] = useState<Vardiya[]>(VARSAYILAN)
@@ -23,8 +24,8 @@ export default function VardiyaAyarlariPanel() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (!saFirmaId) return
-    fetch(`/api/sistem-ayarlari/vardiya?firmaId=${saFirmaId}`)
+    if (!firmaIdEfektif) return
+    fetch(`/api/sistem-ayarlari/vardiya?firmaId=${firmaIdEfektif}`)
       .then(r => r.json())
       .then(j => {
         setSayisi(j.vardiya_sayisi ?? 3)
@@ -32,7 +33,7 @@ export default function VardiyaAyarlariPanel() {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [saFirmaId])
+  }, [firmaIdEfektif])
 
   function sayiDegistir(n: number) {
     setSayisi(n)
@@ -56,13 +57,13 @@ export default function VardiyaAyarlariPanel() {
   }
 
   async function kaydet() {
-    if (!saFirmaId) return
+    if (!firmaIdEfektif) return
     setSaving(true)
     try {
       const res = await fetch('/api/sistem-ayarlari/vardiya', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firmaId: saFirmaId, vardiya_sayisi: sayisi, vardiya_saatleri: saatler }),
+        body: JSON.stringify({ firmaId: firmaIdEfektif, vardiya_sayisi: sayisi, vardiya_saatleri: saatler }),
       })
       if (!res.ok) throw new Error('Kaydedilemedi')
       toast({ type: 'success', title: 'Başarılı', message: 'Vardiya ayarları kaydedildi.' })
