@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatDateTime, CANLI_DURUM_LABEL } from '@/lib/utils'
 import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
 import Button from '@/components/ui/Button'
-import { Download, FileSpreadsheet, Pencil, Trash2, Upload } from 'lucide-react'
+import { Download, FileSpreadsheet, Pencil, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useLicenseExpired } from '@/components/hooks/useLicense'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -676,31 +676,37 @@ async function del() {
   const filterLoc2Options = useMemo(() => filterLoc1 ? (allLocs.filter(l => l.parent_id === filterLoc1).sort((a,b) => a.tanim.localeCompare(b.tanim))) : [], [allLocs, filterLoc1])
   const filterLoc3Options = useMemo(() => filterLoc2 ? (allLocs.filter(l => l.parent_id === filterLoc2).sort((a,b) => a.tanim.localeCompare(b.tanim))) : [], [allLocs, filterLoc2])
 
-  // Arşiv verisi (Uygula'ya basılınca yüklenir)
+  // Arşiv verisi — server-side paginated API
   const [arsivRows, setArsivRows] = useState<any[]>([])
+  const [arsivTotal, setArsivTotal] = useState(0)
   const [arsivLoading, setArsivLoading] = useState(false)
   const [arsivAktif, setArsivAktif] = useState(false)
+  const [arsivSayfa, setArsivSayfa] = useState(1)
+  const ARSIV_PER_PAGE = 50
 
-  const SEL_ARSIV = '*,lokasyonlar(id,tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim)'
-
-  async function uygula() {
+  async function arsivYukle(sayfa?: number) {
+    const pg = sayfa ?? arsivSayfa
     setArsivLoading(true)
     setArsivAktif(true)
     try {
-      const fromISO = from ? new Date(from).toISOString() : null
-      const toISO   = to   ? new Date(to).toISOString()   : null
-      let q2 = supabase.from('canli_gorevler_arsiv').select(SEL_ARSIV + ',arsiv_tarihi,arsiv_nedeni')
-        .eq('firma_id', firmaId).order('arsiv_tarihi', { ascending: false }).limit(500)
-      if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
-      if (yetkiliLokIds) q2 = q2.in('lokasyon_id', yetkiliLokIds)
-      if (lokasyonId) q2 = (q2 as any).eq('lokasyon_id', lokasyonId)
-      if (atananId) q2 = (q2 as any).eq('atanan_kullanici_id', atananId)
-      if (durum) q2 = (q2 as any).eq('durum', durum)
-      if (fromISO) q2 = (q2 as any).gte('arsiv_tarihi', fromISO)
-      if (toISO)   q2 = (q2 as any).lte('arsiv_tarihi', toISO)
-      const { data } = await q2
-      setArsivRows(data ?? [])
-    } finally { setArsivLoading(false) }
+      const qp = new URLSearchParams({ firma_id: firmaId, page: String(pg), limit: String(ARSIV_PER_PAGE) })
+      if (projeId) qp.set('proje_id', projeId)
+      if (lokasyonId) qp.set('lokasyon_id', lokasyonId)
+      if (atananId) qp.set('atanan_id', atananId)
+      if (durum) qp.set('durum', durum)
+      if (q.trim()) qp.set('q', q.trim())
+      if (from) qp.set('from', from)
+      if (to) qp.set('to', to)
+      const res = await fetch(`/api/arsiv/frekansiyel?${qp}`)
+      const j = await res.json()
+      setArsivRows(j.data ?? [])
+      setArsivTotal(j.total ?? 0)
+    } catch {} finally { setArsivLoading(false) }
+  }
+
+  async function uygula() {
+    setArsivSayfa(1)
+    await arsivYukle(1)
   }
 
   const [sortKey, setSortKey] = useState<SortKey>('aktif')
@@ -780,37 +786,20 @@ async function del() {
     return arr
   }, [filtered, sortKey, sortDir, sortDir])
 
-  const combinedRows = useMemo(() => {
-    if (!arsivAktif) return sorted.map(r => ({ ...r, _source: 'tablo' as const }))
-    const tablo = sorted.map(r => ({ ...r, _source: 'tablo' as const }))
+  // Tablo satırları (aktif görevler) — client-side pagination
+  const tabloRows = useMemo(() => sorted.map(r => ({ ...r, _source: 'tablo' as const })), [sorted])
+  // Arşiv satırları — server-side paginated, ayrı section
+  const arsivDisplayRows = useMemo(() => arsivRows.map(r => ({ ...r, _source: 'arsiv' as const })), [arsivRows])
+  const arsivToplamSayfa = Math.max(1, Math.ceil(arsivTotal / ARSIV_PER_PAGE))
 
-    // Arşiv satırlarına da q ve actor client-side filtrelerini uygula
-    const s = q.trim().toLowerCase()
-    const filteredArsiv = arsivRows.filter((g: any) => {
-      if (s) {
-        const hay = [g.tanim ?? '', g.lokasyonlar?.tanim ?? '', g.atanan?.isim_soyisim ?? '', getIslemiYapan(g) ?? ''].join(' ').toLowerCase()
-        if (!hay.includes(s)) return false
-      }
-      if (actor && getIslemiYapan(g) !== actor) return false
-      return true
-    })
+  // combinedRows = sadece tablo (eski uyumluluk için)
+  const combinedRows = tabloRows
 
-    const arsiv = filteredArsiv.map(r => ({ ...r, _source: 'arsiv' as const }))
-    const all = [...tablo, ...arsiv]
-    all.sort((a, b) => {
-      const da = a._source === 'arsiv' ? (a.arsiv_tarihi ?? a.aktif_olma_tarihi) : a.aktif_olma_tarihi
-      const db = b._source === 'arsiv' ? (b.arsiv_tarihi ?? b.aktif_olma_tarihi) : b.aktif_olma_tarihi
-      return new Date(db ?? 0).getTime() - new Date(da ?? 0).getTime()
-    })
-    return all
-  }, [arsivAktif, sorted, arsivRows, q, actor])
-
-  // Sayfalama
+  // Sayfalama (tablo)
   const PAGE_SIZE = 50
   const [sayfa, setSayfa] = useState(1)
   const toplamSayfa = Math.max(1, Math.ceil(combinedRows.length / PAGE_SIZE))
   const sayfaRows = combinedRows.slice((sayfa - 1) * PAGE_SIZE, sayfa * PAGE_SIZE)
-  // Filtre değişince sayfa 1'e dön
   useEffect(() => { setSayfa(1) }, [combinedRows.length])
 
   function toggleSort(key: SortKey) {
@@ -1052,12 +1041,12 @@ async function del() {
             <tr>
               {bulkMode ? <th style={{ width: 44 }}></th> : null}
               {bulkDuzenleMode ? <th style={{ width: 44 }}></th> : null}
-              {arsivAktif && <th>Kayıt Türü</th>}
+              {false && <th>Kayıt Türü</th>}
               <th>{thBtn('Görev', 'tanim')}</th>
               <th>{thBtn('Lokasyon', 'lokasyon')}</th>
               <th>{thBtn('Atanan', 'atanan')}</th>
               <th>{thBtn('Aktif Saat', 'aktif')}</th>
-              <th>{thBtn(arsivAktif ? 'İşlem / Arşiv Tarihi' : 'İŞLEM TARİH-SAAT', 'islem')}</th>
+              <th>{thBtn('İŞLEM TARİH-SAAT', 'islem')}</th>
               <th>{thBtn('Durum', 'durum')}</th>
               <th>{thBtn('İşlemi Yapan', 'actor')}</th>
             </tr>
@@ -1161,6 +1150,54 @@ async function del() {
             <button onClick={() => setSayfa(toplamSayfa)} disabled={sayfa === toplamSayfa}
               style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, cursor: sayfa === toplamSayfa ? 'default' : 'pointer', opacity: sayfa === toplamSayfa ? 0.4 : 1 }}>{'>>'}</button>
           </div>
+        </div>
+      )}
+
+      {/* ── ARŞİV KAYITLARI (Uygula sonrası) ── */}
+      {arsivAktif && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#6b7280' }}>📦 Arşiv Kayıtları</span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>({arsivTotal} kayıt)</span>
+            {arsivLoading && <RefreshCw size={14} style={{ animation: 'spin 0.9s linear infinite', color: '#6b7280' }} />}
+          </div>
+          <div className="verde-table-wrap" style={{ maxHeight: 400, overflowY: 'auto', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+            <table className="verde-table">
+              <thead><tr>
+                <th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th>
+                <th>Arşiv Tarihi</th><th>İşlemi Yapan</th>
+              </tr></thead>
+              <tbody>
+                {arsivDisplayRows.length === 0 ? (
+                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                    {arsivLoading ? 'Yükleniyor...' : 'Arşiv kaydı bulunamadı.'}
+                  </td></tr>
+                ) : arsivDisplayRows.map((g: any) => (
+                  <tr key={g.id} style={{ background: '#f8fafc' }}>
+                    <td style={{ fontWeight: 600, fontSize: 13, color: g.simule_tamamlandi ? '#9ca3af' : '#374151' }}>{g.tanim}</td>
+                    <td style={{ color: '#64748b', fontSize: 12.5 }}>{g.lokasyonlar?.tanim ?? '—'}</td>
+                    <td style={{ color: '#64748b', fontSize: 12.5 }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                    <td><span className={`verde-badge ${g.durum === 'TAMAMLANDI' ? 'status-tamamlandi' : g.durum === 'IPTAL' ? 'status-iptal' : 'status-islemde'}`} style={{ fontSize: 11 }}>{g.durum}</span></td>
+                    <td style={{ whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 12 }}>{g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—'}</td>
+                    <td style={{ color: '#64748b', fontSize: 12.5 }}>{g.islemi_yapan?.isim_soyisim ?? g.tamamlayan?.isim_soyisim ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {arsivToplamSayfa > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+              <button onClick={() => { setArsivSayfa(1); arsivYukle(1) }} disabled={arsivSayfa === 1 || arsivLoading}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa === 1 ? 0.4 : 1 }}>«</button>
+              <button onClick={() => { const p = Math.max(1, arsivSayfa - 1); setArsivSayfa(p); arsivYukle(p) }} disabled={arsivSayfa === 1 || arsivLoading}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa === 1 ? 0.4 : 1 }}>‹ Önceki</button>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{arsivSayfa} / {arsivToplamSayfa}</span>
+              <button onClick={() => { const p = Math.min(arsivToplamSayfa, arsivSayfa + 1); setArsivSayfa(p); arsivYukle(p) }} disabled={arsivSayfa >= arsivToplamSayfa || arsivLoading}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa >= arsivToplamSayfa ? 0.4 : 1 }}>Sonraki ›</button>
+              <button onClick={() => { setArsivSayfa(arsivToplamSayfa); arsivYukle(arsivToplamSayfa) }} disabled={arsivSayfa >= arsivToplamSayfa || arsivLoading}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa >= arsivToplamSayfa ? 0.4 : 1 }}>»</button>
+            </div>
+          )}
         </div>
       )}
 

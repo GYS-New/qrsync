@@ -431,7 +431,16 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                   if (!isActive(item.href)) e.currentTarget.style.background = 'transparent'
                 }}
               >
-                <span style={{ width: 16, textAlign: 'center', fontSize: 17, opacity: 0.5 }}>›</span>
+                {item.href.endsWith('/canli-islemler') && !item.href.includes('tum-gorevler') ? (
+                  <span style={{ width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: '50%', background: '#22c55e',
+                      display: 'inline-block', animation: 'canliPulse 1.5s ease infinite',
+                    }} />
+                  </span>
+                ) : (
+                  <span style={{ width: 16, textAlign: 'center', fontSize: 17, opacity: 0.5 }}>›</span>
+                )}
                 <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.label}
                 </span>

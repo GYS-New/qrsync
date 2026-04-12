@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
   const neden = p.get('neden') ?? ''
   const fromD = p.get('from') ?? ''
   const toD = p.get('to') ?? ''
+  const lokasyonId = p.get('lokasyon_id') ?? ''
+  const atananId = p.get('atanan_id') ?? ''
 
   if (!firmaId) return NextResponse.json({ data: [], total: 0 })
 
@@ -37,6 +39,8 @@ export async function GET(req: NextRequest) {
   if (fromD) countQ = countQ.gte('arsiv_tarihi', fromD + 'T00:00:00')
   if (toD) countQ = countQ.lte('arsiv_tarihi', toD + 'T23:59:59')
   if (q) countQ = countQ.ilike('tanim', `%${q}%`)
+  if (lokasyonId) countQ = countQ.eq('lokasyon_id', lokasyonId)
+  if (atananId) countQ = countQ.eq('atanan_kullanici_id', atananId)
 
   const { count: total } = await countQ
 
@@ -53,6 +57,8 @@ export async function GET(req: NextRequest) {
   if (fromD) dataQ = dataQ.gte('arsiv_tarihi', fromD + 'T00:00:00')
   if (toD) dataQ = dataQ.lte('arsiv_tarihi', toD + 'T23:59:59')
   if (q) dataQ = dataQ.ilike('tanim', `%${q}%`)
+  if (lokasyonId) dataQ = dataQ.eq('lokasyon_id', lokasyonId)
+  if (atananId) dataQ = dataQ.eq('atanan_kullanici_id', atananId)
 
   const { data: rows, error } = await dataQ
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
