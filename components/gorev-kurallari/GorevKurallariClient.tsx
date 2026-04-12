@@ -955,7 +955,12 @@ function VardiyaDuraklatModal({ tanim, firmaId, projeId, aktifOlmaSaati, onClose
         setVardiyalar(aktifSet)
         // aktifOlmaSaati hangi vardiyaya denk geliyor?
         for (const v of aktifSet) {
-          if (aktifOlmaSaati >= v.baslangic && aktifOlmaSaati < v.bitis) {
+          // Gece vardiyası: bitis <= baslangic (ör. 16:00-00:00 veya 20:00-08:00)
+          const geceVardiya = v.bitis <= v.baslangic
+          const eslesme = geceVardiya
+            ? (aktifOlmaSaati >= v.baslangic || aktifOlmaSaati < v.bitis)
+            : (aktifOlmaSaati >= v.baslangic && aktifOlmaSaati < v.bitis)
+          if (eslesme) {
             setUygunVardiyaNo(v.no)
             setSeciliVardiyalar([v.no])
             break
