@@ -19,7 +19,15 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
   const firmaIdEfektif = propFirmaId || saFirmaId
   const { toast } = useToast()
   const [sayisi, setSayisi] = useState(3)
-  const [saatler, setSaatler] = useState<Vardiya[]>(VARSAYILAN)
+  // Her vardiya ayrı state — birbirini etkilemez
+  const [v1Bas, setV1Bas] = useState('00:00')
+  const [v1Bit, setV1Bit] = useState('08:00')
+  const [v2Bas, setV2Bas] = useState('08:00')
+  const [v2Bit, setV2Bit] = useState('16:00')
+  const [v3Bas, setV3Bas] = useState('16:00')
+  const [v3Bit, setV3Bit] = useState('23:59')
+  const [v4Bas, setV4Bas] = useState('00:00')
+  const [v4Bit, setV4Bit] = useState('06:00')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -29,31 +37,24 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
       .then(r => r.json())
       .then(j => {
         setSayisi(j.vardiya_sayisi ?? 3)
-        setSaatler(j.vardiya_saatleri ?? VARSAYILAN)
+        const s = j.vardiya_saatleri ?? VARSAYILAN
+        if (s[0]) { setV1Bas(s[0].baslangic); setV1Bit(s[0].bitis) }
+        if (s[1]) { setV2Bas(s[1].baslangic); setV2Bit(s[1].bitis) }
+        if (s[2]) { setV3Bas(s[2].baslangic); setV3Bit(s[2].bitis) }
+        if (s[3]) { setV4Bas(s[3].baslangic); setV4Bit(s[3].bitis) }
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [firmaIdEfektif])
 
-  function sayiDegistir(n: number) {
-    setSayisi(n)
-    const yeni: Vardiya[] = []
-    const saatPerVardiya = Math.floor(24 / n)
-    for (let i = 0; i < n; i++) {
-      const mevcut = saatler[i]
-      if (mevcut) {
-        yeni.push(mevcut)
-      } else {
-        const bas = String(i * saatPerVardiya).padStart(2, '0') + ':00'
-        const bit = i === n - 1 ? '23:59' : String((i + 1) * saatPerVardiya).padStart(2, '0') + ':00'
-        yeni.push({ no: i + 1, baslangic: bas, bitis: bit })
-      }
-    }
-    setSaatler(yeni.slice(0, n))
-  }
-
-  function saatGuncelle(no: number, field: 'baslangic' | 'bitis', val: string) {
-    setSaatler(prev => prev.map(v => v.no === no ? { ...v, [field]: val } : v))
+  function getSaatler(): Vardiya[] {
+    const all = [
+      { no: 1, baslangic: v1Bas, bitis: v1Bit },
+      { no: 2, baslangic: v2Bas, bitis: v2Bit },
+      { no: 3, baslangic: v3Bas, bitis: v3Bit },
+      { no: 4, baslangic: v4Bas, bitis: v4Bit },
+    ]
+    return all.slice(0, sayisi)
   }
 
   async function kaydet() {
@@ -63,7 +64,7 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
       const res = await fetch('/api/sistem-ayarlari/vardiya', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firmaId: firmaIdEfektif, vardiya_sayisi: sayisi, vardiya_saatleri: saatler }),
+        body: JSON.stringify({ firmaId: firmaIdEfektif, vardiya_sayisi: sayisi, vardiya_saatleri: getSaatler() }),
       })
       if (!res.ok) throw new Error('Kaydedilemedi')
       toast({ type: 'success', title: 'Başarılı', message: 'Vardiya ayarları kaydedildi.' })
@@ -75,7 +76,7 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
 
   if (loading) return <div style={{ padding: 20, color: T.textSoft }}>Yükleniyor...</div>
 
-  const VARDIYA_ISIMLERI = ['1. Vardiya', '2. Vardiya', '3. Vardiya', '4. Vardiya']
+  const timeInp: React.CSSProperties = { flex: 1, height: 34, padding: '0 8px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 700, textAlign: 'center' }
 
   return (
     <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
@@ -90,7 +91,7 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
         <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Vardiya Sayısı:</span>
         <div style={{ display: 'flex', gap: 4 }}>
           {[1, 2, 3, 4].map(n => (
-            <button key={n} onClick={() => sayiDegistir(n)}
+            <button key={n} onClick={() => setSayisi(n)}
               style={{
                 width: 36, height: 36, borderRadius: 8, border: `2px solid ${sayisi === n ? T.blue : T.border}`,
                 background: sayisi === n ? '#eff6ff' : '#fff', color: sayisi === n ? T.blue : T.text,
@@ -103,18 +104,46 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(sayisi, 4)}, 1fr)`, gap: 10, marginBottom: 16 }}>
-        {saatler.slice(0, sayisi).map(v => (
-          <div key={v.no} style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>{VARDIYA_ISIMLERI[v.no - 1]}</div>
+        {sayisi >= 1 && (
+          <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>1. Vardiya</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input type="time" value={v.baslangic} onChange={e => saatGuncelle(v.no, 'baslangic', e.target.value)}
-                style={{ flex: 1, height: 34, padding: '0 8px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 700, textAlign: 'center' }} />
+              <input type="time" value={v1Bas} onChange={e => setV1Bas(e.target.value)} style={timeInp} />
               <span style={{ color: T.textSoft, fontWeight: 600 }}>—</span>
-              <input type="time" value={v.bitis} onChange={e => saatGuncelle(v.no, 'bitis', e.target.value)}
-                style={{ flex: 1, height: 34, padding: '0 8px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 700, textAlign: 'center' }} />
+              <input type="time" value={v1Bit} onChange={e => setV1Bit(e.target.value)} style={timeInp} />
             </div>
           </div>
-        ))}
+        )}
+        {sayisi >= 2 && (
+          <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>2. Vardiya</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input type="time" value={v2Bas} onChange={e => setV2Bas(e.target.value)} style={timeInp} />
+              <span style={{ color: T.textSoft, fontWeight: 600 }}>—</span>
+              <input type="time" value={v2Bit} onChange={e => setV2Bit(e.target.value)} style={timeInp} />
+            </div>
+          </div>
+        )}
+        {sayisi >= 3 && (
+          <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>3. Vardiya</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input type="time" value={v3Bas} onChange={e => setV3Bas(e.target.value)} style={timeInp} />
+              <span style={{ color: T.textSoft, fontWeight: 600 }}>—</span>
+              <input type="time" value={v3Bit} onChange={e => setV3Bit(e.target.value)} style={timeInp} />
+            </div>
+          </div>
+        )}
+        {sayisi >= 4 && (
+          <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>4. Vardiya</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input type="time" value={v4Bas} onChange={e => setV4Bas(e.target.value)} style={timeInp} />
+              <span style={{ color: T.textSoft, fontWeight: 600 }}>—</span>
+              <input type="time" value={v4Bit} onChange={e => setV4Bit(e.target.value)} style={timeInp} />
+            </div>
+          </div>
+        )}
       </div>
 
       <button onClick={kaydet} disabled={saving}
