@@ -75,7 +75,7 @@ export async function POST(req: Request) {
 
       for (const ga of grupAyarlari) {
         const result = await grupSimulasyonCalistir(admin, ayar, ga, uygunPersonel)
-        sonuclar.push({ ayar_id: ayar.id, grup_id: ga.grup_id, ...result })
+        sonuclar.push({ ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id, grup_id: ga.grup_id, ...result })
       }
     }
 

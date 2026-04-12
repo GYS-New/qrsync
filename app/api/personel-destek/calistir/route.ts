@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
     for (const ayar of ayarlar) {
       const result = await destekCalistir(admin, ayar)
-      sonuclar.push({ ayar_id: ayar.id, ust_lokasyon_id: ayar.ust_lokasyon_id, ...result })
+      sonuclar.push({ ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id, ust_lokasyon_id: ayar.ust_lokasyon_id, ...result })
     }
 
     return NextResponse.json({ ok: true, sonuclar }, { headers: CORS })

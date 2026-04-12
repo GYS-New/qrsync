@@ -69,9 +69,12 @@ export default function BildirimBar({ rol }: { rol: 'super_admin' | 'alt_super_a
           }
         }
 
-        // Cron logları — firma bazlı değil, sadece SA/TA görsün
-        if (isSA || isTA) try {
-          const cronRes = await fetch('/api/cron-log')
+        // Cron logları — firma/proje filtreli
+        try {
+          const cronQp = new URLSearchParams()
+          if (firmaId) cronQp.set('firmaId', firmaId)
+          if (projeId) cronQp.set('projeId', projeId)
+          const cronRes = await fetch(`/api/cron-log?${cronQp}`)
           const cronJ = await cronRes.json()
           const CRON_MESAJLAR: Record<string, (s: any) => string> = {
             gece_dongu: s => `🌙 ${s?.uretim?.uretilen ?? 0} görev üretildi${s?.uretim?.duraklatilan ? `, ${s.uretim.duraklatilan} duraklatıldı` : ''}`,
