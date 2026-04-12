@@ -15,8 +15,8 @@ const VARSAYILAN = [
 type Vardiya = { no: number; baslangic: string; bitis: string }
 
 export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId?: string | null }) {
-  const { firmaId: firmaIdEfektif } = useFirma()
-  const firmaIdEfektif = propFirmaId || firmaIdEfektif
+  const { firmaId: saFirmaId } = useFirma()
+  const firmaIdEfektif = propFirmaId || saFirmaId
   const { toast } = useToast()
   const [sayisi, setSayisi] = useState(3)
   const [saatler, setSaatler] = useState<Vardiya[]>(VARSAYILAN)
