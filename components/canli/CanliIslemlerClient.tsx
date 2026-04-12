@@ -127,34 +127,35 @@ function LiveHeader({
         )}
       </div>
 
-      {/* ── KPI SATIRI ── */}
-      <div style={{ padding: '10px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
-        {kpiCards.map(({ label, val, bg, vColor, lColor }) => (
-          <div key={label} style={{ background: bg, borderRadius: 8, padding: '10px 12px', border: bg !== 'transparent' ? '1px solid rgba(0,0,0,.04)' : 'none' }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: vColor, lineHeight: 1 }}>{val}</div>
-            <div style={{ fontSize: 11, color: lColor, marginTop: 3 }}>{label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── DURUM FİLTRE CHIP'LERİ ── */}
-      <div style={{ padding: '10px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {FILTERS.map(({ key, label, count }) => {
-          const active = durumFilter === key
+      {/* ── KPI KARTLARI (tıklanabilir filtre) ── */}
+      <div style={{ padding: '8px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6, alignItems: 'stretch' }}>
+        {kpiCards.map(({ label, val, bg, vColor, lColor }, i) => {
+          const filterKey = FILTERS[i]?.key ?? 'TÜMÜ'
+          const active = durumFilter === filterKey
           return (
-            <button key={key} type="button" onClick={() => setDurumFilter(key)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, fontSize: 12, border: `1px solid ${active ? '#374151' : '#e5e7eb'}`, background: active ? '#e5e7eb' : '#fff', color: active ? '#1f2937' : '#4b5563', fontWeight: active ? 700 : 400, cursor: 'pointer', transition: 'all .12s' }}>
-              {label}
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '0 5px', borderRadius: 10, background: active ? '#d1d5db' : '#f0f0f0', color: active ? '#111827' : '#6b7280' }}>{count}</span>
+            <button key={label} type="button" onClick={() => setDurumFilter(filterKey)}
+              style={{
+                background: active ? vColor + '0F' : bg === 'transparent' ? '#fafafa' : bg,
+                borderRadius: 8, padding: '8px 8px', textAlign: 'left', cursor: 'pointer',
+                border: active ? `2px solid ${vColor}` : '1px solid #e5e7eb',
+                transition: 'all 0.15s',
+                outline: 'none',
+              }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: vColor, lineHeight: 1 }}>{val}</div>
+              <div style={{ fontSize: 10, color: lColor, marginTop: 2, fontWeight: active ? 700 : 500 }}>{label}</div>
             </button>
           )
         })}
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{clock}</div>
+      </div>
+      <div style={{ padding: '4px 18px 4px', display: 'flex', justifyContent: 'flex-end' }}>
+        <span style={{ fontSize: 11, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{clock}</span>
       </div>
 
       <style>{`
         @keyframes canliPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.65)} }
         @keyframes canliScan { 0%{top:-100%} 100%{top:100%} }
+        @keyframes rowGlow { 0%{background:#fef9c3} 100%{background:transparent} }
+        .row-new { animation: rowGlow 5s ease-out forwards; }
       `}</style>
     </div>
   )
@@ -414,7 +415,7 @@ useEffect(() => {
       const nextTopId = data?.[0]?.id
       if (nextTopId && nextTopId !== prevTopId) {
         setHighlightId(nextTopId)
-        setTimeout(() => setHighlightId((cur) => (cur === nextTopId ? null : cur)), 3500)
+        setTimeout(() => setHighlightId((cur) => (cur === nextTopId ? null : cur)), 5000)
       }
       setLiveFlowGorevler(data)
     }
