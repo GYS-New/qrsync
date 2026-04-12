@@ -159,6 +159,7 @@ $$;
 -- 6. FONKSİYON: gece_gorev_uret(p_tarih date)
 -- Verilen tarih için aktif kurallara göre görev üretir.
 -- Aynı kural+tarih için zaten görev varsa üretmez (idempotent).
+-- kural_duraklatmalari tablosunu kontrol ederek duraklatılan kuralları atlar.
 -- ─────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION gece_gorev_uret(p_tarih date DEFAULT CURRENT_DATE)
 RETURNS jsonb
@@ -166,18 +167,26 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  v_gun_no      int;   -- 0=Pazar...6=Cmt
+  v_gun_no      int;
   v_uretilen    int := 0;
   v_atlanan     int := 0;
+  v_duraklatilan int := 0;
   v_hata        text;
   r             RECORD;
   v_saat        text;
   v_aktif_iso   timestamptz;
   v_mevcut      int;
   k             int;
+  v_vardiya_sayisi int;
+  v_tum_ayar    jsonb;
+  v_aktif_set   jsonb;
+  v_vardiya_no  int;
+  v_bas         text;
+  v_bit         text;
+  v_saat_str    text;
+  v_duraklat_var int;
+  v_firma_cache jsonb := '{}'::jsonb;
 BEGIN
-  -- Verilen tarihin gün numarası (0=Pazar, JS ile uyumlu)
-  -- PostgreSQL EXTRACT DOW: 0=Pazar,1=Pzt...6=Cmt — JS ile aynı
   v_gun_no := EXTRACT(DOW FROM p_tarih)::int;
 
   FOR r IN
@@ -190,18 +199,69 @@ BEGIN
     WHERE gk.aktif = true
       AND gk.baslangic_tarihi <= p_tarih
       AND (gk.bitis_tarihi IS NULL OR gk.bitis_tarihi >= p_tarih)
-      -- Bu kural bu gün çalışıyor mu?
       AND v_gun_no = ANY(gk.aktif_gunler)
   LOOP
-    -- Bu kural için bugün zaten aktif görev var mı? (idempotent)
+    -- ── DURAKLATMA KONTROLÜ ──
+    -- Firma vardiya ayarlarını cache'le
+    IF NOT v_firma_cache ? r.firma_id::text THEN
+      SELECT f.vardiya_sayisi, f.tum_vardiya_ayarlari
+      INTO v_vardiya_sayisi, v_tum_ayar
+      FROM firmalar f WHERE f.id = r.firma_id;
+
+      v_vardiya_sayisi := COALESCE(v_vardiya_sayisi, 3);
+      v_aktif_set := COALESCE(v_tum_ayar -> v_vardiya_sayisi::text, '[]'::jsonb);
+      v_firma_cache := v_firma_cache || jsonb_build_object(
+        r.firma_id::text, jsonb_build_object('sayisi', v_vardiya_sayisi, 'set', v_aktif_set)
+      );
+    ELSE
+      v_aktif_set := v_firma_cache -> r.firma_id::text -> 'set';
+    END IF;
+
+    -- Kuralın aktif_olma_saati hangi vardiyaya denk düşüyor?
+    v_saat_str := to_char(r.aktif_olma_saati, 'HH24:MI');
+    v_vardiya_no := NULL;
+
+    FOR k IN 0..(jsonb_array_length(v_aktif_set) - 1) LOOP
+      v_bas := v_aktif_set -> k ->> 'baslangic';
+      v_bit := v_aktif_set -> k ->> 'bitis';
+      IF v_bit <= v_bas THEN
+        -- Gece vardiyası
+        IF v_saat_str >= v_bas OR v_saat_str < v_bit THEN
+          v_vardiya_no := (v_aktif_set -> k ->> 'no')::int;
+          EXIT;
+        END IF;
+      ELSE
+        IF v_saat_str >= v_bas AND v_saat_str < v_bit THEN
+          v_vardiya_no := (v_aktif_set -> k ->> 'no')::int;
+          EXIT;
+        END IF;
+      END IF;
+    END LOOP;
+
+    -- Duraklatma kaydı var mı?
+    IF v_vardiya_no IS NOT NULL THEN
+      SELECT count(*) INTO v_duraklat_var
+      FROM kural_duraklatmalari kd
+      WHERE kd.firma_id = r.firma_id
+        AND kd.tanim = r.tanim
+        AND kd.tarih = p_tarih
+        AND kd.vardiya_no = v_vardiya_no
+        AND (kd.proje_id = r.l_proje_id OR (kd.proje_id IS NULL AND r.l_proje_id IS NULL));
+
+      IF v_duraklat_var > 0 THEN
+        v_duraklatilan := v_duraklatilan + 1;
+        CONTINUE;
+      END IF;
+    END IF;
+    -- ── DURAKLATMA KONTROLÜ SONU ──
+
+    -- Mevcut görev kontrolü (idempotent)
     SELECT count(*) INTO v_mevcut
     FROM canli_gorevler
     WHERE kural_id = r.id
       AND proje_id = r.l_proje_id
-      -- Gün karşılaştırması TRT'e göre yapılmalı (aksi halde gün sınırında kayar)
       AND DATE(aktif_olma_tarihi AT TIME ZONE 'Europe/Istanbul') = p_tarih;
 
-    -- Arşivde de kontrol et (çift üretimi önle)
     IF v_mevcut = 0 THEN
       SELECT count(*) INTO v_mevcut
       FROM canli_gorevler_arsiv
@@ -214,51 +274,35 @@ BEGIN
       CONTINUE;
     END IF;
 
-    -- gunluk_frekans_sayisi kadar görev üret
+    -- Görev üret
     FOR k IN 1..r.gunluk_frekans_sayisi LOOP
-      -- aktif_olma_saati, kullanıcı beklentisine göre TRT saatidir.
-      -- timestamptz üretimini "Europe/Istanbul" üzerinden yap ki UTC'ye doğru çevrilsin.
       v_aktif_iso := ((p_tarih::timestamp + r.aktif_olma_saati) AT TIME ZONE 'Europe/Istanbul');
 
       INSERT INTO canli_gorevler (
-        firma_id,
-        proje_id,
-        tanim,
-        lokasyon_id,
-        atanan_kullanici_id,
-        durum,
-        aktif_olma_tarihi,
-        olusturma_tarihi,
-        olusturan_id,
-        islemi_yapan_id,
-        gunluk_frekans_sayisi,
-        kural_id
+        firma_id, proje_id, tanim, lokasyon_id, atanan_kullanici_id,
+        durum, aktif_olma_tarihi, olusturma_tarihi, olusturan_id,
+        islemi_yapan_id, gunluk_frekans_sayisi, kural_id
       ) VALUES (
-        r.firma_id,
-        r.l_proje_id,
-        r.tanim,
-        r.lokasyon_id,
-        r.atanan_kullanici_id,
-        'HAZIR',
-        v_aktif_iso,
-        now(),
-        r.olusturan_id,
-        r.olusturan_id,
-        r.gunluk_frekans_sayisi,
-        r.id
+        r.firma_id, r.l_proje_id, r.tanim, r.lokasyon_id, r.atanan_kullanici_id,
+        'HAZIR', v_aktif_iso, now(), r.olusturan_id,
+        r.olusturan_id, r.gunluk_frekans_sayisi, r.id
       );
 
       v_uretilen := v_uretilen + 1;
     END LOOP;
   END LOOP;
 
+  -- Süresi geçmiş duraklatmaları temizle
+  DELETE FROM kural_duraklatmalari WHERE tarih < p_tarih;
+
   RETURN jsonb_build_object(
-    'ok',       true,
-    'tarih',    p_tarih::text,
-    'gun_no',   v_gun_no,
-    'uretilen', v_uretilen,
-    'atlanan',  v_atlanan,
-    'zaman',    now()
+    'ok',           true,
+    'tarih',        p_tarih::text,
+    'gun_no',       v_gun_no,
+    'uretilen',     v_uretilen,
+    'atlanan',      v_atlanan,
+    'duraklatilan', v_duraklatilan,
+    'zaman',        now()
   );
 EXCEPTION WHEN OTHERS THEN
   GET STACKED DIAGNOSTICS v_hata = MESSAGE_TEXT;
