@@ -76,6 +76,7 @@ export default function BildirimBar({ rol }: { rol: string }) {
             max_sure: s => `⏰ ${(s?.gorevler_iptal ?? 0) + (s?.canli_gorevler_iptal ?? 0)} görev süre aşımı`,
             personel_takip: s => `👷 ${s?.gonderilen ?? 0} takip bildirimi`,
             rapor_gonder: s => `📊 ${s?.processed ?? 0} rapor gönderildi`,
+            personel_destek: s => { const t = (s?.sonuclar ?? []).reduce((acc: number, r: any) => acc + (r?.tamamlanan ?? 0), 0); return `🤝 ${t} görev destek tamamlandı` },
           }
           for (const log of cronJ.data ?? []) {
             const fn = CRON_MESAJLAR[log.tip]
