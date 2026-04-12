@@ -81,8 +81,9 @@ export default function ArsivClient({
 
   const [aktifSekme, setAktifSekme] = useState<Sekme>('frekansiyel')
 
-  // ── Frekansiyel state ────────────────────────────────────────────────────
-  const [frekData,    setFrekData]    = useState<any[]>(initialArsiv)
+  // ── Frekansiyel state (server-side pagination) ───────────────────────────
+  const [frekData,    setFrekData]    = useState<any[]>([])
+  const [frekTotal,   setFrekTotal]   = useState(0)
   const [frekLoading, setFrekLoading] = useState(false)
   const [frekQ,       setFrekQ]       = useState('')
   const [frekDurum,   setFrekDurum]   = useState('')
@@ -152,53 +153,28 @@ export default function ArsivClient({
 
   // ── Yükleme fonksiyonları ─────────────────────────────────────────────────
 
-  const yukle_frekansiyel = useCallback(async () => {
-    if (!firmaId) { setFrekData([]); return }
-    if (isTA && (projeLoading || !projeId)) { setFrekData([]); return }
+  const yukle_frekansiyel = useCallback(async (sayfa?: number) => {
+    if (!firmaId) { setFrekData([]); setFrekTotal(0); return }
+    if (isTA && (projeLoading || !projeId)) { setFrekData([]); setFrekTotal(0); return }
     setFrekLoading(true)
     try {
-      // FK join'ler timeout'a neden oluyor — basit sorgu + ayrı user lookup
-      const sel = `id,firma_id,proje_id,tanim,lokasyon_id,durum,arsiv_tarihi,arsiv_nedeni,aktif_olma_tarihi,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,iptal_eden_id,islemi_yapan_id,kural_id,gunluk_frekans_sayisi,son_tamamlama_kanali`
-      let q = supabase.from('canli_gorevler_arsiv').select(sel)
-        .eq('firma_id', firmaId).order('arsiv_tarihi', { ascending: false }).limit(1000)
-      if (projeId) q = (q as any).eq('proje_id', projeId)
-      const { data: rows, error } = await q
-      if (error) throw error
-      if (!rows?.length) { setFrekData([]); return }
+      const pg = sayfa ?? frekSayfa
+      const qp = new URLSearchParams({ firma_id: firmaId, page: String(pg), limit: String(FREK_PER_PAGE) })
+      if (projeId) qp.set('proje_id', projeId)
+      if (frekQ.trim()) qp.set('q', frekQ.trim())
+      if (frekDurum) qp.set('durum', frekDurum)
+      if (frekNeden) qp.set('neden', frekNeden)
+      if (frekFrom) qp.set('from', frekFrom)
+      if (frekTo) qp.set('to', frekTo)
 
-      // Lokasyon, user ve kural bilgilerini ayrı çek
-      const lokIds = [...new Set(rows.map((r: any) => r.lokasyon_id).filter(Boolean))]
-      const userIds = [...new Set(rows.flatMap((r: any) => [r.atanan_kullanici_id, r.olusturan_id, r.tamamlayan_kullanici_id, r.iptal_eden_id, r.islemi_yapan_id]).filter(Boolean))]
-      const kuralIds = [...new Set(rows.map((r: any) => r.kural_id).filter(Boolean))]
-
-      const [lokRes, userRes, kuralRes] = await Promise.all([
-        lokIds.length ? supabase.from('lokasyonlar').select('id,tanim').in('id', lokIds) : { data: [] },
-        userIds.length ? supabase.from('users').select('id,isim_soyisim').in('id', userIds) : { data: [] },
-        kuralIds.length ? supabase.from('gorev_kurallari').select('id,tanim').in('id', kuralIds) : { data: [] },
-      ])
-
-      const lokMap: Record<string, any> = {}
-      for (const l of lokRes.data ?? []) lokMap[l.id] = l
-      const userMap: Record<string, any> = {}
-      for (const u of userRes.data ?? []) userMap[u.id] = u
-      const kuralMap: Record<string, any> = {}
-      for (const k of kuralRes.data ?? []) kuralMap[k.id] = k
-
-      const enriched = rows.map((r: any) => ({
-        ...r,
-        lokasyonlar: lokMap[r.lokasyon_id] ?? null,
-        atanan: userMap[r.atanan_kullanici_id] ?? null,
-        olusturan: userMap[r.olusturan_id] ?? null,
-        tamamlayan: userMap[r.tamamlayan_kullanici_id] ?? null,
-        iptalEden: userMap[r.iptal_eden_id] ?? null,
-        islemi_yapan: userMap[r.islemi_yapan_id] ?? null,
-        kural: kuralMap[r.kural_id] ?? null,
-      }))
-
-      setFrekData(enriched)
+      const res = await fetch(`/api/arsiv/frekansiyel?${qp}`)
+      const j = await res.json()
+      if (j.error) throw new Error(j.error)
+      setFrekData(j.data ?? [])
+      setFrekTotal(j.total ?? 0)
     } catch (e: any) { toast({ type: 'error', title: 'Yüklenemedi', message: e.message })
     } finally { setFrekLoading(false) }
-  }, [firmaId, projeId, projeLoading, isTA])
+  }, [firmaId, projeId, projeLoading, isTA, frekSayfa, frekQ, frekDurum, frekNeden, frekFrom, frekTo])
 
   const yukle_personel = useCallback(async () => {
     if (!firmaId) { setPersonelData([]); return }
@@ -426,24 +402,9 @@ export default function ArsivClient({
   }
 
   // ── Filtreli listeler ─────────────────────────────────────────────────────
-  const filtreFrek = useMemo(() => {
-    const s = frekQ.trim().toLowerCase()
-    const fromD = frekFrom ? new Date(frekFrom + 'T00:00:00') : null
-    const toD   = frekTo   ? new Date(frekTo   + 'T23:59:59') : null
-    return frekData.filter((r: any) => {
-      if (s && ![ r.tanim, r.lokasyonlar?.tanim, r.atanan?.isim_soyisim, r.kural?.tanim ].join(' ').toLowerCase().includes(s)) return false
-      if (frekDurum && r.durum !== frekDurum) return false
-      if (frekNeden && r.arsiv_nedeni !== frekNeden) return false
-      if (fromD || toD) {
-        const d = r.arsiv_tarihi ? new Date(r.arsiv_tarihi) : null
-        if (!d || (fromD && d < fromD) || (toD && d > toD)) return false
-      }
-      return true
-    })
-  }, [frekData, frekQ, frekDurum, frekNeden, frekFrom, frekTo])
-
-  // Filtre değiştiğinde sayfayı sıfırla
-  useEffect(() => { setFrekSayfa(1) }, [frekQ, frekDurum, frekNeden, frekFrom, frekTo])
+  // Server-side pagination — filtreFrek = server'dan gelen sayfa verisi
+  const filtreFrek = frekData
+  const frekToplamSayfa = Math.max(1, Math.ceil(frekTotal / FREK_PER_PAGE))
 
   const filtrePersonel = useMemo(() => {
     const s = personelQ.trim().toLowerCase()
@@ -456,7 +417,7 @@ export default function ArsivClient({
     const s = musteriQ.trim().toLowerCase()
     return musteriData.filter((r: any) => {
       if (musteriYildiz && r.yildiz !== musteriYildiz) return false
-      if (s && ![r.lokasyon_tanim, r.ad_soyad, r.yorum].join(' ').toLowerCase().includes(s)) return false
+      if (s && ![r.lokasyon_yol, r.ad_soyad, r.yorum].join(' ').toLowerCase().includes(s)) return false
       return true
     })
   }, [musteriData, musteriYildiz, musteriQ])
@@ -579,7 +540,7 @@ export default function ArsivClient({
       {firmaId && aktifSekme === 'frekansiyel' && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-            <span style={{ fontSize: 13, color: '#64748b' }}><strong style={{ color: '#1f2937' }}>{filtreFrek.length}</strong> kayıt · Sayfa {frekSayfa}/{Math.max(1, Math.ceil(filtreFrek.length / FREK_PER_PAGE))}</span>
+            <span style={{ fontSize: 13, color: '#64748b' }}><strong style={{ color: '#1f2937' }}>{frekTotal}</strong> kayıt · Sayfa {frekSayfa}/{frekToplamSayfa}</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => csvIndir('frekansiyel', ['Görev','Lokasyon','Atanan','Durum','Arşiv Tarihi','Neden'],
                 filtreFrek.map((r:any) => [r.tanim,r.lokasyonlar?.tanim??'',r.atanan?.isim_soyisim??'',CANLI_DURUM_LABEL[r.durum]??r.durum,r.arsiv_tarihi?formatDateTime(r.arsiv_tarihi):'',ARSIV_NEDEN_LABEL[r.arsiv_nedeni]??r.arsiv_nedeni??'']))}
@@ -614,10 +575,10 @@ export default function ArsivClient({
             <input type="date" value={frekFrom} onChange={e => setFrekFrom(e.target.value)} style={inp} />
             <span style={{ color: '#94a3b8' }}>—</span>
             <input type="date" value={frekTo} onChange={e => setFrekTo(e.target.value)} style={inp} />
-            <button onClick={yukle_frekansiyel} disabled={frekLoading} style={applyBtn}>
+            <button onClick={() => { setFrekSayfa(1); yukle_frekansiyel(1) }} disabled={frekLoading} style={applyBtn}>
               <RefreshCw size={12} style={frekLoading ? spinning : {}} /> Uygula
             </button>
-            <button onClick={() => { setFrekQ(''); setFrekDurum(''); setFrekNeden(''); setFrekFrom(''); setFrekTo('') }}
+            <button onClick={() => { setFrekQ(''); setFrekDurum(''); setFrekNeden(''); setFrekFrom(''); setFrekTo(''); setFrekSayfa(1) }}
               className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa]">
               Temizle
             </button>
@@ -633,7 +594,7 @@ export default function ArsivClient({
               <tbody>
                 {frekLoading ? <YukleniyorSatir cols={9} /> :
                  filtreFrek.length === 0 ? <BosKayit cols={9} mesaj="Arşiv kaydı bulunamadı." /> :
-                 filtreFrek.slice((frekSayfa - 1) * FREK_PER_PAGE, frekSayfa * FREK_PER_PAGE).map((r: any) => (
+                 filtreFrek.map((r: any) => (
                   <tr key={r.id}>
                     <td style={{ fontWeight: 600, color: r.simule_tamamlandi ? '#9ca3af' : undefined }}>{r.tanim}</td>
                     <td style={td({ color:'#64748b' })}>{getLocPath(r.lokasyon_id)}</td>
@@ -660,23 +621,23 @@ export default function ArsivClient({
           </div>
 
           {/* Pagination */}
-          {filtreFrek.length > FREK_PER_PAGE && (
+          {frekToplamSayfa > 1 && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12 }}>
-              <button onClick={() => setFrekSayfa(1)} disabled={frekSayfa === 1}
+              <button onClick={() => { setFrekSayfa(1); yukle_frekansiyel(1) }} disabled={frekSayfa === 1 || frekLoading}
                 style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: frekSayfa === 1 ? 0.4 : 1 }}>
                 «
               </button>
-              <button onClick={() => setFrekSayfa(p => Math.max(1, p - 1))} disabled={frekSayfa === 1}
+              <button onClick={() => { const p = Math.max(1, frekSayfa - 1); setFrekSayfa(p); yukle_frekansiyel(p) }} disabled={frekSayfa === 1 || frekLoading}
                 style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: frekSayfa === 1 ? 0.4 : 1 }}>
                 ‹ Önceki
               </button>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{frekSayfa} / {Math.ceil(filtreFrek.length / FREK_PER_PAGE)}</span>
-              <button onClick={() => setFrekSayfa(p => Math.min(Math.ceil(filtreFrek.length / FREK_PER_PAGE), p + 1))} disabled={frekSayfa >= Math.ceil(filtreFrek.length / FREK_PER_PAGE)}
-                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: frekSayfa >= Math.ceil(filtreFrek.length / FREK_PER_PAGE) ? 0.4 : 1 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{frekSayfa} / {frekToplamSayfa}</span>
+              <button onClick={() => { const p = Math.min(frekToplamSayfa, frekSayfa + 1); setFrekSayfa(p); yukle_frekansiyel(p) }} disabled={frekSayfa >= frekToplamSayfa || frekLoading}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: frekSayfa >= frekToplamSayfa ? 0.4 : 1 }}>
                 Sonraki ›
               </button>
-              <button onClick={() => setFrekSayfa(Math.ceil(filtreFrek.length / FREK_PER_PAGE))} disabled={frekSayfa >= Math.ceil(filtreFrek.length / FREK_PER_PAGE)}
-                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: frekSayfa >= Math.ceil(filtreFrek.length / FREK_PER_PAGE) ? 0.4 : 1 }}>
+              <button onClick={() => { setFrekSayfa(frekToplamSayfa); yukle_frekansiyel(frekToplamSayfa) }} disabled={frekSayfa >= frekToplamSayfa || frekLoading}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: frekSayfa >= frekToplamSayfa ? 0.4 : 1 }}>
                 »
               </button>
             </div>
@@ -789,7 +750,7 @@ export default function ArsivClient({
             <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f2937' }}>{filtreMusteri.length}</strong> kayıt</span>
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => csvIndir('musteri', ['Tarih','Lokasyon','Kanal','Puan','Yorum','Ad Soyad'],
-                filtreMusteri.map((r:any) => [r.olusturma_tarihi,r.lokasyon_tanim,r.kanal,String(r.yildiz),r.yorum??'',r.ad_soyad??'']))}
+                filtreMusteri.map((r:any) => [r.olusturma_tarihi,r.lokasyon_yol,r.kanal,String(r.yildiz),r.yorum??'',r.ad_soyad??'']))}
                 disabled={!filtreMusteri.length} className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa] flex items-center gap-2 disabled:opacity-40">
                 <Download size={13} /> CSV
               </button>
@@ -803,7 +764,7 @@ export default function ArsivClient({
                   { header: 'Yorum', key: 'yorum', width: 40 }, { header: 'Ad Soyad', key: 'ad', width: 20 },
                 ]
                 const hr = ws.getRow(1); hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }; hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }; hr.height = 20
-                filtreMusteri.forEach((r:any) => ws.addRow({ tarih: r.olusturma_tarihi, lokasyon: r.lokasyon_tanim, kanal: r.kanal, puan: r.yildiz, yorum: r.yorum??'', ad: r.ad_soyad??'' }))
+                filtreMusteri.forEach((r:any) => ws.addRow({ tarih: r.olusturma_tarihi, lokasyon: r.lokasyon_yol, kanal: r.kanal, puan: r.yildiz, yorum: r.yorum??'', ad: r.ad_soyad??'' }))
                 const buf = await wb.xlsx.writeBuffer(); const a = document.createElement('a')
                 a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
                 a.download = `musteri-degerlendirme-arsiv-${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(a.href)
@@ -813,7 +774,7 @@ export default function ArsivClient({
               </button>
               <button onClick={() => {
                 const rows = filtreMusteri.map((r:any) =>
-                  `<tr><td>${new Date(r.olusturma_tarihi).toLocaleString('tr-TR')}</td><td>${r.lokasyon_tanim}</td><td>${r.kanal}</td><td>${'★'.repeat(r.yildiz)}</td><td>${r.yorum??'—'}</td><td>${r.ad_soyad??'—'}</td></tr>`).join('')
+                  `<tr><td>${new Date(r.olusturma_tarihi).toLocaleString('tr-TR')}</td><td>${r.lokasyon_yol}</td><td>${r.kanal}</td><td>${'★'.repeat(r.yildiz)}</td><td>${r.yorum??'—'}</td><td>${r.ad_soyad??'—'}</td></tr>`).join('')
                 const w = window.open('','_blank','width=1000,height=700'); if (!w) return
                 w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Müşteri Değerlendirme Arşivi</title>
                   <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
@@ -867,7 +828,7 @@ export default function ArsivClient({
                     <td style={{ whiteSpace:'nowrap', color:'#64748b', fontSize:12 }}>
                       {new Date(r.olusturma_tarihi).toLocaleString('tr-TR',{ day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}
                     </td>
-                    <td style={{ fontWeight:600 }}>{r.lokasyon_tanim}</td>
+                    <td style={{ fontWeight:600 }}>{r.lokasyon_yol}</td>
                     <td>
                       <span style={{ padding:'2px 8px', borderRadius:12, fontSize:11.5, fontWeight:700,
                         background: r.kanal==='QR'?'#e0f2fe':'#f9fafb',
@@ -1114,8 +1075,9 @@ function CeklistArsivSekme({
   const { confirm } = useConfirm()
   const yetki = useYetki('arsiv')
   const [data,       setData]       = useState<any[]>([])
+  const [ckTotal,    setCkTotal]    = useState(0)
   const [loading,    setLoading]    = useState(false)
-  const [islemId,    setIslemId]    = useState<string | null>(null) // satır bazı işlem yükleniyor
+  const [islemId,    setIslemId]    = useState<string | null>(null)
   const [topluSilYuk, setTopluSilYuk] = useState(false)
   const [aramaQ,     setAramaQ]     = useState('')
   const [durumF,     setDurumF]     = useState('')
@@ -1123,37 +1085,42 @@ function CeklistArsivSekme({
   const [fromD,      setFromD]      = useState('')
   const [toD,        setToD]        = useState('')
   const [modal,      setModal]      = useState<{ id: string } | null>(null)
+  const [ckSayfa,    setCkSayfa]    = useState(1)
+  const CK_PER_PAGE = 50
 
-  const yukle = useCallback(async (baslangic?: string, bitis?: string) => {
+  const yukle = useCallback(async (sayfa?: number) => {
     setLoading(true)
     try {
-      const p = new URLSearchParams({ firma_id: firmaId, cikti: 'arsiv' })
-      if (projeId)   p.set('proje_id', projeId)
-      if (baslangic) p.set('baslangic', baslangic)
-      if (bitis)     p.set('bitis', bitis)
-      const res  = await fetch(`/api/raporlar/ceklist?${p}`)
+      const pg = sayfa ?? ckSayfa
+      const p = new URLSearchParams({ firma_id: firmaId, page: String(pg), limit: String(CK_PER_PAGE) })
+      if (projeId) p.set('proje_id', projeId)
+      if (aramaQ.trim()) p.set('q', aramaQ.trim())
+      if (fromD) p.set('from', fromD)
+      if (toD) p.set('to', toD)
+      const res = await fetch(`/api/arsiv/ceklist?${p}`)
       const json = await res.json()
-      if (!json.ok) throw new Error(json.error)
+      if (json.error) throw new Error(json.error)
       setData(json.data ?? [])
+      setCkTotal(json.total ?? 0)
     } catch (e: any) {
       toast({ type: 'error', title: 'Yüklenemedi', message: e.message })
     } finally {
       setLoading(false)
     }
-  }, [firmaId, projeId])
+  }, [firmaId, projeId, ckSayfa, aramaQ, fromD, toD])
 
   useEffect(() => { yukle() }, [yukle])
 
+  // Client-side durum/kanal filtresi (hafif — sadece sayfa verisi üzerinde)
   const filtre = useMemo(() => {
-    const s = aramaQ.trim().toLowerCase()
-    return data.filter(r => {
-      if (s && ![r.gorev_tanim, r.lokasyon_tanim, r.kullanici_isim, r.sablon_baslik]
-        .join(' ').toLowerCase().includes(s)) return false
-      if (durumF  && r.gorev_durum !== durumF)  return false
-      if (kanaliF && r.kanal       !== kanaliF) return false
+    return data.filter((r: any) => {
+      if (durumF && r.gorev_durum !== durumF) return false
+      if (kanaliF && r.kanal !== kanaliF) return false
       return true
     })
-  }, [data, aramaQ, durumF, kanaliF])
+  }, [data, durumF, kanaliF])
+
+  const ckToplamSayfa = Math.max(1, Math.ceil(ckTotal / CK_PER_PAGE))
 
   const inp: React.CSSProperties = {
     height: 34, padding: '0 10px', borderRadius: 8,
@@ -1185,7 +1152,7 @@ function CeklistArsivSekme({
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       toast({ type: 'success', title: 'Silindi', message: `${json.silinen} kayıt silindi.` })
-      await yukle(fromD || undefined, toD || undefined)
+      await yukle()
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
     } finally {
@@ -1213,7 +1180,7 @@ function CeklistArsivSekme({
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       toast({ type: 'success', title: 'Silindi', message: 'Çeklist kaydı silindi.' })
-      await yukle(fromD || undefined, toD || undefined)
+      await yukle()
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
     } finally {
@@ -1246,7 +1213,7 @@ function CeklistArsivSekme({
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       toast({ type: 'success', title: 'Geri Yüklendi', message: 'Görev ve çeklist başarıyla geri yüklendi.' })
-      await yukle(fromD || undefined, toD || undefined)
+      await yukle()
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
     } finally {
@@ -1259,9 +1226,9 @@ function CeklistArsivSekme({
     const headers = ['Kayıt Tarihi', 'Görev', 'Lokasyon', 'Şablon', 'Durum', 'Kanal', 'Dolduran', 'Doldurulma %']
     const rows = filtre.map((r: any) => [
       r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
-      r.gorev_tanim, r.lokasyon_tanim, r.sablon_baslik,
+      r.gorev_tanim, r.lokasyon_yol, r.sablon_adi,
       CEKLIST_DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
-      r.kanal, r.kullanici_isim,
+      r.kanal, r.kullanici,
       `%${ckPct(r.doldurulan_madde, r.toplam_madde)}`,
     ])
     const csv = [headers, ...rows]
@@ -1295,11 +1262,11 @@ function CeklistArsivSekme({
     filtre.forEach((r: any) => ws.addRow({
       kayit:     r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '',
       gorev:     r.gorev_tanim,
-      lokasyon:  r.lokasyon_tanim,
-      sablon:    r.sablon_baslik,
+      lokasyon:  r.lokasyon_yol,
+      sablon:    r.sablon_adi,
       durum:     CEKLIST_DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum,
       kanal:     r.kanal,
-      kullanici: r.kullanici_isim,
+      kullanici: r.kullanici,
       oran:      `%${ckPct(r.doldurulan_madde, r.toplam_madde)}`,
     }))
     const buf = await wb.xlsx.writeBuffer()
@@ -1313,10 +1280,10 @@ function CeklistArsivSekme({
     const rows = filtre.map((r: any) =>
       `<tr>
         <td>${r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—'}</td>
-        <td>${r.gorev_tanim}</td><td>${r.lokasyon_tanim}</td>
-        <td>${r.sablon_baslik}</td>
+        <td>${r.gorev_tanim}</td><td>${r.lokasyon_yol}</td>
+        <td>${r.sablon_adi}</td>
         <td>${CEKLIST_DURUM_LABEL[r.gorev_durum] ?? r.gorev_durum}</td>
-        <td>${r.kanal}</td><td>${r.kullanici_isim}</td>
+        <td>${r.kanal}</td><td>${r.kullanici}</td>
         <td>%${ckPct(r.doldurulan_madde, r.toplam_madde)} (${r.doldurulan_madde}/${r.toplam_madde})</td>
       </tr>`
     ).join('')
@@ -1341,7 +1308,7 @@ function CeklistArsivSekme({
       {/* Üst bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <span style={{ fontSize: 13, color: '#64748b' }}>
-          <strong style={{ color: '#1f2937' }}>{filtre.length}</strong> kayıt
+          <strong style={{ color: '#1f2937' }}>{ckTotal}</strong> kayıt · Sayfa {ckSayfa}/{ckToplamSayfa}
         </span>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={csvIndir2} disabled={!filtre.length}
@@ -1400,11 +1367,11 @@ function CeklistArsivSekme({
         <input type="date" value={fromD} onChange={e => setFromD(e.target.value)} style={inp} />
         <span style={{ color: '#94a3b8' }}>—</span>
         <input type="date" value={toD} onChange={e => setToD(e.target.value)} style={inp} />
-        <button onClick={() => yukle(fromD || undefined, toD || undefined)} disabled={loading} style={applyBtn}>
+        <button onClick={() => { setCkSayfa(1); yukle(1) }} disabled={loading} style={applyBtn}>
           <RefreshCw size={12} style={loading ? spinning : {}} /> Uygula
         </button>
         <button
-          onClick={() => { setAramaQ(''); setDurumF(''); setKanaliF(''); setFromD(''); setToD(''); yukle() }}
+          onClick={() => { setAramaQ(''); setDurumF(''); setKanaliF(''); setFromD(''); setToD(''); setCkSayfa(1) }}
           className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa]">
           Temizle
         </button>
@@ -1448,8 +1415,8 @@ function CeklistArsivSekme({
                       {r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—'}
                     </td>
                     <td style={{ fontWeight: 600, fontSize: 13 }}>{r.gorev_tanim}</td>
-                    <td style={{ color: '#64748b', fontSize: 12.5 }}>{r.lokasyon_tanim}</td>
-                    <td style={{ color: '#64748b', fontSize: 12 }}>{r.sablon_baslik}</td>
+                    <td style={{ color: '#64748b', fontSize: 12.5 }}>{r.lokasyon_yol}</td>
+                    <td style={{ color: '#64748b', fontSize: 12 }}>{r.sablon_adi}</td>
                     <td>
                       <span style={{
                         padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 700,
@@ -1466,7 +1433,7 @@ function CeklistArsivSekme({
                         {r.kanal}
                       </span>
                     </td>
-                    <td style={{ color: '#475569', fontSize: 12.5 }}>{r.kullanici_isim}</td>
+                    <td style={{ color: '#475569', fontSize: 12.5 }}>{r.kullanici}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ flex: 1, height: 6, background: '#e2e8f0', borderRadius: 4, minWidth: 60 }}>
@@ -1520,6 +1487,29 @@ function CeklistArsivSekme({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {ckToplamSayfa > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12 }}>
+          <button onClick={() => { setCkSayfa(1); yukle(1) }} disabled={ckSayfa === 1 || loading}
+            style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: ckSayfa === 1 ? 0.4 : 1 }}>
+            «
+          </button>
+          <button onClick={() => { const pg = Math.max(1, ckSayfa - 1); setCkSayfa(pg); yukle(pg) }} disabled={ckSayfa === 1 || loading}
+            style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: ckSayfa === 1 ? 0.4 : 1 }}>
+            ‹ Önceki
+          </button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{ckSayfa} / {ckToplamSayfa}</span>
+          <button onClick={() => { const pg = Math.min(ckToplamSayfa, ckSayfa + 1); setCkSayfa(pg); yukle(pg) }} disabled={ckSayfa >= ckToplamSayfa || loading}
+            style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: ckSayfa >= ckToplamSayfa ? 0.4 : 1 }}>
+            Sonraki ›
+          </button>
+          <button onClick={() => { setCkSayfa(ckToplamSayfa); yukle(ckToplamSayfa) }} disabled={ckSayfa >= ckToplamSayfa || loading}
+            style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: ckSayfa >= ckToplamSayfa ? 0.4 : 1 }}>
+            »
+          </button>
+        </div>
+      )}
 
       {/* Çeklist Detay Modal */}
       {modal && (
