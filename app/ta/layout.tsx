@@ -4,6 +4,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import { ProjeProvider } from '@/components/projeler/ProjeContext'
 import FirmaDurumBanner from '@/components/firmalar/FirmaDurumBanner'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import BildirimBar from '@/components/dashboard/BildirimBar'
 
 function getFirmaDurum(firma: any): { durum: 'pasif' | 'lisans_doldu' | null; lisansTarihi: string | null } {
   if (!firma) return { durum: null, lisansTarihi: null }
@@ -57,6 +58,7 @@ export default async function TALayout({ children }: { children: React.ReactNode
         <div style={{ marginLeft: 282, flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
           {/* Durum banner — pasif veya lisans dolmuşsa tüm sayfalarda görünür */}
           <FirmaDurumBanner durum={durum} lisansTarihi={lisansTarihi} />
+          <BildirimBar rol={user.rol} />
           {children}
         </div>
       </div>
