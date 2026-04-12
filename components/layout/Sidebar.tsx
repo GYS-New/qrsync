@@ -27,6 +27,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
   const mgmt: NavItem[] = isSA
     ? [
         ...(rol === 'super_admin' ? [{ label: 'Süper Adminler', href: `${base}/dashboard/super-adminler`, icon: '🛡️' }] : []),
+        { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
         { label: 'Firmalar', href: `${base}/dashboard/firmalar`, icon: '🏢' },
         { label: 'Firma Adminleri', href: `${base}/dashboard/firma-adminler`, icon: '👤' },
         { label: 'Firma Kullanıcıları', href: `${base}/dashboard/firma-kullanicilar`, icon: '👥' },
@@ -34,58 +35,55 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
         { label: 'Lokasyonlar', href: `${base}/dashboard/lokasyonlar`, icon: '📍' },
         { label: 'Lokasyon Grupları', href: `${base}/dashboard/lokasyon-gruplari`, icon: '🗺️' },
         { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
-        { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
         { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
-          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
-        { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
+        { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
         { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
-        { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
         { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
+        { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
+        { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
       ]
     : isTA
       ? [
+          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
           { label: 'Projeler', href: `${base}/dashboard/projeler`, icon: '🗂️' },
           { label: 'Kullanıcılar', href: `${base}/dashboard/kullanicilar`, icon: '👥' },
           { label: 'Lokasyonlar', href: `${base}/dashboard/lokasyonlar`, icon: '📍' },
           { label: 'Lokasyon Grupları', href: `${base}/dashboard/lokasyon-gruplari`, icon: '🗺️' },
           { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
-          { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
           { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
-          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
-          { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
+          { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
-          { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
           { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
+          { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
+          { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
         ]
       : isMusteri
       ? [
-          // musteri: tüm potansiyel sayfalar — navYetkileri dinamik filtresi kaldırır
+          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
           { label: 'Kullanıcılar', href: `${base}/dashboard/kullanicilar`, icon: '👥' },
           { label: 'Lokasyonlar', href: `${base}/dashboard/lokasyonlar`, icon: '📍' },
           { label: 'Lokasyon Grupları', href: `${base}/dashboard/lokasyon-gruplari`, icon: '🗺️' },
           { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
-          { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
           { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
-          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
-          { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
+          { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
-          { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
           { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
+          { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
+          { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
         ]
       : [
-          // tenant_user: tüm potansiyel sayfalar — navYetkileri dinamik filtresi kaldırır
+          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
           { label: 'Kullanıcılar', href: `${base}/dashboard/kullanicilar`, icon: '👥' },
           { label: 'Lokasyonlar', href: `${base}/dashboard/lokasyonlar`, icon: '📍' },
           { label: 'Lokasyon Grupları', href: `${base}/dashboard/lokasyon-gruplari`, icon: '🗺️' },
           { label: 'Spesifik Görevler', href: `${base}/dashboard/gorevler`, icon: '✓' },
-          { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
           { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
-          { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
+          { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
           { label: 'Görev Duraklatmaları', href: `${base}/dashboard/gorev-duraklatmalari`, icon: '⏸' },
-          { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
-          { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
           { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
+          { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
+          { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
         ]
 
   return [
