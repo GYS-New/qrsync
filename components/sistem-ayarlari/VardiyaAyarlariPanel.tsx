@@ -52,8 +52,8 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
     setSaatler(yeni.slice(0, n))
   }
 
-  function saatGuncelle(idx: number, field: 'baslangic' | 'bitis', val: string) {
-    setSaatler(prev => prev.map((v, i) => i === idx ? { ...v, [field]: val } : v))
+  function saatGuncelle(no: number, field: 'baslangic' | 'bitis', val: string) {
+    setSaatler(prev => prev.map(v => v.no === no ? { ...v, [field]: val } : v))
   }
 
   async function kaydet() {
@@ -103,14 +103,14 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(sayisi, 4)}, 1fr)`, gap: 10, marginBottom: 16 }}>
-        {saatler.slice(0, sayisi).map((v, i) => (
-          <div key={i} style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>{VARDIYA_ISIMLERI[i]}</div>
+        {saatler.slice(0, sayisi).map(v => (
+          <div key={v.no} style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>{VARDIYA_ISIMLERI[v.no - 1]}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input type="time" value={v.baslangic} onChange={e => saatGuncelle(i, 'baslangic', e.target.value)}
+              <input type="time" value={v.baslangic} onChange={e => saatGuncelle(v.no, 'baslangic', e.target.value)}
                 style={{ flex: 1, height: 34, padding: '0 8px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 700, textAlign: 'center' }} />
               <span style={{ color: T.textSoft, fontWeight: 600 }}>—</span>
-              <input type="time" value={v.bitis} onChange={e => saatGuncelle(i, 'bitis', e.target.value)}
+              <input type="time" value={v.bitis} onChange={e => saatGuncelle(v.no, 'bitis', e.target.value)}
                 style={{ flex: 1, height: 34, padding: '0 8px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 700, textAlign: 'center' }} />
             </div>
           </div>
