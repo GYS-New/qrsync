@@ -22,7 +22,7 @@ function gunEtiket(gunler: number[]) {
   return gunler.map(g => GUN_ISIMLERI[g] ?? g).join(', ')
 }
 
-export default function GorevDuraklatmalariClient({ firmaId, projeId }: { firmaId: string; projeId: string | null }) {
+export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebilir = true, silebilir = true }: { firmaId: string; projeId: string | null; ekleyebilir?: boolean; silebilir?: boolean }) {
   const [kurallar, setKurallar] = useState<Kural[]>([])
   const [duraklatmalar, setDuraklatmalar] = useState<Duraklat[]>([])
   const [loading, setLoading] = useState(true)
@@ -126,11 +126,13 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId }: { firmaI
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => setModalTanim(tg)}
-                  style={{ padding: '6px 16px', fontSize: 13, borderRadius: 8, border: '1px solid #fbbf24', background: '#fffbeb', cursor: 'pointer', color: '#92400e', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                  ⏸ Duraklat
-                </button>
+                {ekleyebilir && (
+                  <button
+                    onClick={() => setModalTanim(tg)}
+                    style={{ padding: '6px 16px', fontSize: 13, borderRadius: 8, border: '1px solid #fbbf24', background: '#fffbeb', cursor: 'pointer', color: '#92400e', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    ⏸ Duraklat
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -146,6 +148,7 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId }: { firmaI
           aktifOlmaSaati={modalTanim.aktifOlmaSaati}
           onClose={() => { setModalTanim(null); refreshDuraklatmalar() }}
           toast={toast}
+          silebilir={silebilir}
         />
       )}
     </div>
@@ -153,9 +156,9 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId }: { firmaI
 }
 
 /** Duraklatma popup — VardiyaDuraklatModal'ın bağımsız versiyonu */
-function DuraklatModal({ tanim, firmaId, projeId, aktifOlmaSaati, onClose, toast }: {
+function DuraklatModal({ tanim, firmaId, projeId, aktifOlmaSaati, onClose, toast, silebilir = true }: {
   tanim: string; firmaId: string; projeId: string | null; aktifOlmaSaati: string
-  onClose: () => void; toast: (o: any) => void
+  onClose: () => void; toast: (o: any) => void; silebilir?: boolean
 }) {
   const [vardiyalar, setVardiyalar] = useState<{ no: number; baslangic: string; bitis: string }[]>([])
   const [uygunVardiyaNo, setUygunVardiyaNo] = useState<number | null>(null)
@@ -307,10 +310,12 @@ function DuraklatModal({ tanim, firmaId, projeId, aktifOlmaSaati, onClose, toast
                   <span style={{ fontWeight: 700, color: '#92400e' }}>{m.tarih}</span>
                   <span style={{ color: '#6b7280' }}>·</span>
                   <span style={{ color: '#374151' }}>{m.vardiya_no}. Vardiya</span>
-                  <button onClick={() => kaldir(m.id, m.tarih, m.vardiya_no)}
-                    style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: 11, borderRadius: 4, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
-                    Kaldır
-                  </button>
+                  {silebilir && (
+                    <button onClick={() => kaldir(m.id, m.tarih, m.vardiya_no)}
+                      style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: 11, borderRadius: 4, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
+                      Kaldır
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

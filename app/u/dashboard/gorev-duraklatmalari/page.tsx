@@ -33,7 +33,7 @@ export default async function UGorevDuraklatmalariPage() {
         breadcrumbs={[{ label: 'Görev Duraklatmaları' }]}
       />
       <div style={{ padding: '24px 28px' }}>
-        <GorevDuraklatmalariClient firmaId={firmaId!} projeId={projeId ?? null} />
+        <GorevDuraklatmalariClient firmaId={firmaId!} projeId={projeId ?? null} ekleyebilir={yetki.ekleyebilir} silebilir={yetki.silebilir} />
       </div>
     </div>
   )
