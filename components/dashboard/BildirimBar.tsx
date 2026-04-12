@@ -8,7 +8,7 @@ import { useProje } from '@/components/projeler/ProjeContext'
 type Bildirim = { id: string; mesaj: string; tip: string }
 type Aktivite = { id: string; mesaj: string; saat: string }
 
-export default function BildirimBar({ rol }: { rol: string }) {
+export default function BildirimBar({ rol }: { rol: 'super_admin' | 'alt_super_admin' | 'tenant_admin' | 'tenant_user' | 'musteri' | string }) {
   const [bildirimler, setBildirimler] = useState<Bildirim[]>([])
   const [aktiviteler, setAktiviteler] = useState<Aktivite[]>([])
   const [solIdx, setSolIdx] = useState(0)
@@ -19,6 +19,9 @@ export default function BildirimBar({ rol }: { rol: string }) {
   const { firmaId: ctxFirmaId } = useFirma()
   const { aktifProje } = useProje()
   const isMusteriRol = rol === 'musteri'
+  const isSA = rol === 'super_admin' || rol === 'alt_super_admin'
+  const isTA = rol === 'tenant_admin'
+  const isU  = rol === 'tenant_user'
 
   // TA/U için user bilgisi
   useEffect(() => {
@@ -30,8 +33,9 @@ export default function BildirimBar({ rol }: { rol: string }) {
     })
   }, [ctxFirmaId, supabase])
 
+  // SA: seçili firma + seçili proje | TA: kendi firma + aktif proje | U: kendi firma + kendi proje
   const firmaId = ctxFirmaId || meInfo?.firma_id || null
-  const projeId = aktifProje?.id || meInfo?.proje_id || null
+  const projeId = isSA ? (aktifProje?.id ?? null) : isTA ? (aktifProje?.id ?? null) : (meInfo?.proje_id ?? aktifProje?.id ?? null)
 
   // Sol taraf: sistem bildirimleri + cron
   useEffect(() => {
@@ -95,7 +99,7 @@ export default function BildirimBar({ rol }: { rol: string }) {
     yukle()
     const interval = setInterval(yukle, 60000)
     return () => { alive = false; clearInterval(interval) }
-  }, [firmaId, projeId, isMusteriRol])
+  }, [firmaId, projeId, isMusteriRol, isSA, isTA])
 
   // Sağ taraf: kullanıcı aktiviteleri
   useEffect(() => {
