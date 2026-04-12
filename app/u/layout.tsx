@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
-import BildirimBar from '@/components/dashboard/BildirimBar'
 
 export default async function ULayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
@@ -20,7 +19,6 @@ export default async function ULayout({ children }: { children: React.ReactNode 
     <div style={{ display: 'flex', minHeight: '100vh', background: '#fafafa' }}>
       <Sidebar user={user} firma={firma} projeAdi={proje?.ad ?? null} projeLogo={(proje as any)?.logo_url ?? null} birimFiyatAktifProp={(firma as any)?.birim_fiyat_aktif === true} />
       <div style={{ marginLeft: 282, flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-        <BildirimBar rol={user.rol} propFirmaId={user.firma_id} propProjeId={user.proje_id} />
         {children}
       </div>
     </div>

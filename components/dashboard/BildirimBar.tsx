@@ -13,11 +13,10 @@ export default function BildirimBar({ rol, propFirmaId, propProjeId }: { rol: st
   const { aktifProje } = useProje()
   const firmaId = propFirmaId || ctxFirmaId
   const projeId = propProjeId || aktifProje?.id || null
-
-  // M rolü göremez
-  if (rol === 'musteri') return null
+  const isMusteriRol = rol === 'musteri'
 
   useEffect(() => {
+    if (isMusteriRol) return
     if (!firmaId) return
     let alive = true
 
@@ -77,7 +76,7 @@ export default function BildirimBar({ rol, propFirmaId, propProjeId }: { rol: st
     return () => clearInterval(t)
   }, [bildirimler.length])
 
-  if (bildirimler.length === 0) return null
+  if (isMusteriRol || bildirimler.length === 0) return null
 
   const aktif = bildirimler[aktifIdx % bildirimler.length]
   if (!aktif) return null
@@ -91,9 +90,7 @@ export default function BildirimBar({ rol, propFirmaId, propProjeId }: { rol: st
       alignItems: 'center',
       gap: 10,
       minHeight: 36,
-      position: 'sticky',
-      top: 69,
-      zIndex: 9,
+      borderTop: '1px solid #e5e7eb',
     }}>
       <span style={{
         fontSize: 13,

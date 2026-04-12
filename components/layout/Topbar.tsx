@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import UserPanel from '@/components/layout/UserPanel'
 import DashboardScopeControls from '@/components/layout/DashboardScopeControls'
+import BildirimBar from '@/components/dashboard/BildirimBar'
 import { useFirma } from '@/components/layout/FirmaContext'
 
 interface TopbarProps {
@@ -109,9 +110,13 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
 
   const badgeText = count > 99 ? '99+' : String(count)
 
+  // M rolü dışında bildirim barı göster
+  const showBar = base !== '/m'
+
   return (
+    <>
     <header style={{
-      background:'#fff', borderBottom:'1px solid #e5e7eb',
+      background:'#fff', borderBottom: showBar ? 'none' : '1px solid #e5e7eb',
       height:69, padding:'0 28px',
       display:'flex', alignItems:'center', gap:16,
       position:'sticky', top:0, zIndex:10,
@@ -193,5 +198,7 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
         <UserPanel base={base} />
       </div>
     </header>
+    {showBar && <BildirimBar rol={base === '/sa' ? 'super_admin' : base === '/ta' ? 'tenant_admin' : 'tenant_user'} />}
+    </>
   )
 }
