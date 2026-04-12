@@ -27,14 +27,8 @@ export default async function TAArsivPage() {
     )
   }
 
-  const sel = `*, lokasyonlar(id,tanim), atanan:users!atanan_kullanici_id(isim_soyisim), olusturan:users!olusturan_id(isim_soyisim), tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim), iptalEden:users!iptal_eden_id(isim_soyisim), islemi_yapan:users!islemi_yapan_id(isim_soyisim), kural:gorev_kurallari!arsiv_kural_fkey(tanim)`
-  const { data: arsiv } = await supabase
-    .from('canli_gorevler_arsiv')
-    .select(sel)
-    .eq('firma_id', firmaId)
-    .eq('proje_id', aktifProje.id)
-    .order('arsiv_tarihi', { ascending: false })
-    .limit(1000)
+  // Initial arsiv boş — client tarafında hızlı yükleniyor (FK join timeout önlemi)
+  const arsiv: any[] = []
 
   return (
     <div>

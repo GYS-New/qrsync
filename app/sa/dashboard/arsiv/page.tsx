@@ -21,28 +21,8 @@ export default async function SAArsivPage() {
   const cookieProje = await getAktifProje(firmaId)
   const projeId = cookieProje?.id ?? null
 
-  // Arşiv kayıtlarını getir
-  const sel = `
-    *,
-    lokasyonlar(id, tanim),
-    atanan:users!atanan_kullanici_id(isim_soyisim),
-    olusturan:users!olusturan_id(isim_soyisim),
-    tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),
-    iptalEden:users!iptal_eden_id(isim_soyisim),
-    islemi_yapan:users!islemi_yapan_id(isim_soyisim),
-    kural:gorev_kurallari!arsiv_kural_fkey(tanim)
-  `
-
-  let arsivQuery = admin
-    .from('canli_gorevler_arsiv')
-    .select(sel)
-    .order('arsiv_tarihi', { ascending: false })
-    .limit(1000)
-
-  if (firmaId) arsivQuery = arsivQuery.eq('firma_id', firmaId)
-  if (projeId) arsivQuery = arsivQuery.eq('proje_id', projeId)
-
-  const { data: arsiv } = await arsivQuery
+  // Initial arsiv boş — client tarafında hızlı yükleniyor (FK join timeout önlemi)
+  const arsiv: any[] = []
 
   return (
     <div>

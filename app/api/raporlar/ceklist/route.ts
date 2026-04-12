@@ -241,40 +241,39 @@ async function kayitlarGetir(
 
   const gorevMap: Record<string, GorevRow> = {}
 
-  // 4a. Frekansiyel: canli_gorevler → canli_gorevler_arsiv
+  // 4a. Frekansiyel: canli_gorevler → canli_gorevler_arsiv (batch ile URL limit aşımını önle)
+  const BATCH = 80
   if (canliGorevIds.length) {
-    const { data: canliGorevler } = await admin.from('canli_gorevler')
-      .select('id,tanim,durum,tamamlanma_tarihi,lokasyon_id,durum_degisim_tarihi')
-      .in('id', canliGorevIds)
-      .in('durum', GECERLI_DURUMLAR)
-    for (const g of canliGorevler ?? []) {
-      gorevMap[g.id] = {
-        id: g.id,
-        tanim: g.tanim,
-        durum: g.durum,
-        tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
-        arsiv_tarihi: null,
-        lokasyon_id: g.lokasyon_id,
-        durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
-        dbKaynak: 'canli',
+    for (let i = 0; i < canliGorevIds.length; i += BATCH) {
+      const chunk = canliGorevIds.slice(i, i + BATCH)
+      const { data: canliGorevler } = await admin.from('canli_gorevler')
+        .select('id,tanim,durum,tamamlanma_tarihi,lokasyon_id,durum_degisim_tarihi')
+        .in('id', chunk)
+        .in('durum', GECERLI_DURUMLAR)
+      for (const g of canliGorevler ?? []) {
+        gorevMap[g.id] = {
+          id: g.id, tanim: g.tanim, durum: g.durum,
+          tamamlanma_tarihi: g.tamamlanma_tarihi ?? null, arsiv_tarihi: null,
+          lokasyon_id: g.lokasyon_id, durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
+          dbKaynak: 'canli',
+        }
       }
     }
     const eksik = canliGorevIds.filter(id => !gorevMap[id])
     if (eksik.length) {
-      const { data: arsivGorevler } = await admin.from('canli_gorevler_arsiv')
-        .select('id,tanim,durum,tamamlanma_tarihi,arsiv_tarihi,lokasyon_id,durum_degisim_tarihi')
-        .in('id', eksik)
-        .in('durum', GECERLI_DURUMLAR)
-      for (const g of arsivGorevler ?? []) {
-        gorevMap[g.id] = {
-          id: g.id,
-          tanim: g.tanim,
-          durum: g.durum,
-          tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
-          arsiv_tarihi: g.arsiv_tarihi ?? null,
-          lokasyon_id: g.lokasyon_id,
-          durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
-          dbKaynak: 'arsiv',
+      for (let i = 0; i < eksik.length; i += BATCH) {
+        const chunk = eksik.slice(i, i + BATCH)
+        const { data: arsivGorevler } = await admin.from('canli_gorevler_arsiv')
+          .select('id,tanim,durum,tamamlanma_tarihi,arsiv_tarihi,lokasyon_id,durum_degisim_tarihi')
+          .in('id', chunk)
+          .in('durum', GECERLI_DURUMLAR)
+        for (const g of arsivGorevler ?? []) {
+          gorevMap[g.id] = {
+            id: g.id, tanim: g.tanim, durum: g.durum,
+            tamamlanma_tarihi: g.tamamlanma_tarihi ?? null, arsiv_tarihi: g.arsiv_tarihi ?? null,
+            lokasyon_id: g.lokasyon_id, durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
+            dbKaynak: 'arsiv',
+          }
         }
       }
     }
@@ -335,17 +334,23 @@ async function kayitlarGetir(
 
   // 6. Madde sayıları (from both tables)
   const baslikIds = allBasliklar.map((b: any) => b.id)
-  const { data: maddeSayilari } = await admin.from('checklist_sonuc_maddeleri')
-    .select('sonuc_id')
-    .in('sonuc_id', baslikIds)
+  const maddeSayilari: any[] = []
+  for (let i = 0; i < baslikIds.length; i += BATCH) {
+    const chunk = baslikIds.slice(i, i + BATCH)
+    const { data } = await admin.from('checklist_sonuc_maddeleri').select('sonuc_id').in('sonuc_id', chunk)
+    if (data) maddeSayilari.push(...data)
+  }
 
   // Arşiv maddeleri
-  const { data: arMaddeSayilari } = await admin.from('checklist_sonuc_maddeleri_arsiv')
-    .select('sonuc_id')
-    .in('sonuc_id', baslikIds)
+  const arMaddeSayilari: any[] = []
+  for (let i = 0; i < baslikIds.length; i += BATCH) {
+    const chunk = baslikIds.slice(i, i + BATCH)
+    const { data } = await admin.from('checklist_sonuc_maddeleri_arsiv').select('sonuc_id').in('sonuc_id', chunk)
+    if (data) arMaddeSayilari.push(...data)
+  }
 
   const doldurulanMap: Record<string, number> = {}
-  for (const m of [...(maddeSayilari ?? []), ...(arMaddeSayilari ?? [])]) {
+  for (const m of [...maddeSayilari, ...arMaddeSayilari]) {
     doldurulanMap[m.sonuc_id] = (doldurulanMap[m.sonuc_id] ?? 0) + 1
   }
 

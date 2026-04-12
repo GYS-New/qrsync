@@ -89,6 +89,8 @@ export default function ArsivClient({
   const [frekNeden,   setFrekNeden]   = useState('')
   const [frekFrom,    setFrekFrom]    = useState('')
   const [frekTo,      setFrekTo]      = useState('')
+  const [frekSayfa,   setFrekSayfa]   = useState(1)
+  const FREK_PER_PAGE = 50
 
   // ── Personel state ───────────────────────────────────────────────────────
   const [personelData,    setPersonelData]    = useState<any[]>([])
@@ -440,6 +442,9 @@ export default function ArsivClient({
     })
   }, [frekData, frekQ, frekDurum, frekNeden, frekFrom, frekTo])
 
+  // Filtre değiştiğinde sayfayı sıfırla
+  useEffect(() => { setFrekSayfa(1) }, [frekQ, frekDurum, frekNeden, frekFrom, frekTo])
+
   const filtrePersonel = useMemo(() => {
     const s = personelQ.trim().toLowerCase()
     return personelData.filter((r: any) =>
@@ -574,7 +579,7 @@ export default function ArsivClient({
       {firmaId && aktifSekme === 'frekansiyel' && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-            <span style={{ fontSize: 13, color: '#64748b' }}><strong style={{ color: '#1f2937' }}>{filtreFrek.length}</strong> kayıt</span>
+            <span style={{ fontSize: 13, color: '#64748b' }}><strong style={{ color: '#1f2937' }}>{filtreFrek.length}</strong> kayıt · Sayfa {frekSayfa}/{Math.max(1, Math.ceil(filtreFrek.length / FREK_PER_PAGE))}</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => csvIndir('frekansiyel', ['Görev','Lokasyon','Atanan','Durum','Arşiv Tarihi','Neden'],
                 filtreFrek.map((r:any) => [r.tanim,r.lokasyonlar?.tanim??'',r.atanan?.isim_soyisim??'',CANLI_DURUM_LABEL[r.durum]??r.durum,r.arsiv_tarihi?formatDateTime(r.arsiv_tarihi):'',ARSIV_NEDEN_LABEL[r.arsiv_nedeni]??r.arsiv_nedeni??'']))}
@@ -628,7 +633,7 @@ export default function ArsivClient({
               <tbody>
                 {frekLoading ? <YukleniyorSatir cols={9} /> :
                  filtreFrek.length === 0 ? <BosKayit cols={9} mesaj="Arşiv kaydı bulunamadı." /> :
-                 filtreFrek.map((r: any) => (
+                 filtreFrek.slice((frekSayfa - 1) * FREK_PER_PAGE, frekSayfa * FREK_PER_PAGE).map((r: any) => (
                   <tr key={r.id}>
                     <td style={{ fontWeight: 600, color: r.simule_tamamlandi ? '#9ca3af' : undefined }}>{r.tanim}</td>
                     <td style={td({ color:'#64748b' })}>{getLocPath(r.lokasyon_id)}</td>
@@ -653,6 +658,29 @@ export default function ArsivClient({
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {filtreFrek.length > FREK_PER_PAGE && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12 }}>
+              <button onClick={() => setFrekSayfa(1)} disabled={frekSayfa === 1}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: frekSayfa === 1 ? 0.4 : 1 }}>
+                «
+              </button>
+              <button onClick={() => setFrekSayfa(p => Math.max(1, p - 1))} disabled={frekSayfa === 1}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: frekSayfa === 1 ? 0.4 : 1 }}>
+                ‹ Önceki
+              </button>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{frekSayfa} / {Math.ceil(filtreFrek.length / FREK_PER_PAGE)}</span>
+              <button onClick={() => setFrekSayfa(p => Math.min(Math.ceil(filtreFrek.length / FREK_PER_PAGE), p + 1))} disabled={frekSayfa >= Math.ceil(filtreFrek.length / FREK_PER_PAGE)}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: frekSayfa >= Math.ceil(filtreFrek.length / FREK_PER_PAGE) ? 0.4 : 1 }}>
+                Sonraki ›
+              </button>
+              <button onClick={() => setFrekSayfa(Math.ceil(filtreFrek.length / FREK_PER_PAGE))} disabled={frekSayfa >= Math.ceil(filtreFrek.length / FREK_PER_PAGE)}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: frekSayfa >= Math.ceil(filtreFrek.length / FREK_PER_PAGE) ? 0.4 : 1 }}>
+                »
+              </button>
+            </div>
+          )}
         </>
       )}
 
