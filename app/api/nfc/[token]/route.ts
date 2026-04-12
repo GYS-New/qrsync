@@ -11,15 +11,28 @@ async function getAuthUser(req: Request) {
     const admin = createAdminClient()
     const { data } = await admin
       .from('device_tokens')
-      .select('user_id, aktif')
+      .select('user_id, aktif, firma_id, proje_id')
       .eq('device_token', deviceToken)
       .single()
-    if (data?.aktif) return { id: data.user_id }
+    if (data?.aktif) return { id: data.user_id, firma_id: data.firma_id ?? null, proje_id: data.proje_id ?? null }
     return null
   }
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  return user
+  return user ? { id: user.id } : null
+}
+
+function checkFirmaProje(context: any, user: any) {
+  if (user.firma_id && context.firma?.id && context.firma.id !== user.firma_id) {
+    return { ok: false, code: 'FARKLI_FIRMA', error: `Bu QR/NFC '${context.firma?.ad ?? 'başka firma'}' firmasına ait. Siz farklı bir firmada kayıtlısınız.` }
+  }
+  if (user.proje_id && context.lokasyon) {
+    const lokProjeId = (context.lokasyon as any)?.proje_id
+    if (lokProjeId && lokProjeId !== user.proje_id) {
+      return { ok: false, code: 'FARKLI_PROJE', error: 'Bu QR/NFC çalıştığınız projeye ait değil.' }
+    }
+  }
+  return null
 }
 
 export async function GET(req: Request, { params }: { params: { token: string } }) {
@@ -30,6 +43,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
   try {
     const supabase = createAdminClient()
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'NFC', userId: user.id })
+    const fpHata = checkFirmaProje(context, user)
+    if (fpHata) return NextResponse.json(fpHata, { status: 403 })
     return NextResponse.json({ ok: true, ...context })
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message ?? 'İşlem başarısız' }, { status: 400 })
@@ -70,6 +85,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
     }
 
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'NFC', userId: user.id })
+
+    // Firma/Proje kontrolü
+    const fpHata2 = checkFirmaProje(context, user)
+    if (fpHata2) return NextResponse.json(fpHata2, { status: 403 })
 
     let task = context.tasks.find((t) => t.id === selectedTaskId && t.taskType === selectedTaskType)
     if (!task && selectedTaskId && !selectedTaskType) {

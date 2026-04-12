@@ -48,6 +48,7 @@ export type ScanContext = {
     id: string
     tanim: string
     aktif: boolean
+    proje_id: string | null
     sureli_gorev_aktif: boolean
     tamamlama_qr_zorunlu: boolean
     qr_veri: string | null
@@ -74,6 +75,7 @@ export async function resolveScanContext(opts: {
     .select(`
       id,
       firma_id,
+      proje_id,
       tanim,
       aktif,
       qr_veri,
@@ -193,6 +195,7 @@ export async function resolveScanContext(opts: {
       id: loc.id,
       tanim: loc.tanim,
       aktif: !!loc.aktif,
+      proje_id: (loc as any).proje_id ?? null,
       sureli_gorev_aktif: !!(loc as any).sureli_gorev_aktif,
       tamamlama_qr_zorunlu: !!(loc as any).tamamlama_qr_zorunlu,
       qr_veri: (loc as any).qr_veri ?? null,
