@@ -1,16 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
 
 const T = { text: '#0f172a', textSoft: '#64748b', border: '#e2e8f0', blue: '#1d4ed8' }
-
-const VARSAYILAN = [
-  { no: 1, baslangic: '00:00', bitis: '08:00' },
-  { no: 2, baslangic: '08:00', bitis: '16:00' },
-  { no: 3, baslangic: '16:00', bitis: '23:59' },
-]
 
 type Vardiya = { no: number; baslangic: string; bitis: string }
 
@@ -19,17 +13,18 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
   const firmaIdEfektif = propFirmaId || saFirmaId
   const { toast } = useToast()
   const [sayisi, setSayisi] = useState(3)
-  // Her vardiya ayrı state — birbirini etkilemez
-  const [v1Bas, setV1Bas] = useState('00:00')
-  const [v1Bit, setV1Bit] = useState('08:00')
-  const [v2Bas, setV2Bas] = useState('08:00')
-  const [v2Bit, setV2Bit] = useState('16:00')
-  const [v3Bas, setV3Bas] = useState('16:00')
-  const [v3Bit, setV3Bit] = useState('23:59')
-  const [v4Bas, setV4Bas] = useState('00:00')
-  const [v4Bit, setV4Bit] = useState('06:00')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+
+  // Uncontrolled inputs — ref ile değer okuma, birbirini etkilemez
+  const r1b = useRef<HTMLInputElement>(null)
+  const r1e = useRef<HTMLInputElement>(null)
+  const r2b = useRef<HTMLInputElement>(null)
+  const r2e = useRef<HTMLInputElement>(null)
+  const r3b = useRef<HTMLInputElement>(null)
+  const r3e = useRef<HTMLInputElement>(null)
+  const r4b = useRef<HTMLInputElement>(null)
+  const r4e = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!firmaIdEfektif) return
@@ -37,23 +32,29 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
       .then(r => r.json())
       .then(j => {
         setSayisi(j.vardiya_sayisi ?? 3)
-        const s = j.vardiya_saatleri ?? VARSAYILAN
-        if (s[0]) { setV1Bas(s[0].baslangic); setV1Bit(s[0].bitis) }
-        if (s[1]) { setV2Bas(s[1].baslangic); setV2Bit(s[1].bitis) }
-        if (s[2]) { setV3Bas(s[2].baslangic); setV3Bit(s[2].bitis) }
-        if (s[3]) { setV4Bas(s[3].baslangic); setV4Bit(s[3].bitis) }
+        const s = j.vardiya_saatleri ?? []
+        // setTimeout ile DOM hazır olduktan sonra set et
+        setTimeout(() => {
+          if (r1b.current) r1b.current.value = s[0]?.baslangic ?? ''
+          if (r1e.current) r1e.current.value = s[0]?.bitis ?? ''
+          if (r2b.current) r2b.current.value = s[1]?.baslangic ?? ''
+          if (r2e.current) r2e.current.value = s[1]?.bitis ?? ''
+          if (r3b.current) r3b.current.value = s[2]?.baslangic ?? ''
+          if (r3e.current) r3e.current.value = s[2]?.bitis ?? ''
+          if (r4b.current) r4b.current.value = s[3]?.baslangic ?? ''
+          if (r4e.current) r4e.current.value = s[3]?.bitis ?? ''
+        }, 50)
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [firmaIdEfektif])
 
   function getSaatler(): Vardiya[] {
-    // Her zaman 4 vardiyayı da kaydet — sayı değiştiğinde eski değerler korunsun
     return [
-      { no: 1, baslangic: v1Bas, bitis: v1Bit },
-      { no: 2, baslangic: v2Bas, bitis: v2Bit },
-      { no: 3, baslangic: v3Bas, bitis: v3Bit },
-      { no: 4, baslangic: v4Bas, bitis: v4Bit },
+      { no: 1, baslangic: r1b.current?.value ?? '', bitis: r1e.current?.value ?? '' },
+      { no: 2, baslangic: r2b.current?.value ?? '', bitis: r2e.current?.value ?? '' },
+      { no: 3, baslangic: r3b.current?.value ?? '', bitis: r3e.current?.value ?? '' },
+      { no: 4, baslangic: r4b.current?.value ?? '', bitis: r4e.current?.value ?? '' },
     ]
   }
 
@@ -76,7 +77,7 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
 
   if (loading) return <div style={{ padding: 20, color: T.textSoft }}>Yükleniyor...</div>
 
-  const timeInp: React.CSSProperties = { flex: 1, height: 34, padding: '0 8px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 700, textAlign: 'center' }
+  const ti: React.CSSProperties = { flex: 1, height: 34, padding: '0 8px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 700, textAlign: 'center' }
 
   return (
     <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
@@ -108,9 +109,9 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
           <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>1. Vardiya</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input type="time" value={v1Bas} onChange={e => setV1Bas(e.target.value)} style={timeInp} />
+              <input id="v1b" type="time" ref={r1b} style={ti} />
               <span style={{ color: T.textSoft, fontWeight: 600 }}>—</span>
-              <input type="time" value={v1Bit} onChange={e => setV1Bit(e.target.value)} style={timeInp} />
+              <input id="v1e" type="time" ref={r1e} style={ti} />
             </div>
           </div>
         )}
@@ -118,9 +119,9 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
           <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>2. Vardiya</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input type="time" value={v2Bas} onChange={e => setV2Bas(e.target.value)} style={timeInp} />
+              <input id="v2b" type="time" ref={r2b} style={ti} />
               <span style={{ color: T.textSoft, fontWeight: 600 }}>—</span>
-              <input type="time" value={v2Bit} onChange={e => setV2Bit(e.target.value)} style={timeInp} />
+              <input id="v2e" type="time" ref={r2e} style={ti} />
             </div>
           </div>
         )}
@@ -128,9 +129,9 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
           <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>3. Vardiya</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input type="time" value={v3Bas} onChange={e => setV3Bas(e.target.value)} style={timeInp} />
+              <input id="v3b" type="time" ref={r3b} style={ti} />
               <span style={{ color: T.textSoft, fontWeight: 600 }}>—</span>
-              <input type="time" value={v3Bit} onChange={e => setV3Bit(e.target.value)} style={timeInp} />
+              <input id="v3e" type="time" ref={r3e} style={ti} />
             </div>
           </div>
         )}
@@ -138,9 +139,9 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
           <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: `1px solid ${T.border}` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.blue, marginBottom: 8 }}>4. Vardiya</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input type="time" value={v4Bas} onChange={e => setV4Bas(e.target.value)} style={timeInp} />
+              <input id="v4b" type="time" ref={r4b} style={ti} />
               <span style={{ color: T.textSoft, fontWeight: 600 }}>—</span>
-              <input type="time" value={v4Bit} onChange={e => setV4Bit(e.target.value)} style={timeInp} />
+              <input id="v4e" type="time" ref={r4e} style={ti} />
             </div>
           </div>
         )}
