@@ -75,6 +75,40 @@ export default function BildirimBar({ rol }: { rol: string }) {
           }
         }
 
+        // 2. Cron bildirimleri
+        try {
+          const cronRes = await fetch('/api/cron-log')
+          const cronJ = await cronRes.json()
+          const cronLogs = cronJ.data ?? []
+
+          const CRON_MESAJLAR: Record<string, (s: any) => string> = {
+            gece_dongu: s => `🌙 Gece Döngüsü: ${s?.uretim?.uretilen ?? 0} görev üretildi${s?.uretim?.duraklatilan ? `, ${s.uretim.duraklatilan} duraklatıldı` : ''}`,
+            arsivleme: s => {
+              const t = Object.values(s?.results ?? {}).reduce((acc: number, r: any) => acc + (r?.frekansiyel ?? 0) + (r?.spesifik ?? 0) + (r?.personel ?? 0) + (r?.musteri ?? 0), 0) as number
+              return `📦 Arşivleme: ${t} kayıt arşivlendi`
+            },
+            simulasyon: s => `⚡ Simülasyon: ${s?.tamamlanan ?? 0} görev tamamlandı`,
+            max_sure: s => `⏰ Süre Kontrolü: ${(s?.gorevler_iptal ?? 0) + (s?.canli_gorevler_iptal ?? 0)} görev süre aşımından iptal edildi`,
+            personel_takip: s => `👷 Personel Takip: ${s?.gonderilen ?? 0} bildirim gönderildi`,
+            rapor_gonder: s => `📊 Rapor Gönderimi: ${s?.processed ?? 0} rapor işlendi`,
+          }
+
+          for (const log of cronLogs) {
+            const mesajFn = CRON_MESAJLAR[log.tip]
+            if (!mesajFn) continue
+            const mesaj = mesajFn(log.sonuc)
+            // "0 görev" gibi boş sonuçları atla
+            if (mesaj.includes(': 0 ')) continue
+            const tarih = new Date(log.tarih)
+            const saatStr = tarih.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+            items.push({
+              id: `cron-${log.tip}-${log.tarih}`,
+              mesaj: `${mesaj} (${saatStr})`,
+              tip: 'cron',
+            })
+          }
+        } catch {}
+
         if (alive) setBildirimler(items)
       } catch {}
     }
@@ -100,8 +134,8 @@ export default function BildirimBar({ rol }: { rol: string }) {
 
   return (
     <div style={{
-      background: aktif.tip === 'duraklat' ? '#fffbeb' : '#eff6ff',
-      borderBottom: `1px solid ${aktif.tip === 'duraklat' ? '#fde68a' : '#bfdbfe'}`,
+      background: aktif.tip === 'duraklat' ? '#fffbeb' : '#f0f9ff',
+      borderBottom: `1px solid ${aktif.tip === 'duraklat' ? '#fde68a' : '#e0f2fe'}`,
       padding: '8px 28px',
       display: 'flex',
       alignItems: 'center',
@@ -112,7 +146,7 @@ export default function BildirimBar({ rol }: { rol: string }) {
       <span style={{
         fontSize: 13,
         fontWeight: 600,
-        color: aktif.tip === 'duraklat' ? '#92400e' : '#1e40af',
+        color: aktif.tip === 'duraklat' ? '#92400e' : '#0369a1',
         flex: 1,
         overflow: 'hidden',
         textOverflow: 'ellipsis',

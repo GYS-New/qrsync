@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
     if (error) throw new Error(error.message)
 
     console.log('[cron/gece-dongu]', JSON.stringify(data))
+    // Cron log kaydet
+    await admin.from('cron_log').insert({ tip: 'gece_dongu', sonuc: data })
     return NextResponse.json({ ok: true, sonuc: data })
   } catch (err: any) {
     console.error('[cron/gece-dongu] HATA:', err.message)
