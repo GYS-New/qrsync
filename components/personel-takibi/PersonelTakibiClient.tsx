@@ -7,6 +7,7 @@ import { useProje } from '@/components/projeler/ProjeContext'
 import {
   RefreshCw, QrCode, Download, RotateCcw,
   LogIn, LogOut, Users, UserCheck, UserX, Filter, X,
+  FileSpreadsheet, Archive,
 } from 'lucide-react'
 import QRCode from 'qrcode'
 
@@ -156,12 +157,25 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   const [filtreBaslangic, setFiltreBaslangic] = useState('')
   const [filtreBitis,     setFiltreBitis]     = useState('')
   const [filtreArama,     setFiltreArama]     = useState('')
+  const [filtreLokasyon,  setFiltreLokasyon]  = useState('')
+  const [filtreDurum,     setFiltreDurum]     = useState<'' | 'aktif' | 'pasif'>('')
   const [kayitListe,      setKayitListe]      = useState<MesaiKayit[]>([])
   const [lokMap,          setLokMap]          = useState<Record<string, string>>({})
   const [kayitLoading,    setKayitLoading]    = useState(false)
 
+  // Sayfalama
+  const [sayfa, setSayfa] = useState(1)
+  const PAGE_SIZE = 50
+
+  // Arşiv
+  const [arsivData,     setArsivData]     = useState<any[]>([])
+  const [arsivTotal,    setArsivTotal]    = useState(0)
+  const [arsivSayfa,    setArsivSayfa]    = useState(1)
+  const [arsivLoading,  setArsivLoading]  = useState(false)
+  const [arsivAktif,    setArsivAktif]    = useState(false)
+
   const filtreAktif       = !!(filtreBaslangic || filtreBitis)
-  const aktifFiltreSayisi = [filtreBaslangic, filtreBitis].filter(Boolean).length
+  const aktifFiltreSayisi = [filtreBaslangic, filtreBitis, filtreLokasyon, filtreDurum].filter(Boolean).length
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -220,7 +234,8 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   }
 
   function filtreyiTemizle() {
-    setFiltreBaslangic(''); setFiltreBitis(''); setFiltreArama(''); setKayitListe([])
+    setFiltreBaslangic(''); setFiltreBitis(''); setFiltreArama(''); setFiltreLokasyon(''); setFiltreDurum(''); setKayitListe([])
+    setArsivAktif(false); setArsivData([]); setArsivTotal(0); setArsivSayfa(1)
     yukle()
   }
 
@@ -273,6 +288,9 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
         if (yetkiliUstLokIds && !(p as any).ust_lokasyon_id) return false
         if (yetkiliUstLokIds && !yetkiliUstLokIds.includes((p as any).ust_lokasyon_id)) return false
         if (q && !p.isim_soyisim?.toLowerCase().includes(q) && !p.email?.toLowerCase().includes(q)) return false
+        if (filtreLokasyon && (p as any).ust_lokasyon_id !== filtreLokasyon) return false
+        if (filtreDurum === 'aktif' && !p.aktif) return false
+        if (filtreDurum === 'pasif' && p.aktif) return false
         return true
       })
       .sort((a, b) => {
@@ -280,7 +298,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
         if (!a.aktif && b.aktif) return 1
         return (a.isim_soyisim ?? '').localeCompare(b.isim_soyisim ?? '', 'tr')
       })
-  }, [liste, filtreArama, yetkiliUstLokIds])
+  }, [liste, filtreArama, filtreLokasyon, filtreDurum, yetkiliUstLokIds])
 
   // ── Filtreli / sıralı liste (kayıt modu) ─────────────────────────────────
   const siraliKayitlar = useMemo(() => {
@@ -290,13 +308,93 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
         if (yetkiliUstLokIds && !(k as any).ust_lokasyon_id) return false
         if (yetkiliUstLokIds && !yetkiliUstLokIds.includes((k as any).ust_lokasyon_id)) return false
         if (q && !k.isim_soyisim?.toLowerCase().includes(q) && !k.email?.toLowerCase().includes(q)) return false
+        if (filtreLokasyon && (k as any).ust_lokasyon_id !== filtreLokasyon) return false
+        if (filtreDurum === 'aktif' && !k.aktif) return false
+        if (filtreDurum === 'pasif' && k.aktif) return false
         return true
       })
       .sort((a, b) => {
         if (a.kayit_tarihi !== b.kayit_tarihi) return b.kayit_tarihi.localeCompare(a.kayit_tarihi)
         return (a.isim_soyisim ?? '').localeCompare(b.isim_soyisim ?? '', 'tr')
       })
-  }, [kayitListe, filtreArama, yetkiliUstLokIds])
+  }, [kayitListe, filtreArama, filtreLokasyon, filtreDurum, yetkiliUstLokIds])
+
+  // Sayfalama
+  const aktifListe = filtreAktif ? siraliKayitlar : siraliListe
+  const toplamSayfa = Math.max(1, Math.ceil(aktifListe.length / PAGE_SIZE))
+  const sayfaRows = aktifListe.slice((sayfa - 1) * PAGE_SIZE, sayfa * PAGE_SIZE)
+  useEffect(() => { setSayfa(1) }, [aktifListe.length])
+
+  // Üst lokasyon listesi (filtre dropdown için)
+  const ustLokasyonlar = useMemo(() => {
+    const ids = new Set<string>()
+    for (const p of liste) if ((p as any).ust_lokasyon_id) ids.add((p as any).ust_lokasyon_id)
+    for (const k of kayitListe) if ((k as any).ust_lokasyon_id) ids.add((k as any).ust_lokasyon_id)
+    return [...ids].map(id => ({ id, tanim: lokMap[id] ?? id })).sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr'))
+  }, [liste, kayitListe, lokMap])
+
+  // Excel download
+  async function excelIndir() {
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+    const ws = wb.addWorksheet('Personel Takibi')
+    if (filtreAktif) {
+      ws.columns = [
+        { header: 'Personel', key: 'isim', width: 24 }, { header: 'Email', key: 'email', width: 28 },
+        { header: 'Üst Lokasyon', key: 'lok', width: 20 }, { header: 'Rol', key: 'rol', width: 14 },
+        { header: 'Tarih', key: 'tarih', width: 14 }, { header: 'Durum', key: 'durum', width: 12 },
+        { header: 'İş Başı', key: 'giris', width: 12 }, { header: 'İş Bitimi', key: 'cikis', width: 12 },
+        { header: 'Çalışma Süresi', key: 'sure', width: 16 },
+      ]
+      siraliKayitlar.forEach(k => ws.addRow({
+        isim: k.isim_soyisim, email: k.email,
+        lok: (k as any).ust_lokasyon_id ? lokMap[(k as any).ust_lokasyon_id] ?? '' : '',
+        rol: ROL_BADGE[k.rol]?.label ?? k.rol,
+        tarih: tarihFormatla(k.kayit_tarihi), durum: k.aktif ? 'Aktif' : 'Pasif',
+        giris: saat(k.giris_saati), cikis: saat(k.cikis_saati),
+        sure: sure(k.giris_saati, k.cikis_saati),
+      }))
+    } else {
+      ws.columns = [
+        { header: 'Personel', key: 'isim', width: 24 }, { header: 'Email', key: 'email', width: 28 },
+        { header: 'Üst Lokasyon', key: 'lok', width: 20 }, { header: 'Rol', key: 'rol', width: 14 },
+        { header: 'Durum', key: 'durum', width: 12 },
+        { header: 'İş Başı', key: 'giris', width: 12 }, { header: 'İş Bitimi', key: 'cikis', width: 12 },
+        { header: 'Çalışma Süresi', key: 'sure', width: 16 },
+      ]
+      siraliListe.forEach(p => ws.addRow({
+        isim: p.isim_soyisim, email: p.email,
+        lok: (p as any).ust_lokasyon_id ? lokMap[(p as any).ust_lokasyon_id] ?? '' : '',
+        rol: ROL_BADGE[p.rol]?.label ?? p.rol, durum: p.aktif ? 'Aktif' : 'Pasif',
+        giris: saat(p.giris_saati), cikis: saat(p.cikis_saati),
+        sure: sure(p.giris_saati, p.cikis_saati),
+      }))
+    }
+    const hr = ws.getRow(1)
+    hr.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } }
+    const buf = await wb.xlsx.writeBuffer()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+    a.download = `personel-takibi-${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.click(); URL.revokeObjectURL(a.href)
+  }
+
+  // Arşiv yükle
+  async function arsivYukle(pg?: number) {
+    const page = pg ?? arsivSayfa
+    setArsivLoading(true)
+    try {
+      const p = new URLSearchParams({ firma_id: firmaId!, page: String(page), limit: '50' })
+      if (projeId) p.set('proje_id', projeId)
+      if (filtreBaslangic) p.set('baslangic', filtreBaslangic)
+      if (filtreBitis) p.set('bitis', filtreBitis)
+      const res = await fetch(`/api/mesai/arsiv?${p}`)
+      const json = await res.json()
+      setArsivData(json.data ?? [])
+      setArsivTotal(json.total ?? json.data?.length ?? 0)
+    } catch {} finally { setArsivLoading(false) }
+  }
 
   const spinning    = { animation: 'spin 0.9s linear infinite' }
   const isLoading   = filtreAktif ? kayitLoading : loading
@@ -434,9 +532,12 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
             <div className="verde-card" style={{ overflow: 'hidden' }}>
               {/* Başlık + araçlar */}
               <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 800, fontSize: 14 }}>
-                  {filtreAktif ? 'Filtreli Kayıtlar' : 'Personel Durumu — Bugün'}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: 800, fontSize: 14 }}>
+                    {filtreAktif ? 'Filtreli Kayıtlar' : 'Personel Durumu — Bugün'}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>({aktifListe.length} kayıt{toplamSayfa > 1 ? ` · Sayfa ${sayfa}/${toplamSayfa}` : ''})</span>
+                </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <input
                     placeholder="İsim veya e-posta ara…"
@@ -444,6 +545,19 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                     onChange={e => setFiltreArama(e.target.value)}
                     style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, width: 200 }}
                   />
+                  {ustLokasyonlar.length > 0 && (
+                    <select value={filtreLokasyon} onChange={e => setFiltreLokasyon(e.target.value)}
+                      style={{ height: 32, padding: '0 8px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, background: '#fff', minWidth: 140 }}>
+                      <option value="">Tüm Lokasyonlar</option>
+                      {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                    </select>
+                  )}
+                  <select value={filtreDurum} onChange={e => setFiltreDurum(e.target.value as any)}
+                    style={{ height: 32, padding: '0 8px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, background: '#fff', minWidth: 100 }}>
+                    <option value="">Tüm Durum</option>
+                    <option value="aktif">Aktif</option>
+                    <option value="pasif">Pasif</option>
+                  </select>
                   <button
                     onClick={() => setFiltreAcik(v => !v)}
                     style={{
@@ -453,12 +567,16 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                       background: filtreAcik || filtreAktif ? '#f9fafb' : '#fff',
                       color: filtreAcik || filtreAktif ? '#1f2937' : '#475569',
                     }}>
-                    <Filter size={12} /> Filtrele
+                    <Filter size={12} /> Tarih Filtresi
                     {aktifFiltreSayisi > 0 && (
                       <span style={{ background: '#1f2937', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
                         {aktifFiltreSayisi}
                       </span>
                     )}
+                  </button>
+                  <button onClick={excelIndir} disabled={aktifListe.length === 0}
+                    style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#1d6f42', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', opacity: aktifListe.length === 0 ? 0.4 : 1 }}>
+                    <FileSpreadsheet size={12} /> Excel
                   </button>
                   {!filtreAktif && (
                     <button onClick={yukle} disabled={loading || !firmaId}
@@ -475,31 +593,26 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                 <div style={{ padding: '14px 18px', background: '#f8fafc', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Başlangıç Tarihi</div>
-                    <input
-                      type="date"
-                      value={filtreBaslangic}
-                      onChange={e => setFiltreBaslangic(e.target.value)}
-                      style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }}
-                    />
+                    <input type="date" value={filtreBaslangic} onChange={e => setFiltreBaslangic(e.target.value)}
+                      style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }} />
                   </div>
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Bitiş Tarihi</div>
-                    <input
-                      type="date"
-                      value={filtreBitis}
-                      onChange={e => setFiltreBitis(e.target.value)}
-                      style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }}
-                    />
+                    <input type="date" value={filtreBitis} onChange={e => setFiltreBitis(e.target.value)}
+                      style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }} />
                   </div>
-                  <button
-                    onClick={filtreleUygula}
-                    disabled={kayitLoading}
+                  <button onClick={filtreleUygula} disabled={kayitLoading}
                     style={{ height: 32, padding: '0 16px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Filter size={12} /> {kayitLoading ? 'Yükleniyor…' : 'Uygula'}
                   </button>
+                  {filtreAktif && !arsivAktif && (
+                    <button onClick={() => { setArsivAktif(true); setArsivSayfa(1); arsivYukle(1) }}
+                      style={{ height: 32, padding: '0 14px', borderRadius: 8, border: '1px solid #6b7280', background: '#f9fafb', color: '#374151', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Archive size={12} /> Arşivden Çek
+                    </button>
+                  )}
                   {filtreAktif && (
-                    <button
-                      onClick={filtreyiTemizle}
+                    <button onClick={filtreyiTemizle}
                       style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                       <X size={12} /> Temizle
                     </button>
@@ -518,35 +631,32 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                 </div>
               ) : filtreAktif ? (
 
-                /* ── Filtre modu tablosu ── */
-                siraliKayitlar.length === 0 ? (
+                /* ── Filtre modu tablosu (verde-table) ── */
+                sayfaRows.length === 0 ? (
                   <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
-                    Seçilen tarih aralığında kayıt bulunamadı
+                    {siraliKayitlar.length === 0 ? 'Seçilen tarih aralığında kayıt bulunamadı' : 'Filtre sonucu boş'}
                   </div>
                 ) : (
-                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                        <tr style={{ background: '#1f2937' }}>
-                          {['Personel', 'Üst Lokasyon', 'Rol', 'Tarih', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi'].map(h => (
-                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap', background: '#1f2937' }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
+                    <table className="verde-table">
+                      <thead><tr>
+                        <th>Personel</th><th>Üst Lokasyon</th><th>Rol</th><th>Tarih</th>
+                        <th>Durum</th><th>İş Başı</th><th>İş Bitimi</th><th>Çalışma Süresi</th>
+                      </tr></thead>
                       <tbody>
-                        {siraliKayitlar.map((k, i) => {
+                        {(sayfaRows as MesaiKayit[]).map((k) => {
                           const dim = !k.aktif
                           const tc  = dim ? '#94a3b8' : '#111827'
                           return (
-                            <tr key={k.id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
-                              <td style={td()}>{personelHucresi(k.isim_soyisim, k.email, dim)}</td>
-                              <td style={td({ fontSize: 12, color: tc })}>{k.ust_lokasyon_id ? lokMap[k.ust_lokasyon_id] ?? '—' : '—'}</td>
-                              <td style={td()}>{rolBadge(k.rol, dim)}</td>
-                              <td style={td({ fontWeight: 600, color: tc })}>{tarihFormatla(k.kayit_tarihi)}</td>
-                              <td style={td()}>{durumBadge(k.aktif)}</td>
-                              <td style={td({ fontWeight: 600, color: k.giris_saati ? tc : '#cbd5e1' })}>{saat(k.giris_saati)}</td>
-                              <td style={td({ color: k.cikis_saati ? tc : '#cbd5e1' })}>{saat(k.cikis_saati)}</td>
-                              <td style={td({ color: dim ? '#cbd5e1' : '#475569' })}>{sure(k.giris_saati, k.cikis_saati)}</td>
+                            <tr key={k.id}>
+                              <td>{personelHucresi(k.isim_soyisim, k.email, dim)}</td>
+                              <td style={{ fontSize: 12, color: tc }}>{k.ust_lokasyon_id ? lokMap[k.ust_lokasyon_id] ?? '—' : '—'}</td>
+                              <td>{rolBadge(k.rol, dim)}</td>
+                              <td style={{ fontWeight: 600, color: tc }}>{tarihFormatla(k.kayit_tarihi)}</td>
+                              <td>{durumBadge(k.aktif)}</td>
+                              <td style={{ fontWeight: 600, color: k.giris_saati ? tc : '#cbd5e1' }}>{saat(k.giris_saati)}</td>
+                              <td style={{ color: k.cikis_saati ? tc : '#cbd5e1' }}>{saat(k.cikis_saati)}</td>
+                              <td style={{ color: dim ? '#cbd5e1' : '#475569' }}>{sure(k.giris_saati, k.cikis_saati)}</td>
                             </tr>
                           )
                         })}
@@ -557,33 +667,30 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
 
               ) : (
 
-                /* ── Bugün modu tablosu ── */
-                siraliListe.length === 0 ? (
+                /* ── Bugün modu tablosu (verde-table) ── */
+                sayfaRows.length === 0 ? (
                   <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Bu proje için personel bulunamadı</div>
                 ) : (
-                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                        <tr style={{ background: '#1f2937' }}>
-                          {['Personel', 'Üst Lokasyon', 'Rol', 'Durum', 'İş Başı', 'İş Bitimi', 'Çalışma Süresi', 'Son Görülme'].map(h => (
-                            <th key={h} style={{ padding: '9px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', whiteSpace: 'nowrap', background: '#1f2937' }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
+                    <table className="verde-table">
+                      <thead><tr>
+                        <th>Personel</th><th>Üst Lokasyon</th><th>Rol</th><th>Durum</th>
+                        <th>İş Başı</th><th>İş Bitimi</th><th>Çalışma Süresi</th><th>Son Görülme</th>
+                      </tr></thead>
                       <tbody>
-                        {siraliListe.map((p, i) => {
+                        {(sayfaRows as PersonelSatir[]).map((p) => {
                           const dim = !p.aktif
                           const tc  = dim ? '#94a3b8' : '#111827'
                           return (
-                            <tr key={p.user_id} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
-                              <td style={td()}>{personelHucresi(p.isim_soyisim, p.email, dim)}</td>
-                              <td style={td({ fontSize: 12, color: tc })}>{(p as any).ust_lokasyon_id ? lokMap[(p as any).ust_lokasyon_id] ?? '—' : '—'}</td>
-                              <td style={td()}>{rolBadge(p.rol, dim)}</td>
-                              <td style={td()}>{durumBadge(p.aktif)}</td>
-                              <td style={td({ fontWeight: 600, color: p.giris_saati ? tc : '#cbd5e1' })}>{saat(p.giris_saati)}</td>
-                              <td style={td({ color: p.cikis_saati ? tc : '#cbd5e1' })}>{saat(p.cikis_saati)}</td>
-                              <td style={td({ color: dim ? '#cbd5e1' : '#475569' })}>{sure(p.giris_saati, p.cikis_saati)}</td>
-                              <td style={td({ whiteSpace: 'nowrap', fontSize: 12, color: dim ? '#cbd5e1' : '#64748b' })}>{sonGorulme(p.last_seen_at)}</td>
+                            <tr key={p.user_id}>
+                              <td>{personelHucresi(p.isim_soyisim, p.email, dim)}</td>
+                              <td style={{ fontSize: 12, color: tc }}>{(p as any).ust_lokasyon_id ? lokMap[(p as any).ust_lokasyon_id] ?? '—' : '—'}</td>
+                              <td>{rolBadge(p.rol, dim)}</td>
+                              <td>{durumBadge(p.aktif)}</td>
+                              <td style={{ fontWeight: 600, color: p.giris_saati ? tc : '#cbd5e1' }}>{saat(p.giris_saati)}</td>
+                              <td style={{ color: p.cikis_saati ? tc : '#cbd5e1' }}>{saat(p.cikis_saati)}</td>
+                              <td style={{ color: dim ? '#cbd5e1' : '#475569' }}>{sure(p.giris_saati, p.cikis_saati)}</td>
+                              <td style={{ whiteSpace: 'nowrap', fontSize: 12, color: dim ? '#cbd5e1' : '#64748b' }}>{sonGorulme(p.last_seen_at)}</td>
                             </tr>
                           )
                         })}
@@ -592,7 +699,71 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                   </div>
                 )
               )}
+
+              {/* Sayfalama */}
+              {toplamSayfa > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 18px', borderTop: '1px solid #f3f4f6' }}>
+                  <button onClick={() => setSayfa(1)} disabled={sayfa === 1}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: sayfa === 1 ? 0.4 : 1 }}>«</button>
+                  <button onClick={() => setSayfa(s => Math.max(1, s - 1))} disabled={sayfa === 1}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: sayfa === 1 ? 0.4 : 1 }}>‹ Önceki</button>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{sayfa} / {toplamSayfa}</span>
+                  <button onClick={() => setSayfa(s => Math.min(toplamSayfa, s + 1))} disabled={sayfa >= toplamSayfa}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: sayfa >= toplamSayfa ? 0.4 : 1 }}>Sonraki ›</button>
+                  <button onClick={() => setSayfa(toplamSayfa)} disabled={sayfa >= toplamSayfa}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: sayfa >= toplamSayfa ? 0.4 : 1 }}>»</button>
+                </div>
+              )}
             </div>
+
+            {/* ── ARŞİV BÖLÜMÜ ── */}
+            {arsivAktif && (
+              <div className="verde-card" style={{ overflow: 'hidden', marginTop: 12 }}>
+                <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Archive size={14} color="#6b7280" />
+                  <span style={{ fontWeight: 800, fontSize: 14, color: '#6b7280' }}>Arşiv Kayıtları</span>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>({arsivTotal} kayıt)</span>
+                  {arsivLoading && <RefreshCw size={14} style={{ ...spinning, color: '#6b7280' }} />}
+                </div>
+                <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 400 }}>
+                  <table className="verde-table">
+                    <thead><tr>
+                      <th>Personel</th><th>Email</th><th>Tarih</th>
+                      <th>İş Başı</th><th>İş Bitimi</th><th>Çalışma Süresi</th>
+                    </tr></thead>
+                    <tbody>
+                      {arsivData.length === 0 ? (
+                        <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                          {arsivLoading ? 'Yükleniyor...' : 'Arşiv kaydı bulunamadı.'}
+                        </td></tr>
+                      ) : arsivData.map((r: any) => (
+                        <tr key={r.id} style={{ background: '#f8fafc' }}>
+                          <td style={{ fontWeight: 600, fontSize: 13 }}>{r.isim_soyisim ?? '—'}</td>
+                          <td style={{ color: '#64748b', fontSize: 12 }}>{r.email ?? '—'}</td>
+                          <td style={{ fontWeight: 600 }}>{r.kayit_tarihi ? tarihFormatla(r.kayit_tarihi) : '—'}</td>
+                          <td style={{ fontWeight: 600 }}>{saat(r.giris_saati)}</td>
+                          <td>{saat(r.cikis_saati)}</td>
+                          <td>{sure(r.giris_saati, r.cikis_saati)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {arsivTotal > 50 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 18px', borderTop: '1px solid #f3f4f6' }}>
+                    <button onClick={() => { const p = 1; setArsivSayfa(p); arsivYukle(p) }} disabled={arsivSayfa === 1 || arsivLoading}
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa === 1 ? 0.4 : 1 }}>«</button>
+                    <button onClick={() => { const p = Math.max(1, arsivSayfa - 1); setArsivSayfa(p); arsivYukle(p) }} disabled={arsivSayfa === 1 || arsivLoading}
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa === 1 ? 0.4 : 1 }}>‹ Önceki</button>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{arsivSayfa} / {Math.ceil(arsivTotal / 50)}</span>
+                    <button onClick={() => { const p = Math.min(Math.ceil(arsivTotal / 50), arsivSayfa + 1); setArsivSayfa(p); arsivYukle(p) }} disabled={arsivSayfa >= Math.ceil(arsivTotal / 50) || arsivLoading}
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa >= Math.ceil(arsivTotal / 50) ? 0.4 : 1 }}>Sonraki ›</button>
+                    <button onClick={() => { const p = Math.ceil(arsivTotal / 50); setArsivSayfa(p); arsivYukle(p) }} disabled={arsivSayfa >= Math.ceil(arsivTotal / 50) || arsivLoading}
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa >= Math.ceil(arsivTotal / 50) ? 0.4 : 1 }}>»</button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {personelTakibiAktif && kpi && kpi.pasif > 0 && !filtreAktif && (
               <div style={{ fontSize: 12.5, color: '#dc2626', background: '#fef2f2', padding: '8px 14px', borderRadius: 8, border: '1px solid #fecaca' }}>
