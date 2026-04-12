@@ -41,10 +41,19 @@ export default function BildirimBar({ rol, propFirmaId, propProjeId }: { rol: st
             tanimGrup.set(d.tanim, arr)
           }
 
+          // Her tanım için toplam görev sayısını çek (kural sayısı × frekans)
+          const kuralRes = await fetch(`/api/gorev-kurallari?firma_id=${firmaId}${projeId ? `&proje_id=${projeId}` : ''}`)
+          const kurallar = await kuralRes.json()
+          const kuralArray = Array.isArray(kurallar) ? kurallar : []
+
           for (const [tanim, kayitlar] of tanimGrup) {
+            // Bu tanıma ait toplam görev sayısı = kural sayısı × frekans
+            const tanimKurallari = kuralArray.filter((k: any) => k.tanim === tanim && k.aktif)
+            const toplamGorev = tanimKurallari.reduce((s: number, k: any) => s + (k.gunluk_frekans_sayisi ?? 1), 0)
+
             items.push({
               id: `duraklat-${tanim}`,
-              mesaj: `⏸ Görev Duraklatma: "${tanim}" — ${kayitlar.length} adet görev duraklatıldı`,
+              mesaj: `⏸ Görev Duraklatma: "${tanim}" — ${toplamGorev} adet görev duraklatıldı`,
               tip: 'duraklat',
             })
           }
@@ -55,7 +64,7 @@ export default function BildirimBar({ rol, propFirmaId, propProjeId }: { rol: st
     }
 
     yukle()
-    const interval = setInterval(yukle, 60000) // Her dakika kontrol
+    const interval = setInterval(yukle, 60000)
     return () => { alive = false; clearInterval(interval) }
   }, [firmaId, projeId])
 
@@ -64,7 +73,7 @@ export default function BildirimBar({ rol, propFirmaId, propProjeId }: { rol: st
     if (bildirimler.length <= 1) return
     const t = setInterval(() => {
       setAktifIdx(prev => (prev + 1) % bildirimler.length)
-    }, 5000) // 5 saniyede bir değiş
+    }, 5000)
     return () => clearInterval(t)
   }, [bildirimler.length])
 
@@ -82,7 +91,9 @@ export default function BildirimBar({ rol, propFirmaId, propProjeId }: { rol: st
       alignItems: 'center',
       gap: 10,
       minHeight: 36,
-      transition: 'all 0.3s ease',
+      position: 'sticky',
+      top: 69,
+      zIndex: 9,
     }}>
       <span style={{
         fontSize: 13,

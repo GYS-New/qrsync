@@ -58,7 +58,7 @@ export default async function TALayout({ children }: { children: React.ReactNode
         <div style={{ marginLeft: 282, flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
           {/* Durum banner — pasif veya lisans dolmuşsa tüm sayfalarda görünür */}
           <FirmaDurumBanner durum={durum} lisansTarihi={lisansTarihi} />
-          <BildirimBar rol={user.rol} />
+          <BildirimBar rol={user.rol} propFirmaId={user.firma_id} />
           {children}
         </div>
       </div>
