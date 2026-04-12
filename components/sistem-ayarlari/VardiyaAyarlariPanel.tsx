@@ -43,10 +43,6 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
             }
             return yeni
           })
-        } else if (j.vardiya_saatleri) {
-          // Eski format — aktif sayı için kullan
-          const s = j.vardiya_sayisi ?? 3
-          setAyarlar(prev => ({ ...prev, [s]: j.vardiya_saatleri }))
         }
         setLoading(false)
       })
