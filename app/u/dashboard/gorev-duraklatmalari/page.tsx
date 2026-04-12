@@ -3,6 +3,7 @@ import Topbar from '@/components/layout/Topbar'
 import GorevDuraklatmalariClient from '@/components/gorev-kurallari/GorevDuraklatmalariClient'
 import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,10 @@ export default async function UGorevDuraklatmalariPage() {
   const projeId = me.proje_id
 
   // Yetki kontrolü
-  const yetki = await sayfaYetkileri(me.rol, 'gorev-duraklatmalari', firmaId ?? null)
+  const [yetki, yetkiliLokIds] = await Promise.all([
+    sayfaYetkileri(me.rol, 'gorev-duraklatmalari', firmaId ?? null),
+    firmaId ? getYetkiliLokasyonIds(supabase, firmaId, projeId) : null,
+  ])
   if (!yetki.gorebilir) redirect('/u/dashboard')
 
   return (
@@ -33,7 +37,7 @@ export default async function UGorevDuraklatmalariPage() {
         breadcrumbs={[{ label: 'Görev Duraklatmaları' }]}
       />
       <div style={{ padding: '24px 28px' }}>
-        <GorevDuraklatmalariClient firmaId={firmaId!} projeId={projeId ?? null} ekleyebilir={yetki.ekleyebilir} silebilir={yetki.silebilir} />
+        <GorevDuraklatmalariClient firmaId={firmaId!} projeId={projeId ?? null} ekleyebilir={yetki.ekleyebilir} silebilir={yetki.silebilir} yetkiliLokIds={yetkiliLokIds} />
       </div>
     </div>
   )

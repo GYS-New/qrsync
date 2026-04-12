@@ -22,7 +22,7 @@ function gunEtiket(gunler: number[]) {
   return gunler.map(g => GUN_ISIMLERI[g] ?? g).join(', ')
 }
 
-export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebilir = true, silebilir = true }: { firmaId: string; projeId: string | null; ekleyebilir?: boolean; silebilir?: boolean }) {
+export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebilir = true, silebilir = true, yetkiliLokIds }: { firmaId: string; projeId: string | null; ekleyebilir?: boolean; silebilir?: boolean; yetkiliLokIds?: string[] | null }) {
   const [kurallar, setKurallar] = useState<Kural[]>([])
   const [duraklatmalar, setDuraklatmalar] = useState<Duraklat[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,7 +43,13 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebili
         const kuralData = await kuralRes.json()
         const duraklatData = await duraklatRes.json()
         if (alive) {
-          setKurallar(Array.isArray(kuralData) ? kuralData.filter((k: any) => k.aktif) : [])
+          let aktifKurallar = Array.isArray(kuralData) ? kuralData.filter((k: any) => k.aktif) : []
+          // Yetkili lokasyon filtresi
+          if (yetkiliLokIds) {
+            const lokSet = new Set(yetkiliLokIds)
+            aktifKurallar = aktifKurallar.filter((k: any) => lokSet.has(k.lokasyon_id))
+          }
+          setKurallar(aktifKurallar)
           setDuraklatmalar(duraklatData.data ?? [])
         }
       } catch {}
