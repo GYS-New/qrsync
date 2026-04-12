@@ -59,7 +59,7 @@ export default function GorevKurallariClient({
   const [acikUstLoklar, setAcikUstLoklar] = useState<Set<string>>(new Set())
   const [acikGruplar2, setAcikGruplar2] = useState<Set<string>>(new Set())
   const [acikTanimlar, setAcikTanimlar] = useState<Set<string>>(new Set())
-  const [duraklatVardiyaModal, setDuraklatVardiyaModal] = useState<{ tanim: string; firmaId: string; projeId: string | null } | null>(null)
+  const [duraklatVardiyaModal, setDuraklatVardiyaModal] = useState<{ tanim: string; firmaId: string; projeId: string | null; aktifOlmaSaati: string } | null>(null)
 
   // Sekme içinde (embedded=true) kuralları API'den çek
   useEffect(() => {
@@ -598,7 +598,7 @@ export default function GorevKurallariClient({
                                   </span>
                                   <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
                                     {!readonly && (
-                                      <button onClick={() => setDuraklatVardiyaModal({ tanim: tg.tanim, firmaId: firmaId!, projeId: projeId ?? null })}
+                                      <button onClick={() => setDuraklatVardiyaModal({ tanim: tg.tanim, firmaId: firmaId!, projeId: projeId ?? null, aktifOlmaSaati: tg.kurallar[0]?.aktif_olma_saati?.slice(0, 5) ?? '' })}
                                         style={{ padding: '2px 8px', fontSize: 10, borderRadius: 4, border: '1px solid #fbbf24', background: '#fffbeb', cursor: 'pointer', color: '#92400e', fontWeight: 600 }}>
                                         ⏸ Duraklat
                                       </button>
@@ -705,6 +705,7 @@ export default function GorevKurallariClient({
           tanim={duraklatVardiyaModal.tanim}
           firmaId={duraklatVardiyaModal.firmaId}
           projeId={duraklatVardiyaModal.projeId}
+          aktifOlmaSaati={duraklatVardiyaModal.aktifOlmaSaati}
           onClose={() => setDuraklatVardiyaModal(null)}
         />
       )}
@@ -931,10 +932,11 @@ export default function GorevKurallariClient({
 }
 
 /** Vardiya bazlı duraklatma popup */
-function VardiyaDuraklatModal({ tanim, firmaId, projeId, onClose }: {
-  tanim: string; firmaId: string; projeId: string | null; onClose: () => void
+function VardiyaDuraklatModal({ tanim, firmaId, projeId, aktifOlmaSaati, onClose }: {
+  tanim: string; firmaId: string; projeId: string | null; aktifOlmaSaati: string; onClose: () => void
 }) {
   const [vardiyalar, setVardiyalar] = useState<{ no: number; baslangic: string; bitis: string }[]>([])
+  const [uygunVardiyaNo, setUygunVardiyaNo] = useState<number | null>(null)
   const [seciliTarihler, setSeciliTarihler] = useState<string[]>([])
   const [seciliVardiyalar, setSeciliVardiyalar] = useState<number[]>([])
   const [mevcutlar, setMevcutlar] = useState<any[]>([])
@@ -943,10 +945,23 @@ function VardiyaDuraklatModal({ tanim, firmaId, projeId, onClose }: {
   const { toast } = useToast()
 
   useEffect(() => {
-    // Vardiya tanımlarını çek
+    // Vardiya tanımlarını çek ve uygun vardiyayı bul
     fetch(`/api/sistem-ayarlari/vardiya?firmaId=${firmaId}`)
       .then(r => r.json())
-      .then(j => setVardiyalar(j.vardiya_saatleri ?? []))
+      .then(j => {
+        const sayisi = j.vardiya_sayisi ?? 3
+        const tumAyar = j.tum_vardiya_ayarlari
+        const aktifSet = tumAyar?.[sayisi] ?? j.vardiya_saatleri ?? []
+        setVardiyalar(aktifSet)
+        // aktifOlmaSaati hangi vardiyaya denk geliyor?
+        for (const v of aktifSet) {
+          if (aktifOlmaSaati >= v.baslangic && aktifOlmaSaati < v.bitis) {
+            setUygunVardiyaNo(v.no)
+            setSeciliVardiyalar([v.no])
+            break
+          }
+        }
+      })
       .catch(() => {})
     // Mevcut duraklatmaları çek
     const p = new URLSearchParams({ firmaId, tanim })
@@ -1038,25 +1053,17 @@ function VardiyaDuraklatModal({ tanim, firmaId, projeId, onClose }: {
           )}
         </div>
 
-        {/* Vardiya seçimi */}
+        {/* Vardiya — otomatik eşleşen */}
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Vardiya Seç</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {vardiyalar.map(v => {
-              const secili = seciliVardiyalar.includes(v.no)
-              return (
-                <button key={v.no} onClick={() => setSeciliVardiyalar(prev => secili ? prev.filter(x => x !== v.no) : [...prev, v.no])}
-                  style={{
-                    padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                    border: `2px solid ${secili ? '#1d4ed8' : '#e2e8f0'}`,
-                    background: secili ? '#eff6ff' : '#fff',
-                    color: secili ? '#1d4ed8' : '#374151',
-                  }}>
-                  {v.no}. Vardiya ({v.baslangic} - {v.bitis})
-                </button>
-              )
-            })}
-          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Duraklatılacak Vardiya</div>
+          {uygunVardiyaNo ? (
+            <div style={{ padding: '10px 16px', borderRadius: 8, fontSize: 14, fontWeight: 700, background: '#eff6ff', border: '2px solid #1d4ed8', color: '#1d4ed8', display: 'inline-block' }}>
+              {uygunVardiyaNo}. Vardiya ({vardiyalar.find(v => v.no === uygunVardiyaNo)?.baslangic} - {vardiyalar.find(v => v.no === uygunVardiyaNo)?.bitis})
+              <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 500, marginLeft: 8 }}>Aktif saat: {aktifOlmaSaati}</span>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: '#dc2626' }}>Aktif olma saati ({aktifOlmaSaati}) hiçbir vardiyayla eşleşmiyor</div>
+          )}
         </div>
 
         {/* Kaydet butonu */}
