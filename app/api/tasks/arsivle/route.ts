@@ -131,7 +131,13 @@ export async function POST(req: NextRequest) {
               await admin.from('checklist_sonuc_maddeleri_arsiv').insert(maddeler)
               await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', bIds)
             }
-            await admin.from('checklist_sonuc_basliklari_arsiv').insert(basliklar.map(b => ({ ...b, arsiv_tarihi: new Date().toISOString() })))
+            const gorevFirmaMap2: Record<string, string> = {}
+            for (const g of gorevler) gorevFirmaMap2[g.id] = g.firma_id
+            await admin.from('checklist_sonuc_basliklari_arsiv').insert(basliklar.map(b => ({
+              ...b,
+              arsiv_tarihi: new Date().toISOString(),
+              firma_id: gorevFirmaMap2[b.gorev_id] ?? null,
+            })))
             await admin.from('checklist_sonuc_basliklari').delete().in('id', bIds)
           }
           await admin.from('gorevler_arsiv').insert(gorevler.map(g => ({ ...g, arsivleme_tarihi: new Date().toISOString() })))
@@ -165,7 +171,14 @@ export async function POST(req: NextRequest) {
                   await admin.from('checklist_sonuc_maddeleri_arsiv').upsert(maddeler, { onConflict: 'id', ignoreDuplicates: true })
                   await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', bIds)
                 }
-                const arsivBasliklar = basliklar.map(b => ({ ...b, arsiv_tarihi: new Date().toISOString() }))
+                // firma_id: görevden al (checklist_sonuc_basliklari'nda firma_id yok)
+                const gorevFirmaMap: Record<string, string> = {}
+                for (const g of batch) gorevFirmaMap[g.id] = g.firma_id
+                const arsivBasliklar = basliklar.map(b => ({
+                  ...b,
+                  arsiv_tarihi: new Date().toISOString(),
+                  firma_id: gorevFirmaMap[b.canli_gorev_id] ?? null,
+                }))
                 await admin.from('checklist_sonuc_basliklari_arsiv').upsert(arsivBasliklar, { onConflict: 'id', ignoreDuplicates: true })
                 await admin.from('checklist_sonuc_basliklari').delete().in('id', bIds)
                 ceklistToplam += basliklar.length

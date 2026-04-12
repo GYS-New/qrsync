@@ -155,13 +155,45 @@ export default function ArsivClient({
     if (isTA && (projeLoading || !projeId)) { setFrekData([]); return }
     setFrekLoading(true)
     try {
-      const sel = `*, lokasyonlar(id,tanim), atanan:users!atanan_kullanici_id(isim_soyisim), olusturan:users!olusturan_id(isim_soyisim), tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim), iptalEden:users!iptal_eden_id(isim_soyisim), islemi_yapan:users!islemi_yapan_id(isim_soyisim), kural:gorev_kurallari!arsiv_kural_fkey(tanim)`
+      // FK join'ler timeout'a neden oluyor — basit sorgu + ayrı user lookup
+      const sel = `id,firma_id,proje_id,tanim,lokasyon_id,durum,arsiv_tarihi,arsiv_nedeni,aktif_olma_tarihi,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,iptal_eden_id,islemi_yapan_id,kural_id,gunluk_frekans_sayisi,son_tamamlama_kanali`
       let q = supabase.from('canli_gorevler_arsiv').select(sel)
         .eq('firma_id', firmaId).order('arsiv_tarihi', { ascending: false }).limit(1000)
       if (projeId) q = (q as any).eq('proje_id', projeId)
-      const { data, error } = await q
+      const { data: rows, error } = await q
       if (error) throw error
-      setFrekData((data as any) ?? [])
+      if (!rows?.length) { setFrekData([]); return }
+
+      // Lokasyon, user ve kural bilgilerini ayrı çek
+      const lokIds = [...new Set(rows.map((r: any) => r.lokasyon_id).filter(Boolean))]
+      const userIds = [...new Set(rows.flatMap((r: any) => [r.atanan_kullanici_id, r.olusturan_id, r.tamamlayan_kullanici_id, r.iptal_eden_id, r.islemi_yapan_id]).filter(Boolean))]
+      const kuralIds = [...new Set(rows.map((r: any) => r.kural_id).filter(Boolean))]
+
+      const [lokRes, userRes, kuralRes] = await Promise.all([
+        lokIds.length ? supabase.from('lokasyonlar').select('id,tanim').in('id', lokIds) : { data: [] },
+        userIds.length ? supabase.from('users').select('id,isim_soyisim').in('id', userIds) : { data: [] },
+        kuralIds.length ? supabase.from('gorev_kurallari').select('id,tanim').in('id', kuralIds) : { data: [] },
+      ])
+
+      const lokMap: Record<string, any> = {}
+      for (const l of lokRes.data ?? []) lokMap[l.id] = l
+      const userMap: Record<string, any> = {}
+      for (const u of userRes.data ?? []) userMap[u.id] = u
+      const kuralMap: Record<string, any> = {}
+      for (const k of kuralRes.data ?? []) kuralMap[k.id] = k
+
+      const enriched = rows.map((r: any) => ({
+        ...r,
+        lokasyonlar: lokMap[r.lokasyon_id] ?? null,
+        atanan: userMap[r.atanan_kullanici_id] ?? null,
+        olusturan: userMap[r.olusturan_id] ?? null,
+        tamamlayan: userMap[r.tamamlayan_kullanici_id] ?? null,
+        iptalEden: userMap[r.iptal_eden_id] ?? null,
+        islemi_yapan: userMap[r.islemi_yapan_id] ?? null,
+        kural: kuralMap[r.kural_id] ?? null,
+      }))
+
+      setFrekData(enriched)
     } catch (e: any) { toast({ type: 'error', title: 'Yüklenemedi', message: e.message })
     } finally { setFrekLoading(false) }
   }, [firmaId, projeId, projeLoading, isTA])

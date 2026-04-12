@@ -208,9 +208,9 @@ async function kayitlarGetir(
   // Arşiv tablosundan oku - cikti=arsiv veya birlesik için
   let arBasliklar: any[] = []
   if (cikti === 'arsiv' || cikti === 'birlesik') {
-    // lokIds çok fazla olduğunda URL limiti aşılabilir — firmaId ile çekip sonra filtrele
     let arSbQ = admin.from('checklist_sonuc_basliklari_arsiv')
       .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
+      .eq('firma_id', firmaId)
       .order('kayit_tarihi', { ascending: false })
       .limit(5000)
     if (baslangic) arSbQ = arSbQ.gte('kayit_tarihi', baslangic)
