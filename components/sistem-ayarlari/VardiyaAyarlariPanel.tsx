@@ -48,13 +48,13 @@ export default function VardiyaAyarlariPanel({ firmaId: propFirmaId }: { firmaId
   }, [firmaIdEfektif])
 
   function getSaatler(): Vardiya[] {
-    const all = [
+    // Her zaman 4 vardiyayı da kaydet — sayı değiştiğinde eski değerler korunsun
+    return [
       { no: 1, baslangic: v1Bas, bitis: v1Bit },
       { no: 2, baslangic: v2Bas, bitis: v2Bit },
       { no: 3, baslangic: v3Bas, bitis: v3Bit },
       { no: 4, baslangic: v4Bas, bitis: v4Bit },
     ]
-    return all.slice(0, sayisi)
   }
 
   async function kaydet() {
