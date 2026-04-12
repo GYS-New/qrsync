@@ -58,6 +58,8 @@ export default function GorevKurallariClient({
   const [grupUyeleri, setGrupUyeleri] = useState<any[]>([])
   const [acikUstLoklar, setAcikUstLoklar] = useState<Set<string>>(new Set())
   const [acikGruplar2, setAcikGruplar2] = useState<Set<string>>(new Set())
+  const [acikTanimlar, setAcikTanimlar] = useState<Set<string>>(new Set())
+  const [duraklatVardiyaModal, setDuraklatVardiyaModal] = useState<{ tanim: string; firmaId: string; projeId: string | null } | null>(null)
 
   // Sekme içinde (embedded=true) kuralları API'den çek
   useEffect(() => {
@@ -578,10 +580,15 @@ export default function GorevKurallariClient({
                               )}
                             </div>
                             {/* Tanım bazlı alt gruplar */}
-                            {gAcik && g.tanimlar.map((tg, ti) => (
+                            {gAcik && g.tanimlar.map((tg, ti) => {
+                              const tanimKey = `${g.grupId}::${tg.tanim}`
+                              const tanimAcik = acikTanimlar.has(tanimKey)
+                              return (
                               <div key={ti}>
-                                {/* Tanım başlığı */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px 8px 52px', background: '#fafafa', borderTop: '1px solid #f3f4f6' }}>
+                                {/* Tanım başlığı — tıkla aç/kapa */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px 8px 52px', background: '#fafafa', borderTop: '1px solid #f3f4f6', cursor: 'pointer', userSelect: 'none' }}
+                                  onClick={() => setAcikTanimlar(prev => { const n = new Set(prev); n.has(tanimKey) ? n.delete(tanimKey) : n.add(tanimKey); return n })}>
+                                  <span style={{ fontSize: 11, color: '#6b7280' }}>{tanimAcik ? '▼' : '▶'}</span>
                                   <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', flex: 1 }}>
                                     📋 {tg.tanim}
                                     <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>({tg.kurallar.length} lokasyon)</span>
@@ -589,17 +596,26 @@ export default function GorevKurallariClient({
                                   <span style={{ fontSize: 11, color: '#6b7280' }}>
                                     {tg.kurallar[0]?.aktif_olma_saati?.slice(0, 5) ?? ''} · {gunEtiket(tg.kurallar[0]?.aktif_gunler ?? [])}
                                   </span>
-                                  {!readonly && yetki.silebilir && (
-                                    <button onClick={() => topluSilGrup(tg.kurallar)}
-                                      style={{ padding: '2px 8px', fontSize: 10, borderRadius: 4, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
-                                      Sil
-                                    </button>
-                                  )}
+                                  <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                                    {!readonly && (
+                                      <button onClick={() => setDuraklatVardiyaModal({ tanim: tg.tanim, firmaId: firmaId!, projeId: projeId ?? null })}
+                                        style={{ padding: '2px 8px', fontSize: 10, borderRadius: 4, border: '1px solid #fbbf24', background: '#fffbeb', cursor: 'pointer', color: '#92400e', fontWeight: 600 }}>
+                                        ⏸ Duraklat
+                                      </button>
+                                    )}
+                                    {!readonly && yetki.silebilir && (
+                                      <button onClick={() => topluSilGrup(tg.kurallar)}
+                                        style={{ padding: '2px 8px', fontSize: 10, borderRadius: 4, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
+                                        Sil
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                                {/* Lokasyonlar */}
-                                {tg.kurallar.map(k => renderKuralSatir(k, 3))}
+                                {/* Lokasyonlar — açılır menü */}
+                                {tanimAcik && tg.kurallar.map(k => renderKuralSatir(k, 3))}
                               </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         )
                       })}
@@ -681,6 +697,16 @@ export default function GorevKurallariClient({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Vardiya Bazlı Duraklatma Modal */}
+      {duraklatVardiyaModal && (
+        <VardiyaDuraklatModal
+          tanim={duraklatVardiyaModal.tanim}
+          firmaId={duraklatVardiyaModal.firmaId}
+          projeId={duraklatVardiyaModal.projeId}
+          onClose={() => setDuraklatVardiyaModal(null)}
+        />
       )}
 
       {modal && (
@@ -900,6 +926,170 @@ export default function GorevKurallariClient({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Vardiya bazlı duraklatma popup */
+function VardiyaDuraklatModal({ tanim, firmaId, projeId, onClose }: {
+  tanim: string; firmaId: string; projeId: string | null; onClose: () => void
+}) {
+  const [vardiyalar, setVardiyalar] = useState<{ no: number; baslangic: string; bitis: string }[]>([])
+  const [seciliTarihler, setSeciliTarihler] = useState<string[]>([])
+  const [seciliVardiyalar, setSeciliVardiyalar] = useState<number[]>([])
+  const [mevcutlar, setMevcutlar] = useState<any[]>([])
+  const [tarihInput, setTarihInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    // Vardiya tanımlarını çek
+    fetch(`/api/sistem-ayarlari/vardiya?firmaId=${firmaId}`)
+      .then(r => r.json())
+      .then(j => setVardiyalar(j.vardiya_saatleri ?? []))
+      .catch(() => {})
+    // Mevcut duraklatmaları çek
+    const p = new URLSearchParams({ firmaId, tanim })
+    if (projeId) p.set('projeId', projeId)
+    fetch(`/api/gorev-kurallari/duraklat-vardiya?${p}`)
+      .then(r => r.json())
+      .then(j => setMevcutlar(j.data ?? []))
+      .catch(() => {})
+  }, [firmaId, projeId, tanim])
+
+  function tarihEkle() {
+    if (!tarihInput || seciliTarihler.includes(tarihInput)) return
+    setSeciliTarihler(prev => [...prev, tarihInput].sort())
+    setTarihInput('')
+  }
+
+  async function kaydet() {
+    if (!seciliTarihler.length || !seciliVardiyalar.length) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/gorev-kurallari/duraklat-vardiya', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firmaId, projeId, tanim, tarihler: seciliTarihler, vardiyalar: seciliVardiyalar }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error)
+      toast({ type: 'success', title: 'Duraklatıldı', message: `${j.eklenen} duraklatma eklendi.` })
+      // Mevcut listeyi yenile
+      const p = new URLSearchParams({ firmaId, tanim })
+      if (projeId) p.set('projeId', projeId)
+      const r2 = await fetch(`/api/gorev-kurallari/duraklat-vardiya?${p}`)
+      const j2 = await r2.json()
+      setMevcutlar(j2.data ?? [])
+      setSeciliTarihler([])
+      setSeciliVardiyalar([])
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setSaving(false)
+  }
+
+  async function kaldir(id: string, t: string, v: number) {
+    await fetch('/api/gorev-kurallari/duraklat-vardiya', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firmaId, projeId, tanim, tarih: t, vardiya_no: v }),
+    })
+    setMevcutlar(prev => prev.filter(m => m.id !== id))
+  }
+
+  const GUN_ISIMLERI: Record<string, string> = {}
+  const haftaGunleri = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 520, maxHeight: '80vh', overflow: 'auto', padding: '24px 28px' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#111827', marginBottom: 4 }}>⏸ Vardiya Duraklatma</div>
+        <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
+          <strong>{tanim}</strong> kuralı için belirli günlerde ve vardiyalarda görev üretimini duraklat.
+        </div>
+
+        {/* Tarih seçimi */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Tarih Seç</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="date" value={tarihInput} onChange={e => setTarihInput(e.target.value)}
+              min={new Date().toISOString().slice(0, 10)}
+              style={{ height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14 }} />
+            <button onClick={tarihEkle} disabled={!tarihInput}
+              style={{ height: 36, padding: '0 14px', borderRadius: 8, background: '#1d4ed8', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: tarihInput ? 1 : 0.4 }}>
+              Ekle
+            </button>
+          </div>
+          {seciliTarihler.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {seciliTarihler.map(t => {
+                const d = new Date(t + 'T00:00:00')
+                const gun = haftaGunleri[d.getDay()]
+                return (
+                  <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 13, fontWeight: 600, color: '#1d4ed8' }}>
+                    {t} ({gun})
+                    <span onClick={() => setSeciliTarihler(prev => prev.filter(x => x !== t))} style={{ cursor: 'pointer', color: '#dc2626', fontWeight: 800 }}>×</span>
+                  </span>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Vardiya seçimi */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Vardiya Seç</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {vardiyalar.map(v => {
+              const secili = seciliVardiyalar.includes(v.no)
+              return (
+                <button key={v.no} onClick={() => setSeciliVardiyalar(prev => secili ? prev.filter(x => x !== v.no) : [...prev, v.no])}
+                  style={{
+                    padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    border: `2px solid ${secili ? '#1d4ed8' : '#e2e8f0'}`,
+                    background: secili ? '#eff6ff' : '#fff',
+                    color: secili ? '#1d4ed8' : '#374151',
+                  }}>
+                  {v.no}. Vardiya ({v.baslangic} - {v.bitis})
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Kaydet butonu */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <button onClick={kaydet} disabled={saving || !seciliTarihler.length || !seciliVardiyalar.length}
+            style={{ padding: '8px 20px', borderRadius: 8, background: '#92400e', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: (seciliTarihler.length && seciliVardiyalar.length) ? 1 : 0.4 }}>
+            {saving ? 'Kaydediliyor...' : '⏸ Duraklat'}
+          </button>
+          <button onClick={onClose} style={{ padding: '8px 20px', borderRadius: 8, background: '#fff', color: '#374151', border: '1px solid #e2e8f0', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+            Kapat
+          </button>
+        </div>
+
+        {/* Mevcut duraklatmalar */}
+        {mevcutlar.length > 0 && (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Aktif Duraklatmalar</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {mevcutlar.map(m => (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: '#fffbeb', borderRadius: 6, border: '1px solid #fde68a', fontSize: 13 }}>
+                  <span style={{ fontWeight: 700, color: '#92400e' }}>{m.tarih}</span>
+                  <span style={{ color: '#6b7280' }}>·</span>
+                  <span style={{ color: '#374151' }}>{m.vardiya_no}. Vardiya</span>
+                  <button onClick={() => kaldir(m.id, m.tarih, m.vardiya_no)}
+                    style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: 11, borderRadius: 4, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
+                    Kaldır
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
