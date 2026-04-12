@@ -22,11 +22,12 @@ export async function GET(req: NextRequest) {
   if (!firmaId) return NextResponse.json({ vardiya_sayisi: 3, vardiya_saatleri: VARSAYILAN_VARDIYALAR })
 
   const admin = createAdminClient()
-  const { data: firma } = await admin.from('firmalar').select('vardiya_sayisi,vardiya_saatleri').eq('id', firmaId).single()
+  const { data: firma } = await admin.from('firmalar').select('vardiya_sayisi,vardiya_saatleri,tum_vardiya_ayarlari').eq('id', firmaId).single()
 
   return NextResponse.json({
     vardiya_sayisi: firma?.vardiya_sayisi ?? 3,
     vardiya_saatleri: firma?.vardiya_saatleri ?? VARSAYILAN_VARDIYALAR,
+    tum_vardiya_ayarlari: (firma as any)?.tum_vardiya_ayarlari ?? null,
   })
 }
 
@@ -50,6 +51,7 @@ export async function PATCH(req: NextRequest) {
   const update: any = {}
   if (body.vardiya_sayisi != null) update.vardiya_sayisi = Math.max(1, Math.min(4, Number(body.vardiya_sayisi)))
   if (body.vardiya_saatleri != null) update.vardiya_saatleri = body.vardiya_saatleri
+  if (body.tum_vardiya_ayarlari != null) update.tum_vardiya_ayarlari = body.tum_vardiya_ayarlari
 
   const { error } = await admin.from('firmalar').update(update).eq('id', firmaId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
