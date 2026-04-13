@@ -138,7 +138,7 @@ function SidebarLogo({ src, alt, bordered = false }: { src: string; alt: string;
         src={src}
         alt={alt}
         style={{
-          width: '100%', maxHeight: 70, objectFit: 'contain',
+          width: '80%', maxHeight: 70, objectFit: 'contain',
         }}
       />
     </div>
