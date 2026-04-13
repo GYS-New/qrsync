@@ -4,6 +4,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import { ProjeProvider } from '@/components/projeler/ProjeContext'
 import FirmaDurumBanner from '@/components/firmalar/FirmaDurumBanner'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { TesterProvider } from '@/components/layout/TesterContext'
 
 function getFirmaDurum(firma: any): { durum: 'pasif' | 'lisans_doldu' | null; lisansTarihi: string | null } {
   if (!firma) return { durum: null, lisansTarihi: null }
@@ -50,16 +51,24 @@ export default async function TALayout({ children }: { children: React.ReactNode
     projeLogo = (prj as any)?.logo_url ?? null
   }
 
+  const isTester = (user as any).is_tester === true
+
   return (
     <ProjeProvider firmaId={user.firma_id ?? null}>
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#fafafa' }}>
-        <Sidebar user={user} firma={firma} birimFiyatAktifProp={(firma as any)?.birim_fiyat_aktif === true} projeLogo={projeLogo} />
-        <div style={{ marginLeft: 282, flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-          {/* Durum banner — pasif veya lisans dolmuşsa tüm sayfalarda görünür */}
-          <FirmaDurumBanner durum={durum} lisansTarihi={lisansTarihi} />
-          {children}
+      <TesterProvider isTester={isTester}>
+        <div style={{ display: 'flex', minHeight: '100vh', background: '#fafafa' }}>
+          <Sidebar user={user} firma={firma} birimFiyatAktifProp={(firma as any)?.birim_fiyat_aktif === true} projeLogo={projeLogo} />
+          <div style={{ marginLeft: 282, flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+            <FirmaDurumBanner durum={durum} lisansTarihi={lisansTarihi} />
+            {isTester && (
+              <div style={{ background: '#fef3c7', borderBottom: '1px solid #fcd34d', padding: '6px 28px', fontSize: 12, fontWeight: 600, color: '#92400e', display: 'flex', alignItems: 'center', gap: 6 }}>
+                👁️ Test Modu — Tüm sayfaları görüntüleyebilirsiniz, değişiklik yapamazsınız.
+              </div>
+            )}
+            {children}
+          </div>
         </div>
-      </div>
+      </TesterProvider>
     </ProjeProvider>
   )
 }

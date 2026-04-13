@@ -104,7 +104,7 @@ export default function KullanicilarClient({
 
   // Modal state'leri
   const [openCreate, setOpenCreate] = useState(false)
-  const [createForm, setCreateForm] = useState({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user' as string, ust_lokasyon_id: '', cinsiyet: '' })
+  const [createForm, setCreateForm] = useState({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user' as string, ust_lokasyon_id: '', cinsiyet: '', is_tester: false })
   const [openEdit, setOpenEdit] = useState(false)
   const [openPass, setOpenPass] = useState(false)
   const [target, setTarget] = useState<User | null>(null)
@@ -240,7 +240,7 @@ export default function KullanicilarClient({
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'Oluşturulamadı')
       showOk('Kullanıcı oluşturuldu.')
-      setCreateForm({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user', ust_lokasyon_id: '', cinsiyet: '' })
+      setCreateForm({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user', ust_lokasyon_id: '', cinsiyet: '', is_tester: false })
       setFormProjeId('')
       setOpenCreate(false)
       await refresh()
@@ -454,12 +454,15 @@ export default function KullanicilarClient({
                   </div>
                 </td>
                 <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   {(() => {
                     const b = ROL_BADGE[u.rol]
                     return b
                       ? <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: b.bg, color: b.color }}>{b.kisa}</span>
                       : <span style={{ color: '#4b5563', fontSize: 13 }}>{u.rol}</span>
                   })()}
+                  {(u as any).is_tester && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' }}>TEST</span>}
+                  </div>
                 </td>
                 <td>
                   {canManage && ustLokasyonlar.length > 0 ? (
@@ -575,6 +578,19 @@ export default function KullanicilarClient({
                     SA: sisteme erişim tam yetki · TA: firma yönetimi · M: müşteri görüntüleme · U: operatör
                   </div>
                 </div>
+
+                {/* SA: Test kullanıcısı checkbox (sadece TA rolü seçildiğinde) */}
+                {isSA && createForm.rol === 'tenant_admin' && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: createForm.is_tester ? '#fef3c7' : '#f9fafb', border: `1px solid ${createForm.is_tester ? '#f59e0b' : '#e5e7eb'}` }}>
+                      <input type="checkbox" checked={createForm.is_tester} onChange={e => setCreateForm(f => ({ ...f, is_tester: e.target.checked }))} style={{ accentColor: '#f59e0b' }} />
+                      <div>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>👁️ Test Kullanıcısı</span>
+                        <span style={{ fontSize: 11, color: '#6b7280', display: 'block', marginTop: 1 }}>Tüm TA sayfalarını görür ama hiçbir değişiklik yapamaz</span>
+                      </div>
+                    </label>
+                  </div>
+                )}
 
                 {/* SA: proje seçici (alt_super_admin hariç) */}
                 {isSA && createForm.rol !== 'alt_super_admin' && (

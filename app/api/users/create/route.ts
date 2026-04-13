@@ -106,6 +106,7 @@ export async function POST(req: Request) {
       ...(!isAltSACreation && finalProjeId ? { proje_id: finalProjeId } : {}),
       ...(ust_lokasyon_id ? { ust_lokasyon_id } : {}),
       ...(cinsiyet ? { cinsiyet } : {}),
+      ...(isSA && body.is_tester === true ? { is_tester: true } : {}),
     })
 
   if (insertErr) {
