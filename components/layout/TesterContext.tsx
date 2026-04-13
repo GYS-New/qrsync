@@ -8,6 +8,7 @@ const Ctx = createContext<boolean>(false)
 export function TesterProvider({ isTester, children }: { isTester: boolean; children: React.ReactNode }) {
   const { toast } = useToast()
   const patchedRef = useRef(false)
+  const lastToastRef = useRef(0)
 
   // Global fetch intercept — tester ise POST/PATCH/DELETE engellensin
   useEffect(() => {
@@ -25,7 +26,12 @@ export function TesterProvider({ isTester, children }: { isTester: boolean; chil
         if (!isOurApi && !isSupabaseData) {
           return originalFetch(input, init)
         }
-        toast({ type: 'error', title: 'Yetkiniz yok', message: 'Test modunda değişiklik yapamazsınız.' })
+        // Toast throttle: 30 saniyede en fazla 1 kez
+        const now = Date.now()
+        if (now - lastToastRef.current > 30000) {
+          lastToastRef.current = now
+          toast({ type: 'error', title: 'Yetkiniz yok', message: 'Test modunda değişiklik yapamazsınız.' })
+        }
         return new Response(JSON.stringify({ error: 'Tester — yazma engellendi' }), {
           status: 403,
           headers: { 'Content-Type': 'application/json' },
