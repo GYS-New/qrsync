@@ -7,6 +7,7 @@ import UserAvatar from '@/components/layout/UserAvatar'
 import type { User } from '@/types'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
+import PasswordInput from '@/components/ui/PasswordInput'
 
 export default function AyarlarClient({
   meId,
@@ -332,11 +333,10 @@ export default function AyarlarClient({
           <form onSubmit={changePassword} style={{ display: 'grid', gap: 10 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <Field label="Yeni Şifre">
-                <input className="verde-input" type="password" value={pw1} onChange={(e) => setPw1(e.target.value)} minLength={8} maxLength={72} />
-                <span style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, display: 'block' }}>Minimum 8, maksimum 72 karakter</span>
+                <PasswordInput value={pw1} onChange={setPw1} />
               </Field>
               <Field label="Yeni Şifre (Tekrar)">
-                <input className="verde-input" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} minLength={8} maxLength={72} />
+                <PasswordInput value={pw2} onChange={setPw2} />
               </Field>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

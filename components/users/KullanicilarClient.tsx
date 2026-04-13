@@ -10,6 +10,7 @@ import RowActionButton from '@/components/ui/RowActionButton'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
+import PasswordInput from '@/components/ui/PasswordInput'
 import { useYetki } from '@/lib/yetki/useYetki'
 
 const ROL_LABEL: Record<UserRole, string> = {
@@ -564,7 +565,7 @@ export default function KullanicilarClient({
                 <div><label className="verde-label">İsim Soyisim *</label><input className="verde-input" value={createForm.isim_soyisim} onChange={e => setCreateForm(f => ({ ...f, isim_soyisim: e.target.value }))} autoComplete="off" /></div>
                 <div><label className="verde-label">Telefon</label><input className="verde-input" value={createForm.telefon} onChange={e => setCreateForm(f => ({ ...f, telefon: e.target.value }))} autoComplete="off" /></div>
                 <div><label className="verde-label">Email *</label><input className="verde-input" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))} autoComplete="off" /></div>
-                <div><label className="verde-label">Şifre *</label><input className="verde-input" type="password" value={createForm.password} onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))} autoComplete="new-password" minLength={8} maxLength={72} /><span style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, display: 'block' }}>Minimum 8, maksimum 72 karakter</span></div>
+                <div><label className="verde-label">Şifre *</label><PasswordInput value={createForm.password} onChange={v => setCreateForm(f => ({ ...f, password: v }))} /></div>
                 <div><label className="verde-label">Cinsiyet</label><select className="verde-input" value={createForm.cinsiyet} onChange={e => setCreateForm(f => ({ ...f, cinsiyet: e.target.value }))}><option value="">Seçiniz</option><option value="E">Erkek</option><option value="K">Kadın</option></select></div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label className="verde-label">Kullanıcı Grubu *</label>
@@ -735,8 +736,7 @@ export default function KullanicilarClient({
             </div>
             <div style={{ padding: 18 }}>
               <label className="verde-label">Yeni Şifre</label>
-              <input className="verde-input" type="password" value={newPass} onChange={e => setNewPass(e.target.value)} autoComplete="new-password" minLength={8} maxLength={72} />
-              <span style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, display: 'block' }}>Minimum 8, maksimum 72 karakter</span>
+              <PasswordInput value={newPass} onChange={setNewPass} />
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <Button variant="primary" onClick={changePassword} disabled={loading}>{loading ? 'Kaydediliyor…' : '✓ Kaydet'}</Button>
                 <Button variant="ghost" onClick={() => { setOpenPass(false); setTarget(null) }}>İptal</Button>
