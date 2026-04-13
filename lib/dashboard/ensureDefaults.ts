@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { DEFAULT_DASHBOARD_BLOKLARI } from './blocks'
 
 export async function ensureDashboardDefaults(userId: string) {
-  const supabase = createClient()
+  const admin = createAdminClient()
 
-  const { data: existing } = await supabase
+  const { data: existing } = await admin
     .from('dashboard_bloklar')
     .select('*')
     .eq('user_id', userId)
@@ -18,7 +18,7 @@ export async function ensureDashboardDefaults(userId: string) {
   const missingDefaults = DEFAULT_DASHBOARD_BLOKLARI.filter((b) => !present.has(b.blok_turu))
 
   if (missingDefaults.length > 0) {
-    await supabase.from('dashboard_bloklar').insert(
+    await admin.from('dashboard_bloklar').insert(
       missingDefaults.map((b) => ({
         user_id: userId,
         blok_turu: b.blok_turu,
@@ -29,7 +29,7 @@ export async function ensureDashboardDefaults(userId: string) {
     )
   }
 
-  const { data } = await supabase
+  const { data } = await admin
     .from('dashboard_bloklar')
     .select('*')
     .eq('user_id', userId)
