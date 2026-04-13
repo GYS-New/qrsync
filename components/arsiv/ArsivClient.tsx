@@ -76,7 +76,7 @@ export default function ArsivClient({
   const { aktifProje, loading: projeLoading } = useProje()
 
   const firmaId = base.startsWith('/ta') ? (tenantFirmaId ?? null) : saFirmaId
-  const projeId = aktifProje?.id ?? ''
+  const projeId = aktifProje?.id ?? null
   const isTA    = base.startsWith('/ta')
 
   const [aktifSekme, setAktifSekme] = useState<Sekme>('frekansiyel')
@@ -1068,7 +1068,7 @@ function CeklistArsivSekme({
   getLocPath,
 }: {
   firmaId: string
-  projeId: string
+  projeId: string | null
   getLocPath: (id: string | null | undefined) => string
 }) {
   const { toast } = useToast()
