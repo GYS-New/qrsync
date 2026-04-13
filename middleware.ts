@@ -30,9 +30,19 @@ export async function middleware(request: NextRequest) {
   const { data: { user: authUser } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
 
-  const publicPaths = new Set(['/login', '/forgot-password', '/reset-password'])
-  const isPublicScanPath = pathname.startsWith('/qr/') || pathname.startsWith('/nfc/') || pathname.startsWith('/mesai/')
+  // Mobil cihaz tespiti — web uygulamasına mobil erişimi engelle, landing'e yönlendir
+  const ua = request.headers.get('user-agent') ?? ''
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|Opera Mini|IEMobile/i.test(ua)
   const isLandingPage = pathname === '/' || pathname === '/landing.html'
+  const isPublicScanPath = pathname.startsWith('/qr/') || pathname.startsWith('/nfc/') || pathname.startsWith('/mesai/') || pathname.startsWith('/degerlendirme/')
+  const isApiPath = pathname.startsWith('/api/')
+
+  // Mobil cihaz + web sayfası (scan/api/landing hariç) → landing'e yönlendir
+  if (isMobile && !isLandingPage && !isPublicScanPath && !isApiPath) {
+    return NextResponse.redirect(new URL('/landing.html', request.url))
+  }
+
+  const publicPaths = new Set(['/login', '/forgot-password', '/reset-password'])
 
   if (!authUser && !publicPaths.has(pathname) && !isPublicScanPath && !isLandingPage) {
     return NextResponse.redirect(new URL('/login', request.url))
