@@ -16,18 +16,12 @@ export function TesterProvider({ isTester, children }: { isTester: boolean; chil
 
     const originalFetch = window.fetch.bind(window)
     window.fetch = async (input, init) => {
-      const method = (init?.method ?? 'GET').toUpperCase()
+      const method = (init?.method ?? (typeof input !== 'string' && (input as Request).method) ?? 'GET').toUpperCase()
       if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
-        // Okuma amaçlı POST istekleri hariç tut (cron-log vb. client'tan çağrılmaz)
         const url = typeof input === 'string' ? input : (input as Request).url
-        // İstisna: Supabase auth, Next.js internal, Supabase realtime
-        if (
-          url.includes('/auth/') ||
-          url.includes('supabase.co') ||
-          url.includes('_next/') ||
-          url.includes('__nextjs') ||
-          !url.startsWith('/api/')
-        ) {
+        // Sadece bizim API route'larına yapılan yazma isteklerini engelle
+        const isOurApi = url.includes('/api/') && !url.includes('/auth/')
+        if (!isOurApi) {
           return originalFetch(input, init)
         }
         toast({ type: 'error', title: 'Yetkiniz yok', message: 'Test modunda değişiklik yapamazsınız.' })
