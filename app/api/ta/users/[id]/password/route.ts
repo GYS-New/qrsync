@@ -17,7 +17,7 @@ export async function PUT(req: Request, ctx: { params: { id: string } }) {
   const userId = String(ctx.params.id)
   const body = await req.json().catch(() => ({} as any))
   const password = String(body.password ?? '')
-  if (!password || password.length < 6) {
+  if (!password || password.length < 8) {
     return NextResponse.json({ error: 'Şifre en az 6 karakter olmalı' }, { status: 400 })
   }
 

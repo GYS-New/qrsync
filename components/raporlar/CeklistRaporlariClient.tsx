@@ -425,30 +425,34 @@ export default function CeklistRaporlariClient({
       }
 
       // AŞAMA 4: Tablo HTML'ini oluştur
+      // XSS koruması: HTML escape
+      const esc = (s: any) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+      const escUrl = (u: string) => { try { const url = new URL(u); return ['http:','https:'].includes(url.protocol) ? url.href : '#' } catch { return '#' } }
+
       let tableHtml = ''
       for (const veri of raporVerileri) {
         let rowHtml = `<tr>
-          <td>${veri.kayit_tarihi}</td>
-          <td>${veri.gorev_tanim}</td>
-          <td>${veri.lokasyon_tanim}</td>
-          <td>${veri.sablon_baslik}</td>
-          <td>${veri.gorev_durum}</td>
-          <td>${veri.kanal}</td>
-          <td>${veri.kullanici_isim}</td>
-          <td>${veri.doldurulan_oran}</td>`
+          <td>${esc(veri.kayit_tarihi)}</td>
+          <td>${esc(veri.gorev_tanim)}</td>
+          <td>${esc(veri.lokasyon_tanim)}</td>
+          <td>${esc(veri.sablon_baslik)}</td>
+          <td>${esc(veri.gorev_durum)}</td>
+          <td>${esc(veri.kanal)}</td>
+          <td>${esc(veri.kullanici_isim)}</td>
+          <td>${esc(veri.doldurulan_oran)}</td>`
 
-        if (filtreMod) rowHtml += `<td>${veri.segment}</td>`
+        if (filtreMod) rowHtml += `<td>${esc(veri.segment)}</td>`
 
         // Maddeler
         for (let i = 0; i < maxMadde; i++) {
           const maddeHtml = veri[`madde_${i}`] ?? '—'
-          rowHtml += `<td>${maddeHtml}</td>`
+          rowHtml += `<td>${esc(maddeHtml)}</td>`
         }
 
         // Görseller
         const gorseller = gorselListesi[veri.gorevId] ?? []
-        const gorselHtml = gorseller.length > 0 
-          ? gorseller.map((g, i) => `<a href="${g.url}" target="_blank" style="color:#0369a1;text-decoration:underline">Görsel ${i + 1}</a>`).join(' | ')
+        const gorselHtml = gorseller.length > 0
+          ? gorseller.map((g, i) => `<a href="${escUrl(g.url)}" target="_blank" style="color:#0369a1;text-decoration:underline">Görsel ${i + 1}</a>`).join(' | ')
           : '—'
         rowHtml += `<td>${gorselHtml}</td>`
         rowHtml += '</tr>'
