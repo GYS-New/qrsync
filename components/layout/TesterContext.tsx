@@ -20,8 +20,14 @@ export function TesterProvider({ isTester, children }: { isTester: boolean; chil
       if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
         // Okuma amaçlı POST istekleri hariç tut (cron-log vb. client'tan çağrılmaz)
         const url = typeof input === 'string' ? input : (input as Request).url
-        // Supabase auth isteklerini geçir (login, token refresh)
-        if (url.includes('/auth/') || url.includes('supabase.co/auth')) {
+        // İstisna: Supabase auth, Next.js internal, Supabase realtime
+        if (
+          url.includes('/auth/') ||
+          url.includes('supabase.co') ||
+          url.includes('_next/') ||
+          url.includes('__nextjs') ||
+          !url.startsWith('/api/')
+        ) {
           return originalFetch(input, init)
         }
         toast({ type: 'error', title: 'Yetkiniz yok', message: 'Test modunda değişiklik yapamazsınız.' })

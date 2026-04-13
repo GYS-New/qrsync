@@ -60,11 +60,6 @@ export default async function TALayout({ children }: { children: React.ReactNode
           <Sidebar user={user} firma={firma} birimFiyatAktifProp={(firma as any)?.birim_fiyat_aktif === true} projeLogo={projeLogo} />
           <div style={{ marginLeft: 282, flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             <FirmaDurumBanner durum={durum} lisansTarihi={lisansTarihi} />
-            {isTester && (
-              <div style={{ background: '#fef3c7', borderBottom: '1px solid #fcd34d', padding: '6px 28px', fontSize: 12, fontWeight: 600, color: '#92400e', display: 'flex', alignItems: 'center', gap: 6 }}>
-                👁️ Test Modu — Tüm sayfaları görüntüleyebilirsiniz, değişiklik yapamazsınız.
-              </div>
-            )}
             {children}
           </div>
         </div>
