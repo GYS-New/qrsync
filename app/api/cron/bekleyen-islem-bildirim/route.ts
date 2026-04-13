@@ -9,7 +9,8 @@ import { sendFCMToUser } from '@/lib/fcm-sender'
  */
 export async function POST(req: NextRequest) {
   const cronSecret = req.headers.get('x-cron-token')
-  if (cronSecret !== process.env.CRON_SECRET) {
+  const envSecret = process.env.CRON_SECRET
+  if (!envSecret || !cronSecret || cronSecret !== envSecret) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 

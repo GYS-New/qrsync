@@ -12,8 +12,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
-const CORS = { 'Access-Control-Allow-Origin': '*' }
-// İptal oranı artık DB'den (grupAyar.iptal_orani), fallback %1
+const CORS = {} // Cron endpoint — CORS gereksiz
 
 // Personelin son aktivitesini güncelle (online görünsün)
 async function personelAktiviteGuncelle(admin: any, userId: string) {
@@ -43,7 +42,7 @@ async function personelAktiviteGuncelle(admin: any, userId: string) {
 export async function POST(req: Request) {
   const cronToken = req.headers.get('x-cron-token')
   const secret = process.env.CRON_SECRET
-  if (secret && cronToken !== secret) {
+  if (!secret || cronToken !== secret) {
     return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401, headers: CORS })
   }
 

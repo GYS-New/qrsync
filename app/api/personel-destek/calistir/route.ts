@@ -12,12 +12,12 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
-const CORS = { 'Access-Control-Allow-Origin': '*' }
+const CORS = {} // Cron endpoint — CORS gereksiz
 
 export async function POST(req: Request) {
   const cronToken = req.headers.get('x-cron-token')
   const secret = process.env.CRON_SECRET
-  if (secret && cronToken !== secret) {
+  if (!secret || cronToken !== secret) {
     return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401, headers: CORS })
   }
 

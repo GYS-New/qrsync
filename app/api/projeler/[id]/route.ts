@@ -6,9 +6,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
 
+  const { data: me } = await supabase.from('users').select('rol,firma_id').eq('id', user.id).single()
+  if (!me) return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 403 })
+
   const admin = createAdminClient()
   const { data, error } = await admin.from('projeler').select('*').eq('id', params.id).single()
   if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+
+  // SA tüm projeleri görebilir, diğer roller sadece kendi firmasının projelerini
+  const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
+  if (!isSA && data.firma_id !== me.firma_id) {
+    return NextResponse.json({ error: 'Yetkisiz proje' }, { status: 403 })
+  }
+
   return NextResponse.json(data)
 }
 

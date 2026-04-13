@@ -16,10 +16,13 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
   const { data } = await admin.from('smtp_ayarlari').select('*').limit(1).single()
 
-  return NextResponse.json(data ?? {
+  const result = data ?? {
     smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_secure: false,
     smtp_user: '', smtp_pass: '', smtp_from: '', aktif: true,
-  })
+  }
+  // Şifreyi maskele — client'a plaintext gönderme
+  if (result.smtp_pass) result.smtp_pass = '••••••••'
+  return NextResponse.json(result)
 }
 
 /** PATCH — SMTP ayarlarını güncelle (sadece SA/alt_SA) */

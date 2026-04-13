@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const url      = new URL(req.url)
   const provided = req.headers.get('x-cron-secret') ?? url.searchParams.get('secret')
   const expected = process.env.CRON_SECRET
-  if (expected && provided !== expected) {
+  if (!expected || provided !== expected) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 
