@@ -36,6 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(body.qr_sistemi_aktif  !== undefined && { qr_sistemi_aktif:  body.qr_sistemi_aktif }),
       ...(body.nfc_sistemi_aktif  !== undefined && { nfc_sistemi_aktif:  body.nfc_sistemi_aktif }),
       ...(body.birim_fiyat_aktif !== undefined && { birim_fiyat_aktif: body.birim_fiyat_aktif }),
+      ...(body.varsayilan_ayarlar !== undefined && { varsayilan_ayarlar: body.varsayilan_ayarlar }),
     })
     .eq('id', params.id)
     .select()

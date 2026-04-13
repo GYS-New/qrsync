@@ -146,6 +146,72 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
     router.refresh()
   }
 
+  // Mevcut ayarları varsayılan olarak kaydet (snapshot)
+  async function varsayilaniKaydet() {
+    const ok = await confirm({
+      title: 'Mevcut Ayarları Varsayılan Olarak Kaydet',
+      message: 'Şu anki firma ayarları varsayılan olarak kaydedilecek. TA değişiklik yaparsa bu noktaya geri dönebilirsiniz.',
+      confirmText: 'Kaydet',
+      cancelText: 'İptal',
+    })
+    if (!ok) return
+    setLoading(true)
+    const snapshot = {
+      aktif: form.aktif,
+      qr_sablon_aktif: form.qr_sablon_aktif,
+      rapor_ozellestir_aktif: form.rapor_ozellestir_aktif,
+      personel_takibi_aktif: form.personel_takibi_aktif,
+      birim_fiyat_aktif: form.birim_fiyat_aktif,
+      kaydedilme_tarihi: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('firmalar').update({ varsayilan_ayarlar: snapshot }).eq('id', firma.id)
+    setLoading(false)
+    if (error) { toast({ type: 'error', title: 'Hata', message: error.message }); return }
+    toast({ type: 'success', title: 'Kaydedildi', message: 'Mevcut ayarlar varsayılan olarak kaydedildi.' })
+    router.refresh()
+  }
+
+  // Kaydedilmiş varsayılana geri dön
+  async function varsayilanadon() {
+    const snapshot = (firma as any).varsayilan_ayarlar
+    if (!snapshot) {
+      toast({ type: 'error', title: 'Varsayılan yok', message: 'Önce "Varsayılanı Kaydet" ile mevcut ayarları kaydedin.' })
+      return
+    }
+    const tarih = snapshot.kaydedilme_tarihi ? new Date(snapshot.kaydedilme_tarihi).toLocaleDateString('tr-TR') : '?'
+    const ok = await confirm({
+      title: 'Varsayılan Ayarlara Dön',
+      message: `Firma ayarları ${tarih} tarihinde kaydedilen varsayılanlara geri yüklenecek. Onaylıyor musunuz?`,
+      confirmText: 'Evet, Geri Yükle',
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setLoading(true)
+    const { error } = await supabase
+      .from('firmalar')
+      .update({
+        aktif: snapshot.aktif ?? true,
+        qr_sablon_aktif: snapshot.qr_sablon_aktif ?? true,
+        rapor_ozellestir_aktif: snapshot.rapor_ozellestir_aktif ?? true,
+        personel_takibi_aktif: snapshot.personel_takibi_aktif ?? false,
+        birim_fiyat_aktif: snapshot.birim_fiyat_aktif ?? false,
+      })
+      .eq('id', firma.id)
+    setLoading(false)
+    if (error) { toast({ type: 'error', title: 'Hata', message: error.message }); return }
+    setForm(p => ({
+      ...p,
+      aktif: snapshot.aktif ?? true,
+      qr_sablon_aktif: snapshot.qr_sablon_aktif ?? true,
+      rapor_ozellestir_aktif: snapshot.rapor_ozellestir_aktif ?? true,
+      personel_takibi_aktif: snapshot.personel_takibi_aktif ?? false,
+      birim_fiyat_aktif: snapshot.birim_fiyat_aktif ?? false,
+    }))
+    toast({ type: 'success', title: 'Geri Yüklendi', message: `Firma ayarları ${tarih} tarihli varsayılanlara döndürüldü.` })
+    router.refresh()
+  }
+
   async function remove() {
     const ok = await confirm({
       title: 'Firma Sil',
@@ -183,6 +249,14 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
               <Button variant="primary" type="button" onClick={save} disabled={loading}>Kaydet</Button>
             </>
           )}
+          <button onClick={varsayilaniKaydet} disabled={loading}
+            style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, borderRadius: 6, border: '1px solid #3b82f6', background: '#eff6ff', color: '#1d4ed8', cursor: 'pointer' }}>
+            Varsayılanı Kaydet
+          </button>
+          <button onClick={varsayilanadon} disabled={loading}
+            style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, borderRadius: 6, border: '1px solid #f59e0b', background: '#fffbeb', color: '#92400e', cursor: 'pointer', opacity: (firma as any).varsayilan_ayarlar ? 1 : 0.4 }}>
+            Varsayılana Dön
+          </button>
           <Button variant="danger" type="button" onClick={remove} disabled={loading}>Sil</Button>
         </div>
       </div>

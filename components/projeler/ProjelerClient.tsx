@@ -281,6 +281,80 @@ export default function ProjelerClient({
     }
   }
 
+  // Mevcut proje ayarlarını varsayılan olarak kaydet (snapshot)
+  async function projeVarsayilaniKaydet(p: Proje) {
+    const ok = await confirm({
+      title: 'Varsayılanı Kaydet',
+      message: `"${p.ad}" projesinin mevcut ayarları varsayılan olarak kaydedilecek.`,
+      confirmText: 'Kaydet',
+      cancelText: 'İptal',
+    })
+    if (!ok) return
+    try {
+      const snapshot = {
+        aktif: p.aktif,
+        personel_takibi_aktif: p.personel_takibi_aktif,
+        qr_sistemi_aktif: p.qr_sistemi_aktif,
+        nfc_sistemi_aktif: p.nfc_sistemi_aktif,
+        birim_fiyat_aktif: p.birim_fiyat_aktif,
+        kaydedilme_tarihi: new Date().toISOString(),
+      }
+      const res = await fetch(`/api/projeler/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ varsayilan_ayarlar: snapshot }),
+      })
+      if (!res.ok) throw new Error('Kaydedilemedi')
+      toast({ type: 'success', title: 'Kaydedildi', message: `"${p.ad}" ayarları varsayılan olarak kaydedildi.` })
+      fetchProjeler()
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+  }
+
+  // Kaydedilmiş snapshot'a geri dön
+  async function projeVarsayilana(p: Proje) {
+    const snapshot = (p as any).varsayilan_ayarlar
+    if (!snapshot) {
+      toast({ type: 'error', title: 'Varsayılan yok', message: 'Önce "Varsayılanı Kaydet" ile mevcut ayarları kaydedin.' })
+      return
+    }
+    const tarih = snapshot.kaydedilme_tarihi ? new Date(snapshot.kaydedilme_tarihi).toLocaleDateString('tr-TR') : '?'
+    const ok = await confirm({
+      title: 'Varsayılana Dön',
+      message: `"${p.ad}" projesi ${tarih} tarihindeki varsayılanlara geri yüklenecek. Onaylıyor musunuz?`,
+      confirmText: 'Evet, Geri Yükle',
+      cancelText: 'İptal',
+      variant: 'danger',
+    })
+    if (!ok) return
+    try {
+      const res = await fetch(`/api/projeler/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aktif: snapshot.aktif ?? true,
+          personel_takibi_aktif: snapshot.personel_takibi_aktif ?? false,
+          qr_sistemi_aktif: snapshot.qr_sistemi_aktif ?? true,
+          nfc_sistemi_aktif: snapshot.nfc_sistemi_aktif ?? true,
+          birim_fiyat_aktif: snapshot.birim_fiyat_aktif ?? false,
+        }),
+      })
+      if (!res.ok) throw new Error('Geri yüklenemedi')
+      setProjeler(prev => prev.map(x => x.id === p.id ? {
+        ...x,
+        aktif: snapshot.aktif ?? true,
+        personel_takibi_aktif: snapshot.personel_takibi_aktif ?? false,
+        qr_sistemi_aktif: snapshot.qr_sistemi_aktif ?? true,
+        nfc_sistemi_aktif: snapshot.nfc_sistemi_aktif ?? true,
+        birim_fiyat_aktif: snapshot.birim_fiyat_aktif ?? false,
+      } : x))
+      toast({ type: 'success', title: 'Geri Yüklendi', message: `"${p.ad}" ${tarih} tarihli varsayılanlara döndürüldü.` })
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+  }
+
   const aktifler = projeler.filter(p => p.aktif)
   const pasifler = projeler.filter(p => !p.aktif)
 
@@ -369,6 +443,18 @@ export default function ProjelerClient({
               {/* İşlemler */}
               {!readonly && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {isSA && (
+                    <>
+                      <button onClick={() => projeVarsayilaniKaydet(p)} title="Mevcut ayarları varsayılan olarak kaydet"
+                        style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #3b82f6', background: '#eff6ff', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#1d4ed8' }}>
+                        Kaydet
+                      </button>
+                      <button onClick={() => projeVarsayilana(p)} title="Kaydedilmiş varsayılana dön"
+                        style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #f59e0b', background: '#fffbeb', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#92400e', opacity: (p as any).varsayilan_ayarlar ? 1 : 0.4 }}>
+                        Geri Yükle
+                      </button>
+                    </>
+                  )}
                   {yetki.duzenleyebilir && (
                     <button onClick={() => openEdit(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                       <Pencil size={14} style={{ color: '#4b5563' }} />
