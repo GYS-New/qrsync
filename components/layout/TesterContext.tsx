@@ -19,9 +19,10 @@ export function TesterProvider({ isTester, children }: { isTester: boolean; chil
       const method = (init?.method || (typeof input !== 'string' ? (input as Request).method : undefined) || 'GET').toUpperCase()
       if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
         const url = typeof input === 'string' ? input : (input as Request).url
-        // Sadece bizim API route'larına yapılan yazma isteklerini engelle
+        // Engelle: bizim API route'ları + Supabase veri yazma (rest/v1)
         const isOurApi = url.includes('/api/') && !url.includes('/auth/')
-        if (!isOurApi) {
+        const isSupabaseData = url.includes('supabase.co/rest/v1')
+        if (!isOurApi && !isSupabaseData) {
           return originalFetch(input, init)
         }
         toast({ type: 'error', title: 'Yetkiniz yok', message: 'Test modunda değişiklik yapamazsınız.' })
