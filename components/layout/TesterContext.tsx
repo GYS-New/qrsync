@@ -16,7 +16,7 @@ export function TesterProvider({ isTester, children }: { isTester: boolean; chil
 
     const originalFetch = window.fetch.bind(window)
     window.fetch = async (input, init) => {
-      const method = (init?.method ?? (typeof input !== 'string' && (input as Request).method) ?? 'GET').toUpperCase()
+      const method = (init?.method || (typeof input !== 'string' ? (input as Request).method : undefined) || 'GET').toUpperCase()
       if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
         const url = typeof input === 'string' ? input : (input as Request).url
         // Sadece bizim API route'larına yapılan yazma isteklerini engelle
