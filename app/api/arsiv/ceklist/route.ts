@@ -50,10 +50,12 @@ export async function GET(req: NextRequest) {
     return parts.reverse().join(' > ') || '—'
   }
 
+  // Proje lokasyonlarını DB filtresinde kullan (lokIds max ~200, batch gerekmez)
   // Count
   let countQ = admin.from('checklist_sonuc_basliklari_arsiv')
     .select('id', { count: 'exact', head: true })
     .eq('firma_id', firmaId)
+    .in('lokasyon_id', lokIds)
   if (fromD) countQ = countQ.gte('kayit_tarihi', fromD + 'T00:00:00')
   if (toD) countQ = countQ.lte('kayit_tarihi', toD + 'T23:59:59')
   const { count: total } = await countQ
@@ -63,6 +65,7 @@ export async function GET(req: NextRequest) {
   let dataQ = admin.from('checklist_sonuc_basliklari_arsiv')
     .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
     .eq('firma_id', firmaId)
+    .in('lokasyon_id', lokIds)
     .order('kayit_tarihi', { ascending: false })
     .range(offset, offset + limit - 1)
   if (fromD) dataQ = dataQ.gte('kayit_tarihi', fromD + 'T00:00:00')
@@ -72,9 +75,7 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!basliklar?.length) return NextResponse.json({ data: [], total: total ?? 0 })
 
-  // Lokasyon filtresi (proje bazlı)
-  const lokSet = new Set(lokIds)
-  const filtreliBsl = basliklar.filter(b => lokSet.has(b.lokasyon_id))
+  const filtreliBsl = basliklar
 
   // Görev bilgilerini çek (batch)
   const BATCH = 80
