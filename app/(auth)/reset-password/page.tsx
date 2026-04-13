@@ -141,6 +141,8 @@ export default function ResetPasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  minLength={8}
+                  maxLength={72}
                   disabled={!ready || loading}
                 />
                 <button
@@ -156,6 +158,7 @@ export default function ResetPasswordPage() {
                   )}
                 </button>
               </div>
+              <span style={{ fontSize: 11, color: 'var(--text-300)', marginTop: 4, display: 'block' }}>Minimum 8, maksimum 72 karakter</span>
             </div>
 
             <div className="mb-4">
