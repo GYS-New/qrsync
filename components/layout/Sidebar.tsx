@@ -127,28 +127,18 @@ type SidebarCounts = {
 
 /** Sidebar logo — boyut logoya göre dinamik, beyaz bg + gri border */
 function SidebarLogo({ src, alt, bordered = false }: { src: string; alt: string; bordered?: boolean }) {
-  const imgRef = useRef<HTMLImageElement>(null)
-  const [dims, setDims] = useState<{ w: number; h: number }>({ w: 200, h: 50 })
   return (
     <div style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      ...(bordered ? { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 8 } : {}),
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      width: '100%',
+      ...(bordered ? { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 } : {}),
     }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        ref={imgRef}
         src={src}
         alt={alt}
-        onLoad={() => {
-          const img = imgRef.current
-          if (!img) return
-          const ratio = img.naturalWidth / img.naturalHeight
-          const h = 50
-          setDims({ w: ratio < 1.2 ? h : Math.min(h * ratio, 220), h })
-        }}
         style={{
-          width: dims.w, height: dims.h, objectFit: 'contain',
-          transition: 'width 0.2s ease',
+          width: '100%', maxHeight: 70, objectFit: 'contain',
         }}
       />
     </div>
