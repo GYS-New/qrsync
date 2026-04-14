@@ -125,8 +125,8 @@ type SidebarCounts = {
   arsiv_total: number
 }
 
-/** Sidebar logo — boyut logoya göre dinamik, beyaz bg + gri border */
-function SidebarLogo({ src, alt, bordered = false }: { src: string; alt: string; bordered?: boolean }) {
+/** Sidebar logo — boyut logoya göre dinamik */
+function SidebarLogo({ src, alt, bordered = false, imgWidth = '80%' }: { src: string; alt: string; bordered?: boolean; imgWidth?: string }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -138,7 +138,7 @@ function SidebarLogo({ src, alt, bordered = false }: { src: string; alt: string;
         src={src}
         alt={alt}
         style={{
-          width: '80%', maxHeight: 70, objectFit: 'contain',
+          width: imgWidth, maxHeight: 70, objectFit: 'contain',
         }}
       />
     </div>
@@ -332,12 +332,12 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         >
           {/* Logo alanı */}
           {isSA && sidebarLogo ? (
-            <SidebarLogo src={sidebarLogo} alt="Logo" />
+            <SidebarLogo src={sidebarLogo} alt="Logo" imgWidth="100%" />
           ) : !isSA && firma?.logo_url ? (
             <SidebarLogo src={firma.logo_url} alt="Firma Logo" />
           ) : null}
         </div>
-        {altyazi && (
+        {altyazi && !isSA && (
           <div style={{ textAlign: 'center', marginTop: 6, fontSize: 13, fontWeight: 700, color: '#4b5563', fontFamily: 'Inter, sans-serif', letterSpacing: '0.03em' }}>
             {altyazi}
           </div>
