@@ -380,7 +380,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
-                color: '#9ca3af',
+                color: '#4F6AFF',
                 padding: '10px 8px 4px',
               }}
             >
