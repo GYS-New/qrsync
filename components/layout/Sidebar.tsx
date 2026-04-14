@@ -351,14 +351,6 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           <div style={{ padding: '6px 14px', margin: '8px 6px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <SidebarLogo src={projeLogo} alt="Proje" bordered />
           </div>
-        ) : !isSA ? (
-          <div style={{ padding: '10px 14px', margin: '8px 6px 6px', borderRadius: 10, background: '#f3f4f6', fontWeight: 700, fontSize: 14, color: '#374151', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <ProataMark size={28} rounded={6} gap={2} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700 }}>
-              <span style={{ fontWeight: 300, color: '#4b5563' }}>Pro</span>
-              <span style={{ fontWeight: 800, color: '#1f2937' }}>ATA</span>
-            </span>
-          </div>
         ) : null}
 
         {groups.map((g) => {
