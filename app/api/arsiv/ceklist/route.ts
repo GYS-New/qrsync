@@ -50,32 +50,46 @@ export async function GET(req: NextRequest) {
     return parts.reverse().join(' > ') || '—'
   }
 
-  // Proje lokasyonlarını DB filtresinde kullan (lokIds max ~200, batch gerekmez)
-  // Count
+  // firma_id ile çek, lokasyon filtresi sonradan uygula (lokIds 400+ olabilir, URL limit aşılır)
+  const lokSet = new Set(lokIds)
+
+  // Count — firma bazlı çek, sonra lokasyon filtreli sayı hesapla
   let countQ = admin.from('checklist_sonuc_basliklari_arsiv')
-    .select('id', { count: 'exact', head: true })
+    .select('id,lokasyon_id', { count: 'exact' })
     .eq('firma_id', firmaId)
-    .in('lokasyon_id', lokIds)
   if (fromD) countQ = countQ.gte('kayit_tarihi', fromD + 'T00:00:00')
   if (toD) countQ = countQ.lte('kayit_tarihi', toD + 'T23:59:59')
-  const { count: total } = await countQ
+  const { data: countData } = await countQ
+  const filteredCount = (countData ?? []).filter((r: any) => lokSet.has(r.lokasyon_id)).length
 
-  // Data
-  const offset = (page - 1) * limit
-  let dataQ = admin.from('checklist_sonuc_basliklari_arsiv')
-    .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
-    .eq('firma_id', firmaId)
-    .in('lokasyon_id', lokIds)
-    .order('kayit_tarihi', { ascending: false })
-    .range(offset, offset + limit - 1)
-  if (fromD) dataQ = dataQ.gte('kayit_tarihi', fromD + 'T00:00:00')
-  if (toD) dataQ = dataQ.lte('kayit_tarihi', toD + 'T23:59:59')
+  // Data — fazla çek, lokasyon filtresi uygula, sonra sayfa kes
+  const pageSize = limit * 3
+  let allFiltered: any[] = []
+  let dbOffset = 0
+  const skip = (page - 1) * limit
+  const targetCount = skip + limit
 
-  const { data: basliklar, error } = await dataQ
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (!basliklar?.length) return NextResponse.json({ data: [], total: total ?? 0 })
+  while (allFiltered.length < targetCount) {
+    let dataQ = admin.from('checklist_sonuc_basliklari_arsiv')
+      .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
+      .eq('firma_id', firmaId)
+      .order('kayit_tarihi', { ascending: false })
+      .range(dbOffset, dbOffset + pageSize - 1)
+    if (fromD) dataQ = dataQ.gte('kayit_tarihi', fromD + 'T00:00:00')
+    if (toD) dataQ = dataQ.lte('kayit_tarihi', toD + 'T23:59:59')
 
-  const filtreliBsl = basliklar
+    const { data: batch, error } = await dataQ
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!batch?.length) break
+
+    allFiltered.push(...batch.filter((b: any) => lokSet.has(b.lokasyon_id)))
+    dbOffset += pageSize
+    if (batch.length < pageSize) break // son sayfa
+  }
+
+  const total = filteredCount
+  const filtreliBsl = allFiltered.slice(skip, skip + limit)
+  if (!filtreliBsl.length) return NextResponse.json({ data: [], total })
 
   // Görev bilgilerini çek (batch)
   const BATCH = 80
