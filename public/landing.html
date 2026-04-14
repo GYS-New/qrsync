@@ -12,609 +12,241 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green-dark:  #1a1f36;
-      --green-mid:   #4F6AFF;
-      --green-light: #b8c8ff;
-      --green-bright:#6B8AFF;
-      --bg:          #06081a;
-      --bg2:         #0c1028;
-      --bg3:         #111836;
-      --surface:     rgba(26, 31, 54, 0.55);
-      --border:      rgba(79,106,255,0.22);
-      --text:        #e8ecf5;
-      --text-muted:  #7a8aae;
-      --white:       #ffffff;
+      --primary: #4F6AFF;
+      --primary-dark: #1a1f36;
+      --primary-light: #6B8AFF;
+      --gradient: linear-gradient(135deg, #4F6AFF, #6B8AFF);
+      --gradient-hero: linear-gradient(135deg, #f0f4ff 0%, #e8ecff 50%, #f5f0ff 100%);
+      --bg: #ffffff;
+      --bg-alt: #f8fafc;
+      --bg-card: #ffffff;
+      --text-900: #1a1f36;
+      --text-700: #374151;
+      --text-500: #6b7280;
+      --text-400: #9ca3af;
+      --border: #e5e7eb;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.10);
     }
 
     html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-700); line-height: 1.6; overflow-x: hidden; }
 
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      overflow-x: hidden;
-      line-height: 1.6;
-    }
-
-    /* ── SCROLLBAR ── */
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: #4F6AFF; border-radius: 3px; }
-
-    /* ══════════════════════════════
-       NAVBAR
-    ══════════════════════════════ */
-    #navbar {
+    /* ── NAVBAR ── */
+    .navbar {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 32px;
-      background: rgba(6, 8, 26, 0.92);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-      transition: padding 0.3s;
+      padding: 12px 48px; background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(20px); border-bottom: 1px solid var(--border);
+      transition: padding 0.3s, box-shadow 0.3s;
+    }
+    .navbar.scrolled { padding: 8px 48px; box-shadow: var(--shadow-sm); }
+
+    .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-brand svg { width: 38px; height: 38px; flex-shrink: 0; }
+    .nav-brand-text { font-size: 22px; font-weight: 900; color: var(--primary-dark); letter-spacing: -0.5px; }
+
+    .nav-links { display: flex; align-items: center; gap: 32px; }
+    .nav-links a { font-size: 15px; font-weight: 600; color: var(--text-500); text-decoration: none; transition: color 0.15s; }
+    .nav-links a:hover { color: var(--primary); }
+
+    .nav-actions { display: flex; align-items: center; gap: 10px; }
+    .btn-outline { padding: 9px 20px; border-radius: 8px; border: 2px solid var(--primary); color: var(--primary); font-size: 14px; font-weight: 700; text-decoration: none; transition: all 0.15s; background: transparent; cursor: pointer; }
+    .btn-outline:hover { background: var(--primary); color: #fff; }
+    .btn-solid { padding: 10px 22px; border-radius: 8px; border: none; background: var(--gradient); color: #fff; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; box-shadow: 0 4px 14px rgba(79,106,255,0.3); transition: all 0.15s; }
+    .btn-solid:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79,106,255,0.4); }
+
+    .nav-mobile { display: none; }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 140px 48px 80px; background: var(--gradient-hero);
+      position: relative; overflow: hidden;
+    }
+    .hero-inner {
+      max-width: 1320px; margin: 0 auto; display: grid;
+      grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 4.5vw, 56px); font-weight: 900;
+      line-height: 1.12; letter-spacing: -1.5px; color: var(--primary-dark);
+      margin-bottom: 20px;
+    }
+    .hero h1 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: 18px; color: var(--text-500); line-height: 1.7; margin-bottom: 32px; max-width: 520px; }
+    .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; }
+    .hero-visual {
+      background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border);
+      box-shadow: var(--shadow-lg); padding: 24px; position: relative;
+      transform: perspective(1200px) rotateY(-4deg) rotateX(2deg);
+    }
+    .hero-visual img { width: 100%; border-radius: 8px; }
+    .hero-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+      margin-top: 48px; max-width: 1320px; margin-left: auto; margin-right: auto;
+      padding: 0 48px;
+    }
+    .hero-stat {
+      text-align: center; padding: 20px; background: var(--bg-card);
+      border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+    }
+    .hero-stat .num { font-size: 32px; font-weight: 900; color: var(--primary); }
+    .hero-stat .label { font-size: 13px; color: var(--text-500); margin-top: 4px; font-weight: 600; }
+
+    /* ── SECTIONS ── */
+    .section { padding: 96px 48px; }
+    .section-alt { background: var(--bg-alt); }
+    .section-header { text-align: center; margin-bottom: 56px; }
+    .section-header h2 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 900; color: var(--primary-dark); letter-spacing: -1px; margin-bottom: 12px; }
+    .section-header h2 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .section-header p { font-size: 17px; color: var(--text-500); max-width: 600px; margin: 0 auto; }
+    .section-tag { display: inline-block; padding: 6px 16px; border-radius: 99px; font-size: 13px; font-weight: 700; color: var(--primary); background: rgba(79,106,255,0.1); margin-bottom: 16px; letter-spacing: 0.3px; }
+    .container { max-width: 1320px; margin: 0 auto; }
+
+    /* ── FEATURE CARDS ── */
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .feature-card {
+      padding: 32px 28px; background: var(--bg-card); border-radius: 16px;
+      border: 1px solid var(--border); transition: all 0.2s;
+      box-shadow: var(--shadow-sm);
+    }
+    .feature-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: var(--primary); }
+    .feature-icon {
+      width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center;
+      font-size: 24px; margin-bottom: 16px;
+    }
+    .fi-blue { background: rgba(79,106,255,0.1); }
+    .fi-purple { background: rgba(139,92,246,0.1); }
+    .fi-green { background: rgba(34,197,94,0.1); }
+    .fi-orange { background: rgba(249,115,22,0.1); }
+    .fi-red { background: rgba(239,68,68,0.1); }
+    .fi-cyan { background: rgba(6,182,212,0.1); }
+    .feature-card h3 { font-size: 18px; font-weight: 800; color: var(--primary-dark); margin-bottom: 8px; }
+    .feature-card p { font-size: 14px; color: var(--text-500); line-height: 1.65; }
+
+    /* ── HOW IT WORKS ── */
+    .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; position: relative; }
+    .step { text-align: center; padding: 32px 24px; }
+    .step-num {
+      width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center;
+      font-size: 22px; font-weight: 900; color: #fff; background: var(--gradient);
+      margin: 0 auto 20px; box-shadow: 0 4px 16px rgba(79,106,255,0.3);
+    }
+    .step h3 { font-size: 18px; font-weight: 800; color: var(--primary-dark); margin-bottom: 8px; }
+    .step p { font-size: 14px; color: var(--text-500); line-height: 1.65; }
+
+    /* ── DETAIL CARDS ── */
+    .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 56px; }
+    .detail-card { padding: 28px 32px; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+    .detail-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .detail-card-head h3 { font-size: 17px; font-weight: 800; color: var(--primary-dark); }
+    .detail-card p { font-size: 14px; color: var(--text-500); line-height: 1.7; margin-bottom: 14px; }
+    .mini-chart { background: var(--bg-alt); border-radius: 10px; padding: 16px; border: 1px solid var(--border); }
+    .mini-chart-label { font-size: 11px; font-weight: 700; color: var(--text-400); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ── EXTRAS ROW ── */
+    .extras-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
+    .extra-card { padding: 24px; background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border); text-align: center; box-shadow: var(--shadow-sm); transition: all 0.2s; }
+    .extra-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .extra-card .icon { font-size: 32px; margin-bottom: 10px; }
+    .extra-card h4 { font-size: 15px; font-weight: 700; color: var(--primary-dark); margin-bottom: 4px; }
+    .extra-card p { font-size: 12px; color: var(--text-500); }
+
+    /* ── CONTACT ── */
+    .contact-cards { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+    .contact-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 28px 36px; text-align: center; min-width: 220px; box-shadow: var(--shadow-sm); }
+    .contact-card .icon { font-size: 28px; margin-bottom: 10px; }
+    .contact-card h4 { font-size: 15px; font-weight: 700; color: var(--primary-dark); }
+    .contact-card p { font-size: 13px; color: var(--text-500); margin-top: 4px; }
+
+    /* ── FOOTER ── */
+    .footer { background: var(--primary-dark); padding: 32px 48px; color: rgba(255,255,255,0.6); }
+    .footer-inner { max-width: 1320px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+    .footer-copy { font-size: 13px; }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { font-size: 13px; color: rgba(255,255,255,0.5); text-decoration: none; transition: color 0.15s; }
+    .footer-links a:hover { color: #fff; }
+
+    /* ── ANIMATIONS ── */
+    .fade-in { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .navbar { padding: 10px 16px; }
+      .nav-links { display: none; }
+      .nav-mobile { display: flex; gap: 6px; }
+      .nav-actions .btn-outline, .nav-actions .btn-solid { display: none; }
+      .nav-brand svg { width: 32px; height: 32px; }
+      .nav-brand-text { font-size: 19px; }
+
+      .hero { padding: 100px 20px 48px; }
+      .hero-inner { grid-template-columns: 1fr; text-align: center; gap: 32px; }
+      .hero p { margin-left: auto; margin-right: auto; }
+      .hero-cta { justify-content: center; }
+      .hero-visual { transform: none; }
+      .hero-stats { grid-template-columns: repeat(2, 1fr); padding: 0 20px; }
+
+      .section { padding: 64px 20px; }
+      .features-grid { grid-template-columns: 1fr; }
+      .steps-grid { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .extras-grid { grid-template-columns: repeat(2, 1fr); }
+      .contact-cards { flex-direction: column; align-items: center; }
+
+      .footer { padding: 24px 16px; }
+      .footer-inner { flex-direction: column; text-align: center; }
+      .footer-links { flex-wrap: wrap; justify-content: center; }
+    }
+    @media (max-width: 480px) {
+      .hero-stats { grid-template-columns: repeat(2, 1fr); }
+      .extras-grid { grid-template-columns: 1fr; }
     }
 
-    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 1; min-width: 0; }
-    .nav-logo-icon { width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0; }
-    .nav-logo-text { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
-    .nav-logo-text .brand { font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.3px; }
-    .nav-logo-text .tagline { font-size: 9px; font-weight: 600; color: #6B8AFF; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 1px; }
-
-    .nav-links {
-      display: flex; align-items: center; gap: 28px;
-      margin: 0 auto; padding: 0 32px;
-    }
-    .nav-links a {
-      font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.7);
-      text-decoration: none; transition: color 0.15s;
-      white-space: nowrap;
-    }
-    .nav-links a:hover { color: #4F6AFF; }
-
-    .logo-mark {
-      width: 40px; height: 40px; border-radius: 9px; overflow: hidden;
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(3, 1fr); gap: 2.5px;
-      background: rgba(79,106,255,0.15); padding: 2.5px;
-      flex-shrink: 0;
-    }
-    .logo-mark-cell { border-radius: 2px; }
-    .c-dark  { background: #1a1f36; }
-    .c-mid   { background: #4F6AFF; }
-    .c-light { background: rgba(107,138,255,0.4); }
-
-    .logo-text { display: flex; flex-direction: column; line-height: 1.1; }
-    .logo-text .brand { font-size: 20px; letter-spacing: -0.4px; line-height: 1; }
-    .logo-text .brand span:first-child { font-weight: 300; color: rgba(255,255,255,0.7); }
-    .logo-text .brand span:last-child  { font-weight: 900; color: var(--green-light); }
-    .logo-text .tagline { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; color: var(--text-muted); text-transform: uppercase; margin-top: 1px; }
-
-    /* Desktop nav actions */
-    .nav-actions-desktop { display: flex; align-items: center; gap: 12px; }
-    .nav-actions-mobile  { display: none; }
-
-    .btn-dashboard {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 10px 20px; border-radius: 10px;
-      background: #4F6AFF; color: #fff;
-      font-size: 14px; font-weight: 600; text-decoration: none;
-      border: none; cursor: pointer;
-      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
-      box-shadow: 0 4px 16px rgba(79,106,255,0.35);
-    }
-    .btn-dashboard:hover { background: #3a56e0; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(79,106,255,0.5); }
-    .btn-dashboard svg { width: 15px; height: 15px; }
-
+    /* Mobile app buttons */
     .btn-app {
       display: inline-flex; align-items: center; gap: 5px;
       padding: 7px 12px; border-radius: 8px;
-      background: rgba(79,106,255,0.15); border: 1px solid rgba(79,106,255,0.3);
-      color: #fff; font-size: 12px; font-weight: 600;
-      text-decoration: none; cursor: pointer;
-      transition: background 0.2s, transform 0.15s;
+      background: var(--primary-dark); color: #fff;
+      font-size: 12px; font-weight: 600; text-decoration: none;
+      border: 1px solid var(--border); transition: all 0.15s; cursor: pointer;
     }
-    .btn-app:hover { background: #4F6AFF; transform: translateY(-1px); }
-    .btn-app svg { width: 18px; height: 18px; }
-
-    /* ══════════════════════════════
-       HERO
-    ══════════════════════════════ */
-    .hero {
-      min-height: 100vh;
-      display: flex; align-items: center;
-      padding: 120px 24px 80px;
-      position: relative; overflow: hidden;
-    }
-
-    /* Gradient orbs */
-    .hero::before {
-      content: '';
-      position: absolute; top: -200px; right: -200px;
-      width: 700px; height: 700px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(79,106,255,0.18) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .hero::after {
-      content: '';
-      position: absolute; bottom: -150px; left: -100px;
-      width: 500px; height: 500px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(31,107,31,0.12) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    /* Grid lines background */
-    .grid-bg {
-      position: absolute; inset: 0; pointer-events: none;
-      background-image:
-        linear-gradient(rgba(79,106,255,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(79,106,255,0.04) 1px, transparent 1px);
-      background-size: 60px 60px;
-      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
-    }
-
-    .hero-inner {
-      max-width: 1440px; margin: 0 auto; width: 100%;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 48px;
-      align-items: center; position: relative; z-index: 1;
-    }
-
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 14px; border-radius: 99px;
-      background: rgba(79,106,255,0.15); border: 1px solid rgba(79,106,255,0.3);
-      font-size: 12px; font-weight: 600; color: var(--green-light);
-      letter-spacing: 0.5px; margin-bottom: 24px;
-    }
-    .hero-badge::before {
-      content: ''; width: 7px; height: 7px; border-radius: 50%;
-      background: var(--green-bright);
-      box-shadow: 0 0 8px var(--green-bright);
-      animation: pulse-dot 2s ease-in-out infinite;
-    }
-    @keyframes pulse-dot {
-      0%,100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(1.4); }
-    }
-
-    .hero h1 {
-      font-size: clamp(38px, 5.5vw, 68px);
-      font-weight: 900; line-height: 1.08;
-      letter-spacing: -2px; margin-bottom: 24px;
-    }
-    .hero h1 .accent { color: var(--green-bright); }
-    .hero h1 .dim    { color: rgba(255,255,255,0.45); font-weight: 300; }
-
-    .hero p {
-      font-size: 18px; color: var(--text-muted);
-      line-height: 1.75; margin-bottom: 40px; max-width: 540px;
-    }
-
-    .hero-cta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-
-    .btn-primary {
-      display: inline-flex; align-items: center; gap: 10px;
-      padding: 14px 28px; border-radius: 12px;
-      background: linear-gradient(135deg, var(--green-mid), var(--green-dark));
-      color: #fff; font-size: 15px; font-weight: 700;
-      text-decoration: none; border: none; cursor: pointer;
-      box-shadow: 0 8px 32px rgba(79,106,255,0.4);
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(79,106,255,0.55); }
-
-    .btn-secondary {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 14px 24px; border-radius: 12px;
-      background: transparent; border: 1px solid var(--border);
-      color: var(--text); font-size: 15px; font-weight: 500;
-      text-decoration: none; cursor: pointer;
-      transition: background 0.2s, transform 0.2s;
-    }
-    .btn-secondary:hover { background: rgba(79,106,255,0.1); transform: translateY(-2px); }
-
-    /* Hero visual */
-    .hero-visual { display: flex; justify-content: center; align-items: center; }
-
-    .qr-mockup {
-      position: relative; width: 380px; height: 420px;
-    }
-
-    /* Main QR frame */
-    .qr-frame {
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 220px; height: 220px;
-      background: var(--bg2);
-      border-radius: 24px;
-      border: 2px solid rgba(79,106,255,0.4);
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 60px rgba(79,106,255,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
-      z-index: 5;
-    }
-
-    .qr-code-svg {
-      width: 150px; height: 150px;
-      filter: drop-shadow(0 0 8px rgba(107,138,255,0.4));
-    }
-
-    /* Scanning line animation */
-    .scan-line {
-      position: absolute; left: 15px; right: 15px; height: 2px;
-      background: linear-gradient(90deg, transparent, var(--green-bright), transparent);
-      border-radius: 1px;
-      animation: scan 2.5s ease-in-out infinite;
-      box-shadow: 0 0 12px var(--green-bright);
-    }
-    @keyframes scan {
-      0%   { top: 35px; opacity: 0; }
-      10%  { opacity: 1; }
-      90%  { opacity: 1; }
-      100% { top: 185px; opacity: 0; }
-    }
-
-    /* Corner decorations */
-    .qr-corner {
-      position: absolute; width: 20px; height: 20px;
-    }
-    .qr-corner.tl { top: 14px; left: 14px; border-top: 2.5px solid var(--green-bright); border-left: 2.5px solid var(--green-bright); border-radius: 4px 0 0 0; }
-    .qr-corner.tr { top: 14px; right: 14px; border-top: 2.5px solid var(--green-bright); border-right: 2.5px solid var(--green-bright); border-radius: 0 4px 0 0; }
-    .qr-corner.bl { bottom: 14px; left: 14px; border-bottom: 2.5px solid var(--green-bright); border-left: 2.5px solid var(--green-bright); border-radius: 0 0 0 4px; }
-    .qr-corner.br { bottom: 14px; right: 14px; border-bottom: 2.5px solid var(--green-bright); border-right: 2.5px solid var(--green-bright); border-radius: 0 0 4px 0; }
-
-    /* Floating cards around QR */
-    .float-card {
-      position: absolute;
-      background: var(--surface);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px 18px;
-      font-size: 14px; font-weight: 600;
-      display: flex; align-items: center; gap: 10px;
-      color: var(--text);
-      animation: float 4s ease-in-out infinite;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    }
-
-    .float-card:nth-child(2) { top: 10px; right: 10px; animation-delay: 0s; }
-    .float-card:nth-child(3) { bottom: 30px; left: 0; animation-delay: 1.5s; }
-    .float-card:nth-child(4) { top: 80px; left: -10px; animation-delay: 0.8s; }
-    .float-card:nth-child(5) { bottom: 10px; right: 5px; animation-delay: 2.2s; }
-
-    @keyframes float {
-      0%,100% { transform: translateY(0); }
-      50% { transform: translateY(-8px); }
-    }
-
-    .float-icon {
-      width: 32px; height: 32px; border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
-    .float-icon.green  { background: rgba(79,106,255,0.25); color: var(--green-bright); }
-    .float-icon.blue   { background: rgba(59,130,246,0.2); color: #60a5fa; }
-    .float-icon.purple { background: rgba(139,92,246,0.2); color: #a78bfa; }
-    .float-icon.orange { background: rgba(249,115,22,0.2); color: #fb923c; }
-
-    .float-card .label { color: var(--text-muted); font-size: 13px; font-weight: 500; margin-top: 2px; }
-    .float-card .value { font-size: 18px; font-weight: 800; }
-
-    /* Orbit ring */
-    .orbit-ring {
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 340px; height: 340px;
-      border-radius: 50%;
-      border: 1px dashed rgba(79,106,255,0.18);
-      animation: orbit-spin 20s linear infinite;
-    }
-    @keyframes orbit-spin { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
-
-    .orbit-dot {
-      position: absolute; top: -4px; left: 50%;
-      transform: translateX(-50%);
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--green-bright);
-      box-shadow: 0 0 10px var(--green-bright);
-    }
-
-    /* ══════════════════════════════
-       STATS
-    ══════════════════════════════ */
-    .stats {
-      padding: 60px 40px;
-      background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .stats-inner {
-      max-width: 1440px; margin: 0 auto;
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px;
-    }
-
-    .stat-item { text-align: center; }
-    .stat-num {
-      font-size: 48px; font-weight: 900; line-height: 1;
-      background: linear-gradient(135deg, var(--green-bright), var(--green-light));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text; letter-spacing: -2px;
-    }
-    .stat-label { font-size: 14px; color: var(--text-muted); margin-top: 8px; font-weight: 500; }
-
-    /* ══════════════════════════════
-       FEATURES
-    ══════════════════════════════ */
-    section { padding: 100px 24px; }
-
-    .section-header { text-align: center; margin-bottom: 64px; }
-    .section-tag {
-      display: inline-block; padding: 5px 14px; border-radius: 99px;
-      background: rgba(79,106,255,0.12); border: 1px solid rgba(79,106,255,0.25);
-      font-size: 12px; font-weight: 600; color: var(--green-light);
-      letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 16px;
-    }
-
-    .section-header h2 {
-      font-size: clamp(28px, 4vw, 48px); font-weight: 800;
-      letter-spacing: -1.5px; margin-bottom: 16px; line-height: 1.1;
-    }
-    .section-header h2 .accent { color: var(--green-bright); }
-
-    .section-header p {
-      font-size: 17px; color: var(--text-muted); max-width: 560px; margin: 0 auto;
-    }
-
-    .container { max-width: 1440px; margin: 0 auto; }
-
-    /* Feature grid */
-    .features-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
-    }
-
-    .feature-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px; padding: 32px;
-      transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
-      backdrop-filter: blur(10px);
-      position: relative; overflow: hidden;
-    }
-    .feature-card::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(107,138,255,0.4), transparent);
-      opacity: 0; transition: opacity 0.25s;
-    }
-    .feature-card:hover { transform: translateY(-4px); border-color: rgba(79,106,255,0.5); box-shadow: 0 16px 48px rgba(0,0,0,0.5); }
-    .feature-card:hover::before { opacity: 1; }
-
-    .feature-icon {
-      width: 52px; height: 52px; border-radius: 14px; margin-bottom: 20px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 24px;
-    }
-    .fi-green  { background: rgba(79,106,255,0.2); }
-    .fi-blue   { background: rgba(59,130,246,0.15); }
-    .fi-purple { background: rgba(139,92,246,0.15); }
-    .fi-orange { background: rgba(249,115,22,0.15); }
-    .fi-pink   { background: rgba(236,72,153,0.15); }
-    .fi-teal   { background: rgba(20,184,166,0.15); }
-
-    .feature-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.3px; }
-    .feature-card p  { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
-
-    /* ══════════════════════════════
-       HOW IT WORKS
-    ══════════════════════════════ */
-    .how-it-works { background: var(--bg2); }
-
-    .steps-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px;
-      position: relative;
-    }
-    .steps-grid::before {
-      content: '';
-      position: absolute; top: 36px; left: calc(16.66% + 20px); right: calc(16.66% + 20px);
-      height: 2px;
-      background: linear-gradient(90deg, var(--green-mid), transparent 50%, var(--green-mid));
-      border-top: 2px dashed rgba(79,106,255,0.3);
-    }
-
-    .step { text-align: center; position: relative; }
-
-    .step-num {
-      width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 24px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 24px; font-weight: 900;
-      background: linear-gradient(135deg, var(--green-mid), var(--green-dark));
-      color: #fff;
-      box-shadow: 0 8px 24px rgba(79,106,255,0.4);
-      position: relative; z-index: 1;
-    }
-
-    .step h3 { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
-    .step p   { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
-
-    /* ══════════════════════════════
-       ROLE CARDS
-    ══════════════════════════════ */
-    .roles-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
-    }
-
-    .role-card {
-      border-radius: 20px; padding: 36px 30px; text-align: center;
-      border: 1px solid var(--border); position: relative; overflow: hidden;
-      transition: transform 0.25s, box-shadow 0.25s;
-    }
-    .role-card:hover { transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-
-    .role-card.super { background: linear-gradient(145deg, rgba(31,107,31,0.3), rgba(6,14,6,0.9)); }
-    .role-card.admin { background: linear-gradient(145deg, rgba(59,130,246,0.15), rgba(6,14,6,0.9)); }
-    .role-card.user  { background: linear-gradient(145deg, rgba(139,92,246,0.15), rgba(6,14,6,0.9)); }
-
-    .role-emoji { font-size: 40px; margin-bottom: 16px; }
-    .role-card h3 { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
-    .role-card .role-badge {
-      display: inline-block; padding: 3px 10px; border-radius: 99px;
-      font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
-      margin-bottom: 16px;
-    }
-    .super .role-badge { background: rgba(79,106,255,0.2); color: var(--green-light); border: 1px solid rgba(79,106,255,0.3); }
-    .admin .role-badge { background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); }
-    .user  .role-badge { background: rgba(139,92,246,0.2); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.3); }
-
-    .role-card p { font-size: 14px; color: var(--text-muted); line-height: 1.65; }
-
-    /* ══════════════════════════════
-       APP PROMO / CTA
-    ══════════════════════════════ */
-    .app-promo {
-      background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(31,107,31,0.15) 0%, transparent 70%),
-                  var(--bg);
-      text-align: center;
-    }
-
-    .app-promo h2 {
-      font-size: clamp(28px, 4vw, 44px); font-weight: 800;
-      letter-spacing: -1.5px; margin-bottom: 16px;
-    }
-    .app-promo p { font-size: 17px; color: var(--text-muted); margin-bottom: 40px; }
-
-    .app-buttons { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
-
-    .app-btn {
-      display: inline-flex; align-items: center; gap: 12px;
-      padding: 14px 24px; border-radius: 14px;
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-      color: var(--white); text-decoration: none;
-      transition: background 0.2s, transform 0.2s, border-color 0.2s;
-    }
-    .app-btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); border-color: rgba(255,255,255,0.2); }
-    .app-btn svg { width: 28px; height: 28px; }
-    .app-btn .btn-text { text-align: left; }
-    .app-btn .btn-text small { font-size: 11px; color: rgba(255,255,255,0.5); display: block; }
-    .app-btn .btn-text strong { font-size: 16px; font-weight: 700; }
-
-    /* ══════════════════════════════
-       FOOTER
-    ══════════════════════════════ */
-    footer {
-      padding: 48px 40px;
-      border-top: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-      flex-wrap: wrap; gap: 20px;
-    }
-
-    .footer-brand { display: flex; align-items: center; gap: 10px; }
-    .footer-copy { font-size: 13px; color: var(--text-muted); }
-    .footer-links { display: flex; gap: 28px; margin-left: auto; }
-    .footer-links a { font-size: 15px; color: var(--text-muted); text-decoration: none; transition: color 0.2s; white-space: nowrap; }
-    .footer-links a:hover { color: var(--green-light); }
-
-    /* ══════════════════════════════
-       RESPONSIVE
-    ══════════════════════════════ */
-    @media (max-width: 900px) {
-      .desktop-only { display: none !important; }
-      .nav-links { display: none !important; }
-      nav { padding: 8px 12px; }
-      .nav-logo-icon { width: 32px; height: 32px; }
-      .nav-logo-text .brand { font-size: 17px; }
-      .nav-logo-text .tagline { font-size: 8px; }
-
-      .nav-actions-desktop { display: none; }
-      .nav-actions-mobile  { display: flex; gap: 6px; flex-shrink: 0; }
-
-      .hero { padding: 100px 20px 60px; }
-      .hero-inner {
-        grid-template-columns: 1fr; gap: 48px; text-align: center;
-      }
-      .hero p { margin-left: auto; margin-right: auto; }
-      .hero-cta { justify-content: center; }
-
-      .hero-visual { display: none; }
-
-      .stats { padding: 40px 20px; }
-      .stats-inner { grid-template-columns: repeat(2, 1fr); gap: 24px; }
-
-      section { padding: 64px 20px; }
-
-      .features-grid { grid-template-columns: 1fr; }
-      .steps-grid { grid-template-columns: 1fr; }
-      .how-detail-grid { grid-template-columns: 1fr !important; }
-      .how-extra-grid { grid-template-columns: repeat(2, 1fr) !important; }
-      .steps-grid::before { display: none; }
-      .roles-grid { grid-template-columns: 1fr; }
-
-      #contact { padding: 48px 20px; }
-      footer { padding: 24px 16px !important; }
-      footer > div { flex-direction: column; align-items: center; text-align: center; }
-      .footer-links { flex-wrap: wrap; justify-content: center; }
-    }
-
-    @media (max-width: 480px) {
-      .stats-inner { grid-template-columns: repeat(2, 1fr); }
-      .stat-num { font-size: 36px; }
-      .how-extra-grid { grid-template-columns: 1fr !important; }
-    }
-
-    /* ── Fade-in animation ── */
-    .fade-in {
-      opacity: 0; transform: translateY(24px);
-      transition: opacity 0.65s ease, transform 0.65s ease;
-    }
-    .fade-in.visible { opacity: 1; transform: translateY(0); }
+    .btn-app:hover { background: var(--primary); }
+    .btn-app svg { width: 16px; height: 16px; }
   </style>
 </head>
 <body>
 
   <!-- ══ NAVBAR ══ -->
-  <nav id="navbar">
-    <a href="/landing.html" class="nav-logo" id="nav-logo-link">
-      <svg class="nav-logo-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <nav class="navbar" id="navbar">
+    <a href="/landing.html" class="nav-brand">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
         <rect width="64" height="64" rx="14" fill="#1a1f36"/>
         <path d="M32 16c-8.8 0-16 7.2-16 16s7.2 16 16 16c4 0 7.6-1.4 10.4-3.8l-2.8-2.8C37.6 43 34.9 44 32 44c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.3 0 6.3 1.3 8.5 3.5L38 26l12-2-2 12-3.2-3.2C41.6 36.4 37.1 38.8 32 39c-3.9 0-7-3.1-7-7s3.1-7 7-7c1.9 0 3.7.8 4.9 2.1" fill="none" stroke="#4F6AFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         <circle cx="32" cy="32" r="3" fill="#6B8AFF"/>
       </svg>
-      <div class="nav-logo-text">
-        <div class="brand" id="nav-app-name">Syncora</div>
-        <div class="tagline">QR/NFC Tabanlı Görev Yönetim Sistemi</div>
-      </div>
+      <span class="nav-brand-text" id="nav-app-name">SYNCORA</span>
     </a>
 
-    <!-- Merkez linkler (Desktop) -->
-    <div class="nav-links desktop-only">
+    <div class="nav-links">
       <a href="#features">Özellikler</a>
       <a href="#how">Nasıl Çalışır</a>
-      <a href="#roles">Kurumsal</a>
       <a href="#contact">İletişim</a>
     </div>
 
-    <!-- Desktop: Dashboard butonu -->
-    <div class="nav-actions-desktop">
-      <a href="/login" class="btn-dashboard">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
-          <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
-        </svg>
-        Dashboard Girişi
-      </a>
+    <div class="nav-actions">
+      <a href="/login" class="btn-solid">Dashboard Girişi</a>
     </div>
 
-    <!-- Mobil: Uygulama indirme butonları -->
-    <div class="nav-actions-mobile">
-      <a href="#" class="btn-app" title="App Store">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.78 22.05 6.8 20.68 5.96 19.47C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
-        </svg>
+    <!-- Mobil -->
+    <div class="nav-mobile">
+      <a href="#" class="btn-app" title="iOS">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.78 22.05 6.8 20.68 5.96 19.47C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/></svg>
         iOS
       </a>
-      <a href="#" class="btn-app" title="Google Play">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M3.18 23.76C3.49 24 3.92 24.05 4.34 23.82L14.55 18L11.19 14.63L3.18 23.76ZM20.94 10.19L18.29 8.67L14.58 12.25L18.3 15.97L20.96 14.42C21.76 13.97 22.27 13.2 22.27 12.38C22.27 11.56 21.75 10.74 20.94 10.19ZM2.06 1.22C2.02 1.36 2 1.52 2 1.69V22.31C2 22.48 2.02 22.64 2.06 22.78L10.89 13.94L2.06 1.22ZM14.55 6L4.34 0.18C3.92-0.05 3.49 0 3.18 0.24L11.19 9.37L14.55 6Z"/>
-        </svg>
+      <a href="#" class="btn-app" title="Android">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76C3.49 24 3.92 24.05 4.34 23.82L14.55 18L11.19 14.63L3.18 23.76ZM20.94 10.19L18.29 8.67L14.58 12.25L18.3 15.97L20.96 14.42C21.76 13.97 22.27 13.2 22.27 12.38C22.27 11.56 21.75 10.74 20.94 10.19ZM2.06 1.22C2.02 1.36 2 1.52 2 1.69V22.31C2 22.48 2.02 22.64 2.06 22.78L10.89 13.94L2.06 1.22ZM14.55 6L4.34 0.18C3.92-0.05 3.49 0 3.18 0.24L11.19 9.37L14.55 6Z"/></svg>
         Android
       </a>
     </div>
@@ -622,561 +254,233 @@
 
   <!-- ══ HERO ══ -->
   <section class="hero">
-    <div class="grid-bg"></div>
     <div class="hero-inner">
-      <div class="hero-content">
-        <div class="hero-badge">Sürüm 2.0 · Şimdi Kullanılabilir</div>
-        <h1>
-          <span class="dim">QR Kodla</span><br>
-          <span class="accent">Akıllı Operasyon</span><br>
-          Yönetimi
-        </h1>
-        <p>
-          Saha operasyonlarınızı QR & NFC teknolojisiyle dijitalleştirin.
-          Görevleri, kontrol listelerini ve personeli tek platformdan yönetin.
-          Gerçek zamanlı raporlarla sahada tam kontrol.
-        </p>
+      <div>
+        <h1>QR/NFC ile<br><span>Akıllı Operasyon Yönetimi</span></h1>
+        <p>Saha operasyonlarınızı dijitalleştirin. Görevleri, kontrol listelerini ve personeli tek platformdan yönetin. Gerçek zamanlı raporlarla sahada tam kontrol.</p>
         <div class="hero-cta">
-          <a href="#features" class="btn-primary">
-            Özellikleri Keşfet →
-          </a>
+          <a href="#features" class="btn-solid" style="padding:14px 32px;font-size:16px;">Özellikleri Keşfet →</a>
+          <a href="#contact" class="btn-outline" style="padding:13px 28px;font-size:16px;">İletişim</a>
         </div>
       </div>
-
       <div class="hero-visual">
-        <div class="qr-mockup">
-          <!-- Orbit -->
-          <div class="orbit-ring"><div class="orbit-dot"></div></div>
-
-          <!-- Floating cards -->
-          <div class="float-card">
-            <div class="float-icon green">✅</div>
-            <div>
-              <div class="value">48</div>
-              <div class="label">Görev Tamamlandı</div>
+        <!-- Placeholder dashboard mockup -->
+        <div style="background:var(--bg-alt);border-radius:8px;padding:20px;min-height:320px;display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;gap:12px;">
+            <div style="flex:1;background:var(--primary);border-radius:8px;padding:16px;color:#fff;">
+              <div style="font-size:11px;opacity:0.8;">Görevler</div>
+              <div style="font-size:28px;font-weight:900;">248</div>
+            </div>
+            <div style="flex:1;background:#22c55e;border-radius:8px;padding:16px;color:#fff;">
+              <div style="font-size:11px;opacity:0.8;">Tamamlanan</div>
+              <div style="font-size:28px;font-weight:900;">%94</div>
             </div>
           </div>
-          <div class="float-card">
-            <div class="float-icon blue">📊</div>
-            <div>
-              <div class="value">%94</div>
-              <div class="label">Tamamlanma Oranı</div>
+          <div style="display:flex;gap:12px;">
+            <div style="flex:1;background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px;">
+              <div style="font-size:11px;color:var(--text-400);">Personel</div>
+              <div style="font-size:24px;font-weight:900;color:var(--primary-dark);">32</div>
+            </div>
+            <div style="flex:1;background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px;">
+              <div style="font-size:11px;color:var(--text-400);">Lokasyon</div>
+              <div style="font-size:24px;font-weight:900;color:var(--primary-dark);">156</div>
             </div>
           </div>
-          <div class="float-card">
-            <div class="float-icon purple">👥</div>
-            <div>
-              <div class="value">12</div>
-              <div class="label">Aktif Personel</div>
+          <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;flex:1;">
+            <div style="font-size:11px;color:var(--text-400);margin-bottom:8px;">Haftalık Performans</div>
+            <div style="display:flex;gap:4px;height:48px;align-items:end;">
+              <div style="flex:1;background:var(--primary);border-radius:3px;height:65%;opacity:0.7;"></div>
+              <div style="flex:1;background:var(--primary);border-radius:3px;height:80%;opacity:0.8;"></div>
+              <div style="flex:1;background:var(--primary);border-radius:3px;height:90%;"></div>
+              <div style="flex:1;background:var(--primary);border-radius:3px;height:72%;opacity:0.8;"></div>
+              <div style="flex:1;background:#22c55e;border-radius:3px;height:95%;"></div>
+              <div style="flex:1;background:var(--primary);border-radius:3px;height:45%;opacity:0.6;"></div>
+              <div style="flex:1;background:var(--primary);border-radius:3px;height:20%;opacity:0.4;"></div>
             </div>
-          </div>
-          <div class="float-card">
-            <div class="float-icon orange">⚡</div>
-            <div>
-              <div class="value">3 dk</div>
-              <div class="label">Ort. Yanıt Süresi</div>
-            </div>
-          </div>
-
-          <!-- Main QR Frame -->
-          <div class="qr-frame">
-            <div class="scan-line"></div>
-            <div class="qr-corner tl"></div>
-            <div class="qr-corner tr"></div>
-            <div class="qr-corner bl"></div>
-            <div class="qr-corner br"></div>
-            <!-- SVG QR Code -->
-            <svg class="qr-code-svg" viewBox="0 0 150 150" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <!-- Finder patterns -->
-              <rect x="8" y="8" width="42" height="42" rx="4" fill="rgba(107,138,255,0.15)" stroke="#6B8AFF" stroke-width="2"/>
-              <rect x="15" y="15" width="28" height="28" rx="2" fill="rgba(107,138,255,0.15)"/>
-              <rect x="21" y="21" width="16" height="16" rx="1.5" fill="#6B8AFF"/>
-
-              <rect x="100" y="8" width="42" height="42" rx="4" fill="rgba(107,138,255,0.15)" stroke="#6B8AFF" stroke-width="2"/>
-              <rect x="107" y="15" width="28" height="28" rx="2" fill="rgba(107,138,255,0.15)"/>
-              <rect x="113" y="21" width="16" height="16" rx="1.5" fill="#6B8AFF"/>
-
-              <rect x="8" y="100" width="42" height="42" rx="4" fill="rgba(107,138,255,0.15)" stroke="#6B8AFF" stroke-width="2"/>
-              <rect x="15" y="107" width="28" height="28" rx="2" fill="rgba(107,138,255,0.15)"/>
-              <rect x="21" y="113" width="16" height="16" rx="1.5" fill="#6B8AFF"/>
-
-              <!-- Data modules (randomized) -->
-              <g fill="rgba(107,138,255,0.7)">
-                <rect x="58" y="8"  width="8" height="8" rx="1"/>
-                <rect x="70" y="8"  width="8" height="8" rx="1"/>
-                <rect x="82" y="8"  width="8" height="8" rx="1"/>
-                <rect x="58" y="20" width="8" height="8" rx="1"/>
-                <rect x="82" y="20" width="8" height="8" rx="1"/>
-                <rect x="70" y="32" width="8" height="8" rx="1"/>
-                <rect x="58" y="44" width="8" height="8" rx="1"/>
-                <rect x="82" y="44" width="8" height="8" rx="1"/>
-
-                <rect x="8"  y="58" width="8" height="8" rx="1"/>
-                <rect x="20" y="58" width="8" height="8" rx="1"/>
-                <rect x="44" y="58" width="8" height="8" rx="1"/>
-                <rect x="8"  y="70" width="8" height="8" rx="1"/>
-                <rect x="32" y="70" width="8" height="8" rx="1"/>
-                <rect x="20" y="82" width="8" height="8" rx="1"/>
-                <rect x="44" y="82" width="8" height="8" rx="1"/>
-
-                <rect x="58" y="58" width="8" height="8" rx="1"/>
-                <rect x="70" y="58" width="8" height="8" rx="1"/>
-                <rect x="82" y="70" width="8" height="8" rx="1"/>
-                <rect x="58" y="82" width="8" height="8" rx="1"/>
-                <rect x="70" y="82" width="8" height="8" rx="1"/>
-
-                <rect x="100" y="58" width="8" height="8" rx="1"/>
-                <rect x="124" y="58" width="8" height="8" rx="1"/>
-                <rect x="112" y="70" width="8" height="8" rx="1"/>
-                <rect x="100" y="82" width="8" height="8" rx="1"/>
-                <rect x="124" y="82" width="8" height="8" rx="1"/>
-                <rect x="136" y="70" width="8" height="8" rx="1"/>
-
-                <rect x="58" y="100" width="8" height="8" rx="1"/>
-                <rect x="82" y="100" width="8" height="8" rx="1"/>
-                <rect x="70" y="112" width="8" height="8" rx="1"/>
-                <rect x="58" y="124" width="8" height="8" rx="1"/>
-                <rect x="82" y="136" width="8" height="8" rx="1"/>
-
-                <rect x="100" y="100" width="8" height="8" rx="1"/>
-                <rect x="124" y="112" width="8" height="8" rx="1"/>
-                <rect x="112" y="124" width="8" height="8" rx="1"/>
-                <rect x="100" y="136" width="8" height="8" rx="1"/>
-                <rect x="136" y="100" width="8" height="8" rx="1"/>
-              </g>
-
-              <!-- Center logo mark -->
-              <rect x="60" y="60" width="30" height="30" rx="6" fill="#0c190c" stroke="rgba(107,138,255,0.4)" stroke-width="1.5"/>
-              <g>
-                <rect x="63" y="63" width="7" height="7" rx="1" fill="#1a1f36"/>
-                <rect x="72" y="63" width="7" height="7" rx="1" fill="#4F6AFF"/>
-                <rect x="81" y="63" width="7" height="7" rx="1" fill="rgba(107,138,255,0.4)"/>
-                <rect x="63" y="72" width="7" height="7" rx="1" fill="rgba(107,138,255,0.4)"/>
-                <rect x="72" y="72" width="7" height="7" rx="1" fill="#1a1f36"/>
-                <rect x="81" y="72" width="7" height="7" rx="1" fill="#4F6AFF"/>
-                <rect x="63" y="81" width="7" height="7" rx="1" fill="#4F6AFF"/>
-                <rect x="72" y="81" width="7" height="7" rx="1" fill="rgba(107,138,255,0.4)"/>
-                <rect x="81" y="81" width="7" height="7" rx="1" fill="#1a1f36"/>
-              </g>
-            </svg>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ══ STATS ══ -->
-  <div class="stats">
-    <div class="stats-inner">
-      <div class="stat-item fade-in">
-        <div class="stat-num">500+</div>
-        <div class="stat-label">Aktif Lokasyon</div>
-      </div>
-      <div class="stat-item fade-in">
-        <div class="stat-num">10K+</div>
-        <div class="stat-label">Tamamlanan Görev</div>
-      </div>
-      <div class="stat-item fade-in">
-        <div class="stat-num">%99</div>
-        <div class="stat-label">Servis Sürekliliği</div>
-      </div>
-      <div class="stat-item fade-in">
-        <div class="stat-num">50+</div>
-        <div class="stat-label">Aktif Firma</div>
-      </div>
-    </div>
+  <!-- Stats bar -->
+  <div class="hero-stats">
+    <div class="hero-stat fade-in"><div class="num">500+</div><div class="label">Lokasyon</div></div>
+    <div class="hero-stat fade-in"><div class="num">50K+</div><div class="label">Görev/Ay</div></div>
+    <div class="hero-stat fade-in"><div class="num">%98</div><div class="label">Uptime</div></div>
+    <div class="hero-stat fade-in"><div class="num">7/24</div><div class="label">Destek</div></div>
   </div>
 
   <!-- ══ FEATURES ══ -->
-  <section id="features">
+  <section class="section" id="features">
     <div class="container">
       <div class="section-header fade-in">
         <div class="section-tag">Özellikler</div>
-        <h2>Operasyonunuzu <span class="accent">Güçlendiren</span> Araçlar</h2>
-        <p>Saha ekiplerinden yöneticilere kadar herkes için tasarlanmış kapsamlı operasyon yönetim platformu.</p>
+        <h2>Tüm Operasyonunuzu <span>Tek Platformda</span> Yönetin</h2>
+        <p>QR ve NFC teknolojisi ile saha yönetimini dijitalleştiren kapsamlı çözüm.</p>
       </div>
       <div class="features-grid">
         <div class="feature-card fade-in">
-          <div class="feature-icon fi-green">📱</div>
-          <h3>QR & NFC Görev Takibi</h3>
-          <p>Lokasyonlara yerleştirilen QR kod veya NFC etiketlerini okuyarak görevleri anında başlatın, tamamlayın ve kayıt altına alın.</p>
+          <div class="feature-icon fi-blue">⚡</div>
+          <h3>Frekansiyel Görev Motoru</h3>
+          <p>Vardiya bazlı otomatik görev üretimi. Günlük frekans, aktif saatler ve vardiya tanımları ile tam kontrol.</p>
         </div>
         <div class="feature-card fade-in">
-          <div class="feature-icon fi-blue">✅</div>
-          <h3>Dinamik Çeklist Sistemi</h3>
-          <p>Şablonlardan oluşturulan kontrol listeleriyle saha personelinin adım adım takip edebileceği görev akışları oluşturun.</p>
+          <div class="feature-icon fi-purple">📋</div>
+          <h3>Çeklist & Kontrol Listesi</h3>
+          <p>Lokasyona bağlı özelleştirilebilir çeklist şablonları. Fotoğraf, açıklama ve zorunlu madde desteği.</p>
         </div>
         <div class="feature-card fade-in">
-          <div class="feature-icon fi-purple">📊</div>
-          <h3>Gerçek Zamanlı Raporlama</h3>
-          <p>Grafiksel raporlar, Excel export ve özelleştirilebilir rapor şablonlarıyla operasyonel kararlarınızı veriye dayandırın.</p>
+          <div class="feature-icon fi-green">⏱️</div>
+          <h3>Süre Takip & Analiz</h3>
+          <p>Min/hedef/max süre tanımları. Gerçek zamanlı süre takibi, gecikme raporları ve performans analizi.</p>
         </div>
         <div class="feature-card fade-in">
-          <div class="feature-icon fi-orange">🏢</div>
-          <h3>Çoklu Firma & Proje</h3>
-          <p>Farklı firmalar ve projeler için ayrı yönetim alanları oluşturun. Her firmanın kendi hiyerarşisi ve yetkili kullanıcıları olsun.</p>
+          <div class="feature-icon fi-orange">📊</div>
+          <h3>Canlı Görev Akışı</h3>
+          <p>Tüm görev tamamlamalarını anlık izleyin. Durum filtreleri, personel bazlı takip ve Excel/PDF dışa aktarım.</p>
         </div>
         <div class="feature-card fade-in">
-          <div class="feature-icon fi-pink">⏰</div>
-          <h3>Personel Mesai Takibi</h3>
-          <p>Personelin giriş/çıkış saatlerini, mesai sürelerini ve lokasyon bazlı çalışma raporlarını otomatik olarak kayıt altına alın.</p>
+          <div class="feature-icon fi-red">👷</div>
+          <h3>Personel Takibi</h3>
+          <p>QR/NFC ile iş başı ve bitimi. Mesai saatleri, online durum ve lokasyon bazlı personel yönetimi.</p>
         </div>
         <div class="feature-card fade-in">
-          <div class="feature-icon fi-teal">🔔</div>
-          <h3>Anlık Bildirimler</h3>
-          <p>Geciken görevler, tamamlanan kontrol listeleri ve önemli olaylar için sistem bildirimleri ve push notification desteği.</p>
+          <div class="feature-icon fi-cyan">📱</div>
+          <h3>Mobil Uygulama</h3>
+          <p>iOS ve Android desteği. QR/NFC tarama, offline çalışma, push bildirimler ve anlık görev yönetimi.</p>
         </div>
       </div>
     </div>
   </section>
 
   <!-- ══ HOW IT WORKS ══ -->
-  <section class="how-it-works" id="how">
+  <section class="section section-alt" id="how">
     <div class="container">
       <div class="section-header fade-in">
         <div class="section-tag">Nasıl Çalışır</div>
-        <h2>Uçtan Uca <span class="accent">Operasyon Yönetimi</span></h2>
-        <p>QR/NFC teknolojisi ile saha operasyonlarınızı dijitalleştirin, anlık takip edin, raporlayın.</p>
+        <h2>3 Adımda <span>Operasyonunuzu Dijitalleştirin</span></h2>
+        <p>Karmaşık kurulum yok. Dakikalar içinde sahanızı yönetmeye başlayın.</p>
       </div>
 
-      <!-- Adımlar -->
       <div class="steps-grid">
         <div class="step fade-in">
           <div class="step-num">1</div>
-          <h3>Lokasyon & QR/NFC Tanımla</h3>
-          <p>Hiyerarşik lokasyon yapısı oluşturun. Her lokasyona benzersiz QR kod veya NFC etiketi atayın. Sistem otomatik üretir.</p>
+          <h3>QR/NFC Tanımla</h3>
+          <p>Hiyerarşik lokasyon yapısı oluşturun. Her lokasyona benzersiz QR veya NFC etiketi atayın.</p>
         </div>
         <div class="step fade-in">
           <div class="step-num">2</div>
           <h3>Görev Ata & Tara</h3>
-          <p>Frekansiyel veya spesifik görevler tanımlayın. Personel mobil uygulama ile QR/NFC okutarak görevi başlatır ve çeklistleri doldurur.</p>
+          <p>Frekansiyel veya spesifik görevler tanımlayın. Personel mobil uygulama ile okutarak görevi başlatsın.</p>
         </div>
         <div class="step fade-in">
           <div class="step-num">3</div>
           <h3>Takip Et & Raporla</h3>
-          <p>Canlı görev akışını izleyin, süre analizleri yapın, grafiksel raporlarla performansı ölçün ve dışa aktarın.</p>
+          <p>Canlı görev akışını izleyin, süre analizleri yapın, grafiksel raporlarla performansı ölçün.</p>
         </div>
       </div>
 
-      <!-- Detaylı Özellik Kartları -->
-      <div style="margin-top:64px;display:grid;grid-template-columns:repeat(2,1fr);gap:24px;" class="fade-in how-detail-grid">
-
-        <!-- Frekansiyel Görev Sistemi -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 32px;">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-            <div style="width:40px;height:40px;border-radius:10px;background:rgba(79,106,255,0.2);display:grid;place-items:center;font-size:20px;">⚡</div>
-            <h3 style="font-size:18px;font-weight:800;color:var(--white);margin:0;">Frekansiyel Görev Motoru</h3>
+      <!-- Detail cards -->
+      <div class="detail-grid">
+        <div class="detail-card fade-in">
+          <div class="detail-card-head">
+            <div class="feature-icon fi-blue" style="width:40px;height:40px;font-size:20px;">⚡</div>
+            <h3>Vardiya Bazlı Görev Üretimi</h3>
           </div>
-          <p style="font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:16px;">
-            Vardiya bazlı otomatik görev üretimi. Her gün belirlenen saatlerde, belirlenen lokasyonlara görevler otomatik atanır.
-            Günlük frekans sayısı, vardiya saatleri ve aktif günler tamamen yapılandırılabilir.
-          </p>
-          <!-- Mini grafik: Vardiya timeline -->
-          <div style="background:rgba(6,8,26,0.6);border-radius:10px;padding:16px;border:1px solid rgba(79,106,255,0.12);">
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Vardiya Zaman Çizelgesi</div>
+          <p>Her gün belirlenen saatlerde, belirlenen lokasyonlara görevler otomatik atanır. Günlük frekans ve aktif günler yapılandırılabilir.</p>
+          <div class="mini-chart">
+            <div class="mini-chart-label">Vardiya Zaman Çizelgesi</div>
             <div style="display:flex;gap:4px;height:32px;align-items:end;">
-              <div style="flex:1;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.3));border-radius:4px 4px 0 0;height:100%;position:relative;">
-                <span style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text-muted);white-space:nowrap;">08:00</span>
-              </div>
-              <div style="flex:1;background:linear-gradient(to top,#6B8AFF,rgba(107,138,255,0.3));border-radius:4px 4px 0 0;height:75%;">
-                <span style="position:absolute;display:none;">16:00</span>
-              </div>
-              <div style="flex:1;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.2));border-radius:4px 4px 0 0;height:55%;"></div>
+              <div style="flex:1;background:var(--gradient);border-radius:4px 4px 0 0;height:100%;"></div>
+              <div style="flex:1;background:var(--primary-light);border-radius:4px 4px 0 0;height:75%;opacity:0.7;"></div>
+              <div style="flex:1;background:var(--primary);border-radius:4px 4px 0 0;height:55%;opacity:0.5;"></div>
             </div>
-            <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--text-muted);">
-              <span>1. Vardiya</span><span>2. Vardiya</span><span>3. Vardiya</span>
-            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--text-400);"><span>1. Vardiya</span><span>2. Vardiya</span><span>3. Vardiya</span></div>
           </div>
         </div>
 
-        <!-- Süre Takip Sistemi -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 32px;">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-            <div style="width:40px;height:40px;border-radius:10px;background:rgba(79,106,255,0.2);display:grid;place-items:center;font-size:20px;">⏱️</div>
-            <h3 style="font-size:18px;font-weight:800;color:var(--white);margin:0;">Süre Takip & Analiz</h3>
+        <div class="detail-card fade-in">
+          <div class="detail-card-head">
+            <div class="feature-icon fi-green" style="width:40px;height:40px;font-size:20px;">⏱️</div>
+            <h3>Görev Süre Dağılımı</h3>
           </div>
-          <p style="font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:16px;">
-            Her görev için minimum, hedef ve maksimum süre tanımlayın. Sistem gerçek zamanlı süre takibi yapar.
-            Hedef altında tamamlanan, hedefi aşan ve süre limiti dolmuş görevler ayrı raporlanır.
-          </p>
-          <!-- Mini grafik: Süre dağılımı -->
-          <div style="background:rgba(6,8,26,0.6);border-radius:10px;padding:16px;border:1px solid rgba(79,106,255,0.12);">
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Görev Süre Dağılımı</div>
-            <div style="display:flex;gap:12px;align-items:center;">
-              <div style="flex:1;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                  <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></div>
-                  <span style="font-size:11px;color:var(--text-muted);">Hedefte</span>
-                  <span style="font-size:13px;font-weight:800;color:#22c55e;margin-left:auto;">%72</span>
-                </div>
-                <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
-                  <div style="width:72%;height:100%;background:#22c55e;border-radius:3px;"></div>
-                </div>
-              </div>
-              <div style="flex:1;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                  <div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;"></div>
-                  <span style="font-size:11px;color:var(--text-muted);">Gecikmeli</span>
-                  <span style="font-size:13px;font-weight:800;color:#f59e0b;margin-left:auto;">%21</span>
-                </div>
-                <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
-                  <div style="width:21%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-                </div>
-              </div>
-              <div style="flex:1;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                  <div style="width:8px;height:8px;border-radius:50%;background:#ef4444;"></div>
-                  <span style="font-size:11px;color:var(--text-muted);">Aşım</span>
-                  <span style="font-size:13px;font-weight:800;color:#ef4444;margin-left:auto;">%7</span>
-                </div>
-                <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
-                  <div style="width:7%;height:100%;background:#ef4444;border-radius:3px;"></div>
-                </div>
-              </div>
+          <p>Her görev için minimum, hedef ve maksimum süre tanımlayın. Hedef altında, hedefi aşan ve süre limiti dolmuş görevler ayrı raporlanır.</p>
+          <div class="mini-chart">
+            <div class="mini-chart-label">Süre Analizi</div>
+            <div style="display:flex;gap:12px;">
+              <div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></div><span style="font-size:11px;color:var(--text-500);">Hedefte</span><span style="font-size:13px;font-weight:800;color:#22c55e;margin-left:auto;">%72</span></div><div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;"><div style="width:72%;height:100%;background:#22c55e;border-radius:3px;"></div></div></div>
+              <div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;"></div><span style="font-size:11px;color:var(--text-500);">Gecikmeli</span><span style="font-size:13px;font-weight:800;color:#f59e0b;margin-left:auto;">%21</span></div><div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;"><div style="width:21%;height:100%;background:#f59e0b;border-radius:3px;"></div></div></div>
+              <div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:8px;height:8px;border-radius:50%;background:#ef4444;"></div><span style="font-size:11px;color:var(--text-500);">Aşım</span><span style="font-size:13px;font-weight:800;color:#ef4444;margin-left:auto;">%7</span></div><div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;"><div style="width:7%;height:100%;background:#ef4444;border-radius:3px;"></div></div></div>
             </div>
           </div>
-        </div>
-
-        <!-- Checklist Sistemi -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 32px;">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-            <div style="width:40px;height:40px;border-radius:10px;background:rgba(79,106,255,0.2);display:grid;place-items:center;font-size:20px;">📋</div>
-            <h3 style="font-size:18px;font-weight:800;color:var(--white);margin:0;">Çeklist & Kontrol Listesi</h3>
-          </div>
-          <p style="font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:16px;">
-            Lokasyonlara bağlı özelleştirilebilir çeklist şablonları. Personel görev tamamlarken zorunlu maddeleri işaretler,
-            fotoğraf yükler, açıklama girer. Doldurulma oranları anlık raporlanır.
-          </p>
-          <!-- Mini UI: Checklist preview -->
-          <div style="background:rgba(6,8,26,0.6);border-radius:10px;padding:14px;border:1px solid rgba(79,106,255,0.12);">
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Çeklist Önizleme</div>
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid rgba(34,197,94,0.2);">
-                <div style="width:16px;height:16px;border-radius:4px;background:#22c55e;display:grid;place-items:center;font-size:10px;color:#fff;">✓</div>
-                <span style="font-size:12px;color:var(--text);">Zemin temizliği yapıldı</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid rgba(34,197,94,0.2);">
-                <div style="width:16px;height:16px;border-radius:4px;background:#22c55e;display:grid;place-items:center;font-size:10px;color:#fff;">✓</div>
-                <span style="font-size:12px;color:var(--text);">Ekipman kontrolü tamamlandı</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(79,106,255,0.08);border-radius:6px;border:1px solid rgba(79,106,255,0.15);">
-                <div style="width:16px;height:16px;border-radius:4px;border:2px solid rgba(79,106,255,0.4);"></div>
-                <span style="font-size:12px;color:var(--text-muted);">Fotoğraf yükleniyor...</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Canlı Görev Akışı & Raporlama -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 32px;">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-            <div style="width:40px;height:40px;border-radius:10px;background:rgba(79,106,255,0.2);display:grid;place-items:center;font-size:20px;">📊</div>
-            <h3 style="font-size:18px;font-weight:800;color:var(--white);margin:0;">Canlı Akış & Raporlama</h3>
-          </div>
-          <p style="font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:16px;">
-            Tüm görev tamamlamalarını anlık izleyin. Personel bazlı performans, lokasyon bazlı analiz,
-            frekansiyel rapor, hakediş raporu ve Excel/PDF dışa aktarım.
-          </p>
-          <!-- Mini grafik: Günlük performans -->
-          <div style="background:rgba(6,8,26,0.6);border-radius:10px;padding:16px;border:1px solid rgba(79,106,255,0.12);">
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Haftalık Görev Tamamlama</div>
-            <div style="display:flex;gap:6px;height:48px;align-items:end;">
-              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
-                <div style="width:100%;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.4));border-radius:3px;height:65%;"></div>
-                <span style="font-size:9px;color:var(--text-muted);">Pzt</span>
-              </div>
-              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
-                <div style="width:100%;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.4));border-radius:3px;height:80%;"></div>
-                <span style="font-size:9px;color:var(--text-muted);">Sal</span>
-              </div>
-              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
-                <div style="width:100%;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.4));border-radius:3px;height:90%;"></div>
-                <span style="font-size:9px;color:var(--text-muted);">Çar</span>
-              </div>
-              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
-                <div style="width:100%;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.4));border-radius:3px;height:72%;"></div>
-                <span style="font-size:9px;color:var(--text-muted);">Per</span>
-              </div>
-              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
-                <div style="width:100%;background:linear-gradient(to top,#22c55e,rgba(34,197,94,0.4));border-radius:3px;height:95%;"></div>
-                <span style="font-size:9px;color:var(--text-muted);">Cum</span>
-              </div>
-              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
-                <div style="width:100%;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.3));border-radius:3px;height:45%;"></div>
-                <span style="font-size:9px;color:var(--text-muted);">Cmt</span>
-              </div>
-              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
-                <div style="width:100%;background:linear-gradient(to top,rgba(79,106,255,0.4),rgba(79,106,255,0.15));border-radius:3px;height:20%;"></div>
-                <span style="font-size:9px;color:var(--text-muted);">Paz</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Ek özellikler satırı -->
-      <div style="margin-top:40px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;" class="fade-in how-extra-grid">
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
-          <div style="font-size:28px;margin-bottom:8px;">👷</div>
-          <div style="font-size:14px;font-weight:700;color:var(--white);">Personel Takibi</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">QR/NFC ile iş başı/bitimi, mesai saatleri ve online durum</div>
-        </div>
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
-          <div style="font-size:28px;margin-bottom:8px;">🔔</div>
-          <div style="font-size:14px;font-weight:700;color:var(--white);">Anlık Bildirimler</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Görev ataması, durum değişikliği ve süre aşımı push bildirimleri</div>
-        </div>
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
-          <div style="font-size:28px;margin-bottom:8px;">🗂️</div>
-          <div style="font-size:14px;font-weight:700;color:var(--white);">Otomatik Arşivleme</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Tamamlanan görevler otomatik arşivlenir, raporlar korunur</div>
-        </div>
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
-          <div style="font-size:28px;margin-bottom:8px;">📱</div>
-          <div style="font-size:14px;font-weight:700;color:var(--white);">Mobil Uygulama</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">iOS ve Android — offline çalışma, push bildirim, QR/NFC tarama</div>
         </div>
       </div>
 
+      <!-- Extras -->
+      <div class="extras-grid">
+        <div class="extra-card fade-in"><div class="icon">🔔</div><h4>Anlık Bildirimler</h4><p>Görev ataması ve süre aşımı push bildirimleri</p></div>
+        <div class="extra-card fade-in"><div class="icon">🗂️</div><h4>Otomatik Arşivleme</h4><p>Tamamlanan görevler otomatik arşivlenir</p></div>
+        <div class="extra-card fade-in"><div class="icon">📈</div><h4>Grafiksel Raporlar</h4><p>Excel, PDF dışa aktarım ve süre analizi</p></div>
+        <div class="extra-card fade-in"><div class="icon">🔒</div><h4>Güvenli Altyapı</h4><p>Rol bazlı erişim ve firma izolasyonu</p></div>
+      </div>
     </div>
   </section>
 
-  <!-- ══ ROLLER ══ -->
-  <section>
+  <!-- ══ CONTACT ══ -->
+  <section class="section" id="contact">
     <div class="container">
       <div class="section-header fade-in">
-        <div class="section-tag">Kullanıcı Rolleri</div>
-        <h2>Herkes İçin <span class="accent">Doğru Araç</span></h2>
-        <p>Hiyerarşik rol yapısıyla herkesin ihtiyacına özel bir deneyim.</p>
+        <div class="section-tag">İletişim</div>
+        <h2>Projeleriniz İçin <span>Demo Talep Edin</span></h2>
+        <p>Sorularınızı iletin veya canlı demo planlayalım.</p>
       </div>
-      <div class="roles-grid">
-        <div class="role-card super fade-in">
-          <div class="role-emoji">🛡️</div>
-          <h3>Süper Admin</h3>
-          <div class="role-badge">Super Admin</div>
-          <p>Tüm firmaları, projeleri ve kullanıcıları merkezi olarak yönetin. Sistem genelinde tam yetkiye sahip olun.</p>
-        </div>
-        <div class="role-card admin fade-in">
-          <div class="role-emoji">👔</div>
-          <h3>Firma Yöneticisi</h3>
-          <div class="role-badge">Tenant Admin</div>
-          <p>Kendi firmanızın lokasyon, personel ve görev yapısını yönetin. Raporlara ve analizlere tam erişim.</p>
-        </div>
-        <div class="role-card user fade-in">
-          <div class="role-emoji">🔧</div>
-          <h3>Saha Personeli</h3>
-          <div class="role-badge">Kullanıcı</div>
-          <p>QR kod tarayarak atanan görevleri ve çeklistleri mobil cihazdan hızlıca tamamlayın ve raporlayın.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ APP PROMO ══ -->
-  <section class="app-promo" id="app">
-    <div class="container">
-      <div class="fade-in">
-        <div class="section-tag" style="margin-bottom:16px">Mobil Uygulama</div>
-        <h2>Sahada da <span style="color:var(--green-bright)">Güçlü</span></h2>
-        <p>iOS ve Android uygulamalarıyla görevleri internet bağlantısı olmadan bile tamamlayın.</p>
-        <div class="app-buttons">
-          <a href="#" class="app-btn">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.78 22.05 6.8 20.68 5.96 19.47C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
-            </svg>
-            <div class="btn-text">
-              <small>App Store'dan İndir</small>
-              <strong>iPhone & iPad</strong>
-            </div>
-          </a>
-          <a href="#" class="app-btn">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3.18 23.76C3.49 24 3.92 24.05 4.34 23.82L14.55 18L11.19 14.63L3.18 23.76ZM20.94 10.19L18.29 8.67L14.58 12.25L18.3 15.97L20.96 14.42C21.76 13.97 22.27 13.2 22.27 12.38C22.27 11.56 21.75 10.74 20.94 10.19ZM2.06 1.22C2.02 1.36 2 1.52 2 1.69V22.31C2 22.48 2.02 22.64 2.06 22.78L10.89 13.94L2.06 1.22ZM14.55 6L4.34 0.18C3.92-0.05 3.49 0 3.18 0.24L11.19 9.37L14.55 6Z"/>
-            </svg>
-            <div class="btn-text">
-              <small>Google Play'den İndir</small>
-              <strong>Android</strong>
-            </div>
-          </a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ İLETİŞİM ══ -->
-  <section id="contact" style="padding:80px 40px;background:var(--bg2);">
-    <div class="container fade-in" style="text-align:center;">
-      <h2 style="font-size:32px;font-weight:900;color:var(--white);margin-bottom:12px;">İletişim</h2>
-      <p style="font-size:16px;color:var(--text-muted);max-width:600px;margin:0 auto 32px;">
-        Projeleriniz için demo talep edin veya sorularınızı iletin.
-      </p>
-      <div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px 32px;min-width:220px;">
-          <div style="font-size:24px;margin-bottom:8px;">📧</div>
-          <div style="font-size:14px;font-weight:700;color:var(--white);">E-Posta</div>
-          <div style="font-size:13px;color:var(--text-muted);margin-top:4px;" id="contact-email">info@syncora.net.tr</div>
-        </div>
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px 32px;min-width:220px;">
-          <div style="font-size:24px;margin-bottom:8px;">🌐</div>
-          <div style="font-size:14px;font-weight:700;color:var(--white);">Web</div>
-          <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">www.syncora.net.tr</div>
-        </div>
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px 32px;min-width:220px;">
-          <div style="font-size:24px;margin-bottom:8px;">📍</div>
-          <div style="font-size:14px;font-weight:700;color:var(--white);">Konum</div>
-          <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">Türkiye</div>
-        </div>
+      <div class="contact-cards">
+        <div class="contact-card fade-in"><div class="icon">📧</div><h4>E-Posta</h4><p>info@syncora.net.tr</p></div>
+        <div class="contact-card fade-in"><div class="icon">🌐</div><h4>Web</h4><p>www.syncora.net.tr</p></div>
+        <div class="contact-card fade-in"><div class="icon">📍</div><h4>Konum</h4><p>Türkiye</p></div>
       </div>
     </div>
   </section>
 
   <!-- ══ FOOTER ══ -->
-  <footer style="padding:28px 48px;">
-    <div style="max-width:1320px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
-      <div class="footer-brand">
-        <span class="footer-copy" style="font-size:12px;" id="footer-copy">© 2026 Syncora Yazılım · Tüm hakları saklıdır</span>
-      </div>
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="footer-copy" id="footer-copy">© 2026 Syncora Yazılım · Tüm hakları saklıdır</span>
       <nav class="footer-links">
         <a href="#features">Özellikler</a>
         <a href="#how">Nasıl Çalışır</a>
-        <a href="#roles">Kurumsal</a>
         <a href="#contact">İletişim</a>
-        <a href="#app">Mobil Uygulama</a>
-        <a href="/login" class="desktop-only">Dashboard</a>
+        <a href="/login">Dashboard</a>
       </nav>
     </div>
   </footer>
 
   <script>
-    // Scroll fade-in
-    const observer = new IntersectionObserver((entries) => {
+    // Fade-in on scroll
+    const obs = new IntersectionObserver((entries) => {
       entries.forEach((e, i) => {
         if (e.isIntersecting) {
-          setTimeout(() => e.target.classList.add('visible'), i * 80);
-          observer.unobserve(e.target);
+          setTimeout(() => e.target.classList.add('visible'), i * 60);
+          obs.unobserve(e.target);
         }
       });
-    }, { threshold: 0.12 });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
 
-    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
-
-    // Navbar scroll shrink
+    // Navbar scroll
     window.addEventListener('scroll', () => {
-      document.getElementById('navbar').style.padding =
-        window.scrollY > 40 ? '10px 40px' : '16px 40px';
+      document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
     });
 
-    // Uygulama adı + logo API'den
+    // API'den uygulama adı
     fetch('/api/public/app-config').then(r => r.json()).then(j => {
       const isim = j.isim || 'Syncora';
-      const logo = j.logo || null;
       document.title = isim + ' — QR/NFC Tabanlı Görev Yönetim Sistemi';
-      const footerCopy = document.getElementById('footer-copy');
-      if (footerCopy) footerCopy.textContent = '© 2026 ' + isim + ' · Tüm hakları saklıdır';
-      // İsim güncelle
-      const navName = document.getElementById('nav-app-name');
-      if (navName) navName.textContent = isim;
+      const n = document.getElementById('nav-app-name');
+      if (n) n.textContent = isim.toUpperCase();
+      const fc = document.getElementById('footer-copy');
+      if (fc) fc.textContent = '© 2026 ' + isim + ' · Tüm hakları saklıdır';
     }).catch(() => {});
   </script>
 </body>
