@@ -9,7 +9,7 @@ import QRCodePng from '@/components/ui/QRCodePng'
 
 function AnimatedQrPreview() {
   return (
-    <div className="relative h-[190px] w-[190px] overflow-hidden rounded-[14px] border border-[rgba(214,228,214,.95)] bg-white">
+    <div className="relative h-[190px] w-[190px] overflow-hidden rounded-[14px] border border-[rgba(79,106,255,.12)] bg-white">
       <div
         className="absolute inset-0 rounded-[14px]"
         style={{
@@ -49,7 +49,7 @@ function AnimatedQrPreview() {
 
 function AnimatedNfcPreview() {
   return (
-    <div className="relative h-[190px] w-[190px] overflow-hidden rounded-[14px] border border-[rgba(214,228,214,.95)] bg-white">
+    <div className="relative h-[190px] w-[190px] overflow-hidden rounded-[14px] border border-[rgba(79,106,255,.12)] bg-white">
       <div
         className="absolute inset-0 rounded-[14px]"
         style={{
@@ -113,7 +113,7 @@ function AnimatedNfcPreview() {
 function ReadyCard({ title, subtitle, type }: { title: string; subtitle: string; type: 'qr' | 'nfc' }) {
   return (
     <div
-      className="h-full w-full rounded-[16px] border border-[rgba(214,228,214,.9)] bg-white/75 p-3 shadow-[0_1px_4px_rgba(15,40,15,0.07),0_1px_2px_rgba(15,40,15,0.04)]"
+      className="h-full w-full rounded-[16px] border border-[rgba(79,106,255,.15)] bg-white/75 p-3 shadow-[0_1px_4px_rgba(15,40,15,0.07),0_1px_2px_rgba(15,40,15,0.04)]"
       style={{ animation: 'fadeUp 750ms ease 220ms both' }}
     >
       <div className="grid place-items-center">{type === 'qr' ? <AnimatedQrPreview /> : <AnimatedNfcPreview />}</div>
@@ -126,7 +126,7 @@ function ReadyCard({ title, subtitle, type }: { title: string; subtitle: string;
         </div>
         <div
           className="h-[10px] w-[10px] shrink-0 rounded-full"
-          style={{ background: 'var(--green-600)', boxShadow: '0 0 0 6px rgba(46,139,46,.12)' }}
+          style={{ background: '#4F6AFF', boxShadow: '0 0 0 6px rgba(79,106,255,.15)' }}
         />
       </div>
     </div>
@@ -231,7 +231,7 @@ export default function LoginPage() {
         className="pointer-events-none absolute inset-0 opacity-60"
         style={{
           backgroundImage:
-            'linear-gradient(to right, rgba(214,228,214,.55) 1px, transparent 1px), linear-gradient(to bottom, rgba(214,228,214,.55) 1px, transparent 1px)',
+            'linear-gradient(to right, rgba(79,106,255,.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(79,106,255,.12) 1px, transparent 1px)',
           backgroundSize: '56px 56px',
           maskImage: 'radial-gradient(60% 60% at 50% 40%, black 40%, transparent 72%)',
           animation: 'fadeIn 700ms ease forwards',
@@ -241,26 +241,26 @@ export default function LoginPage() {
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -left-28 top-[18%] h-[320px] w-[320px] rounded-full blur-[18px] opacity-60"
-        style={{ background: 'rgba(46,139,46,.22)', animation: 'fadeIn 600ms ease forwards' }}
+        style={{ background: 'rgba(79,106,255,.18)', animation: 'fadeIn 600ms ease forwards' }}
       />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-36 top-[8%] h-[380px] w-[380px] rounded-full blur-[18px] opacity-70"
-        style={{ background: 'rgba(184,224,184,.45)', animation: 'fadeIn 600ms ease forwards' }}
+        style={{ background: 'rgba(107,138,255,.30)', animation: 'fadeIn 600ms ease forwards' }}
       />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute left-[55%] -bottom-28 h-[260px] w-[260px] rounded-full blur-[18px] opacity-60"
-        style={{ background: 'rgba(61,156,61,.18)', animation: 'fadeIn 600ms ease forwards' }}
+        style={{ background: 'rgba(26,31,54,.15)', animation: 'fadeIn 600ms ease forwards' }}
       />
 
       <main className="relative mx-auto grid min-h-screen w-full max-w-[1000px] place-items-center px-4 py-10">
         <section className="grid w-full grid-cols-1 gap-5 md:grid-cols-[1.15fr_.85fr]">
           <aside
-            className="hidden overflow-hidden rounded-[14px] border border-[rgba(214,228,214,.9)] bg-white/80 p-6 shadow-[0_14px_40px_rgba(15,40,15,0.10),0_2px_8px_rgba(15,40,15,0.06)] backdrop-blur-[10px] md:block"
+            className="hidden overflow-hidden rounded-[14px] border border-[rgba(79,106,255,.15)] bg-white/80 p-6 shadow-[0_14px_40px_rgba(26,31,54,0.10),0_2px_8px_rgba(26,31,54,0.06)] backdrop-blur-[10px] md:block"
             style={{
               background:
-                'linear-gradient(135deg, rgba(255,255,255,.80), rgba(240,249,240,.70)), radial-gradient(800px 420px at 20% 20%, rgba(46,139,46,.18), transparent 55%), radial-gradient(700px 420px at 80% 80%, rgba(184,224,184,.45), transparent 60%)',
+                'linear-gradient(135deg, rgba(255,255,255,.85), rgba(240,244,255,.70)), radial-gradient(800px 420px at 20% 20%, rgba(79,106,255,.12), transparent 55%), radial-gradient(700px 420px at 80% 80%, rgba(107,138,255,.20), transparent 60%)',
               animation: 'fadeUp 700ms ease 60ms both',
             }}
           >
@@ -297,12 +297,12 @@ export default function LoginPage() {
               ].map((x, i) => (
                 <div
                   key={x.t}
-                  className="flex gap-3 rounded-[12px] border border-[rgba(214,228,214,.9)] bg-white/80 p-3 shadow-[0_1px_2px_rgba(15,40,15,0.05)]"
+                  className="flex gap-3 rounded-[12px] border border-[rgba(79,106,255,.15)] bg-white/80 p-3 shadow-[0_1px_2px_rgba(15,40,15,0.05)]"
                   style={{ animation: `fadeUp 700ms ease ${120 + i * 80}ms both` }}
                 >
                   <div
                     className="mt-[6px] h-[10px] w-[10px] shrink-0 rounded-full"
-                    style={{ background: 'var(--green-600)', boxShadow: '0 0 0 5px rgba(46,139,46,.12)' }}
+                    style={{ background: '#4F6AFF', boxShadow: '0 0 0 5px rgba(79,106,255,.15)' }}
                   />
                   <div className="min-w-0">
                     <div className="truncate text-[16px] font-extrabold">{x.t}</div>
@@ -321,7 +321,7 @@ export default function LoginPage() {
           </aside>
 
           <section
-            className="relative overflow-hidden rounded-[14px] border border-[rgba(214,228,214,.95)] bg-white/85 p-7 shadow-[0_14px_40px_rgba(15,40,15,0.10),0_2px_8px_rgba(15,40,15,0.06)] backdrop-blur-[10px]"
+            className="relative overflow-hidden rounded-[14px] border border-[rgba(79,106,255,.12)] bg-white/85 p-7 shadow-[0_14px_40px_rgba(26,31,54,0.10),0_2px_8px_rgba(26,31,54,0.06)] backdrop-blur-[10px]"
             style={{ animation: 'fadeUp 700ms ease 100ms both' }}
           >
             <div
@@ -329,7 +329,7 @@ export default function LoginPage() {
               className="pointer-events-none absolute -right-24 -top-24 h-[280px] w-[280px] blur-[6px]"
               style={{
                 background:
-                  'radial-gradient(circle at 30% 30%, rgba(46,139,46,.18), transparent 55%), radial-gradient(circle at 70% 70%, rgba(184,224,184,.45), transparent 58%)',
+                  'radial-gradient(circle at 30% 30%, rgba(79,106,255,.12), transparent 55%), radial-gradient(circle at 70% 70%, rgba(107,138,255,.20), transparent 58%)',
                 transform: 'rotate(12deg)',
               }}
             />
@@ -356,7 +356,7 @@ export default function LoginPage() {
                   <label className="verde-label">E-Posta</label>
                   <div
                     className="flex items-center gap-2 rounded-[6px] border px-3 py-[10px] transition-colors"
-                    style={{ background: 'rgba(240,249,240,.9)', borderColor: 'rgba(214,228,214,.95)' }}
+                    style={{ background: 'rgba(240,244,255,.9)', borderColor: 'rgba(214,228,214,.95)' }}
                   >
                     <Mail className="h-[18px] w-[18px]" style={{ color: 'var(--text-300)' }} />
                     <input
@@ -374,7 +374,7 @@ export default function LoginPage() {
                   <label className="verde-label">Şifre</label>
                   <div
                     className="flex items-center gap-2 rounded-[6px] border px-3 py-[10px] transition-colors"
-                    style={{ background: 'rgba(240,249,240,.9)', borderColor: 'rgba(214,228,214,.95)' }}
+                    style={{ background: 'rgba(240,244,255,.9)', borderColor: 'rgba(214,228,214,.95)' }}
                   >
                     <Lock className="h-[18px] w-[18px]" style={{ color: 'var(--text-300)' }} />
                     <input
@@ -413,7 +413,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     className="text-[16px] font-bold hover:underline"
-                    style={{ color: 'var(--green-700)' }}
+                    style={{ color: '#4F6AFF' }}
                     onClick={() => router.push('/forgot-password')}
                   >
                     Şifremi unuttum
@@ -423,8 +423,8 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-[6px] px-4 py-3 text-[17px] font-medium text-white shadow-[0_16px_34px_rgba(46,139,46,.22)] transition-all hover:-translate-y-[1px] active:translate-y-0 disabled:opacity-60 disabled:shadow-none"
-                  style={{ background: 'linear-gradient(145deg, var(--green-600), var(--green-500))' }}
+                  className="w-full rounded-[6px] px-4 py-3 text-[17px] font-medium text-white shadow-[0_16px_34px_rgba(79,106,255,.22)] transition-all hover:-translate-y-[1px] active:translate-y-0 disabled:opacity-60 disabled:shadow-none"
+                  style={{ background: 'linear-gradient(145deg, #1a1f36, #4F6AFF)' }}
                 >
                   {loading ? 'Giriş yapılıyor...' : 'Giriş Yap →'}
                 </button>
