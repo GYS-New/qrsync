@@ -47,11 +47,12 @@
     #navbar {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 40px;
-      background: rgba(6, 14, 6, 0.85);
+      padding: 12px 40px;
+      background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid #e2e8f0;
       transition: padding 0.3s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     }
 
     .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
@@ -81,7 +82,7 @@
     .btn-dashboard {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 10px 20px; border-radius: 10px;
-      background: var(--green-mid); color: #fff;
+      background: #1a1f36; color: #fff;
       font-size: 14px; font-weight: 600; text-decoration: none;
       border: none; cursor: pointer;
       transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
@@ -549,7 +550,7 @@
   <!-- ══ NAVBAR ══ -->
   <nav id="navbar">
     <a href="/landing.html" class="nav-logo" id="nav-logo-link">
-      <img id="nav-logo-img" src="/favicon.svg" alt="Logo" style="height:40px;max-width:220px;width:auto;object-fit:contain;" />
+      <img id="nav-logo-img" src="/favicon.svg" alt="Logo" style="height:48px;max-width:320px;width:auto;object-fit:contain;" />
     </a>
 
     <!-- Desktop: Dashboard butonu -->
@@ -928,7 +929,7 @@
       } else {
         // Logo yoksa favicon yerine sadece isim göster
         const navLink = document.getElementById('nav-logo-link');
-        if (navLink) navLink.innerHTML = '<span style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.3px;">' + isim + '</span>';
+        if (navLink) navLink.innerHTML = '<span style="font-size:20px;font-weight:800;color:#1a1f36;letter-spacing:-0.3px;">' + isim + '</span>';
       }
     }).catch(() => {});
   </script>
