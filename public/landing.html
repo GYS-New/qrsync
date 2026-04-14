@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ProATA — QR Kod Tabanlı Görev Yönetim Sistemi</title>
+  <title>Syncora — QR/NFC Tabanlı Görev Yönetim Sistemi</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -548,20 +549,8 @@
   <!-- ══ NAVBAR ══ -->
   <nav id="navbar">
     <a href="/landing.html" class="nav-logo">
-      <div class="logo-mark">
-        <div class="logo-mark-cell c-dark"></div>
-        <div class="logo-mark-cell c-mid"></div>
-        <div class="logo-mark-cell c-light"></div>
-        <div class="logo-mark-cell c-light"></div>
-        <div class="logo-mark-cell c-dark"></div>
-        <div class="logo-mark-cell c-mid"></div>
-        <div class="logo-mark-cell c-mid"></div>
-        <div class="logo-mark-cell c-light"></div>
-        <div class="logo-mark-cell c-dark"></div>
-      </div>
-      <div class="logo-text">
-        <div class="tagline">Task Management</div>
-      </div>
+      <img id="nav-logo-img" src="/favicon.svg" alt="Logo" style="height:36px;width:auto;border-radius:8px;" />
+      <span id="nav-app-name" style="font-size:18px;font-weight:800;color:#fff;letter-spacing:-0.3px;">Syncora</span>
     </a>
 
     <!-- Desktop: Dashboard butonu -->
@@ -895,18 +884,8 @@
   <!-- ══ FOOTER ══ -->
   <footer>
     <div class="footer-brand">
-      <div class="logo-mark" style="width:32px;height:32px;border-radius:7px;gap:2px;padding:2px;">
-        <div class="logo-mark-cell c-dark"></div>
-        <div class="logo-mark-cell c-mid"></div>
-        <div class="logo-mark-cell c-light"></div>
-        <div class="logo-mark-cell c-light"></div>
-        <div class="logo-mark-cell c-dark"></div>
-        <div class="logo-mark-cell c-mid"></div>
-        <div class="logo-mark-cell c-mid"></div>
-        <div class="logo-mark-cell c-light"></div>
-        <div class="logo-mark-cell c-dark"></div>
-      </div>
-      <span class="footer-copy" style="margin-left:10px;">© 2026 Syncora Yazılım · Tüm hakları saklıdır</span>
+      <img id="footer-logo-img" src="/favicon.svg" alt="Logo" style="height:28px;width:auto;border-radius:6px;" />
+      <span class="footer-copy" style="margin-left:10px;" id="footer-copy">© 2026 Syncora Yazılım · Tüm hakları saklıdır</span>
     </div>
     <nav class="footer-links">
       <a href="#features">Özellikler</a>
@@ -933,6 +912,23 @@
       document.getElementById('navbar').style.padding =
         window.scrollY > 40 ? '10px 40px' : '16px 40px';
     });
+
+    // Uygulama adı + logo API'den
+    fetch('/api/public/app-config').then(r => r.json()).then(j => {
+      const isim = j.isim || 'Syncora';
+      const logo = j.logo || null;
+      document.title = isim + ' — QR/NFC Tabanlı Görev Yönetim Sistemi';
+      const navName = document.getElementById('nav-app-name');
+      if (navName) navName.textContent = isim;
+      const footerCopy = document.getElementById('footer-copy');
+      if (footerCopy) footerCopy.textContent = '© 2026 ' + isim + ' · Tüm hakları saklıdır';
+      if (logo) {
+        const navLogo = document.getElementById('nav-logo-img');
+        if (navLogo) navLogo.src = logo;
+        const footerLogo = document.getElementById('footer-logo-img');
+        if (footerLogo) footerLogo.src = logo;
+      }
+    }).catch(() => {});
   </script>
 </body>
 </html>
