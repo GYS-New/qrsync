@@ -537,6 +537,8 @@
 
       .features-grid { grid-template-columns: 1fr; }
       .steps-grid { grid-template-columns: 1fr; }
+      .how-detail-grid { grid-template-columns: 1fr !important; }
+      .how-extra-grid { grid-template-columns: repeat(2, 1fr) !important; }
       .steps-grid::before { display: none; }
       .roles-grid { grid-template-columns: 1fr; }
 
@@ -549,6 +551,7 @@
     @media (max-width: 480px) {
       .stats-inner { grid-template-columns: repeat(2, 1fr); }
       .stat-num { font-size: 36px; }
+      .how-extra-grid { grid-template-columns: 1fr !important; }
     }
 
     /* ── Fade-in animation ── */
@@ -814,30 +817,214 @@
   </section>
 
   <!-- ══ HOW IT WORKS ══ -->
-  <section class="how-it-works">
+  <section class="how-it-works" id="how">
     <div class="container">
       <div class="section-header fade-in">
         <div class="section-tag">Nasıl Çalışır</div>
-        <h2>3 Adımda <span class="accent">Başlayın</span></h2>
-        <p>Karmaşık kurulum yok. Dakikalar içinde sahanızı dijitalleştirin.</p>
+        <h2>Uçtan Uca <span class="accent">Operasyon Yönetimi</span></h2>
+        <p>QR/NFC teknolojisi ile saha operasyonlarınızı dijitalleştirin, anlık takip edin, raporlayın.</p>
       </div>
+
+      <!-- Adımlar -->
       <div class="steps-grid">
         <div class="step fade-in">
           <div class="step-num">1</div>
-          <h3>QR Kod Yapıştır</h3>
-          <p>Sistem tarafından üretilen QR kodları lokasyonlara, ekipmanlara veya noktalara yapıştırın. Her kod benzersizdir ve takip edilebilir.</p>
+          <h3>Lokasyon & QR/NFC Tanımla</h3>
+          <p>Hiyerarşik lokasyon yapısı oluşturun. Her lokasyona benzersiz QR kod veya NFC etiketi atayın. Sistem otomatik üretir.</p>
         </div>
         <div class="step fade-in">
           <div class="step-num">2</div>
-          <h3>Görev Tara & Tamamla</h3>
-          <p>Personel telefon kamerasıyla QR kodu okur, atanan görevi ve çeklistleri görür, tamamladıkça işaretler.</p>
+          <h3>Görev Ata & Tara</h3>
+          <p>Frekansiyel veya spesifik görevler tanımlayın. Personel mobil uygulama ile QR/NFC okutarak görevi başlatır ve çeklistleri doldurur.</p>
         </div>
         <div class="step fade-in">
           <div class="step-num">3</div>
-          <h3>Raporla & Analiz Et</h3>
-          <p>Dashboard'dan tüm aktiviteleri gerçek zamanlı takip edin. Filtrelenebilir raporlar ve grafiklerle performansı ölçün.</p>
+          <h3>Takip Et & Raporla</h3>
+          <p>Canlı görev akışını izleyin, süre analizleri yapın, grafiksel raporlarla performansı ölçün ve dışa aktarın.</p>
         </div>
       </div>
+
+      <!-- Detaylı Özellik Kartları -->
+      <div style="margin-top:64px;display:grid;grid-template-columns:repeat(2,1fr);gap:24px;" class="fade-in how-detail-grid">
+
+        <!-- Frekansiyel Görev Sistemi -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 32px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(79,106,255,0.2);display:grid;place-items:center;font-size:20px;">⚡</div>
+            <h3 style="font-size:18px;font-weight:800;color:var(--white);margin:0;">Frekansiyel Görev Motoru</h3>
+          </div>
+          <p style="font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:16px;">
+            Vardiya bazlı otomatik görev üretimi. Her gün belirlenen saatlerde, belirlenen lokasyonlara görevler otomatik atanır.
+            Günlük frekans sayısı, vardiya saatleri ve aktif günler tamamen yapılandırılabilir.
+          </p>
+          <!-- Mini grafik: Vardiya timeline -->
+          <div style="background:rgba(6,8,26,0.6);border-radius:10px;padding:16px;border:1px solid rgba(79,106,255,0.12);">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Vardiya Zaman Çizelgesi</div>
+            <div style="display:flex;gap:4px;height:32px;align-items:end;">
+              <div style="flex:1;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.3));border-radius:4px 4px 0 0;height:100%;position:relative;">
+                <span style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text-muted);white-space:nowrap;">08:00</span>
+              </div>
+              <div style="flex:1;background:linear-gradient(to top,#6B8AFF,rgba(107,138,255,0.3));border-radius:4px 4px 0 0;height:75%;">
+                <span style="position:absolute;display:none;">16:00</span>
+              </div>
+              <div style="flex:1;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.2));border-radius:4px 4px 0 0;height:55%;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--text-muted);">
+              <span>1. Vardiya</span><span>2. Vardiya</span><span>3. Vardiya</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Süre Takip Sistemi -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 32px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(79,106,255,0.2);display:grid;place-items:center;font-size:20px;">⏱️</div>
+            <h3 style="font-size:18px;font-weight:800;color:var(--white);margin:0;">Süre Takip & Analiz</h3>
+          </div>
+          <p style="font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:16px;">
+            Her görev için minimum, hedef ve maksimum süre tanımlayın. Sistem gerçek zamanlı süre takibi yapar.
+            Hedef altında tamamlanan, hedefi aşan ve süre limiti dolmuş görevler ayrı raporlanır.
+          </p>
+          <!-- Mini grafik: Süre dağılımı -->
+          <div style="background:rgba(6,8,26,0.6);border-radius:10px;padding:16px;border:1px solid rgba(79,106,255,0.12);">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Görev Süre Dağılımı</div>
+            <div style="display:flex;gap:12px;align-items:center;">
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></div>
+                  <span style="font-size:11px;color:var(--text-muted);">Hedefte</span>
+                  <span style="font-size:13px;font-weight:800;color:#22c55e;margin-left:auto;">%72</span>
+                </div>
+                <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
+                  <div style="width:72%;height:100%;background:#22c55e;border-radius:3px;"></div>
+                </div>
+              </div>
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;"></div>
+                  <span style="font-size:11px;color:var(--text-muted);">Gecikmeli</span>
+                  <span style="font-size:13px;font-weight:800;color:#f59e0b;margin-left:auto;">%21</span>
+                </div>
+                <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
+                  <div style="width:21%;height:100%;background:#f59e0b;border-radius:3px;"></div>
+                </div>
+              </div>
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#ef4444;"></div>
+                  <span style="font-size:11px;color:var(--text-muted);">Aşım</span>
+                  <span style="font-size:13px;font-weight:800;color:#ef4444;margin-left:auto;">%7</span>
+                </div>
+                <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
+                  <div style="width:7%;height:100%;background:#ef4444;border-radius:3px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checklist Sistemi -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 32px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(79,106,255,0.2);display:grid;place-items:center;font-size:20px;">📋</div>
+            <h3 style="font-size:18px;font-weight:800;color:var(--white);margin:0;">Çeklist & Kontrol Listesi</h3>
+          </div>
+          <p style="font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:16px;">
+            Lokasyonlara bağlı özelleştirilebilir çeklist şablonları. Personel görev tamamlarken zorunlu maddeleri işaretler,
+            fotoğraf yükler, açıklama girer. Doldurulma oranları anlık raporlanır.
+          </p>
+          <!-- Mini UI: Checklist preview -->
+          <div style="background:rgba(6,8,26,0.6);border-radius:10px;padding:14px;border:1px solid rgba(79,106,255,0.12);">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Çeklist Önizleme</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid rgba(34,197,94,0.2);">
+                <div style="width:16px;height:16px;border-radius:4px;background:#22c55e;display:grid;place-items:center;font-size:10px;color:#fff;">✓</div>
+                <span style="font-size:12px;color:var(--text);">Zemin temizliği yapıldı</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid rgba(34,197,94,0.2);">
+                <div style="width:16px;height:16px;border-radius:4px;background:#22c55e;display:grid;place-items:center;font-size:10px;color:#fff;">✓</div>
+                <span style="font-size:12px;color:var(--text);">Ekipman kontrolü tamamlandı</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(79,106,255,0.08);border-radius:6px;border:1px solid rgba(79,106,255,0.15);">
+                <div style="width:16px;height:16px;border-radius:4px;border:2px solid rgba(79,106,255,0.4);"></div>
+                <span style="font-size:12px;color:var(--text-muted);">Fotoğraf yükleniyor...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canlı Görev Akışı & Raporlama -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 32px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(79,106,255,0.2);display:grid;place-items:center;font-size:20px;">📊</div>
+            <h3 style="font-size:18px;font-weight:800;color:var(--white);margin:0;">Canlı Akış & Raporlama</h3>
+          </div>
+          <p style="font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:16px;">
+            Tüm görev tamamlamalarını anlık izleyin. Personel bazlı performans, lokasyon bazlı analiz,
+            frekansiyel rapor, hakediş raporu ve Excel/PDF dışa aktarım.
+          </p>
+          <!-- Mini grafik: Günlük performans -->
+          <div style="background:rgba(6,8,26,0.6);border-radius:10px;padding:16px;border:1px solid rgba(79,106,255,0.12);">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Haftalık Görev Tamamlama</div>
+            <div style="display:flex;gap:6px;height:48px;align-items:end;">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div style="width:100%;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.4));border-radius:3px;height:65%;"></div>
+                <span style="font-size:9px;color:var(--text-muted);">Pzt</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div style="width:100%;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.4));border-radius:3px;height:80%;"></div>
+                <span style="font-size:9px;color:var(--text-muted);">Sal</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div style="width:100%;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.4));border-radius:3px;height:90%;"></div>
+                <span style="font-size:9px;color:var(--text-muted);">Çar</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div style="width:100%;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.4));border-radius:3px;height:72%;"></div>
+                <span style="font-size:9px;color:var(--text-muted);">Per</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div style="width:100%;background:linear-gradient(to top,#22c55e,rgba(34,197,94,0.4));border-radius:3px;height:95%;"></div>
+                <span style="font-size:9px;color:var(--text-muted);">Cum</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div style="width:100%;background:linear-gradient(to top,#4F6AFF,rgba(79,106,255,0.3));border-radius:3px;height:45%;"></div>
+                <span style="font-size:9px;color:var(--text-muted);">Cmt</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div style="width:100%;background:linear-gradient(to top,rgba(79,106,255,0.4),rgba(79,106,255,0.15));border-radius:3px;height:20%;"></div>
+                <span style="font-size:9px;color:var(--text-muted);">Paz</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Ek özellikler satırı -->
+      <div style="margin-top:40px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;" class="fade-in how-extra-grid">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:8px;">👷</div>
+          <div style="font-size:14px;font-weight:700;color:var(--white);">Personel Takibi</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">QR/NFC ile iş başı/bitimi, mesai saatleri ve online durum</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:8px;">🔔</div>
+          <div style="font-size:14px;font-weight:700;color:var(--white);">Anlık Bildirimler</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Görev ataması, durum değişikliği ve süre aşımı push bildirimleri</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:8px;">🗂️</div>
+          <div style="font-size:14px;font-weight:700;color:var(--white);">Otomatik Arşivleme</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Tamamlanan görevler otomatik arşivlenir, raporlar korunur</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:8px;">📱</div>
+          <div style="font-size:14px;font-weight:700;color:var(--white);">Mobil Uygulama</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">iOS ve Android — offline çalışma, push bildirim, QR/NFC tarama</div>
+        </div>
+      </div>
+
     </div>
   </section>
 
