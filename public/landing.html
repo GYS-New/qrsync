@@ -168,6 +168,42 @@
     .footer-links a { font-size: 13px; color: rgba(255,255,255,0.5); text-decoration: none; transition: color 0.15s; }
     .footer-links a:hover { color: #fff; }
 
+    /* ── SCREENSHOTS ── */
+    .screenshot-wrap {
+      position: relative; border-radius: 12px; overflow: hidden;
+      box-shadow: var(--shadow-lg); border: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+    .screenshot-wrap img { width: 100%; display: block; }
+    .screenshot-tilt {
+      transform: perspective(1200px) rotateY(-3deg) rotateX(2deg);
+      transition: transform 0.4s ease;
+    }
+    .screenshot-tilt:hover { transform: perspective(1200px) rotateY(0deg) rotateX(0deg); }
+    .screenshot-float {
+      position: absolute; border-radius: 10px; overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15); border: 1px solid var(--border);
+      background: var(--bg-card); transition: transform 0.3s ease;
+    }
+    .screenshot-float:hover { transform: translateY(-4px) scale(1.02); }
+    .screenshot-float img { width: 100%; display: block; }
+
+    /* ── SHOWCASE SECTION ── */
+    .showcase-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; margin-top: 56px; }
+    .showcase-grid.reverse { direction: rtl; }
+    .showcase-grid.reverse > * { direction: ltr; }
+    .showcase-text h3 { font-size: 24px; font-weight: 900; color: var(--primary-dark); margin-bottom: 12px; }
+    .showcase-text p { font-size: 15px; color: var(--text-500); line-height: 1.7; }
+    .showcase-text ul { list-style: none; padding: 0; margin-top: 16px; }
+    .showcase-text ul li { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; color: var(--text-700); }
+    .showcase-text ul li::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+
+    @media (max-width: 900px) {
+      .showcase-grid { grid-template-columns: 1fr; }
+      .showcase-grid.reverse { direction: ltr; }
+      .screenshot-tilt { transform: none; }
+    }
+
     /* ── ANIMATIONS ── */
     .fade-in { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
     .fade-in.visible { opacity: 1; transform: translateY(0); }
@@ -263,41 +299,13 @@
           <a href="#contact" class="btn-outline" style="padding:13px 28px;font-size:16px;">İletişim</a>
         </div>
       </div>
-      <div class="hero-visual">
-        <!-- Placeholder dashboard mockup -->
-        <div style="background:var(--bg-alt);border-radius:8px;padding:20px;min-height:320px;display:flex;flex-direction:column;gap:12px;">
-          <div style="display:flex;gap:12px;">
-            <div style="flex:1;background:var(--primary);border-radius:8px;padding:16px;color:#fff;">
-              <div style="font-size:11px;opacity:0.8;">Görevler</div>
-              <div style="font-size:28px;font-weight:900;">248</div>
-            </div>
-            <div style="flex:1;background:#22c55e;border-radius:8px;padding:16px;color:#fff;">
-              <div style="font-size:11px;opacity:0.8;">Tamamlanan</div>
-              <div style="font-size:28px;font-weight:900;">%94</div>
-            </div>
-          </div>
-          <div style="display:flex;gap:12px;">
-            <div style="flex:1;background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px;">
-              <div style="font-size:11px;color:var(--text-400);">Personel</div>
-              <div style="font-size:24px;font-weight:900;color:var(--primary-dark);">32</div>
-            </div>
-            <div style="flex:1;background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px;">
-              <div style="font-size:11px;color:var(--text-400);">Lokasyon</div>
-              <div style="font-size:24px;font-weight:900;color:var(--primary-dark);">156</div>
-            </div>
-          </div>
-          <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;flex:1;">
-            <div style="font-size:11px;color:var(--text-400);margin-bottom:8px;">Haftalık Performans</div>
-            <div style="display:flex;gap:4px;height:48px;align-items:end;">
-              <div style="flex:1;background:var(--primary);border-radius:3px;height:65%;opacity:0.7;"></div>
-              <div style="flex:1;background:var(--primary);border-radius:3px;height:80%;opacity:0.8;"></div>
-              <div style="flex:1;background:var(--primary);border-radius:3px;height:90%;"></div>
-              <div style="flex:1;background:var(--primary);border-radius:3px;height:72%;opacity:0.8;"></div>
-              <div style="flex:1;background:#22c55e;border-radius:3px;height:95%;"></div>
-              <div style="flex:1;background:var(--primary);border-radius:3px;height:45%;opacity:0.6;"></div>
-              <div style="flex:1;background:var(--primary);border-radius:3px;height:20%;opacity:0.4;"></div>
-            </div>
-          </div>
+      <div style="position:relative;">
+        <div class="screenshot-wrap screenshot-tilt">
+          <img src="/screenshots/dashboard.png" alt="Dashboard" loading="lazy" />
+        </div>
+        <!-- Floating mini screenshot -->
+        <div class="screenshot-float" style="bottom:-24px;right:-20px;width:45%;z-index:2;">
+          <img src="/screenshots/frekansiyel-rapor.png" alt="Rapor" loading="lazy" />
         </div>
       </div>
     </div>
@@ -381,39 +389,54 @@
         </div>
       </div>
 
-      <!-- Detail cards -->
-      <div class="detail-grid">
-        <div class="detail-card fade-in">
-          <div class="detail-card-head">
-            <div class="feature-icon fi-blue" style="width:40px;height:40px;font-size:20px;">⚡</div>
-            <h3>Vardiya Bazlı Görev Üretimi</h3>
-          </div>
-          <p>Her gün belirlenen saatlerde, belirlenen lokasyonlara görevler otomatik atanır. Günlük frekans ve aktif günler yapılandırılabilir.</p>
-          <div class="mini-chart">
-            <div class="mini-chart-label">Vardiya Zaman Çizelgesi</div>
-            <div style="display:flex;gap:4px;height:32px;align-items:end;">
-              <div style="flex:1;background:var(--gradient);border-radius:4px 4px 0 0;height:100%;"></div>
-              <div style="flex:1;background:var(--primary-light);border-radius:4px 4px 0 0;height:75%;opacity:0.7;"></div>
-              <div style="flex:1;background:var(--primary);border-radius:4px 4px 0 0;height:55%;opacity:0.5;"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--text-400);"><span>1. Vardiya</span><span>2. Vardiya</span><span>3. Vardiya</span></div>
-          </div>
+      <!-- Showcase: Süre Analiz -->
+      <div class="showcase-grid fade-in">
+        <div class="showcase-text">
+          <h3>⏱️ Detaylı Süre Analizi</h3>
+          <p>Tüm görevlerin tamamlanma sürelerini analiz edin. Medyan, P75, P90, P95 yüzdelik dilimleri ile performans ölçümü.</p>
+          <ul>
+            <li>Ortalama, en hızlı, en yavaş süre metrikleri</li>
+            <li>Süre dağılım histogramı</li>
+            <li>Günlük ortalama süre trend grafiği</li>
+            <li>Lokasyon ve personel bazlı karşılaştırma</li>
+          </ul>
         </div>
+        <div class="screenshot-wrap" style="box-shadow:var(--shadow-lg);">
+          <img src="/screenshots/sure-analiz.png" alt="Süre Analiz Raporu" loading="lazy" />
+        </div>
+      </div>
 
-        <div class="detail-card fade-in">
-          <div class="detail-card-head">
-            <div class="feature-icon fi-green" style="width:40px;height:40px;font-size:20px;">⏱️</div>
-            <h3>Görev Süre Dağılımı</h3>
-          </div>
-          <p>Her görev için minimum, hedef ve maksimum süre tanımlayın. Hedef altında, hedefi aşan ve süre limiti dolmuş görevler ayrı raporlanır.</p>
-          <div class="mini-chart">
-            <div class="mini-chart-label">Süre Analizi</div>
-            <div style="display:flex;gap:12px;">
-              <div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></div><span style="font-size:11px;color:var(--text-500);">Hedefte</span><span style="font-size:13px;font-weight:800;color:#22c55e;margin-left:auto;">%72</span></div><div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;"><div style="width:72%;height:100%;background:#22c55e;border-radius:3px;"></div></div></div>
-              <div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;"></div><span style="font-size:11px;color:var(--text-500);">Gecikmeli</span><span style="font-size:13px;font-weight:800;color:#f59e0b;margin-left:auto;">%21</span></div><div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;"><div style="width:21%;height:100%;background:#f59e0b;border-radius:3px;"></div></div></div>
-              <div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:8px;height:8px;border-radius:50%;background:#ef4444;"></div><span style="font-size:11px;color:var(--text-500);">Aşım</span><span style="font-size:13px;font-weight:800;color:#ef4444;margin-left:auto;">%7</span></div><div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;"><div style="width:7%;height:100%;background:#ef4444;border-radius:3px;"></div></div></div>
-            </div>
-          </div>
+      <!-- Showcase: Frekansiyel Rapor -->
+      <div class="showcase-grid reverse fade-in" style="margin-top:56px;">
+        <div class="showcase-text">
+          <h3>📊 Frekansiyel Görev Raporu</h3>
+          <p>Tüm frekansiyel görevlerin performansını tek ekranda görün. Hedef, tamamlanan, kayıp ve frekans dışı metrikleri.</p>
+          <ul>
+            <li>Genel performans özeti (%76 başarı)</li>
+            <li>Grup bazlı tamamlanma grafiği</li>
+            <li>Sapma ve kayıp analizi</li>
+            <li>Excel dışa aktarım</li>
+          </ul>
+        </div>
+        <div class="screenshot-wrap" style="box-shadow:var(--shadow-lg);">
+          <img src="/screenshots/frekansiyel-rapor.png" alt="Frekansiyel Görev Raporu" loading="lazy" />
+        </div>
+      </div>
+
+      <!-- Showcase: Raporlar -->
+      <div class="showcase-grid fade-in" style="margin-top:56px;">
+        <div class="showcase-text">
+          <h3>📈 Hızlı Raporlar & Grafikler</h3>
+          <p>Lokasyon, kullanıcı, frekansiyel ve spesifik görevler için anlık raporlar. Grafiksel karşılaştırmalar.</p>
+          <ul>
+            <li>Lokasyon bazlı görev dağılımı</li>
+            <li>Kullanıcı performans raporları</li>
+            <li>Dönemsel karşılaştırma grafikleri</li>
+            <li>Hakediş raporu desteği</li>
+          </ul>
+        </div>
+        <div class="screenshot-wrap" style="box-shadow:var(--shadow-lg);">
+          <img src="/screenshots/raporlar.png" alt="Hızlı Raporlar" loading="lazy" />
         </div>
       </div>
 
