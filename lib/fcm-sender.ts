@@ -71,6 +71,19 @@ export async function sendFCMToUser(userId: string, title: string, body: string,
                   channel_id: effectiveChannelId,
                 },
               },
+              apns: {
+                payload: {
+                  aps: {
+                    alert: { title, body },
+                    sound: soundName === 'default' ? 'default' : `${soundName}.wav`,
+                    badge: 1,
+                    'content-available': 1,
+                  },
+                },
+                headers: {
+                  'apns-priority': '10',
+                },
+              },
             },
           }),
         })
