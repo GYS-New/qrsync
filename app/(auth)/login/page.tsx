@@ -434,7 +434,7 @@ export default function LoginPage() {
                 </p>
 
                 <p className="mt-64 text-center text-[13px]" style={{ color: 'var(--text-400)' }}>
-                  © 2026 ProATA · Tüm hakları saklıdır
+                  © 2026 Syncora Yazılım · Tüm hakları saklıdır
                 </p>
               </form>
             </div>
