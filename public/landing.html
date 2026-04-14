@@ -11,17 +11,17 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green-dark:  #1f6b1f;
-      --green-mid:   #2e8b2e;
-      --green-light: #b8e0b8;
-      --green-bright:#4ade80;
-      --bg:          #060e06;
-      --bg2:         #0c190c;
-      --bg3:         #111f11;
-      --surface:     rgba(30, 55, 30, 0.55);
-      --border:      rgba(46,139,46,0.22);
-      --text:        #e8f5e8;
-      --text-muted:  #7a9e7a;
+      --green-dark:  #1a1f36;
+      --green-mid:   #4F6AFF;
+      --green-light: #b8c8ff;
+      --green-bright:#6B8AFF;
+      --bg:          #06081a;
+      --bg2:         #0c1028;
+      --bg3:         #111836;
+      --surface:     rgba(26, 31, 54, 0.55);
+      --border:      rgba(79,106,255,0.22);
+      --text:        #e8ecf5;
+      --text-muted:  #7a8aae;
       --white:       #ffffff;
     }
 
@@ -38,7 +38,7 @@
     /* ── SCROLLBAR ── */
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: var(--green-mid); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: #4F6AFF; border-radius: 3px; }
 
     /* ══════════════════════════════
        NAVBAR
@@ -59,13 +59,13 @@
       width: 40px; height: 40px; border-radius: 9px; overflow: hidden;
       display: grid; grid-template-columns: repeat(3, 1fr);
       grid-template-rows: repeat(3, 1fr); gap: 2.5px;
-      background: rgba(184, 224, 184, 0.15); padding: 2.5px;
+      background: rgba(79,106,255,0.15); padding: 2.5px;
       flex-shrink: 0;
     }
     .logo-mark-cell { border-radius: 2px; }
-    .c-dark  { background: #1f6b1f; }
-    .c-mid   { background: #2e8b2e; }
-    .c-light { background: rgba(184,224,184,0.4); }
+    .c-dark  { background: #1a1f36; }
+    .c-mid   { background: #4F6AFF; }
+    .c-light { background: rgba(107,138,255,0.4); }
 
     .logo-text { display: flex; flex-direction: column; line-height: 1.1; }
     .logo-text .brand { font-size: 20px; letter-spacing: -0.4px; line-height: 1; }
@@ -84,20 +84,20 @@
       font-size: 14px; font-weight: 600; text-decoration: none;
       border: none; cursor: pointer;
       transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
-      box-shadow: 0 4px 16px rgba(46,139,46,0.35);
+      box-shadow: 0 4px 16px rgba(79,106,255,0.35);
     }
-    .btn-dashboard:hover { background: #38a838; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(46,139,46,0.5); }
+    .btn-dashboard:hover { background: #3a56e0; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(79,106,255,0.5); }
     .btn-dashboard svg { width: 15px; height: 15px; }
 
     .btn-app {
       display: inline-flex; align-items: center; gap: 7px;
       padding: 9px 16px; border-radius: 10px;
-      background: rgba(30,55,30,0.8); border: 1px solid var(--border);
+      background: rgba(26,31,54,0.8); border: 1px solid var(--border);
       color: var(--text); font-size: 13px; font-weight: 500;
       text-decoration: none; cursor: pointer;
       transition: background 0.2s, transform 0.15s;
     }
-    .btn-app:hover { background: rgba(46,139,46,0.25); transform: translateY(-1px); }
+    .btn-app:hover { background: rgba(79,106,255,0.25); transform: translateY(-1px); }
     .btn-app svg { width: 18px; height: 18px; }
 
     /* ══════════════════════════════
@@ -115,7 +115,7 @@
       content: '';
       position: absolute; top: -200px; right: -200px;
       width: 700px; height: 700px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(46,139,46,0.18) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(79,106,255,0.18) 0%, transparent 70%);
       pointer-events: none;
     }
     .hero::after {
@@ -130,8 +130,8 @@
     .grid-bg {
       position: absolute; inset: 0; pointer-events: none;
       background-image:
-        linear-gradient(rgba(46,139,46,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(46,139,46,0.04) 1px, transparent 1px);
+        linear-gradient(rgba(79,106,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,106,255,0.04) 1px, transparent 1px);
       background-size: 60px 60px;
       mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
     }
@@ -145,7 +145,7 @@
     .hero-badge {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 6px 14px; border-radius: 99px;
-      background: rgba(46,139,46,0.15); border: 1px solid rgba(46,139,46,0.3);
+      background: rgba(79,106,255,0.15); border: 1px solid rgba(79,106,255,0.3);
       font-size: 12px; font-weight: 600; color: var(--green-light);
       letter-spacing: 0.5px; margin-bottom: 24px;
     }
@@ -181,10 +181,10 @@
       background: linear-gradient(135deg, var(--green-mid), var(--green-dark));
       color: #fff; font-size: 15px; font-weight: 700;
       text-decoration: none; border: none; cursor: pointer;
-      box-shadow: 0 8px 32px rgba(46,139,46,0.4);
+      box-shadow: 0 8px 32px rgba(79,106,255,0.4);
       transition: transform 0.2s, box-shadow 0.2s;
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(46,139,46,0.55); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(79,106,255,0.55); }
 
     .btn-secondary {
       display: inline-flex; align-items: center; gap: 8px;
@@ -194,7 +194,7 @@
       text-decoration: none; cursor: pointer;
       transition: background 0.2s, transform 0.2s;
     }
-    .btn-secondary:hover { background: rgba(46,139,46,0.1); transform: translateY(-2px); }
+    .btn-secondary:hover { background: rgba(79,106,255,0.1); transform: translateY(-2px); }
 
     /* Hero visual */
     .hero-visual { display: flex; justify-content: center; align-items: center; }
@@ -210,15 +210,15 @@
       width: 220px; height: 220px;
       background: var(--bg2);
       border-radius: 24px;
-      border: 2px solid rgba(46,139,46,0.4);
+      border: 2px solid rgba(79,106,255,0.4);
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 60px rgba(46,139,46,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+      box-shadow: 0 0 60px rgba(79,106,255,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
       z-index: 5;
     }
 
     .qr-code-svg {
       width: 150px; height: 150px;
-      filter: drop-shadow(0 0 8px rgba(74,222,128,0.4));
+      filter: drop-shadow(0 0 8px rgba(107,138,255,0.4));
     }
 
     /* Scanning line animation */
@@ -275,7 +275,7 @@
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
     }
-    .float-icon.green  { background: rgba(46,139,46,0.25); color: var(--green-bright); }
+    .float-icon.green  { background: rgba(79,106,255,0.25); color: var(--green-bright); }
     .float-icon.blue   { background: rgba(59,130,246,0.2); color: #60a5fa; }
     .float-icon.purple { background: rgba(139,92,246,0.2); color: #a78bfa; }
     .float-icon.orange { background: rgba(249,115,22,0.2); color: #fb923c; }
@@ -289,7 +289,7 @@
       transform: translate(-50%, -50%);
       width: 340px; height: 340px;
       border-radius: 50%;
-      border: 1px dashed rgba(46,139,46,0.18);
+      border: 1px dashed rgba(79,106,255,0.18);
       animation: orbit-spin 20s linear infinite;
     }
     @keyframes orbit-spin { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
@@ -334,7 +334,7 @@
     .section-header { text-align: center; margin-bottom: 64px; }
     .section-tag {
       display: inline-block; padding: 5px 14px; border-radius: 99px;
-      background: rgba(46,139,46,0.12); border: 1px solid rgba(46,139,46,0.25);
+      background: rgba(79,106,255,0.12); border: 1px solid rgba(79,106,255,0.25);
       font-size: 12px; font-weight: 600; color: var(--green-light);
       letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 16px;
     }
@@ -367,10 +367,10 @@
     .feature-card::before {
       content: '';
       position: absolute; top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(74,222,128,0.4), transparent);
+      background: linear-gradient(90deg, transparent, rgba(107,138,255,0.4), transparent);
       opacity: 0; transition: opacity 0.25s;
     }
-    .feature-card:hover { transform: translateY(-4px); border-color: rgba(46,139,46,0.5); box-shadow: 0 16px 48px rgba(0,0,0,0.5); }
+    .feature-card:hover { transform: translateY(-4px); border-color: rgba(79,106,255,0.5); box-shadow: 0 16px 48px rgba(0,0,0,0.5); }
     .feature-card:hover::before { opacity: 1; }
 
     .feature-icon {
@@ -378,7 +378,7 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 24px;
     }
-    .fi-green  { background: rgba(46,139,46,0.2); }
+    .fi-green  { background: rgba(79,106,255,0.2); }
     .fi-blue   { background: rgba(59,130,246,0.15); }
     .fi-purple { background: rgba(139,92,246,0.15); }
     .fi-orange { background: rgba(249,115,22,0.15); }
@@ -402,7 +402,7 @@
       position: absolute; top: 36px; left: calc(16.66% + 20px); right: calc(16.66% + 20px);
       height: 2px;
       background: linear-gradient(90deg, var(--green-mid), transparent 50%, var(--green-mid));
-      border-top: 2px dashed rgba(46,139,46,0.3);
+      border-top: 2px dashed rgba(79,106,255,0.3);
     }
 
     .step { text-align: center; position: relative; }
@@ -413,7 +413,7 @@
       font-size: 24px; font-weight: 900;
       background: linear-gradient(135deg, var(--green-mid), var(--green-dark));
       color: #fff;
-      box-shadow: 0 8px 24px rgba(46,139,46,0.4);
+      box-shadow: 0 8px 24px rgba(79,106,255,0.4);
       position: relative; z-index: 1;
     }
 
@@ -445,7 +445,7 @@
       font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
       margin-bottom: 16px;
     }
-    .super .role-badge { background: rgba(46,139,46,0.2); color: var(--green-light); border: 1px solid rgba(46,139,46,0.3); }
+    .super .role-badge { background: rgba(79,106,255,0.2); color: var(--green-light); border: 1px solid rgba(79,106,255,0.3); }
     .admin .role-badge { background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); }
     .user  .role-badge { background: rgba(139,92,246,0.2); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.3); }
 
@@ -660,20 +660,20 @@
             <!-- SVG QR Code -->
             <svg class="qr-code-svg" viewBox="0 0 150 150" fill="none" xmlns="http://www.w3.org/2000/svg">
               <!-- Finder patterns -->
-              <rect x="8" y="8" width="42" height="42" rx="4" fill="rgba(74,222,128,0.15)" stroke="#4ade80" stroke-width="2"/>
-              <rect x="15" y="15" width="28" height="28" rx="2" fill="rgba(74,222,128,0.15)"/>
-              <rect x="21" y="21" width="16" height="16" rx="1.5" fill="#4ade80"/>
+              <rect x="8" y="8" width="42" height="42" rx="4" fill="rgba(107,138,255,0.15)" stroke="#6B8AFF" stroke-width="2"/>
+              <rect x="15" y="15" width="28" height="28" rx="2" fill="rgba(107,138,255,0.15)"/>
+              <rect x="21" y="21" width="16" height="16" rx="1.5" fill="#6B8AFF"/>
 
-              <rect x="100" y="8" width="42" height="42" rx="4" fill="rgba(74,222,128,0.15)" stroke="#4ade80" stroke-width="2"/>
-              <rect x="107" y="15" width="28" height="28" rx="2" fill="rgba(74,222,128,0.15)"/>
-              <rect x="113" y="21" width="16" height="16" rx="1.5" fill="#4ade80"/>
+              <rect x="100" y="8" width="42" height="42" rx="4" fill="rgba(107,138,255,0.15)" stroke="#6B8AFF" stroke-width="2"/>
+              <rect x="107" y="15" width="28" height="28" rx="2" fill="rgba(107,138,255,0.15)"/>
+              <rect x="113" y="21" width="16" height="16" rx="1.5" fill="#6B8AFF"/>
 
-              <rect x="8" y="100" width="42" height="42" rx="4" fill="rgba(74,222,128,0.15)" stroke="#4ade80" stroke-width="2"/>
-              <rect x="15" y="107" width="28" height="28" rx="2" fill="rgba(74,222,128,0.15)"/>
-              <rect x="21" y="113" width="16" height="16" rx="1.5" fill="#4ade80"/>
+              <rect x="8" y="100" width="42" height="42" rx="4" fill="rgba(107,138,255,0.15)" stroke="#6B8AFF" stroke-width="2"/>
+              <rect x="15" y="107" width="28" height="28" rx="2" fill="rgba(107,138,255,0.15)"/>
+              <rect x="21" y="113" width="16" height="16" rx="1.5" fill="#6B8AFF"/>
 
               <!-- Data modules (randomized) -->
-              <g fill="rgba(74,222,128,0.7)">
+              <g fill="rgba(107,138,255,0.7)">
                 <rect x="58" y="8"  width="8" height="8" rx="1"/>
                 <rect x="70" y="8"  width="8" height="8" rx="1"/>
                 <rect x="82" y="8"  width="8" height="8" rx="1"/>
@@ -718,17 +718,17 @@
               </g>
 
               <!-- Center logo mark -->
-              <rect x="60" y="60" width="30" height="30" rx="6" fill="#0c190c" stroke="rgba(74,222,128,0.4)" stroke-width="1.5"/>
+              <rect x="60" y="60" width="30" height="30" rx="6" fill="#0c190c" stroke="rgba(107,138,255,0.4)" stroke-width="1.5"/>
               <g>
-                <rect x="63" y="63" width="7" height="7" rx="1" fill="#1f6b1f"/>
-                <rect x="72" y="63" width="7" height="7" rx="1" fill="#2e8b2e"/>
-                <rect x="81" y="63" width="7" height="7" rx="1" fill="rgba(184,224,184,0.4)"/>
-                <rect x="63" y="72" width="7" height="7" rx="1" fill="rgba(184,224,184,0.4)"/>
-                <rect x="72" y="72" width="7" height="7" rx="1" fill="#1f6b1f"/>
-                <rect x="81" y="72" width="7" height="7" rx="1" fill="#2e8b2e"/>
-                <rect x="63" y="81" width="7" height="7" rx="1" fill="#2e8b2e"/>
-                <rect x="72" y="81" width="7" height="7" rx="1" fill="rgba(184,224,184,0.4)"/>
-                <rect x="81" y="81" width="7" height="7" rx="1" fill="#1f6b1f"/>
+                <rect x="63" y="63" width="7" height="7" rx="1" fill="#1a1f36"/>
+                <rect x="72" y="63" width="7" height="7" rx="1" fill="#4F6AFF"/>
+                <rect x="81" y="63" width="7" height="7" rx="1" fill="rgba(107,138,255,0.4)"/>
+                <rect x="63" y="72" width="7" height="7" rx="1" fill="rgba(107,138,255,0.4)"/>
+                <rect x="72" y="72" width="7" height="7" rx="1" fill="#1a1f36"/>
+                <rect x="81" y="72" width="7" height="7" rx="1" fill="#4F6AFF"/>
+                <rect x="63" y="81" width="7" height="7" rx="1" fill="#4F6AFF"/>
+                <rect x="72" y="81" width="7" height="7" rx="1" fill="rgba(107,138,255,0.4)"/>
+                <rect x="81" y="81" width="7" height="7" rx="1" fill="#1a1f36"/>
               </g>
             </svg>
           </div>
