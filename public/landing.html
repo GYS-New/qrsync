@@ -548,9 +548,8 @@
 
   <!-- ══ NAVBAR ══ -->
   <nav id="navbar">
-    <a href="/landing.html" class="nav-logo">
-      <img id="nav-logo-img" src="/favicon.svg" alt="Logo" style="height:36px;width:auto;border-radius:8px;" />
-      <span id="nav-app-name" style="font-size:18px;font-weight:800;color:#fff;letter-spacing:-0.3px;">Syncora</span>
+    <a href="/landing.html" class="nav-logo" id="nav-logo-link">
+      <img id="nav-logo-img" src="/favicon.svg" alt="Logo" style="height:40px;max-width:220px;width:auto;object-fit:contain;" />
     </a>
 
     <!-- Desktop: Dashboard butonu -->
@@ -884,7 +883,7 @@
   <!-- ══ FOOTER ══ -->
   <footer>
     <div class="footer-brand">
-      <img id="footer-logo-img" src="/favicon.svg" alt="Logo" style="height:28px;width:auto;border-radius:6px;" />
+      <img id="footer-logo-img" src="/favicon.svg" alt="Logo" style="height:28px;max-width:160px;width:auto;object-fit:contain;" />
       <span class="footer-copy" style="margin-left:10px;" id="footer-copy">© 2026 Syncora Yazılım · Tüm hakları saklıdır</span>
     </div>
     <nav class="footer-links">
@@ -918,15 +917,18 @@
       const isim = j.isim || 'Syncora';
       const logo = j.logo || null;
       document.title = isim + ' — QR/NFC Tabanlı Görev Yönetim Sistemi';
-      const navName = document.getElementById('nav-app-name');
-      if (navName) navName.textContent = isim;
       const footerCopy = document.getElementById('footer-copy');
       if (footerCopy) footerCopy.textContent = '© 2026 ' + isim + ' · Tüm hakları saklıdır';
       if (logo) {
+        // DB'de logo varsa onu göster
         const navLogo = document.getElementById('nav-logo-img');
         if (navLogo) navLogo.src = logo;
         const footerLogo = document.getElementById('footer-logo-img');
         if (footerLogo) footerLogo.src = logo;
+      } else {
+        // Logo yoksa favicon yerine sadece isim göster
+        const navLink = document.getElementById('nav-logo-link');
+        if (navLink) navLink.innerHTML = '<span style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.3px;">' + isim + '</span>';
       }
     }).catch(() => {});
   </script>
