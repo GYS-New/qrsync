@@ -56,6 +56,7 @@
     }
 
     .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; flex-shrink: 0; }
+    .nav-logo-img { height: 72px; max-width: 420px; width: auto; object-fit: contain; }
 
     .nav-links {
       display: flex; align-items: center; gap: 28px;
@@ -517,7 +518,7 @@
       .desktop-only { display: none !important; }
       .nav-links { display: none !important; }
       nav { padding: 10px 16px; }
-      #nav-logo-img { height: 52px !important; max-width: 260px !important; }
+      .nav-logo-img { height: 52px; max-width: 260px; }
       .nav-logo { margin-right: auto; }
 
       .nav-actions-desktop { display: none; }
@@ -569,7 +570,7 @@
   <!-- ══ NAVBAR ══ -->
   <nav id="navbar">
     <a href="/landing.html" class="nav-logo" id="nav-logo-link">
-      <img id="nav-logo-img" src="/favicon.svg" alt="Logo" style="height:72px;max-width:420px;width:auto;object-fit:contain;" />
+      <img id="nav-logo-img" src="/favicon.svg" alt="Logo" class="nav-logo-img" />
     </a>
 
     <!-- Merkez linkler (Desktop) -->
