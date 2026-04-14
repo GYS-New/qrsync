@@ -53,42 +53,33 @@ export async function GET(req: NextRequest) {
   // firma_id ile çek, lokasyon filtresi sonradan uygula (lokIds 400+ olabilir, URL limit aşılır)
   const lokSet = new Set(lokIds)
 
-  // Count — firma bazlı çek, sonra lokasyon filtreli sayı hesapla
-  let countQ = admin.from('checklist_sonuc_basliklari_arsiv')
-    .select('id,lokasyon_id', { count: 'exact' })
-    .eq('firma_id', firmaId)
-  if (fromD) countQ = countQ.gte('kayit_tarihi', fromD + 'T00:00:00')
-  if (toD) countQ = countQ.lte('kayit_tarihi', toD + 'T23:59:59')
-  const { data: countData } = await countQ
-  const filteredCount = (countData ?? []).filter((r: any) => lokSet.has(r.lokasyon_id)).length
-
-  // Data — fazla çek, lokasyon filtresi uygula, sonra sayfa kes
-  const pageSize = limit * 3
-  let allFiltered: any[] = []
+  // Tüm firma arşiv başlıklarını çek, lokasyon filtresi uygula, sonra sayfala
+  // (firma başına max birkaç bin kayıt — tek seferde çekilebilir)
+  const sel = 'id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi'
+  let allRows: any[] = []
   let dbOffset = 0
-  const skip = (page - 1) * limit
-  const targetCount = skip + limit
+  const CHUNK = 1000
 
-  while (allFiltered.length < targetCount) {
-    let dataQ = admin.from('checklist_sonuc_basliklari_arsiv')
-      .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
-      .eq('firma_id', firmaId)
+  while (true) {
+    let q = admin.from('checklist_sonuc_basliklari_arsiv')
+      .select(sel).eq('firma_id', firmaId)
       .order('kayit_tarihi', { ascending: false })
-      .range(dbOffset, dbOffset + pageSize - 1)
-    if (fromD) dataQ = dataQ.gte('kayit_tarihi', fromD + 'T00:00:00')
-    if (toD) dataQ = dataQ.lte('kayit_tarihi', toD + 'T23:59:59')
-
-    const { data: batch, error } = await dataQ
+      .range(dbOffset, dbOffset + CHUNK - 1)
+    if (fromD) q = q.gte('kayit_tarihi', fromD + 'T00:00:00')
+    if (toD) q = q.lte('kayit_tarihi', toD + 'T23:59:59')
+    const { data: chunk, error } = await q
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    if (!batch?.length) break
-
-    allFiltered.push(...batch.filter((b: any) => lokSet.has(b.lokasyon_id)))
-    dbOffset += pageSize
-    if (batch.length < pageSize) break // son sayfa
+    if (!chunk?.length) break
+    allRows.push(...chunk)
+    if (chunk.length < CHUNK) break
+    dbOffset += CHUNK
   }
 
-  const total = filteredCount
-  const filtreliBsl = allFiltered.slice(skip, skip + limit)
+  // Lokasyon filtresi
+  const lokFiltered = allRows.filter(b => lokSet.has(b.lokasyon_id))
+  const total = lokFiltered.length
+  const skip = (page - 1) * limit
+  const filtreliBsl = lokFiltered.slice(skip, skip + limit)
   if (!filtreliBsl.length) return NextResponse.json({ data: [], total })
 
   // Görev bilgilerini çek (batch)
