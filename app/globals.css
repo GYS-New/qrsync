@@ -72,7 +72,7 @@ html, body {
 /* ── COMPONENTS ── */
 @layer components {
   .verde-card {
-    @apply bg-white border border-[#e5e7eb] rounded-[7px] shadow-[0_1px_2px_rgba(0,0,0,0.05)];
+    @apply bg-white border border-[#d1d5db] rounded-[7px] shadow-[0_1px_2px_rgba(0,0,0,0.05)];
   }
 
   .verde-btn-primary {

@@ -43,7 +43,7 @@ export default function KpiCard({
       style={{
         animationDelay: `${delay}ms`,
         background: '#ffffff',
-        border: '1px solid #e5e7eb',
+        border: '1px solid #d1d5db',
         borderRadius: 10,
         padding: '16px 18px',
         position: 'relative',
