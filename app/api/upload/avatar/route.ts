@@ -22,11 +22,13 @@ export async function POST(req: Request) {
   const upload = await admin.storage.from('avatars').upload(path, arrayBuffer, {
     upsert: true,
     contentType: 'image/png',
-    cacheControl: '3600',
+    cacheControl: '0',
   })
   if (upload.error) return NextResponse.json({ error: upload.error.message }, { status: 400 })
 
-  const publicUrl = admin.storage.from('avatars').getPublicUrl(path).data.publicUrl
+  const baseUrl = admin.storage.from('avatars').getPublicUrl(path).data.publicUrl
+  // Cache bust: timestamp ekle — tarayıcı eski resmi göstermesin
+  const publicUrl = `${baseUrl}?v=${Date.now()}`
 
   const { error: upErr } = await admin.from('users').update({ profil_foto: publicUrl }).eq('id', user.id)
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 400 })
