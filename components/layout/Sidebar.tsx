@@ -332,7 +332,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         >
           {/* Logo alanı */}
           {isSA && sidebarLogo ? (
-            <SidebarLogo src={sidebarLogo} alt="Logo" bordered />
+            <SidebarLogo src={sidebarLogo} alt="Logo" />
           ) : !isSA && firma?.logo_url ? (
             <SidebarLogo src={firma.logo_url} alt="Firma Logo" />
           ) : null}
