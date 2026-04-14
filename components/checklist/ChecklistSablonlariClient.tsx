@@ -100,7 +100,7 @@ export default function ChecklistSablonlariClient({
   const [baglaGrupList, setBaglaGrupList] = useState<GrupRow[]>([])
   const [baglaLoading, setBaglaLoading] = useState(false)
   const [secilenLok,   setSecilenLok]   = useState<Set<string>>(new Set())
-  const [secilenGrup,  setSecilenGrup]  = useState<string>('')
+  const [secilenGruplar, setSecilenGruplar] = useState<Set<string>>(new Set())
   const [lokArama,     setLokArama]     = useState('')
   const [lokUstFiltre, setLokUstFiltre] = useState('')
 
@@ -568,7 +568,7 @@ export default function ChecklistSablonlariClient({
     setBaglaLoading(true)
     setBaglaInfo({ sablon, asama: 'secim' })
     setSecilenLok(new Set())
-    setSecilenGrup('')
+    setSecilenGruplar(new Set())
     setLokArama('')
     setLokUstFiltre('')
     setBaglaLokList([])
@@ -651,26 +651,45 @@ export default function ChecklistSablonlariClient({
       if (error) showError(error.message)
       else showSuccess(`${ids.length} lokasyona bağlandı.`)
     } else if (baglaInfo.asama === 'grup') {
-      if (!secilenGrup) return showError('Bir grup seçin')
-      const grup = baglaGrupList.find(g => g.id === secilenGrup)
-      if (!grup || grup.lokasyon_ids.length === 0) return showError('Bu grubun lokasyonu yok')
+      if (secilenGruplar.size === 0) return showError('En az bir grup seçin')
+      // Seçili grupların tüm lokasyon ID'lerini birleştir (tekrarsız)
+      const tumLokIds = new Set<string>()
+      for (const gId of secilenGruplar) {
+        const grup = baglaGrupList.find(g => g.id === gId)
+        if (grup) for (const lid of grup.lokasyon_ids) tumLokIds.add(lid)
+      }
+      if (tumLokIds.size === 0) return showError('Seçili grupların lokasyonu yok')
       setLoading(true)
-      const { error } = await supabase
-        .from('lokasyonlar')
-        .update({ checklist_sablon_id: baglaInfo.sablon.id })
-        .in('id', grup.lokasyon_ids)
-      if (error) showError(error.message)
-      else showSuccess(`${grup.lokasyon_ids.length} lokasyona bağlandı.`)
+      const ids = [...tumLokIds]
+      // Batch (URL limit)
+      for (let i = 0; i < ids.length; i += 80) {
+        const chunk = ids.slice(i, i + 80)
+        const { error } = await supabase
+          .from('lokasyonlar')
+          .update({ checklist_sablon_id: baglaInfo.sablon.id })
+          .in('id', chunk)
+        if (error) { showError(error.message); break }
+      }
+      showSuccess(`${secilenGruplar.size} grup — ${tumLokIds.size} lokasyona bağlandı.`)
     }
     setBaglaInfo(null)
     setSecilenLok(new Set())
-    setSecilenGrup('')
+    setSecilenGruplar(new Set())
     if (firmaId) await refresh(firmaId)
     setLoading(false)
   }
 
   function toggleLokSec(id: string) {
     setSecilenLok(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleGrupSec(id: string) {
+    setSecilenGruplar(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -982,43 +1001,67 @@ export default function ChecklistSablonlariClient({
                   </>
                 )}
 
-                {/* ── Grup seçim aşaması ── */}
+                {/* ── Grup seçim aşaması (çoklu seçim) ── */}
                 {baglaInfo.asama === 'grup' && (
                   <>
-                    <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
+                    <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', flexShrink: 0, display: 'flex', gap: 8 }}>
                       <select
                         value={lokUstFiltre}
-                        onChange={e => { setLokUstFiltre(e.target.value); setSecilenGrup('') }}
-                        style={{ height: 32, padding: '0 8px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, width: '100%' }}>
+                        onChange={e => setLokUstFiltre(e.target.value)}
+                        style={{ height: 32, padding: '0 8px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, flex: 1 }}>
                         <option value="">Tüm Üst Lokasyonlar</option>
                         {grupUstFiltreler.map(l => (
                           <option key={l.id} value={l.id}>{l.tanim}</option>
                         ))}
                       </select>
+                      <button
+                        onClick={() => {
+                          const ids = filteredGruplar.map(g => g.id)
+                          const allSelected = ids.every(id => secilenGruplar.has(id))
+                          setSecilenGruplar(prev => {
+                            const next = new Set(prev)
+                            if (allSelected) ids.forEach(id => next.delete(id))
+                            else ids.forEach(id => next.add(id))
+                            return next
+                          })
+                        }}
+                        style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', color: '#374151' }}>
+                        {filteredGruplar.every(g => secilenGruplar.has(g.id)) ? 'Tümünü Kaldır' : 'Tümünü Seç'}
+                      </button>
                     </div>
                     <div style={{ overflowY: 'auto', flex: 1 }}>
                       {filteredGruplar.length === 0 ? (
                         <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Grup bulunamadı</div>
                       ) : filteredGruplar.map(g => (
-                        <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', cursor: 'pointer', background: secilenGrup === g.id ? '#f9fafb' : 'transparent', borderBottom: '1px solid #f1f5f1' }}>
-                          <input type="radio" name="grup" checked={secilenGrup === g.id} onChange={() => setSecilenGrup(g.id)} style={{ width: 16, height: 16, flexShrink: 0 }} />
-                          <div>
+                        <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', cursor: 'pointer', background: secilenGruplar.has(g.id) ? '#f0fdf4' : 'transparent', borderBottom: '1px solid #f1f5f1' }}>
+                          <input type="checkbox" checked={secilenGruplar.has(g.id)} onChange={() => toggleGrupSec(g.id)} style={{ width: 16, height: 16, flexShrink: 0, accentColor: '#16a34a' }} />
+                          <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: '#102110' }}>{g.ad}</div>
-                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{g.lokasyon_ids.length} lokasyon</div>
+                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                              {g.ust_lokasyon_tanim && <span>{g.ust_lokasyon_tanim} · </span>}
+                              {g.lokasyon_ids.length} lokasyon
+                            </div>
                           </div>
                         </label>
                       ))}
                     </div>
                     <div style={{ padding: '12px 18px', borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                       <span style={{ fontSize: 12, color: '#64748b' }}>
-                        {secilenGrup
-                          ? `${baglaGrupList.find(g => g.id === secilenGrup)?.lokasyon_ids.length ?? 0} lokasyon bağlanacak`
-                          : 'Bir grup seçin'}
+                        {secilenGruplar.size > 0
+                          ? (() => {
+                              const toplamLok = new Set<string>()
+                              for (const gId of secilenGruplar) {
+                                const g = baglaGrupList.find(gr => gr.id === gId)
+                                if (g) for (const lid of g.lokasyon_ids) toplamLok.add(lid)
+                              }
+                              return `${secilenGruplar.size} grup — ${toplamLok.size} lokasyon bağlanacak`
+                            })()
+                          : 'Grup seçin'}
                       </span>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <Button variant="ghost" size="sm" onClick={() => setBaglaInfo(prev => prev ? { ...prev, asama: 'secim' } : null)}>← Geri</Button>
-                        <Button variant="primary" size="sm" onClick={baglayiKaydet} disabled={!secilenGrup || loading}>
-                          {loading ? 'Bağlanıyor…' : 'Bağla'}
+                        <Button variant="primary" size="sm" onClick={baglayiKaydet} disabled={secilenGruplar.size === 0 || loading}>
+                          {loading ? 'Bağlanıyor…' : `Bağla (${secilenGruplar.size})`}
                         </Button>
                       </div>
                     </div>
