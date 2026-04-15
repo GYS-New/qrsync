@@ -36,16 +36,17 @@ export async function middleware(request: NextRequest) {
   const isLandingPage = pathname === '/' || pathname === '/landing.html'
   const isPublicScanPath = pathname.startsWith('/qr/') || pathname.startsWith('/nfc/') || pathname.startsWith('/mesai/') || pathname.startsWith('/degerlendirme/')
   const isApiPath = pathname.startsWith('/api/')
+  const isAuthCallback = pathname.startsWith('/auth/callback')
 
   const publicPaths = new Set(['/login', '/forgot-password', '/reset-password'])
   const isAuthPage = publicPaths.has(pathname)
 
   // Mobil cihaz + web sayfası (scan/api/landing/auth hariç) → landing'e yönlendir
-  if (isMobile && !isLandingPage && !isPublicScanPath && !isApiPath && !isAuthPage) {
+  if (isMobile && !isLandingPage && !isPublicScanPath && !isApiPath && !isAuthPage && !isAuthCallback) {
     return NextResponse.redirect(new URL('/landing.html', request.url))
   }
 
-  if (!authUser && !isAuthPage && !isPublicScanPath && !isLandingPage) {
+  if (!authUser && !isAuthPage && !isPublicScanPath && !isLandingPage && !isAuthCallback) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
