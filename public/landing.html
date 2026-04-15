@@ -43,9 +43,12 @@
     }
     .navbar.scrolled { padding: 8px 48px; box-shadow: var(--shadow-sm); }
 
-    .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-    .nav-brand svg { width: 38px; height: 38px; flex-shrink: 0; }
-    .nav-brand-text { font-size: 22px; font-weight: 900; color: var(--primary-dark); letter-spacing: -0.5px; }
+    .nav-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .nav-brand img { width: 42px; height: 42px; border-radius: 10px; flex-shrink: 0; }
+    .nav-brand-info { display: flex; flex-direction: column; line-height: 1.2; }
+    .nav-brand-title { font-size: 20px; font-weight: 900; color: var(--primary-dark); letter-spacing: -0.3px; }
+    .nav-brand-title span { font-weight: 400; color: var(--primary); }
+    .nav-brand-sub { font-size: 10.5px; font-weight: 500; color: var(--text-400); letter-spacing: 0.3px; }
 
     .nav-links { display: flex; align-items: center; gap: 32px; }
     .nav-links a { font-size: 15px; font-weight: 600; color: var(--text-500); text-decoration: none; transition: color 0.15s; }
@@ -215,8 +218,9 @@
       .nav-links { display: none; }
       .nav-mobile { display: flex; gap: 6px; }
       .nav-actions .btn-outline, .nav-actions .btn-solid { display: none; }
-      .nav-brand svg { width: 32px; height: 32px; }
-      .nav-brand-text { font-size: 19px; }
+      .nav-brand img { width: 36px; height: 36px; }
+      .nav-brand-title { font-size: 17px; }
+      .nav-brand-sub { font-size: 9.5px; }
 
       .hero { padding: 100px 20px 48px; }
       .hero-inner { grid-template-columns: 1fr; text-align: center; gap: 32px; }
@@ -258,13 +262,11 @@
   <!-- ══ NAVBAR ══ -->
   <nav class="navbar" id="navbar">
     <a href="/landing.html" class="nav-brand">
-      <svg viewBox="0 0 68 68" xmlns="http://www.w3.org/2000/svg">
-        <rect width="68" height="68" rx="15" fill="#0C447C"/>
-        <circle cx="14" cy="8" r="4" fill="white"/>
-        <rect x="11" y="16" width="6" height="36" rx="2.5" fill="white"/>
-        <circle cx="39" cy="34" r="18" fill="none" stroke="white" stroke-width="4.5"/>
-      </svg>
-      <span class="nav-brand-text" id="nav-app-name">İOGYS</span>
+      <img src="/io-logo-animation-v2.gif" alt="İO Teknoloji" />
+      <div class="nav-brand-info">
+        <div class="nav-brand-title">İO <span>Teknoloji</span></div>
+        <div class="nav-brand-sub">Yazılım &amp; Danışmanlık</div>
+      </div>
     </a>
 
     <div class="nav-links">
@@ -502,10 +504,8 @@
     fetch('/api/public/app-config').then(r => r.json()).then(j => {
       const isim = j.isim || 'İOGYS';
       document.title = isim + ' — Akıllı Operasyon Görev Yönetim Sistemi';
-      const n = document.getElementById('nav-app-name');
-      if (n) n.textContent = isim.toUpperCase();
       const fc = document.getElementById('footer-copy');
-      if (fc) fc.textContent = '© 2026 ' + isim + ' · Tüm hakları saklıdır';
+      if (fc) fc.textContent = '© 2026 İO Teknoloji · Tüm hakları saklıdır';
     }).catch(() => {});
   </script>
 </body>
