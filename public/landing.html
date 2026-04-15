@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>İOGYS — QR/NFC Tabanlı Görev Yönetim Sistemi</title>
+  <title>İOGYS — Akıllı Operasyon Görev Yönetim Sistemi</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,11 +12,11 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --primary: #4F6AFF;
-      --primary-dark: #1a1f36;
-      --primary-light: #6B8AFF;
-      --gradient: linear-gradient(135deg, #4F6AFF, #6B8AFF);
-      --gradient-hero: linear-gradient(135deg, #f0f4ff 0%, #e8ecff 50%, #f5f0ff 100%);
+      --primary: #185FA5;
+      --primary-dark: #042C53;
+      --primary-light: #378ADD;
+      --gradient: linear-gradient(135deg, #0C447C, #185FA5);
+      --gradient-hero: linear-gradient(135deg, #f0f6ff 0%, #e4edf8 50%, #f0f6ff 100%);
       --bg: #ffffff;
       --bg-alt: #f8fafc;
       --bg-card: #ffffff;
@@ -54,8 +54,8 @@
     .nav-actions { display: flex; align-items: center; gap: 10px; }
     .btn-outline { padding: 9px 20px; border-radius: 8px; border: 2px solid var(--primary); color: var(--primary); font-size: 14px; font-weight: 700; text-decoration: none; transition: all 0.15s; background: transparent; cursor: pointer; }
     .btn-outline:hover { background: var(--primary); color: #fff; }
-    .btn-solid { padding: 10px 22px; border-radius: 8px; border: none; background: var(--gradient); color: #fff; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; box-shadow: 0 4px 14px rgba(79,106,255,0.3); transition: all 0.15s; }
-    .btn-solid:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79,106,255,0.4); }
+    .btn-solid { padding: 10px 22px; border-radius: 8px; border: none; background: var(--gradient); color: #fff; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; box-shadow: 0 4px 14px rgba(12,68,124,0.3); transition: all 0.15s; }
+    .btn-solid:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(12,68,124,0.4); }
 
     .nav-mobile { display: none; }
 
@@ -102,7 +102,7 @@
     .section-header h2 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 900; color: var(--primary-dark); letter-spacing: -1px; margin-bottom: 12px; }
     .section-header h2 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .section-header p { font-size: 17px; color: var(--text-500); max-width: 600px; margin: 0 auto; }
-    .section-tag { display: inline-block; padding: 6px 16px; border-radius: 99px; font-size: 13px; font-weight: 700; color: var(--primary); background: rgba(79,106,255,0.1); margin-bottom: 16px; letter-spacing: 0.3px; }
+    .section-tag { display: inline-block; padding: 6px 16px; border-radius: 99px; font-size: 13px; font-weight: 700; color: var(--primary); background: rgba(12,68,124,0.1); margin-bottom: 16px; letter-spacing: 0.3px; }
     .container { max-width: 1320px; margin: 0 auto; }
 
     /* ── FEATURE CARDS ── */
@@ -117,7 +117,7 @@
       width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center;
       font-size: 24px; margin-bottom: 16px;
     }
-    .fi-blue { background: rgba(79,106,255,0.1); }
+    .fi-blue { background: rgba(12,68,124,0.1); }
     .fi-purple { background: rgba(139,92,246,0.1); }
     .fi-green { background: rgba(34,197,94,0.1); }
     .fi-orange { background: rgba(249,115,22,0.1); }
@@ -132,7 +132,7 @@
     .step-num {
       width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center;
       font-size: 22px; font-weight: 900; color: #fff; background: var(--gradient);
-      margin: 0 auto 20px; box-shadow: 0 4px 16px rgba(79,106,255,0.3);
+      margin: 0 auto 20px; box-shadow: 0 4px 16px rgba(12,68,124,0.3);
     }
     .step h3 { font-size: 18px; font-weight: 800; color: var(--primary-dark); margin-bottom: 8px; }
     .step p { font-size: 14px; color: var(--text-500); line-height: 1.65; }
@@ -258,10 +258,11 @@
   <!-- ══ NAVBAR ══ -->
   <nav class="navbar" id="navbar">
     <a href="/landing.html" class="nav-brand">
-      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-        <rect width="64" height="64" rx="14" fill="#1a1f36"/>
-        <path d="M32 16c-8.8 0-16 7.2-16 16s7.2 16 16 16c4 0 7.6-1.4 10.4-3.8l-2.8-2.8C37.6 43 34.9 44 32 44c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.3 0 6.3 1.3 8.5 3.5L38 26l12-2-2 12-3.2-3.2C41.6 36.4 37.1 38.8 32 39c-3.9 0-7-3.1-7-7s3.1-7 7-7c1.9 0 3.7.8 4.9 2.1" fill="none" stroke="#4F6AFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="32" cy="32" r="3" fill="#6B8AFF"/>
+      <svg viewBox="0 0 68 68" xmlns="http://www.w3.org/2000/svg">
+        <rect width="68" height="68" rx="15" fill="#0C447C"/>
+        <circle cx="14" cy="8" r="4" fill="white"/>
+        <rect x="11" y="16" width="6" height="36" rx="2.5" fill="white"/>
+        <circle cx="39" cy="34" r="18" fill="none" stroke="white" stroke-width="4.5"/>
       </svg>
       <span class="nav-brand-text" id="nav-app-name">İOGYS</span>
     </a>
@@ -500,7 +501,7 @@
     // API'den uygulama adı
     fetch('/api/public/app-config').then(r => r.json()).then(j => {
       const isim = j.isim || 'İOGYS';
-      document.title = isim + ' — QR/NFC Tabanlı Görev Yönetim Sistemi';
+      document.title = isim + ' — Akıllı Operasyon Görev Yönetim Sistemi';
       const n = document.getElementById('nav-app-name');
       if (n) n.textContent = isim.toUpperCase();
       const fc = document.getElementById('footer-copy');

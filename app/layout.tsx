@@ -13,13 +13,13 @@ export async function generateMetadata(): Promise<Metadata> {
     const isim = data?.uygulama_ismi ?? 'İOGYS'
     return {
       title: { default: isim, template: `%s · ${isim}` },
-      description: 'QR/NFC Tabanlı Görev Yönetim Sistemi',
+      description: 'Akıllı Operasyon Görev Yönetim Sistemi',
       icons: { icon: '/favicon.svg' },
     }
   } catch {
     return {
       title: 'İOGYS',
-      description: 'QR/NFC Tabanlı Görev Yönetim Sistemi',
+      description: 'Akıllı Operasyon Görev Yönetim Sistemi',
       icons: { icon: '/favicon.svg' },
     }
   }
