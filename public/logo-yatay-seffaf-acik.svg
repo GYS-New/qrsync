@@ -1,0 +1,13 @@
+<svg width="440" height="100" viewBox="0 0 440 100" xmlns="http://www.w3.org/2000/svg">
+  <defs><style>text{font-family:"Liberation Sans","DejaVu Sans",Arial,sans-serif;}</style></defs>
+  <g transform="translate(14,16)">
+    <rect width="68" height="68" rx="15" fill="#0C447C"/>
+    <circle cx="14" cy="8" r="4" fill="white"/>
+    <rect x="11" y="16" width="6" height="36" rx="2.5" fill="white"/>
+    <circle cx="39" cy="34" r="18" fill="none" stroke="white" stroke-width="4.5"/>
+  </g>
+  <text x="96" y="52" font-size="30" letter-spacing="-0.5">
+    <tspan font-weight="700" fill="#042C53">İO </tspan><tspan font-weight="400" fill="#185FA5">Teknoloji</tspan>
+  </text>
+  <text x="96" y="73" font-size="15" font-weight="400" fill="#378ADD" textLength="231" lengthAdjust="spacing">Yazilim &amp; Danismanlik</text>
+</svg>
