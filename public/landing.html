@@ -1,512 +1,571 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>İOGYS — Akıllı Operasyon Görev Yönetim Sistemi</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>İOGYS — Akıllı Operasyon Görev Yönetim Sistemi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#042C53;
+  --blue:#0C447C;
+  --mid:#185FA5;
+  --accent:#378ADD;
+  --light:#85B7EB;
+  --ice:#E6F1FB;
+  --white:#ffffff;
+  --gray-50:#f8fafc;
+  --gray-100:#f1f5f9;
+  --gray-200:#e2e8f0;
+  --gray-500:#64748b;
+  --gray-700:#334155;
+  --text:#1a2744;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#fff;color:var(--gray-700);line-height:1.6;overflow-x:hidden}
 
-    :root {
-      --primary: #185FA5;
-      --primary-dark: #042C53;
-      --primary-light: #378ADD;
-      --gradient: linear-gradient(135deg, #0C447C, #185FA5);
-      --gradient-hero: linear-gradient(135deg, #f0f6ff 0%, #e4edf8 50%, #f0f6ff 100%);
-      --bg: #ffffff;
-      --bg-alt: #f8fafc;
-      --bg-card: #ffffff;
-      --text-900: #1a1f36;
-      --text-700: #374151;
-      --text-500: #6b7280;
-      --text-400: #9ca3af;
-      --border: #e5e7eb;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-      --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
-      --shadow-lg: 0 12px 40px rgba(0,0,0,0.10);
-    }
+/* ── NAVBAR ── */
+.nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 48px;
+  background:rgba(4,44,83,0.96);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  transition:padding .3s;
+}
+.nav.scrolled{padding:10px 48px;background:rgba(4,44,83,0.99)}
+.nav-logo{display:flex;align-items:center;gap:12px;text-decoration:none}
+.nav-logo img{width:44px;height:44px;border-radius:10px}
+.nav-logo-text{display:flex;flex-direction:column;line-height:1.1}
+.nav-logo-name{font-size:17px;font-weight:800;color:#fff;letter-spacing:-.3px}
+.nav-logo-name span{color:var(--light);font-weight:400}
+.nav-logo-sub{font-size:8px;color:rgba(255,255,255,.4);letter-spacing:1.5px;font-weight:500;margin-top:2px;white-space:nowrap}
+.nav-links{display:flex;gap:28px}
+.nav-links a{font-size:14px;font-weight:600;color:rgba(255,255,255,.7);text-decoration:none;transition:color .15s}
+.nav-links a:hover{color:#fff}
+.nav-cta{display:flex;gap:10px;align-items:center}
+.btn-ghost{padding:9px 20px;border-radius:8px;border:1.5px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85);font-size:13px;font-weight:700;text-decoration:none;transition:all .15s;font-family:inherit}
+.btn-ghost:hover{border-color:rgba(255,255,255,.7);color:#fff}
+.btn-primary{padding:10px 22px;border-radius:8px;background:var(--accent);color:#fff;font-size:13px;font-weight:700;text-decoration:none;transition:all .15s;border:none;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(55,138,221,.4)}
+.btn-primary:hover{background:#4a9ee8;transform:translateY(-1px);box-shadow:0 6px 20px rgba(55,138,221,.5)}
 
-    html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-700); line-height: 1.6; overflow-x: hidden; }
+/* ── HERO ── */
+.hero{
+  min-height:100vh;
+  background:linear-gradient(160deg,#020c1a 0%,#042C53 45%,#0C447C 100%);
+  display:flex;flex-direction:column;justify-content:center;
+  padding:120px 48px 80px;
+  position:relative;overflow:hidden;
+}
+.hero::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 60% at 70% 50%,rgba(55,138,221,.12) 0%,transparent 70%);
+  pointer-events:none;
+}
+.hero::after{
+  content:'';position:absolute;
+  top:-200px;right:-200px;
+  width:700px;height:700px;border-radius:50%;
+  background:radial-gradient(circle,rgba(24,95,165,.15) 0%,transparent 65%);
+  pointer-events:none;
+}
+.hero-inner{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:1fr 1.15fr;gap:64px;align-items:center;position:relative;z-index:1}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(55,138,221,.15);border:1px solid rgba(55,138,221,.35);color:var(--light);font-size:12px;font-weight:700;padding:6px 14px;border-radius:99px;margin-bottom:24px;letter-spacing:.3px}
+.hero-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#34d399;flex-shrink:0;box-shadow:0 0 8px #34d399}
+.hero h1{font-size:clamp(38px,4.5vw,64px);font-weight:800;line-height:1.08;letter-spacing:-2px;color:#fff;margin-bottom:20px}
+.hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),var(--light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{font-size:18px;color:rgba(255,255,255,.65);line-height:1.75;margin-bottom:36px;max-width:480px}
+.hero-actions{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:48px}
+.btn-hero-main{display:inline-flex;align-items:center;gap:8px;padding:16px 32px;border-radius:10px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;text-decoration:none;box-shadow:0 8px 32px rgba(55,138,221,.4);transition:all .2s;font-family:inherit;border:none;cursor:pointer}
+.btn-hero-main:hover{background:#4a9ee8;transform:translateY(-2px);box-shadow:0 12px 40px rgba(55,138,221,.5)}
+.btn-hero-outline{display:inline-flex;align-items:center;gap:8px;padding:15px 28px;border-radius:10px;border:1.5px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85);font-size:16px;font-weight:600;text-decoration:none;transition:all .2s;font-family:inherit;cursor:pointer;background:transparent}
+.btn-hero-outline:hover{border-color:rgba(255,255,255,.6);color:#fff;background:rgba(255,255,255,.05)}
+.hero-trust{display:flex;align-items:center;gap:16px}
+.hero-trust-avatars{display:flex}
+.hero-trust-avatars span{width:32px;height:32px;border-radius:50%;border:2px solid rgba(4,44,83,.8);background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;margin-left:-8px}
+.hero-trust-avatars span:first-child{margin-left:0}
+.hero-trust-text{font-size:13px;color:rgba(255,255,255,.55)}<br/>.hero-trust-text strong{color:rgba(255,255,255,.85);font-weight:700}
 
-    /* ── NAVBAR ── */
-    .navbar {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 48px; background: rgba(255,255,255,0.95);
-      backdrop-filter: blur(20px); border-bottom: 1px solid var(--border);
-      transition: padding 0.3s, box-shadow 0.3s;
-    }
-    .navbar.scrolled { padding: 8px 48px; box-shadow: var(--shadow-sm); }
+/* Hero visual */
+.hero-visual{position:relative}
+.hero-mockup{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:0 40px 100px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.06);
+  transform:perspective(1400px) rotateY(-6deg) rotateX(3deg);
+  transition:transform .4s ease;
+}
+.hero-mockup:hover{transform:perspective(1400px) rotateY(-2deg) rotateX(1deg)}
+.hero-mockup img{width:100%;display:block;border-radius:15px}
+.hero-mockup-bar{background:rgba(255,255,255,.06);padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.06)}
+.hero-mockup-dots{display:flex;gap:5px}
+.hero-mockup-dots span{width:10px;height:10px;border-radius:50%}
+.hero-mockup-dots span:nth-child(1){background:#ff5f57}
+.hero-mockup-dots span:nth-child(2){background:#febc2e}
+.hero-mockup-dots span:nth-child(3){background:#28c840}
+.hero-mockup-url{flex:1;background:rgba(255,255,255,.05);border-radius:5px;padding:4px 12px;font-size:11px;color:rgba(255,255,255,.35);font-family:monospace}
+.hero-float{
+  position:absolute;bottom:-24px;right:-16px;width:42%;
+  background:rgba(4,44,83,.95);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:12px;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);
+  transition:transform .3s ease;
+}
+.hero-float:hover{transform:translateY(-4px) scale(1.02)}
+.hero-float img{width:100%;display:block}
 
-    .nav-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-    .nav-brand img { width: 76px; height: 76px; border-radius: 14px; flex-shrink: 0; }
-    .nav-brand-info { display: flex; flex-direction: column; line-height: 1.2; }
-    .nav-brand-title { font-size: 42px; font-weight: 900; color: var(--primary-dark); letter-spacing: -0.3px; }
-    .nav-brand-title span { font-weight: 400; color: var(--primary); }
-    .nav-brand-sub { font-size: 18px; font-weight: 500; color: var(--text-400); letter-spacing: 4.5px; }
+/* ── STATS ── */
+.stats-bar{background:#fff;border-top:1px solid var(--gray-200);border-bottom:1px solid var(--gray-200)}
+.stats-bar-inner{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);padding:0 48px}
+.stat-item{padding:28px 24px;text-align:center;border-right:1px solid var(--gray-200);position:relative}
+.stat-item:last-child{border-right:none}
+.stat-num{font-size:36px;font-weight:800;color:var(--navy);letter-spacing:-1px;line-height:1}
+.stat-label{font-size:13px;color:var(--gray-500);margin-top:4px;font-weight:500}
 
-    .nav-links { display: flex; align-items: center; gap: 32px; }
-    .nav-links a { font-size: 15px; font-weight: 600; color: var(--text-500); text-decoration: none; transition: color 0.15s; }
-    .nav-links a:hover { color: var(--primary); }
+/* ── SECTIONS ── */
+section{padding:100px 48px}
+.container{max-width:1280px;margin:0 auto}
+.sec-label{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--mid);background:var(--ice);padding:5px 14px;border-radius:99px;margin-bottom:14px;letter-spacing:.5px}
+.sec-h2{font-size:clamp(28px,3.2vw,44px);font-weight:800;color:var(--navy);letter-spacing:-1.2px;line-height:1.1;margin-bottom:14px}
+.sec-h2 em{font-style:normal;background:linear-gradient(90deg,var(--mid),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sec-p{font-size:17px;color:var(--gray-500);max-width:560px;margin:0 auto;line-height:1.7}
+.sec-header{text-align:center;margin-bottom:64px}
 
-    .nav-actions { display: flex; align-items: center; gap: 10px; }
-    .btn-outline { padding: 9px 20px; border-radius: 8px; border: 2px solid var(--primary); color: var(--primary); font-size: 14px; font-weight: 700; text-decoration: none; transition: all 0.15s; background: transparent; cursor: pointer; }
-    .btn-outline:hover { background: var(--primary); color: #fff; }
-    .btn-solid { padding: 10px 22px; border-radius: 8px; border: none; background: var(--gradient); color: #fff; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; box-shadow: 0 4px 14px rgba(12,68,124,0.3); transition: all 0.15s; }
-    .btn-solid:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(12,68,124,0.4); }
+/* ── FEATURES ── */
+.feat-bg{background:var(--gray-50)}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.feat-card{
+  background:#fff;border-radius:16px;padding:32px;
+  border:1px solid var(--gray-200);
+  transition:all .2s;
+  position:relative;overflow:hidden;
+}
+.feat-card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(24,95,165,.04) 0%,transparent 60%);
+  opacity:0;transition:opacity .2s;
+}
+.feat-card:hover{transform:translateY(-4px);box-shadow:0 20px 60px rgba(12,68,124,.1);border-color:rgba(24,95,165,.3)}
+.feat-card:hover::before{opacity:1}
+.feat-icon{
+  width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  margin-bottom:20px;font-size:22px;
+}
+.fi-1{background:linear-gradient(135deg,#dbeafe,#bfdbfe)}
+.fi-2{background:linear-gradient(135deg,#ede9fe,#ddd6fe)}
+.fi-3{background:linear-gradient(135deg,#dcfce7,#bbf7d0)}
+.fi-4{background:linear-gradient(135deg,#fff7ed,#fed7aa)}
+.fi-5{background:linear-gradient(135deg,#fce7f3,#fbcfe8)}
+.fi-6{background:linear-gradient(135deg,#e0f2fe,#bae6fd)}
+.feat-card h3{font-size:17px;font-weight:800;color:var(--navy);margin-bottom:8px}
+.feat-card p{font-size:14px;color:var(--gray-500);line-height:1.7}
 
-    .nav-mobile { display: none; }
+/* ── STEPS ── */
+.steps-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative;margin-top:20px}
+.steps-wrap::before{
+  content:'';position:absolute;top:40px;left:calc(16.66% + 24px);right:calc(16.66% + 24px);
+  height:2px;background:linear-gradient(90deg,var(--mid),var(--accent));z-index:0;
+}
+.step-box{text-align:center;padding:0 32px;position:relative;z-index:1}
+.step-circle{
+  width:80px;height:80px;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue),var(--mid));
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 24px;
+  box-shadow:0 8px 32px rgba(12,68,124,.3);
+  font-size:28px;font-weight:900;color:#fff;
+  position:relative;z-index:1;
+  border:4px solid #fff;
+}
+.step-box h3{font-size:18px;font-weight:800;color:var(--navy);margin-bottom:8px}
+.step-box p{font-size:14px;color:var(--gray-500);line-height:1.7}
 
-    /* ── HERO ── */
-    .hero {
-      padding: 140px 48px 80px; background: var(--gradient-hero);
-      position: relative; overflow: hidden;
-    }
-    .hero-inner {
-      max-width: 1320px; margin: 0 auto; display: grid;
-      grid-template-columns: 1fr 1.3fr; gap: 48px; align-items: center;
-    }
-    .hero h1 {
-      font-size: clamp(36px, 4.5vw, 56px); font-weight: 900;
-      line-height: 1.12; letter-spacing: -1.5px; color: var(--primary-dark);
-      margin-bottom: 20px;
-    }
-    .hero h1 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .hero p { font-size: 18px; color: var(--text-500); line-height: 1.7; margin-bottom: 32px; max-width: 520px; }
-    .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; }
-    .hero-visual {
-      background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border);
-      box-shadow: var(--shadow-lg); padding: 24px; position: relative;
-      transform: perspective(1200px) rotateY(-4deg) rotateX(2deg);
-      min-width: 560px;
-    }
-    .hero-visual img { width: 100%; border-radius: 8px; }
-    .hero-stats {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
-      margin-top: 48px; max-width: 1320px; margin-left: auto; margin-right: auto;
-      padding: 0 48px;
-    }
-    .hero-stat {
-      text-align: center; padding: 20px; background: var(--bg-card);
-      border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);
-    }
-    .hero-stat .num { font-size: 32px; font-weight: 900; color: var(--primary); }
-    .hero-stat .label { font-size: 13px; color: var(--text-500); margin-top: 4px; font-weight: 600; }
+/* ── SHOWCASE ── */
+.showcase-row{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;margin-top:72px}
+.showcase-row.flip{direction:rtl}
+.showcase-row.flip>*{direction:ltr}
+.showcase-text h3{font-size:26px;font-weight:800;color:var(--navy);letter-spacing:-.5px;margin-bottom:14px}
+.showcase-text p{font-size:15px;color:var(--gray-500);line-height:1.75;margin-bottom:20px}
+.showcase-list{list-style:none;display:flex;flex-direction:column;gap:10px}
+.showcase-list li{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--gray-700);font-weight:500}
+.showcase-list li::before{content:'✓';width:22px;height:22px;border-radius:50%;background:var(--ice);color:var(--mid);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.showcase-img{border-radius:16px;overflow:hidden;box-shadow:0 24px 80px rgba(12,68,124,.15);border:1px solid var(--gray-200)}
+.showcase-img img{width:100%;display:block}
+.showcase-img-placeholder{
+  aspect-ratio:16/10;
+  background:linear-gradient(135deg,var(--ice) 0%,#d4e8f7 100%);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;color:var(--mid);font-weight:600;
+}
 
-    /* ── SECTIONS ── */
-    .section { padding: 96px 48px; }
-    .section-alt { background: var(--bg-alt); }
-    .section-header { text-align: center; margin-bottom: 56px; }
-    .section-header h2 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 900; color: var(--primary-dark); letter-spacing: -1px; margin-bottom: 12px; }
-    .section-header h2 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .section-header p { font-size: 17px; color: var(--text-500); max-width: 600px; margin: 0 auto; }
-    .section-tag { display: inline-block; padding: 6px 16px; border-radius: 99px; font-size: 13px; font-weight: 700; color: var(--primary); background: rgba(12,68,124,0.1); margin-bottom: 16px; letter-spacing: 0.3px; }
-    .container { max-width: 1320px; margin: 0 auto; }
+/* ── EXTRAS ── */
+.extras-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:56px}
+.extra{background:#fff;border-radius:14px;padding:24px;border:1px solid var(--gray-200);text-align:center;transition:all .2s;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.extra:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(12,68,124,.1);border-color:rgba(24,95,165,.3)}
+.extra-ic{font-size:32px;margin-bottom:10px}
+.extra h4{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px}
+.extra p{font-size:12px;color:var(--gray-500)}
 
-    /* ── FEATURE CARDS ── */
-    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-    .feature-card {
-      padding: 32px 28px; background: var(--bg-card); border-radius: 16px;
-      border: 1px solid var(--border); transition: all 0.2s;
-      box-shadow: var(--shadow-sm);
-    }
-    .feature-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: var(--primary); }
-    .feature-icon {
-      width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center;
-      font-size: 24px; margin-bottom: 16px;
-    }
-    .fi-blue { background: rgba(12,68,124,0.1); }
-    .fi-purple { background: rgba(139,92,246,0.1); }
-    .fi-green { background: rgba(34,197,94,0.1); }
-    .fi-orange { background: rgba(249,115,22,0.1); }
-    .fi-red { background: rgba(239,68,68,0.1); }
-    .fi-cyan { background: rgba(6,182,212,0.1); }
-    .feature-card h3 { font-size: 18px; font-weight: 800; color: var(--primary-dark); margin-bottom: 8px; }
-    .feature-card p { font-size: 14px; color: var(--text-500); line-height: 1.65; }
+/* ── CTA BAND ── */
+.cta-band{
+  background:linear-gradient(135deg,var(--navy) 0%,var(--blue) 100%);
+  padding:80px 48px;text-align:center;position:relative;overflow:hidden;
+}
+.cta-band::before{
+  content:'';position:absolute;top:-50%;left:-20%;
+  width:500px;height:500px;border-radius:50%;
+  background:radial-gradient(circle,rgba(55,138,221,.15),transparent 65%);
+  pointer-events:none;
+}
+.cta-band h2{font-size:clamp(28px,3vw,42px);font-weight:800;color:#fff;letter-spacing:-1px;margin-bottom:14px}
+.cta-band p{font-size:17px;color:rgba(255,255,255,.65);margin-bottom:36px;max-width:500px;margin-left:auto;margin-right:auto}
+.cta-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn-white{display:inline-flex;align-items:center;gap:8px;padding:16px 32px;border-radius:10px;background:#fff;color:var(--navy);font-size:16px;font-weight:700;text-decoration:none;transition:all .2s;font-family:inherit;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.btn-white:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.2)}
+.btn-dark-outline{display:inline-flex;align-items:center;gap:8px;padding:15px 28px;border-radius:10px;border:1.5px solid rgba(255,255,255,.3);color:rgba(255,255,255,.85);font-size:16px;font-weight:600;text-decoration:none;transition:all .2s;font-family:inherit}
+.btn-dark-outline:hover{border-color:rgba(255,255,255,.7);color:#fff}
 
-    /* ── HOW IT WORKS ── */
-    .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; position: relative; }
-    .step { text-align: center; padding: 32px 24px; }
-    .step-num {
-      width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center;
-      font-size: 22px; font-weight: 900; color: #fff; background: var(--gradient);
-      margin: 0 auto 20px; box-shadow: 0 4px 16px rgba(12,68,124,0.3);
-    }
-    .step h3 { font-size: 18px; font-weight: 800; color: var(--primary-dark); margin-bottom: 8px; }
-    .step p { font-size: 14px; color: var(--text-500); line-height: 1.65; }
+/* ── CONTACT ── */
+.contact-grid{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.contact-card{background:#fff;border:1px solid var(--gray-200);border-radius:16px;padding:32px 40px;text-align:center;min-width:200px;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:all .2s}
+.contact-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(12,68,124,.1);border-color:rgba(24,95,165,.3)}
+.contact-card .cicon{font-size:32px;margin-bottom:12px}
+.contact-card h4{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px}
+.contact-card p{font-size:13px;color:var(--gray-500)}
 
-    /* ── DETAIL CARDS ── */
-    .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 56px; }
-    .detail-card { padding: 28px 32px; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-    .detail-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-    .detail-card-head h3 { font-size: 17px; font-weight: 800; color: var(--primary-dark); }
-    .detail-card p { font-size: 14px; color: var(--text-500); line-height: 1.7; margin-bottom: 14px; }
-    .mini-chart { background: var(--bg-alt); border-radius: 10px; padding: 16px; border: 1px solid var(--border); }
-    .mini-chart-label { font-size: 11px; font-weight: 700; color: var(--text-400); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+/* ── FOOTER ── */
+.footer{background:var(--navy);padding:36px 48px}
+.footer-inner{max-width:1280px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.footer-logo img{width:36px;height:36px;border-radius:8px;opacity:.85}
+.footer-logo span{font-size:16px;font-weight:700;color:rgba(255,255,255,.75)}
+.footer-copy{font-size:13px;color:rgba(255,255,255,.4)}
+.footer-nav{display:flex;gap:24px}
+.footer-nav a{font-size:13px;color:rgba(255,255,255,.45);text-decoration:none;transition:color .15s}
+.footer-nav a:hover{color:rgba(255,255,255,.85)}
 
-    /* ── EXTRAS ROW ── */
-    .extras-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
-    .extra-card { padding: 24px; background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border); text-align: center; box-shadow: var(--shadow-sm); transition: all 0.2s; }
-    .extra-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-    .extra-card .icon { font-size: 32px; margin-bottom: 10px; }
-    .extra-card h4 { font-size: 15px; font-weight: 700; color: var(--primary-dark); margin-bottom: 4px; }
-    .extra-card p { font-size: 12px; color: var(--text-500); }
+/* ── ANIMATIONS ── */
+.fade{opacity:0;transform:translateY(28px);transition:opacity .65s ease,transform .65s ease}
+.fade.on{opacity:1;transform:translateY(0)}
+.fade-d1{transition-delay:.07s}
+.fade-d2{transition-delay:.14s}
+.fade-d3{transition-delay:.21s}
+.fade-d4{transition-delay:.28s}
+.fade-d5{transition-delay:.35s}
+.fade-d6{transition-delay:.42s}
 
-    /* ── CONTACT ── */
-    .contact-cards { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
-    .contact-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 28px 36px; text-align: center; min-width: 220px; box-shadow: var(--shadow-sm); }
-    .contact-card .icon { font-size: 28px; margin-bottom: 10px; }
-    .contact-card h4 { font-size: 15px; font-weight: 700; color: var(--primary-dark); }
-    .contact-card p { font-size: 13px; color: var(--text-500); margin-top: 4px; }
-
-    /* ── FOOTER ── */
-    .footer { background: var(--primary-dark); padding: 32px 48px; color: rgba(255,255,255,0.6); }
-    .footer-inner { max-width: 1320px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
-    .footer-copy { font-size: 13px; }
-    .footer-links { display: flex; gap: 24px; }
-    .footer-links a { font-size: 13px; color: rgba(255,255,255,0.5); text-decoration: none; transition: color 0.15s; }
-    .footer-links a:hover { color: #fff; }
-
-    /* ── SCREENSHOTS ── */
-    .screenshot-wrap {
-      position: relative; border-radius: 12px; overflow: hidden;
-      box-shadow: var(--shadow-lg); border: 1px solid var(--border);
-      background: var(--bg-card);
-    }
-    .screenshot-wrap img { width: 100%; display: block; }
-    .screenshot-tilt {
-      transform: perspective(1200px) rotateY(-3deg) rotateX(2deg);
-      transition: transform 0.4s ease;
-    }
-    .screenshot-tilt:hover { transform: perspective(1200px) rotateY(0deg) rotateX(0deg); }
-    .screenshot-float {
-      position: absolute; border-radius: 10px; overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.15); border: 1px solid var(--border);
-      background: var(--bg-card); transition: transform 0.3s ease;
-    }
-    .screenshot-float:hover { transform: translateY(-4px) scale(1.02); }
-    .screenshot-float img { width: 100%; display: block; }
-
-    /* ── SHOWCASE SECTION ── */
-    .showcase-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; margin-top: 56px; }
-    .showcase-grid.reverse { direction: rtl; }
-    .showcase-grid.reverse > * { direction: ltr; }
-    .showcase-text h3 { font-size: 24px; font-weight: 900; color: var(--primary-dark); margin-bottom: 12px; }
-    .showcase-text p { font-size: 15px; color: var(--text-500); line-height: 1.7; }
-    .showcase-text ul { list-style: none; padding: 0; margin-top: 16px; }
-    .showcase-text ul li { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; color: var(--text-700); }
-    .showcase-text ul li::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
-
-    @media (max-width: 900px) {
-      .showcase-grid { grid-template-columns: 1fr; }
-      .showcase-grid.reverse { direction: ltr; }
-      .screenshot-tilt { transform: none; }
-    }
-
-    /* ── ANIMATIONS ── */
-    .fade-in { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
-    .fade-in.visible { opacity: 1; transform: translateY(0); }
-
-    /* ── RESPONSIVE ── */
-    @media (max-width: 900px) {
-      .navbar { padding: 10px 16px; }
-      .nav-links { display: none; }
-      .nav-mobile { display: flex; gap: 6px; }
-      .nav-actions .btn-outline, .nav-actions .btn-solid { display: none; }
-      .nav-brand img { width: 36px; height: 36px; }
-      .nav-brand-title { font-size: 17px; }
-      .nav-brand-sub { font-size: 9.5px; }
-
-      .hero { padding: 100px 20px 48px; }
-      .hero-inner { grid-template-columns: 1fr; text-align: center; gap: 32px; }
-      .hero p { margin-left: auto; margin-right: auto; }
-      .hero-cta { justify-content: center; }
-      .hero-visual { transform: none; min-width: unset; }
-      .hero-stats { grid-template-columns: repeat(2, 1fr); padding: 0 20px; }
-
-      .section { padding: 64px 20px; }
-      .features-grid { grid-template-columns: 1fr; }
-      .steps-grid { grid-template-columns: 1fr; }
-      .detail-grid { grid-template-columns: 1fr; }
-      .extras-grid { grid-template-columns: repeat(2, 1fr); }
-      .contact-cards { flex-direction: column; align-items: center; }
-
-      .footer { padding: 24px 16px; }
-      .footer-inner { flex-direction: column; text-align: center; }
-      .footer-links { flex-wrap: wrap; justify-content: center; }
-    }
-    @media (max-width: 480px) {
-      .hero-stats { grid-template-columns: repeat(2, 1fr); }
-      .extras-grid { grid-template-columns: 1fr; }
-    }
-
-    /* Mobile app buttons */
-    .btn-app {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 7px 12px; border-radius: 8px;
-      background: var(--primary-dark); color: #fff;
-      font-size: 12px; font-weight: 600; text-decoration: none;
-      border: 1px solid var(--border); transition: all 0.15s; cursor: pointer;
-    }
-    .btn-app:hover { background: var(--primary); }
-    .btn-app svg { width: 16px; height: 16px; }
-  </style>
+/* ── MOBILE ── */
+@media(max-width:900px){
+  .nav{padding:12px 20px}
+  .nav-links{display:none}
+  .hero{padding:100px 20px 60px}
+  .hero-inner{grid-template-columns:1fr;text-align:center;gap:40px}
+  .hero p{margin:0 auto 36px}
+  .hero-actions{justify-content:center}
+  .hero-trust{justify-content:center}
+  .hero-mockup{transform:none}
+  .hero-float{display:none}
+  .stats-bar-inner{grid-template-columns:repeat(2,1fr);padding:0 20px}
+  .stat-item:nth-child(2){border-right:none}
+  section{padding:64px 20px}
+  .feat-grid{grid-template-columns:1fr}
+  .steps-wrap{grid-template-columns:1fr;gap:32px}
+  .steps-wrap::before{display:none}
+  .showcase-row,.showcase-row.flip{grid-template-columns:1fr;direction:ltr}
+  .extras-grid{grid-template-columns:repeat(2,1fr)}
+  .footer{padding:24px 20px}
+  .footer-inner{flex-direction:column;text-align:center}
+}
+@media(max-width:480px){
+  .extras-grid{grid-template-columns:1fr}
+  .stats-bar-inner{grid-template-columns:repeat(2,1fr)}
+}
+</style>
 </head>
 <body>
 
-  <!-- ══ NAVBAR ══ -->
-  <nav class="navbar" id="navbar">
-    <a href="/landing.html" class="nav-brand">
-      <img src="/io-logo-animation-v2.gif" alt="İO Teknoloji" />
-      <div class="nav-brand-info">
-        <div class="nav-brand-title">İO <span>Teknoloji</span></div>
-        <div class="nav-brand-sub">Yazılım &amp; Danışmanlık</div>
-      </div>
-    </a>
+<!-- ═══ NAVBAR ═══ -->
+<nav class="nav" id="navbar">
+  <a href="/" class="nav-logo">
+    <img src="/io-logo-animation-v2.gif" alt="İO"/>
+    <div class="nav-logo-text">
+      <div class="nav-logo-name">İO <span>Teknoloji</span></div>
+      <div class="nav-logo-sub">Yazılım &amp; Danışmanlık</div>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="#features">Özellikler</a>
+    <a href="#how">Nasıl Çalışır</a>
+    <a href="#contact">İletişim</a>
+  </div>
+  <div class="nav-cta">
+    <a href="#contact" class="btn-ghost">Demo Talep Et</a>
+    <a href="/login" class="btn-primary">Dashboard Girişi →</a>
+  </div>
+</nav>
 
-    <div class="nav-links">
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-badge">Canlı Sistem · Türkiye Geneli</div>
+      <h1>QR &amp; NFC ile<br><em>Akıllı Operasyon</em><br>Yönetimi</h1>
+      <p>Saha operasyonlarınızı dijitalleştirin. Görevleri, kontrol listelerini ve personeli tek platformdan gerçek zamanlı olarak yönetin.</p>
+      <div class="hero-actions">
+        <a href="#features" class="btn-hero-main">
+          Özellikleri Keşfet
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <a href="#contact" class="btn-hero-outline">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013 5.18 2 2 0 014.95 3h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L9.09 10.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 17.92z"/></svg>
+          İletişim
+        </a>
+      </div>
+      <div class="hero-trust">
+        <div class="hero-trust-avatars">
+          <span>AK</span><span>MD</span><span>SY</span><span>CA</span>
+        </div>
+        <div class="hero-trust-text"><strong>500+ lokasyon</strong>'da aktif kullanım</div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-mockup">
+        <div class="hero-mockup-bar">
+          <div class="hero-mockup-dots"><span></span><span></span><span></span></div>
+          <div class="hero-mockup-url">app.iogys.com.tr/dashboard</div>
+        </div>
+        <img src="/screenshots/dashboard.png" alt="İOGYS Dashboard" loading="lazy"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        <div style="display:none;aspect-ratio:16/10;background:linear-gradient(135deg,#0C447C,#185FA5);align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:40px">
+          <svg width="48" height="48" viewBox="0 0 68 68" style="flex-shrink:0"><rect width="68" height="68" rx="12" fill="rgba(255,255,255,.1)"/><circle cx="14" cy="8" r="4" fill="white"/><rect x="11" y="16" width="6" height="36" rx="2.5" fill="white"/><circle cx="39" cy="34" r="18" fill="none" stroke="white" stroke-width="4.5"/></svg>
+          <div style="color:rgba(255,255,255,.7);font-size:14px;font-weight:600">İOGYS Dashboard</div>
+        </div>
+      </div>
+      <div class="hero-float">
+        <img src="/screenshots/frekansiyel-rapor.png" alt="Rapor" loading="lazy"
+          onerror="this.style.display='none';this.parentElement.style.display='none'"/>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ STATS ═══ -->
+<div class="stats-bar">
+  <div class="stats-bar-inner">
+    <div class="stat-item fade"><div class="stat-num">500+</div><div class="stat-label">Aktif Lokasyon</div></div>
+    <div class="stat-item fade fade-d1"><div class="stat-num">50K+</div><div class="stat-label">Görev / Ay</div></div>
+    <div class="stat-item fade fade-d2"><div class="stat-num">%98</div><div class="stat-label">Uptime Garantisi</div></div>
+    <div class="stat-item fade fade-d3"><div class="stat-num">7/24</div><div class="stat-label">Teknik Destek</div></div>
+  </div>
+</div>
+
+<!-- ═══ FEATURES ═══ -->
+<section class="feat-bg" id="features">
+  <div class="container">
+    <div class="sec-header">
+      <div class="fade"><div class="sec-label">Özellikler</div></div>
+      <h2 class="sec-h2 fade fade-d1">Tüm Operasyonunuzu<br><em>Tek Platformdan</em> Yönetin</h2>
+      <p class="sec-p fade fade-d2">QR ve NFC teknolojisi ile saha yönetimini dijitalleştiren kapsamlı çözüm.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-card fade">
+        <div class="feat-icon fi-1">⚡</div>
+        <h3>Frekansiyel Görev Motoru</h3>
+        <p>Vardiya bazlı otomatik görev üretimi. Günlük frekans, aktif saatler ve vardiya tanımları ile tam kontrol.</p>
+      </div>
+      <div class="feat-card fade fade-d1">
+        <div class="feat-icon fi-2">📋</div>
+        <h3>Çeklist &amp; Kontrol Listesi</h3>
+        <p>Lokasyona bağlı özelleştirilebilir çeklist şablonları. Fotoğraf, açıklama ve zorunlu madde desteği.</p>
+      </div>
+      <div class="feat-card fade fade-d2">
+        <div class="feat-icon fi-3">⏱️</div>
+        <h3>Süre Takip &amp; Analiz</h3>
+        <p>Min/hedef/max süre tanımları. Gerçek zamanlı süre takibi, gecikme raporları ve performans analizi.</p>
+      </div>
+      <div class="feat-card fade fade-d3">
+        <div class="feat-icon fi-4">📊</div>
+        <h3>Canlı Görev Akışı</h3>
+        <p>Tüm görev tamamlamalarını anlık izleyin. Durum filtreleri, personel bazlı takip ve Excel/PDF dışa aktarım.</p>
+      </div>
+      <div class="feat-card fade fade-d4">
+        <div class="feat-icon fi-5">👷</div>
+        <h3>Personel Takibi</h3>
+        <p>QR/NFC ile iş başı ve bitimi. Mesai saatleri, online durum ve lokasyon bazlı personel yönetimi.</p>
+      </div>
+      <div class="feat-card fade fade-d5">
+        <div class="feat-icon fi-6">📱</div>
+        <h3>iOS &amp; Android Uygulama</h3>
+        <p>QR/NFC tarama, offline çalışma modu, push bildirimler ve anlık görev yönetimi ile tam mobil deneyim.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section id="how">
+  <div class="container">
+    <div class="sec-header">
+      <div class="fade"><div class="sec-label">Nasıl Çalışır</div></div>
+      <h2 class="sec-h2 fade fade-d1">3 Adımda <em>Sahayı Dijitalleştirin</em></h2>
+      <p class="sec-p fade fade-d2">Karmaşık kurulum yok. Dakikalar içinde yönetmeye başlayın.</p>
+    </div>
+    <div class="steps-wrap">
+      <div class="step-box fade">
+        <div class="step-circle">1</div>
+        <h3>QR / NFC Tanımla</h3>
+        <p>Hiyerarşik lokasyon yapısı oluşturun. Her noktaya benzersiz QR veya NFC etiketi atayın.</p>
+      </div>
+      <div class="step-box fade fade-d2">
+        <div class="step-circle">2</div>
+        <h3>Görev Ata &amp; Tara</h3>
+        <p>Frekansiyel veya spesifik görevler tanımlayın. Personel mobil app ile okutarak başlatsın.</p>
+      </div>
+      <div class="step-box fade fade-d4">
+        <div class="step-circle">3</div>
+        <h3>Takip Et &amp; Raporla</h3>
+        <p>Canlı görev akışını izleyin, süre analizleri yapın, grafiksel raporlarla performansı ölçün.</p>
+      </div>
+    </div>
+
+    <!-- Showcase 1 -->
+    <div class="showcase-row fade">
+      <div class="showcase-text">
+        <div class="sec-label" style="margin-bottom:12px">Süre Analizi</div>
+        <h3>Detaylı Performans &amp; Süre Analizi</h3>
+        <p>Tüm görevlerin tamamlanma sürelerini derinlemesine analiz edin. Medyan, P75, P90, P95 yüzdelik dilimleri ile nesnel performans ölçümü.</p>
+        <ul class="showcase-list">
+          <li>Ortalama, en hızlı ve en yavaş süre metrikleri</li>
+          <li>Süre dağılım histogramı görselleştirmesi</li>
+          <li>Günlük trend grafiği ve karşılaştırma</li>
+          <li>Lokasyon ve personel bazlı analiz</li>
+        </ul>
+      </div>
+      <div class="showcase-img">
+        <img src="/screenshots/sure-analiz.png" alt="Süre Analiz" loading="lazy"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        <div class="showcase-img-placeholder">📊 Süre Analiz Raporu</div>
+      </div>
+    </div>
+
+    <!-- Showcase 2 -->
+    <div class="showcase-row flip fade">
+      <div class="showcase-text">
+        <div class="sec-label" style="margin-bottom:12px">Frekansiyel Rapor</div>
+        <h3>Frekansiyel Görev Performansı</h3>
+        <p>Tüm frekansiyel görevlerin başarı oranlarını tek ekranda görün. Hedef, tamamlanan, kayıp ve sapma metrikleri.</p>
+        <ul class="showcase-list">
+          <li>Genel performans özeti ve başarı oranı</li>
+          <li>Grup bazlı tamamlanma grafikleri</li>
+          <li>Sapma ve kayıp analizi</li>
+          <li>Excel dışa aktarım desteği</li>
+        </ul>
+      </div>
+      <div class="showcase-img">
+        <img src="/screenshots/frekansiyel-rapor.png" alt="Frekansiyel Rapor" loading="lazy"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        <div class="showcase-img-placeholder">📈 Frekansiyel Görev Raporu</div>
+      </div>
+    </div>
+
+    <!-- Showcase 3 -->
+    <div class="showcase-row fade">
+      <div class="showcase-text">
+        <div class="sec-label" style="margin-bottom:12px">Raporlama</div>
+        <h3>Hızlı Raporlar &amp; Grafikler</h3>
+        <p>Lokasyon, kullanıcı ve görev tipine göre anlık raporlar üretin. Grafiksel karşılaştırma ve hakediş raporu desteği.</p>
+        <ul class="showcase-list">
+          <li>Lokasyon bazlı görev dağılımı</li>
+          <li>Kullanıcı performans raporları</li>
+          <li>Dönemsel karşılaştırma grafikleri</li>
+          <li>Hakediş raporu ve PDF dışa aktarım</li>
+        </ul>
+      </div>
+      <div class="showcase-img">
+        <img src="/screenshots/raporlar.png" alt="Raporlar" loading="lazy"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        <div class="showcase-img-placeholder">📋 Hızlı Raporlar</div>
+      </div>
+    </div>
+
+    <!-- Extras -->
+    <div class="extras-grid">
+      <div class="extra fade"><div class="extra-ic">🔔</div><h4>Anlık Bildirimler</h4><p>Görev ataması ve süre aşımı push bildirimleri</p></div>
+      <div class="extra fade fade-d1"><div class="extra-ic">🗂️</div><h4>Otomatik Arşivleme</h4><p>Tamamlanan görevler otomatik arşivlenir</p></div>
+      <div class="extra fade fade-d2"><div class="extra-ic">📈</div><h4>Grafiksel Raporlar</h4><p>Excel, PDF dışa aktarım ve süre analizi</p></div>
+      <div class="extra fade fade-d3"><div class="extra-ic">🔒</div><h4>Güvenli Altyapı</h4><p>Rol bazlı erişim ve firma izolasyonu</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA BAND ═══ -->
+<div class="cta-band">
+  <h2>Sahada Tam Kontrolü<br>Bugün Başlatın</h2>
+  <p>Sorularınızı iletin veya canlı demo planlayalım. Kurulum gerektirmez.</p>
+  <div class="cta-actions">
+    <a href="#contact" class="btn-white">Demo Talep Et →</a>
+    <a href="/login" class="btn-dark-outline">Dashboard Girişi</a>
+  </div>
+</div>
+
+<!-- ═══ CONTACT ═══ -->
+<section id="contact">
+  <div class="container">
+    <div class="sec-header">
+      <div class="fade"><div class="sec-label">İletişim</div></div>
+      <h2 class="sec-h2 fade fade-d1">Demo <em>Talep Edin</em></h2>
+      <p class="sec-p fade fade-d2">Sorularınızı iletin veya canlı demo planlayalım.</p>
+    </div>
+    <div class="contact-grid">
+      <div class="contact-card fade"><div class="cicon">📧</div><h4>E-Posta</h4><p>info@iogys.com.tr</p></div>
+      <div class="contact-card fade fade-d1"><div class="cicon">🌐</div><h4>Web</h4><p>www.iogys.com.tr</p></div>
+      <div class="contact-card fade fade-d2"><div class="cicon">📍</div><h4>Konum</h4><p>Türkiye</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+  <div class="footer-inner">
+    <a class="footer-logo" href="/">
+      <img src="/io-logo-animation-v2.gif" alt="İO"/>
+      <span>İO Teknoloji</span>
+    </a>
+    <span class="footer-copy" id="footer-copy">© 2026 İO Teknoloji · Tüm hakları saklıdır</span>
+    <nav class="footer-nav">
       <a href="#features">Özellikler</a>
       <a href="#how">Nasıl Çalışır</a>
       <a href="#contact">İletişim</a>
-    </div>
-
-    <div class="nav-actions">
-      <a href="/login" class="btn-solid">Dashboard Girişi</a>
-    </div>
-
-    <!-- Mobil -->
-    <div class="nav-mobile">
-      <a href="#" class="btn-app" title="iOS">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.78 22.05 6.8 20.68 5.96 19.47C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/></svg>
-        iOS
-      </a>
-      <a href="#" class="btn-app" title="Android">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76C3.49 24 3.92 24.05 4.34 23.82L14.55 18L11.19 14.63L3.18 23.76ZM20.94 10.19L18.29 8.67L14.58 12.25L18.3 15.97L20.96 14.42C21.76 13.97 22.27 13.2 22.27 12.38C22.27 11.56 21.75 10.74 20.94 10.19ZM2.06 1.22C2.02 1.36 2 1.52 2 1.69V22.31C2 22.48 2.02 22.64 2.06 22.78L10.89 13.94L2.06 1.22ZM14.55 6L4.34 0.18C3.92-0.05 3.49 0 3.18 0.24L11.19 9.37L14.55 6Z"/></svg>
-        Android
-      </a>
-    </div>
-  </nav>
-
-  <!-- ══ HERO ══ -->
-  <section class="hero">
-    <div class="hero-inner">
-      <div>
-        <h1>QR/NFC ile<br><span>Akıllı Operasyon Yönetimi</span></h1>
-        <p>Saha operasyonlarınızı dijitalleştirin. Görevleri, kontrol listelerini ve personeli tek platformdan yönetin. Gerçek zamanlı raporlarla sahada tam kontrol.</p>
-        <div class="hero-cta">
-          <a href="#features" class="btn-solid" style="padding:14px 32px;font-size:16px;">Özellikleri Keşfet →</a>
-          <a href="#contact" class="btn-outline" style="padding:13px 28px;font-size:16px;">İletişim</a>
-        </div>
-      </div>
-      <div style="position:relative;">
-        <div class="screenshot-wrap screenshot-tilt">
-          <img src="/screenshots/dashboard.png" alt="Dashboard" loading="lazy" />
-        </div>
-        <!-- Floating mini screenshot -->
-        <div class="screenshot-float" style="bottom:-24px;right:-20px;width:45%;z-index:2;">
-          <img src="/screenshots/frekansiyel-rapor.png" alt="Rapor" loading="lazy" />
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Stats bar -->
-  <div class="hero-stats">
-    <div class="hero-stat fade-in"><div class="num">500+</div><div class="label">Lokasyon</div></div>
-    <div class="hero-stat fade-in"><div class="num">50K+</div><div class="label">Görev/Ay</div></div>
-    <div class="hero-stat fade-in"><div class="num">%98</div><div class="label">Uptime</div></div>
-    <div class="hero-stat fade-in"><div class="num">7/24</div><div class="label">Destek</div></div>
+      <a href="/login">Dashboard</a>
+    </nav>
   </div>
+</footer>
 
-  <!-- ══ FEATURES ══ -->
-  <section class="section" id="features">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-tag">Özellikler</div>
-        <h2>Tüm Operasyonunuzu <span>Tek Platformda</span> Yönetin</h2>
-        <p>QR ve NFC teknolojisi ile saha yönetimini dijitalleştiren kapsamlı çözüm.</p>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card fade-in">
-          <div class="feature-icon fi-blue">⚡</div>
-          <h3>Frekansiyel Görev Motoru</h3>
-          <p>Vardiya bazlı otomatik görev üretimi. Günlük frekans, aktif saatler ve vardiya tanımları ile tam kontrol.</p>
-        </div>
-        <div class="feature-card fade-in">
-          <div class="feature-icon fi-purple">📋</div>
-          <h3>Çeklist & Kontrol Listesi</h3>
-          <p>Lokasyona bağlı özelleştirilebilir çeklist şablonları. Fotoğraf, açıklama ve zorunlu madde desteği.</p>
-        </div>
-        <div class="feature-card fade-in">
-          <div class="feature-icon fi-green">⏱️</div>
-          <h3>Süre Takip & Analiz</h3>
-          <p>Min/hedef/max süre tanımları. Gerçek zamanlı süre takibi, gecikme raporları ve performans analizi.</p>
-        </div>
-        <div class="feature-card fade-in">
-          <div class="feature-icon fi-orange">📊</div>
-          <h3>Canlı Görev Akışı</h3>
-          <p>Tüm görev tamamlamalarını anlık izleyin. Durum filtreleri, personel bazlı takip ve Excel/PDF dışa aktarım.</p>
-        </div>
-        <div class="feature-card fade-in">
-          <div class="feature-icon fi-red">👷</div>
-          <h3>Personel Takibi</h3>
-          <p>QR/NFC ile iş başı ve bitimi. Mesai saatleri, online durum ve lokasyon bazlı personel yönetimi.</p>
-        </div>
-        <div class="feature-card fade-in">
-          <div class="feature-icon fi-cyan">📱</div>
-          <h3>Mobil Uygulama</h3>
-          <p>iOS ve Android desteği. QR/NFC tarama, offline çalışma, push bildirimler ve anlık görev yönetimi.</p>
-        </div>
-      </div>
-    </div>
-  </section>
+<script>
+const obs=new IntersectionObserver((entries)=>{
+  entries.forEach((e,i)=>{
+    if(e.isIntersecting){
+      setTimeout(()=>e.target.classList.add('on'),i*60);
+      obs.unobserve(e.target);
+    }
+  });
+},{threshold:0.1});
+document.querySelectorAll('.fade').forEach(el=>obs.observe(el));
 
-  <!-- ══ HOW IT WORKS ══ -->
-  <section class="section section-alt" id="how">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-tag">Nasıl Çalışır</div>
-        <h2>3 Adımda <span>Operasyonunuzu Dijitalleştirin</span></h2>
-        <p>Karmaşık kurulum yok. Dakikalar içinde sahanızı yönetmeye başlayın.</p>
-      </div>
+window.addEventListener('scroll',()=>{
+  document.getElementById('navbar').classList.toggle('scrolled',window.scrollY>40);
+});
 
-      <div class="steps-grid">
-        <div class="step fade-in">
-          <div class="step-num">1</div>
-          <h3>QR/NFC Tanımla</h3>
-          <p>Hiyerarşik lokasyon yapısı oluşturun. Her lokasyona benzersiz QR veya NFC etiketi atayın.</p>
-        </div>
-        <div class="step fade-in">
-          <div class="step-num">2</div>
-          <h3>Görev Ata & Tara</h3>
-          <p>Frekansiyel veya spesifik görevler tanımlayın. Personel mobil uygulama ile okutarak görevi başlatsın.</p>
-        </div>
-        <div class="step fade-in">
-          <div class="step-num">3</div>
-          <h3>Takip Et & Raporla</h3>
-          <p>Canlı görev akışını izleyin, süre analizleri yapın, grafiksel raporlarla performansı ölçün.</p>
-        </div>
-      </div>
-
-      <!-- Showcase: Süre Analiz -->
-      <div class="showcase-grid fade-in">
-        <div class="showcase-text">
-          <h3>⏱️ Detaylı Süre Analizi</h3>
-          <p>Tüm görevlerin tamamlanma sürelerini analiz edin. Medyan, P75, P90, P95 yüzdelik dilimleri ile performans ölçümü.</p>
-          <ul>
-            <li>Ortalama, en hızlı, en yavaş süre metrikleri</li>
-            <li>Süre dağılım histogramı</li>
-            <li>Günlük ortalama süre trend grafiği</li>
-            <li>Lokasyon ve personel bazlı karşılaştırma</li>
-          </ul>
-        </div>
-        <div class="screenshot-wrap" style="box-shadow:var(--shadow-lg);">
-          <img src="/screenshots/sure-analiz.png" alt="Süre Analiz Raporu" loading="lazy" />
-        </div>
-      </div>
-
-      <!-- Showcase: Frekansiyel Rapor -->
-      <div class="showcase-grid reverse fade-in" style="margin-top:56px;">
-        <div class="showcase-text">
-          <h3>📊 Frekansiyel Görev Raporu</h3>
-          <p>Tüm frekansiyel görevlerin performansını tek ekranda görün. Hedef, tamamlanan, kayıp ve frekans dışı metrikleri.</p>
-          <ul>
-            <li>Genel performans özeti (%76 başarı)</li>
-            <li>Grup bazlı tamamlanma grafiği</li>
-            <li>Sapma ve kayıp analizi</li>
-            <li>Excel dışa aktarım</li>
-          </ul>
-        </div>
-        <div class="screenshot-wrap" style="box-shadow:var(--shadow-lg);">
-          <img src="/screenshots/frekansiyel-rapor.png" alt="Frekansiyel Görev Raporu" loading="lazy" />
-        </div>
-      </div>
-
-      <!-- Showcase: Raporlar -->
-      <div class="showcase-grid fade-in" style="margin-top:56px;">
-        <div class="showcase-text">
-          <h3>📈 Hızlı Raporlar & Grafikler</h3>
-          <p>Lokasyon, kullanıcı, frekansiyel ve spesifik görevler için anlık raporlar. Grafiksel karşılaştırmalar.</p>
-          <ul>
-            <li>Lokasyon bazlı görev dağılımı</li>
-            <li>Kullanıcı performans raporları</li>
-            <li>Dönemsel karşılaştırma grafikleri</li>
-            <li>Hakediş raporu desteği</li>
-          </ul>
-        </div>
-        <div class="screenshot-wrap" style="box-shadow:var(--shadow-lg);">
-          <img src="/screenshots/raporlar.png" alt="Hızlı Raporlar" loading="lazy" />
-        </div>
-      </div>
-
-      <!-- Extras -->
-      <div class="extras-grid">
-        <div class="extra-card fade-in"><div class="icon">🔔</div><h4>Anlık Bildirimler</h4><p>Görev ataması ve süre aşımı push bildirimleri</p></div>
-        <div class="extra-card fade-in"><div class="icon">🗂️</div><h4>Otomatik Arşivleme</h4><p>Tamamlanan görevler otomatik arşivlenir</p></div>
-        <div class="extra-card fade-in"><div class="icon">📈</div><h4>Grafiksel Raporlar</h4><p>Excel, PDF dışa aktarım ve süre analizi</p></div>
-        <div class="extra-card fade-in"><div class="icon">🔒</div><h4>Güvenli Altyapı</h4><p>Rol bazlı erişim ve firma izolasyonu</p></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ CONTACT ══ -->
-  <section class="section" id="contact">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-tag">İletişim</div>
-        <h2>Projeleriniz İçin <span>Demo Talep Edin</span></h2>
-        <p>Sorularınızı iletin veya canlı demo planlayalım.</p>
-      </div>
-      <div class="contact-cards">
-        <div class="contact-card fade-in"><div class="icon">📧</div><h4>E-Posta</h4><p>info@iogys.com.tr</p></div>
-        <div class="contact-card fade-in"><div class="icon">🌐</div><h4>Web</h4><p>www.iogys.com.tr</p></div>
-        <div class="contact-card fade-in"><div class="icon">📍</div><h4>Konum</h4><p>Türkiye</p></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ FOOTER ══ -->
-  <footer class="footer">
-    <div class="footer-inner">
-      <span class="footer-copy" id="footer-copy">© 2026 İO Teknoloji · Tüm hakları saklıdır</span>
-      <nav class="footer-links">
-        <a href="#features">Özellikler</a>
-        <a href="#how">Nasıl Çalışır</a>
-        <a href="#contact">İletişim</a>
-        <a href="/login">Dashboard</a>
-      </nav>
-    </div>
-  </footer>
-
-  <script>
-    // Fade-in on scroll
-    const obs = new IntersectionObserver((entries) => {
-      entries.forEach((e, i) => {
-        if (e.isIntersecting) {
-          setTimeout(() => e.target.classList.add('visible'), i * 60);
-          obs.unobserve(e.target);
-        }
-      });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
-
-    // Navbar scroll
-    window.addEventListener('scroll', () => {
-      document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
-    });
-
-    // API'den uygulama adı
-    fetch('/api/public/app-config').then(r => r.json()).then(j => {
-      const isim = j.isim || 'İOGYS';
-      document.title = isim + ' — Akıllı Operasyon Görev Yönetim Sistemi';
-      const fc = document.getElementById('footer-copy');
-      if (fc) fc.textContent = '© 2026 İO Teknoloji · Tüm hakları saklıdır';
-    }).catch(() => {});
-  </script>
+fetch('/api/public/app-config').then(r=>r.json()).then(j=>{
+  if(j.isim) document.title=j.isim+' — Akıllı Operasyon Görev Yönetim Sistemi';
+}).catch(()=>{});
+</script>
 </body>
 </html>
