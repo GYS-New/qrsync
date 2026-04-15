@@ -106,7 +106,7 @@ export default function LokasyonGorevAnaliziBlock({
           {loading && <div style={{ fontSize: 12, color: '#6b7280', marginLeft: 4 }}>Yükleniyor…</div>}
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, border: '1px solid #f3f4f6', borderRadius: 12, background: 'linear-gradient(180deg, rgba(240,249,240,.85), rgba(255,255,255,.92))', overflow: 'hidden' }}>
+        <div style={{ flex: 1, minHeight: 0, border: '1px solid #f3f4f6', borderRadius: 12, background: '#ffffff', overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 54px', gap: 10, padding: '10px 14px', borderBottom: '1px solid #f3f4f6', fontSize: 12, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.8 }}>
             <div>No</div><div>Lokasyon</div><div style={{ textAlign: 'right' }}>Adet</div>
           </div>

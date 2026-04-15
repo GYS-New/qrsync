@@ -78,7 +78,7 @@ export default async function GunlukPerformansBlock({
           <div style={{
             height: '100%', border: '1px solid #f3f4f6', borderRadius: 12,
             padding: '14px 14px 12px',
-            background: 'linear-gradient(180deg, rgba(240,249,240,.85), rgba(255,255,255,.92))',
+            background: '#ffffff',
             display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ fontSize: 12.5, color: '#6b7280', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase' }}>
