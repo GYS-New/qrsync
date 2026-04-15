@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   try {
     const admin = createAdminClient()
     const { data } = await admin.from('sistem_konfigurasyon').select('uygulama_ismi').limit(1).single()
-    const isim = data?.uygulama_ismi ?? 'Syncora'
+    const isim = data?.uygulama_ismi ?? 'İOGYS'
     return {
       title: { default: isim, template: `%s · ${isim}` },
       description: 'QR/NFC Tabanlı Görev Yönetim Sistemi',
@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     }
   } catch {
     return {
-      title: 'Syncora',
+      title: 'İOGYS',
       description: 'QR/NFC Tabanlı Görev Yönetim Sistemi',
       icons: { icon: '/favicon.svg' },
     }

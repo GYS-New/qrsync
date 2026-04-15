@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Syncora — QR/NFC Tabanlı Görev Yönetim Sistemi</title>
+  <title>İOGYS — QR/NFC Tabanlı Görev Yönetim Sistemi</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -263,7 +263,7 @@
         <path d="M32 16c-8.8 0-16 7.2-16 16s7.2 16 16 16c4 0 7.6-1.4 10.4-3.8l-2.8-2.8C37.6 43 34.9 44 32 44c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.3 0 6.3 1.3 8.5 3.5L38 26l12-2-2 12-3.2-3.2C41.6 36.4 37.1 38.8 32 39c-3.9 0-7-3.1-7-7s3.1-7 7-7c1.9 0 3.7.8 4.9 2.1" fill="none" stroke="#4F6AFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         <circle cx="32" cy="32" r="3" fill="#6B8AFF"/>
       </svg>
-      <span class="nav-brand-text" id="nav-app-name">SYNCORA</span>
+      <span class="nav-brand-text" id="nav-app-name">İOGYS</span>
     </a>
 
     <div class="nav-links">
@@ -460,8 +460,8 @@
         <p>Sorularınızı iletin veya canlı demo planlayalım.</p>
       </div>
       <div class="contact-cards">
-        <div class="contact-card fade-in"><div class="icon">📧</div><h4>E-Posta</h4><p>info@syncora.net.tr</p></div>
-        <div class="contact-card fade-in"><div class="icon">🌐</div><h4>Web</h4><p>www.syncora.net.tr</p></div>
+        <div class="contact-card fade-in"><div class="icon">📧</div><h4>E-Posta</h4><p>info@iogys.com.tr</p></div>
+        <div class="contact-card fade-in"><div class="icon">🌐</div><h4>Web</h4><p>www.iogys.com.tr</p></div>
         <div class="contact-card fade-in"><div class="icon">📍</div><h4>Konum</h4><p>Türkiye</p></div>
       </div>
     </div>
@@ -470,7 +470,7 @@
   <!-- ══ FOOTER ══ -->
   <footer class="footer">
     <div class="footer-inner">
-      <span class="footer-copy" id="footer-copy">© 2026 Syncora Yazılım · Tüm hakları saklıdır</span>
+      <span class="footer-copy" id="footer-copy">© 2026 İO Teknoloji · Tüm hakları saklıdır</span>
       <nav class="footer-links">
         <a href="#features">Özellikler</a>
         <a href="#how">Nasıl Çalışır</a>
@@ -499,7 +499,7 @@
 
     // API'den uygulama adı
     fetch('/api/public/app-config').then(r => r.json()).then(j => {
-      const isim = j.isim || 'Syncora';
+      const isim = j.isim || 'İOGYS';
       document.title = isim + ' — QR/NFC Tabanlı Görev Yönetim Sistemi';
       const n = document.getElementById('nav-app-name');
       if (n) n.textContent = isim.toUpperCase();
