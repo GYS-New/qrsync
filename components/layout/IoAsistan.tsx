@@ -58,7 +58,8 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
         if (errData.error === 'rate_limit') {
           setMessages(prev => [...prev, { role: 'assistant', content: 'Çok fazla mesaj gönderdiniz. Lütfen biraz bekleyin. ⏳' }])
         } else {
-          setMessages(prev => [...prev, { role: 'assistant', content: 'Bir hata oluştu. Lütfen tekrar deneyin.' }])
+          console.error('[io-asistan] Error:', errData)
+          setMessages(prev => [...prev, { role: 'assistant', content: `Bir hata oluştu (${errData.error || res.status}). Lütfen tekrar deneyin.` }])
         }
         setLoading(false)
         return
