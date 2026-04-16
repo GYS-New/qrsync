@@ -126,6 +126,39 @@ type SidebarCounts = {
   arsiv_total: number
 }
 
+/** İO düşünce baloncuğu — boşta iken rastgele düşünceler gösterir */
+const IO_THOUGHTS = ['🤔', '...?', '💭', 'hmm...', '✨', '🔍', '...!', '💡']
+function IoThinkingBubble() {
+  const [thought, setThought] = useState<string | null>(null)
+  const [phase, setPhase] = useState<'show' | 'hide'>('show')
+
+  useEffect(() => {
+    let showTimeout: ReturnType<typeof setTimeout>
+    let hideTimeout: ReturnType<typeof setTimeout>
+
+    function schedule() {
+      // 8-15 saniye arası rastgele bekle
+      const delay = 8000 + Math.random() * 7000
+      showTimeout = setTimeout(() => {
+        const pick = IO_THOUGHTS[Math.floor(Math.random() * IO_THOUGHTS.length)]
+        setThought(pick)
+        setPhase('show')
+        // 2.5-4 saniye göster sonra kapat
+        hideTimeout = setTimeout(() => {
+          setPhase('hide')
+          setTimeout(() => { setThought(null); schedule() }, 300)
+        }, 2500 + Math.random() * 1500)
+      }, delay)
+    }
+
+    schedule()
+    return () => { clearTimeout(showTimeout); clearTimeout(hideTimeout) }
+  }, [])
+
+  if (!thought) return null
+  return <div className={`io-thought-bubble ${phase}`}>{thought}</div>
+}
+
 /** Sidebar logo — boyut logoya göre dinamik */
 function SidebarLogo({ src, alt, bordered = false, imgWidth = '80%' }: { src: string; alt: string; bordered?: boolean; imgWidth?: string }) {
   return (
@@ -355,14 +388,53 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
             <style>{`
               @keyframes ioFloat {
                 0%, 100% { transform: translateY(0px); }
-                50% { transform: translateY(-4px); }
+                50% { transform: translateY(-6px); }
               }
+              @keyframes ioShadowPulse {
+                0%, 100% { opacity: 0.3; transform: scaleX(1); }
+                50% { opacity: 0.15; transform: scaleX(0.85); }
+              }
+              @keyframes ioBubbleIn {
+                0% { opacity: 0; transform: scale(0.3) translateY(4px); }
+                50% { opacity: 1; transform: scale(1.05) translateY(-1px); }
+                100% { opacity: 1; transform: scale(1) translateY(0); }
+              }
+              @keyframes ioBubbleOut {
+                0% { opacity: 1; transform: scale(1); }
+                100% { opacity: 0; transform: scale(0.5) translateY(4px); }
+              }
+              .io-avatar-wrap { position: relative; }
               .io-avatar { animation: ioFloat 3s ease-in-out infinite; transition: filter 0.3s ease, transform 0.3s ease; }
               .io-avatar:hover { filter: drop-shadow(0 0 12px rgba(55,138,221,0.6)); transform: scale(1.08) !important; animation-play-state: paused; }
+              .io-ground-shadow {
+                width: 50px; height: 8px; border-radius: 50%;
+                background: radial-gradient(ellipse, rgba(0,0,0,0.18) 0%, transparent 70%);
+                margin: -2px auto 0; animation: ioShadowPulse 3s ease-in-out infinite;
+              }
+              .io-thought-bubble {
+                position: absolute; top: -8px; right: -12px;
+                background: #fff; border: 1.5px solid #e2e8f0;
+                border-radius: 12px; padding: 3px 8px;
+                font-size: 11px; color: #64748b; font-weight: 600;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                pointer-events: none; white-space: nowrap;
+              }
+              .io-thought-bubble.show { animation: ioBubbleIn 0.3s ease forwards; }
+              .io-thought-bubble.hide { animation: ioBubbleOut 0.3s ease forwards; }
+              .io-thought-bubble::after {
+                content: ''; position: absolute; bottom: -4px; left: 12px;
+                width: 6px; height: 6px; background: #fff;
+                border-right: 1.5px solid #e2e8f0; border-bottom: 1.5px solid #e2e8f0;
+                transform: rotate(45deg);
+              }
             `}</style>
-            <div className="io-avatar" onClick={() => setAsistanOpen(true)} title="İO Asistan" style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14, cursor: 'pointer' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div className="io-avatar-wrap">
+              <div className="io-avatar" onClick={() => setAsistanOpen(true)} title="İO Asistan" style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14, cursor: 'pointer' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+              <div className="io-ground-shadow" style={{ marginLeft: -14 }} />
+              <IoThinkingBubble />
             </div>
             <div style={{ flex: 1, height: 48, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
