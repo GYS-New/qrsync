@@ -351,7 +351,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           <div style={{ padding: '6px 14px', margin: '8px 6px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 48, height: 48, borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden', flexShrink: 0, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/io-chat.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             <div style={{ flex: 1, height: 48, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
