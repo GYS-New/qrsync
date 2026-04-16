@@ -116,7 +116,9 @@ export async function sendMail(opts: MailOpts) {
       })
       const rows = await res.json()
       if (Array.isArray(rows) && rows.length > 0 && rows[0].smtp_from) {
-        from = rows[0].smtp_from
+        const dbFrom = rows[0].smtp_from
+        // DB'deki adres sadece email ise isim ekle
+        from = dbFrom.includes('<') ? dbFrom : `İO Teknoloji <${dbFrom}>`
       }
     }
   } catch {}
