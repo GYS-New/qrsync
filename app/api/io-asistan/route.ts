@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 
   try {
     const stream = anthropic.messages.stream({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-3-haiku-20240307',
       max_tokens: 1024,
       system: buildSystemPrompt(me),
       messages,
@@ -106,8 +106,9 @@ export async function POST(request: Request) {
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
           controller.close()
         } catch (err) {
-          console.error('[io-asistan] Stream error:', err)
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'stream_error' })}\n\n`))
+          const errMsg = err instanceof Error ? err.message : String(err)
+          console.error('[io-asistan] Stream error:', errMsg)
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'stream_error', detail: errMsg })}\n\n`))
           controller.close()
         }
       },
