@@ -326,15 +326,26 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
       {/* Logo */}
       <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid #f3f4f6' }}>
         <div
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, cursor: 'pointer' }}
           onClick={() => go(`${base}/dashboard`)}
           title="Gösterge Paneli"
         >
-          {/* Logo alanı */}
+          {/* İO GIF */}
+          <div style={{ width: 52, height: 52, borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden', flexShrink: 0, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/io-logo-animation-v2.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+          {/* Firma Logo */}
           {isSA && sidebarLogo ? (
-            <SidebarLogo src={sidebarLogo} alt="Logo" imgWidth="100%" />
+            <div style={{ flex: 1, height: 52, borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={sidebarLogo} alt="Logo" style={{ maxWidth: '100%', maxHeight: 44, objectFit: 'contain' }} />
+            </div>
           ) : !isSA && firma?.logo_url ? (
-            <SidebarLogo src={firma.logo_url} alt="Firma Logo" />
+            <div style={{ flex: 1, height: 52, borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={firma.logo_url} alt="Firma Logo" style={{ maxWidth: '100%', maxHeight: 44, objectFit: 'contain' }} />
+            </div>
           ) : null}
         </div>
         {altyazi && !isSA && (
