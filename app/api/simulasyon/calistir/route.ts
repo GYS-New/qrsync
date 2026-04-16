@@ -113,7 +113,13 @@ async function filtreliPersonelGetir(admin: any, firmaId: string, projeId: strin
         .eq('kayit_tarihi', bugun)
         .is('cikis_saati', null)
       const mesailiSet = new Set((mesailar ?? []).map((m: any) => m.user_id))
-      uygun = uygun.filter(p => mesailiSet.has(p.id))
+      const mesailiPersonel = uygun.filter(p => mesailiSet.has(p.id))
+      // Simülasyon: mesaili personel yoksa, tüm sim personellerini kullan (mesai bypass)
+      if (mesailiPersonel.length > 0) {
+        uygun = mesailiPersonel
+      } else {
+        console.log(`[SIMULASYON] Mesaili personel yok — sim personelleri ile devam ediliyor (${uygun.length} kişi)`)
+      }
     }
   }
 
