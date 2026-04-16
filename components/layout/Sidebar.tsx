@@ -391,8 +391,8 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                 50% { transform: translateY(-6px); }
               }
               @keyframes ioShadowPulse {
-                0%, 100% { opacity: 0.3; transform: scaleX(1); }
-                50% { opacity: 0.15; transform: scaleX(0.85); }
+                0%, 100% { opacity: 0.5; transform: scaleX(1); }
+                50% { opacity: 0.25; transform: scaleX(0.8); }
               }
               @keyframes ioBubbleIn {
                 0% { opacity: 0; transform: scale(0.3) translateY(4px); }
@@ -407,24 +407,25 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
               .io-avatar { animation: ioFloat 3s ease-in-out infinite; transition: filter 0.3s ease, transform 0.3s ease; }
               .io-avatar:hover { filter: drop-shadow(0 0 12px rgba(55,138,221,0.6)); transform: scale(1.08) !important; animation-play-state: paused; }
               .io-ground-shadow {
-                width: 50px; height: 8px; border-radius: 50%;
-                background: radial-gradient(ellipse, rgba(0,0,0,0.18) 0%, transparent 70%);
-                margin: -2px auto 0; animation: ioShadowPulse 3s ease-in-out infinite;
+                width: 64px; height: 12px; border-radius: 50%;
+                background: radial-gradient(ellipse, rgba(0,0,0,0.3) 0%, transparent 70%);
+                margin: 0 auto 0; animation: ioShadowPulse 3s ease-in-out infinite;
               }
               .io-thought-bubble {
-                position: absolute; top: -8px; right: -12px;
-                background: #fff; border: 1.5px solid #e2e8f0;
-                border-radius: 12px; padding: 3px 8px;
-                font-size: 11px; color: #64748b; font-weight: 600;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                position: absolute; top: -14px; right: -18px;
+                background: #fff; border: 2px solid #cbd5e1;
+                border-radius: 14px; padding: 5px 12px;
+                font-size: 16px; color: #475569; font-weight: 700;
+                box-shadow: 0 4px 14px rgba(0,0,0,0.12);
                 pointer-events: none; white-space: nowrap;
+                z-index: 10;
               }
-              .io-thought-bubble.show { animation: ioBubbleIn 0.3s ease forwards; }
+              .io-thought-bubble.show { animation: ioBubbleIn 0.35s ease forwards; }
               .io-thought-bubble.hide { animation: ioBubbleOut 0.3s ease forwards; }
               .io-thought-bubble::after {
-                content: ''; position: absolute; bottom: -4px; left: 12px;
-                width: 6px; height: 6px; background: #fff;
-                border-right: 1.5px solid #e2e8f0; border-bottom: 1.5px solid #e2e8f0;
+                content: ''; position: absolute; bottom: -6px; left: 14px;
+                width: 10px; height: 10px; background: #fff;
+                border-right: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1;
                 transform: rotate(45deg);
               }
             `}</style>
