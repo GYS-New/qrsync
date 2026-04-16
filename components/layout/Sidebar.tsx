@@ -8,6 +8,7 @@ import { useRouteLoading } from '@/components/ui/RouteLoadingProvider'
 import ProataLogo, { ProataMark } from '@/components/brand/ProataLogo'
 import { useProje } from '@/components/projeler/ProjeContext'
 import { useFirma } from '@/components/layout/FirmaContext'
+import IoAsistan from './IoAsistan'
 
 interface NavItem {
   label: string
@@ -204,6 +205,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
   // U ve M rolleri için sayfa yetkileri (dinamik nav filtresi)
   const isUOrM = user.rol === 'tenant_user' || user.rol === 'musteri'
   const [navYetkileri, setNavYetkileri] = useState<Record<string, { gorebilir: boolean }> | null>(null)
+  const [asistanOpen, setAsistanOpen] = useState(false)
 
   const base =
     user.rol === 'super_admin' || user.rol === 'alt_super_admin'
@@ -308,6 +310,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
   }, [counts, user.rol, base])
 
   return (
+    <>
     <aside
       style={{
         width: 282,
@@ -357,7 +360,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
               .io-avatar { animation: ioFloat 3s ease-in-out infinite; transition: filter 0.3s ease, transform 0.3s ease; }
               .io-avatar:hover { filter: drop-shadow(0 0 12px rgba(55,138,221,0.6)); transform: scale(1.08) !important; animation-play-state: paused; }
             `}</style>
-            <div className="io-avatar" style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14, cursor: 'pointer' }}>
+            <div className="io-avatar" onClick={() => setAsistanOpen(true)} title="İO Asistan" style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14, cursor: 'pointer' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
@@ -490,5 +493,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         </div>
       </div>
     </aside>
+    <IoAsistan open={asistanOpen} onClose={() => setAsistanOpen(false)} />
+    </>
   )
 }
