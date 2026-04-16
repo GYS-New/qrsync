@@ -49,6 +49,12 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#fff;color:
 .btn-primary{padding:10px 22px;border-radius:8px;background:var(--accent);color:#fff;font-size:13px;font-weight:700;text-decoration:none;transition:all .15s;border:none;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(55,138,221,.4)}
 .btn-primary:hover{background:#4a9ee8;transform:translateY(-1px);box-shadow:0 6px 20px rgba(55,138,221,.5)}
 
+/* ── STORE BUTTONS (mobile only) ── */
+.nav-mobile-stores{display:none}
+.btn-store{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:7px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:11px;font-weight:600;text-decoration:none;transition:all .15s;font-family:inherit}
+.btn-store:hover{background:rgba(255,255,255,.2)}
+.btn-store svg{width:14px;height:14px}
+
 /* ── HERO ── */
 .hero{
   min-height:100vh;
@@ -263,9 +269,8 @@ section{padding:100px 48px}
   .nav{padding:10px 16px;flex-wrap:wrap;gap:8px}
   .nav-logo img{height:48px}
   .nav-links{display:none}
-  .nav-cta{gap:6px}
-  .nav-cta .btn-ghost{padding:7px 12px;font-size:11px}
-  .nav-cta .btn-primary{padding:8px 14px;font-size:11px}
+  .nav-cta{display:none}
+  .nav-mobile-stores{display:flex;gap:6px}
   .hero{padding:120px 20px 60px}
   .hero-inner{grid-template-columns:1fr;text-align:center;gap:40px}
   .hero p{margin:0 auto 36px}
@@ -305,6 +310,16 @@ section{padding:100px 48px}
   <div class="nav-cta">
     <a href="#contact" class="btn-ghost">Demo Talep Et</a>
     <a href="/login" class="btn-primary">Dashboard Girişi →</a>
+  </div>
+  <div class="nav-mobile-stores">
+    <a href="#" class="btn-store">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.78 22.05 6.8 20.68 5.96 19.47C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/></svg>
+      iOS
+    </a>
+    <a href="#" class="btn-store">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76C3.49 24 3.92 24.05 4.34 23.82L14.55 18L11.19 14.63L3.18 23.76ZM20.94 10.19L18.29 8.67L14.58 12.25L18.3 15.97L20.96 14.42C21.76 13.97 22.27 13.2 22.27 12.38C22.27 11.56 21.75 10.74 20.94 10.19ZM2.06 1.22C2.02 1.36 2 1.52 2 1.69V22.31C2 22.48 2.02 22.64 2.06 22.78L10.89 13.94L2.06 1.22ZM14.55 6L4.34 .18C3.92-.05 3.49 0 3.18 .24L11.19 9.37L14.55 6Z"/></svg>
+      Android
+    </a>
   </div>
 </nav>
 
