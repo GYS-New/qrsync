@@ -120,24 +120,28 @@ async function executeTool(
   try {
     switch (name) {
       case 'bugunku_mesai': {
+        // TRT bugün hesapla (UTC+3)
+        const trtNow = new Date(Date.now() + 3 * 60 * 60 * 1000)
+        const bugun = trtNow.toISOString().split('T')[0]
         let q = supabase
           .from('personel_mesai_kayitlari')
-          .select('id,kullanici_id,giris_saati,cikis_saati,giris_tipi,cikis_tipi,users!kullanici_id(isim_soyisim)')
-          .gte('giris_saati', `${today}T00:00:00`)
-          .lte('giris_saati', `${today}T23:59:59`)
-          .order('giris_saati', { ascending: false })
+          .select('id,user_id,giris_saati,cikis_saati,giris_tipi,cikis_tipi,arsivlendi,users!user_id(isim_soyisim)')
+          .eq('kayit_tarihi', bugun)
+          .eq('arsivlendi', false)
+          .order('giris_saati', { ascending: true })
           .limit(50)
         if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
         if (!data?.length) return 'Bugün henüz mesaiye giriş yapan personel yok.'
-        return data.map((r: Record<string, unknown>) => {
-          const user = r.users as Record<string, unknown> | null
-          const isim = user?.isim_soyisim || 'Bilinmiyor'
-          const giris = r.giris_saati ? new Date(r.giris_saati as string).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'
-          const cikis = r.cikis_saati ? new Date(r.cikis_saati as string).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : 'Henüz çıkış yapmadı'
-          return `• ${isim}: Giriş ${giris} (${r.giris_tipi}), Çıkış: ${cikis}`
-        }).join('\n')
+        return `Bugün (${bugun}) Mesai Kayıtları (${data.length} kişi):\n` +
+          data.map((r: Record<string, unknown>) => {
+            const user = r.users as Record<string, unknown> | null
+            const isim = user?.isim_soyisim || 'Bilinmiyor'
+            const giris = r.giris_saati ? new Date(r.giris_saati as string).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'
+            const cikis = r.cikis_saati ? new Date(r.cikis_saati as string).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : 'Henüz çıkış yapmadı'
+            return `• ${isim}: Giriş ${giris} (${r.giris_tipi}), Çıkış: ${cikis}`
+          }).join('\n')
       }
 
       case 'gorev_ozeti': {
@@ -145,8 +149,8 @@ async function executeTool(
         let q = supabase
           .from('gorevler')
           .select('durum')
-          .gte('kayit_tarihi', `${tarih}T00:00:00`)
-          .lte('kayit_tarihi', `${tarih}T23:59:59`)
+          .gte('olusturma_tarihi', `${tarih}T00:00:00`)
+          .lte('olusturma_tarihi', `${tarih}T23:59:59`)
         if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
@@ -163,8 +167,8 @@ async function executeTool(
         let q = supabase
           .from('canli_gorevler')
           .select('durum')
-          .gte('olusturulma_tarihi', `${tarih}T00:00:00`)
-          .lte('olusturulma_tarihi', `${tarih}T23:59:59`)
+          .gte('olusturma_tarihi', `${tarih}T00:00:00`)
+          .lte('olusturma_tarihi', `${tarih}T23:59:59`)
         if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
@@ -180,19 +184,19 @@ async function executeTool(
         const limit = (input.limit as number) || 10
         let q = supabase
           .from('musteri_degerlendirmeleri')
-          .select('puan,yorum,musteri_adi,kayit_tarihi,lokasyonlar!lokasyon_id(tanim)')
-          .order('kayit_tarihi', { ascending: false })
+          .select('yildiz,yorum,ad_soyad,olusturma_tarihi,lokasyonlar!lokasyon_id(tanim)')
+          .order('olusturma_tarihi', { ascending: false })
           .limit(limit)
         if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
         if (!data?.length) return 'Henüz müşteri değerlendirmesi yok.'
-        const avg = data.reduce((s: number, r: Record<string, unknown>) => s + (r.puan as number || 0), 0) / data.length
+        const avg = data.reduce((s: number, r: Record<string, unknown>) => s + (r.yildiz as number || 0), 0) / data.length
         return `Son ${data.length} Değerlendirme (Ort: ${avg.toFixed(1)}/5):\n` +
           data.map((r: Record<string, unknown>) => {
             const lok = r.lokasyonlar as Record<string, unknown> | null
-            const tarih = r.kayit_tarihi ? new Date(r.kayit_tarihi as string).toLocaleDateString('tr-TR') : ''
-            return `• ${'⭐'.repeat(r.puan as number || 0)} ${r.musteri_adi || 'Anonim'} — ${lok?.tanim || ''} (${tarih})${r.yorum ? ': "' + r.yorum + '"' : ''}`
+            const tarih = r.olusturma_tarihi ? new Date(r.olusturma_tarihi as string).toLocaleDateString('tr-TR') : ''
+            return `• ${'⭐'.repeat(r.yildiz as number || 0)} ${r.ad_soyad || 'Anonim'} — ${lok?.tanim || ''} (${tarih})${r.yorum ? ': "' + r.yorum + '"' : ''}`
           }).join('\n')
       }
 
