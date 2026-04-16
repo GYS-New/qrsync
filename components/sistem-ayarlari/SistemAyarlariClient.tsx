@@ -730,9 +730,15 @@ function SmtpAyarlariPanel() {
         <div style={{ width: 4, height: 20, borderRadius: 2, background: '#1d4ed8' }} />
         <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Mail Sunucusu (SMTP)</h3>
       </div>
+      <div style={{ padding: '12px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 12.5, color: '#166534', lineHeight: 1.7, marginBottom: 16 }}>
+        <strong>✓ Resend API aktif</strong> — Mail gönderimi Resend HTTP API üzerinden yapılmaktadır (Railway SMTP port kısıtlaması nedeniyle).<br/>
+        <span style={{ fontSize: 11.5, color: '#15803d' }}>
+          Servis: <strong>resend.com</strong> · Domain: <strong>iogys.com.tr</strong> (verified) · Gönderen: <strong>info@iogys.com.tr</strong><br/>
+          API Key: Railway env → <code style={{ background: '#dcfce7', padding: '1px 4px', borderRadius: 3 }}>RESEND_API_KEY</code> · Aşağıdaki SMTP ayarları yedek (fallback) olarak saklanır.
+        </span>
+      </div>
       <div style={{ padding: '10px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, fontSize: 12.5, color: '#1e40af', lineHeight: 1.6, marginBottom: 16 }}>
-        Otomatik rapor gönderimi ve sistem bildirimleri için SMTP ayarları.
-        Gmail kullanıyorsanız "Uygulama Şifresi" oluşturmanız gerekir (Google Hesap &gt; Güvenlik &gt; 2FA &gt; Uygulama Şifreleri).
+        Aşağıdaki SMTP ayarları sadece Resend API key tanımlı değilse kullanılır (fallback).
       </div>
       <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
