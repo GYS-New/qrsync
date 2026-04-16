@@ -59,6 +59,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, mesaj: 'Aktif simülasyon yok', sonuclar: [] }, { headers: CORS })
     }
 
+    console.log(`[SIMULASYON] ${ayarlar.length} aktif ayar bulundu`)
+
     for (const ayar of ayarlar) {
       const [grupRes, personelRes] = await Promise.all([
         admin.from('simulasyon_grup_ayarlari').select('*').eq('simulasyon_id', ayar.id),
@@ -67,10 +69,12 @@ export async function POST(req: Request) {
 
       const grupAyarlari = grupRes.data ?? []
       const personelIdler = (personelRes.data ?? []).map((p: any) => p.user_id)
-      if (grupAyarlari.length === 0 || personelIdler.length === 0) continue
+      console.log(`[SIMULASYON] Ayar ${ayar.id}: grup=${grupAyarlari.length}, personel=${personelIdler.length}, firma=${ayar.firma_id}, proje=${ayar.proje_id}`)
+      if (grupAyarlari.length === 0 || personelIdler.length === 0) { console.log('[SIMULASYON] SKIP: grup veya personel yok'); continue }
 
       const uygunPersonel = await filtreliPersonelGetir(admin, ayar.firma_id, ayar.proje_id, personelIdler)
-      if (uygunPersonel.length === 0) continue
+      console.log(`[SIMULASYON] Uygun personel: ${uygunPersonel.length}`)
+      if (uygunPersonel.length === 0) { console.log('[SIMULASYON] SKIP: uygun personel yok (mesai kontrolü?)'); continue }
 
       for (const ga of grupAyarlari) {
         const result = await grupSimulasyonCalistir(admin, ayar, ga, uygunPersonel)
