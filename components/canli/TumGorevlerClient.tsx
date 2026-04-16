@@ -875,7 +875,7 @@ async function del() {
       {sekme === 'gorevler' && (<>
 
       {/* ── SATIR 1: Başlık + Araçlar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
         {/* Arama */}
         <input ref={importInputRef} type="file" accept=".xlsx" style={{ display:'none' }} onChange={onImportFile} />
         <input
