@@ -93,6 +93,17 @@ const tools: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: 'arsiv_ozeti',
+    description: 'Arşiv tablolarındaki kayıt sayılarını getirir. Frekansiyel görev arşivi, spesifik görev arşivi, mesai arşivi, müşteri değerlendirme arşivi, çeklist arşivi.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tablo: { type: 'string', description: 'Belirli arşiv tablosu (opsiyonel): personel_mesai, musteri, gorevler, checklist. Belirtilmezse hepsinin özeti.' },
+      },
+      required: [],
+    },
+  },
 ]
 
 // ── Tool çalıştırıcılar ──
@@ -231,6 +242,32 @@ async function executeTool(
         const skorlar = data.map((r: { skor: number | null }) => r.skor).filter((s): s is number => s !== null)
         const avg = skorlar.length ? skorlar.reduce((a, b) => a + b, 0) / skorlar.length : 0
         return `${tarih} Çeklist Özeti:\n• Toplam: ${data.length}\n• Ortalama Skor: %${avg.toFixed(0)}\n• En Düşük: %${Math.min(...skorlar)}\n• En Yüksek: %${Math.max(...skorlar)}`
+      }
+
+      case 'arsiv_ozeti': {
+        const tablo = input.tablo as string | undefined
+        const results: string[] = []
+
+        if (!tablo || tablo === 'personel_mesai') {
+          const { count } = await supabase.from('personel_mesai_kayitlari_arsiv').select('id', { count: 'exact', head: true })
+          results.push(`• Mesai Arşivi: ${count ?? 0} kayıt`)
+        }
+        if (!tablo || tablo === 'musteri') {
+          const { count } = await supabase.from('musteri_degerlendirmeleri_arsiv').select('id', { count: 'exact', head: true })
+          results.push(`• Müşteri Değerlendirme Arşivi: ${count ?? 0} kayıt`)
+        }
+        if (!tablo || tablo === 'gorevler') {
+          const { count } = await supabase.from('gorevler_arsiv').select('id', { count: 'exact', head: true })
+          results.push(`• Spesifik Görev Arşivi: ${count ?? 0} kayıt`)
+        }
+        if (!tablo || tablo === 'checklist') {
+          const { count: baslikCount } = await supabase.from('checklist_sonuc_basliklari_arsiv').select('id', { count: 'exact', head: true })
+          const { count: maddeCount } = await supabase.from('checklist_sonuc_maddeleri_arsiv').select('id', { count: 'exact', head: true })
+          results.push(`• Çeklist Arşivi: ${baslikCount ?? 0} başlık, ${maddeCount ?? 0} madde`)
+        }
+
+        // canli_gorevler arşivi (ana arşiv tablosu olmayabilir, gorevler_arsiv zaten var)
+        return results.length ? `Arşiv Özeti:\n${results.join('\n')}` : 'Arşiv verisi bulunamadı.'
       }
 
       default:
