@@ -349,7 +349,15 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         {/* Brand label — İO GIF + proje logosu yan yana */}
         {projeLogo ? (
           <div style={{ padding: '2px 14px', margin: '2px 6px 2px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14 }}>
+            <style>{`
+              @keyframes ioFloat {
+                0%, 100% { transform: translateY(0px); }
+                50% { transform: translateY(-4px); }
+              }
+              .io-avatar { animation: ioFloat 3s ease-in-out infinite; transition: filter 0.3s ease, transform 0.3s ease; }
+              .io-avatar:hover { filter: drop-shadow(0 0 12px rgba(55,138,221,0.6)); transform: scale(1.08) !important; animation-play-state: paused; }
+            `}</style>
+            <div className="io-avatar" style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14, cursor: 'pointer' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
