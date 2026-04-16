@@ -432,7 +432,7 @@ export default function ArsivClient({
   // ── Frekansiyel dışa aktar ────────────────────────────────────────────────
   async function frekExcel() {
     const ExcelJS = (await import('exceljs')).default
-    const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+    const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
     const ws = wb.addWorksheet('Frekansiyel Arşiv')
     ws.columns = [
       { header: 'Görev', key: 'tanim', width: 32 }, { header: 'Lokasyon', key: 'lokasyon', width: 24 },
@@ -660,7 +660,7 @@ export default function ArsivClient({
               </button>
               <button onClick={async () => {
                 const ExcelJS = (await import('exceljs')).default
-                const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+                const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
                 const ws = wb.addWorksheet('Personel Arşiv')
                 ws.columns = [
                   { header: 'Personel', key: 'isim', width: 24 }, { header: 'Email', key: 'email', width: 28 },
@@ -756,7 +756,7 @@ export default function ArsivClient({
               </button>
               <button onClick={async () => {
                 const ExcelJS = (await import('exceljs')).default
-                const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+                const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
                 const ws = wb.addWorksheet('Müşteri Değerlendirme Arşivi')
                 ws.columns = [
                   { header: 'Tarih', key: 'tarih', width: 20 }, { header: 'Lokasyon', key: 'lokasyon', width: 24 },
@@ -872,7 +872,7 @@ export default function ArsivClient({
               </button>
               <button onClick={async () => {
                 const ExcelJS = (await import('exceljs')).default
-                const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+                const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
                 const ws = wb.addWorksheet('Spesifik Görevler Arşivi')
                 ws.columns = [
                   { header: 'Görev', key: 'tanim', width: 32 }, { header: 'Lokasyon', key: 'lokasyon', width: 24 },
@@ -1243,7 +1243,7 @@ function CeklistArsivSekme({
 
   async function excelIndir2() {
     const ExcelJS = (await import('exceljs')).default
-    const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+    const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
     const ws = wb.addWorksheet('Çeklist Raporları Arşiv')
     ws.columns = [
       { header: 'Kayıt Tarihi',  key: 'kayit',     width: 20 },

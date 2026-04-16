@@ -295,7 +295,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
   // ── Excel İndir ─────────────────────────────────────────────────────────
   async function excelIndir() {
     const ExcelJS = (await import('exceljs')).default
-    const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+    const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
     const ws = wb.addWorksheet('Müşteri Değerlendirmeleri')
     ws.columns = [
       { header: 'Tarih',    key: 'tarih',    width: 20 },

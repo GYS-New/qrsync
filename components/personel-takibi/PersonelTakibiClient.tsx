@@ -336,7 +336,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   // Excel download
   async function excelIndir() {
     const ExcelJS = (await import('exceljs')).default
-    const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+    const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
     const ws = wb.addWorksheet('Personel Takibi')
     if (filtreAktif) {
       ws.columns = [

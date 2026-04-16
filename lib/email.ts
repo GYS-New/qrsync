@@ -106,7 +106,7 @@ async function sendViaSMTP(opts: MailOpts): Promise<{ ok: true } | { ok: false; 
 // Ana fonksiyon — Resend varsa onu kullan, yoksa SMTP fallback
 export async function sendMail(opts: MailOpts) {
   // Gönderen adresini DB'den oku
-  let from = 'info@iogys.com.tr'
+  let from = 'İO Teknoloji <info@iogys.com.tr>'
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY

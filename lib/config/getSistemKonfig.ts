@@ -30,7 +30,7 @@ export async function getSistemKonfig(): Promise<{
         cache = rows[0]
         cacheTime = now
         return {
-          uygulama_domain: rows[0].uygulama_domain || 'app.qrsync.com',
+          uygulama_domain: rows[0].uygulama_domain || 'app.iogys.com.tr',
           firebase_project_id: rows[0].firebase_project_id || process.env.FIREBASE_PROJECT_ID || '',
           firebase_client_email: rows[0].firebase_client_email || process.env.FIREBASE_CLIENT_EMAIL || '',
           firebase_private_key: rows[0].firebase_private_key || process.env.FIREBASE_PRIVATE_KEY || '',
@@ -42,7 +42,7 @@ export async function getSistemKonfig(): Promise<{
 
   // Fallback: env vars
   return {
-    uygulama_domain: 'app.qrsync.com',
+    uygulama_domain: 'app.iogys.com.tr',
     firebase_project_id: process.env.FIREBASE_PROJECT_ID || '',
     firebase_client_email: process.env.FIREBASE_CLIENT_EMAIL || '',
     firebase_private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),

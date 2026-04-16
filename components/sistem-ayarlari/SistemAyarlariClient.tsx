@@ -393,7 +393,7 @@ function MobilAyarlariPanel() {
 function UygulamaAyarlariPanel() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [sidebarLogoUrl, setSidebarLogoUrl] = useState<string | null>(null)
-  const [appName, setAppName] = useState('QR-Sync')
+  const [appName, setAppName] = useState('İOGYS')
   const [sidebarAltyazi, setSidebarAltyazi] = useState('GÖREV YÖNETİM SİSTEMİ')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -404,7 +404,7 @@ function UygulamaAyarlariPanel() {
   useEffect(() => {
     fetch('/api/sistem-ayarlari/konfigurasyon')
       .then(r => r.json())
-      .then(j => { setLogoUrl(j.uygulama_logo_url ?? null); setSidebarLogoUrl(j.sidebar_logo_url ?? null); setAppName(j.uygulama_ismi ?? 'QR-Sync'); setSidebarAltyazi(j.sidebar_altyazi ?? 'GÖREV YÖNETİM SİSTEMİ'); setLoading(false) })
+      .then(j => { setLogoUrl(j.uygulama_logo_url ?? null); setSidebarLogoUrl(j.sidebar_logo_url ?? null); setAppName(j.uygulama_ismi ?? 'İOGYS'); setSidebarAltyazi(j.sidebar_altyazi ?? 'GÖREV YÖNETİM SİSTEMİ'); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
@@ -497,7 +497,7 @@ function UygulamaAyarlariPanel() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input value={appName} onChange={e => setAppName(e.target.value)}
             style={{ height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 14, fontWeight: 700, flex: 1 }}
-            placeholder="QR-Sync" />
+            placeholder="İOGYS" />
           <button onClick={handleSaveName} disabled={saving}
             style={{ height: 36, padding: '0 16px', borderRadius: 8, background: '#111827', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
             {saving ? '...' : 'Kaydet'}
@@ -588,7 +588,7 @@ function UygulamaAyarlariPanel() {
 }
 
 function SistemKonfigurasyonPanel() {
-  const [form, setForm] = useState({ uygulama_domain: 'app.qrsync.com', firebase_project_id: '', firebase_client_email: '', firebase_private_key: '', cron_secret: '' })
+  const [form, setForm] = useState({ uygulama_domain: 'app.iogys.com.tr', firebase_project_id: '', firebase_client_email: '', firebase_private_key: '', cron_secret: '' })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -631,7 +631,7 @@ function SistemKonfigurasyonPanel() {
         <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>Uygulama</div>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Domain (QR/NFC bağlantı adresi)</span>
-          <input value={form.uygulama_domain} onChange={e => setForm(f => ({ ...f, uygulama_domain: e.target.value }))} style={sinp} placeholder="app.qrsync.com" />
+          <input value={form.uygulama_domain} onChange={e => setForm(f => ({ ...f, uygulama_domain: e.target.value }))} style={sinp} placeholder="app.iogys.com.tr" />
           <span style={{ fontSize: 11, color: '#64748b' }}>QR kodlarında ve sistem bağlantılarında kullanılan domain adresi</span>
         </label>
       </div>

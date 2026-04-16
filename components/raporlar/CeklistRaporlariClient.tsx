@@ -203,7 +203,7 @@ export default function CeklistRaporlariClient({
     setIsDownloading(true)
     try {
       const ExcelJS = (await import('exceljs')).default
-      const wb = new ExcelJS.Workbook(); wb.creator = 'QR-Sync'
+      const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
       const ws = wb.addWorksheet('Çeklist Raporları')
       
       // AŞAMA 1: Tüm görevler için çeklist verilerini al (PARALEL)

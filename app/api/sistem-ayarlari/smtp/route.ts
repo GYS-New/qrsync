@@ -75,8 +75,8 @@ export async function POST(req: NextRequest) {
     const { sendMail } = await import('@/lib/email')
     const result = await sendMail({
       to: me.email,
-      subject: 'QR-Sync SMTP Test',
-      text: 'Bu bir test mailidir. SMTP ayarlarınız doğru çalışıyor.',
+      subject: 'İOGYS Mail Test',
+      text: 'Bu bir test mailidir. Mail ayarlarınız doğru çalışıyor.',
     })
     return NextResponse.json({ ok: result.ok, skipped: (result as any).skipped ?? false })
   } catch (e: any) {
