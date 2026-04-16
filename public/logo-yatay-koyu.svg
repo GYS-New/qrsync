@@ -1,6 +1,6 @@
-<svg width="440" height="100" viewBox="0 0 440 100" xmlns="http://www.w3.org/2000/svg">
+<svg width="340" height="100" viewBox="0 0 340 100" xmlns="http://www.w3.org/2000/svg">
   <defs><style>text{font-family:"Liberation Sans",Arial,sans-serif;}</style></defs>
-  <rect width="440" height="100" fill="#042C53"/>
+  <rect width="340" height="100" fill="#042C53"/>
   <g transform="translate(14,16)">
     <rect width="68" height="68" rx="15" fill="#185FA5"/>
     <circle cx="14" cy="8" r="4" fill="white"/>
@@ -11,5 +11,5 @@
     <tspan font-weight="700" fill="white">İO </tspan><tspan font-weight="400" fill="#85B7EB">Teknoloji</tspan>
   </text>
   <text x="98" y="73" font-size="16" font-weight="400" fill="#85B7EB"
-        textLength="195" lengthAdjust="spacing">Yazılım &amp; Danışmanlık</text>
+        textLength="155" lengthAdjust="spacing">Yazılım &amp; Danışmanlık</text>
 </svg>
