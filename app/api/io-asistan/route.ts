@@ -87,22 +87,30 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Önce non-streaming dene — hata tespiti için
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const stream = anthropic.messages.stream({
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: buildSystemPrompt(me),
       messages,
     })
 
-    const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
-
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-        controller.close()
+      async start(controller) {
+        try {
+          for await (const event of stream) {
+            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`))
+            }
+          }
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+          controller.close()
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          console.error('[io-asistan] Stream error:', errMsg)
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'stream_error', detail: errMsg })}\n\n`))
+          controller.close()
+        }
       },
     })
 
