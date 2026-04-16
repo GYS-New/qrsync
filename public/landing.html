@@ -35,9 +35,7 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#fff;color:
   background:rgba(4,44,83,0.96);
   backdrop-filter:blur(20px);
   border-bottom:1px solid rgba(255,255,255,0.08);
-  transition:padding .3s;
 }
-.nav.scrolled{padding:14px 48px;background:rgba(4,44,83,0.99)}
 .nav-logo{display:flex;align-items:center;text-decoration:none}
 .nav-logo img{height:80px;width:auto}
 .nav-links{display:flex;gap:28px}
@@ -569,10 +567,6 @@ const obs=new IntersectionObserver((entries)=>{
   });
 },{threshold:0.1});
 document.querySelectorAll('.fade').forEach(el=>obs.observe(el));
-
-window.addEventListener('scroll',()=>{
-  document.getElementById('navbar').classList.toggle('scrolled',window.scrollY>40);
-});
 
 fetch('/api/public/app-config').then(r=>r.json()).then(j=>{
   if(j.isim) document.title=j.isim+' — Akıllı Operasyon Görev Yönetim Sistemi';
