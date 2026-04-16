@@ -128,19 +128,29 @@ type SidebarCounts = {
 /** Sidebar logo — boyut logoya göre dinamik */
 function SidebarLogo({ src, alt, bordered = false, imgWidth = '80%' }: { src: string; alt: string; bordered?: boolean; imgWidth?: string }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      width: '100%',
-      ...(bordered ? { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 } : {}),
-    }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={alt}
-        style={{
-          width: imgWidth, maxHeight: 70, objectFit: 'contain',
-        }}
-      />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+      {/* İO GIF */}
+      {!bordered && (
+        <div style={{ width: 52, height: 52, borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden', flexShrink: 0, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/io-globe-v2-seffaf.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+      )}
+      {/* Logo */}
+      <div style={{
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: bordered ? undefined : 52,
+        ...(bordered ? { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 } : { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '4px 8px' }),
+      }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={alt}
+          style={{
+            width: bordered ? imgWidth : undefined, maxWidth: '100%', maxHeight: bordered ? 70 : 44, objectFit: 'contain',
+          }}
+        />
+      </div>
     </div>
   )
 }
@@ -330,22 +340,11 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           onClick={() => go(`${base}/dashboard`)}
           title="Gösterge Paneli"
         >
-          {/* İO GIF */}
-          <div style={{ width: 52, height: 52, borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden', flexShrink: 0, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/io-logo-animation-v2.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
-          {/* Firma Logo */}
+          {/* Sidebar Logo (firma veya SA) */}
           {isSA && sidebarLogo ? (
-            <div style={{ flex: 1, height: 52, borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={sidebarLogo} alt="Logo" style={{ maxWidth: '100%', maxHeight: 44, objectFit: 'contain' }} />
-            </div>
+            <SidebarLogo src={sidebarLogo} alt="Logo" imgWidth="100%" />
           ) : !isSA && firma?.logo_url ? (
-            <div style={{ flex: 1, height: 52, borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={firma.logo_url} alt="Firma Logo" style={{ maxWidth: '100%', maxHeight: 44, objectFit: 'contain' }} />
-            </div>
+            <SidebarLogo src={firma.logo_url} alt="Firma Logo" />
           ) : null}
         </div>
         {altyazi && !isSA && (
