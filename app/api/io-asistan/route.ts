@@ -87,30 +87,22 @@ export async function POST(request: Request) {
   }
 
   try {
-    const stream = anthropic.messages.stream({
-      model: 'claude-3-haiku-20240307',
+    // Önce non-streaming dene — hata tespiti için
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
       system: buildSystemPrompt(me),
       messages,
     })
 
+    const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
+
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const event of stream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`))
-            }
-          }
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-          controller.close()
-        } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err)
-          console.error('[io-asistan] Stream error:', errMsg)
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'stream_error', detail: errMsg })}\n\n`))
-          controller.close()
-        }
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        controller.close()
       },
     })
 
@@ -122,7 +114,8 @@ export async function POST(request: Request) {
       },
     })
   } catch (err) {
-    console.error('[io-asistan] API error:', err)
-    return new Response(JSON.stringify({ error: 'api_error', detail: String(err) }), { status: 500 })
+    const errMsg = err instanceof Error ? err.message : String(err)
+    console.error('[io-asistan] API error:', errMsg)
+    return new Response(JSON.stringify({ error: 'api_error', detail: errMsg }), { status: 500 })
   }
 }
