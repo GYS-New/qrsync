@@ -348,7 +348,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
       <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
         {/* Brand label — İO GIF + proje logosu yan yana */}
         {projeLogo ? (
-          <div style={{ padding: '6px 14px', margin: '8px 6px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ padding: '2px 14px', margin: '2px 6px 2px', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
