@@ -10,6 +10,6 @@
   <text x="98" y="52" font-size="30">
     <tspan font-weight="700" fill="#042C53">İO </tspan><tspan font-weight="400" fill="#185FA5">Teknoloji</tspan>
   </text>
-  <text x="98" y="73" font-size="15.5" font-weight="400" fill="#378ADD"
-        textLength="240" lengthAdjust="spacing">Yazılım &amp; Danışmanlık</text>
+  <text x="98" y="73" font-size="16" font-weight="400" fill="#378ADD"
+        textLength="195" lengthAdjust="spacing">Yazılım &amp; Danışmanlık</text>
 </svg>
