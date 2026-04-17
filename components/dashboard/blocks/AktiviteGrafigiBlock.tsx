@@ -68,26 +68,44 @@ export default function AktiviteGrafigiBlock({
   async function fetchData() {
     const rangeISO = rangeStart.toISOString()
 
-    // Canlı görevler
+    // Tamamlanan canlı görevler (frekansiyel)
     const buildCanli = () => {
-      let q = supabase.from("canli_gorevler").select("olusturma_tarihi").gte("olusturma_tarihi", rangeISO)
+      let q = supabase.from("canli_gorevler").select("tamamlanma_tarihi")
+        .not("tamamlanma_tarihi", "is", null)
+        .gte("tamamlanma_tarihi", rangeISO)
       if (firmaId) q = q.eq("firma_id", firmaId)
       if (projeId) q = (q as any).eq("proje_id", projeId)
       if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
       return q
     }
 
-    // Arşiv görevler — aynı dönemde oluşturulup arşivlenenler
+    // Tamamlanan arşiv görevler
     const buildArsiv = () => {
-      let q = supabase.from("canli_gorevler_arsiv").select("olusturma_tarihi").gte("olusturma_tarihi", rangeISO)
+      let q = supabase.from("canli_gorevler_arsiv").select("tamamlanma_tarihi")
+        .not("tamamlanma_tarihi", "is", null)
+        .gte("tamamlanma_tarihi", rangeISO)
       if (firmaId) q = q.eq("firma_id", firmaId)
       if (projeId) q = (q as any).eq("proje_id", projeId)
       if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
       return q
     }
 
-    const [canliRows, arsivRows] = await Promise.all([fetchAllPages(buildCanli), fetchAllPages(buildArsiv)])
-    const rows = [...canliRows, ...arsivRows]
+    // Tamamlanan spesifik görevler
+    const buildSpesifik = () => {
+      let q = supabase.from("gorevler").select("tamamlanma_tarihi")
+        .eq("durum", "TAMAMLANDI")
+        .not("tamamlanma_tarihi", "is", null)
+        .gte("tamamlanma_tarihi", rangeISO)
+      if (firmaId) q = q.eq("firma_id", firmaId)
+      if (projeId) q = (q as any).eq("proje_id", projeId)
+      if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
+      return q
+    }
+
+    const [canliRows, arsivRows, spesifikRows] = await Promise.all([
+      fetchAllPages(buildCanli), fetchAllPages(buildArsiv), fetchAllPages(buildSpesifik)
+    ])
+    const rows = [...canliRows, ...arsivRows, ...spesifikRows]
 
     const grouped: Record<string, number> = {}
 
@@ -98,7 +116,7 @@ export default function AktiviteGrafigiBlock({
         grouped[label] = 0
       }
       rows.forEach((r: any) => {
-        const d = startOfHourTR(new Date(r.olusturma_tarihi))
+        const d = startOfHourTR(new Date(r.tamamlanma_tarihi))
         const label = d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false })
         if (label in grouped) grouped[label] = (grouped[label] || 0) + 1
       })
@@ -110,7 +128,7 @@ export default function AktiviteGrafigiBlock({
         grouped[key] = 0
       })
       rows.forEach((r: any) => {
-        const d = startOfDayTR(new Date(r.olusturma_tarihi))
+        const d = startOfDayTR(new Date(r.tamamlanma_tarihi))
         const key = d.toLocaleDateString("tr-TR", { weekday: "short", timeZone: "Europe/Istanbul" })
         if (key in grouped) grouped[key] = (grouped[key] || 0) + 1
       })
@@ -119,7 +137,7 @@ export default function AktiviteGrafigiBlock({
       const weeks = ["Hafta 1", "Hafta 2", "Hafta 3", "Hafta 4", "Hafta 5"]
       weeks.forEach((w) => (grouped[w] = 0))
       rows.forEach((r: any) => {
-        const d = new Date(r.olusturma_tarihi)
+        const d = new Date(r.tamamlanma_tarihi)
         const diffDays = Math.floor((d.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
         const bucket = Math.min(4, Math.max(0, Math.floor(diffDays / 7)))
         grouped[weeks[bucket]] = (grouped[weeks[bucket]] || 0) + 1
@@ -160,7 +178,7 @@ export default function AktiviteGrafigiBlock({
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
             <Tooltip />
-            <Area type="monotone" dataKey="value" stroke="#374151" fill="#e5e7eb" name="Görev Sayısı" />
+            <Area type="monotone" dataKey="value" stroke="#22c55e" fill="#dcfce7" name="Tamamlanan Görev" />
           </AreaChart>
         ) : null}
       </div>
