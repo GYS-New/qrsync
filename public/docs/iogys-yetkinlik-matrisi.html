@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İOGYS Yetkinlik Matrisi & Platform Yetenekleri</title>
+    <style>
+        :root {
+            --navy: #042C53;
+            --blue: #0C447C;
+            --accent: #378ADD;
+            --light-bg: #f0f5fb;
+            --border: #d0dcea;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --partial: #f59e0b;
+            --text: #1e293b;
+            --muted: #64748b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text);
+            line-height: 1.6;
+            background: #fff;
+        }
+
+        /* Print styles */
+        @media print {
+            body { font-size: 10pt; }
+            .page-break { page-break-before: always; }
+            .no-print { display: none !important; }
+            .cover { min-height: 100vh; }
+            table { font-size: 8pt; }
+            h2 { font-size: 14pt; }
+            h3 { font-size: 12pt; }
+            .section { padding: 20px 0; }
+        }
+
+        @page {
+            size: A4;
+            margin: 15mm;
+        }
+
+        /* Cover */
+        .cover {
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 50%, var(--accent) 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            text-align: center;
+            padding: 60px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cover::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 50%, rgba(55, 138, 221, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .cover-logo {
+            font-size: 72px;
+            font-weight: 800;
+            letter-spacing: -2px;
+            margin-bottom: 8px;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .cover-tagline {
+            font-size: 18px;
+            opacity: 0.85;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 50px;
+        }
+
+        .cover-title {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .cover-subtitle {
+            font-size: 20px;
+            opacity: 0.9;
+            margin-bottom: 60px;
+        }
+
+        .cover-meta {
+            display: flex;
+            gap: 40px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .cover-meta span {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cover-divider {
+            width: 120px;
+            height: 3px;
+            background: rgba(255,255,255,0.4);
+            border-radius: 2px;
+            margin: 30px 0;
+        }
+
+        /* Content */
+        .content {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 30px;
+        }
+
+        .section {
+            padding: 50px 0;
+        }
+
+        .section-number {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--navy), var(--accent));
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 36px;
+            font-weight: 700;
+            font-size: 16px;
+            margin-right: 12px;
+            vertical-align: middle;
+        }
+
+        h2 {
+            font-size: 28px;
+            color: var(--navy);
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h3 {
+            font-size: 20px;
+            color: var(--blue);
+            margin: 28px 0 14px;
+        }
+
+        p { margin-bottom: 14px; }
+
+        .highlight-box {
+            background: linear-gradient(135deg, var(--light-bg), #e8f0fe);
+            border-left: 5px solid var(--accent);
+            padding: 24px 28px;
+            border-radius: 0 12px 12px 0;
+            margin: 20px 0 30px;
+        }
+
+        .highlight-box p:last-child { margin-bottom: 0; }
+
+        /* Tables */
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 20px 0 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(4,44,83,0.08);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        table thead th {
+            background: linear-gradient(135deg, var(--navy), var(--blue));
+            color: #fff;
+            padding: 14px 10px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+        }
+
+        table thead th:first-child {
+            text-align: left;
+            padding-left: 16px;
+            min-width: 200px;
+        }
+
+        table tbody td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        table tbody td:first-child {
+            text-align: left;
+            padding-left: 16px;
+            font-weight: 500;
+        }
+
+        table tbody tr:hover { background: var(--light-bg); }
+
+        .cat-row td {
+            background: linear-gradient(90deg, #e8f0fe, #f0f5fb) !important;
+            font-weight: 700 !important;
+            color: var(--navy);
+            font-size: 13px;
+            letter-spacing: 0.3px;
+        }
+
+        .yes { color: var(--success); font-size: 18px; font-weight: 700; }
+        .no { color: var(--danger); font-size: 18px; font-weight: 700; }
+        .partial { color: var(--partial); font-size: 18px; font-weight: 700; }
+
+        /* Module cards */
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+            gap: 24px;
+            margin: 24px 0;
+        }
+
+        .module-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            transition: box-shadow 0.2s;
+            box-shadow: 0 2px 8px rgba(4,44,83,0.05);
+        }
+
+        .module-card:hover {
+            box-shadow: 0 4px 20px rgba(4,44,83,0.12);
+        }
+
+        .module-card h4 {
+            font-size: 18px;
+            color: var(--navy);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .module-card h4 .icon {
+            font-size: 24px;
+        }
+
+        .module-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 14px;
+        }
+
+        .module-card ul li {
+            padding: 4px 0 4px 20px;
+            position: relative;
+            font-size: 13.5px;
+        }
+
+        .module-card ul li::before {
+            content: '>';
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .module-card .tag {
+            display: inline-block;
+            background: var(--light-bg);
+            color: var(--blue);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 6px;
+            margin-top: 4px;
+        }
+
+        .module-card .diff {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            font-size: 12.5px;
+            color: var(--muted);
+        }
+
+        .module-card .diff strong { color: var(--navy); }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 18px;
+            margin: 24px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--navy), var(--blue));
+            color: #fff;
+            border-radius: 12px;
+            padding: 24px 18px;
+            text-align: center;
+        }
+
+        .stat-card .number {
+            font-size: 36px;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            opacity: 0.85;
+            margin-top: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card:nth-child(even) {
+            background: linear-gradient(135deg, var(--blue), var(--accent));
+        }
+
+        /* Comparison */
+        .compare-table thead th:first-child { min-width: 180px; }
+        .compare-table thead th:nth-child(2) { background: linear-gradient(135deg, var(--accent), #2d9bf0); }
+        .compare-table tbody td:nth-child(2) { background: rgba(55,138,221,0.06); font-weight: 600; }
+
+        /* Tech list */
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 18px;
+            margin: 20px 0;
+        }
+
+        .tech-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            background: var(--light-bg);
+            border-radius: 10px;
+        }
+
+        .tech-item .icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+        .tech-item .label { font-weight: 600; color: var(--navy); font-size: 13px; }
+        .tech-item .desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+        /* Footer */
+        .footer {
+            background: var(--navy);
+            color: rgba(255,255,255,0.7);
+            text-align: center;
+            padding: 30px;
+            font-size: 13px;
+            margin-top: 40px;
+        }
+
+        .footer strong { color: #fff; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .cover-title { font-size: 24px; }
+            .cover-logo { font-size: 48px; }
+            .module-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .cover-meta { flex-direction: column; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ==================== KAPAK ==================== -->
+<div class="cover">
+    <div class="cover-logo">İOGYS</div>
+    <div class="cover-tagline">QR & NFC Tabanlı Saha Operasyonları Yönetim Platformu</div>
+    <div class="cover-divider"></div>
+    <div class="cover-title">Yetkinlik Matrisi & Platform Yetenekleri</div>
+    <div class="cover-subtitle">Kapsamlı yetenek analizi, rol bazlı erişim haritası ve modül detayları</div>
+    <div class="cover-divider"></div>
+    <div class="cover-meta">
+        <span>İO Teknoloji</span>
+        <span>Versiyon 1.0</span>
+        <span>Nisan 2026</span>
+        <span>iogys.com.tr</span>
+    </div>
+</div>
+
+<div class="content">
+
+<!-- ==================== 1. PLATFORM ÖZETİ ==================== -->
+<div class="section">
+    <h2><span class="section-number">1</span> Platform Özeti</h2>
+
+    <div class="highlight-box">
+        <p><strong>İOGYS (İO Genel Yönetim Sistemi)</strong>, İO Teknoloji tarafından geliştirilen, QR kod ve NFC teknolojileri ile entegre edilmiş kapsamlı bir saha operasyonları yönetim platformudur. Temizlik, güvenlik, bakım ve facility management sektörlerinde faaliyet gösteren firmalara, sahada gerçekleştirilen tüm operasyonları dijital olarak takip etme, raporlama ve optimizasyon imkanı sunar.</p>
+        <p>Platform, çok kiracılı (multi-tenant) mimarisi sayesinde tek bir altyapı üzerinden onlarca farklı firmaya hizmet verebilir. Her firma kendi lokasyonları, personeli, görevleri ve raporlarını bağımsız olarak yönetir; üst yönetim ise tüm operasyonları merkezi bir panelden izler.</p>
+    </div>
+
+    <h3>Hedef Kitle</h3>
+    <p>Entegre tesis yönetimi (IFM), temizlik hizmetleri, güvenlik, teknik bakım ve peyzaj sektörlerinde faaliyet gösteren orta ve büyük ölçekli şirketler ile bu hizmetleri alan kurumsal müşteriler İOGYS'nin birincil hedef kitlesini oluşturur.</p>
+
+    <h3>Temel Değer Önermeleri</h3>
+    <p><strong>Dijital Dönüşüm:</strong> Kağıt bazlı operasyonlardan tam dijital takibe geçiş; QR ve NFC etiketleri ile lokasyon doğrulaması, anlık görev güncellemeleri ve otomatik raporlama ile verimlilik artışı sağlanır.</p>
+    <p><strong>Gerçek Zamanlı Kontrol:</strong> Canlı görev akışı paneli sayesinde hangi lokasyonda hangi işin ne durumda olduğu anlık olarak görüntülenir. Frekansiyel görev kuralları ile tekrarlayan işler otomatik olarak oluşturulur.</p>
+    <p><strong>Yapay Zeka Desteği:</strong> İO Asistan modülü, kullanıcılara platform kullanımı, görev oluşturma ve rapor yorumlama konularında akıllı rehberlik sunar. Operasyonel veriler üzerinden öngörüsel analiz yapılabilir.</p>
+    <p><strong>Ölçeklenebilirlik:</strong> Yüzlerce lokasyon, binlerce günlük görev ve onlarca kullanıcı ile sorunsuz çalışabilen, arşiv sistemi ile uzun vadeli veri yönetimini garanti eden bir altyapı.</p>
+</div>
+
+<!-- ==================== 2. YETKİNLİK MATRİSİ ==================== -->
+<div class="section page-break">
+    <h2><span class="section-number">2</span> Yetkinlik Matrisi (Rol Bazlı Erişim)</h2>
+    <p>Aşağıdaki tablo, İOGYS platformundaki tüm temel özelliklerin beş kullanıcı rolüne göre erişim durumunu göstermektedir. <span class="yes">&#10003;</span> tam erişim, <span class="partial">&#9684;</span> kısıtlı erişim, <span class="no">&#10007;</span> erişim yok anlamına gelir.</p>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Özellik</th>
+                    <th>SA</th>
+                    <th>Alt SA</th>
+                    <th>TA</th>
+                    <th>TU</th>
+                    <th>Müşteri</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Görev Yönetimi -->
+                <tr class="cat-row"><td colspan="6">Görev Yönetimi</td></tr>
+                <tr><td>Spesifik görev oluşturma</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Frekansiyel kural tanımlama</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Canlı görev akışı izleme</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Görev durumu değiştirme</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Görev atama (personele)</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Toplu görev düzenleme</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Görev duraklatma / iptal</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+
+                <!-- Lokasyon Yönetimi -->
+                <tr class="cat-row"><td colspan="6">Lokasyon Yönetimi</td></tr>
+                <tr><td>Lokasyon oluşturma</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>QR / NFC etiket bağlama</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Lokasyon grupları yönetimi</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Hiyerarşik yapı (bina/kat/oda)</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Toplu import / export</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+
+                <!-- Çeklist Sistemi -->
+                <tr class="cat-row"><td colspan="6">Çeklist Sistemi</td></tr>
+                <tr><td>Şablon oluşturma</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Çeklist doldurma (sahada)</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Otomatik skorlama</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>Çeklist raporlama</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td></tr>
+
+                <!-- Personel & Mesai -->
+                <tr class="cat-row"><td colspan="6">Personel & Mesai</td></tr>
+                <tr><td>QR ile giriş / çıkış</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
+                <tr><td>GPS konum doğrulama</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Manuel mesai kaydı</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Mesai raporu görüntüleme</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td></tr>
+
+                <!-- Raporlar -->
+                <tr class="cat-row"><td colspan="6">Raporlar (9 Rapor Türü)</td></tr>
+                <tr><td>Frekansiyel görev raporu</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Spesifik görev raporu</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Personel mesai raporu</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Müşteri değerlendirme raporu</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>Çeklist raporu</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Birim fiyat / hakedis raporu</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Lokasyon bazlı rapor</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Performans özet raporu</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Arşiv raporu</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+
+                <!-- Müşteri -->
+                <tr class="cat-row"><td colspan="6">Müşteri Modülü</td></tr>
+                <tr><td>Değerlendirme formu doldurma</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td><td class="yes">&#10003;</td></tr>
+                <tr><td>Puan / yorum görüntüleme</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>Değerlendirme export (PDF/Excel)</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+
+                <!-- Birim Fiyatlar -->
+                <tr class="cat-row"><td colspan="6">Birim Fiyatlar</td></tr>
+                <tr><td>Fiyat tanımlama</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Hakedis hesaplama</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+
+                <!-- Arşiv -->
+                <tr class="cat-row"><td colspan="6">Arşiv Sistemi</td></tr>
+                <tr><td>Arşiv verisi görüntüleme</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Arşivden geri yükleme</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Kalıcı silme</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Arşiv kapasite izleme</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+
+                <!-- Kullanıcı Yönetimi -->
+                <tr class="cat-row"><td colspan="6">Kullanıcı Yönetimi</td></tr>
+                <tr><td>Firma (tenant) oluşturma</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Kullanıcı ekleme / düzenleme</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Rol ve yetki atama</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Toplu kullanıcı import</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+
+                <!-- Sistem -->
+                <tr class="cat-row"><td colspan="6">Sistem & Ayarlar</td></tr>
+                <tr><td>Genel ayarlar</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Dashboard özelleştirme</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td></tr>
+                <tr><td>SMTP / mail ayarları</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="no">&#10007;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Simülasyon modu</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+
+                <!-- AI & Mobil -->
+                <tr class="cat-row"><td colspan="6">AI & Mobil</td></tr>
+                <tr><td>İO Asistan (AI chat)</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Mobil uygulama erişimi</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td></tr>
+                <tr><td>Push bildirimler</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>Çevrimdışı mod</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p style="font-size:12px;color:var(--muted);">
+        <strong>SA:</strong> Super Admin | <strong>Alt SA:</strong> Alt Super Admin | <strong>TA:</strong> Tenant Admin | <strong>TU:</strong> Tenant User | <strong>Müşteri:</strong> Hizmet alan firma yetkilisi
+    </p>
+</div>
+
+<!-- ==================== 3. MODÜL DETAYLARI ==================== -->
+<div class="section page-break">
+    <h2><span class="section-number">3</span> Modül Detayları</h2>
+    <p>Her bir modül, platformun temel işlevselliğini oluşturan bağımsız ancak birbiriyle entegre çalışan birimlerdir.</p>
+
+    <div class="module-grid">
+        <!-- 1 -->
+        <div class="module-card">
+            <h4><span class="icon">&#128203;</span> Görev Yönetimi</h4>
+            <ul>
+                <li>Spesifik (tek seferlik) ve frekansiyel (tekrarlayan) görev oluşturma</li>
+                <li>Canlı görev akış paneli ile anlık durum takibi</li>
+                <li>Görev atama, durum geçişi, duraklatma ve iptal</li>
+                <li>Toplu düzenleme ile yüzlerce görevi tek seferde güncelleme</li>
+                <li>Fotoğraflı kanıt yükleme ve not ekleme</li>
+            </ul>
+            <div>
+                <span class="tag">QR Doğrulama</span>
+                <span class="tag">NFC Doğrulama</span>
+                <span class="tag">GPS</span>
+            </div>
+            <div class="diff"><strong>Fark yaratan:</strong> Frekansiyel kural motoru ile günlük, haftalık veya özel periyotlarda otomatik görev üretimi; kağıt iş emirlerine son.</div>
+        </div>
+
+        <!-- 2 -->
+        <div class="module-card">
+            <h4><span class="icon">&#128205;</span> Lokasyon Yönetimi</h4>
+            <ul>
+                <li>Bina > Kat > Oda hiyerarşik yapı tanımlama</li>
+                <li>Her lokasyona benzersiz QR kod ve/veya NFC etiketi bağlama</li>
+                <li>Lokasyon grupları ile toplu operasyon yönetimi</li>
+                <li>Excel import/export ile hızlı kurulum</li>
+                <li>Lokasyon bazlı istatistik ve performans görüntüleme</li>
+            </ul>
+            <div>
+                <span class="tag">Hiyerarşi</span>
+                <span class="tag">Toplu Import</span>
+                <span class="tag">QR Üretici</span>
+            </div>
+            <div class="diff"><strong>Fark yaratan:</strong> Fiziksel QR/NFC etiketleri ile sahadaki personelin doğru lokasyonda olduğunu garanti eden doğrulama mekanizması.</div>
+        </div>
+
+        <!-- 3 -->
+        <div class="module-card">
+            <h4><span class="icon">&#9989;</span> Çeklist Sistemi</h4>
+            <ul>
+                <li>Özelleştirilebilir çeklist şablonları (başlık + maddeler)</li>
+                <li>Sahada mobil cihaz ile çeklist doldurma</li>
+                <li>Otomatik skor hesaplama ve kalite puanlama</li>
+                <li>Çeklist sonuçlarının raporlanması ve trend analizi</li>
+                <li>Şablon kopyalama ve versiyonlama</li>
+            </ul>
+            <div>
+                <span class="tag">Skorlama</span>
+                <span class="tag">Şablon Motoru</span>
+                <span class="tag">Arşivleme</span>
+            </div>
+            <div class="diff"><strong>Fark yaratan:</strong> Dinamik skorlama algoritması ile lokasyon bazlı kalite trendini otomatik izleme, zayıf noktaları önceden tespit.</div>
+        </div>
+
+        <!-- 4 -->
+        <div class="module-card">
+            <h4><span class="icon">&#128337;</span> Personel & Mesai</h4>
+            <ul>
+                <li>QR okutarak giriş/çıkış kaydı</li>
+                <li>GPS konum doğrulama ile sahte kayıt engelleme</li>
+                <li>Manuel mesai kaydı ekleme ve düzeltme (yöneticiler için)</li>
+                <li>Günlük, haftalık, aylık mesai raporu</li>
+                <li>Fazla mesai ve eksik saat uyarıları</li>
+            </ul>
+            <div>
+                <span class="tag">QR Giriş/Çıkış</span>
+                <span class="tag">GPS</span>
+                <span class="tag">Otomatik Arşiv</span>
+            </div>
+            <div class="diff"><strong>Fark yaratan:</strong> QR + GPS çift katmanlı doğrulama ile mesai sahteciliğini sıfıra indiren, tamamen dijital puantaj sistemi.</div>
+        </div>
+
+        <!-- 5 -->
+        <div class="module-card">
+            <h4><span class="icon">&#128202;</span> Raporlar & Analitik</h4>
+            <ul>
+                <li>9 farklı rapor türü: frekansiyel, spesifik, personel, müşteri, çeklist, birim fiyat, lokasyon, performans, arşiv</li>
+                <li>Tarih aralığı, lokasyon, personel ve durum bazlı filtreleme</li>
+                <li>Excel ve PDF export desteği</li>
+                <li>Arşiv verileri dahil geçmişe dönük analiz</li>
+                <li>Yetki bazlı rapor erişim kontrolü</li>
+            </ul>
+            <div>
+                <span class="tag">9 Rapor Türü</span>
+                <span class="tag">Excel Export</span>
+                <span class="tag">PDF</span>
+            </div>
+            <div class="diff"><strong>Fark yaratan:</strong> Arşiv sistemi entegrasyonu sayesinde aylarca geriye dönük veri analizi; rakiplerde genellikle 30 günle sınırlı.</div>
+        </div>
+
+        <!-- 6 -->
+        <div class="module-card">
+            <h4><span class="icon">&#11088;</span> Müşteri Değerlendirme</h4>
+            <ul>
+                <li>Müşteri temsilcisi için özel değerlendirme formu</li>
+                <li>Puan bazlı (1-5 yıldız) ve yorumlu geri bildirim</li>
+                <li>Lokasyon ve dönem bazlı memnuniyet trendi</li>
+                <li>Değerlendirmeleri arşivleme ve geri yükleme</li>
+                <li>Yönetici panelinde toplu değerlendirme analizi</li>
+            </ul>
+            <div>
+                <span class="tag">Puan Sistemi</span>
+                <span class="tag">Trend Analizi</span>
+                <span class="tag">Arşiv</span>
+            </div>
+            <div class="diff"><strong>Fark yaratan:</strong> Müşteri rolü ile doğrudan platforma erişim; aracısız, anlık geri bildirim döngüsü.</div>
+        </div>
+
+        <!-- 7 -->
+        <div class="module-card">
+            <h4><span class="icon">&#128176;</span> Birim Fiyat & Hakedis</h4>
+            <ul>
+                <li>Görev türü bazlı birim fiyat tanımlama</li>
+                <li>Tamamlanan görevler üzerinden otomatik hakedis hesaplama</li>
+                <li>Dönemsel hakedis raporu oluşturma</li>
+                <li>Lokasyon ve firma bazlı maliyet analizi</li>
+            </ul>
+            <div>
+                <span class="tag">Otomatik Hesaplama</span>
+                <span class="tag">Dönemsel Rapor</span>
+            </div>
+            <div class="diff"><strong>Fark yaratan:</strong> Görev tamamlama verisi ile doğrudan entegre; manuel hakedis hesabı hatalarını ortadan kaldırır.</div>
+        </div>
+
+        <!-- 8 -->
+        <div class="module-card">
+            <h4><span class="icon">&#128451;</span> Arşiv Sistemi</h4>
+            <ul>
+                <li>5 arşiv tablosu: mesai, değerlendirme, görev, çeklist başlık, çeklist madde</li>
+                <li>Otomatik arşivleme: 24+ saat eski veriler 6 saatte bir taşınır</li>
+                <li>Arşivden geri yükleme ve kalıcı silme</li>
+                <li>Arşiv kapasite izleme ve uyarı sistemi</li>
+                <li>Raporlarda arşiv verilerine erişim</li>
+            </ul>
+            <div>
+                <span class="tag">Node.js Cron</span>
+                <span class="tag">6 Saatlik Döngü</span>
+                <span class="tag">Railway</span>
+            </div>
+            <div class="diff"><strong>Fark yaratan:</strong> Aktif tabloları sürekli hafif tutan, performansı koruyan otomatik arşiv mimarisi; veritabanı yavaşlaması yaşanmaz.</div>
+        </div>
+
+        <!-- 9 -->
+        <div class="module-card">
+            <h4><span class="icon">&#129302;</span> İO Asistan (AI)</h4>
+            <ul>
+                <li>Yapay zeka destekli platform rehberi</li>
+                <li>Doğal dil ile görev oluşturma ve sorgulama</li>
+                <li>Rapor yorumlama ve öngörüsel analiz</li>
+                <li>Kullanıcı eğitimi ve onboarding desteği</li>
+            </ul>
+            <div>
+                <span class="tag">AI Chat</span>
+                <span class="tag">NLP</span>
+                <span class="tag">Akıllı Rehber</span>
+            </div>
+            <div class="diff"><strong>Fark yaratan:</strong> Sektörde nadir görülen entegre AI asistan; platform kullanımını öğrenme eğrisini minimize eder.</div>
+        </div>
+
+        <!-- 10 -->
+        <div class="module-card">
+            <h4><span class="icon">&#128241;</span> Mobil & Bildirimler</h4>
+            <ul>
+                <li>Responsive web uygulaması (PWA uyumlu)</li>
+                <li>QR ve NFC okuma desteği (mobil tarayıcı)</li>
+                <li>Push bildirimler ile anlık görev uyarıları</li>
+                <li>Çevrimdışı mod ile bağlantısız ortamda çalışma</li>
+                <li>Mobil optimizeli dashboard ve form arayüzleri</li>
+            </ul>
+            <div>
+                <span class="tag">PWA</span>
+                <span class="tag">Push Bildirim</span>
+                <span class="tag">Çevrimdışı</span>
+            </div>
+            <div class="diff"><strong>Fark yaratan:</strong> Native uygulama gerektirmeden tam mobil deneyim; kurulum maliyeti ve güncelleme yükü sıfır.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 4. TEKNİK YETKİNLİKLER ==================== -->
+<div class="section page-break">
+    <h2><span class="section-number">4</span> Teknik Yetkinlikler</h2>
+
+    <h3>Performans Metrikleri</h3>
+    <div class="tech-grid">
+        <div class="tech-item">
+            <span class="icon">&#9889;</span>
+            <div>
+                <div class="label">Sayfa Yüklenme</div>
+                <div class="desc">Ortalama sayfa yüklenme suresi &lt; 2 saniye (CDN destekli)</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128640;</span>
+            <div>
+                <div class="label">API Yanıt Suresi</div>
+                <div class="desc">REST API ortalama yanıt suresi &lt; 200ms</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128200;</span>
+            <div>
+                <div class="label">Eşzamanlı Kullanıcı</div>
+                <div class="desc">500+ eşzamanlı aktif kullanıcı desteği</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128736;</span>
+            <div>
+                <div class="label">Uptime</div>
+                <div class="desc">%99.9 erişilebilirlik hedefi (Railway altyapısı)</div>
+            </div>
+        </div>
+    </div>
+
+    <h3>Ölçeklenebilirlik</h3>
+    <div class="tech-grid">
+        <div class="tech-item">
+            <span class="icon">&#127959;</span>
+            <div>
+                <div class="label">Multi-Tenant Mimari</div>
+                <div class="desc">Tek altyapıda onlarca firma, birbirinden izole veri katmanları</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128451;</span>
+            <div>
+                <div class="label">Otomatik Arşivleme</div>
+                <div class="desc">Node.js cron ile 6 saatlik döngüde eski veri arşive taşınır, tablo performansı korunur</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#9729;&#65039;</span>
+            <div>
+                <div class="label">Bulut Altyapı</div>
+                <div class="desc">Railway PaaS + Supabase PostgreSQL; yatay ve dikey ölçekleme</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128230;</span>
+            <div>
+                <div class="label">Veritabanı Optimizasyonu</div>
+                <div class="desc">Dizin optimizasyonu, bağlantı havuzu ve sorgu önbellekleme</div>
+            </div>
+        </div>
+    </div>
+
+    <h3>Güvenlik</h3>
+    <div class="tech-grid">
+        <div class="tech-item">
+            <span class="icon">&#128274;</span>
+            <div>
+                <div class="label">Kimlik Doğrulama</div>
+                <div class="desc">Supabase Auth ile JWT tabanlı güvenli oturum yönetimi</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128737;</span>
+            <div>
+                <div class="label">RLS Politikaları</div>
+                <div class="desc">PostgreSQL Row Level Security ile veri izolasyonu</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128272;</span>
+            <div>
+                <div class="label">HTTPS / TLS</div>
+                <div class="desc">Tüm trafik SSL/TLS ile şifrelenir, sertifika otomatik yenileme</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128101;</span>
+            <div>
+                <div class="label">Rol Tabanlı Erişim (RBAC)</div>
+                <div class="desc">5 rol seviyesi, grup bazlı yetkilendirme, API seviyesinde kontrol</div>
+            </div>
+        </div>
+    </div>
+
+    <h3>API & Entegrasyon Yetenekleri</h3>
+    <div class="tech-grid">
+        <div class="tech-item">
+            <span class="icon">&#128279;</span>
+            <div>
+                <div class="label">RESTful API</div>
+                <div class="desc">Tüm modüller için standart REST endpoint'leri</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128231;</span>
+            <div>
+                <div class="label">E-posta Entegrasyonu</div>
+                <div class="desc">Resend HTTP API ile bildirim ve raporlama mailleri</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128196;</span>
+            <div>
+                <div class="label">Export Formatları</div>
+                <div class="desc">Excel (XLSX), PDF, CSV formatlarında veri dışa aktarımı</div>
+            </div>
+        </div>
+        <div class="tech-item">
+            <span class="icon">&#128268;</span>
+            <div>
+                <div class="label">Webhook Desteği</div>
+                <div class="desc">Görev durumu değişikliklerinde dış sistemlere bildirim</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 5. RAKİP KARŞILAŞTIRMASI ==================== -->
+<div class="section page-break">
+    <h2><span class="section-number">5</span> Rakip Karşılaştırması</h2>
+    <p>Aşağıdaki tablo, İOGYS platformunu geleneksel (kağıt/telefon tabanlı) yöntemler ve piyasadaki benzer yazılım çözümleriyle karşılaştırmaktadır.</p>
+
+    <div class="table-wrapper">
+        <table class="compare-table">
+            <thead>
+                <tr>
+                    <th>Kriter</th>
+                    <th>İOGYS</th>
+                    <th>Geleneksel Yöntemler</th>
+                    <th>Rakip Yazılımlar</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>QR / NFC lokasyon doğrulama</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>Frekansiyel görev otomasyonu</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>Canlı görev akış paneli</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>Çeklist skorlama motoru</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>Otomatik arşiv sistemi</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Multi-tenant mimari</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>AI asistan</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="no">&#10007;</td></tr>
+                <tr><td>Müşteri portalı</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>Birim fiyat / hakedis</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="partial">&#9684;</td></tr>
+                <tr><td>GPS mesai doğrulama</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="yes">&#10003;</td></tr>
+                <tr><td>Kurulum süresi</td><td><strong>&lt; 1 gün</strong></td><td>Yok</td><td>1-4 hafta</td></tr>
+                <tr><td>Mobil uygulama ihtiyacı</td><td><strong>Hayır (PWA)</strong></td><td>Yok</td><td>Evet (native)</td></tr>
+                <tr><td>Rapor türü sayısı</td><td><strong>9+</strong></td><td>Manuel</td><td>3-5</td></tr>
+                <tr><td>Rol seviyesi</td><td><strong>5</strong></td><td>1-2</td><td>2-3</td></tr>
+                <tr><td>Veri saklama süresi</td><td><strong>Sınırsız (arşiv)</strong></td><td>Fiziksel dosya</td><td>30-90 gün</td></tr>
+                <tr><td>Maliyet verimliliği</td><td><strong>Yüksek</strong></td><td>Düşük</td><td>Orta</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="highlight-box">
+        <p><strong>Sonuç:</strong> İOGYS, geleneksel yöntemlere kıyasla tüm kriterlerde üstünlük sağlarken, rakip yazılımlara karşı da özellikle otomatik arşivleme, AI asistan, QR/NFC doğrulama, frekansiyel görev motoru ve 9 farklı rapor türü ile belirgin bir rekabet avantajı sunmaktadır. Kurulum süresinin kısalığı ve native uygulama gerektirmemesi ise operasyonel maliyetleri minimumda tutar.</p>
+    </div>
+</div>
+
+<!-- ==================== 6. PLATFORM İSTATİSTİKLERİ ==================== -->
+<div class="section page-break">
+    <h2><span class="section-number">6</span> Platform İstatistikleri</h2>
+    <p>İOGYS platformunun mevcut kapasite ve kullanım metrikleri:</p>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="number">500+</div>
+            <div class="label">Aktif Lokasyon</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">1.400+</div>
+            <div class="label">Günlük Görev</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">5</div>
+            <div class="label">Kullanıcı Rolü</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">9</div>
+            <div class="label">Rapor Türü</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">6</div>
+            <div class="label">Arşiv Tablosu</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">11</div>
+            <div class="label">Ana Modül</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">50+</div>
+            <div class="label">API Endpoint</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">AI</div>
+            <div class="label">İO Asistan</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">QR</div>
+            <div class="label">Kod Desteği</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">NFC</div>
+            <div class="label">Etiket Desteği</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">24/7</div>
+            <div class="label">Erişilebilirlik</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">6sa</div>
+            <div class="label">Arşiv Döngüsü</div>
+        </div>
+    </div>
+
+    <div class="highlight-box">
+        <p><strong>Teknik Altyapı:</strong> Next.js (TypeScript) framework, Supabase PostgreSQL veritabanı, Railway PaaS hosting, Resend HTTP API mail servisi, Node.js cron arşiv motoru. Tüm bileşenler bulut tabanlı, yüksek erişilebilirlik ve ölçeklenebilirlik için optimize edilmiştir.</p>
+    </div>
+
+    <h3>Teknoloji Yığını</h3>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Katman</th>
+                    <th>Teknoloji</th>
+                    <th>Versiyon / Detay</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Frontend</td><td>Next.js + React + TypeScript</td><td>App Router, Server Components</td></tr>
+                <tr><td>UI Kütüphanesi</td><td>Tailwind CSS + shadcn/ui</td><td>Responsive, erişilebilir bileşenler</td></tr>
+                <tr><td>Veritabanı</td><td>Supabase PostgreSQL</td><td>RLS, Realtime, Edge Functions</td></tr>
+                <tr><td>Kimlik Doğrulama</td><td>Supabase Auth</td><td>JWT, OAuth, Magic Link</td></tr>
+                <tr><td>Hosting</td><td>Railway</td><td>Custom server, otomatik deploy</td></tr>
+                <tr><td>Mail Servisi</td><td>Resend HTTP API</td><td>SMTP port kısıtlaması bypass</td></tr>
+                <tr><td>Cron / Arşiv</td><td>Node.js + node-cron</td><td>6 saatlik periyodik arşivleme</td></tr>
+                <tr><td>AI</td><td>LLM Entegrasyonu</td><td>İO Asistan chatbot</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</div><!-- /content -->
+
+<!-- Footer -->
+<div class="footer">
+    <strong>İOGYS</strong> - QR & NFC Tabanlı Saha Operasyonları Yönetim Platformu<br>
+    <strong>İO Teknoloji</strong> | iogys.com.tr | Nisan 2026 | v1.0<br><br>
+    Bu belge İO Teknoloji tarafından hazırlanmıştır. Tüm hakları saklıdır.
+</div>
+
+</body>
+</html>

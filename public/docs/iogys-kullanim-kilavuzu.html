@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>İOGYS Kullanım Kılavuzu - İO Teknoloji</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 18mm 25mm 18mm;
+    @bottom-center {
+      content: "İO Teknoloji - İOGYS Kullanım Kılavuzu v1.0";
+      font-size: 8pt;
+      color: #999;
+    }
+    @bottom-right {
+      content: counter(page);
+      font-size: 8pt;
+      color: #999;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --navy: #042C53;
+    --blue: #0C447C;
+    --accent: #378ADD;
+    --bg: #f8f9fb;
+    --text: #2c3e50;
+    --border: #dde3ea;
+    --light-accent: #e8f1fb;
+  }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.72;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page-container {
+    max-width: 210mm;
+    margin: 0 auto;
+    background: #fff;
+  }
+
+  @media screen {
+    .page-container {
+      box-shadow: 0 2px 24px rgba(4,44,83,0.10);
+      margin: 24px auto;
+      border-radius: 4px;
+      padding: 48px 54px;
+    }
+  }
+
+  @media print {
+    body { background: #fff; }
+    .page-container { padding: 0; box-shadow: none; }
+    .cover-page { page-break-after: always; }
+    .toc { page-break-after: always; }
+    h2 { page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; }
+    .tip-box, .note-box, .warning-box { break-inside: avoid; }
+  }
+
+  /* ── Cover Page ── */
+  .cover-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 90vh;
+    text-align: center;
+    padding: 60px 20px;
+  }
+  .cover-logo {
+    width: 88px;
+    height: 88px;
+    background: var(--navy);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 36px;
+    box-shadow: 0 8px 32px rgba(4,44,83,0.18);
+  }
+  .cover-logo span {
+    color: #fff;
+    font-size: 32pt;
+    font-weight: 800;
+    letter-spacing: -1px;
+  }
+  .cover-title {
+    font-size: 30pt;
+    font-weight: 800;
+    color: var(--navy);
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  .cover-subtitle {
+    font-size: 16pt;
+    color: var(--blue);
+    font-weight: 600;
+    margin-bottom: 48px;
+  }
+  .cover-meta {
+    font-size: 10.5pt;
+    color: #6b7d91;
+    line-height: 2;
+  }
+  .cover-meta strong { color: var(--navy); }
+  .cover-line {
+    width: 80px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--navy), var(--accent));
+    border-radius: 2px;
+    margin: 32px auto;
+  }
+
+  /* ── Table of Contents ── */
+  .toc { margin: 40px 0 48px; }
+  .toc h2 {
+    font-size: 18pt;
+    color: var(--navy);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    page-break-before: avoid;
+  }
+  .toc ol {
+    list-style: none;
+    counter-reset: toc-section;
+  }
+  .toc > ol > li {
+    counter-increment: toc-section;
+    margin-bottom: 4px;
+  }
+  .toc > ol > li > a {
+    display: flex;
+    align-items: baseline;
+    text-decoration: none;
+    color: var(--text);
+    padding: 6px 0;
+    border-bottom: 1px dotted var(--border);
+    font-weight: 600;
+    font-size: 10.5pt;
+  }
+  .toc > ol > li > a::before {
+    content: counter(toc-section) ".";
+    color: var(--accent);
+    font-weight: 700;
+    min-width: 28px;
+  }
+  .toc > ol > li > a:hover { color: var(--accent); }
+  .toc ol ol {
+    list-style: none;
+    padding-left: 28px;
+  }
+  .toc ol ol li a {
+    text-decoration: none;
+    color: #5a6d7f;
+    font-size: 10pt;
+    display: block;
+    padding: 2px 0;
+  }
+  .toc ol ol li a:hover { color: var(--accent); }
+
+  /* ── Headings ── */
+  h2 {
+    font-size: 18pt;
+    color: var(--navy);
+    margin: 48px 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 3px solid var(--accent);
+    font-weight: 800;
+    letter-spacing: -0.3px;
+  }
+  h3 {
+    font-size: 13pt;
+    color: var(--blue);
+    margin: 28px 0 10px;
+    font-weight: 700;
+  }
+  h4 {
+    font-size: 11pt;
+    color: var(--navy);
+    margin: 18px 0 8px;
+    font-weight: 700;
+  }
+
+  p { margin-bottom: 12px; }
+
+  /* ── Lists ── */
+  ul, ol { margin: 8px 0 16px 24px; }
+  li { margin-bottom: 4px; }
+
+  /* ── Boxes ── */
+  .tip-box, .note-box, .warning-box {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 10.5pt;
+    line-height: 1.65;
+  }
+  .tip-box {
+    background: #e8f8ee;
+    border-left: 4px solid #2ecc71;
+  }
+  .tip-box::before {
+    content: "İpucu: ";
+    font-weight: 700;
+    color: #27ae60;
+  }
+  .note-box {
+    background: var(--light-accent);
+    border-left: 4px solid var(--accent);
+  }
+  .note-box::before {
+    content: "Not: ";
+    font-weight: 700;
+    color: var(--blue);
+  }
+  .warning-box {
+    background: #fef5e7;
+    border-left: 4px solid #f39c12;
+  }
+  .warning-box::before {
+    content: "Dikkat: ";
+    font-weight: 700;
+    color: #e67e22;
+  }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 20px;
+    font-size: 10pt;
+  }
+  th {
+    background: var(--navy);
+    color: #fff;
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+  }
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:nth-child(even) td { background: #f5f7fa; }
+
+  /* ── Code / Kbd ── */
+  code {
+    background: #f0f3f7;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10pt;
+    color: var(--blue);
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  }
+  kbd {
+    background: var(--navy);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 9pt;
+    font-family: inherit;
+  }
+
+  /* ── Steps ── */
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    margin-left: 0;
+    padding-left: 0;
+  }
+  .steps li {
+    counter-increment: step;
+    padding: 8px 0 8px 42px;
+    position: relative;
+    margin-bottom: 4px;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 28px;
+    height: 28px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 10pt;
+  }
+
+  /* ── Status badges ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 9pt;
+    font-weight: 600;
+    color: #fff;
+    margin-right: 4px;
+  }
+  .badge-acik { background: #3498db; }
+  .badge-islemde { background: #f39c12; }
+  .badge-beklemede { background: #9b59b6; }
+  .badge-tamamlandi { background: #2ecc71; }
+  .badge-iptal { background: #e74c3c; }
+  .badge-gecikmis { background: #c0392b; }
+
+  /* ── Footer ── */
+  .doc-footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 2px solid var(--border);
+    text-align: center;
+    font-size: 9pt;
+    color: #8e9baa;
+  }
+</style>
+</head>
+<body>
+<div class="page-container">
+
+<!-- ═══════════════════════ COVER PAGE ═══════════════════════ -->
+<div class="cover-page">
+  <div class="cover-logo"><span>İO</span></div>
+  <div class="cover-title">İOGYS</div>
+  <div class="cover-subtitle">Kullanım Kılavuzu</div>
+  <div class="cover-line"></div>
+  <div class="cover-meta">
+    <strong>İO Görev Yönetim Sistemi</strong><br>
+    QR &amp; NFC Tabanlı Saha Operasyonları Yönetim Platformu<br><br>
+    <strong>Hazırlayan:</strong> İO Teknoloji<br>
+    <strong>Sürüm:</strong> 1.0<br>
+    <strong>Tarih:</strong> Nisan 2026<br>
+    <strong>Web:</strong> iogys.com.tr
+  </div>
+</div>
+
+<!-- ═══════════════════════ TABLE OF CONTENTS ═══════════════════════ -->
+<div class="toc">
+  <h2>İçindekiler</h2>
+  <ol>
+    <li><a href="#giris">Giriş</a></li>
+    <li><a href="#sisteme-giris">Sisteme Giriş</a></li>
+    <li><a href="#dashboard">Gösterge Paneli (Dashboard)</a></li>
+    <li><a href="#gorev-yonetimi">Görev Yönetimi</a>
+      <ol>
+        <li><a href="#spesifik-gorevler">Spesifik Görevler</a></li>
+        <li><a href="#frekansiyel-gorevler">Frekansiyel Görevler</a></li>
+        <li><a href="#canli-gorev">Canlı Görev Akışı</a></li>
+        <li><a href="#gorev-durumlari">Görev Durumları</a></li>
+      </ol>
+    </li>
+    <li><a href="#lokasyon">Lokasyon Yönetimi</a></li>
+    <li><a href="#checklist">Checklist Sistemi</a></li>
+    <li><a href="#personel">Personel Takibi &amp; Mesai</a></li>
+    <li><a href="#raporlar">Raporlar</a></li>
+    <li><a href="#musteri">Müşteri Değerlendirmeleri</a></li>
+    <li><a href="#birim-fiyat">Birim Fiyatlar</a></li>
+    <li><a href="#arsiv">Arşiv Sistemi</a></li>
+    <li><a href="#kullanici-yonetimi">Kullanıcı &amp; Firma Yönetimi</a></li>
+    <li><a href="#sistem-ayarlari">Sistem Ayarları</a></li>
+    <li><a href="#mobil">Mobil Uygulama</a></li>
+    <li><a href="#io-asistan">İO Asistan</a></li>
+    <li><a href="#sss">SSS (Sıkça Sorulan Sorular)</a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════ 1. GİRİŞ ═══════════════════════ -->
+<h2 id="giris">1. Giriş</h2>
+
+<p>İOGYS (İO Görev Yönetim Sistemi), İO Teknoloji tarafından geliştirilen QR ve NFC tabanlı saha operasyonları yönetim platformudur. Temizlik, güvenlik, bakım-onarım ve tesis yönetimi gibi alanlarda faaliyet gösteren firmaların saha operasyonlarını dijitalleştirmek, görev takibini kolaylaştırmak ve verimliliği artırmak amacıyla tasarlanmıştır. Platform; görev atama, personel mesai takibi, checklist yönetimi, müşteri değerlendirme ve kapsamlı raporlama modüllerini tek bir çatı altında sunar.</p>
+
+<p>İOGYS, temizlik ve tesis yönetim şirketlerinin saha operasyonlarını yönetmesi gereken operasyon müdürleri, bölge sorumluları, saha ekip liderleri ve sahada çalışan personel tarafından kullanılmak üzere tasarlanmıştır. Ayrıca müşteri firmalar da sisteme kendi rolleriyle erişerek değerlendirme yapabilir ve raporları inceleyebilir. Sistem, çok kiracılı (multi-tenant) mimarisi sayesinde farklı firmaların birbirinden bağımsız çalışmasını sağlar.</p>
+
+<p>Sistemi kullanabilmek için güncel bir web tarayıcısı (Chrome, Firefox, Edge veya Safari'nin son sürümü) yeterlidir. Mobil cihazlarda QR kod okutma ve NFC dokunma işlemleri için kamera ve NFC desteği bulunan bir akıllı telefon gereklidir. Platform tamamen web tabanlı olduğundan herhangi bir kurulum veya indirme gerekmez; internet bağlantısı olan her yerden erişilebilir.</p>
+
+<div class="tip-box">İOGYS tüm modern tarayıcılarla uyumludur. En iyi deneyim için Google Chrome veya Microsoft Edge tarayıcısının güncel sürümünü kullanmanız önerilir.</div>
+
+<!-- ═══════════════════════ 2. SİSTEME GİRİŞ ═══════════════════════ -->
+<h2 id="sisteme-giris">2. Sisteme Giriş</h2>
+
+<h3>Giriş Yapma</h3>
+<p>İOGYS platformuna erişmek için tarayıcınızda <code>iogys.com.tr</code> adresine gidin. Karşınıza gelen giriş ekranında size tanımlanmış e-posta adresi ve şifre ile oturum açın. Sistem, başarılı giriş sonrasında sizi rolünüze uygun gösterge paneline yönlendirecektir. Süper yönetici, kiracı yöneticisi ve saha personeli rolleri farklı paneller ve yetkilerle karşılanır.</p>
+
+<ol class="steps">
+  <li><code>iogys.com.tr</code> adresine gidin.</li>
+  <li>E-posta adresinizi ve şifrenizi girin.</li>
+  <li><strong>Giriş Yap</strong> butonuna tıklayın.</li>
+  <li>Sistem sizi otomatik olarak gösterge paneline yönlendirecektir.</li>
+</ol>
+
+<h3>Şifre Sıfırlama</h3>
+<p>Şifrenizi unuttuysanız, giriş sayfasındaki <strong>"Şifremi Unuttum"</strong> bağlantısına tıklayın. Açılan sayfada kayıtlı e-posta adresinizi girin; sistem size şifre sıfırlama bağlantısı içeren bir e-posta gönderecektir. E-postadaki bağlantıya tıklayarak yeni şifrenizi belirleyin. Şifreniz en az 8 karakter uzunluğunda olmalı ve güvenlik gereksinimlerini karşılamalıdır.</p>
+
+<h3>Profil Ayarları</h3>
+<p>Oturum açtıktan sonra sağ üst köşedeki profil simgesine tıklayarak profil ayarlarınıza ulaşabilirsiniz. Bu sayfada adınızı, telefon numaranızı ve profil fotoğrafınızı güncelleyebilirsiniz. Ayrıca şifre değiştirme işlemini de buradan gerçekleştirebilirsiniz. Bildirim tercihleri ve dil ayarları da profil bölümünden yönetilir.</p>
+
+<div class="note-box">Hesap bilgilerinizde yapacağınız değişiklikler, bir sonraki oturum açmanızda etkili olacaktır. E-posta adresinizi değiştirmek için sistem yöneticinize başvurmanız gerekmektedir.</div>
+
+<!-- ═══════════════════════ 3. DASHBOARD ═══════════════════════ -->
+<h2 id="dashboard">3. Gösterge Paneli (Dashboard)</h2>
+
+<p>Gösterge paneli, İOGYS platformuna giriş yaptığınızda karşınıza çıkan ana sayfadır. Bu sayfa, operasyonlarınızın genel durumunu tek bakışta görmenizi sağlayan KPI kartları, grafikler ve özet bloklar içerir. Açık görev sayısı, tamamlanma oranı, geciken görevler, aktif personel sayısı ve günlük mesai durumu gibi kritik metrikler anlık olarak güncellenir.</p>
+
+<p>Dashboard üzerindeki bloklar özelleştirilebilir yapıdadır. Yönetici rolündeki kullanıcılar, <strong>Sistem Ayarları &gt; Dashboard Düzeni</strong> menüsünden hangi blokların görüntüleneceğini, sırasını ve boyutlarını belirleyebilir. Her bir blok sürükle-bırak yöntemiyle yeniden konumlandırılabilir. Böylece her firma kendi ihtiyaçlarına göre özelleştirilmiş bir gösterge paneline sahip olur.</p>
+
+<p>KPI kartları üzerine tıklandığında ilgili modülün detay sayfasına yönlendirilirsiniz. Örneğin "Geciken Görevler" kartına tıklamak sizi doğrudan geciken görevlerin filtrelenmiş listesine götürür. Bu sayede sorunlu alanları hızlıca tespit edip aksiyon alabilirsiniz. Grafikler ise tarih aralığı seçilerek geçmişe dönük analiz yapılmasına imkan tanır.</p>
+
+<div class="tip-box">Dashboard'daki blok düzenini değiştirdikten sonra "Kaydet" butonuna basmayı unutmayın. Kaydetmeden sayfadan çıkarsanız değişiklikler korunmaz.</div>
+
+<!-- ═══════════════════════ 4. GÖREV YÖNETİMİ ═══════════════════════ -->
+<h2 id="gorev-yonetimi">4. Görev Yönetimi</h2>
+
+<p>İOGYS'nin temel modülü olan görev yönetimi, saha operasyonlarını planlamak, atamak ve izlemek için kapsamlı araçlar sunar. Görevler iki ana kategoride ele alınır: belirli bir tarih ve saatte yapılması gereken <strong>spesifik görevler</strong> ile tekrarlayan kurallara bağlı olarak otomatik oluşturulan <strong>frekansiyel görevler</strong>. Her iki görev türü de canlı görev akışında anlık olarak izlenebilir.</p>
+
+<!-- 4.1 -->
+<h3 id="spesifik-gorevler">4.1 Spesifik Görevler</h3>
+
+<p>Spesifik görevler, belirli bir tarihte belirli bir lokasyonda yapılması gereken tek seferlik görevlerdir. Yeni bir spesifik görev oluşturmak için <strong>Görev Yönetimi &gt; Spesifik Görevler</strong> sayfasına gidin ve <strong>"Yeni Görev"</strong> butonuna tıklayın. Açılan formda görevin adını, açıklamasını, hedef tarih ve saatini, atanacak personeli ve lokasyonu belirleyin.</p>
+
+<p>Görev oluşturulduktan sonra listede görünür ve atanan personele bildirim gönderilir. Görevleri filtrelemek için sayfanın üst kısmındaki filtre çubuğunu kullanabilirsiniz: duruma, tarihe, lokasyona veya personele göre filtreleme yapabilirsiniz. Toplu işlem özelliği ile birden fazla görevi seçerek durum değiştirme, silme veya yeniden atama işlemlerini gerçekleştirebilirsiniz.</p>
+
+<p>Her görev kartı üzerine tıklandığında detay paneli açılır. Bu panelde görevin tüm bilgileri, geçmişi, yorum ve ekleri görüntülenebilir. Görevin durumunu bu panelden manuel olarak değiştirebilir, not ekleyebilir veya fotoğraf yükleyebilirsiniz.</p>
+
+<div class="tip-box">Sık tekrarlayan görevler için spesifik görev yerine frekansiyel görev kuralı oluşturmak zaman kazandırır.</div>
+
+<!-- 4.2 -->
+<h3 id="frekansiyel-gorevler">4.2 Frekansiyel Görevler</h3>
+
+<p>Frekansiyel görevler, belirli kurallara göre otomatik olarak tekrarlayan görevlerdir. Günlük, haftalık, aylık veya özel periyotlarla tekrarlayan görev kuralları tanımlayabilirsiniz. <strong>Görev Yönetimi &gt; Frekansiyel Görevler</strong> sayfasından yeni bir kural oluşturmak için <strong>"Yeni Kural"</strong> butonuna tıklayın.</p>
+
+<p>Kural oluşturma formunda görevin adını, frekansını (günlük, haftalık, aylık), aktif olacağı günleri ve saati belirleyin. Örneğin "Her Pazartesi ve Çarşamba 09:00'da Zemin Kat Temizlik" şeklinde bir kural tanımlayabilirsiniz. Kural aktif edildiğinde, belirlenen zaman dilimlerinde otomatik olarak görevler oluşturulur ve ilgili personele atanır.</p>
+
+<p>Kuralları geçici olarak durdurmak için <strong>"Duraklat"</strong> özelliğini kullanabilirsiniz. Duraklatılan kurallar yeni görev üretmez ancak mevcut görevler etkilenmez. İhtiyaç duyulduğunda kuralı yeniden aktifleştirmek mümkündür. Her kuralın detay sayfasında, o kurala bağlı oluşturulmuş tüm görevlerin listesini ve tamamlanma istatistiklerini görüntüleyebilirsiniz.</p>
+
+<!-- 4.3 -->
+<h3 id="canli-gorev">4.3 Canlı Görev Akışı</h3>
+
+<p>Canlı görev akışı, saha operasyonlarını gerçek zamanlı olarak izlemenizi sağlayan güçlü bir modüldür. Bu ekranda anlık olarak hangi görevlerin başladığını, devam ettiğini, tamamlandığını veya geciktiğini görebilirsiniz. Görevler kart formatında listelenir ve durumlarına göre renk kodlarıyla işaretlenir.</p>
+
+<p>Her görev kartında <strong>Play</strong> (başlat), <strong>Pause</strong> (duraklat) ve <strong>Stop</strong> (bitir) kontrolleri bulunur. Personel sahada göreve başladığında Play butonuna basar, mola verdiğinde Pause'a, tamamladığında Stop'a basar. Bu işlemler zaman damgasıyla kaydedilir ve süre analizi raporlarına yansır. Yöneticiler bu akışı filtreler aracılığıyla lokasyon, personel veya durum bazında daraltabilir.</p>
+
+<p>Canlı akış sayfası otomatik olarak yenilenir, ancak isterseniz sağ üst köşedeki yenileme butonuyla manuel güncelleme de yapabilirsiniz. Kritik gecikme durumlarında sistem otomatik uyarı oluşturur ve ilgili yöneticilere bildirim gönderir.</p>
+
+<!-- 4.4 -->
+<h3 id="gorev-durumlari">4.4 Görev Durumları</h3>
+
+<p>İOGYS'de görevler altı farklı durumda olabilir. Her durum, görevin yaşam döngüsündeki konumunu belirtir:</p>
+
+<table>
+  <tr><th>Durum</th><th>Açıklama</th><th>Renk</th></tr>
+  <tr><td><span class="badge badge-acik">AÇIK</span></td><td>Görev oluşturuldu, henüz başlanmadı</td><td>Mavi</td></tr>
+  <tr><td><span class="badge badge-islemde">İŞLEMDE</span></td><td>Personel göreve başladı, devam ediyor</td><td>Turuncu</td></tr>
+  <tr><td><span class="badge badge-beklemede">BEKLEMEDE</span></td><td>Görev geçici olarak askıya alındı</td><td>Mor</td></tr>
+  <tr><td><span class="badge badge-tamamlandi">TAMAMLANDI</span></td><td>Görev başarıyla bitirildi</td><td>Yeşil</td></tr>
+  <tr><td><span class="badge badge-iptal">İPTAL</span></td><td>Görev iptal edildi</td><td>Kırmızı</td></tr>
+  <tr><td><span class="badge badge-gecikmis">GECİKMİŞ</span></td><td>Hedef süre aşıldı, görev gecikmiş</td><td>Koyu Kırmızı</td></tr>
+</table>
+
+<p>Görev durumları hem otomatik hem de manuel olarak değiştirilebilir. Personel sahada QR/NFC okutarak görevi İŞLEMDE durumuna geçirir, tamamladığında ise TAMAMLANDI durumuna alır. Hedef süre aşıldığında sistem otomatik olarak GECİKMİŞ durumunu atar. Yöneticiler herhangi bir görevi istedikleri duruma manuel olarak da taşıyabilir.</p>
+
+<div class="warning-box">İPTAL edilen görevler 24 saat sonra otomatik olarak arşive taşınır ve varsayılan listelerden kaldırılır. Bu görevlere Arşiv modülünden ulaşabilirsiniz.</div>
+
+<!-- ═══════════════════════ 5. LOKASYON YÖNETİMİ ═══════════════════════ -->
+<h2 id="lokasyon">5. Lokasyon Yönetimi</h2>
+
+<p>Lokasyon yönetimi, saha operasyonlarının gerçekleştirileceği fiziksel alanları tanımlama ve organize etme modülüdür. İOGYS'de lokasyonlar hiyerarşik bir yapıda organize edilir: Bina &gt; Kat &gt; Bölge &gt; Oda şeklinde iç içe lokasyonlar oluşturabilirsiniz. Bu yapı, büyük tesislerdeki görevlerin doğru konuma atanmasını ve raporlamanın detaylı yapılmasını sağlar.</p>
+
+<p>Her lokasyona QR kod veya NFC etiketi bağlanabilir. <strong>Lokasyon Yönetimi</strong> sayfasında ilgili lokasyonu seçin ve <strong>"QR/NFC Bağla"</strong> butonuna tıklayın. Sistem otomatik olarak benzersiz bir QR kod oluşturur; bu kodu yazdırarak ilgili alana yapıştırabilirsiniz. NFC etiketi bağlamak için ise NFC okuyucu olan bir cihazla etiketi okutup lokasyonla eşleştirin. Personel sahada bu kodları okutarak doğru lokasyonda olduğunu teyit eder.</p>
+
+<p>Lokasyonlar gruplara ayrılabilir. Gruplar, benzer lokasyonları bir araya getirerek toplu işlem yapmayı kolaylaştırır. Örneğin tüm "Zemin Kat Tuvaletleri" bir grup altında toplanabilir ve bu gruba tek seferde görev atanabilir. İçe ve dışa aktarma (import/export) özellikleri ile lokasyon listelerinizi Excel formatında yükleyebilir veya indirebilirsiniz.</p>
+
+<div class="tip-box">Çok sayıda lokasyonu hızla eklemek için Excel şablonunu indirip doldurun ve toplu içe aktarma özelliğini kullanın.</div>
+
+<!-- ═══════════════════════ 6. CHECKLIST SİSTEMİ ═══════════════════════ -->
+<h2 id="checklist">6. Checklist Sistemi</h2>
+
+<p>Checklist sistemi, saha operasyonlarında standart kontrol listeleri oluşturmanızı ve personelin bu listeleri sahada doldurmasını sağlar. Bir checklist şablonu oluşturmak için <strong>Checklist &gt; Şablonlar</strong> sayfasına gidin ve <strong>"Yeni Şablon"</strong> butonuna tıklayın. Şablona bir isim verin, ardından kontrol maddelerini ekleyin.</p>
+
+<p>Her madde farklı tipte olabilir: Evet/Hayır, metin girişi, sayısal değer, çoktan seçmeli veya fotoğraf yükleme. Maddelere ağırlık puanı atayarak skorlama sistemi kurabilirsiniz. Örneğin bir temizlik kontrolü checklist'inde "Zemin temiz mi?" maddesi 10 puan, "Çöpler alınmış mı?" maddesi 5 puan olarak ağırlıklandırılabilir. Toplam puan otomatik hesaplanır ve yüzdelik başarı skoru oluşturulur.</p>
+
+<p>Checklist şablonları görevlere veya lokasyonlara bağlanabilir. Personel sahada görevi yaparken ilgili checklist'i doldurur; sonuçlar anlık olarak sisteme kaydedilir. Yöneticiler <strong>Raporlar &gt; Çeklist Raporu</strong> bölümünden tüm checklist sonuçlarını filtreleyerek inceleyebilir, başarı oranlarını karşılaştırabilir ve trend analizlerini görüntüleyebilir.</p>
+
+<p>Şablonlar kopyalanabilir ve düzenlenebilir. Bir şablonu kopyaladığınızda tüm maddeler ve ayarları yeni şablona aktarılır; böylece benzer checklist'ler oluşturmak için sıfırdan başlamanız gerekmez. Arşivlenen checklist sonuçları da raporlarda "Arşiv" seçeneği ile sorgulanabilir.</p>
+
+<div class="note-box">Checklist sonuçları 24 saat sonra otomatik olarak arşiv tablosuna taşınır. Arşivlenen veriler raporlarda "Arşiv dahil" filtresi ile görüntülenebilir.</div>
+
+<!-- ═══════════════════════ 7. PERSONEL TAKİBİ ═══════════════════════ -->
+<h2 id="personel">7. Personel Takibi &amp; Mesai</h2>
+
+<p>Personel takibi modülü, saha çalışanlarının mesai giriş-çıkış saatlerini, çalışma sürelerini ve lokasyon bazlı hareketlerini kayıt altına alır. Personel, sahaya geldiğinde ilgili lokasyondaki QR kodu okutarak veya NFC etiketine dokunarak mesai girişini yapar. Aynı şekilde mesai çıkışını da QR/NFC okutarak gerçekleştirir.</p>
+
+<p>Her mesai kaydı GPS koordinatlarıyla birlikte saklanır. Bu sayede personelin doğru lokasyonda olup olmadığı doğrulanabilir. Sistem, tanımlanan lokasyon çemberinin dışından yapılan giriş denemelerini uyarı olarak işaretler. Yöneticiler <strong>Personel &gt; Mesai Kayıtları</strong> sayfasından tüm personelin mesai geçmişini tarih, personel veya lokasyon bazında filtreleyerek inceleyebilir.</p>
+
+<p>Mesai raporları günlük, haftalık ve aylık bazda özetlenebilir. Toplam çalışma saati, fazla mesai, eksik mesai ve devamsızlık verileri otomatik hesaplanır. Bu veriler hakedis hesaplaması ve bordro entegrasyonu için dışa aktarılabilir. Mesai kayıtları da 24 saat sonra otomatik olarak arşivlenir; geçmişe dönük sorgulama arşiv üzerinden yapılır.</p>
+
+<div class="tip-box">Personel mesai girişini unuttuğunda, yetkili yönetici <strong>Mesai Kayıtları</strong> sayfasından manuel giriş oluşturabilir.</div>
+
+<!-- ═══════════════════════ 8. RAPORLAR ═══════════════════════ -->
+<h2 id="raporlar">8. Raporlar</h2>
+
+<p>İOGYS, operasyonel verileri anlamlı bilgiye dönüştüren kapsamlı bir raporlama altyapısı sunar. <strong>Raporlar</strong> menüsü altında 9 farklı rapor türüne erişebilirsiniz. Her rapor türü, farklı bir bakış açısıyla operasyonlarınızı analiz etmenize olanak tanır.</p>
+
+<table>
+  <tr><th>Rapor Türü</th><th>Açıklama</th></tr>
+  <tr><td><strong>Çeklist Raporu</strong></td><td>Checklist sonuçları, başarı oranları ve trend analizi</td></tr>
+  <tr><td><strong>Grafiksel Rapor</strong></td><td>Görev tamamlanma, gecikme ve performans grafikleri</td></tr>
+  <tr><td><strong>Hakedis Raporu</strong></td><td>Birim fiyat bazlı mali özet ve hakedis hesaplaması</td></tr>
+  <tr><td><strong>Ham Veri</strong></td><td>Filtrelenebilir ham veri tablosu, Excel dışa aktarma</td></tr>
+  <tr><td><strong>Müşteri Raporu</strong></td><td>Müşteri değerlendirmeleri ve memnuniyet analizi</td></tr>
+  <tr><td><strong>Özelleştir</strong></td><td>Sütun, filtre ve gruplama seçimleriyle özel rapor oluşturma</td></tr>
+  <tr><td><strong>Süre Analiz</strong></td><td>Görev başlangıç-bitiş süreleri, ortalama ve sapma analizi</td></tr>
+  <tr><td><strong>Hızlı Rapor</strong></td><td>Tek tıkla hazır rapor şablonları</td></tr>
+  <tr><td><strong>Şablon Yönetimi</strong></td><td>Rapor şablonlarını oluşturma, düzenleme ve paylaşma</td></tr>
+</table>
+
+<p>Her rapor sayfasında tarih aralığı, lokasyon, personel, görev türü ve durum gibi filtreler mevcuttur. Filtreleri uyguladıktan sonra rapor anlık olarak güncellenir. Raporları PDF veya Excel formatında dışa aktarabilir, yazdırabilir veya e-posta ile paylaşabilirsiniz. Özelleştir modülü ile kendi rapor şablonlarınızı oluşturup kaydederek tekrar tekrar kullanabilirsiniz.</p>
+
+<p>Grafiksel raporlar; çubuk, çizgi ve pasta grafik formatlarını destekler. Tarih bazlı trend grafikleri ile operasyonel performansın zaman içindeki değişimini izleyebilirsiniz. Hakedis raporu ise birim fiyat tanımlarıyla entegre çalışarak mali özetler üretir.</p>
+
+<div class="note-box">Arşivlenmiş veriler de raporlarda görüntülenebilir. İlgili rapor sayfasında "Arşiv dahil" veya "Sadece arşiv" filtre seçeneklerini kullanın.</div>
+
+<!-- ═══════════════════════ 9. MÜŞTERİ DEĞERLENDİRMELERİ ═══════════════════════ -->
+<h2 id="musteri">9. Müşteri Değerlendirmeleri</h2>
+
+<p>Müşteri değerlendirmeleri modülü, hizmet verilen müşteri firmaların memnuniyetini ölçmek ve geri bildirim toplamak için tasarlanmıştır. Sistem, her müşteri için benzersiz bir token oluşturur ve bu token aracılığıyla müşterilere özel bir değerlendirme formu sunulur. Müşteriler sisteme giriş yapmadan, sadece kendilerine iletilen bağlantı ile değerlendirme yapabilir.</p>
+
+<p>Değerlendirme formu yıldız puanlama (1-5) ve serbest metin yorum alanı içerir. Müşteri, hizmet kalitesini, personel davranışını, temizlik seviyesini ve genel memnuniyetini ayrı ayrı puanlayabilir. Gönderilen değerlendirmeler anlık olarak yönetici paneline düşer ve ilgili proje yöneticisine bildirim gönderilir.</p>
+
+<p>Değerlendirmeler <strong>Raporlar &gt; Müşteri Raporu</strong> bölümünde detaylı olarak incelenebilir. Zaman bazlı memnuniyet trendi, lokasyon bazlı karşılaştırma ve ortalama puanlar grafiksel olarak sunulur. Düşük puan alan değerlendirmeler otomatik olarak uyarı oluşturur ve aksiyon takibine alınabilir. Değerlendirmeler de 24 saat sonra arşive taşınır; arşivlenen değerlendirmelere arşiv filtreleri ile ulaşılabilir.</p>
+
+<div class="tip-box">Müşteri değerlendirme bağlantısını düzenli aralıklarla (örneğin haftalık) müşteriye e-posta ile göndermeniz, sürekli geri bildirim akışı sağlar.</div>
+
+<!-- ═══════════════════════ 10. BİRİM FİYATLAR ═══════════════════════ -->
+<h2 id="birim-fiyat">10. Birim Fiyatlar</h2>
+
+<p>Birim fiyatlar modülü, saha operasyonlarının mali boyutunu yönetmek için kullanılır. Her lokasyon veya lokasyon grubuna birim fiyat tanımlayarak, yapılan işlerin hakedis hesaplamasını otomatikleştirebilirsiniz. <strong>Birim Fiyatlar</strong> sayfasından yeni fiyat tanımı eklemek için <strong>"Yeni Birim Fiyat"</strong> butonuna tıklayın.</p>
+
+<p>Fiyat tanımında lokasyon veya grup seçimi, birim fiyat tutarı, para birimi (TRY, USD, EUR) ve geçerlilik tarihi belirleyin. Sistem, tamamlanan görevleri birim fiyatlarla eşleştirerek otomatik hakedis hesaplaması yapar. Bu hesaplama <strong>Raporlar &gt; Hakedis Raporu</strong> bölümünde detaylı olarak görüntülenebilir ve dışa aktarılabilir.</p>
+
+<p>Birim fiyatlar geçmişi korunur; fiyat güncellemesi yapıldığında eski fiyat kaydedilir ve raporlarda ilgili dönemin fiyatı kullanılır. Toplu fiyat güncelleme özelliği ile seçilen tüm lokasyonlara aynı anda fiyat değişikliği uygulanabilir.</p>
+
+<!-- ═══════════════════════ 11. ARŞİV SİSTEMİ ═══════════════════════ -->
+<h2 id="arsiv">11. Arşiv Sistemi</h2>
+
+<p>İOGYS arşiv sistemi, veritabanı performansını optimize etmek amacıyla tasarlanmıştır. Sistem, 24 saatten eski verileri otomatik olarak arşiv tablolarına taşıyarak ana tabloları hafifletir. Bu işlem her 6 saatte bir (00:00, 06:00, 12:00, 18:00 UTC) otomatik çalışan bir zamanlayıcı (cron job) tarafından gerçekleştirilir.</p>
+
+<p>Arşivlenen veri türleri şunlardır: personel mesai kayıtları, müşteri değerlendirmeleri, tamamlanmış veya iptal edilmiş görevler, checklist sonuç başlıkları ve checklist sonuç maddeleri. Arşiv verileri silinmez; yalnızca ayrı tablolara taşınır ve ilgili rapor sayfalarındaki "Arşiv" filtresi ile erişilebilir durumda kalır.</p>
+
+<p>Bir kaydı arşivden geri yüklemek gerektiğinde, ilgili sayfada kaydı bulun ve <strong>"Geri Yükle"</strong> butonuna tıklayın. Kayıt ana tabloya geri taşınır ve aktif listede görünür hale gelir. Arşiv kapasitesi ve transfer istatistikleri sistem ayarlarından izlenebilir. Yöneticiler, arşivleme kurallarını ihtiyaçlarına göre özelleştirebilir.</p>
+
+<div class="warning-box">Arşiv sistemi otomatik çalışır ve manuel müdahale gerektirmez. Ancak arşivlenmiş verileri raporlardan çıkarmak isterseniz filtre ayarlarını kontrol edin.</div>
+
+<!-- ═══════════════════════ 12. KULLANICI & FİRMA YÖNETİMİ ═══════════════════════ -->
+<h2 id="kullanici-yonetimi">12. Kullanıcı &amp; Firma Yönetimi</h2>
+
+<h3>Roller ve Yetkiler</h3>
+<p>İOGYS'de beş farklı kullanıcı rolü bulunur. Her rol, sisteme farklı düzeylerde erişim sağlar:</p>
+
+<table>
+  <tr><th>Rol</th><th>Açıklama</th><th>Yetki Düzeyi</th></tr>
+  <tr><td><strong>Süper Yönetici</strong></td><td>Platform genelinde tam yetki</td><td>En yüksek</td></tr>
+  <tr><td><strong>Alt Süper Yönetici</strong></td><td>Platform yönetimi (kısıtlı)</td><td>Yüksek</td></tr>
+  <tr><td><strong>Kiracı Yönetici</strong></td><td>Firma bazında tam yönetim</td><td>Orta-Yüksek</td></tr>
+  <tr><td><strong>Kiracı Kullanıcı</strong></td><td>Saha personeli, atanan görevler</td><td>Temel</td></tr>
+  <tr><td><strong>Müşteri</strong></td><td>Değerlendirme ve rapor görüntüleme</td><td>Sınırlı</td></tr>
+</table>
+
+<p>Yetkilendirme grup tabanlı çalışır. Yöneticiler, kullanıcı grupları oluşturup bu gruplara spesifik yetkiler atayabilir. Örneğin "Raporlar" grubuna "ceklist-raporlari" yetkisi atanabilir ve bu gruba eklenen kullanıcılar yalnızca çeklist raporlarını görüntüleyebilir. Bu yapı, en az yetki (least privilege) prensibine uygun esnek bir erişim kontrolü sağlar.</p>
+
+<h3>Firma ve Proje Oluşturma</h3>
+<p>Süper yönetici rolündeki kullanıcılar yeni firmalar (tenant) oluşturabilir. Her firma kendi kullanıcıları, lokasyonları, görevleri ve verileri ile birbirinden izole çalışır. Firmalar altında projeler tanımlanabilir; her proje farklı bir müşteri sahası veya operasyon birimi olabilir. Proje bazlı raporlama ve yetkilendirme bu hiyerarşik yapı üzerinden yönetilir.</p>
+
+<!-- ═══════════════════════ 13. SİSTEM AYARLARI ═══════════════════════ -->
+<h2 id="sistem-ayarlari">13. Sistem Ayarları</h2>
+
+<p>Sistem ayarları, İOGYS platformunun genel yapılandırmasını yönettiğiniz bölümdür. Bu sayfaya sol menüdeki <strong>Ayarlar</strong> simgesinden ulaşabilirsiniz. Ayarlar birkaç alt bölümde organize edilmiştir.</p>
+
+<h3>Genel Ayarlar</h3>
+<p>Platform adı, varsayılan dil, saat dilimi ve tarih formatı gibi temel ayarlar bu bölümden yapılandırılır. Ayrıca oturum zaman aşımı süresi ve şifre politikası gibi güvenlik ayarları da buradan yönetilir.</p>
+
+<h3>Proje Ayarları</h3>
+<p>Her projeye özel ayarlar tanımlanabilir: varsayılan görev süresi, otomatik gecikme uyarı eşiği, çalışma saatleri ve tatil günleri gibi parametreler proje bazında özelleştirilebilir.</p>
+
+<h3>Yetkililer</h3>
+<p>Projeye atanan yetkili kişiler (proje müdürü, bölge sorumlusu vb.) bu bölümden yönetilir. Yetkililer, ilgili projeden gelen bildirimleri alır ve raporlara erişebilir.</p>
+
+<h3>SMTP / E-posta Ayarları</h3>
+<p>Sistem tarafından gönderilen e-postaların yapılandırması bu bölümden yapılır. İOGYS, Resend API üzerinden e-posta gönderimi yapar. SMTP sunucu adresi, port, kimlik bilgileri ve gönderen adı ayarları bu sayfadan yönetilir. Ayarları kaydettikten sonra <strong>"Test E-postası Gönder"</strong> butonu ile yapılandırmanın doğruluğunu test edebilirsiniz.</p>
+
+<h3>Dashboard Düzeni</h3>
+<p>Gösterge panelinde hangi blokların görüntüleneceğini, sırasını ve boyutlarını bu sayfadan belirleyebilirsiniz. Blokları sürükle-bırak ile yeniden düzenleyin ve <strong>"Kaydet"</strong> butonuna tıklayın.</p>
+
+<div class="note-box">Sistem ayarlarında yapılan değişiklikler anında etkili olur. Kritik ayarları değiştirmeden önce mevcut değerleri not almanız önerilir.</div>
+
+<!-- ═══════════════════════ 14. MOBİL UYGULAMA ═══════════════════════ -->
+<h2 id="mobil">14. Mobil Uygulama</h2>
+
+<p>İOGYS mobil uygulaması, saha personelinin görevlerini tamamlamasını, mesai giriş-çıkış yapmasını ve checklist doldurmasını kolaylaştıran mobil arayüzü sunar. Uygulama, cihazın kamerasını kullanarak QR kod okutma ve NFC donanımını kullanarak NFC etiketi okuma işlemlerini destekler.</p>
+
+<p>Personel sahaya ulaştığında mobil uygulama üzerinden QR kodu okutarak veya NFC etiketine dokunarak lokasyona giriş yapar. Sistem otomatik olarak GPS konumunu kaydeder ve mesai başlangıcını işaretler. Kendisine atanmış görevler listesinde göreve tıklayarak detayları görüntüler, başlatır ve tamamlar. Görev tamamlama sırasında fotoğraf çekme ve not ekleme imkanı vardır.</p>
+
+<p>Push bildirimleri sayesinde personel, yeni görev ataması, görev hatırlatması ve yönetici mesajlarından anında haberdar olur. Mobil uygulama çevrimdışı modda da temel işlevleri destekler; internet bağlantısı yeniden sağlandığında veriler otomatik olarak senkronize edilir.</p>
+
+<div class="tip-box">QR kod okutma sırasında sorun yaşıyorsanız, kamera izninin verildiğinden ve yeterli aydınlatma olduğundan emin olun. NFC okutma için telefonunuzun NFC özelliğinin açık olduğunu kontrol edin.</div>
+
+<!-- ═══════════════════════ 15. İO ASISTAN ═══════════════════════ -->
+<h2 id="io-asistan">15. İO Asistan</h2>
+
+<p>İO Asistan, İOGYS platformuna entegre edilmiş yapay zeka destekli bir sohbet asistanıdır. Platform içindeki herhangi bir sayfada sağ alt köşedeki asistan simgesine tıklayarak İO Asistan'ı açabilirsiniz. Asistan, platformla ilgili sorularınızı yanıtlar, yardım sağlar ve veri sorgulama işlemlerinizde size yol gösterir.</p>
+
+<p>İO Asistan'a doğal dilde sorular sorabilirsiniz. Örneğin "Bugün kaç görev tamamlandı?", "Zemin kat temizlik checklist sonuçları nasıl?", "Bu hafta en çok geciken lokasyon hangisi?" gibi sorularla anlık veri sorgulaması yapabilirsiniz. Asistan, sorunuzu analiz eder, ilgili veritabanı sorgusunu çalıştırır ve sonucu anlaşılır bir şekilde sunar.</p>
+
+<p>Asistan aynı zamanda platform kullanımı hakkında rehberlik sağlar. "Frekansiyel görev nasıl oluşturulur?", "Rapor nasıl dışa aktarılır?" gibi sorularla adım adım yol tarifi alabilirsiniz. Yapay zeka tabanlı analiz önerileri ile operasyonel iyileştirme fırsatlarını keşfedebilirsiniz.</p>
+
+<div class="tip-box">İO Asistan'dan en iyi sonucu almak için sorularınızı net ve spesifik bir şekilde sorun. Örneğin "rapor" yerine "bu haftanın çeklist başarı oranı raporu" gibi detaylı sorular daha doğru sonuçlar üretir.</div>
+
+<!-- ═══════════════════════ 16. SSS ═══════════════════════ -->
+<h2 id="sss">16. SSS (Sıkça Sorulan Sorular)</h2>
+
+<h4>Şifremi unuttum, ne yapmalıyım?</h4>
+<p>Giriş sayfasındaki "Şifremi Unuttum" bağlantısına tıklayarak kayıtlı e-posta adresinize şifre sıfırlama linki gönderebilirsiniz. E-posta birkaç dakika içinde gelecektir; spam/gereksiz klasörünü de kontrol edin.</p>
+
+<h4>QR kod okutma çalışmıyor, ne yapmalıyım?</h4>
+<p>Tarayıcınızın kamera iznine sahip olduğundan emin olun. Tarayıcı ayarlarından kamera iznini kontrol edin. Ayrıca QR kodun yıpranmamış, temiz ve yeterli ışık altında olduğundan emin olun. Sorun devam ederse farklı bir tarayıcı deneyin.</p>
+
+<h4>Görev durumu neden otomatik "GECİKMİŞ" oldu?</h4>
+<p>Görevin hedef tamamlanma süresi aşıldığında sistem otomatik olarak durumu GECİKMİŞ olarak günceller. Bu eşik süresini <strong>Sistem Ayarları &gt; Proje Ayarları</strong> bölümünden değiştirebilirsiniz.</p>
+
+<h4>Arşivlenmiş verilere nasıl ulaşırım?</h4>
+<p>İlgili rapor sayfasında filtre seçenekleri arasında "Arşiv" veya "Arşiv dahil" seçeneğini kullanarak arşivlenmiş verileri görüntüleyebilirsiniz. Arşivden geri yükleme yapmak için kaydın yanındaki "Geri Yükle" butonunu kullanın.</p>
+
+<h4>Birden fazla firmayı aynı hesapla yönetebilir miyim?</h4>
+<p>Süper yönetici rolüne sahip hesaplar, tüm firmaları tek bir panelden yönetebilir. Kiracı yönetici hesapları ise yalnızca kendi firmalarının verilerine erişebilir.</p>
+
+<h4>Raporları Excel formatında nasıl indiririm?</h4>
+<p>Her rapor sayfasının sağ üst köşesinde bulunan <strong>"Dışa Aktar"</strong> butonuna tıklayın ve format olarak Excel'i seçin. Filtrelediğiniz veriler seçtiğiniz formatta indirilecektir.</p>
+
+<h4>Müşteri değerlendirme bağlantısını müşterime nasıl gönderirim?</h4>
+<p><strong>Müşteri Değerlendirmeleri</strong> sayfasından ilgili müşterinin değerlendirme bağlantısını kopyalayarak e-posta veya mesaj ile paylaşabilirsiniz. Bağlantı, müşteriyi doğrudan oturum açmadan erişilebilen değerlendirme formuna yönlendirir.</p>
+
+<h4>Sistem hangi tarayıcıları destekliyor?</h4>
+<p>İOGYS; Google Chrome, Mozilla Firefox, Microsoft Edge ve Safari tarayıcılarının güncel sürümlerini destekler. En iyi performans ve uyumluluk için Chrome veya Edge önerilir.</p>
+
+<!-- ═══════════════════════ FOOTER ═══════════════════════ -->
+<div class="doc-footer">
+  <p>&copy; 2026 İO Teknoloji. Tüm hakları saklıdır.</p>
+  <p>İOGYS Kullanım Kılavuzu v1.0 &mdash; Nisan 2026</p>
+  <p>iogys.com.tr</p>
+</div>
+
+</div>
+</body>
+</html>

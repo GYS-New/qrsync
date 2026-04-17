@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>İOGYS Teknik Dokümantasyon — İO Teknoloji</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 18mm 22mm 18mm;
+    }
+
+    :root {
+      --navy: #042C53;
+      --blue: #0C447C;
+      --accent: #378ADD;
+      --bg: #FAFCFF;
+      --text: #1a1a1a;
+      --muted: #5a6a7a;
+      --border: #d0dbe8;
+      --code-bg: #f0f4f9;
+      --table-stripe: #f5f8fc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 11pt;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .container {
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Cover ── */
+    .cover {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(160deg, var(--navy) 0%, var(--blue) 55%, var(--accent) 100%);
+      color: #fff;
+      page-break-after: always;
+      padding: 60px 40px;
+    }
+    .cover-logo {
+      width: 90px;
+      height: 90px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 36px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(4px);
+    }
+    .cover h1 {
+      font-size: 36pt;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    .cover .subtitle {
+      font-size: 16pt;
+      font-weight: 300;
+      opacity: 0.85;
+      margin-bottom: 48px;
+    }
+    .cover-meta {
+      font-size: 10pt;
+      opacity: 0.65;
+      line-height: 2;
+    }
+    .cover-meta strong { opacity: 1; font-weight: 600; }
+    .cover-divider {
+      width: 80px;
+      height: 2px;
+      background: rgba(255,255,255,0.3);
+      margin: 32px auto;
+    }
+
+    /* ── TOC ── */
+    .toc {
+      page-break-after: always;
+      padding: 60px 0 40px;
+    }
+    .toc h2 {
+      font-size: 20pt;
+      color: var(--navy);
+      margin-bottom: 28px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid var(--accent);
+    }
+    .toc ol {
+      list-style: none;
+      counter-reset: toc-counter;
+    }
+    .toc ol li {
+      counter-increment: toc-counter;
+      padding: 10px 0;
+      border-bottom: 1px dotted var(--border);
+      display: flex;
+      align-items: baseline;
+    }
+    .toc ol li::before {
+      content: counter(toc-counter, decimal-leading-zero);
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 13pt;
+      min-width: 36px;
+    }
+    .toc ol li a {
+      color: var(--navy);
+      text-decoration: none;
+      font-size: 12pt;
+      font-weight: 500;
+    }
+    .toc ol li a:hover { color: var(--accent); }
+
+    /* ── Sections ── */
+    .section {
+      padding: 40px 0 24px;
+      page-break-before: always;
+    }
+    .section:first-of-type { page-break-before: avoid; }
+
+    .section-number {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10pt;
+      font-weight: 700;
+      padding: 3px 12px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      font-size: 20pt;
+      color: var(--navy);
+      margin-bottom: 20px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h3 {
+      font-size: 13pt;
+      color: var(--blue);
+      margin: 24px 0 10px;
+      padding-left: 12px;
+      border-left: 3px solid var(--accent);
+    }
+
+    h4 {
+      font-size: 11pt;
+      color: var(--navy);
+      margin: 16px 0 6px;
+      font-weight: 600;
+    }
+
+    p {
+      margin-bottom: 12px;
+      text-align: justify;
+      hyphens: auto;
+    }
+
+    ul, ol {
+      margin: 8px 0 14px 24px;
+    }
+    li { margin-bottom: 4px; }
+
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 9.5pt;
+      background: var(--code-bg);
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: var(--blue);
+    }
+
+    pre {
+      background: var(--navy);
+      color: #e0ecf8;
+      padding: 16px 20px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 9pt;
+      line-height: 1.6;
+      margin: 12px 0 16px;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 20px;
+      font-size: 10pt;
+    }
+    thead th {
+      background: var(--navy);
+      color: #fff;
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 9.5pt;
+    }
+    tbody td {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr:nth-child(even) { background: var(--table-stripe); }
+
+    .info-box {
+      background: #e8f2fc;
+      border-left: 4px solid var(--accent);
+      padding: 14px 18px;
+      border-radius: 0 6px 6px 0;
+      margin: 14px 0;
+      font-size: 10pt;
+    }
+    .info-box strong { color: var(--navy); }
+
+    .warn-box {
+      background: #fff8e6;
+      border-left: 4px solid #d4a017;
+      padding: 14px 18px;
+      border-radius: 0 6px 6px 0;
+      margin: 14px 0;
+      font-size: 10pt;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 40px 0 24px;
+      color: var(--muted);
+      font-size: 9pt;
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+
+    @media print {
+      body { background: #fff; font-size: 10pt; }
+      .container { max-width: 100%; padding: 0; }
+      .cover { min-height: 100vh; }
+      .section { padding: 24px 0 16px; }
+      pre { font-size: 8pt; }
+      a { color: var(--navy) !important; text-decoration: none !important; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════ COVER ════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">iO</div>
+  <h1>İOGYS</h1>
+  <div class="subtitle">Teknik Dokümantasyon</div>
+  <div class="cover-divider"></div>
+  <div class="cover-meta">
+    <strong>İO Teknoloji</strong><br>
+    Sürüm 1.0 — Nisan 2026<br>
+    Gizlilik: Şirket İçi<br>
+    iogys.com.tr
+  </div>
+</div>
+
+<!-- ════════════════════════════════ TOC ═════════════════════════════════ -->
+<div class="container toc">
+  <h2>İçindekiler</h2>
+  <ol>
+    <li><a href="#s1">Sistem Mimarisi</a></li>
+    <li><a href="#s2">Veritabanı Şeması</a></li>
+    <li><a href="#s3">API Route Yapısı</a></li>
+    <li><a href="#s4">Cron Job Sistemi</a></li>
+    <li><a href="#s5">Arşiv Sistemi</a></li>
+    <li><a href="#s6">Simülasyon Motoru</a></li>
+    <li><a href="#s7">Yetkilendirme (RBAC)</a></li>
+    <li><a href="#s8">Güvenlik</a></li>
+    <li><a href="#s9">Deployment</a></li>
+    <li><a href="#s10">Entegrasyonlar</a></li>
+  </ol>
+</div>
+
+<!-- ══════════════════════ 1. SİSTEM MİMARİSİ ═══════════════════════════ -->
+<div class="container">
+  <div class="section" id="s1">
+    <span class="section-number">BÖLÜM 01</span>
+    <h2>Sistem Mimarisi</h2>
+
+    <h3>Genel Bakış</h3>
+    <p>
+      İOGYS (İO Görev Yönetim Sistemi), saha operasyonlarının dijital yönetimi için tasarlanmış kapsamlı bir
+      web platformudur. Sistem, modern web teknolojilerinin sunduğu performans ve güvenilirlik avantajlarını
+      bir araya getiren katmanlı bir mimari üzerine inşa edilmiştir. Kullanıcılar responsive bir web arayüzü
+      üzerinden sisteme erişirken, arka planda güçlü bir sunucu altyapısı görev yönetimi, mesai takibi,
+      çeklist denetimi ve raporlama gibi kritik iş süreçlerini yürütmektedir.
+    </p>
+    <p>
+      Platform, monolitik ancak modüler bir yapıda geliştirilmiştir. Next.js framework'ünün App Router mimarisi
+      sayesinde her sayfa ve API endpoint'i bağımsız bir modül olarak çalışır. Bu yaklaşım, ekip içi geliştirme
+      süreçlerini hızlandırırken aynı zamanda bakım maliyetlerini de düşük tutmaktadır. Server Components ile
+      istemciye gönderilen JavaScript miktarı minimize edilmiş, sayfa yüklenme süreleri kritik düzeyde
+      iyileştirilmiştir.
+    </p>
+
+    <h3>Frontend Katmanı</h3>
+    <p>
+      Ön yüz katmanı Next.js 14+ sürümü ile App Router paradigması kullanılarak geliştirilmiştir. TypeScript
+      dili, tüm bileşen ve yardımcı fonksiyonlarda zorunlu olarak kullanılmakta; bu sayede derleme zamanında
+      tip güvenliği sağlanmaktadır. React 18'in Concurrent Features desteği sayesinde kullanıcı arayüzü
+      kesintisiz bir deneyim sunmaktadır. Tailwind CSS ile utility-first bir stil yaklaşımı benimsenmiş,
+      bileşen kütüphanesi olarak özelleştirilmiş UI elementleri tercih edilmiştir.
+    </p>
+    <p>
+      Sayfa yönlendirmeleri App Router'ın dosya tabanlı route sistemi ile yönetilmektedir. Her tenant,
+      firma ve proje düzeyinde dinamik segmentler kullanılarak izole edilmiş görünümler elde edilir.
+      Layout dosyaları aracılığıyla ortak başlık, kenar çubuğu ve bildirim bileşenleri paylaşılmaktadır.
+      İstemci tarafında state yönetimi için React Context API ve yerel hook'lar kullanılırken, sunucu
+      tarafında veri çekme işlemleri doğrudan Server Components içinde gerçekleştirilmektedir.
+    </p>
+
+    <h3>Backend Katmanı</h3>
+    <p>
+      Sunucu tarafı mantığı tamamen Next.js API Routes üzerinde çalışmaktadır. Her API endpoint'i
+      <code>app/api/</code> dizini altında organize edilmiş route handler dosyalarından oluşur. Bu handler'lar
+      HTTP metodlarına göre ayrılmış <code>GET</code>, <code>POST</code>, <code>PATCH</code>, <code>DELETE</code>
+      fonksiyonları içerir. Veritabanı işlemleri Supabase JavaScript Client aracılığıyla yürütülmekte,
+      her istekte kullanıcı kimlik doğrulaması JWT token kontrolü ile sağlanmaktadır.
+    </p>
+    <p>
+      Railway üzerinde çalışan özel <code>server.js</code> dosyası, Next.js uygulamasını bir HTTP sunucusu
+      olarak başlatırken aynı zamanda node-cron tabanlı zamanlayıcı görevleri de initialize etmektedir.
+      Bu hibrit yaklaşım, ayrı bir worker servisi gerektirmeden periyodik arşivleme, simülasyon ve
+      bildirim gönderimi gibi arka plan işlerinin yürütülmesini mümkün kılmaktadır.
+    </p>
+
+    <h3>Veritabanı ve Kimlik Doğrulama</h3>
+    <p>
+      Veritabanı olarak Supabase PostgreSQL (Pro plan, 8 GB) kullanılmaktadır. Supabase, yalnızca bir
+      veritabanı hizmeti değil, aynı zamanda kimlik doğrulama (Auth), gerçek zamanlı abonelikler (Realtime)
+      ve dosya depolama (Storage) gibi tamamlayıcı servisler de sunmaktadır. Kimlik doğrulama sürecinde
+      JWT tabanlı cookie-based SSR auth yaklaşımı benimsenmiştir; bu sayede hem sunucu tarafında hem de
+      istemci tarafında tutarlı bir oturum yönetimi sağlanmaktadır.
+    </p>
+
+    <h3>Yapay Zeka Entegrasyonu</h3>
+    <p>
+      İO Asistan modülü, Anthropic Claude API üzerinden çalışan bir yapay zeka destekli yardımcıdır.
+      Anthropic SDK kullanılarak entegre edilen bu modül, Server-Sent Events (SSE) protokolü ile
+      streaming yanıtlar üretmektedir. Kullanıcılar, saha operasyonlarıyla ilgili sorularını doğal dilde
+      sorabilir; sistem bağlamsal bilgi ile zenginleştirilmiş yanıtlar döndürür. Rate limiting mekanizması
+      ile API kullanımı kontrol altında tutulmaktadır.
+    </p>
+
+    <div class="info-box">
+      <strong>Mimari Özet:</strong> Next.js (App Router) + TypeScript + Supabase PostgreSQL + Railway + node-cron + Claude API.
+      Tek bir deployment unit içinde hem web uygulaması hem de arka plan servisleri çalışmaktadır.
+    </div>
+  </div>
+
+  <!-- ══════════════════════ 2. VERİTABANI ŞEMASI ════════════════════════ -->
+  <div class="section" id="s2">
+    <span class="section-number">BÖLÜM 02</span>
+    <h2>Veritabanı Şeması</h2>
+
+    <h3>Çekirdek Tablolar</h3>
+    <p>
+      Sistemin temel veri modeli, çok kiracılı (multi-tenant) bir yapı üzerine kurulmuştur.
+      <code>firmalar</code> tablosu en üst düzey organizasyon birimini temsil eder; her firma altında
+      bir veya birden fazla <code>projeler</code> kaydı bulunur. Kullanıcı bilgileri Supabase Auth ile
+      senkronize edilen <code>users</code> tablosunda tutulur. Her kullanıcı bir firmaya ve isteğe bağlı
+      olarak bir veya birden fazla projeye atanabilir. <code>lokasyonlar</code> tablosu fiziksel çalışma
+      noktalarını, <code>lokasyon_gruplari</code> ise bu noktaların mantıksal gruplandırmasını sağlar.
+    </p>
+    <p>
+      Firmalar tablosu, kiracı bazlı konfigürasyon bilgilerini de barındırır: aktif modüller, plan
+      bilgisi, logo URL'leri ve iletişim detayları gibi alanlar bu tabloda yer alır. Projeler tablosu
+      ise firma altındaki bağımsız iş birimlerini ifade eder ve her proje kendi lokasyon, görev ve
+      personel havuzuna sahip olabilir. Bu yapı, tek bir İOGYS kurulumunun onlarca farklı firma ve
+      yüzlerce projeyi eş zamanlı olarak yönetmesine imkan tanır.
+    </p>
+
+    <h3>Görev Tabloları</h3>
+    <p>
+      Görev yönetimi iki ana tablo etrafında şekillenmektedir. <code>gorevler</code> tablosu spesifik
+      (tek seferlik veya belirli tarihe atanmış) görevleri içerirken, <code>canli_gorevler</code> tablosu
+      frekansiyel olarak tekrarlanan görevleri barındırır. Her iki tablo da lokasyon, personel, proje ve
+      durum bilgilerini foreign key ilişkileriyle tutar. <code>gorev_kurallari</code> tablosu ise
+      frekansiyel görevlerin tekrar kurallarını (günlük, haftalık, aylık vb.) tanımlar ve bu kurallar
+      doğrultusunda görevlerin otomatik olarak oluşturulmasını sağlar.
+    </p>
+    <p>
+      Görev durumları bir yaşam döngüsü izler: oluşturuldu, atandı, başladı, tamamlandı, iptal edildi.
+      Her durum değişikliği zaman damgası ile kaydedilir. Tamamlanan veya iptal edilen görevler belirli
+      bir süre sonra otomatik olarak arşiv tablolarına taşınır. Görev tabloları, fotoğraf URL'leri,
+      açıklama metinleri, QR/NFC etiket referansları ve GPS koordinatları gibi saha verilerini de
+      depolayacak şekilde tasarlanmıştır.
+    </p>
+
+    <h3>Çeklist Tabloları</h3>
+    <p>
+      Çeklist sistemi, şablon-sonuç ayrımı ile tasarlanmıştır. <code>checklist_sablonlari</code> tablosu
+      çeklist tanımlarını, <code>checklist_sablon_maddeleri</code> her şablonun maddelerini ve
+      <code>checklist_madde_secenekleri</code> ise maddelere ait seçenekleri (evet/hayır, puan, çoktan
+      seçmeli vb.) tutar. Saha personeli bir çeklist doldurduğunda, sonuçlar
+      <code>checklist_sonuc_basliklari</code> ve <code>checklist_sonuc_maddeleri</code> tablolarına
+      yazılır. Bu ayrım sayesinde şablonlar değiştirilse bile geçmiş sonuçlar korunur.
+    </p>
+    <p>
+      Çeklist şablonları hiyerarşik bir yapıda organize edilebilir; kategoriler ve alt kategoriler
+      aracılığıyla yüzlerce madde mantıksal bölümlere ayrılır. Her madde tipi farklı bir veri toplama
+      yöntemini destekler: metin girişi, sayısal değer, fotoğraf yükleme, tarih seçimi ve çoktan seçmeli
+      sorular bunların başlıcalarıdır. Şablon maddeleri sıra numarası ile düzenlenir ve zorunluluk
+      durumu ayrıca belirlenebilir.
+    </p>
+
+    <h3>Arşiv Tabloları</h3>
+    <p>
+      Veritabanı performansını korumak amacıyla altı adet arşiv tablosu tanımlanmıştır:
+      <code>personel_mesai_kayitlari_arsiv</code>, <code>musteri_degerlendirmeleri_arsiv</code>,
+      <code>gorevler_arsiv</code>, <code>canli_gorevler_arsiv</code>,
+      <code>checklist_sonuc_basliklari_arsiv</code> ve <code>checklist_sonuc_maddeleri_arsiv</code>.
+      Bu tablolar, kaynak tablolarla birebir aynı şemaya sahiptir ve cron job tarafından otomatik olarak
+      doldurulur. Arşive taşınan veriler, raporlama arayüzlerinden hala erişilebilir durumdadır.
+    </p>
+
+    <h3>Diğer Tablolar</h3>
+    <table>
+      <thead>
+        <tr><th>Tablo</th><th>Açıklama</th><th>Temel İlişki</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>personel_mesai_kayitlari</code></td><td>Giriş-çıkış saatleri, GPS konum</td><td>users, lokasyonlar</td></tr>
+        <tr><td><code>musteri_degerlendirmeleri</code></td><td>Müşteri memnuniyet puanları ve yorumları</td><td>firmalar, projeler</td></tr>
+        <tr><td><code>birim_fiyatlar</code></td><td>Hizmet birim fiyat tanımları</td><td>firmalar</td></tr>
+        <tr><td><code>bildirimler</code></td><td>Uygulama içi bildirim kayıtları</td><td>users</td></tr>
+        <tr><td><code>cron_log</code></td><td>Cron job çalışma geçmişi</td><td>—</td></tr>
+        <tr><td><code>device_tokens</code></td><td>FCM push notification token'ları</td><td>users</td></tr>
+        <tr><td><code>dashboard_bloklari</code></td><td>Özelleştirilebilir dashboard widget konfigürasyonları</td><td>users, firmalar</td></tr>
+        <tr><td><code>simulasyon_ayarlari</code></td><td>Simülasyon motor parametreleri</td><td>firmalar, projeler</td></tr>
+        <tr><td><code>simulasyon_personeller</code></td><td>Simülasyon sanal personel havuzu</td><td>simulasyon_ayarlari</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Tüm tablolar arasında PostgreSQL foreign key constraint'leri tanımlıdır. Cascade delete kuralları,
+      bir firma silindiğinde ilişkili tüm verilerin tutarlı şekilde temizlenmesini garanti eder. Tablolar
+      üzerinde performans için uygun indeksler oluşturulmuş, özellikle tarih ve durum alanları üzerinde
+      composite index'ler tanımlanmıştır.
+    </p>
+  </div>
+
+  <!-- ══════════════════════ 3. API ROUTE YAPISI ═════════════════════════ -->
+  <div class="section" id="s3">
+    <span class="section-number">BÖLÜM 03</span>
+    <h2>API Route Yapısı</h2>
+
+    <h3>Genel Mimari</h3>
+    <p>
+      İOGYS API katmanı, Next.js App Router'ın <code>app/api/</code> dizini altındaki route handler'ları
+      ile oluşturulmuştur. Her endpoint, HTTP metodlarına karşılık gelen ve dışa aktarılan asenkron
+      fonksiyonlar içerir. API tasarımında RESTful prensipler uygulanmış, kaynak adları URL path'inde,
+      filtreler query string'de ve veri gövdesi JSON formatında iletilmektedir. Tüm yanıtlar tutarlı
+      bir <code>NextResponse.json()</code> formatında döndürülür.
+    </p>
+    <p>
+      Kimlik doğrulama, her API çağrısının başında standart bir pattern ile gerçekleştirilir:
+      <code>createClient()</code> fonksiyonu ile Supabase istemcisi oluşturulur, ardından
+      <code>supabase.auth.getUser()</code> çağrısı ile JWT token doğrulanır. Dönen kullanıcı kimliği
+      <code>users</code> tablosundan sorgulanarak rol, firma ve proje bilgileri elde edilir. Bu bilgiler
+      doğrultusunda yetki kontrolleri uygulanır ve yalnızca izin verilen veriye erişim sağlanır.
+    </p>
+
+    <h3>Temel Endpoint Grupları</h3>
+    <table>
+      <thead>
+        <tr><th>Route Grubu</th><th>Kapsam</th><th>Temel İşlemler</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>/api/auth/*</code></td><td>Kimlik doğrulama</td><td>Login, logout, kayıt, şifre sıfırlama</td></tr>
+        <tr><td><code>/api/tasks/*</code></td><td>Görev yönetimi</td><td>CRUD, durum güncelleme, atama</td></tr>
+        <tr><td><code>/api/mesai/*</code></td><td>Mesai takibi</td><td>Giriş/çıkış kayıt, arşiv okuma</td></tr>
+        <tr><td><code>/api/arsiv/*</code></td><td>Arşiv verileri</td><td>Arşiv sorgulama, geri alma</td></tr>
+        <tr><td><code>/api/raporlar/*</code></td><td>Raporlama</td><td>Frekansiyel, personel, müşteri, çeklist raporları</td></tr>
+        <tr><td><code>/api/simulasyon/*</code></td><td>Simülasyon motoru</td><td>Ayar yönetimi, başlatma/durdurma</td></tr>
+        <tr><td><code>/api/io-asistan</code></td><td>Yapay zeka asistan</td><td>SSE streaming, bağlamsal soru-cevap</td></tr>
+        <tr><td><code>/api/scan/*</code></td><td>QR/NFC tarama</td><td>Etiket doğrulama, görev başlatma</td></tr>
+        <tr><td><code>/api/app/*</code></td><td>Mobil uygulama</td><td>Bildirim, cihaz kaydı, durum senkronizasyonu</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Streaming ve Gerçek Zamanlı İletişim</h3>
+    <p>
+      İO Asistan endpoint'i, standart JSON yanıt yerine Server-Sent Events (SSE) protokolünü kullanır.
+      İstemci tarafında <code>EventSource</code> veya <code>fetch</code> ile açılan bağlantı üzerinden
+      yapay zeka yanıtları anlık olarak token token iletilir. Bu yaklaşım, kullanıcının uzun yanıtları
+      beklemek zorunda kalmadan ilk çıktıyı anında görmesini sağlar. SSE bağlantısı, yanıt tamamlandığında
+      sunucu tarafından kapatılır.
+    </p>
+    <p>
+      Raporlama endpoint'leri büyük veri kümeleri ile çalışabilmektedir. Performans için veritabanı
+      sorgularında sayfalama (pagination) ve tarih aralığı filtreleri zorunlu tutulmuştur. Arşiv sorguları,
+      hem aktif hem de arşiv tablolarını birleştirerek kapsamlı sonuç kümeleri döndürebilir. Müşteri
+      değerlendirme endpoint'i, arşivlendi toggle özelliği ile veriyi tablolar arasında transfer edebilir.
+    </p>
+
+    <h3>Hata Yönetimi</h3>
+    <p>
+      Tüm API handler'ları try-catch blokları ile sarılmıştır. Hata durumunda uygun HTTP durum kodu
+      (400, 401, 403, 404, 500) ile birlikte Türkçe hata mesajı döndürülür. Kimlik doğrulama hataları
+      401, yetki hataları 403 ve doğrulama hataları 400 kodu ile işaretlenir. Sunucu tarafı hatalar
+      loglama altyapısına kaydedilirken, hassas hata detayları istemciye iletilmez.
+    </p>
+  </div>
+
+  <!-- ══════════════════════ 4. CRON JOB SİSTEMİ ════════════════════════ -->
+  <div class="section" id="s4">
+    <span class="section-number">BÖLÜM 04</span>
+    <h2>Cron Job Sistemi</h2>
+
+    <h3>Mimari Tasarım</h3>
+    <p>
+      İOGYS'nin arka plan görevleri, Railway platformu üzerinde çalışan özel bir sunucu yapısı ile
+      yönetilmektedir. Standart Next.js uygulamaları serverless ortamlarda çalıştığında cron job
+      desteği sınırlı kalır; bu nedenle <code>server.js</code> dosyası ile özel bir Node.js HTTP
+      sunucusu oluşturulmuştur. Bu sunucu, Next.js request handler'ını saran bir katman olarak çalışır
+      ve uygulama başlatıldığında <code>initArsivCron()</code> fonksiyonunu çağırarak zamanlayıcı
+      görevleri aktifleştirir.
+    </p>
+    <p>
+      Zamanlayıcı altyapısı olarak <code>node-cron</code> kütüphanesi tercih edilmiştir. Bu kütüphane,
+      Unix cron formatında tanımlanan zamanlamalara göre JavaScript fonksiyonlarını periyodik olarak
+      çalıştırır. Railway'in container tabanlı deploy mekanizması sayesinde, her deploy sonrası sunucu
+      yeniden başlatıldığında cron görevleri otomatik olarak yeniden kayıt edilir. Bu yapı, ayrı bir
+      worker servisi veya harici bir zamanlayıcı gerektirmeden güvenilir periyodik iş yürütme imkanı
+      sunar.
+    </p>
+
+    <h3>Zamanlayıcı Görevleri</h3>
+    <table>
+      <thead>
+        <tr><th>Görev</th><th>Periyot</th><th>Açıklama</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Arşivleme</td><td>Her 6 saat</td><td>24+ saat eski kayıtları arşiv tablolarına taşır</td></tr>
+        <tr><td>Maksimum süre kontrol</td><td>Her 5 dakika</td><td>Aşırı uzun açık mesai kayıtlarını tespit eder</td></tr>
+        <tr><td>Simülasyon</td><td>Her 1 dakika</td><td>Aktif simülasyon senaryolarını ilerletir</td></tr>
+        <tr><td>Rapor gönderme</td><td>Her 15 dakika</td><td>Zamanlanmış raporları e-posta ile gönderir</td></tr>
+        <tr><td>Personel takip</td><td>Her 5 dakika</td><td>Saha personeli konum ve durum kontrolü</td></tr>
+        <tr><td>Gece döngüsü</td><td>pg_cron (gece)</td><td>Veritabanı bakım ve temizlik işlemleri</td></tr>
+        <tr><td>Bekleyen işlem</td><td>22:00 TRT</td><td>Gün sonu bekleyen görev ve mesai kontrolü</td></tr>
+        <tr><td>Personel destek</td><td>Vardiya sonları</td><td>Vardiya kapanış bildirimleri ve hatırlatmalar</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Çalışma Mekanizması</h3>
+    <p>
+      Her cron görevi çalıştığında öncelikle <code>cron_log</code> tablosuna bir başlangıç kaydı oluşturur.
+      İş tamamlandığında veya hata oluştuğunda bu kayıt güncellenir. Bu loglama mekanizması, cron
+      görevlerinin sağlık durumunun izlenmesini ve sorun giderme süreçlerinin hızlandırılmasını sağlar.
+      Ayrıca, aynı görevin eş zamanlı olarak birden fazla kez çalışmasını engellemek için kilit (lock)
+      mekanizması uygulanmıştır.
+    </p>
+    <p>
+      Arşivleme görevi, en kritik cron işidir ve altı farklı tabloyu sırasıyla işler. Her tablo için
+      önce arşiv koşulunu sağlayan kayıtlar <code>INSERT INTO ... SELECT</code> ile arşiv tablosuna
+      kopyalanır, ardından kaynak tablodan silinir. Bu işlem tek bir veritabanı transaction'ı içinde
+      gerçekleştirilir; böylece herhangi bir hata durumunda kısmi veri kaybı önlenir. Simülasyon görevi
+      ise her dakika çalışarak aktif simülasyon senaryolarındaki sanal personellerin görev durumlarını
+      günceller.
+    </p>
+
+    <h3>Hata Toleransı</h3>
+    <p>
+      Cron görevleri, Railway container yeniden başlatmalarına dayanıklı olacak şekilde tasarlanmıştır.
+      <code>server.js</code> dosyası her başlatıldığında tüm cron görevleri sıfırdan kayıt edilir;
+      bu nedenle önceki oturumdan kalan state bilgisine ihtiyaç duyulmaz. Her görev kendi try-catch
+      bloğuna sahiptir ve bir görevin başarısız olması diğerlerini etkilemez. Kritik hatalar
+      <code>console.error</code> ile loglanır ve gerektiğinde bildirim mekanizması tetiklenir.
+    </p>
+  </div>
+
+  <!-- ══════════════════════ 5. ARŞİV SİSTEMİ ═══════════════════════════ -->
+  <div class="section" id="s5">
+    <span class="section-number">BÖLÜM 05</span>
+    <h2>Arşiv Sistemi</h2>
+
+    <h3>Tasarım Felsefesi</h3>
+    <p>
+      Arşiv sistemi, İOGYS veritabanının uzun vadeli performansını korumak amacıyla tasarlanmıştır.
+      Saha operasyonları yoğun veri üreten süreçlerdir: her personelin günlük mesai kaydı, her
+      görevin durum geçmişi ve her çeklist dolumu tablolarda birikerek sorgu performansını düşürür.
+      Arşiv mekanizması, belirlenen yaş eşiğini (varsayılan 24 saat) aşmış kayıtları otomatik olarak
+      ayrı tablolara taşıyarak aktif tabloların boyutunu kontrol altında tutar.
+    </p>
+    <p>
+      Bu yaklaşım, "sıcak veri — soğuk veri" ayrımı prensibine dayanır. Güncel ve aktif olarak
+      sorgulanan veriler ana tablolarda kalırken, geçmişe dönük raporlama ihtiyaçları arşiv tablolarından
+      karşılanır. Kullanıcı deneyimi açısından bu ayrım tamamen şeffaftır; raporlama arayüzleri her iki
+      tablo grubunu da sorgulayabilir ve sonuçları birleşik olarak sunabilir.
+    </p>
+
+    <h3>Arşiv Tabloları ve Taşıma Kuralları</h3>
+    <table>
+      <thead>
+        <tr><th>Kaynak Tablo</th><th>Arşiv Tablo</th><th>Koşul</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>personel_mesai_kayitlari</td><td>personel_mesai_kayitlari_arsiv</td><td>24+ saat eski</td></tr>
+        <tr><td>musteri_degerlendirmeleri</td><td>musteri_degerlendirmeleri_arsiv</td><td>24+ saat eski</td></tr>
+        <tr><td>gorevler</td><td>gorevler_arsiv</td><td>IPTAL veya 24+ saat TAMAMLANDI</td></tr>
+        <tr><td>canli_gorevler</td><td>canli_gorevler_arsiv</td><td>24+ saat eski tamamlanmış</td></tr>
+        <tr><td>checklist_sonuc_basliklari</td><td>checklist_sonuc_basliklari_arsiv</td><td>24+ saat eski</td></tr>
+        <tr><td>checklist_sonuc_maddeleri</td><td>checklist_sonuc_maddeleri_arsiv</td><td>Başlık ile birlikte</td></tr>
+      </tbody>
+    </table>
+
+    <h3>PostgreSQL Fonksiyonları</h3>
+    <p>
+      Arşivleme işleminin kritik bölümleri PostgreSQL fonksiyonları olarak tanımlanmıştır.
+      <code>gun_sonu_arsivle()</code> fonksiyonu, gün sonu toplu arşivleme işlemini tek bir veritabanı
+      çağrısı ile gerçekleştirir. Bu fonksiyon, tüm tabloları sırasıyla işler ve her adımda etkilenen
+      kayıt sayısını döndürür. Transaction yönetimi PostgreSQL seviyesinde yapıldığından, uygulama
+      katmanından daha güvenilir bir atomik işlem garantisi sağlanır.
+    </p>
+    <p>
+      <code>get_table_sizes()</code> RPC fonksiyonu, tüm İOGYS tablolarının boyut bilgilerini döndürür.
+      Bu fonksiyon, yönetici panelinden çağrılarak veritabanı kapasite izlemesi yapılmasını sağlar.
+      Tablo boyutları, satır sayıları ve indeks boyutları gibi metrikler düzenli olarak kontrol edilerek
+      kapasite planlaması yapılır. Arşivleme işleminin etkinliği bu metrikler üzerinden değerlendirilir.
+    </p>
+
+    <h3>API Entegrasyonu</h3>
+    <p>
+      Arşiv verileri, özel API endpoint'leri aracılığıyla erişilebilir durumdadır.
+      <code>/api/mesai/arsiv</code> endpoint'i arşivlenmiş mesai kayıtlarını,
+      <code>/api/raporlar/musteri-degerlendirme?arsivlendi=true</code> ise arşivlenmiş müşteri
+      değerlendirmelerini döndürür. Çeklist raporları için <code>cikti=arsiv</code> parametresi
+      kullanılarak hem aktif hem arşiv tablolarından veri çekilebilir. PATCH metodu ile tekil kayıtların
+      arşiv durumu değiştirilebilir; bu işlem veriyi tablolar arasında fiziksel olarak transfer eder.
+    </p>
+  </div>
+
+  <!-- ══════════════════════ 6. SİMÜLASYON MOTORU ════════════════════════ -->
+  <div class="section" id="s6">
+    <span class="section-number">BÖLÜM 06</span>
+    <h2>Simülasyon Motoru</h2>
+
+    <h3>Amaç ve Kapsam</h3>
+    <p>
+      Simülasyon motoru, İOGYS platformunun demo ve test ortamlarında gerçekçi saha operasyonu verileri
+      üretmek için geliştirilmiş bir alt sistemdir. Potansiyel müşterilere sistemin yeteneklerini
+      göstermek, eğitim senaryoları oluşturmak ve yük testi yapmak amacıyla kullanılır. Motor, gerçek
+      saha operasyonlarının doğal akışını taklit eden parametrik bir algoritmaya sahiptir ve yapılandırma
+      ayarlarına göre farklı senaryolar üretebilir.
+    </p>
+    <p>
+      Simülasyon, gerçek veritabanı tablolarına veri yazarak çalışır; bu sayede raporlama, dashboard ve
+      bildirim gibi tüm sistem bileşenleri simülasyon verileriyle de sorunsuz çalışır. Bu yaklaşım,
+      ayrı bir "demo modu" geliştirme ihtiyacını ortadan kaldırır ve sistemin tüm modüllerinin
+      entegre olarak test edilmesini sağlar.
+    </p>
+
+    <h3>Veri Modeli</h3>
+    <p>
+      Simülasyon sistemi üç ana tablo üzerine kuruludur. <code>simulasyon_ayarlari</code> tablosu
+      genel simülasyon parametrelerini tutar: aktiflik durumu, hedef oran, iptal olasılığı, erken
+      ve geç sapma oranları gibi değerler bu tabloda tanımlanır. <code>simulasyon_grup_ayarlari</code>
+      tablosu, lokasyon gruplarına özel parametreleri barındırır; bu sayede farklı bölgeler için
+      farklı simülasyon profilleri oluşturulabilir. <code>simulasyon_personeller</code> tablosu ise
+      simülasyonda kullanılacak sanal personel havuzunu içerir.
+    </p>
+    <p>
+      Her sanal personel, isim, cinsiyet, atanmış lokasyon ve vardiya bilgilerine sahiptir. Cinsiyet
+      eşleştirmesi özelliği, gerçek saha koşullarına uygun personel ataması yapılmasını sağlar.
+      Personel havuzu yönetici tarafından önceden tanımlanır ve simülasyon motoru bu havuzdan
+      rastgele seçimler yaparak görev atamaları gerçekleştirir.
+    </p>
+
+    <h3>Vardiya Bazlı Doğal Akış</h3>
+    <p>
+      Simülasyon motoru, vardiya saatlerine göre doğal bir iş akışı simüle eder. Vardiya başlangıcında
+      personel giriş kaydı oluşturulur, ardından belirlenen aralıklarla görev başlatma ve tamamlama
+      olayları üretilir. Erken ve geç sapma oranları, görev tamamlanma sürelerindeki doğal varyasyonu
+      taklit eder. İptal olasılığı parametresi, gerçek hayatta karşılaşılan görev iptali senaryolarını
+      yansıtır.
+    </p>
+    <p>
+      Hedef oran parametresi, belirlenen süre içinde tamamlanması gereken görev yüzdesini ifade eder.
+      Motor, bu orana ulaşmak için görev atama hızını dinamik olarak ayarlar. Vardiya sonunda tüm
+      açık görevler tamamlanır veya ertesi güne aktarılır, personel çıkış kaydı oluşturulur.
+      Bu döngü, cron job tarafından her dakika tetiklenerek sürekli bir veri akışı sağlar.
+    </p>
+
+    <h3>Konfigürasyon Parametreleri</h3>
+    <p>
+      Simülasyon parametreleri yönetici panelinden gerçek zamanlı olarak değiştirilebilir.
+      Aktiflik toggle'ı ile simülasyon anında başlatılıp durdurulabilir. Oran parametreleri
+      yüzde cinsinden girilir ve motor tarafından olasılık hesaplamalarında kullanılır.
+      Grup bazlı ayarlar, belirli lokasyon gruplarında daha yoğun veya daha seyrek aktivite
+      simüle edilmesine olanak tanır. Tüm parametre değişiklikleri bir sonraki cron çalışmasında
+      otomatik olarak etkisini gösterir.
+    </p>
+  </div>
+
+  <!-- ══════════════════════ 7. YETKİLENDİRME (RBAC) ════════════════════ -->
+  <div class="section" id="s7">
+    <span class="section-number">BÖLÜM 07</span>
+    <h2>Yetkilendirme (RBAC)</h2>
+
+    <h3>Rol Hiyerarşisi</h3>
+    <p>
+      İOGYS, Rol Tabanlı Erişim Kontrolü (RBAC) modeli ile kapsamlı bir yetkilendirme sistemi
+      sunar. Sistemde beş temel rol tanımlanmıştır ve her rol farklı erişim seviyelerine sahiptir.
+      Roller hiyerarşik bir yapıda organize edilmiştir; üst roller, alt rollerin tüm yetkilerini
+      miras alır ve ek yetkiler ekler.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Rol</th><th>Kapsam</th><th>Erişim Seviyesi</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>super_admin</code></td><td>Tüm sistem</td><td>Tüm firmalar, tüm veriler, sistem yönetimi</td></tr>
+        <tr><td><code>alt_super_admin</code></td><td>Tüm sistem (kısıtlı)</td><td>Firma yönetimi hariç tam erişim</td></tr>
+        <tr><td><code>tenant_admin</code></td><td>Kendi firması</td><td>Firma içi tüm projeler ve veriler</td></tr>
+        <tr><td><code>tenant_user</code></td><td>Atanmış projeler</td><td>Yalnızca yetkili projeler ve lokasyonlar</td></tr>
+        <tr><td><code>musteri</code></td><td>Atanmış lokasyonlar</td><td>Yalnızca değerlendirme ve görüntüleme</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Sayfa Bazlı Yetkilendirme</h3>
+    <p>
+      Her kullanıcı rolü, sayfa bazında dört temel izin türüne sahip olabilir: <code>gorebilir</code>
+      (görüntüleme), <code>ekleyebilir</code> (oluşturma), <code>duzenleyebilir</code> (güncelleme)
+      ve <code>silebilir</code> (silme). Bu izinler, her sayfa için ayrı ayrı yapılandırılabilir.
+      Örneğin, bir <code>tenant_user</code> görevleri görebilir ve yeni görev ekleyebilir ancak
+      mevcut görevleri silemeyebilir. Bu granüler yapı, iş süreçlerine uygun esnek yetki
+      konfigürasyonları oluşturulmasına olanak tanır.
+    </p>
+    <p>
+      Yetki kontrolleri hem sunucu hem de istemci tarafında uygulanır. Sunucu tarafında API
+      handler'ları kullanıcı rolünü kontrol ederek yetkisiz istekleri reddeder. İstemci tarafında
+      ise UI bileşenleri kullanıcının yetkilerine göre koşullu olarak render edilir: yetkisi
+      olmayan butonlar gizlenir, erişilemeyen sayfalar için yönlendirme yapılır. Bu çift katmanlı
+      yaklaşım, güvenliğin yalnızca arayüze bağlı kalmamasını garanti eder.
+    </p>
+
+    <h3>Lokasyon Bazlı Kısıtlama</h3>
+    <p>
+      <code>tenant_user</code> ve <code>musteri</code> rolleri için lokasyon bazlı erişim kısıtlaması
+      uygulanmaktadır. Bu kullanıcılar yalnızca kendilerine atanmış lokasyonlara ait verileri
+      görebilir ve işleyebilir. Lokasyon ataması <code>users</code> tablosundaki ilişki alanları
+      üzerinden yönetilir. Grup yetkileri sayesinde bir kullanıcıya tek tek lokasyon atamak yerine
+      bir lokasyon grubuna atama yapılabilir; gruba eklenen yeni lokasyonlar otomatik olarak
+      kullanıcının erişim kapsamına girer.
+    </p>
+    <p>
+      Raporlama modülünde de aynı kısıtlamalar geçerlidir. Bir <code>tenant_user</code> yalnızca
+      kendi lokasyonlarına ait mesai kayıtlarını, görev raporlarını ve çeklist sonuçlarını
+      görüntüleyebilir. Bu kısıtlama veritabanı sorgusu seviyesinde uygulandığından, performans
+      üzerinde minimum etki yaratır ve veri sızıntısı riski ortadan kalkar.
+    </p>
+  </div>
+
+  <!-- ══════════════════════ 8. GÜVENLİK ════════════════════════════════ -->
+  <div class="section" id="s8">
+    <span class="section-number">BÖLÜM 08</span>
+    <h2>Güvenlik</h2>
+
+    <h3>Kimlik Doğrulama ve Oturum Yönetimi</h3>
+    <p>
+      İOGYS, Supabase Auth altyapısı üzerine kurulu bir kimlik doğrulama sistemi kullanmaktadır.
+      Kullanıcı girişi e-posta ve parola ile gerçekleştirilir; başarılı doğrulama sonucunda JWT
+      (JSON Web Token) oluşturulur ve HTTP-only cookie olarak saklanır. Bu yaklaşım, XSS
+      saldırılarına karşı token güvenliğini artırır. Token süresi dolduğunda refresh token
+      mekanizması ile yeni token alınır; bu süreç kullanıcı tarafından fark edilmeden
+      gerçekleştirilir.
+    </p>
+    <p>
+      Server-Side Rendering (SSR) ortamında cookie tabanlı kimlik doğrulama, hem sunucu hem de
+      istemci tarafında tutarlı bir oturum deneyimi sağlar. Her sunucu tarafı sayfa isteğinde
+      cookie'den JWT çıkartılarak kullanıcı kimliği doğrulanır. Geçersiz veya süresi dolmuş
+      token tespit edildiğinde kullanıcı otomatik olarak giriş sayfasına yönlendirilir.
+    </p>
+
+    <h3>Veritabanı Güvenliği (RLS)</h3>
+    <p>
+      Supabase PostgreSQL üzerinde Row Level Security (RLS) politikaları etkinleştirilmiştir.
+      RLS, veritabanı seviyesinde erişim kontrolü sağlayarak uygulama katmanındaki olası
+      güvenlik açıklarının veri sızıntısına yol açmasını engeller. Her tablo için SELECT,
+      INSERT, UPDATE ve DELETE operasyonlarına yönelik ayrı politikalar tanımlanmıştır.
+      Bu politikalar, JWT token'ından çıkartılan kullanıcı kimliğine ve rolüne göre
+      erişimi kısıtlar.
+    </p>
+
+    <h3>API Güvenliği</h3>
+    <p>
+      Cron job endpoint'leri <code>CRON_SECRET</code> environment variable'ı ile korunmaktadır.
+      Harici bir kaynaktan cron endpoint'ine yapılan isteklerde bu secret header olarak
+      gönderilmeli ve sunucu tarafında doğrulanmalıdır. Bu mekanizma, cron görevlerinin
+      yalnızca yetkili kaynaklar tarafından tetiklenmesini garanti eder.
+    </p>
+    <p>
+      İO Asistan (Claude API) endpoint'i için rate limiting uygulanmıştır. Her kullanıcı
+      belirli bir zaman diliminde sınırlı sayıda istek gönderebilir; bu sınır aşıldığında
+      429 (Too Many Requests) yanıtı döndürülür. Rate limiting, hem API maliyetlerini
+      kontrol altında tutmak hem de olası kötüye kullanımı engellemek amacıyla tasarlanmıştır.
+    </p>
+
+    <h3>Ek Güvenlik Mekanizmaları</h3>
+    <p>
+      Tenant Admin seviyesindeki arşiv silme işlemleri için ek bir parola kapısı (password gate)
+      tanımlanmıştır. Bu kritik işlem gerçekleştirilmeden önce kullanıcıdan mevcut parolasını
+      tekrar girmesi istenir; parola Supabase Auth üzerinden doğrulandıktan sonra işleme izin
+      verilir. Bu yaklaşım, yanlışlıkla veya yetkisiz arşiv silme riskini minimize eder.
+    </p>
+    <p>
+      Tüm hassas environment variable'ları (veritabanı bağlantı bilgileri, API anahtarları,
+      CRON_SECRET vb.) Railway platform seviyesinde şifrelenmiş olarak saklanmaktadır. Kaynak
+      kodda hiçbir hassas bilgi bulunmaz; <code>.env.local</code> dosyası <code>.gitignore</code>
+      ile versiyon kontrolünden hariç tutulmuştur. HTTPS zorunluluğu Railway platformu tarafından
+      otomatik olarak sağlanır ve tüm iletişim TLS 1.3 ile şifrelenir.
+    </p>
+  </div>
+
+  <!-- ══════════════════════ 9. DEPLOYMENT ═══════════════════════════════ -->
+  <div class="section" id="s9">
+    <span class="section-number">BÖLÜM 09</span>
+    <h2>Deployment</h2>
+
+    <h3>Railway Platform Yapısı</h3>
+    <p>
+      İOGYS, Railway bulut platformu üzerinde deploy edilmektedir. Railway, GitHub reposu ile
+      entegre çalışan container tabanlı bir PaaS (Platform as a Service) hizmetidir. Her git
+      push işlemi otomatik olarak yeni bir deployment tetikler: kaynak kodu Nixpack ile derlenir,
+      Docker imajı oluşturulur ve yeni container başlatılır. Zero-downtime deployment sayesinde
+      geçiş süreci kullanıcıları etkilemez.
+    </p>
+    <p>
+      Railway'in tercih edilmesinin temel sebebi, daimi çalışan bir Node.js process'ine ihtiyaç
+      duyulmasıdır. Vercel gibi serverless platformlar, cron job'lar için uzun süre çalışan
+      process'leri desteklemez ve SMTP port kısıtlamaları gibi ek sınırlamalar getirir.
+      Railway'in container bazlı mimarisi, hem web sunucusunun hem de cron zamanlayıcısının
+      aynı process içinde sorunsuz çalışmasına olanak tanır.
+    </p>
+
+    <h3>Başlatma Süreci</h3>
+    <pre><code># Build aşaması
+npm run build          # next build — üretim derlemesi
+
+# Çalıştırma aşaması
+npm start              # node server.js
+  → Next.js HTTP handler başlatılır
+  → initArsivCron() çağrılır
+  → node-cron görevleri kayıt edilir
+  → Sunucu PORT ortam değişkeninden dinlemeye başlar</code></pre>
+    <p>
+      <code>server.js</code> dosyası, Node.js <code>http.createServer</code> ile bir HTTP sunucusu
+      oluşturur ve Next.js'in request handler'ını bu sunucuya bağlar. Ardından cron initialization
+      fonksiyonunu çağırarak arka plan görevlerini başlatır. Railway, <code>PORT</code> environment
+      variable'ını otomatik olarak sağlar ve sunucu bu portu dinleyerek gelen istekleri işler.
+    </p>
+
+    <h3>Environment Variables</h3>
+    <table>
+      <thead>
+        <tr><th>Değişken</th><th>Açıklama</th><th>Kaynak</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code></td><td>Supabase proje URL'i</td><td>Supabase Dashboard</td></tr>
+        <tr><td><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></td><td>Supabase anonim anahtar</td><td>Supabase Dashboard</td></tr>
+        <tr><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>Supabase servis anahtarı (RLS bypass)</td><td>Supabase Dashboard</td></tr>
+        <tr><td><code>CRON_SECRET</code></td><td>Cron endpoint güvenlik token'ı</td><td>Manuel</td></tr>
+        <tr><td><code>RESEND_API_KEY</code></td><td>Resend e-posta API anahtarı</td><td>Resend Dashboard</td></tr>
+        <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Claude API anahtarı</td><td>Anthropic Console</td></tr>
+        <tr><td><code>STRIPE_SECRET_KEY</code></td><td>Stripe ödeme API anahtarı</td><td>Stripe Dashboard</td></tr>
+        <tr><td><code>PORT</code></td><td>HTTP sunucu portu</td><td>Railway (otomatik)</td></tr>
+        <tr><td><code>RAILWAY_PUBLIC_DOMAIN</code></td><td>Public domain adresi</td><td>Railway (otomatik)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deploy Kontrol Listesi</h3>
+    <p>
+      Üretim deployment'ı öncesinde şu adımlar takip edilmelidir: veritabanı migration'ları Supabase
+      Dashboard veya CLI üzerinden çalıştırılmalı, environment variable'ları Railway Dashboard'da
+      doğrulanmalı, build sürecinin hatasız tamamlandığı kontrol edilmeli ve deployment sonrası
+      cron görevlerinin aktif olduğu <code>cron_log</code> tablosundan teyit edilmelidir. Geri
+      alma (rollback) gerektiğinde Railway'in önceki deployment'a dönme özelliği kullanılabilir.
+    </p>
+  </div>
+
+  <!-- ══════════════════════ 10. ENTEGRASYONLAR ══════════════════════════ -->
+  <div class="section" id="s10">
+    <span class="section-number">BÖLÜM 10</span>
+    <h2>Entegrasyonlar</h2>
+
+    <h3>E-posta — Resend</h3>
+    <p>
+      İOGYS, e-posta gönderimi için Resend HTTP API'sini kullanmaktadır. Railway platformundaki SMTP
+      port kısıtlamalarını aşmak amacıyla geleneksel SMTP yerine REST API tabanlı bir entegrasyon
+      tercih edilmiştir. Resend, <code>iogys.com.tr</code> domain'i üzerinden doğrulanmış e-postalar
+      göndermeye olanak tanır. Gönderen adı "İO Teknoloji" olarak yapılandırılmıştır ve tüm sistem
+      bildirimleri, rapor gönderimleri ve kullanıcı davetleri bu kanal üzerinden iletilir.
+    </p>
+    <p>
+      E-posta şablonları HTML formatında hazırlanmıştır ve İOGYS marka renklerini kullanır. Rapor
+      e-postaları, zamanlanmış cron görevi tarafından otomatik olarak tetiklenir ve alıcı listesi
+      proje bazında yapılandırılabilir. Gönderim durumu ve hata logları Resend Dashboard üzerinden
+      izlenebilir. Mail ayarları yönetici panelinden düzenlenebilir durumdadır ve Resend API
+      anahtarı environment variable olarak güvenli şekilde saklanmaktadır.
+    </p>
+
+    <h3>Push Bildirimler — Firebase Cloud Messaging (FCM)</h3>
+    <p>
+      Mobil ve web push bildirimleri Firebase Cloud Messaging altyapısı ile gönderilmektedir.
+      Kullanıcıların cihazlarından alınan FCM token'ları <code>device_tokens</code> tablosunda
+      saklanır. Bildirim gönderimi, görev ataması, mesai hatırlatması, çeklist tamamlanması gibi
+      olaylar tarafından tetiklenir. Her bildirim, başlık, gövde metni ve tıklanınca yönlendirilecek
+      URL bilgisi içerir.
+    </p>
+    <p>
+      FCM entegrasyonu sunucu tarafında Firebase Admin SDK ile gerçekleştirilir. Toplu bildirim
+      gönderimi için batch API kullanılarak tek bir istekte birden fazla cihaza bildirim
+      iletilebilir. Token geçerliliği kontrol edilir; geçersiz token'lar otomatik olarak
+      veritabanından temizlenir. Bu self-cleaning mekanizma, zamanla biriken eski cihaz
+      kayıtlarının veritabanını şişirmesini önler.
+    </p>
+
+    <h3>Ödeme Sistemi — Stripe</h3>
+    <p>
+      İOGYS platformunun SaaS abonelik yönetimi Stripe ödeme altyapısı ile gerçekleştirilmektedir.
+      Firma kayıtları sırasında veya plan yükseltmelerinde Stripe Checkout oturumu oluşturulur ve
+      kullanıcı güvenli ödeme sayfasına yönlendirilir. Ödeme başarılı olduğunda webhook aracılığıyla
+      İOGYS bilgilendirilir ve firma planı otomatik olarak güncellenir. Abonelik yenileme, iptal
+      ve fatura işlemleri Stripe tarafından yönetilir.
+    </p>
+    <p>
+      Stripe webhook endpoint'i, gelen olayların imza doğrulamasını yaparak sahte istekleri reddeder.
+      Desteklenen olay türleri arasında <code>checkout.session.completed</code>,
+      <code>invoice.paid</code>, <code>customer.subscription.updated</code> ve
+      <code>customer.subscription.deleted</code> yer alır. Her olay, ilgili firma kaydı üzerinde
+      uygun güncellemeyi tetikler.
+    </p>
+
+    <h3>QR ve NFC Donanım Entegrasyonu</h3>
+    <p>
+      İOGYS'nin saha operasyonları yönetimindeki temel farklılaştırıcı özelliği, fiziksel QR kodlar
+      ve NFC etiketleri ile dijital iş süreçlerini birleştirmesidir. Her lokasyona özgü QR kodlar
+      ve NFC etiketler üretilir; saha personeli bu etiketleri tarayarak mesai girişi yapar, görev
+      başlatır veya çeklist doldurma sürecini tetikler. <code>/api/scan/*</code> endpoint'leri
+      tarama verilerini doğrular ve ilgili iş akışını başlatır.
+    </p>
+    <p>
+      QR kodlar, lokasyon kimliğini ve doğrulama hash'ini içeren şifreli veri taşır. Tarama
+      sırasında bu veri sunucuya gönderilir, hash doğrulanır ve lokasyon eşleştirilir. GPS
+      koordinatları ile çapraz kontrol yapılarak personelin gerçekten ilgili lokasyonda
+      bulunduğu teyit edilebilir. NFC etiketleri de benzer bir doğrulama sürecinden geçer
+      ve her iki teknoloji paralel olarak desteklenmektedir. Bu donanım entegrasyonu, sahada
+      güvenilir ve hızlı bir veri girişi deneyimi sunar.
+    </p>
+  </div>
+
+  <!-- ════════════════════════════ FOOTER ════════════════════════════════ -->
+  <div class="footer">
+    İOGYS Teknik Dokümantasyon v1.0 — Nisan 2026<br>
+    &copy; 2026 İO Teknoloji. Tüm hakları saklıdır.<br>
+    iogys.com.tr
+  </div>
+</div>
+
+</body>
+</html>
