@@ -205,10 +205,10 @@ function IoHands() {
           transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
           animation: ioFloat 3s ease-in-out infinite;
         }
-        /* Sol el — gövdenin sol yanında, hafif içe dönük */
+        /* Sol el — gövdenin sol yanında, parmaklar hafif aşağı içe */
         .io-hand-left {
           left: -10px; bottom: 20px;
-          transform: rotate(70deg);
+          transform: rotate(100deg);
         }
         .io-hand-left.wave {
           transform: rotate(20deg) translateX(-4px) translateY(-16px);
@@ -220,10 +220,10 @@ function IoHands() {
         .io-hand-left.scratch {
           transform: rotate(65deg) translateY(-2px);
         }
-        /* Sağ el — gövdenin sağ yanında, hafif içe dönük */
+        /* Sağ el — gövdenin sağ yanında, parmaklar hafif aşağı içe */
         .io-hand-right {
           right: 2px; bottom: 20px;
-          transform: rotate(-70deg);
+          transform: rotate(-100deg);
         }
         .io-hand-right.wave {
           transform: rotate(-60deg);
