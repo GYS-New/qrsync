@@ -1,8 +1,8 @@
 export const IMPORT_EXPORT_BUTTON_STYLE = {
-  minWidth: 136,
-  minHeight: 38,
-  paddingLeft: 12,
-  paddingRight: 12,
+  minWidth: 0,
+  minHeight: 34,
+  paddingLeft: 10,
+  paddingRight: 10,
   textAlign: 'center' as const,
   justifyContent: 'center' as const,
   display: 'inline-flex' as const,
