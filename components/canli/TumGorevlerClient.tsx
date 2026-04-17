@@ -173,9 +173,9 @@ const [locMap, setLocMap] = useState<Record<string, { tanim: string; parent_id: 
     return { l1: chain[0], l2: chain[1], l3: chain[2] }
   }
 
-const getLocPath = useMemo(() => {
-  return (lokasyonId: string | null | undefined, fallbackName?: string | null) => {
-    if (!lokasyonId) return fallbackName ?? '—'
+const getLocParts = useMemo(() => {
+  return (lokasyonId: string | null | undefined, fallbackName?: string | null): string[] => {
+    if (!lokasyonId) return fallbackName ? [fallbackName] : []
     const parts: string[] = []
     let cur: string | null = lokasyonId
     let guard = 0
@@ -187,10 +187,16 @@ const getLocPath = useMemo(() => {
       cur = node.parent_id
       guard++
     }
-    const path = parts.reverse().join(' / ')
-    return path || (fallbackName ?? '—')
+    return parts.reverse()
   }
 }, [locMap])
+
+const getLocUstAlt = (lokasyonId: string | null | undefined, fallbackName?: string | null) => {
+  const parts = getLocParts(lokasyonId, fallbackName)
+  if (parts.length === 0) return { ust: '—', alt: fallbackName ?? '—' }
+  if (parts.length === 1) return { ust: '—', alt: parts[0] }
+  return { ust: parts.slice(0, -1).join(' / '), alt: parts[parts.length - 1] }
+}
 
 
 
@@ -833,9 +839,9 @@ async function del() {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 4,
+        gap: 6,
         fontWeight: 700,
-        fontSize: 12.5,
+        fontSize: 13.5,
         textTransform: 'uppercase',
         color: '#6b7280',
         letterSpacing: '0.05em',
@@ -846,7 +852,7 @@ async function del() {
       }}
     >
       {label}
-      <span style={{ fontSize: 11, opacity: sortKey === key ? 1 : 0.35 }}>
+      <span style={{ fontSize: 14, opacity: sortKey === key ? 1 : 0.45, color: sortKey === key ? '#1f2937' : '#9ca3af' }}>
         {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}
       </span>
     </button>
@@ -1044,12 +1050,14 @@ async function del() {
               {bulkDuzenleMode ? <th style={{ width: 44 }}></th> : null}
               {false && <th>Kayıt Türü</th>}
               <th>{thBtn('Görev', 'tanim')}</th>
+              <th>{thBtn('Üst Lokasyon', 'lokasyon')}</th>
               <th>{thBtn('Lokasyon', 'lokasyon')}</th>
-              <th>{thBtn('Atanan', 'atanan')}</th>
-              <th>{thBtn('Aktif Saat', 'aktif')}</th>
+              <th style={{ paddingRight: 22 }}>{thBtn('Atanan', 'atanan')}</th>
+              <th style={{ paddingLeft: 22 }}>{thBtn('Aktif Saat', 'aktif')}</th>
               <th>{thBtn('İŞLEM TARİH-SAAT', 'islem')}</th>
-              <th>{thBtn('Durum', 'durum')}</th>
               <th>{thBtn('İşlemi Yapan', 'actor')}</th>
+              <th>{thBtn('Durum', 'durum')}</th>
+              <th style={{ textAlign:'center' }}>Çeklist</th>
             </tr>
           </thead>
           <tbody>
@@ -1100,33 +1108,42 @@ async function del() {
                   </td>
                 )}
                 <td style={{ fontWeight: 600, color: isArsiv ? '#475569' : g.simule_tamamlandi && !isU ? '#9ca3af' : undefined }}>{g.tanim}</td>
-                <td style={{ color: isArsiv ? '#64748b' : '#4b5563' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-                <td style={{ color: isArsiv ? '#64748b' : '#4b5563' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
-                <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
+                {(() => {
+                  const { ust, alt } = getLocUstAlt(g.lokasyon_id, g.lokasyonlar?.tanim)
+                  return (
+                    <>
+                      <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', fontSize: 12.5 }}>{ust}</td>
+                      <td style={{ color: isArsiv ? '#64748b' : '#4b5563', fontWeight: 600 }}>{alt}</td>
+                    </>
+                  )
+                })()}
+                <td style={{ color: isArsiv ? '#64748b' : '#4b5563', paddingRight: 22 }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13, paddingLeft: 22 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
                 <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
                   {isArsiv
                     ? (g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—')
                     : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
                 </td>
+                <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g)}</td>
                 <td>
                   <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
                 </td>
-                <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g)}
-                  {!isArsiv && lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) && (
+                <td style={{ textAlign: 'center' }}>
+                  {!isArsiv && lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); setChecklistGorev({ id: g.id, type: 'canli_gorevler' }) }}
-                      style={{ marginLeft: 6, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 7px', cursor: 'pointer', fontSize: 11, color: '#1d4ed8' }}
+                      style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 7px', cursor: 'pointer', fontSize: 11, color: '#1d4ed8' }}
                     >
                       📋 Çeklist
                     </button>
-                  )}
+                  ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                 </td>
               </tr>
               )
             })}
             {!combinedRows.length && (
               <tr>
-                <td colSpan={(bulkMode || bulkDuzenleMode) ? (arsivAktif ? 9 : 8) : (arsivAktif ? 8 : 7)} style={{ textAlign: 'center', color: '#6b7280', padding: '26px 0', fontSize: 13 }}>
+                <td colSpan={(bulkMode || bulkDuzenleMode) ? (arsivAktif ? 11 : 10) : (arsivAktif ? 10 : 9)} style={{ textAlign: 'center', color: '#6b7280', padding: '26px 0', fontSize: 13 }}>
                   Kriterlere uygun görev bulunamadı
                 </td>
               </tr>
