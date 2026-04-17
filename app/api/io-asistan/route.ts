@@ -123,6 +123,34 @@ const tools: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: 'veritabani_sorgula',
+    description: 'Herhangi bir veritabanı tablosunu sorgular. Filtre, sıralama, limit ve count destekler. Tablo şemasını system prompt\'ta bulabilirsin. Diğer tool\'ların kapsamadığı sorular için kullan.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tablo: { type: 'string', description: 'Sorgulanacak tablo adı (örn: canli_gorevler, users, firmalar, projeler, lokasyonlar vb.)' },
+        select: { type: 'string', description: 'Seçilecek kolonlar, virgülle ayrılmış (varsayılan: *). Örn: "id,tanim,durum"' },
+        filtreler: {
+          type: 'array',
+          description: 'Filtre dizisi. Her filtre: { kolon, operator, deger }. Operatörler: eq, neq, gt, gte, lt, lte, like, ilike, in, is',
+          items: {
+            type: 'object',
+            properties: {
+              kolon: { type: 'string' },
+              operator: { type: 'string' },
+              deger: { type: 'string' },
+            },
+          },
+        },
+        siralama: { type: 'string', description: 'Sıralama kolonu (varsayılan: id). Başına - koyarak DESC yapılır (örn: "-olusturma_tarihi")' },
+        limit: { type: 'number', description: 'Maksimum kayıt sayısı (varsayılan: 20, max: 100)' },
+        sadece_say: { type: 'boolean', description: 'true ise sadece kayıt sayısını döner (count)' },
+        ...PROJE_PARAM,
+      },
+      required: ['tablo'],
+    },
+  },
 ]
 
 // ── Tool çalıştırıcılar ──
@@ -369,6 +397,97 @@ async function executeTool(
         return results.length ? `Arşiv Özeti:\n${results.join('\n')}` : 'Arşiv verisi bulunamadı.'
       }
 
+      case 'veritabani_sorgula': {
+        const tablo = input.tablo as string
+        if (!tablo) return 'Tablo adı belirtilmedi.'
+        // Güvenlik: sadece izin verilen tablolar
+        const izinliTablolar = [
+          'users','firmalar','projeler','lokasyonlar','lokasyon_gruplari','lokasyon_grup_uyeleri',
+          'gorevler','canli_gorevler','gorev_kurallari','kural_duraklatmalari',
+          'checklist_sablonlari','checklist_sablon_maddeleri','checklist_madde_secenekleri',
+          'checklist_sonuc_basliklari','checklist_sonuc_maddeleri',
+          'personel_mesai_kayitlari','musteri_degerlendirmeleri','birim_fiyatlar',
+          'bildirimler','device_tokens','dashboard_bloklar','cron_log',
+          'canli_gorevler_arsiv','gorevler_arsiv','personel_mesai_kayitlari_arsiv',
+          'musteri_degerlendirmeleri_arsiv','checklist_sonuc_basliklari_arsiv','checklist_sonuc_maddeleri_arsiv',
+          'simulasyon_ayarlari','simulasyon_grup_ayarlari','simulasyon_personeller',
+          'rapor_zamanlama','rapor_sablonlari','kullanici_grubu_yetkileri',
+          'kullanici_lokasyon_yetkileri','personel_gorev_destegi','personel_destek_personeller',
+          'mesai_qr_kodlari','firma_rapor_turleri','personel_takip_alicilar',
+        ]
+        if (!izinliTablolar.includes(tablo)) return `"${tablo}" tablosuna erişim izni yok.`
+
+        const selectCols = (input.select as string) || '*'
+        const limit = Math.min((input.limit as number) || 20, 100)
+        const sadeceSay = input.sadece_say as boolean
+
+        if (sadeceSay) {
+          let q = supabase.from(tablo).select('id', { count: 'exact', head: true })
+          if (!ctx.isSA && ctx.firmaId) {
+            // firma_id kolonu olan tablolarda filtrele
+            q = q.eq('firma_id', ctx.firmaId)
+          }
+          if (projeId) q = q.eq('proje_id', projeId)
+          // Filtreleri uygula
+          const filtreler = (input.filtreler as Array<{ kolon: string; operator: string; deger: string }>) || []
+          for (const f of filtreler) {
+            switch (f.operator) {
+              case 'eq': q = q.eq(f.kolon, f.deger); break
+              case 'neq': q = q.neq(f.kolon, f.deger); break
+              case 'gt': q = q.gt(f.kolon, f.deger); break
+              case 'gte': q = q.gte(f.kolon, f.deger); break
+              case 'lt': q = q.lt(f.kolon, f.deger); break
+              case 'lte': q = q.lte(f.kolon, f.deger); break
+              case 'like': q = q.like(f.kolon, f.deger); break
+              case 'ilike': q = q.ilike(f.kolon, f.deger); break
+              case 'is': q = q.is(f.kolon, f.deger === 'null' ? null : f.deger === 'true'); break
+            }
+          }
+          const { count, error } = await q
+          if (error) return `Hata: ${error.message}`
+          return `${tablo}${projeLabel}: ${count ?? 0} kayıt`
+        }
+
+        let q = supabase.from(tablo).select(selectCols).limit(limit)
+        if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        if (projeId) q = q.eq('proje_id', projeId)
+
+        // Filtreleri uygula
+        const filtreler = (input.filtreler as Array<{ kolon: string; operator: string; deger: string }>) || []
+        for (const f of filtreler) {
+          switch (f.operator) {
+            case 'eq': q = q.eq(f.kolon, f.deger); break
+            case 'neq': q = q.neq(f.kolon, f.deger); break
+            case 'gt': q = q.gt(f.kolon, f.deger); break
+            case 'gte': q = q.gte(f.kolon, f.deger); break
+            case 'lt': q = q.lt(f.kolon, f.deger); break
+            case 'lte': q = q.lte(f.kolon, f.deger); break
+            case 'like': q = q.like(f.kolon, f.deger); break
+            case 'ilike': q = q.ilike(f.kolon, f.deger); break
+            case 'is': q = q.is(f.kolon, f.deger === 'null' ? null : f.deger === 'true'); break
+          }
+        }
+
+        // Sıralama
+        const siralama = (input.siralama as string) || ''
+        if (siralama) {
+          const desc = siralama.startsWith('-')
+          const col = desc ? siralama.slice(1) : siralama
+          q = q.order(col, { ascending: !desc })
+        }
+
+        const { data, error } = await q
+        if (error) return `Hata: ${error.message}`
+        if (!data?.length) return `${tablo}${projeLabel}: kayıt bulunamadı.`
+        // Sonuçları okunabilir formata çevir
+        return `${tablo}${projeLabel} (${data.length} kayıt):\n` +
+          (data as unknown as Record<string, unknown>[]).map((r, i) => {
+            const entries = Object.entries(r).filter(([, v]) => v !== null && v !== undefined)
+            const summary = entries.slice(0, 8).map(([k, v]) => `${k}: ${typeof v === 'string' && v.length > 50 ? v.slice(0, 50) + '...' : v}`).join(', ')
+            return `${i + 1}. ${summary}`
+          }).join('\n')
+      }
+
       default:
         return 'Bilinmeyen tool.'
     }
@@ -442,11 +561,57 @@ Kullanıcılara yönlendirme yaparken bu menü isimlerini AYNEN kullan:
 - **Sistem Ayarları** → /dashboard/sistem-ayarlari — SA/TA. Yetkililer, SMTP, konfigurasyon, dashboard düzeni.
 - **Dashboard Ayarları** → /dashboard/ayarlar/dashboard
 
+## VERİTABANI ŞEMASI (veritabani_sorgula tool'u için)
+Aşağıdaki tablolar sorgulanabilir. Kolon adlarını AYNEN kullan:
+
+### Kullanıcılar & Firmalar
+- **users**: id, isim_soyisim, email, telefon, rol, firma_id, proje_id, aktif, profil_foto, last_seen_at, is_online, ust_lokasyon_id, cinsiyet, kayit_tarihi
+- **firmalar**: id, firma_adi, ticari_unvan, vergi_no, yetkili_isim, yetkili_tel, aktif, logo_url, personel_takibi_aktif, qr_sistemi_aktif, nfc_sistemi_aktif, kayit_tarihi
+- **projeler**: id, firma_id, ad, aciklama, aktif, personel_takibi_aktif, sureli_gorev_aktif, kayit_tarihi
+
+### Görevler
+- **gorevler** (spesifik): id, firma_id, proje_id, tanim, lokasyon_id, atanan_kullanici_id, durum (AÇIK/İŞLEMDE/TAMAMLANDI/İPTAL), olusturma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye
+- **canli_gorevler** (frekansiyel): id, firma_id, proje_id, tanim, lokasyon_id, atanan_kullanici_id, durum, aktif_olma_tarihi, olusturma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, kural_id, simule_tamamlandi
+- **gorev_kurallari**: id, firma_id, proje_id, lokasyon_id, tanim, aktif_gunler, gunluk_frekans_sayisi, aktif_olma_saati, aktif, baslangic_tarihi, bitis_tarihi, atanan_kullanici_id
+
+### Lokasyonlar
+- **lokasyonlar**: id, firma_id, proje_id, parent_id, tanim, aktif, qr_veri, nfc_token, checklist_sablon_id, sureli_gorev_aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika, gunluk_frekans_sayisi
+- **lokasyon_gruplari**: id, firma_id, proje_id, ad, aktif, ust_lokasyon_id
+- **lokasyon_grup_uyeleri**: id, grup_id, lokasyon_id
+
+### Çeklist
+- **checklist_sablonlari**: id, firma_id, proje_id, baslik, tanim, aktif, versiyon
+- **checklist_sablon_maddeleri**: id, sablon_id, sira_no, baslik, zorunlu_cevap, gorsel_gerekli
+- **checklist_sonuc_basliklari**: id, gorev_id, canli_gorev_id, lokasyon_id, sablon_id, kullanici_id, kayit_tarihi, kanal
+- **checklist_sonuc_maddeleri**: id, sonuc_id, madde_id, secenek_degeri, aciklama, gorsel_url
+
+### Mesai & Personel
+- **personel_mesai_kayitlari**: id, user_id, firma_id, proje_id, giris_saati, cikis_saati, giris_tipi, cikis_tipi, kayit_tarihi, arsivlendi
+- **device_tokens**: id, user_id, firma_id, isim_soyisim, aktif, son_kullanim (online personel tespiti için)
+- **mesai_qr_kodlari**: id, firma_id, proje_id (QR kodları)
+
+### Diğer
+- **musteri_degerlendirmeleri**: id, firma_id, proje_id, lokasyon_id, yildiz, yorum, ad_soyad, olusturma_tarihi, arsivlendi
+- **birim_fiyatlar**: id, firma_id, proje_id, grup_id, lokasyon_id, fiyat, para_birimi
+- **bildirimler**: id, alici_id, baslik, mesaj, okundu, tarih, tip
+- **kullanici_grubu_yetkileri**: id, firma_id, rol, sayfa_kodu, gorebilir, ekleyebilir, duzenleyebilir, silebilir
+- **rapor_zamanlama**: id, firma_id, proje_id, tekrar_tipi, aktif, son_gonderim_tarihi
+- **simulasyon_ayarlari**: id, firma_id, proje_id, aktif
+- **cron_log**: id, tip, sonuc, tarih, firma_id, proje_id
+
+### Arşiv Tabloları
+- **canli_gorevler_arsiv**: canli_gorevler ile aynı + arsiv_tarihi, arsiv_nedeni
+- **gorevler_arsiv**: gorevler ile aynı + arsiv_tarihi
+- **personel_mesai_kayitlari_arsiv**: mesai kayıtları arşivi
+- **musteri_degerlendirmeleri_arsiv**: müşteri değerlendirmeleri arşivi
+- **checklist_sonuc_basliklari_arsiv**: çeklist başlık arşivi
+- **checklist_sonuc_maddeleri_arsiv**: çeklist madde arşivi
+
 ## Kullanıcı: ${user.isim_soyisim} | Rol: ${roleMap[user.rol] || user.rol}
 
 ## Kurallar
 - Türkçe yanıt ver, kısa ve net
-- Veri sorusu gelince tool çağır, tahmin etme
+- Veri sorusu gelince tool çağır, tahmin etme — veritabani_sorgula tool'u ile herhangi bir tablo sorgulanabilir
 - Sidebar menü isimlerini AYNEN kullan
 - Adım adım rehberlik et
 - Kullanıcının rolüne uygun öneriler ver
