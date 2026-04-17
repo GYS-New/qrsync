@@ -15,36 +15,51 @@ function checkRateLimit(userId: string): boolean {
 }
 
 // ── Tool tanımları ──
+// Ortak proje parametresi — tüm tool'larda kullanılır
+const PROJE_PARAM = {
+  proje_adi: { type: 'string', description: 'Proje adı (örn: "Oyak Renault"). Proje adından ID otomatik çözümlenir.' },
+}
+
 const tools: Anthropic.Tool[] = [
+  {
+    name: 'projeleri_listele',
+    description: 'Kullanıcının erişebildiği projelerin listesini getirir. Proje adı, firma adı ve ID bilgileri. Kullanıcı hangi proje için sorduğunu belirtmediğinde önce bu tool ile projeleri listele ve kullanıcıya sor.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
   {
     name: 'bugunku_mesai',
     description: 'Bugün mesaiye giriş yapan personellerin listesini getirir. Giriş/çıkış saatleri ve süreleri ile birlikte.',
     input_schema: {
       type: 'object' as const,
-      properties: {
-        firma_id: { type: 'string', description: 'Firma ID (opsiyonel, belirtilmezse kullanıcının firması)' },
-      },
+      properties: { ...PROJE_PARAM },
       required: [],
     },
   },
   {
     name: 'gorev_ozeti',
-    description: 'Spesifik görevlerin durum özetini getirir. Bugünkü veya belirtilen tarih aralığındaki görev sayıları (AÇIK, İŞLEMDE, TAMAMLANDI, İPTAL).',
+    description: 'Spesifik görevlerin durum özetini getirir. Oluşturulan ve tamamlanan görev sayıları (AÇIK, İŞLEMDE, TAMAMLANDI, İPTAL).',
     input_schema: {
       type: 'object' as const,
       properties: {
         tarih: { type: 'string', description: 'Tarih filtresi YYYY-MM-DD formatında (varsayılan: bugün)' },
+        ...PROJE_PARAM,
       },
       required: [],
     },
   },
   {
     name: 'canli_gorev_durumu',
-    description: 'Frekansiyel (canlı) görevlerin bugünkü durum özetini getirir. Kaç tanesi tamamlandı, işlemde, beklemede, gecikmiş vs.',
+    description: 'Frekansiyel (canlı) görevlerin durum özetini getirir. Kaç tanesi tamamlandı, işlemde, beklemede, gecikmiş vs. Tamamlanamayan görevleri de gösterir.',
     input_schema: {
       type: 'object' as const,
       properties: {
         tarih: { type: 'string', description: 'Tarih filtresi YYYY-MM-DD (varsayılan: bugün)' },
+        durum: { type: 'string', description: 'Belirli durum filtresi: TAMAMLANDI, ACIK, ISLEMDE, BEKLEMEDE, IPTAL, ZAMANINDA_YAPILAMAYAN, ZAMANI_GECMIS (opsiyonel)' },
+        ...PROJE_PARAM,
       },
       required: [],
     },
@@ -56,6 +71,7 @@ const tools: Anthropic.Tool[] = [
       type: 'object' as const,
       properties: {
         limit: { type: 'number', description: 'Kaç kayıt getirilsin (varsayılan: 10)' },
+        ...PROJE_PARAM,
       },
       required: [],
     },
@@ -67,6 +83,7 @@ const tools: Anthropic.Tool[] = [
       type: 'object' as const,
       properties: {
         sadece_aktif: { type: 'boolean', description: 'Sadece aktif kullanıcıları getir (varsayılan: true)' },
+        ...PROJE_PARAM,
       },
       required: [],
     },
@@ -78,6 +95,7 @@ const tools: Anthropic.Tool[] = [
       type: 'object' as const,
       properties: {
         arama: { type: 'string', description: 'Lokasyon adıyla arama (opsiyonel)' },
+        ...PROJE_PARAM,
       },
       required: [],
     },
@@ -89,17 +107,18 @@ const tools: Anthropic.Tool[] = [
       type: 'object' as const,
       properties: {
         tarih: { type: 'string', description: 'Tarih filtresi YYYY-MM-DD (varsayılan: bugün)' },
+        ...PROJE_PARAM,
       },
       required: [],
     },
   },
   {
     name: 'arsiv_ozeti',
-    description: 'Arşiv tablolarındaki kayıt sayılarını getirir. Frekansiyel görev arşivi, spesifik görev arşivi, mesai arşivi, müşteri değerlendirme arşivi, çeklist arşivi.',
+    description: 'Arşiv tablolarındaki kayıt sayılarını getirir.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        tablo: { type: 'string', description: 'Belirli arşiv tablosu (opsiyonel): personel_mesai, musteri, gorevler, checklist. Belirtilmezse hepsinin özeti.' },
+        tablo: { type: 'string', description: 'Belirli arşiv tablosu (opsiyonel): personel_mesai, musteri, gorevler, checklist.' },
       },
       required: [],
     },
@@ -109,6 +128,25 @@ const tools: Anthropic.Tool[] = [
 // ── Tool çalıştırıcılar ──
 type ToolContext = { firmaId: string | null; projeId: string | null; isSA: boolean }
 
+// Proje adından ID çözümle
+async function resolveProjeId(
+  supabase: ReturnType<typeof createClient>,
+  projeAdi: string | undefined,
+  ctx: ToolContext
+): Promise<string | null> {
+  if (!projeAdi) return ctx.projeId
+  const { data } = await supabase
+    .from('projeler')
+    .select('id,ad')
+    .ilike('ad', `%${projeAdi}%`)
+    .limit(5)
+  if (!data?.length) return null
+  if (data.length === 1) return data[0].id
+  // Tam eşleşme ara
+  const exact = data.find(p => p.ad.toLowerCase() === projeAdi.toLowerCase())
+  return exact ? exact.id : data[0].id
+}
+
 async function executeTool(
   name: string,
   input: Record<string, unknown>,
@@ -116,9 +154,27 @@ async function executeTool(
   supabase: ReturnType<typeof createClient>
 ): Promise<string> {
   const today = new Date().toISOString().split('T')[0]
+  // Proje çözümle (tool'dan gelen proje_adi parametresi)
+  const projeAdi = input.proje_adi as string | undefined
+  const projeId = await resolveProjeId(supabase, projeAdi, ctx)
+  if (projeAdi && !projeId) return `"${projeAdi}" adında bir proje bulunamadı.`
+  const projeLabel = projeAdi ? ` (${projeAdi})` : ''
 
   try {
     switch (name) {
+      case 'projeleri_listele': {
+        let q = supabase.from('projeler').select('id,ad,firmalar!firma_id(firma_adi)').order('ad')
+        if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        const { data, error } = await q
+        if (error) return `Hata: ${error.message}`
+        if (!data?.length) return 'Erişebileceğiniz proje bulunamadı.'
+        return `Projeler (${data.length}):\n` +
+          data.map((p: Record<string, unknown>) => {
+            const firma = p.firmalar as Record<string, unknown> | null
+            return `• ${p.ad}${firma?.firma_adi ? ` — ${firma.firma_adi}` : ''}`
+          }).join('\n') +
+          '\n\nHangi proje için bilgi almak istediğinizi belirtin.'
+      }
       case 'bugunku_mesai': {
         // TRT bugün hesapla (UTC+3)
         const trtNow = new Date(Date.now() + 3 * 60 * 60 * 1000)
@@ -131,10 +187,11 @@ async function executeTool(
           .order('giris_saati', { ascending: true })
           .limit(50)
         if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        if (projeId) q = q.eq('proje_id', projeId)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
-        if (!data?.length) return 'Bugün henüz mesaiye giriş yapan personel yok.'
-        return `Bugün (${bugun}) Mesai Kayıtları (${data.length} kişi):\n` +
+        if (!data?.length) return `Bugün henüz mesaiye giriş yapan personel yok${projeLabel}.`
+        return `Bugün (${bugun}) Mesai Kayıtları${projeLabel} (${data.length} kişi):\n` +
           data.map((r: Record<string, unknown>) => {
             const user = r.users as Record<string, unknown> | null
             const isim = user?.isim_soyisim || 'Bilinmiyor'
@@ -153,23 +210,25 @@ async function executeTool(
           .gte('olusturma_tarihi', `${tarih}T00:00:00`)
           .lte('olusturma_tarihi', `${tarih}T23:59:59`)
         if (!ctx.isSA && ctx.firmaId) qOlusturulan = qOlusturulan.eq('firma_id', ctx.firmaId)
-        // Bugün tamamlanan görevler (farklı günde oluşturulmuş olabilir)
+        if (projeId) qOlusturulan = qOlusturulan.eq('proje_id', projeId)
+        // Tamamlanan görevler (farklı günde oluşturulmuş olabilir)
         let qTamamlanan = supabase
           .from('gorevler')
           .select('id')
           .gte('tamamlanma_tarihi', `${tarih}T00:00:00`)
           .lte('tamamlanma_tarihi', `${tarih}T23:59:59`)
         if (!ctx.isSA && ctx.firmaId) qTamamlanan = qTamamlanan.eq('firma_id', ctx.firmaId)
+        if (projeId) qTamamlanan = qTamamlanan.eq('proje_id', projeId)
 
         const [olusRes, tamRes] = await Promise.all([qOlusturulan, qTamamlanan])
         if (olusRes.error) return `Hata: ${olusRes.error.message}`
         const data = olusRes.data ?? []
         const tamamlananBugun = tamRes.data?.length ?? 0
-        if (!data.length && !tamamlananBugun) return `${tarih} tarihinde spesifik görev kaydı yok.`
+        if (!data.length && !tamamlananBugun) return `${tarih} tarihinde spesifik görev kaydı yok${projeLabel}.`
         const counts: Record<string, number> = {}
         data.forEach((r: { durum: string }) => { counts[r.durum] = (counts[r.durum] || 0) + 1 })
         const total = data.length
-        return `${tarih} Spesifik Görev Özeti:\n` +
+        return `${tarih} Spesifik Görev Özeti${projeLabel}:\n` +
           `• Toplam oluşturulan: ${total}\n` +
           Object.entries(counts).map(([k, v]) => `• ${k}: ${v}`).join('\n') +
           `\n• Bugün tamamlanan: ${tamamlananBugun}`
@@ -184,26 +243,33 @@ async function executeTool(
           .gte('aktif_olma_tarihi', `${tarih}T00:00:00`)
           .lte('aktif_olma_tarihi', `${tarih}T23:59:59`)
         if (!ctx.isSA && ctx.firmaId) qOlusturulan = qOlusturulan.eq('firma_id', ctx.firmaId)
-        // Bugün tamamlanan frekansiyel görevler
+        if (projeId) qOlusturulan = qOlusturulan.eq('proje_id', projeId)
+        const durumFiltre = input.durum as string | undefined
+        if (durumFiltre) qOlusturulan = qOlusturulan.eq('durum', durumFiltre)
+        // Tamamlanan frekansiyel görevler
         let qTamamlanan = supabase
           .from('canli_gorevler')
           .select('id')
           .gte('tamamlanma_tarihi', `${tarih}T00:00:00`)
           .lte('tamamlanma_tarihi', `${tarih}T23:59:59`)
         if (!ctx.isSA && ctx.firmaId) qTamamlanan = qTamamlanan.eq('firma_id', ctx.firmaId)
+        if (projeId) qTamamlanan = qTamamlanan.eq('proje_id', projeId)
 
         const [olusRes, tamRes] = await Promise.all([qOlusturulan, qTamamlanan])
         if (olusRes.error) return `Hata: ${olusRes.error.message}`
         const frekData = olusRes.data ?? []
         const frekTamamlananBugun = tamRes.data?.length ?? 0
-        if (!frekData.length && !frekTamamlananBugun) return `${tarih} tarihinde frekansiyel görev kaydı yok.`
+        if (!frekData.length && !frekTamamlananBugun) return `${tarih} tarihinde frekansiyel görev kaydı yok${projeLabel}.`
         const frekCounts: Record<string, number> = {}
         frekData.forEach((r: { durum: string }) => { frekCounts[r.durum] = (frekCounts[r.durum] || 0) + 1 })
         const frekTotal = frekData.length
-        return `${tarih} Frekansiyel Görev Durumu:\n` +
-          `• Toplam oluşturulan: ${frekTotal}\n` +
+        // Tamamlanamayan = AÇIK + GECİKMİŞ + ZAMANINDA_YAPILMAYAN
+        const tamamlanamayan = (frekCounts['ACIK'] ?? 0) + (frekCounts['ZAMANI_GECMIS'] ?? 0) + (frekCounts['ZAMANINDA_YAPILAMAYAN'] ?? 0)
+        return `${tarih} Frekansiyel Görev Durumu${projeLabel}:\n` +
+          `• Toplam aktif görev: ${frekTotal}\n` +
           Object.entries(frekCounts).map(([k, v]) => `• ${k}: ${v}`).join('\n') +
-          `\n• Bugün tamamlanan: ${frekTamamlananBugun}`
+          `\n• Bugün tamamlanan: ${frekTamamlananBugun}` +
+          (tamamlanamayan > 0 ? `\n• Tamamlanamayan: ${tamamlanamayan}` : '')
       }
 
       case 'musteri_degerlendirmeleri': {
@@ -214,11 +280,12 @@ async function executeTool(
           .order('olusturma_tarihi', { ascending: false })
           .limit(limit)
         if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        if (projeId) q = q.eq('proje_id', projeId)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
-        if (!data?.length) return 'Henüz müşteri değerlendirmesi yok.'
+        if (!data?.length) return `Henüz müşteri değerlendirmesi yok${projeLabel}.`
         const avg = data.reduce((s: number, r: Record<string, unknown>) => s + (r.yildiz as number || 0), 0) / data.length
-        return `Son ${data.length} Değerlendirme (Ort: ${avg.toFixed(1)}/5):\n` +
+        return `Son ${data.length} Değerlendirme${projeLabel} (Ort: ${avg.toFixed(1)}/5):\n` +
           data.map((r: Record<string, unknown>) => {
             const lok = r.lokasyonlar as Record<string, unknown> | null
             const tarih = r.olusturma_tarihi ? new Date(r.olusturma_tarihi as string).toLocaleDateString('tr-TR') : ''
@@ -235,11 +302,12 @@ async function executeTool(
           .order('isim_soyisim')
           .limit(50)
         if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        if (projeId) q = q.eq('proje_id', projeId)
         if (sadece_aktif) q = q.eq('aktif', true)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
-        if (!data?.length) return 'Kayıtlı personel bulunamadı.'
-        return `Personel Listesi (${data.length} kişi):\n` +
+        if (!data?.length) return `Kayıtlı personel bulunamadı${projeLabel}.`
+        return `Personel Listesi${projeLabel} (${data.length} kişi):\n` +
           data.map((r: Record<string, unknown>) => `• ${r.isim_soyisim} (${r.rol === 'tenant_admin' ? 'Yönetici' : 'Personel'}) — ${r.email}`).join('\n')
       }
 
@@ -252,11 +320,12 @@ async function executeTool(
           .order('tanim')
           .limit(30)
         if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        if (projeId) q = q.eq('proje_id', projeId)
         if (arama) q = q.ilike('tanim', `%${arama}%`)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
-        if (!data?.length) return arama ? `"${arama}" ile eşleşen lokasyon bulunamadı.` : 'Kayıtlı lokasyon yok.'
-        return `Lokasyonlar (${data.length}):\n` +
+        if (!data?.length) return arama ? `"${arama}" ile eşleşen lokasyon bulunamadı${projeLabel}.` : `Kayıtlı lokasyon yok${projeLabel}.`
+        return `Lokasyonlar${projeLabel} (${data.length}):\n` +
           data.map((r: Record<string, unknown>) => `• ${r.tanim}${r.ust_lokasyon_id ? ' (alt lokasyon)' : ''}`).join('\n')
       }
 
@@ -321,6 +390,13 @@ function buildSystemPrompt(user: { isim_soyisim: string; rol: string }): string 
   return `Sen İO Asistan'sın — İOGYS (İO Görev Yönetim Sistemi) yapay zeka asistanısın.
 İO Teknoloji tarafından geliştirilen bu sistemi kullanıcılara tanıtıyor ve yardımcı oluyorsun.
 Veritabanına erişim tool'ların var — kullanıcı veri sorusu sorduğunda ilgili tool'u çağır.
+
+## PROJE BAZLI SORGULAMA (ÇOK ÖNEMLİ)
+- Tüm veri sorguları PROJE BAZLI yapılmalıdır.
+- Kullanıcı bir proje adı belirtmişse (örn: "Oyak Renault"), tool'a proje_adi parametresi olarak gönder.
+- Kullanıcı proje belirtmemişse ve birden fazla proje varsa, ÖNCE projeleri_listele tool'unu çağır ve kullanıcıya "Hangi proje için bilgi almak istiyorsunuz?" diye sor.
+- Kullanıcının tek projesi varsa veya önceki mesajlarda proje belirtilmişse, o projeyi kullan.
+- "Dün tamamlanamayan görevler" gibi sorularda tarih parametresini dünün tarihi olarak ayarla.
 
 ## İOGYS Nedir?
 Profesyonel temizlik ve tesis yönetimi firmalarının saha operasyonlarını dijital olarak yönetmelerine olanak tanıyan bir QR & NFC tabanlı platformdur.
