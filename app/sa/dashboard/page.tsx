@@ -24,7 +24,7 @@ export default async function SADashboard() {
         base="/sa"
         breadcrumbs={[{ label: 'Gösterge Paneli' }]}
       />
-      <div style={{ padding: '24px 28px' }}>
+      <div style={{ padding: 'clamp(12px, 2vw, 28px)' }}>
         <DashboardRenderer
           bloklar={bloklar}
           firmaId={firmaId}

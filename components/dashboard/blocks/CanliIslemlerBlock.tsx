@@ -107,7 +107,7 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
   const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 100) : 0)
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <KpiCard
         label="Spesifik Görevler"
         value={anlikToplam}

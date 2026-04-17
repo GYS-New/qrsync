@@ -104,9 +104,9 @@ export default async function DashboardRenderer({
         - To keep the right column width equal to a single KPI card width, use the same 4-column grid on lg+
           and make big blocks span 3 columns, small blocks span 1 column.
       */}
-      <div className="grid gap-4 items-start lg:grid-cols-4">
-        <div className="flex flex-col gap-4 lg:col-span-3">{left.map(render)}</div>
-        <div className="flex flex-col gap-4 lg:col-span-1">{right.map(render)}</div>
+      <div className="grid gap-4 items-start md:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-col gap-4 md:col-span-2 lg:col-span-3">{left.map(render)}</div>
+        <div className="flex flex-col gap-4 md:col-span-2 lg:col-span-1">{right.map(render)}</div>
       </div>
     </div>
   )

@@ -28,7 +28,7 @@ export default async function Dashboard() {
         base="/ta"
         breadcrumbs={[{ label: 'Gosterge Paneli' }]}
       />
-      <div style={{ padding: '24px 28px' }}>
+      <div style={{ padding: 'clamp(12px, 2vw, 28px)' }}>
         <DashboardRenderer bloklar={bloklar} firmaId={firmaId} isSuperAdmin={false} basePath="/ta" projeId={aktifProje?.id ?? null} />
       </div>
       <DashboardRefresher />
