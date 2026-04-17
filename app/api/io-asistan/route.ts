@@ -146,38 +146,64 @@ async function executeTool(
 
       case 'gorev_ozeti': {
         const tarih = (input.tarih as string) || today
-        let q = supabase
+        // Oluşturulan görevler
+        let qOlusturulan = supabase
           .from('gorevler')
           .select('durum')
           .gte('olusturma_tarihi', `${tarih}T00:00:00`)
           .lte('olusturma_tarihi', `${tarih}T23:59:59`)
-        if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
-        const { data, error } = await q
-        if (error) return `Hata: ${error.message}`
-        if (!data?.length) return `${tarih} tarihinde spesifik görev kaydı yok.`
+        if (!ctx.isSA && ctx.firmaId) qOlusturulan = qOlusturulan.eq('firma_id', ctx.firmaId)
+        // Bugün tamamlanan görevler (farklı günde oluşturulmuş olabilir)
+        let qTamamlanan = supabase
+          .from('gorevler')
+          .select('id')
+          .gte('tamamlanma_tarihi', `${tarih}T00:00:00`)
+          .lte('tamamlanma_tarihi', `${tarih}T23:59:59`)
+        if (!ctx.isSA && ctx.firmaId) qTamamlanan = qTamamlanan.eq('firma_id', ctx.firmaId)
+
+        const [olusRes, tamRes] = await Promise.all([qOlusturulan, qTamamlanan])
+        if (olusRes.error) return `Hata: ${olusRes.error.message}`
+        const data = olusRes.data ?? []
+        const tamamlananBugun = tamRes.data?.length ?? 0
+        if (!data.length && !tamamlananBugun) return `${tarih} tarihinde spesifik görev kaydı yok.`
         const counts: Record<string, number> = {}
         data.forEach((r: { durum: string }) => { counts[r.durum] = (counts[r.durum] || 0) + 1 })
         const total = data.length
-        return `${tarih} Spesifik Görev Özeti (Toplam: ${total}):\n` +
-          Object.entries(counts).map(([k, v]) => `• ${k}: ${v}`).join('\n')
+        return `${tarih} Spesifik Görev Özeti:\n` +
+          `• Toplam oluşturulan: ${total}\n` +
+          Object.entries(counts).map(([k, v]) => `• ${k}: ${v}`).join('\n') +
+          `\n• Bugün tamamlanan: ${tamamlananBugun}`
       }
 
       case 'canli_gorev_durumu': {
         const tarih = (input.tarih as string) || today
-        let q = supabase
+        // Bugünkü frekansiyel görevler (aktif_olma_tarihi ile — görevler gece oluşturulup gündüz aktif olur)
+        let qOlusturulan = supabase
           .from('canli_gorevler')
           .select('durum')
-          .gte('olusturma_tarihi', `${tarih}T00:00:00`)
-          .lte('olusturma_tarihi', `${tarih}T23:59:59`)
-        if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
-        const { data, error } = await q
-        if (error) return `Hata: ${error.message}`
-        if (!data?.length) return `${tarih} tarihinde frekansiyel görev kaydı yok.`
-        const counts: Record<string, number> = {}
-        data.forEach((r: { durum: string }) => { counts[r.durum] = (counts[r.durum] || 0) + 1 })
-        const total = data.length
-        return `${tarih} Frekansiyel Görev Durumu (Toplam: ${total}):\n` +
-          Object.entries(counts).map(([k, v]) => `• ${k}: ${v}`).join('\n')
+          .gte('aktif_olma_tarihi', `${tarih}T00:00:00`)
+          .lte('aktif_olma_tarihi', `${tarih}T23:59:59`)
+        if (!ctx.isSA && ctx.firmaId) qOlusturulan = qOlusturulan.eq('firma_id', ctx.firmaId)
+        // Bugün tamamlanan frekansiyel görevler
+        let qTamamlanan = supabase
+          .from('canli_gorevler')
+          .select('id')
+          .gte('tamamlanma_tarihi', `${tarih}T00:00:00`)
+          .lte('tamamlanma_tarihi', `${tarih}T23:59:59`)
+        if (!ctx.isSA && ctx.firmaId) qTamamlanan = qTamamlanan.eq('firma_id', ctx.firmaId)
+
+        const [olusRes, tamRes] = await Promise.all([qOlusturulan, qTamamlanan])
+        if (olusRes.error) return `Hata: ${olusRes.error.message}`
+        const frekData = olusRes.data ?? []
+        const frekTamamlananBugun = tamRes.data?.length ?? 0
+        if (!frekData.length && !frekTamamlananBugun) return `${tarih} tarihinde frekansiyel görev kaydı yok.`
+        const frekCounts: Record<string, number> = {}
+        frekData.forEach((r: { durum: string }) => { frekCounts[r.durum] = (frekCounts[r.durum] || 0) + 1 })
+        const frekTotal = frekData.length
+        return `${tarih} Frekansiyel Görev Durumu:\n` +
+          `• Toplam oluşturulan: ${frekTotal}\n` +
+          Object.entries(frekCounts).map(([k, v]) => `• ${k}: ${v}`).join('\n') +
+          `\n• Bugün tamamlanan: ${frekTamamlananBugun}`
       }
 
       case 'musteri_degerlendirmeleri': {
