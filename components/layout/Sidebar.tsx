@@ -159,104 +159,7 @@ function IoThinkingBubble() {
   return <div className={`io-thought-bubble ${phase}`}>{thought}</div>
 }
 
-/** İO Kollar — kısa kol + yuvarlak uç (eldiven), omuz pivotlu */
-type ArmPose = 'idle' | 'wave' | 'think' | 'scratch'
-const ARM_COLOR = '#B8E4F0'
-const ARM_STROKE = '#93D3E8'
-const ARM_BALL = '#A4D9EE'
 
-function IoArms() {
-  const [pose, setPose] = useState<ArmPose>('idle')
-
-  useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout>
-    function next() {
-      const delay = 6000 + Math.random() * 8000
-      timeout = setTimeout(() => {
-        const poses: ArmPose[] = ['wave', 'think', 'scratch']
-        setPose(poses[Math.floor(Math.random() * poses.length)])
-        setTimeout(() => { setPose('idle'); next() }, 2500 + Math.random() * 1500)
-      }, delay)
-    }
-    next()
-    return () => clearTimeout(timeout)
-  }, [])
-
-  return (
-    <>
-      <style>{`
-        .io-arm {
-          position: absolute; z-index: 4;
-          pointer-events: none;
-          animation: ioFloat 3s ease-in-out infinite;
-        }
-        /* Sol kol — omuz pivotu üstte */
-        .io-arm-left {
-          left: -6px; top: 46px;
-          transform-origin: 8px 0px;
-          transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-          transform: rotate(15deg);
-        }
-        .io-arm-left.wave {
-          transform: rotate(-45deg);
-          animation: ioFloat 3s ease-in-out infinite, ioArmWave 0.3s ease-in-out 5;
-        }
-        .io-arm-left.think {
-          transform: rotate(10deg);
-        }
-        .io-arm-left.scratch {
-          transform: rotate(12deg);
-        }
-        /* Sağ kol — omuz pivotu üstte */
-        .io-arm-right {
-          right: 6px; top: 46px;
-          transform-origin: calc(100% - 8px) 0px;
-          transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-          transform: rotate(-15deg);
-        }
-        .io-arm-right.wave {
-          transform: rotate(-10deg);
-        }
-        .io-arm-right.think {
-          transform: rotate(-60deg);
-          animation: ioFloat 3s ease-in-out infinite, ioArmThink 0.8s ease-in-out 2;
-        }
-        .io-arm-right.scratch {
-          transform: rotate(-55deg);
-          animation: ioFloat 3s ease-in-out infinite, ioArmScratch 0.2s ease-in-out 6;
-        }
-        @keyframes ioArmWave {
-          0%, 100% { transform: rotate(-45deg); }
-          50% { transform: rotate(-65deg); }
-        }
-        @keyframes ioArmThink {
-          0%, 100% { transform: rotate(-60deg); }
-          50% { transform: rotate(-55deg); }
-        }
-        @keyframes ioArmScratch {
-          0%, 100% { transform: rotate(-55deg); }
-          50% { transform: rotate(-60deg); }
-        }
-      `}</style>
-      {/* Sol kol */}
-      <div className={`io-arm io-arm-left ${pose}`}>
-        <svg width="16" height="30" viewBox="0 0 16 30">
-          {/* Kol çubuğu */}
-          <rect x="5" y="0" width="6" height="20" rx="3" fill={ARM_COLOR} stroke={ARM_STROKE} strokeWidth="0.8" />
-          {/* Yuvarlak uç (eldiven/yumruk) */}
-          <circle cx="8" cy="24" r="6" fill={ARM_BALL} stroke={ARM_STROKE} strokeWidth="0.8" />
-        </svg>
-      </div>
-      {/* Sağ kol */}
-      <div className={`io-arm io-arm-right ${pose}`}>
-        <svg width="16" height="30" viewBox="0 0 16 30">
-          <rect x="5" y="0" width="6" height="20" rx="3" fill={ARM_COLOR} stroke={ARM_STROKE} strokeWidth="0.8" />
-          <circle cx="8" cy="24" r="6" fill={ARM_BALL} stroke={ARM_STROKE} strokeWidth="0.8" />
-        </svg>
-      </div>
-    </>
-  )
-}
 
 /** Sidebar logo — boyut logoya göre dinamik */
 function SidebarLogo({ src, alt, bordered = false, imgWidth = '80%' }: { src: string; alt: string; bordered?: boolean; imgWidth?: string }) {
@@ -534,7 +437,6 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                 <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
               <div className="io-ground-shadow" style={{ marginLeft: -14 }} />
-              <IoArms />
               <IoThinkingBubble />
             </div>
             <div style={{ flex: 1, height: 48, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
