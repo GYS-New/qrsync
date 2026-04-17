@@ -113,6 +113,19 @@ const tools: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'personel_basari_analizi',
+    description: 'Personel başarı analizi — belirtilen tarihte en çok görev tamamlayan personelleri sıralar. Frekansiyel ve spesifik görevler dahil. İsim, tamamlanan görev sayısı ve ortalama süre bilgisi.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tarih: { type: 'string', description: 'Tarih YYYY-MM-DD (varsayılan: bugün)' },
+        limit: { type: 'number', description: 'Kaç personel gösterilsin (varsayılan: 10)' },
+        ...PROJE_PARAM,
+      },
+      required: [],
+    },
+  },
+  {
     name: 'arsiv_ozeti',
     description: 'Arşiv tablolarındaki kayıt sayılarını getirir.',
     input_schema: {
@@ -369,6 +382,76 @@ async function executeTool(
         const skorlar = data.map((r: { skor: number | null }) => r.skor).filter((s): s is number => s !== null)
         const avg = skorlar.length ? skorlar.reduce((a, b) => a + b, 0) / skorlar.length : 0
         return `${tarih} Çeklist Özeti:\n• Toplam: ${data.length}\n• Ortalama Skor: %${avg.toFixed(0)}\n• En Düşük: %${Math.min(...skorlar)}\n• En Yüksek: %${Math.max(...skorlar)}`
+      }
+
+      case 'personel_basari_analizi': {
+        const tarih = (input.tarih as string) || today
+        const topN = Math.min((input.limit as number) || 10, 30)
+
+        // Frekansiyel + Spesifik tamamlanan görevleri birleştir
+        let qFrek = supabase
+          .from('canli_gorevler')
+          .select('tamamlayan_kullanici_id,tamamlanma_suresi_saniye')
+          .gte('tamamlanma_tarihi', `${tarih}T00:00:00`)
+          .lte('tamamlanma_tarihi', `${tarih}T23:59:59`)
+          .not('tamamlayan_kullanici_id', 'is', null)
+        if (!ctx.isSA && ctx.firmaId) qFrek = qFrek.eq('firma_id', ctx.firmaId)
+        if (projeId) qFrek = qFrek.eq('proje_id', projeId)
+
+        let qSpesifik = supabase
+          .from('gorevler')
+          .select('islemi_yapan_id,tamamlanma_suresi_saniye')
+          .eq('durum', 'TAMAMLANDI')
+          .gte('tamamlanma_tarihi', `${tarih}T00:00:00`)
+          .lte('tamamlanma_tarihi', `${tarih}T23:59:59`)
+        if (!ctx.isSA && ctx.firmaId) qSpesifik = qSpesifik.eq('firma_id', ctx.firmaId)
+        if (projeId) qSpesifik = qSpesifik.eq('proje_id', projeId)
+
+        const [frekRes, spRes] = await Promise.all([qFrek, qSpesifik])
+
+        // Personel bazlı gruplama
+        const personelMap = new Map<string, { frek: number; spesifik: number; toplamSure: number }>()
+        for (const r of (frekRes.data ?? []) as Record<string, unknown>[]) {
+          const uid = r.tamamlayan_kullanici_id as string
+          const entry = personelMap.get(uid) ?? { frek: 0, spesifik: 0, toplamSure: 0 }
+          entry.frek++
+          entry.toplamSure += (r.tamamlanma_suresi_saniye as number) || 0
+          personelMap.set(uid, entry)
+        }
+        for (const r of (spRes.data ?? []) as Record<string, unknown>[]) {
+          const uid = r.islemi_yapan_id as string
+          if (!uid) continue
+          const entry = personelMap.get(uid) ?? { frek: 0, spesifik: 0, toplamSure: 0 }
+          entry.spesifik++
+          entry.toplamSure += (r.tamamlanma_suresi_saniye as number) || 0
+          personelMap.set(uid, entry)
+        }
+
+        if (!personelMap.size) return `${tarih} tarihinde tamamlanmış görev bulunamadı${projeLabel}.`
+
+        // Sıralama (toplam görev sayısına göre)
+        const sorted = [...personelMap.entries()]
+          .map(([uid, d]) => ({ uid, toplam: d.frek + d.spesifik, ...d }))
+          .sort((a, b) => b.toplam - a.toplam)
+          .slice(0, topN)
+
+        // Personel isimlerini çek
+        const userIds = sorted.map(s => s.uid)
+        const { data: users } = await supabase
+          .from('users')
+          .select('id,isim_soyisim')
+          .in('id', userIds)
+        const nameMap = new Map<string, string>()
+        for (const u of (users ?? []) as Record<string, unknown>[]) {
+          nameMap.set(u.id as string, u.isim_soyisim as string)
+        }
+
+        return `${tarih} Personel Başarı Analizi${projeLabel} (Top ${sorted.length}):\n` +
+          sorted.map((s, i) => {
+            const isim = nameMap.get(s.uid) || 'Bilinmiyor'
+            const ortSure = s.toplam > 0 ? Math.round(s.toplamSure / s.toplam / 60) : 0
+            return `${i + 1}. ${isim}: ${s.toplam} görev (${s.frek} frekansiyel + ${s.spesifik} spesifik) — ort. ${ortSure} dk`
+          }).join('\n')
       }
 
       case 'arsiv_ozeti': {
