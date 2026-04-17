@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/server'
 
 const CORS_HEADERS = {
@@ -7,6 +8,29 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, X-Device-Token',
 }
 
+// Basit in-memory brute-force koruması
+// Not: Railway tek process çalıştırıyor — Map yeterli.
+// Scaling sonrası DB-backed rate limit'e geçilebilir.
+const MAX_DENEME = 5
+const KILIT_MS   = 15 * 60 * 1000 // 15 dk
+const denemeler = new Map<string, { sayi: number; kilitBitis: number }>()
+
+function kontrolRateLimit(deviceId: string): { izin: boolean; kalanSn?: number } {
+  const now = Date.now()
+  const rec = denemeler.get(deviceId)
+  if (!rec) return { izin: true }
+  if (rec.kilitBitis > now) return { izin: false, kalanSn: Math.ceil((rec.kilitBitis - now) / 1000) }
+  if (rec.kilitBitis && rec.kilitBitis <= now) denemeler.delete(deviceId)
+  return { izin: true }
+}
+function yanlisDenemeKaydet(deviceId: string) {
+  const rec = denemeler.get(deviceId) ?? { sayi: 0, kilitBitis: 0 }
+  rec.sayi += 1
+  if (rec.sayi >= MAX_DENEME) rec.kilitBitis = Date.now() + KILIT_MS
+  denemeler.set(deviceId, rec)
+}
+function basariyiTemizle(deviceId: string) { denemeler.delete(deviceId) }
+
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: CORS_HEADERS })
 }
@@ -14,7 +38,7 @@ export async function OPTIONS() {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { firma_token, device_id, user_id, isim_soyisim, proje_id } = body
+    const { firma_token, device_id, user_id, isim_soyisim, proje_id, sifre } = body
 
     if (!firma_token || !device_id || !user_id || !isim_soyisim) {
       return NextResponse.json({ ok: false, error: 'Eksik parametreler' }, { status: 400, headers: CORS_HEADERS })
@@ -49,6 +73,50 @@ export async function POST(req: Request) {
 
     if (!kullanici.aktif) {
       return NextResponse.json({ ok: false, error: 'Hesabınız aktif değil' }, { status: 403, headers: CORS_HEADERS })
+    }
+
+    // ── ŞİFRE DOĞRULAMA (opsiyonel, mobil yeni sürüm için) ─────────────────
+    // Geriye uyumluluk: eski mobil sürümler sifre göndermeyebilir — o zaman atlanır.
+    // Yeni mobil sürümler (v>=X.Y.Z) sifre göndermek zorunda, mobil tarafta zorunlu.
+    if (sifre !== undefined && sifre !== null && sifre !== '') {
+      // Rate limit — brute force koruması
+      const rl = kontrolRateLimit(device_id)
+      if (!rl.izin) {
+        return NextResponse.json({
+          ok: false,
+          error: `Çok fazla yanlış deneme. ${rl.kalanSn} saniye sonra tekrar deneyin.`,
+          kilitli: true,
+          kalan_sn: rl.kalanSn,
+        }, { status: 429, headers: CORS_HEADERS })
+      }
+
+      // Kullanıcının email'ini auth.users'dan çek
+      const { data: authUser, error: authErr } = await admin.auth.admin.getUserById(user_id)
+      if (authErr || !authUser?.user?.email) {
+        return NextResponse.json({ ok: false, error: 'Kullanıcı kimlik bilgileri alınamadı' }, { status: 500, headers: CORS_HEADERS })
+      }
+
+      // Ayrı (anon) client ile signInWithPassword — şifre doğrulaması
+      const anon = createSupabaseJsClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+      )
+      const { error: signErr } = await anon.auth.signInWithPassword({
+        email: authUser.user.email,
+        password: sifre,
+      })
+
+      if (signErr) {
+        yanlisDenemeKaydet(device_id)
+        return NextResponse.json({
+          ok: false,
+          error: 'Şifre hatalı',
+          sifre_hatali: true,
+        }, { status: 401, headers: CORS_HEADERS })
+      }
+
+      basariyiTemizle(device_id)
     }
 
     const { data: mevcutKayit } = await admin
