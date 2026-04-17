@@ -838,8 +838,8 @@ export default function ArsivClient({
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
             <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f2937' }}>{filtreMusteri.length}</strong> kayıt</span>
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => csvIndir('musteri', ['Tarih','Lokasyon','Kanal','Puan','Yorum','Ad Soyad'],
-                filtreMusteri.map((r:any) => [r.olusturma_tarihi,r.lokasyon_yol,r.kanal,String(r.yildiz),r.yorum??'',r.ad_soyad??'']))}
+              <button onClick={() => csvIndir('musteri', ['Tarih','Lokasyon','Puan','Yorum','Ad Soyad'],
+                filtreMusteri.map((r:any) => [r.olusturma_tarihi,r.lokasyon_yol,String(r.yildiz),r.yorum??'',r.ad_soyad??'']))}
                 disabled={!filtreMusteri.length} className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa] flex items-center gap-2 disabled:opacity-40">
                 <Download size={13} /> CSV
               </button>
@@ -849,11 +849,11 @@ export default function ArsivClient({
                 const ws = wb.addWorksheet('Müşteri Değerlendirme Arşivi')
                 ws.columns = [
                   { header: 'Tarih', key: 'tarih', width: 20 }, { header: 'Lokasyon', key: 'lokasyon', width: 24 },
-                  { header: 'Kanal', key: 'kanal', width: 10 }, { header: 'Puan', key: 'puan', width: 8 },
-                  { header: 'Yorum', key: 'yorum', width: 40 }, { header: 'Ad Soyad', key: 'ad', width: 20 },
+                  { header: 'Puan', key: 'puan', width: 8 },
+                  { header: 'Yorum', key: 'yorum', width: 60 }, { header: 'Ad Soyad', key: 'ad', width: 20 },
                 ]
                 const hr = ws.getRow(1); hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }; hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }; hr.height = 20
-                filtreMusteri.forEach((r:any) => ws.addRow({ tarih: r.olusturma_tarihi, lokasyon: r.lokasyon_yol, kanal: r.kanal, puan: r.yildiz, yorum: r.yorum??'', ad: r.ad_soyad??'' }))
+                filtreMusteri.forEach((r:any) => ws.addRow({ tarih: r.olusturma_tarihi, lokasyon: r.lokasyon_yol, puan: r.yildiz, yorum: r.yorum??'', ad: r.ad_soyad??'' }))
                 const buf = await wb.xlsx.writeBuffer(); const a = document.createElement('a')
                 a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
                 a.download = `musteri-degerlendirme-arsiv-${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(a.href)
@@ -863,14 +863,14 @@ export default function ArsivClient({
               </button>
               <button onClick={() => {
                 const rows = filtreMusteri.map((r:any) =>
-                  `<tr><td>${new Date(r.olusturma_tarihi).toLocaleString('tr-TR')}</td><td>${r.lokasyon_yol}</td><td>${r.kanal}</td><td>${'★'.repeat(r.yildiz)}</td><td>${r.yorum??'—'}</td><td>${r.ad_soyad??'—'}</td></tr>`).join('')
+                  `<tr><td>${new Date(r.olusturma_tarihi).toLocaleString('tr-TR')}</td><td>${r.lokasyon_yol}</td><td>${'★'.repeat(r.yildiz)}</td><td>${r.yorum??'—'}</td><td>${r.ad_soyad??'—'}</td></tr>`).join('')
                 const w = window.open('','_blank','width=1000,height=700'); if (!w) return
                 w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Müşteri Değerlendirme Arşivi</title>
                   <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}table{width:100%;border-collapse:collapse}
                   th{background:#e5e7eb;color:#1f2937;font-weight:700;padding:6px 8px;border:1px solid #d1d5db;text-align:left}
                   td{padding:5px 8px;border:1px solid #e5e7eb}tr:nth-child(even)td{background:#fafafa}</style>
                   </head><body><h2 style="color:#1f2937">Müşteri Değerlendirmeleri Arşivi</h2>
-                  <table><thead><tr><th>Tarih</th><th>Lokasyon</th><th>Kanal</th><th>Puan</th><th>Yorum</th><th>Ad Soyad</th></tr></thead>
+                  <table><thead><tr><th>Tarih</th><th>Lokasyon</th><th>Puan</th><th>Yorum</th><th>Ad Soyad</th></tr></thead>
                   <tbody>${rows}</tbody></table></body></html>`)
                 w.document.close(); setTimeout(() => w.print(), 400)
               }} disabled={!filtreMusteri.length}
@@ -903,37 +903,41 @@ export default function ArsivClient({
           </div>
 
           <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
-            <table className="verde-table">
+            <table className="verde-table" style={{ tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                <col style={{ width: 140 }} />
+                <col style={{ width: 220 }} />
+                <col style={{ width: 130 }} />
+                <col />
+                <col style={{ width: 160 }} />
+                <col style={{ width: 150 }} />
+                <col style={{ width: 90 }} />
+              </colgroup>
               <thead><tr>
-                <th>Tarih</th><th>Lokasyon</th><th>Kanal</th><th>Puan</th>
+                <th>Tarih</th><th>Lokasyon</th><th>Puan</th>
                 <th>Yorum</th><th>Ad Soyad</th><th>Arşivlenme</th>
                 <th style={{ textAlign:'center' }}>İşlem</th>
               </tr></thead>
               <tbody>
-                {musteriLoading ? <YukleniyorSatir cols={8} /> :
-                 filtreMusteri.length === 0 ? <BosKayit cols={8} mesaj="Müşteri değerlendirme arşivi boş." /> :
+                {musteriLoading ? <YukleniyorSatir cols={7} /> :
+                 filtreMusteri.length === 0 ? <BosKayit cols={7} mesaj="Müşteri değerlendirme arşivi boş." /> :
                  filtreMusteri.map((r: any) => (
                   <tr key={r.id}>
-                    <td style={{ whiteSpace:'nowrap', color:'#64748b', fontSize:12 }}>
+                    <td style={{ whiteSpace:'nowrap', color:'#64748b', fontSize:13 }}>
                       {new Date(r.olusturma_tarihi).toLocaleString('tr-TR',{ day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}
                     </td>
-                    <td style={{ fontWeight:600 }}>{r.lokasyon_yol}</td>
-                    <td>
-                      <span style={{ padding:'2px 8px', borderRadius:12, fontSize:11.5, fontWeight:700,
-                        background: r.kanal==='QR'?'#e0f2fe':'#f9fafb',
-                        color:      r.kanal==='QR'?'#0369a1':'#166534' }}>{r.kanal}
-                      </span>
-                    </td>
+                    <td style={{ fontWeight:600, fontSize:13 }}>{r.lokasyon_yol}</td>
                     <td style={{ whiteSpace:'nowrap' }}>
-                      {'★'.repeat(r.yildiz)}<span style={{ fontSize:11, color:'#94a3b8', marginLeft:4 }}>{YILDIZ_ETIKET[r.yildiz]}</span>
+                      <span style={{ fontSize:16, letterSpacing:1, color:'#f59e0b' }}>{'★'.repeat(r.yildiz)}</span>
+                      <span style={{ fontSize:13, color:'#64748b', marginLeft:6, fontWeight:600 }}>{YILDIZ_ETIKET[r.yildiz]}</span>
                     </td>
-                    <td style={{ maxWidth:220, color:'#334155', fontSize:12 }}>
-                      <span title={r.yorum??''} style={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' as any, overflow:'hidden' }}>
+                    <td style={{ color:'#334155', fontSize:13.5, lineHeight:1.45 }}>
+                      <span title={r.yorum??''} style={{ display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical' as any, overflow:'hidden' }}>
                         {r.yorum || <span style={{ color:'#cbd5e1' }}>—</span>}
                       </span>
                     </td>
-                    <td style={{ color: r.ad_soyad?'#111827':'#cbd5e1', fontSize:13 }}>{r.ad_soyad||'—'}</td>
-                    <td style={{ fontSize:12, color:'#94a3b8' }}>{r.arsivleme_tarihi ? formatDateTime(r.arsivleme_tarihi) : '—'}</td>
+                    <td style={{ color: r.ad_soyad?'#111827':'#cbd5e1', fontSize:14 }}>{r.ad_soyad||'—'}</td>
+                    <td style={{ fontSize:13, color:'#94a3b8', whiteSpace:'nowrap' }}>{r.arsivleme_tarihi ? formatDateTime(r.arsivleme_tarihi) : '—'}</td>
                     <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
                       {yetki.duzenleyebilir && <button onClick={() => musteriCikar(r)} title="Arşivden Çıkar" style={aksBtn('#d97706','#fef3c7')}><RotateCcw size={13} /></button>}
                       {yetki.silebilir && <button onClick={() => musteriSil(r)}   title="Kalıcı Sil"    style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>}
