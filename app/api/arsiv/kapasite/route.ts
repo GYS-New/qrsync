@@ -80,7 +80,7 @@ export async function GET() {
       // RPC başarılı — gerçek boyut verileri
       const boyutMap = new Map<string, { total_bytes: number; row_count: number }>()
       for (const row of boyutData) {
-        boyutMap.set(row.table_name, { total_bytes: Number(row.total_bytes), row_count: Number(row.row_count) })
+        boyutMap.set(row.table_name, { total_bytes: Number(row.total_bytes), row_count: Math.max(0, Number(row.row_count)) })
       }
 
       for (const { tablo, label } of ARSIV_TABLOLARI) {
