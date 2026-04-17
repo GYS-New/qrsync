@@ -166,7 +166,7 @@ const HAND_FILL = '#B8E4F0'
 const HAND_STROKE = '#8ED0E6'
 // Doğal el SVG — avuç + 5 parmak + başparmak, karikatür ama el görünümlü
 const HandSVG = ({ side }: { side: 'left' | 'right' }) => (
-  <svg width="20" height="24" viewBox="0 0 20 24" style={{ transform: side === 'right' ? 'scaleX(-1)' : undefined }}>
+  <svg width="20" height="24" viewBox="0 0 20 24" style={{ transform: side === 'left' ? 'scaleX(-1)' : undefined }}>
     {/* Avuç içi */}
     <rect x="3" y="10" width="13" height="12" rx="5" fill={HAND_FILL} stroke={HAND_STROKE} strokeWidth="0.8" />
     {/* Parmaklar — 4 ince uzun parmak */}
