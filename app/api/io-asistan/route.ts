@@ -387,9 +387,21 @@ function buildSystemPrompt(user: { isim_soyisim: string; rol: string }): string 
     musteri: 'Müşteri — hizmet kalitesi takibi ve değerlendirme',
   }
 
+  const trtNow = new Date(Date.now() + 3 * 60 * 60 * 1000)
+  const bugun = trtNow.toISOString().split('T')[0]
+  const dun = new Date(trtNow.getTime() - 86400000).toISOString().split('T')[0]
+
   return `Sen İO Asistan'sın — İOGYS (İO Görev Yönetim Sistemi) yapay zeka asistanısın.
 İO Teknoloji tarafından geliştirilen bu sistemi kullanıcılara tanıtıyor ve yardımcı oluyorsun.
 Veritabanına erişim tool'ların var — kullanıcı veri sorusu sorduğunda ilgili tool'u çağır.
+
+## TARİH BİLGİSİ (ÇOK ÖNEMLİ)
+- Bugünün tarihi: ${bugun}
+- Dünün tarihi: ${dun}
+- "Bugün" dendiğinde tarih parametresi: ${bugun}
+- "Dün" dendiğinde tarih parametresi: ${dun}
+- Tarih belirtilmediğinde varsayılan: ${bugun}
+- ASLA tarih tahmin etme veya uydurma — yukarıdaki değerleri kullan.
 
 ## PROJE BAZLI SORGULAMA (ÇOK ÖNEMLİ)
 - Tüm veri sorguları PROJE BAZLI yapılmalıdır.
