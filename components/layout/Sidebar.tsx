@@ -159,8 +159,23 @@ function IoThinkingBubble() {
   return <div className={`io-thought-bubble ${phase}`}>{thought}</div>
 }
 
-/** İO Eller — kolsuz, animasyonlu iki iri el */
+/** İO Eller — kolsuz, SVG, İO rengiyle aynı, float ile senkronize */
 type HandPose = 'idle' | 'wave' | 'think' | 'scratch'
+const IO_HAND_COLOR = '#7EC8E3' // İO'nun açık mavi tonu
+const IO_HAND_SHADOW = '#5BA3C9'
+// SVG el — yuvarlak, karikatür tarzı, iri
+const HandSVG = ({ flip }: { flip?: boolean }) => (
+  <svg width="24" height="22" viewBox="0 0 24 22" style={{ transform: flip ? 'scaleX(-1)' : undefined }}>
+    {/* Avuç */}
+    <ellipse cx="12" cy="13" rx="10" ry="8.5" fill={IO_HAND_COLOR} stroke={IO_HAND_SHADOW} strokeWidth="1.2" />
+    {/* Parmaklar — 4 yuvarlak çıkıntı */}
+    <ellipse cx="5" cy="6" rx="3" ry="5" fill={IO_HAND_COLOR} stroke={IO_HAND_SHADOW} strokeWidth="1" />
+    <ellipse cx="10" cy="4" rx="2.8" ry="5.5" fill={IO_HAND_COLOR} stroke={IO_HAND_SHADOW} strokeWidth="1" />
+    <ellipse cx="15" cy="4.5" rx="2.8" ry="5" fill={IO_HAND_COLOR} stroke={IO_HAND_SHADOW} strokeWidth="1" />
+    <ellipse cx="19.5" cy="7" rx="2.5" ry="4.5" fill={IO_HAND_COLOR} stroke={IO_HAND_SHADOW} strokeWidth="1" />
+  </svg>
+)
+
 function IoHands() {
   const [pose, setPose] = useState<HandPose>('idle')
 
@@ -171,7 +186,6 @@ function IoHands() {
       timeout = setTimeout(() => {
         const poses: HandPose[] = ['wave', 'think', 'scratch']
         setPose(poses[Math.floor(Math.random() * poses.length)])
-        // Poz süresi
         setTimeout(() => { setPose('idle'); next() }, 2500 + Math.random() * 1500)
       }, delay)
     }
@@ -183,52 +197,53 @@ function IoHands() {
     <>
       <style>{`
         .io-hand {
-          position: absolute; font-size: 22px; z-index: 5;
-          filter: drop-shadow(1px 2px 3px rgba(0,0,0,0.15));
-          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          position: absolute; z-index: 5;
           pointer-events: none;
+          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          /* Float ile senkronize — aynı animasyon */
+          animation: ioFloat 3s ease-in-out infinite;
         }
-        /* Sol el — gövdenin sol alt kenarı */
+        /* Sol el */
         .io-hand-left {
-          left: -8px; bottom: 18px;
-          transform: rotate(15deg) translateX(-2px);
+          left: -16px; bottom: 22px;
+          transform: rotate(20deg);
         }
         .io-hand-left.wave {
-          transform: rotate(-20deg) translateX(-6px) translateY(-18px);
-          animation: ioWave 0.4s ease-in-out 3;
+          transform: rotate(-15deg) translateY(-14px);
+          animation: ioFloat 3s ease-in-out infinite, ioHandWave 0.35s ease-in-out 4;
         }
         .io-hand-left.think {
-          transform: rotate(5deg) translateX(-2px) translateY(-4px);
+          transform: rotate(10deg) translateY(-2px);
         }
         .io-hand-left.scratch {
-          transform: rotate(10deg) translateX(-2px);
+          transform: rotate(15deg) translateY(-2px);
         }
-        /* Sağ el — gövdenin sağ alt kenarı */
+        /* Sağ el */
         .io-hand-right {
-          right: 4px; bottom: 18px;
-          transform: rotate(-15deg) translateX(2px);
+          right: -4px; bottom: 22px;
+          transform: rotate(-20deg);
         }
         .io-hand-right.wave {
-          transform: rotate(-10deg) translateX(2px);
+          transform: rotate(-15deg);
         }
         .io-hand-right.think {
-          transform: rotate(-40deg) translateX(8px) translateY(-24px);
+          transform: rotate(-50deg) translateX(4px) translateY(-22px);
         }
         .io-hand-right.scratch {
-          transform: rotate(-30deg) translateX(6px) translateY(-20px);
-          animation: ioScratch 0.3s ease-in-out 4;
+          transform: rotate(-40deg) translateX(2px) translateY(-18px);
+          animation: ioFloat 3s ease-in-out infinite, ioHandScratch 0.25s ease-in-out 5;
         }
-        @keyframes ioWave {
-          0%, 100% { transform: rotate(-20deg) translateX(-6px) translateY(-18px); }
-          50% { transform: rotate(-45deg) translateX(-10px) translateY(-22px); }
+        @keyframes ioHandWave {
+          0%, 100% { transform: rotate(-15deg) translateY(-14px); }
+          50% { transform: rotate(-40deg) translateY(-18px); }
         }
-        @keyframes ioScratch {
-          0%, 100% { transform: rotate(-30deg) translateX(6px) translateY(-20px); }
-          50% { transform: rotate(-35deg) translateX(8px) translateY(-23px); }
+        @keyframes ioHandScratch {
+          0%, 100% { transform: rotate(-40deg) translateX(2px) translateY(-18px); }
+          50% { transform: rotate(-45deg) translateX(4px) translateY(-21px); }
         }
       `}</style>
-      <span className={`io-hand io-hand-left ${pose}`}>🤚</span>
-      <span className={`io-hand io-hand-right ${pose}`}>🖐️</span>
+      <span className={`io-hand io-hand-left ${pose}`}><HandSVG /></span>
+      <span className={`io-hand io-hand-right ${pose}`}><HandSVG flip /></span>
     </>
   )
 }
