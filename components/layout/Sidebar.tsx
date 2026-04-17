@@ -159,6 +159,80 @@ function IoThinkingBubble() {
   return <div className={`io-thought-bubble ${phase}`}>{thought}</div>
 }
 
+/** İO Eller — kolsuz, animasyonlu iki iri el */
+type HandPose = 'idle' | 'wave' | 'think' | 'scratch'
+function IoHands() {
+  const [pose, setPose] = useState<HandPose>('idle')
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>
+    function next() {
+      const delay = 6000 + Math.random() * 8000
+      timeout = setTimeout(() => {
+        const poses: HandPose[] = ['wave', 'think', 'scratch']
+        setPose(poses[Math.floor(Math.random() * poses.length)])
+        // Poz süresi
+        setTimeout(() => { setPose('idle'); next() }, 2500 + Math.random() * 1500)
+      }, delay)
+    }
+    next()
+    return () => clearTimeout(timeout)
+  }, [])
+
+  return (
+    <>
+      <style>{`
+        .io-hand {
+          position: absolute; font-size: 22px; z-index: 5;
+          filter: drop-shadow(1px 2px 3px rgba(0,0,0,0.15));
+          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          pointer-events: none;
+        }
+        /* Sol el — gövdenin sol alt kenarı */
+        .io-hand-left {
+          left: -8px; bottom: 18px;
+          transform: rotate(15deg) translateX(-2px);
+        }
+        .io-hand-left.wave {
+          transform: rotate(-20deg) translateX(-6px) translateY(-18px);
+          animation: ioWave 0.4s ease-in-out 3;
+        }
+        .io-hand-left.think {
+          transform: rotate(5deg) translateX(-2px) translateY(-4px);
+        }
+        .io-hand-left.scratch {
+          transform: rotate(10deg) translateX(-2px);
+        }
+        /* Sağ el — gövdenin sağ alt kenarı */
+        .io-hand-right {
+          right: 4px; bottom: 18px;
+          transform: rotate(-15deg) translateX(2px);
+        }
+        .io-hand-right.wave {
+          transform: rotate(-10deg) translateX(2px);
+        }
+        .io-hand-right.think {
+          transform: rotate(-40deg) translateX(8px) translateY(-24px);
+        }
+        .io-hand-right.scratch {
+          transform: rotate(-30deg) translateX(6px) translateY(-20px);
+          animation: ioScratch 0.3s ease-in-out 4;
+        }
+        @keyframes ioWave {
+          0%, 100% { transform: rotate(-20deg) translateX(-6px) translateY(-18px); }
+          50% { transform: rotate(-45deg) translateX(-10px) translateY(-22px); }
+        }
+        @keyframes ioScratch {
+          0%, 100% { transform: rotate(-30deg) translateX(6px) translateY(-20px); }
+          50% { transform: rotate(-35deg) translateX(8px) translateY(-23px); }
+        }
+      `}</style>
+      <span className={`io-hand io-hand-left ${pose}`}>🤚</span>
+      <span className={`io-hand io-hand-right ${pose}`}>🖐️</span>
+    </>
+  )
+}
+
 /** Sidebar logo — boyut logoya göre dinamik */
 function SidebarLogo({ src, alt, bordered = false, imgWidth = '80%' }: { src: string; alt: string; bordered?: boolean; imgWidth?: string }) {
   return (
@@ -435,6 +509,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                 <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
               <div className="io-ground-shadow" style={{ marginLeft: -14 }} />
+              <IoHands />
               <IoThinkingBubble />
             </div>
             <div style={{ flex: 1, height: 48, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
