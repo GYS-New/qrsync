@@ -114,12 +114,14 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: 'personel_basari_analizi',
-    description: 'Personel başarı analizi — belirtilen tarihte en çok görev tamamlayan personelleri sıralar. Frekansiyel ve spesifik görevler dahil. İsim, tamamlanan görev sayısı ve ortalama süre bilgisi.',
+    description: 'Personel başarı analizi — belirtilen tarihte görev tamamlayan personelleri sıralar. "en başarılı" için siralama="desc", "en başarısız/en az tamamlayan" için siralama="asc" kullan. Hiç görev tamamlamamış personelleri de gösterebilir.',
     input_schema: {
       type: 'object' as const,
       properties: {
         tarih: { type: 'string', description: 'Tarih YYYY-MM-DD (varsayılan: bugün)' },
         limit: { type: 'number', description: 'Kaç personel gösterilsin (varsayılan: 10)' },
+        siralama: { type: 'string', description: '"desc" = en çok tamamlayan (varsayılan), "asc" = en az tamamlayan / başarısız' },
+        hic_tamamlamayan: { type: 'boolean', description: 'true ise hiç görev tamamlamamış personelleri de göster (başarısız analiz için)' },
         ...PROJE_PARAM,
       },
       required: [],
@@ -427,12 +429,33 @@ async function executeTool(
           personelMap.set(uid, entry)
         }
 
-        if (!personelMap.size) return `${tarih} tarihinde tamamlanmış görev bulunamadı${projeLabel}.`
+        const siralamaTipi = (input.siralama as string) || 'desc'
+        const hicTamamlamayan = input.hic_tamamlamayan as boolean
 
-        // Sıralama (toplam görev sayısına göre)
+        // Hiç tamamlamayan personelleri de ekle
+        if (hicTamamlamayan || siralamaTipi === 'asc') {
+          let qUsers = supabase
+            .from('users')
+            .select('id,isim_soyisim')
+            .in('rol', ['tenant_user', 'tenant_admin'])
+            .eq('aktif', true)
+          if (!ctx.isSA && ctx.firmaId) qUsers = qUsers.eq('firma_id', ctx.firmaId)
+          if (projeId) qUsers = qUsers.eq('proje_id', projeId)
+          const { data: allUsers } = await qUsers
+          for (const u of (allUsers ?? []) as Record<string, unknown>[]) {
+            const uid = u.id as string
+            if (!personelMap.has(uid)) {
+              personelMap.set(uid, { frek: 0, spesifik: 0, toplamSure: 0 })
+            }
+          }
+        }
+
+        if (!personelMap.size) return `${tarih} tarihinde personel bulunamadı${projeLabel}.`
+
+        // Sıralama
         const sorted = [...personelMap.entries()]
           .map(([uid, d]) => ({ uid, toplam: d.frek + d.spesifik, ...d }))
-          .sort((a, b) => b.toplam - a.toplam)
+          .sort((a, b) => siralamaTipi === 'asc' ? a.toplam - b.toplam : b.toplam - a.toplam)
           .slice(0, topN)
 
         // Personel isimlerini çek
@@ -446,11 +469,12 @@ async function executeTool(
           nameMap.set(u.id as string, u.isim_soyisim as string)
         }
 
-        return `${tarih} Personel Başarı Analizi${projeLabel} (Top ${sorted.length}):\n` +
+        const baslik = siralamaTipi === 'asc' ? 'En Az Tamamlayan' : 'En Çok Tamamlayan'
+        return `${tarih} Personel ${baslik} Analizi${projeLabel} (${sorted.length} kişi):\n` +
           sorted.map((s, i) => {
             const isim = nameMap.get(s.uid) || 'Bilinmiyor'
             const ortSure = s.toplam > 0 ? Math.round(s.toplamSure / s.toplam / 60) : 0
-            return `${i + 1}. ${isim}: ${s.toplam} görev (${s.frek} frekansiyel + ${s.spesifik} spesifik) — ort. ${ortSure} dk`
+            return `${i + 1}. ${isim}: ${s.toplam} görev (${s.frek} frek + ${s.spesifik} spesifik)${s.toplam > 0 ? ` — ort. ${ortSure} dk` : ' — hiç tamamlamadı'}`
           }).join('\n')
       }
 
