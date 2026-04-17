@@ -1048,7 +1048,7 @@ async function del() {
             <tr>
               {bulkMode ? <th style={{ width: 44 }}></th> : null}
               {bulkDuzenleMode ? <th style={{ width: 44 }}></th> : null}
-              {false && <th>Kayıt Türü</th>}
+              {arsivAktif && <th>Kayıt Türü</th>}
               <th>{thBtn('Görev', 'tanim')}</th>
               <th>{thBtn('Üst Lokasyon', 'lokasyon')}</th>
               <th>{thBtn('Lokasyon', 'lokasyon')}</th>
