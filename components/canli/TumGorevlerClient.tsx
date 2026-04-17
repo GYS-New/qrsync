@@ -849,6 +849,7 @@ async function del() {
         border: 'none',
         cursor: 'pointer',
         padding: 0,
+        whiteSpace: 'nowrap',
       }}
     >
       {label}
@@ -1110,10 +1111,11 @@ async function del() {
                 <td style={{ fontWeight: 600, color: isArsiv ? '#475569' : g.simule_tamamlandi && !isU ? '#9ca3af' : undefined }}>{g.tanim}</td>
                 {(() => {
                   const { ust, alt } = getLocUstAlt(g.lokasyon_id, g.lokasyonlar?.tanim)
+                  const simSoluk = g.simule_tamamlandi && !isU
                   return (
                     <>
-                      <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', fontSize: 12.5 }}>{ust}</td>
-                      <td style={{ color: isArsiv ? '#64748b' : '#4b5563', fontWeight: 600 }}>{alt}</td>
+                      <td style={{ color: isArsiv ? '#94a3b8' : simSoluk ? '#b0b7c0' : '#6b7280', fontSize: 12.5 }}>{ust}</td>
+                      <td style={{ color: isArsiv ? '#64748b' : simSoluk ? '#9ca3af' : '#4b5563', fontWeight: 600 }}>{alt}</td>
                     </>
                   )
                 })()}
