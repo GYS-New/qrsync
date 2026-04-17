@@ -72,10 +72,12 @@ export async function GET(req: NextRequest) {
   }
 
   function mapRow(r: any, segment: 'tablo' | 'arsiv') {
+    const yol = getLocPath(r.lokasyon_id)
     return {
       id:                r.id,
       lokasyon_id:       r.lokasyon_id,
-      lokasyon_tanim:    getLocPath(r.lokasyon_id),
+      lokasyon_tanim:    yol,
+      lokasyon_yol:      yol,
       kanal:             r.kanal,
       yildiz:            r.yildiz,
       yorum:             r.yorum,
