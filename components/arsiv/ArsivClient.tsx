@@ -115,6 +115,12 @@ export default function ArsivClient({
   const [spesifikFrom,    setSpesifikFrom]    = useState('')
   const [spesifikTo,      setSpesifikTo]      = useState('')
 
+  // ── Kapasite state ───────────────────────────────────────────────────────
+  const [kapasite, setKapasite] = useState<{
+    genel: { toplam_kayit: number; toplam_limit: number; doluluk: number; durum: string; db_limit: string }
+    tablolar: Array<{ tablo: string; label: string; kayit: number; limit: number; doluluk: number; durum: string }>
+  } | null>(null)
+
   // ── Toplu sil modal ───────────────────────────────────────────────────────
   const [topluSilSekme,  setTopluSilSekme]  = useState<Sekme | null>(null)
   const [topluSilFrom,   setTopluSilFrom]   = useState('')
@@ -129,6 +135,12 @@ export default function ArsivClient({
     supabase.from('lokasyonlar').select('id,tanim,parent_id').eq('firma_id', firmaId)
       .then(({ data }) => { if (data) setLokasyonlarTum(data) })
   }, [firmaId])
+
+  // Kapasite verisini çek (sadece SA)
+  useEffect(() => {
+    if (isTA) return
+    fetch('/api/arsiv/kapasite').then(r => r.json()).then(d => { if (d.ok) setKapasite(d) }).catch(() => {})
+  }, [])
 
   const locMap = useMemo(() => {
     const m: Record<string, { tanim: string; parent_id: string | null }> = {}
@@ -519,13 +531,80 @@ export default function ArsivClient({
         <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>Arşivlenmiş kayıtları görüntüle, geri yükle veya kalıcı sil</div>
       </div>
 
+      {/* Kapasite Göstergesi */}
+      {kapasite && (
+        <div style={{ marginBottom: 16, padding: 14, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#334155', letterSpacing: '0.03em' }}>
+              GENEL ARŞİV KAPASİTESİ
+            </div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>{kapasite.genel.db_limit}</div>
+          </div>
+          {/* Genel bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ flex: 1, height: 10, background: '#e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+              <div style={{
+                width: `${Math.min(kapasite.genel.doluluk, 100)}%`, height: '100%', borderRadius: 6,
+                background: kapasite.genel.durum === 'kritik' ? '#ef4444' : kapasite.genel.durum === 'uyari' ? '#f59e0b' : '#22c55e',
+                transition: 'width 0.5s ease',
+              }} />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 800, color: kapasite.genel.durum === 'kritik' ? '#ef4444' : kapasite.genel.durum === 'uyari' ? '#f59e0b' : '#22c55e', minWidth: 44 }}>
+              %{kapasite.genel.doluluk}
+            </span>
+          </div>
+          {/* Tablo detayları */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+            {kapasite.tablolar.map(t => (
+              <div key={t.tablo} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, color: '#475569', marginBottom: 2 }}>{t.label}</div>
+                  <div style={{ height: 5, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${Math.min(t.doluluk, 100)}%`, height: '100%', borderRadius: 4,
+                      background: t.durum === 'kritik' ? '#ef4444' : t.durum === 'uyari' ? '#f59e0b' : '#22c55e',
+                    }} />
+                  </div>
+                </div>
+                <span style={{ fontWeight: 700, color: t.durum === 'kritik' ? '#ef4444' : t.durum === 'uyari' ? '#f59e0b' : '#64748b', minWidth: 32, textAlign: 'right' }}>
+                  %{t.doluluk}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8' }}>
+            Toplam: {kapasite.genel.toplam_kayit.toLocaleString('tr-TR')} / {kapasite.genel.toplam_limit.toLocaleString('tr-TR')} kayıt
+          </div>
+        </div>
+      )}
+
       {/* Sekme çubuğu */}
       <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 10, padding: 4, marginBottom: 18, flexWrap: 'wrap' }}>
-        {SEKMELER.map(s => (
-          <button key={s.id} style={sekmeBtn(s.id)} onClick={() => setAktifSekme(s.id)}>
-            {s.icon}{s.label}
-          </button>
-        ))}
+        {SEKMELER.map(s => {
+          const sekmeTabloMap: Record<Sekme, string> = {
+            frekansiyel: 'canli_gorevler_arsiv',
+            personel: 'personel_mesai_kayitlari_arsiv',
+            musteri: 'musteri_degerlendirmeleri_arsiv',
+            spesifik: 'gorevler_arsiv',
+            ceklist: 'checklist_sonuc_basliklari_arsiv',
+          }
+          const tabloInfo = kapasite?.tablolar.find(t => t.tablo === sekmeTabloMap[s.id])
+          return (
+            <button key={s.id} style={sekmeBtn(s.id)} onClick={() => setAktifSekme(s.id)}>
+              {s.icon}{s.label}
+              {tabloInfo && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, marginLeft: 4,
+                  padding: '1px 5px', borderRadius: 6,
+                  background: tabloInfo.durum === 'kritik' ? '#fee2e2' : tabloInfo.durum === 'uyari' ? '#fef3c7' : '#f0fdf4',
+                  color: tabloInfo.durum === 'kritik' ? '#dc2626' : tabloInfo.durum === 'uyari' ? '#d97706' : '#16a34a',
+                }}>
+                  %{tabloInfo.doluluk}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {!firmaId && (
