@@ -35,6 +35,7 @@ export default function FirmaDetayClient({ firma }: { firma: Firma }) {
     lisans_gecerlilik_tarihi: (firma as any).lisans_gecerlilik_tarihi
       ? new Date((firma as any).lisans_gecerlilik_tarihi).toISOString().slice(0, 10)
       : '',
+    depolama_kapasitesi_mb: Number((firma as any).depolama_kapasitesi_mb ?? 1024),
   })
 
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -132,6 +133,7 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
         lisans_gecerlilik_tarihi: form.lisans_gecerlilik_tarihi
           ? new Date(form.lisans_gecerlilik_tarihi + 'T23:59:59').toISOString()
           : null,
+        depolama_kapasitesi_mb: Math.max(1, Math.round(form.depolama_kapasitesi_mb || 1024)),
       })
       .eq('id', firma.id)
 
@@ -423,6 +425,32 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
             <input className="verde-input" value={form.aciklama} onChange={(e) => setForm({ ...form, aciklama: e.target.value })} />
           ) : (
             <span>{firma.aciklama ?? '—'}</span>
+          )}
+        </Row>
+
+        <Row label="Depolama Kapasitesi">
+          {edit ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                className="verde-input"
+                style={{ width: 140 }}
+                value={form.depolama_kapasitesi_mb}
+                onChange={(e) => setForm({ ...form, depolama_kapasitesi_mb: Number(e.target.value) })}
+              />
+              <span style={{ fontSize: 12, color: '#64748b' }}>
+                MB (≈ {(form.depolama_kapasitesi_mb / 1024).toFixed(2)} GB) — firma arşivi için rezerve edilen alan
+              </span>
+            </div>
+          ) : (
+            <span style={{ fontWeight: 600 }}>
+              {Number((firma as any).depolama_kapasitesi_mb ?? 1024).toLocaleString('tr-TR')} MB
+              <span style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>
+                (≈ {(Number((firma as any).depolama_kapasitesi_mb ?? 1024) / 1024).toFixed(2)} GB)
+              </span>
+            </span>
           )}
         </Row>
 

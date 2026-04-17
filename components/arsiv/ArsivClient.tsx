@@ -117,6 +117,7 @@ export default function ArsivClient({
 
   // ── Kapasite state ───────────────────────────────────────────────────────
   const [kapasite, setKapasite] = useState<{
+    scope?: 'firma' | 'global'
     genel: { toplam_kayit: number; toplam_bytes: number; toplam_label: string; doluluk: number; durum: string; db_limit: string; db_limit_label: string }
     tablolar: Array<{ tablo: string; label: string; kayit: number; boyut_bytes: number; boyut_label: string; doluluk: number; durum: string }>
   } | null>(null)
@@ -136,11 +137,14 @@ export default function ArsivClient({
       .then(({ data }) => { if (data) setLokasyonlarTum(data) })
   }, [firmaId])
 
-  // Kapasite verisini çek (sadece SA)
+  // Kapasite verisini çek — SA global ya da firma seçiliyse firma bazlı; TA kendi firması
   useEffect(() => {
-    if (isTA) return
-    fetch('/api/arsiv/kapasite').then(r => r.json()).then(d => { if (d.ok) setKapasite(d) }).catch(() => {})
-  }, [])
+    const url = firmaId
+      ? `/api/arsiv/kapasite?firma_id=${firmaId}`
+      : '/api/arsiv/kapasite'
+    setKapasite(null)
+    fetch(url).then(r => r.json()).then(d => { if (d.ok) setKapasite(d) }).catch(() => {})
+  }, [firmaId])
 
   const locMap = useMemo(() => {
     const m: Record<string, { tanim: string; parent_id: string | null }> = {}
@@ -537,9 +541,10 @@ export default function ArsivClient({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#334155', letterSpacing: '0.03em' }}>
               ARŞİV DEPOLAMA KAPASİTESİ
+              {kapasite.scope === 'firma' && <span style={{ fontSize: 10, fontWeight: 700, color:'#64748b', marginLeft: 8 }}>(FİRMA KOTASI)</span>}
             </div>
             <div style={{ fontSize: 12, color: '#64748b' }}>
-              {kapasite.genel.toplam_label} / {kapasite.genel.db_limit} DB
+              {kapasite.genel.toplam_label} / {kapasite.genel.db_limit} {kapasite.scope === 'firma' ? '' : 'DB'}
             </div>
           </div>
           {/* Genel bar */}
