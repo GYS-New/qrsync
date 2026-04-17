@@ -886,6 +886,7 @@ async function del() {
           style={{ width: 240, flexShrink: 0 }}
         />
 
+        <div style={{ flex: 1 }} />
         {/* Canlı Akış linki — her rol için görünür, belirgin */}
         <a href={`${base}/dashboard/canli-islemler`} style={{ textDecoration: 'none', flexShrink: 0 }}>
           <button type="button" style={{
