@@ -680,9 +680,9 @@
                 <li>Raporlarda arşiv verilerine erişim</li>
             </ul>
             <div>
-                <span class="tag">Node.js Cron</span>
+                <span class="tag">Otomatik Cron</span>
                 <span class="tag">6 Saatlik Döngü</span>
-                <span class="tag">Railway</span>
+                <span class="tag">Bulut Sunucu</span>
             </div>
             <div class="diff"><strong>Fark yaratan:</strong> Aktif tabloları sürekli hafif tutan, performansı koruyan otomatik arşiv mimarisi; veritabanı yavaşlaması yaşanmaz.</div>
         </div>
@@ -708,18 +708,18 @@
         <div class="module-card">
             <h4><span class="icon">&#128241;</span> Mobil & Bildirimler</h4>
             <ul>
-                <li>Responsive web uygulaması (PWA uyumlu)</li>
+                <li>Native mobil uygulama (iOS &amp; Android)</li>
                 <li>QR ve NFC okuma desteği (mobil tarayıcı)</li>
                 <li>Push bildirimler ile anlık görev uyarıları</li>
                 <li>Çevrimdışı mod ile bağlantısız ortamda çalışma</li>
                 <li>Mobil optimizeli dashboard ve form arayüzleri</li>
             </ul>
             <div>
-                <span class="tag">PWA</span>
+                <span class="tag">Mobil App</span>
                 <span class="tag">Push Bildirim</span>
                 <span class="tag">Çevrimdışı</span>
             </div>
-            <div class="diff"><strong>Fark yaratan:</strong> Native uygulama gerektirmeden tam mobil deneyim; kurulum maliyeti ve güncelleme yükü sıfır.</div>
+            <div class="diff"><strong>Fark yaratan:</strong> iOS ve Android native mobil uygulama ile tam saha deneyimi; QR/NFC okuma, push bildirim ve çevrimdışı destek.</div>
         </div>
     </div>
 </div>
@@ -755,7 +755,7 @@
             <span class="icon">&#128736;</span>
             <div>
                 <div class="label">Uptime</div>
-                <div class="desc">%99.9 erişilebilirlik hedefi (Railway altyapısı)</div>
+                <div class="desc">%99.9 erişilebilirlik hedefi (Turhost altyapısı)</div>
             </div>
         </div>
     </div>
@@ -780,7 +780,7 @@
             <span class="icon">&#9729;&#65039;</span>
             <div>
                 <div class="label">Bulut Altyapı</div>
-                <div class="desc">Railway PaaS + Supabase PostgreSQL; yatay ve dikey ölçekleme</div>
+                <div class="desc">Turhost bulut sunucu + PostgreSQL veritabanı; yatay ve dikey ölçekleme</div>
             </div>
         </div>
         <div class="tech-item">
@@ -798,7 +798,7 @@
             <span class="icon">&#128274;</span>
             <div>
                 <div class="label">Kimlik Doğrulama</div>
-                <div class="desc">Supabase Auth ile JWT tabanlı güvenli oturum yönetimi</div>
+                <div class="desc">JWT tabanlı güvenli oturum yönetimi ve çift faktörlü doğrulama</div>
             </div>
         </div>
         <div class="tech-item">
@@ -884,7 +884,7 @@
                 <tr><td>Birim fiyat / hakedis</td><td class="yes">&#10003;</td><td class="partial">&#9684;</td><td class="partial">&#9684;</td></tr>
                 <tr><td>GPS mesai doğrulama</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="yes">&#10003;</td></tr>
                 <tr><td>Kurulum süresi</td><td><strong>&lt; 1 gün</strong></td><td>Yok</td><td>1-4 hafta</td></tr>
-                <tr><td>Mobil uygulama ihtiyacı</td><td><strong>Hayır (PWA)</strong></td><td>Yok</td><td>Evet (native)</td></tr>
+                <tr><td>Mobil uygulama ihtiyacı</td><td><strong>Evet (Mobil Uygulama)</strong></td><td>Yok</td><td>Evet (native)</td></tr>
                 <tr><td>Rapor türü sayısı</td><td><strong>9+</strong></td><td>Manuel</td><td>3-5</td></tr>
                 <tr><td>Rol seviyesi</td><td><strong>5</strong></td><td>1-2</td><td>2-3</td></tr>
                 <tr><td>Veri saklama süresi</td><td><strong>Sınırsız (arşiv)</strong></td><td>Fiziksel dosya</td><td>30-90 gün</td></tr>
@@ -955,7 +955,7 @@
     </div>
 
     <div class="highlight-box">
-        <p><strong>Teknik Altyapı:</strong> Next.js (TypeScript) framework, Supabase PostgreSQL veritabanı, Railway PaaS hosting, Resend HTTP API mail servisi, Node.js cron arşiv motoru. Tüm bileşenler bulut tabanlı, yüksek erişilebilirlik ve ölçeklenebilirlik için optimize edilmiştir.</p>
+        <p><strong>Teknik Altyapı:</strong> Next.js (TypeScript) framework, PostgreSQL veritabanı, Turhost bulut sunucu hosting, HTTP API mail servisi, otomatik arşiv motoru. Tüm bileşenler bulut tabanlı, yüksek erişilebilirlik ve ölçeklenebilirlik için optimize edilmiştir.</p>
     </div>
 
     <h3>Teknoloji Yığını</h3>
@@ -971,12 +971,12 @@
             <tbody>
                 <tr><td>Frontend</td><td>Next.js + React + TypeScript</td><td>App Router, Server Components</td></tr>
                 <tr><td>UI Kütüphanesi</td><td>Tailwind CSS + shadcn/ui</td><td>Responsive, erişilebilir bileşenler</td></tr>
-                <tr><td>Veritabanı</td><td>Supabase PostgreSQL</td><td>RLS, Realtime, Edge Functions</td></tr>
-                <tr><td>Kimlik Doğrulama</td><td>Supabase Auth</td><td>JWT, OAuth, Magic Link</td></tr>
-                <tr><td>Hosting</td><td>Railway</td><td>Custom server, otomatik deploy</td></tr>
-                <tr><td>Mail Servisi</td><td>Resend HTTP API</td><td>SMTP port kısıtlaması bypass</td></tr>
-                <tr><td>Cron / Arşiv</td><td>Node.js + node-cron</td><td>6 saatlik periyodik arşivleme</td></tr>
-                <tr><td>AI</td><td>LLM Entegrasyonu</td><td>İO Asistan chatbot</td></tr>
+                <tr><td>Veritabanı</td><td>PostgreSQL</td><td>RLS, Realtime, Yüksek Performans</td></tr>
+                <tr><td>Kimlik Doğrulama</td><td>JWT Auth</td><td>Token tabanlı güvenli oturum yönetimi</td></tr>
+                <tr><td>Hosting</td><td>Turhost Bulut Sunucu</td><td>Yüksek erişilebilirlik, otomatik deploy</td></tr>
+                <tr><td>Mail Servisi</td><td>HTTP API Mail</td><td>Güvenilir e-posta teslimi</td></tr>
+                <tr><td>Cron / Arşiv</td><td>Otomatik Zamanlayıcı</td><td>6 saatlik periyodik arşivleme</td></tr>
+                <tr><td>AI</td><td>İO Asistan (LLM)</td><td>Yapay zeka destekli akıllı chatbot</td></tr>
             </tbody>
         </table>
     </div>
