@@ -79,10 +79,10 @@ export default function KpiCard({
           {value}
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 7, paddingInline: 4 }}>
-          <div style={{ textAlign: 'left', minWidth: 0 }}>
-            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-1.2px', color: '#111827', lineHeight: 1 }}>{value}</div>
-            <div style={{ marginTop: 5, fontSize: 13, fontWeight: 700, color: '#6b7280' }}>Toplam</div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 28, marginBottom: 7, paddingInline: 8 }}>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1.2px', color: '#111827', lineHeight: 1 }}>{value}</div>
+            <div style={{ marginTop: 5, fontSize: 14, fontWeight: 700, color: '#6b7280' }}>Toplam</div>
           </div>
           <div
             style={{
@@ -90,12 +90,10 @@ export default function KpiCard({
               flexDirection: 'column',
               alignItems: 'center',
               textAlign: 'center',
-              minWidth: 0,
-              flexShrink: 0,
             }}
           >
-            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-1.2px', color: '#374151', lineHeight: 1 }}>{secondaryValue}</div>
-            <div style={{ marginTop: 5, fontSize: 13, fontWeight: 700, color: '#6b7280' }}>{secondaryLabel ?? ''}</div>
+            <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1.2px', color: '#374151', lineHeight: 1 }}>{secondaryValue}</div>
+            <div style={{ marginTop: 5, fontSize: 14, fontWeight: 700, color: '#6b7280' }}>{secondaryLabel ?? ''}</div>
           </div>
         </div>
       )}
