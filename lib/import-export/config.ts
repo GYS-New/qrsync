@@ -238,7 +238,7 @@ async function importUsers(firmaId: string, actor: Actor, rows: Record<string, s
     }
 
     if (password.length < 8) {
-      importedErrors.push(`Satır ${rowNo}: Şifre en az 6 karakter olmalıdır.`)
+      importedErrors.push(`Satır ${rowNo}: Şifre en az 8 karakter olmalıdır.`)
       continue
     }
 
