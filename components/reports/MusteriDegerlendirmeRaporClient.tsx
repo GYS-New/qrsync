@@ -164,7 +164,6 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
   const [baslangic, setBaslangic]       = useState('')
   const [bitis, setBitis]               = useState('')
   const [filtreYildiz, setFiltreYildiz] = useState(0)
-  const [filtreKanal, setFiltreKanal]   = useState<'TUMU' | 'QR' | 'NFC'>('TUMU')
   const [gorselModal, setGorselModal]   = useState<string | null>(null)
   const [hata, setHata]                 = useState<string | null>(null)
   const [filtreMod, setFiltreMod]       = useState(false)
@@ -218,7 +217,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
   }
 
   function filtreTemizle() {
-    setAramaQ(''); setBaslangic(''); setBitis(''); setFiltreYildiz(0); setFiltreKanal('TUMU')
+    setAramaQ(''); setBaslangic(''); setBitis(''); setFiltreYildiz(0)
     setFiltreMod(false)
     yukle()
   }
@@ -229,11 +228,10 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     const s = aramaQ.trim().toLowerCase()
     return kayitlar.filter((k: any) => {
       if (filtreYildiz && k.yildiz !== filtreYildiz) return false
-      if (filtreKanal !== 'TUMU' && k.kanal !== filtreKanal) return false
       if (s && ![k.lokasyon_tanim, k.ad_soyad, k.yorum].join(' ').toLowerCase().includes(s)) return false
       return true
     })
-  }, [kayitlar, filtreYildiz, filtreKanal, aramaQ])
+  }, [kayitlar, filtreYildiz, aramaQ])
 
   const ozet = useMemo(() => {
     if (!filtreliKayitlar.length) return null
@@ -300,10 +298,9 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     ws.columns = [
       { header: 'Tarih',    key: 'tarih',    width: 20 },
       { header: 'Lokasyon', key: 'lokasyon', width: 28 },
-      { header: 'Kanal',    key: 'kanal',    width: 10 },
       { header: 'Puan',     key: 'puan',     width: 8 },
       { header: 'Etiket',   key: 'etiket',   width: 14 },
-      { header: 'Yorum',    key: 'yorum',    width: 40 },
+      { header: 'Yorum',    key: 'yorum',    width: 50 },
       { header: 'Ad Soyad', key: 'ad',       width: 20 },
     ]
     const hr = ws.getRow(1)
@@ -312,7 +309,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     hr.height = 22
     filtreliKayitlar.forEach((k: any) => ws.addRow({
       tarih: new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }),
-      lokasyon: k.lokasyon_tanim, kanal: k.kanal, puan: k.yildiz,
+      lokasyon: k.lokasyon_tanim, puan: k.yildiz,
       etiket: YILDIZ_ETIKET[k.yildiz], yorum: k.yorum ?? '', ad: k.ad_soyad ?? '',
     }))
     const buf = await wb.xlsx.writeBuffer()
@@ -328,7 +325,6 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       `<tr>
         <td>${new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</td>
         <td>${k.lokasyon_tanim}</td>
-        <td>${k.kanal}</td>
         <td>${'★'.repeat(k.yildiz)} ${YILDIZ_ETIKET[k.yildiz]}</td>
         <td>${k.yorum ?? '—'}</td>
         <td>${k.ad_soyad ?? '—'}</td>
@@ -361,7 +357,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       <div style="font-size:11px;color:#64748b;margin-bottom:12px">${new Date().toLocaleDateString('tr-TR')} — ${filtreliKayitlar.length} kayıt</div>
       ${ozetHtml}
       <table>
-        <thead><tr><th>Tarih</th><th>Lokasyon</th><th>Kanal</th><th>Puan</th><th>Yorum</th><th>Ad Soyad</th></tr></thead>
+        <thead><tr><th>Tarih</th><th>Lokasyon</th><th>Puan</th><th>Yorum</th><th>Ad Soyad</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </body></html>`)
@@ -422,12 +418,6 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
               style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff', minWidth: 140 }}>
               <option value={0}>Puan (Tümü)</option>
               {[5,4,3,2,1].map(n => <option key={n} value={n}>{'★'.repeat(n)} — {YILDIZ_ETIKET[n]}</option>)}
-            </select>
-            <select value={filtreKanal} onChange={e => setFiltreKanal(e.target.value as any)}
-              style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff', minWidth: 100 }}>
-              <option value="TUMU">Kanal (Tümü)</option>
-              <option value="QR">QR</option>
-              <option value="NFC">NFC</option>
             </select>
             <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)}
               style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} />
@@ -510,7 +500,6 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                   <tr>
                     <th>Tarih</th>
                     <th>Lokasyon (Üst &gt; Alt)</th>
-                    <th>Kanal</th>
                     <th>Puan</th>
                     <th>Yorum</th>
                     <th>Ad Soyad</th>
@@ -526,11 +515,6 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                         {new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td style={{ fontWeight: 600, color: '#111827' }}>{k.lokasyon_tanim}</td>
-                      <td>
-                        <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 700, background: k.kanal === 'QR' ? '#e0f2fe' : '#f9fafb', color: k.kanal === 'QR' ? '#0369a1' : '#166534' }}>
-                          {k.kanal}
-                        </span>
-                      </td>
                       <td><YildizRow yildiz={k.yildiz} /></td>
                       <td style={{ maxWidth: 280, color: '#334155' }}>
                         {k.yorum ? (
