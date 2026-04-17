@@ -117,8 +117,8 @@ export default function ArsivClient({
 
   // ── Kapasite state ───────────────────────────────────────────────────────
   const [kapasite, setKapasite] = useState<{
-    genel: { toplam_kayit: number; toplam_limit: number; doluluk: number; durum: string; db_limit: string }
-    tablolar: Array<{ tablo: string; label: string; kayit: number; limit: number; doluluk: number; durum: string }>
+    genel: { toplam_kayit: number; toplam_bytes: number; toplam_label: string; doluluk: number; durum: string; db_limit: string; db_limit_label: string }
+    tablolar: Array<{ tablo: string; label: string; kayit: number; boyut_bytes: number; boyut_label: string; doluluk: number; durum: string }>
   } | null>(null)
 
   // ── Toplu sil modal ───────────────────────────────────────────────────────
@@ -536,44 +536,49 @@ export default function ArsivClient({
         <div style={{ marginBottom: 16, padding: 14, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#334155', letterSpacing: '0.03em' }}>
-              GENEL ARŞİV KAPASİTESİ
+              ARŞİV DEPOLAMA KAPASİTESİ
             </div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>{kapasite.genel.db_limit}</div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>
+              {kapasite.genel.toplam_label} / {kapasite.genel.db_limit} DB
+            </div>
           </div>
           {/* Genel bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <div style={{ flex: 1, height: 10, background: '#e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
               <div style={{
-                width: `${Math.min(kapasite.genel.doluluk, 100)}%`, height: '100%', borderRadius: 6,
+                width: `${Math.max(Math.min(kapasite.genel.doluluk, 100), 0.5)}%`, height: '100%', borderRadius: 6,
                 background: kapasite.genel.durum === 'kritik' ? '#ef4444' : kapasite.genel.durum === 'uyari' ? '#f59e0b' : '#22c55e',
                 transition: 'width 0.5s ease',
               }} />
             </div>
-            <span style={{ fontSize: 14, fontWeight: 800, color: kapasite.genel.durum === 'kritik' ? '#ef4444' : kapasite.genel.durum === 'uyari' ? '#f59e0b' : '#22c55e', minWidth: 44 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: kapasite.genel.durum === 'kritik' ? '#ef4444' : kapasite.genel.durum === 'uyari' ? '#f59e0b' : '#22c55e', minWidth: 48 }}>
               %{kapasite.genel.doluluk}
             </span>
           </div>
           {/* Tablo detayları */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
             {kapasite.tablolar.map(t => (
               <div key={t.tablo} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, color: '#475569', marginBottom: 2 }}>{t.label}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                    <span style={{ fontWeight: 600, color: '#475569' }}>{t.label}</span>
+                    <span style={{ color: '#94a3b8', fontSize: 11 }}>{t.boyut_label} · {t.kayit.toLocaleString('tr-TR')} kayıt</span>
+                  </div>
                   <div style={{ height: 5, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{
-                      width: `${Math.min(t.doluluk, 100)}%`, height: '100%', borderRadius: 4,
+                      width: `${Math.max(Math.min(t.doluluk, 100), 0.5)}%`, height: '100%', borderRadius: 4,
                       background: t.durum === 'kritik' ? '#ef4444' : t.durum === 'uyari' ? '#f59e0b' : '#22c55e',
                     }} />
                   </div>
                 </div>
-                <span style={{ fontWeight: 700, color: t.durum === 'kritik' ? '#ef4444' : t.durum === 'uyari' ? '#f59e0b' : '#64748b', minWidth: 32, textAlign: 'right' }}>
+                <span style={{ fontWeight: 700, color: t.durum === 'kritik' ? '#ef4444' : t.durum === 'uyari' ? '#f59e0b' : '#64748b', minWidth: 36, textAlign: 'right' }}>
                   %{t.doluluk}
                 </span>
               </div>
             ))}
           </div>
           <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8' }}>
-            Toplam: {kapasite.genel.toplam_kayit.toLocaleString('tr-TR')} / {kapasite.genel.toplam_limit.toLocaleString('tr-TR')} kayıt
+            Toplam: {kapasite.genel.toplam_kayit.toLocaleString('tr-TR')} kayıt · Arşiv alanı: {kapasite.genel.toplam_label} / {kapasite.genel.db_limit}
           </div>
         </div>
       )}
@@ -599,7 +604,7 @@ export default function ArsivClient({
                   background: tabloInfo.durum === 'kritik' ? '#fee2e2' : tabloInfo.durum === 'uyari' ? '#fef3c7' : '#f0fdf4',
                   color: tabloInfo.durum === 'kritik' ? '#dc2626' : tabloInfo.durum === 'uyari' ? '#d97706' : '#16a34a',
                 }}>
-                  %{tabloInfo.doluluk}
+                  {tabloInfo.boyut_label}
                 </span>
               )}
             </button>

@@ -4,20 +4,27 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 /**
  * GET /api/arsiv/kapasite
  *
- * Arşiv tablolarının doluluk oranlarını döner.
+ * Arşiv tablolarının gerçek disk boyutlarını Supabase'den çeker.
+ * pg_total_relation_size() ile index dahil toplam boyut.
  * Supabase Pro: 8GB database limiti.
- * Her arşiv tablosu için makul kayıt limitleri belirlendi.
  */
 
-// Tablo başına maksimum kayıt limitleri
-// Supabase 8GB DB — tahmini satır başı boyut × limit ≈ toplam ~4GB arşiv alanı
-const KAPASITE_LIMITLERI: Record<string, { limit: number; label: string }> = {
-  canli_gorevler_arsiv:              { limit: 500_000, label: 'Frekansiyel Görevler' },
-  personel_mesai_kayitlari_arsiv:    { limit: 200_000, label: 'Personel Mesai' },
-  musteri_degerlendirmeleri_arsiv:    { limit: 100_000, label: 'Müşteri Değerlendirmeleri' },
-  gorevler_arsiv:                    { limit: 200_000, label: 'Spesifik Görevler' },
-  checklist_sonuc_basliklari_arsiv:  { limit: 300_000, label: 'Çeklist Başlıkları' },
-  checklist_sonuc_maddeleri_arsiv:   { limit: 1_000_000, label: 'Çeklist Maddeleri' },
+const DB_LIMIT_BYTES = 8 * 1024 * 1024 * 1024 // 8 GB
+
+const ARSIV_TABLOLARI: { tablo: string; label: string }[] = [
+  { tablo: 'canli_gorevler_arsiv',             label: 'Frekansiyel Görevler' },
+  { tablo: 'personel_mesai_kayitlari_arsiv',   label: 'Personel Mesai' },
+  { tablo: 'musteri_degerlendirmeleri_arsiv',   label: 'Müşteri Değerlendirmeleri' },
+  { tablo: 'gorevler_arsiv',                   label: 'Spesifik Görevler' },
+  { tablo: 'checklist_sonuc_basliklari_arsiv', label: 'Çeklist Başlıkları' },
+  { tablo: 'checklist_sonuc_maddeleri_arsiv',  label: 'Çeklist Maddeleri' },
+]
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
 export async function GET() {
@@ -37,58 +44,73 @@ export async function GET() {
   const admin = createAdminClient()
 
   try {
-    const tablolar = Object.keys(KAPASITE_LIMITLERI)
-    const sonuclar: Array<{
+    // Tüm tablo boyutlarını tek SQL ile çek
+    const tabloIsimleri = ARSIV_TABLOLARI.map(t => `'${t.tablo}'`).join(',')
+    const { data: boyutData, error: boyutErr } = await admin.rpc('get_table_sizes', {
+      table_names: ARSIV_TABLOLARI.map(t => t.tablo),
+    })
+
+    // RPC yoksa fallback: tek tek count ile hesapla
+    let sonuclar: Array<{
       tablo: string
       label: string
       kayit: number
-      limit: number
+      boyut_bytes: number
+      boyut_label: string
       doluluk: number
       durum: 'normal' | 'uyari' | 'kritik'
     }> = []
 
-    // Paralel count sorguları
-    const countPromises = tablolar.map(async (tablo) => {
-      const { count, error } = await admin
-        .from(tablo)
-        .select('id', { count: 'exact', head: true })
-
-      return { tablo, count: error ? 0 : (count ?? 0) }
-    })
-
-    const counts = await Promise.all(countPromises)
-
-    let toplamKayit = 0
-    let toplamLimit = 0
-
-    for (const { tablo, count } of counts) {
-      const conf = KAPASITE_LIMITLERI[tablo]
-      const doluluk = Math.round((count / conf.limit) * 100)
-      const durum = doluluk >= 90 ? 'kritik' : doluluk >= 70 ? 'uyari' : 'normal'
-
-      toplamKayit += count
-      toplamLimit += conf.limit
-
-      sonuclar.push({
-        tablo,
-        label: conf.label,
-        kayit: count,
-        limit: conf.limit,
-        doluluk,
-        durum,
+    if (boyutErr || !boyutData) {
+      // Fallback: count + tahmini boyut (satır başı ~500 byte ortalama)
+      const countPromises = ARSIV_TABLOLARI.map(async ({ tablo, label }) => {
+        const { count } = await admin.from(tablo).select('id', { count: 'exact', head: true })
+        const kayit = count ?? 0
+        const boyut_bytes = kayit * 500 // tahmini
+        const doluluk = Math.round((boyut_bytes / DB_LIMIT_BYTES) * 100 * 10) / 10
+        return {
+          tablo, label, kayit, boyut_bytes,
+          boyut_label: formatBytes(boyut_bytes),
+          doluluk,
+          durum: (doluluk >= 10 ? 'kritik' : doluluk >= 5 ? 'uyari' : 'normal') as 'normal' | 'uyari' | 'kritik',
+        }
       })
+      sonuclar = await Promise.all(countPromises)
+    } else {
+      // RPC başarılı — gerçek boyut verileri
+      const boyutMap = new Map<string, { total_bytes: number; row_count: number }>()
+      for (const row of boyutData) {
+        boyutMap.set(row.table_name, { total_bytes: Number(row.total_bytes), row_count: Number(row.row_count) })
+      }
+
+      for (const { tablo, label } of ARSIV_TABLOLARI) {
+        const info = boyutMap.get(tablo) ?? { total_bytes: 0, row_count: 0 }
+        const doluluk = Math.round((info.total_bytes / DB_LIMIT_BYTES) * 100 * 10) / 10
+        sonuclar.push({
+          tablo, label,
+          kayit: info.row_count,
+          boyut_bytes: info.total_bytes,
+          boyut_label: formatBytes(info.total_bytes),
+          doluluk,
+          durum: doluluk >= 10 ? 'kritik' : doluluk >= 5 ? 'uyari' : 'normal',
+        })
+      }
     }
 
-    const genelDoluluk = Math.round((toplamKayit / toplamLimit) * 100)
+    const toplamBytes = sonuclar.reduce((s, r) => s + r.boyut_bytes, 0)
+    const toplamKayit = sonuclar.reduce((s, r) => s + r.kayit, 0)
+    const genelDoluluk = Math.round((toplamBytes / DB_LIMIT_BYTES) * 100 * 10) / 10
 
     return NextResponse.json({
       ok: true,
       genel: {
         toplam_kayit: toplamKayit,
-        toplam_limit: toplamLimit,
+        toplam_bytes: toplamBytes,
+        toplam_label: formatBytes(toplamBytes),
         doluluk: genelDoluluk,
-        durum: genelDoluluk >= 90 ? 'kritik' : genelDoluluk >= 70 ? 'uyari' : 'normal',
-        db_limit: '8 GB (Supabase Pro)',
+        durum: genelDoluluk >= 10 ? 'kritik' : genelDoluluk >= 5 ? 'uyari' : 'normal',
+        db_limit: '8 GB',
+        db_limit_label: formatBytes(DB_LIMIT_BYTES),
       },
       tablolar: sonuclar,
     })
