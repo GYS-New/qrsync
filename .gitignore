@@ -34,3 +34,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# one-off admin scripts (geri dönüşsüz — git'e alınmaz)
+scripts/bulk-password-reset.mjs
