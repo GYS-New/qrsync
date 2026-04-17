@@ -159,20 +159,23 @@ function IoThinkingBubble() {
   return <div className={`io-thought-bubble ${phase}`}>{thought}</div>
 }
 
-/** İO Eller — kolsuz, SVG, İO rengiyle aynı, float ile senkronize */
+/** İO Eller — kolsuz, SVG, İO gövde rengiyle uyumlu, float senkronize */
 type HandPose = 'idle' | 'wave' | 'think' | 'scratch'
-const IO_HAND_COLOR = '#7EC8E3' // İO'nun açık mavi tonu
-const IO_HAND_SHADOW = '#5BA3C9'
-// SVG el — yuvarlak, karikatür tarzı, iri
-const HandSVG = ({ flip }: { flip?: boolean }) => (
-  <svg width="24" height="22" viewBox="0 0 24 22" style={{ transform: flip ? 'scaleX(-1)' : undefined }}>
-    {/* Avuç */}
-    <ellipse cx="12" cy="13" rx="10" ry="8.5" fill={IO_HAND_COLOR} stroke={IO_HAND_SHADOW} strokeWidth="1.2" />
-    {/* Parmaklar — 4 yuvarlak çıkıntı */}
-    <ellipse cx="5" cy="6" rx="3" ry="5" fill={IO_HAND_COLOR} stroke={IO_HAND_SHADOW} strokeWidth="1" />
-    <ellipse cx="10" cy="4" rx="2.8" ry="5.5" fill={IO_HAND_COLOR} stroke={IO_HAND_SHADOW} strokeWidth="1" />
-    <ellipse cx="15" cy="4.5" rx="2.8" ry="5" fill={IO_HAND_COLOR} stroke={IO_HAND_SHADOW} strokeWidth="1" />
-    <ellipse cx="19.5" cy="7" rx="2.5" ry="4.5" fill={IO_HAND_COLOR} stroke={IO_HAND_SHADOW} strokeWidth="1" />
+// İO gövdesiyle aynı açık ton
+const HAND_FILL = '#B8E4F0'
+const HAND_STROKE = '#8ED0E6'
+// Doğal el SVG — avuç + 5 parmak + başparmak, karikatür ama el görünümlü
+const HandSVG = ({ side }: { side: 'left' | 'right' }) => (
+  <svg width="20" height="24" viewBox="0 0 20 24" style={{ transform: side === 'right' ? 'scaleX(-1)' : undefined }}>
+    {/* Avuç içi */}
+    <rect x="3" y="10" width="13" height="12" rx="5" fill={HAND_FILL} stroke={HAND_STROKE} strokeWidth="0.8" />
+    {/* Parmaklar — 4 ince uzun parmak */}
+    <rect x="3.5" y="2" width="3" height="11" rx="1.5" fill={HAND_FILL} stroke={HAND_STROKE} strokeWidth="0.7" />
+    <rect x="7" y="0.5" width="3" height="12" rx="1.5" fill={HAND_FILL} stroke={HAND_STROKE} strokeWidth="0.7" />
+    <rect x="10.5" y="1.5" width="3" height="11" rx="1.5" fill={HAND_FILL} stroke={HAND_STROKE} strokeWidth="0.7" />
+    <rect x="13.5" y="4" width="2.8" height="9" rx="1.4" fill={HAND_FILL} stroke={HAND_STROKE} strokeWidth="0.7" />
+    {/* Başparmak — yandan çıkan */}
+    <rect x="-1" y="11" width="6" height="3" rx="1.5" fill={HAND_FILL} stroke={HAND_STROKE} strokeWidth="0.7" transform="rotate(-20, 1, 12)" />
   </svg>
 )
 
@@ -200,50 +203,49 @@ function IoHands() {
           position: absolute; z-index: 5;
           pointer-events: none;
           transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-          /* Float ile senkronize — aynı animasyon */
           animation: ioFloat 3s ease-in-out infinite;
         }
-        /* Sol el */
+        /* Sol el — gövdenin sol yanında, hafif içe dönük */
         .io-hand-left {
-          left: -16px; bottom: 22px;
-          transform: rotate(20deg);
+          left: -10px; bottom: 20px;
+          transform: rotate(70deg);
         }
         .io-hand-left.wave {
-          transform: rotate(-15deg) translateY(-14px);
+          transform: rotate(20deg) translateX(-4px) translateY(-16px);
           animation: ioFloat 3s ease-in-out infinite, ioHandWave 0.35s ease-in-out 4;
         }
         .io-hand-left.think {
-          transform: rotate(10deg) translateY(-2px);
+          transform: rotate(60deg) translateY(-3px);
         }
         .io-hand-left.scratch {
-          transform: rotate(15deg) translateY(-2px);
+          transform: rotate(65deg) translateY(-2px);
         }
-        /* Sağ el */
+        /* Sağ el — gövdenin sağ yanında, hafif içe dönük */
         .io-hand-right {
-          right: -4px; bottom: 22px;
-          transform: rotate(-20deg);
+          right: 2px; bottom: 20px;
+          transform: rotate(-70deg);
         }
         .io-hand-right.wave {
-          transform: rotate(-15deg);
+          transform: rotate(-60deg);
         }
         .io-hand-right.think {
-          transform: rotate(-50deg) translateX(4px) translateY(-22px);
+          transform: rotate(-30deg) translateX(6px) translateY(-20px);
         }
         .io-hand-right.scratch {
-          transform: rotate(-40deg) translateX(2px) translateY(-18px);
+          transform: rotate(-25deg) translateX(4px) translateY(-16px);
           animation: ioFloat 3s ease-in-out infinite, ioHandScratch 0.25s ease-in-out 5;
         }
         @keyframes ioHandWave {
-          0%, 100% { transform: rotate(-15deg) translateY(-14px); }
-          50% { transform: rotate(-40deg) translateY(-18px); }
+          0%, 100% { transform: rotate(20deg) translateX(-4px) translateY(-16px); }
+          50% { transform: rotate(-10deg) translateX(-8px) translateY(-20px); }
         }
         @keyframes ioHandScratch {
-          0%, 100% { transform: rotate(-40deg) translateX(2px) translateY(-18px); }
-          50% { transform: rotate(-45deg) translateX(4px) translateY(-21px); }
+          0%, 100% { transform: rotate(-25deg) translateX(4px) translateY(-16px); }
+          50% { transform: rotate(-30deg) translateX(6px) translateY(-19px); }
         }
       `}</style>
-      <span className={`io-hand io-hand-left ${pose}`}><HandSVG /></span>
-      <span className={`io-hand io-hand-right ${pose}`}><HandSVG flip /></span>
+      <span className={`io-hand io-hand-left ${pose}`}><HandSVG side="left" /></span>
+      <span className={`io-hand io-hand-right ${pose}`}><HandSVG side="right" /></span>
     </>
   )
 }
