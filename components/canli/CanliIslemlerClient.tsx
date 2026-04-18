@@ -458,7 +458,7 @@ useEffect(() => {
       .order('durum_degisim_tarihi', { ascending: false })
       .limit(500)
 
-    if (projeId) liveQ = (liveQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+    if (projeId) liveQ = liveQ.eq('proje_id', projeId)
     if (yetkiliLokIds) liveQ = liveQ.in('lokasyon_id', yetkiliLokIds)
 
     // KPI için ayrı count sorgusu — sadece durum kolonu, yüksek limit
@@ -469,33 +469,36 @@ useEffect(() => {
       .not('durum', 'in', '(HAZIR,ACIK)')
       .gte('durum_degisim_tarihi', liveSinceISO)
       .limit(10000)
-    if (projeId) kpiQ = (kpiQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+    if (projeId) kpiQ = kpiQ.eq('proje_id', projeId)
     if (yetkiliLokIds) kpiQ = kpiQ.in('lokasyon_id', yetkiliLokIds)
 
     const [res, kpiRes] = await Promise.all([liveQ, kpiQ])
 
+    if (kpiRes.error) {
+      console.error('[LiveFlow] kpi error:', kpiRes.error)
+    }
     if (kpiRes.data && !kpiRes.error) {
       setLiveKpiRows(kpiRes.data as { durum: string }[])
     }
 
     if (res.error) {
-      // durum_degisim_tarihi kolonu yoksa olusturma_tarihi ile fallback
+      console.error('[LiveFlow] primary error:', res.error)
+      // Join hatası vs — basit fallback ile join'siz dene
       let fallbackQ = supabase
         .from('canli_gorevler')
-        .select(liveSelect)
+        .select('*')
         .eq('firma_id', firmaId)
         .not('durum', 'in', '(HAZIR,ACIK)')
         .gte('durum_degisim_tarihi', liveSinceISO)
         .order('durum_degisim_tarihi', { ascending: false })
         .limit(500)
+      if (projeId) fallbackQ = fallbackQ.eq('proje_id', projeId)
       if (yetkiliLokIds) fallbackQ = fallbackQ.in('lokasyon_id', yetkiliLokIds)
 
-      const res2 = projeId
-        ? await (fallbackQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
-        : await fallbackQ
+      const res2 = await fallbackQ
 
       if (res2.error) {
-        console.error('LiveFlow fetch error:', res2.error)
+        console.error('[LiveFlow] fallback error:', res2.error)
         return
       }
 
