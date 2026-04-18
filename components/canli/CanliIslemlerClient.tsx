@@ -154,7 +154,7 @@ function LiveHeader({
       <style>{`
         @keyframes canliPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.65)} }
         @keyframes canliScan { 0%{top:-100%} 100%{top:100%} }
-        @keyframes islemdePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+        @keyframes islemdePulse { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
         /* Parlama efekti — 3 katman: data-attribute, class, element hover bypass */
         .verde-table tbody tr[data-highlight="1"],
         .verde-table tbody tr.row-new,
@@ -280,8 +280,8 @@ const getLocPath = useMemo(() => {
       const badge = tr.querySelector<HTMLElement>('.verde-badge')
       if (!badge) return
       if (g.durum === 'ISLEMDE') {
-        const offset = (Date.now() / 1000) % 1.2
-        badge.style.setProperty('animation', 'islemdePulse 1.2s ease-in-out infinite', 'important')
+        const offset = (Date.now() / 1000) % 1.0
+        badge.style.setProperty('animation', 'islemdePulse 1s linear infinite', 'important')
         badge.style.setProperty('animation-delay', `${-offset}s`, 'important')
       } else {
         badge.style.removeProperty('animation')
