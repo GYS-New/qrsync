@@ -429,14 +429,18 @@ useEffect(() => {
 
     const data = res.data
     if (data) {
-      // Yeni gelen görev (en üst) 3 sn vurgulansın.
-      // useRef ile önceki top id'yi tut — setInterval closure bağımlılığı yok,
-      // StrictMode double-render'ı sorun çıkarmaz.
       const nextTopId = data?.[0]?.id ?? null
-      if (nextTopId && nextTopId !== lastTopIdRef.current) {
+      const prevTopId = lastTopIdRef.current
+      // TEMP DEBUG — parlama sorununu bulmak için
+      console.log('[LiveFlow]', { count: data.length, nextTopId, prevTopId, willHighlight: !!(nextTopId && nextTopId !== prevTopId) })
+      if (nextTopId && nextTopId !== prevTopId) {
         const targetId = nextTopId
+        console.log('[LiveFlow] HIGHLIGHT SET →', targetId)
         setHighlightId(targetId)
-        setTimeout(() => setHighlightId(cur => cur === targetId ? null : cur), 3000)
+        setTimeout(() => {
+          console.log('[LiveFlow] HIGHLIGHT CLEARED →', targetId)
+          setHighlightId(cur => cur === targetId ? null : cur)
+        }, 3000)
       }
       lastTopIdRef.current = nextTopId
       setLiveFlowGorevler(data)
