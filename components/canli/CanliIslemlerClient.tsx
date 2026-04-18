@@ -208,6 +208,7 @@ const getLocPath = useMemo(() => {
 
   const [browseGorevler, setBrowseGorevler] = useState<any[]>(initialGorevler)
   const [liveFlowGorevler, setLiveFlowGorevler] = useState<any[]>([])
+  const [liveKpiRows, setLiveKpiRows] = useState<{ durum: string }[]>([])
   const [highlightId, setHighlightId] = useState<string | null>(null)
   const lastTopIdRef = useRef<string | null>(null)
   const [checklistGorev, setChecklistGorev] = useState<{ id: string; type: 'canli_gorevler' } | null>(null)
@@ -271,6 +272,7 @@ const getLocPath = useMemo(() => {
 useEffect(() => {
     if (streamState === 'stopped') {
       setLiveFlowGorevler([])
+      setLiveKpiRows([])
       return
     }
 
@@ -380,7 +382,22 @@ useEffect(() => {
     if (projeId) liveQ = (liveQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
     if (yetkiliLokIds) liveQ = liveQ.in('lokasyon_id', yetkiliLokIds)
 
-    const res = await liveQ
+    // KPI için ayrı count sorgusu — sadece durum kolonu, yüksek limit
+    let kpiQ = supabase
+      .from('canli_gorevler')
+      .select('durum')
+      .eq('firma_id', firmaId)
+      .not('durum', 'in', '(HAZIR,ACIK)')
+      .gte('durum_degisim_tarihi', liveSinceISO)
+      .limit(10000)
+    if (projeId) kpiQ = (kpiQ as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+    if (yetkiliLokIds) kpiQ = kpiQ.in('lokasyon_id', yetkiliLokIds)
+
+    const [res, kpiRes] = await Promise.all([liveQ, kpiQ])
+
+    if (kpiRes.data && !kpiRes.error) {
+      setLiveKpiRows(kpiRes.data as { durum: string }[])
+    }
 
     if (res.error) {
       // durum_degisim_tarihi kolonu yoksa olusturma_tarihi ile fallback
@@ -428,16 +445,17 @@ useEffect(() => {
   }, [browseGorevler, selectedGorev, selectedId])
 
 
-  // KPI sayaçları
+  // KPI sayaçları — liveKpiRows'dan (ayrı/limitsiz sorgudan) hesaplanır.
+  // liveFlowGorevler limit(500) ile sınırlı olduğu için KPI total yanlış gösteriyordu.
   const kpi = useMemo(() => ({
-    toplam:     liveFlowGorevler.length,
-    tamamlandi: liveFlowGorevler.filter((g:any) => g.durum === 'TAMAMLANDI').length,
-    islemde:    liveFlowGorevler.filter((g:any) => g.durum === 'ISLEMDE').length,
-    beklemede:  liveFlowGorevler.filter((g:any) => g.durum === 'BEKLEMEDE').length,
-    iptal:      liveFlowGorevler.filter((g:any) => g.durum === 'IPTAL').length,
-    gecikmis:   liveFlowGorevler.filter((g:any) => g.durum === 'ZAMANINDA_YAPILAMAYAN').length,
-    gecmis:     liveFlowGorevler.filter((g:any) => g.durum === 'ZAMANI_GECMIS').length,
-  }), [liveFlowGorevler])
+    toplam:     liveKpiRows.length,
+    tamamlandi: liveKpiRows.filter(g => g.durum === 'TAMAMLANDI').length,
+    islemde:    liveKpiRows.filter(g => g.durum === 'ISLEMDE').length,
+    beklemede:  liveKpiRows.filter(g => g.durum === 'BEKLEMEDE').length,
+    iptal:      liveKpiRows.filter(g => g.durum === 'IPTAL').length,
+    gecikmis:   liveKpiRows.filter(g => g.durum === 'ZAMANINDA_YAPILAMAYAN').length,
+    gecmis:     liveKpiRows.filter(g => g.durum === 'ZAMANI_GECMIS').length,
+  }), [liveKpiRows])
 
   // Durum filtreli canlı liste
   const filteredLive = useMemo(() => {
