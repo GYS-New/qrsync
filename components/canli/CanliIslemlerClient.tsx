@@ -270,24 +270,22 @@ const getLocPath = useMemo(() => {
     return () => clearTimeout(t)
   }, [highlightId])
 
-  // İŞLEMDE durumundaki satırlara yanıp sönen efekt (DOM direkt manipülasyon).
+  // İŞLEMDE durumunda olan görevlerin badge'i (durum rozeti) yanıp sönsün.
+  // Satır değil — sadece rozet. Görev devam ediyor anlamında.
   // Negatif animation-delay ile global clock'a senkron — re-mount'ta kopmaz.
   useEffect(() => {
     liveFlowGorevler.forEach(g => {
       const tr = document.querySelector<HTMLTableRowElement>(`tr[data-gid="${g.id}"]`)
       if (!tr) return
-      const tds = tr.querySelectorAll<HTMLTableCellElement>('td')
+      const badge = tr.querySelector<HTMLElement>('.verde-badge')
+      if (!badge) return
       if (g.durum === 'ISLEMDE') {
-        const offset = (Date.now() / 1000) % 1.4
-        tds.forEach(td => {
-          td.style.setProperty('animation', 'islemdePulse 1.4s ease-in-out infinite', 'important')
-          td.style.setProperty('animation-delay', `${-offset}s`, 'important')
-        })
+        const offset = (Date.now() / 1000) % 1.2
+        badge.style.setProperty('animation', 'islemdePulse 1.2s ease-in-out infinite', 'important')
+        badge.style.setProperty('animation-delay', `${-offset}s`, 'important')
       } else {
-        tds.forEach(td => {
-          td.style.removeProperty('animation')
-          td.style.removeProperty('animation-delay')
-        })
+        badge.style.removeProperty('animation')
+        badge.style.removeProperty('animation-delay')
       }
     })
   }, [liveFlowGorevler])
