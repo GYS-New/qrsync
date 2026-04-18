@@ -139,6 +139,21 @@ const tools: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'yonetici_iletisim',
+    description: 'Sistem yöneticisi (SA/Alt SA) veya firma yöneticisi (TA) iletişim bilgilerini (isim, e-posta, telefon) döndürür. Kullanıcı "destek / sistem yöneticisi / firma admin / yönetici iletişim" gibi ifadeler kullandığında bu tool\'u çağır.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tip: {
+          type: 'string',
+          enum: ['sistem', 'firma'],
+          description: '"sistem" = İO Teknoloji sistem yöneticileri (SA/Alt SA). "firma" = kullanıcının kendi firmasının TA yöneticileri.',
+        },
+      },
+      required: ['tip'],
+    },
+  },
+  {
     name: 'veritabani_sorgula',
     description: 'Herhangi bir veritabanı tablosunu sorgular. Filtre, sıralama, limit ve count destekler. Tablo şemasını system prompt\'ta bulabilirsin. Diğer tool\'ların kapsamadığı sorular için kullan.',
     input_schema: {
@@ -501,6 +516,49 @@ async function executeTool(
           }).join('\n')
       }
 
+      case 'yonetici_iletisim': {
+        const tip = input.tip as 'sistem' | 'firma'
+        if (tip === 'sistem') {
+          // SA/Alt SA — firma_id null, her role açık
+          const { data, error } = await supabase
+            .from('users')
+            .select('isim_soyisim,email,telefon,rol')
+            .in('rol', ['super_admin', 'alt_super_admin'])
+            .eq('aktif', true)
+            .order('rol', { ascending: true })
+          if (error) return `Hata: ${error.message}`
+          if (!data?.length) return 'Sistem yöneticisi bulunamadı.'
+          return `İO Teknoloji Sistem Yöneticileri:\n` +
+            data.map((u: Record<string, unknown>) => {
+              const etiket = u.rol === 'super_admin' ? 'Sistem Yöneticisi' : 'Alt Sistem Yöneticisi'
+              const lines = [`• ${u.isim_soyisim} (${etiket})`]
+              if (u.email)   lines.push(`  E-posta: ${u.email}`)
+              if (u.telefon) lines.push(`  Telefon: ${u.telefon}`)
+              return lines.join('\n')
+            }).join('\n\n') +
+            `\n\nGenel iletişim: info@iogys.com.tr | www.iogys.com.tr`
+        } else if (tip === 'firma') {
+          if (!ctx.firmaId) return 'Firma kapsamınız yok; firma yöneticisi bilgisi gösterilemiyor.'
+          const { data, error } = await supabase
+            .from('users')
+            .select('isim_soyisim,email,telefon')
+            .eq('rol', 'tenant_admin')
+            .eq('firma_id', ctx.firmaId)
+            .eq('aktif', true)
+            .order('isim_soyisim')
+          if (error) return `Hata: ${error.message}`
+          if (!data?.length) return 'Firmanızın aktif yöneticisi bulunamadı.'
+          return `Firma Yöneticileri:\n` +
+            data.map((u: Record<string, unknown>) => {
+              const lines = [`• ${u.isim_soyisim}`]
+              if (u.email)   lines.push(`  E-posta: ${u.email}`)
+              if (u.telefon) lines.push(`  Telefon: ${u.telefon}`)
+              return lines.join('\n')
+            }).join('\n\n')
+        }
+        return 'Geçersiz tip. "sistem" veya "firma" olmalı.'
+      }
+
       case 'arsiv_ozeti': {
         const tablo = input.tablo as string | undefined
         const results: string[] = []
@@ -803,7 +861,12 @@ Veri sorgularında:
 - **Web:** www.iogys.com.tr
 - **Uygulama:** app.iogys.com.tr
 - **Konum:** Türkiye
-"Destek/iletişim/sözleşme" sorulduğunda yukarıdaki e-posta ve web adresini verebilirsin. Telefon numarası yok — sorulursa "e-posta üzerinden iletişim tercih ediliyor" de.
+
+## YÖNETİCİ İLETİŞİMİ (DB sorgulu — yonetici_iletisim tool'u kullan)
+Kullanıcı şu tip sorular sorduğunda yonetici_iletisim tool'unu çağır, UYDURMA:
+- "İO Teknoloji destek / sistem yöneticisi / SA kim / e-posta-telefon?" → tool tip="sistem"
+- "Firma yöneticim kim / firma admin iletişim / TA'ma nasıl ulaşırım?" → tool tip="firma"
+Kurumsal genel iletişim (info@, web) sorularında da resmi listedeki bilgileri verebilirsin — ancak spesifik kişi sorulursa tool şart.
 
 ## HALÜSİNASYON ÖNLEME (ÇOK ÖNEMLİ)
 - Yukarıdaki "İO TEKNOLOJİ RESMİ İLETİŞİM" bölümü DIŞINDA bir e-posta/telefon/URL UYDURMA. Bu bilgiler doğrulandı, diğerleri belirsiz.
