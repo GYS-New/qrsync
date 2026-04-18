@@ -700,6 +700,25 @@ async function del() {
   // Seçili lokasyon filtresi (3 seviyeden en derini)
   const lokasyonId = filterLoc3 || filterLoc2 || filterLoc1
 
+  // Seçilen lokasyonun tüm alt lokasyonlarını (dahil kendisi) set olarak döndür —
+  // üst lokasyon seçildiğinde alt lokasyonlarındaki görevler de filtreye dahil olsun.
+  const lokasyonSet = useMemo(() => {
+    if (!lokasyonId) return null
+    const set = new Set<string>([lokasyonId])
+    // BFS ile descendants
+    const queue = [lokasyonId]
+    while (queue.length > 0) {
+      const cur = queue.shift()!
+      for (const l of allLocs) {
+        if (l.parent_id === cur && !set.has(l.id)) {
+          set.add(l.id)
+          queue.push(l.id)
+        }
+      }
+    }
+    return set
+  }, [lokasyonId, allLocs])
+
   // Filtre lokasyon seçenekleri
   const filterLoc2Options = useMemo(() => filterLoc1 ? (allLocs.filter(l => l.parent_id === filterLoc1).sort((a,b) => a.tanim.localeCompare(b.tanim))) : [], [allLocs, filterLoc1])
   const filterLoc3Options = useMemo(() => filterLoc2 ? (allLocs.filter(l => l.parent_id === filterLoc2).sort((a,b) => a.tanim.localeCompare(b.tanim))) : [], [allLocs, filterLoc2])
@@ -769,7 +788,7 @@ async function del() {
         if (!hay.includes(s)) return false
       }
 
-      if (lokasyonId && g.lokasyon_id !== lokasyonId) return false
+      if (lokasyonSet && (!g.lokasyon_id || !lokasyonSet.has(g.lokasyon_id))) return false
       if (atananId && g.atanan_kullanici_id !== atananId) return false
       if (durum && g.durum !== durum) return false
       if (actor && getIslemiYapan(g) !== actor) return false
@@ -790,7 +809,7 @@ async function del() {
 
       return true
     })
-  }, [q, lokasyonId, atananId, durum, actor, from, to, islemFrom, islemTo, gorevler])
+  }, [q, lokasyonSet, atananId, durum, actor, from, to, islemFrom, islemTo, gorevler])
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1

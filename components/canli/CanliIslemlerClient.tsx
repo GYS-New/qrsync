@@ -555,6 +555,19 @@ useEffect(() => {
     return liveFlowGorevler
   }, [liveFlowGorevler, durumFilter])
 
+  // Sayfalama — canlı akış
+  const LIVE_PER_PAGE = 100
+  const [liveSayfa, setLiveSayfa] = useState(1)
+  const liveToplamSayfa = Math.max(1, Math.ceil(filteredLive.length / LIVE_PER_PAGE))
+  const filtreLiveSayfa = useMemo(
+    () => filteredLive.slice((liveSayfa - 1) * LIVE_PER_PAGE, liveSayfa * LIVE_PER_PAGE),
+    [filteredLive, liveSayfa]
+  )
+  // Filtre değişince 1. sayfaya dön
+  useEffect(() => { setLiveSayfa(1) }, [durumFilter])
+  // Sayfa sayısı düştüyse (yeni filtre) sayfayı sınır içine çek
+  useEffect(() => { if (liveSayfa > liveToplamSayfa) setLiveSayfa(liveToplamSayfa) }, [liveToplamSayfa, liveSayfa])
+
   const browseList = useMemo(() => {
     if (browse === 'ACIK') return browseGorevler.filter((g) => ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE'].includes(g.durum))
     if (browse === 'IPTAL') return browseGorevler.filter((g) => g.durum === 'IPTAL')
@@ -921,7 +934,7 @@ useEffect(() => {
                 <th>Aktif Saat</th><th>İŞLEM TARİH-SAAT</th><th>Durum</th><th>İşlemi Yapan</th>
               </tr></thead>
               <tbody>
-                {filteredLive.map((g: any) => (
+                {filtreLiveSayfa.map((g: any) => (
                   <TableRow key={g.id} g={g} showOps={false} showActor={true} highlight={g.id === highlightId} fontSize={14} />
                 ))}
                 {!filteredLive.length && (
@@ -932,6 +945,7 @@ useEffect(() => {
               </tbody>
             </table>
           </div>
+          <LiveSayfalama total={filteredLive.length} sayfa={liveSayfa} toplam={liveToplamSayfa} onSayfa={setLiveSayfa} perPage={LIVE_PER_PAGE} />
         </div>
       </div>
     )
@@ -952,7 +966,7 @@ useEffect(() => {
               <th>Aktif Saat</th><th>İŞLEM TARİH-SAAT</th><th>Durum</th><th>İşlemi Yapan</th>
             </tr></thead>
             <tbody>
-              {filteredLive.map((g: any) => (
+              {filtreLiveSayfa.map((g: any) => (
                 <TableRow key={g.id} g={g} showOps={false} showActor fontSize={14} />
               ))}
               {!filteredLive.length && (
@@ -963,6 +977,7 @@ useEffect(() => {
             </tbody>
           </table>
         </div>
+        <LiveSayfalama total={filteredLive.length} sayfa={liveSayfa} toplam={liveToplamSayfa} onSayfa={setLiveSayfa} perPage={LIVE_PER_PAGE} />
       </div>
 
       {checklistGorev && (
@@ -972,6 +987,33 @@ useEffect(() => {
           onKapat={() => setChecklistGorev(null)}
         />
       )}
+    </div>
+  )
+}
+
+function LiveSayfalama({ total, sayfa, toplam, onSayfa, perPage }: {
+  total: number; sayfa: number; toplam: number; onSayfa: (n: number) => void; perPage: number
+}) {
+  if (total <= perPage) return null
+  const ilk = (sayfa - 1) * perPage + 1
+  const son = Math.min(sayfa * perPage, total)
+  const btnBase: React.CSSProperties = { padding: '5px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderTop: '1px solid #f1f5f9', background: '#fafafa' }}>
+      <span style={{ fontSize: 12.5, color: '#64748b' }}>
+        <strong style={{ color: '#111827' }}>{ilk}-{son}</strong> / {total} kayıt · Sayfa {sayfa}/{toplam}
+      </span>
+      <div style={{ display: 'flex', gap: 4 }}>
+        <button onClick={() => onSayfa(1)} disabled={sayfa === 1}
+          style={{ ...btnBase, opacity: sayfa === 1 ? 0.4 : 1 }}>{'<<'}</button>
+        <button onClick={() => onSayfa(Math.max(1, sayfa - 1))} disabled={sayfa === 1}
+          style={{ ...btnBase, opacity: sayfa === 1 ? 0.4 : 1 }}>{'<'}</button>
+        <span style={{ ...btnBase, background: '#f1f5f9', cursor: 'default' }}>{sayfa} / {toplam}</span>
+        <button onClick={() => onSayfa(Math.min(toplam, sayfa + 1))} disabled={sayfa === toplam}
+          style={{ ...btnBase, opacity: sayfa === toplam ? 0.4 : 1 }}>{'>'}</button>
+        <button onClick={() => onSayfa(toplam)} disabled={sayfa === toplam}
+          style={{ ...btnBase, opacity: sayfa === toplam ? 0.4 : 1 }}>{'>>'}</button>
+      </div>
     </div>
   )
 }
