@@ -608,6 +608,38 @@ async function executeTool(
       case 'veritabani_sorgula': {
         const tablo = input.tablo as string
         if (!tablo) return 'Tablo adı belirtilmedi.'
+        // UUID doğrulayıcı
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        // Filtreleri önden doğrula — _id kolonlarına UUID olmayan değer gelirse AI'a yol tarif et
+        const rawFiltreler = (input.filtreler as Array<{ kolon: string; operator: string; deger: string }>) || []
+        for (const f of rawFiltreler) {
+          if (!f.kolon || !f.operator) continue
+          const isIdCol = f.kolon === 'id' || f.kolon.endsWith('_id')
+          const isEqualityOp = f.operator === 'eq' || f.operator === 'neq'
+          if (isIdCol && isEqualityOp && typeof f.deger === 'string' && !uuidRegex.test(f.deger)) {
+            // Tipik hata: AI isim yazmış UUID yerine
+            const refTablo =
+              f.kolon === 'firma_id'       ? 'firmalar'        :
+              f.kolon === 'proje_id'       ? 'projeler'        :
+              f.kolon === 'lokasyon_id'    ? 'lokasyonlar'     :
+              f.kolon === 'kullanici_id' ||
+              f.kolon === 'user_id'        ? 'users'           :
+              f.kolon === 'sablon_id'      ? 'checklist_sablonlari' :
+              null
+            const refKolon =
+              f.kolon === 'firma_id'       ? 'firma_adi veya ticari_unvan' :
+              f.kolon === 'proje_id'       ? 'ad' :
+              f.kolon === 'lokasyon_id'    ? 'tanim' :
+              f.kolon === 'kullanici_id' ||
+              f.kolon === 'user_id'        ? 'isim_soyisim veya email' :
+              f.kolon === 'sablon_id'      ? 'baslik' :
+              'ilgili isim kolonu'
+            const hint = refTablo
+              ? `"${f.kolon}" UUID beklediği için "${f.deger}" çalışmaz. ÖNCE ${refTablo} tablosundan ilike filtresiyle ${refKolon} üzerinden id'yi bul, SONRA o id'yi ${f.kolon} filter'ına koy.`
+              : `"${f.kolon}" UUID olmalı; "${f.deger}" UUID değil.`
+            return `Hata: ${hint}`
+          }
+        }
         // Güvenlik: sadece izin verilen tablolar
         const izinliTablolar = [
           'users','firmalar','projeler','lokasyonlar','lokasyon_gruplari','lokasyon_grup_uyeleri',
@@ -889,6 +921,18 @@ Kullanıcının rolüne göre ERİŞEBİLECEĞİ VERİ SINIRLIDIR. Bu sınırı 
 - **Müşteri (M):** SADECE kendi firmasına bağlı değerlendirme verileri.
 
 Kural ihlali = güvenlik ihlali. Herhangi bir soru bu sınırı aşıyorsa "Size bu veri görünmez" de.
+
+## İSİM vs UUID — İKİ ADIMLI SORGU ŞART
+Kullanıcı bir FIRMA/PROJE/LOKASYON/KULLANICI adı söylediğinde, onu DOĞRUDAN firma_id, proje_id, lokasyon_id, kullanici_id filter'ına YAZMA. Bu kolonlar UUID bekler, isim değil. İki adımda yap:
+
+1. ÖNCE ilgili isim tablosundan ilike ile id'yi bul. Örnek:
+   - "acar temizlik" için: veritabani_sorgula(tablo='firmalar', select='id,firma_adi', filtreler=[{kolon:'firma_adi', operator:'ilike', deger:'%ACAR%'}])
+   - "oyak renault" için: tablo='projeler', filter'da ad kolonu
+   - lokasyon: tablo='lokasyonlar', filter'da tanim
+   - kullanıcı: tablo='users', filter'da isim_soyisim veya email
+2. SONRA dönen id'yi ikinci sorguda firma_id/proje_id/... filter'ına koy.
+
+"firma_id=ACAR TEMIZLIK" YAZMAK HATALIDIR. Önce ACAR TEMIZLIK'in id'sini bul, sonra o UUID'yi kullan.
 
 ## TOOL KULLANIM ZORUNLULUĞU
 Aşağıdaki soru tiplerinde CEVAP VERMEDEN ÖNCE mutlaka bir tool çağır — tahmin etme, genelleme yapma:
