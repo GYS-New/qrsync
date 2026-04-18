@@ -93,6 +93,31 @@ DB tablosu kalabilir (veri taşımıyor, silmek kolay):
 DROP TABLE IF EXISTS public.io_asistan_hata_log CASCADE;
 ```
 
+## 5. Gece testte çıkan ek olay (commit e179068)
+
+Kullanıcı `357b88d` sonrası Atalian TA hesabıyla test etti, "sistemde
+hangi firmalar var" sorusuna İO **5 firma** listeledi. Gerçekte DB'de
+sadece **2 firma var** (ATALİAN, EKOL). KOÇAK/ACAR TEMIZLIK/PALMET ÇELİK/
+ŞAKAR TESİSLER **uydurma** (halüsinasyon).
+
+**Nedeni:** Haiku tool çağırmadan direkt isim listesi ürettiyse, prompt
+kuralları bunu durduramadı.
+
+**Fix (commit e179068):**
+- Prompt'a açık "KAPSAM KURALLARI" — TA/U başka firma isimlerini asla
+  listelemez, "size sadece kendi firmanız görünür" der.
+- Halüsinasyon kuralları sertleştirildi — isim/liste üretmeden önce
+  MUTLAKA tool şart.
+- `veritabani_sorgula` içinde `firmalar` tablosu özel case
+  (.eq('id', firmaId), .eq('firma_id', ...) değil).
+
+**Sabah mutlaka test et:**
+- TA hesabıyla tekrar "sistemde hangi firmalar" sor → sadece ATALİAN
+  yanıtı gelmeli.
+- Haiku kurallara uymuyorsa uzun vadede model routing (önerim:
+  Sonnet 4.6'ya fallback kritik sorularda) veya post-processing sanitizer
+  gerekebilir.
+
 ---
 
 İyi sabahlar. Sorun varsa hepsi reversible.
