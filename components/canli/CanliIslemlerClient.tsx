@@ -154,6 +154,7 @@ function LiveHeader({
       <style>{`
         @keyframes canliPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.65)} }
         @keyframes canliScan { 0%{top:-100%} 100%{top:100%} }
+        @keyframes islemdePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
         /* Parlama efekti — 3 katman: data-attribute, class, element hover bypass */
         .verde-table tbody tr[data-highlight="1"],
         .verde-table tbody tr.row-new,
@@ -268,6 +269,28 @@ const getLocPath = useMemo(() => {
     const t = setTimeout(() => setHighlightId(cur => cur === target ? null : cur), 3000)
     return () => clearTimeout(t)
   }, [highlightId])
+
+  // İŞLEMDE durumundaki satırlara yanıp sönen efekt (DOM direkt manipülasyon).
+  // Negatif animation-delay ile global clock'a senkron — re-mount'ta kopmaz.
+  useEffect(() => {
+    liveFlowGorevler.forEach(g => {
+      const tr = document.querySelector<HTMLTableRowElement>(`tr[data-gid="${g.id}"]`)
+      if (!tr) return
+      const tds = tr.querySelectorAll<HTMLTableCellElement>('td')
+      if (g.durum === 'ISLEMDE') {
+        const offset = (Date.now() / 1000) % 1.4
+        tds.forEach(td => {
+          td.style.setProperty('animation', 'islemdePulse 1.4s ease-in-out infinite', 'important')
+          td.style.setProperty('animation-delay', `${-offset}s`, 'important')
+        })
+      } else {
+        tds.forEach(td => {
+          td.style.removeProperty('animation')
+          td.style.removeProperty('animation-delay')
+        })
+      }
+    })
+  }, [liveFlowGorevler])
   const [checklistGorev, setChecklistGorev] = useState<{ id: string; type: 'canli_gorevler' } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedGorev, setSelectedGorev] = useState<any | null>(null)
