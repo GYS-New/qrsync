@@ -428,6 +428,10 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
           )}
         </Row>
 
+        <Row label="Mobil Firma Kodu">
+          <MobilKoduPanel firmaId={firma.id} initialKod={(firma as any).mobil_firma_kodu ?? ''} />
+        </Row>
+
         <Row label="Depolama Kapasitesi">
           {edit ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -497,6 +501,67 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 12, alignItems: 'center' }}>
       <div style={{ fontSize: 14, color: '#6b7280' }}>{label}</div>
       <div>{children}</div>
+    </div>
+  )
+}
+
+function MobilKoduPanel({ firmaId, initialKod }: { firmaId: string; initialKod: string }) {
+  const [kod, setKod] = useState(initialKod || '—')
+  const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  async function copy() {
+    if (!kod || kod === '—') return
+    try {
+      await navigator.clipboard.writeText(kod)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {}
+  }
+
+  async function yenile() {
+    const ok = typeof window !== 'undefined' && window.confirm(
+      'Mobil firma kodu yenilensin mi? Eski kod ile yeni eşleşme yapılamaz. Mevcut cihazlar etkilenmez.'
+    )
+    if (!ok) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/firmalar/mobil-kod-yenile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firma_id: firmaId }),
+      })
+      const j = await res.json()
+      if (res.ok && j.ok) setKod(j.mobil_firma_kodu)
+      else alert(j.error ?? 'Yenilenemedi')
+    } catch (e: any) {
+      alert(e?.message ?? 'Yenilenemedi')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontSize: 20, fontWeight: 800, letterSpacing: 2,
+        padding: '6px 14px', borderRadius: 8,
+        background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#0f172a',
+      }}>
+        {kod}
+      </div>
+      <button type="button" onClick={copy} disabled={loading || kod === '—'}
+        style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, borderRadius: 6, border: '1px solid #cbd5e1', background: copied ? '#dcfce7' : '#fff', color: copied ? '#166534' : '#1f2937', cursor: 'pointer' }}>
+        {copied ? '✓ Kopyalandı' : 'Kopyala'}
+      </button>
+      <button type="button" onClick={yenile} disabled={loading}
+        style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, borderRadius: 6, border: '1px solid #f59e0b', background: '#fffbeb', color: '#92400e', cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>
+        {loading ? 'Yenileniyor…' : 'Yenile'}
+      </button>
+      <span style={{ fontSize: 11.5, color: '#64748b', marginLeft: 6 }}>
+        Personel mobil uygulamayı açarken bu kodu girer. Sızarsa yenileyin.
+      </span>
     </div>
   )
 }

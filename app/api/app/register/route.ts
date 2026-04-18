@@ -38,33 +38,59 @@ export async function OPTIONS() {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { firma_token, device_id, user_id, isim_soyisim, proje_id, sifre } = body
+    const { firma_token, firma_id: firmaIdParam, device_id, user_id, isim_soyisim, proje_id, sifre } = body
 
-    if (!firma_token || !device_id || !user_id || !isim_soyisim) {
-      return NextResponse.json({ ok: false, error: 'Eksik parametreler' }, { status: 400, headers: CORS_HEADERS })
+    if ((!firma_token && !firmaIdParam) || !device_id || !user_id || !isim_soyisim) {
+      return NextResponse.json({ ok: false, error: 'Eksik parametreler (firma_token veya firma_id gerekli)' }, { status: 400, headers: CORS_HEADERS })
     }
 
     const admin = createAdminClient()
 
-    const { data: linkData, error: linkErr } = await admin
-      .from('app_download_links')
-      .select('firma_id, aktif, mod')
-      .eq('link_token', firma_token)
-      .single()
-
-    if (linkErr || !linkData) {
-      return NextResponse.json({ ok: false, error: 'Geçersiz firma linki' }, { status: 404, headers: CORS_HEADERS })
-    }
-
-    if (!linkData.aktif) {
-      return NextResponse.json({ ok: false, error: 'Bu link artık aktif değil' }, { status: 403, headers: CORS_HEADERS })
+    // Firma_id'yi iki yoldan çözümle: firma_id direkt veya firma_token
+    let firmaId: string = ''
+    let mod = 'QR'
+    if (firmaIdParam) {
+      const { data: firma, error: firmaErr } = await admin
+        .from('firmalar')
+        .select('id, aktif')
+        .eq('id', firmaIdParam)
+        .single()
+      if (firmaErr || !firma) {
+        return NextResponse.json({ ok: false, error: 'Firma bulunamadı' }, { status: 404, headers: CORS_HEADERS })
+      }
+      if (!firma.aktif) {
+        return NextResponse.json({ ok: false, error: 'Firma aktif değil' }, { status: 403, headers: CORS_HEADERS })
+      }
+      firmaId = firma.id
+      const { data: linkRow } = await admin
+        .from('app_download_links')
+        .select('mod')
+        .eq('firma_id', firmaId)
+        .eq('aktif', true)
+        .limit(1)
+        .maybeSingle()
+      mod = linkRow?.mod || 'QR'
+    } else {
+      const { data: linkData, error: linkErr } = await admin
+        .from('app_download_links')
+        .select('firma_id, aktif, mod')
+        .eq('link_token', firma_token)
+        .single()
+      if (linkErr || !linkData) {
+        return NextResponse.json({ ok: false, error: 'Geçersiz firma linki' }, { status: 404, headers: CORS_HEADERS })
+      }
+      if (!linkData.aktif) {
+        return NextResponse.json({ ok: false, error: 'Bu link artık aktif değil' }, { status: 403, headers: CORS_HEADERS })
+      }
+      firmaId = firmaId
+      mod = linkData.mod || 'QR'
     }
 
     const { data: kullanici, error: kullaniciErr } = await admin
       .from('users')
       .select('id, isim_soyisim, firma_id, aktif')
       .eq('id', user_id)
-      .eq('firma_id', linkData.firma_id)
+      .eq('firma_id', firmaId)
       .single()
 
     if (kullaniciErr || !kullanici) {
@@ -133,7 +159,7 @@ export async function POST(req: Request) {
         .from('device_tokens')
         .update({
           user_id,
-          firma_id: linkData.firma_id,
+          firma_id: firmaId,
           isim_soyisim: kullanici.isim_soyisim,
           proje_id: proje_id || null,
           aktif: true,
@@ -146,7 +172,7 @@ export async function POST(req: Request) {
         .insert({
           device_id,
           user_id,
-          firma_id: linkData.firma_id,
+          firma_id: firmaId,
           isim_soyisim: kullanici.isim_soyisim,
           proje_id: proje_id || null,
           aktif: true,
@@ -167,9 +193,9 @@ export async function POST(req: Request) {
       device_token: deviceToken,
       user_id,
       isim_soyisim: kullanici.isim_soyisim,
-      firma_id: linkData.firma_id,
+      firma_id: firmaId,
       proje_id: proje_id || null,
-      mod: linkData.mod || 'QR',
+      mod,
     }, { headers: CORS_HEADERS })
 
   } catch (error: any) {
