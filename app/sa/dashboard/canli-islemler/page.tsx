@@ -62,6 +62,7 @@ export default async function SACanliIslemlerPage() {
         kullanicilar={kullanicilar ?? []}
         initialGorevler={canliGorevler ?? []}
         meId={me.id}
+        meName={me.isim_soyisim ?? undefined}
         projeId={projeId}
         readonly={false}
         canliAkisSureSaat={firmaId ? (await getEfektifAyar(firmaId, projeId)).canli_akis_sure_saat : 8}

@@ -39,12 +39,23 @@ const DURUM_RENK: Record<string, string> = {
   SILINDI: 'status-silindi',
 }
 
-function getIslemiYapan(g: any) {
+function getIslemiYapan(g: any, ctx?: { meId?: string; meName?: string; kullanicilar?: { id: string; isim_soyisim: string }[] }) {
   if (g.islemi_yapan?.isim_soyisim) return g.islemi_yapan.isim_soyisim
-  if (['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum)) return g.tamamlayan?.isim_soyisim ?? '—'
-  if (g.durum === 'IPTAL') return g.iptalEden?.isim_soyisim ?? '—'
-  if (['BEKLEMEDE', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'KAPATILDI', 'SILINDI'].includes(g.durum)) {
-    return g.iptalEden?.isim_soyisim ?? g.olusturan?.isim_soyisim ?? '—'
+  // SA gibi farklı firma_id'li kullanıcılar join ile gelmez; id + isim eşleştirmesi ile fallback
+  const lookup = (id: string | null | undefined) => {
+    if (!id) return null
+    if (ctx?.meId && id === ctx.meId && ctx.meName) return ctx.meName
+    const u = ctx?.kullanicilar?.find(k => k.id === id)
+    return u?.isim_soyisim ?? null
+  }
+  const byId = lookup(g.islemi_yapan_id)
+  if (byId) return byId
+  if (['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum)) {
+    return g.tamamlayan?.isim_soyisim ?? lookup(g.tamamlayan_kullanici_id) ?? '—'
+  }
+  if (g.durum === 'IPTAL') return g.iptalEden?.isim_soyisim ?? lookup(g.iptal_eden_id) ?? '—'
+  if (['BEKLEMEDE', 'ZAMANI_GECMIS', 'KAPATILDI', 'SILINDI'].includes(g.durum)) {
+    return g.iptalEden?.isim_soyisim ?? lookup(g.iptal_eden_id) ?? g.olusturan?.isim_soyisim ?? '—'
   }
   return g.olusturan?.isim_soyisim ?? '—'
 }
@@ -53,6 +64,7 @@ export default function TumGorevlerClient({
   base,
   firmaId,
   meId,
+  meName,
   readonly,
   lokasyonlar,
   kullanicilar,
@@ -64,6 +76,7 @@ export default function TumGorevlerClient({
   base: '/sa' | '/ta' | '/u'
   firmaId: string
   meId: string
+  meName?: string
   readonly: boolean
   lokasyonlar: { id: string; tanim: string; parent_id?: string | null; checklist_sablon_id?: string | null }[]
   kullanicilar: { id: string; isim_soyisim: string }[]
@@ -762,7 +775,7 @@ async function del() {
   const actorOptions = useMemo(() => {
     const set = new Set<string>()
     ;(gorevler ?? []).forEach((g: any) => {
-      const name = getIslemiYapan(g)
+      const name = getIslemiYapan(g, { meId, meName, kullanicilar })
       if (name && name !== '—') set.add(name)
     })
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'tr'))
@@ -781,7 +794,7 @@ async function del() {
           g.tanim ?? '',
           g.lokasyonlar?.tanim ?? '',
           g.atanan?.isim_soyisim ?? '',
-          getIslemiYapan(g) ?? '',
+          getIslemiYapan(g, { meId, meName, kullanicilar }) ?? '',
         ]
           .join(' ')
           .toLowerCase()
@@ -791,7 +804,7 @@ async function del() {
       if (lokasyonSet && (!g.lokasyon_id || !lokasyonSet.has(g.lokasyon_id))) return false
       if (atananId && g.atanan_kullanici_id !== atananId) return false
       if (durum && g.durum !== durum) return false
-      if (actor && getIslemiYapan(g) !== actor) return false
+      if (actor && getIslemiYapan(g, { meId, meName, kullanicilar }) !== actor) return false
 
       if (fromD || toD) {
         const d = g.aktif_olma_tarihi ? new Date(g.aktif_olma_tarihi) : null
@@ -818,7 +831,7 @@ async function del() {
       if (sortKey === 'lokasyon') return (g.lokasyonlar?.tanim ?? '').toString()
       if (sortKey === 'atanan') return (g.atanan?.isim_soyisim ?? '').toString()
       if (sortKey === 'durum') return (CANLI_DURUM_LABEL[g.durum] ?? g.durum ?? '').toString()
-      if (sortKey === 'actor') return (getIslemiYapan(g) ?? '').toString()
+      if (sortKey === 'actor') return (getIslemiYapan(g, { meId, meName, kullanicilar }) ?? '').toString()
       // aktif
       return g.aktif_olma_tarihi ? new Date(g.aktif_olma_tarihi).getTime() : 0
     }
@@ -1167,7 +1180,7 @@ async function del() {
                     ? (g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—')
                     : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
                 </td>
-                <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g)}</td>
+                <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g, { meId, meName, kullanicilar })}</td>
                 <td>
                   <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
                 </td>

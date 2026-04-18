@@ -65,6 +65,7 @@ export default async function SATumGorevlerPage() {
         firmaId={firmaId}
         projeId={projeId}
         meId={me.id}
+        meName={me.isim_soyisim ?? undefined}
         readonly={false}
         lokasyonlar={(lokasyonlar as any) ?? []}
         kullanicilar={(kullanicilar as any) ?? []}

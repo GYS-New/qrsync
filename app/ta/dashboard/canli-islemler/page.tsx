@@ -43,6 +43,7 @@ export default async function CanliIslemlerPage() {
         kullanicilar={kullanicilar ?? []}
         initialGorevler={canliGorevler ?? []}
         meId={me.id}
+        meName={me.isim_soyisim ?? undefined}
         projeId={aktifProje.id}
         readonly={me.rol === 'tenant_user'}
         canliAkisSureSaat={(await getEfektifAyar(firmaId, aktifProje.id)).canli_akis_sure_saat}

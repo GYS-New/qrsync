@@ -58,6 +58,7 @@ export default async function TATumGorevlerPage() {
         base="/ta"
         firmaId={firmaId}
         meId={me.id}
+        meName={me.isim_soyisim ?? undefined}
         readonly={me.rol === 'tenant_user'}
         lokasyonlar={(lokasyonlar as any) ?? []}
         kullanicilar={(kullanicilar as any) ?? []}

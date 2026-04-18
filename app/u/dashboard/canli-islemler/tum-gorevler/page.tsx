@@ -16,7 +16,7 @@ export default async function UTumGorevlerPage() {
 
   const { data: me } = await supabase
     .from('users')
-    .select('id,rol,firma_id,proje_id')
+    .select('id,rol,firma_id,proje_id,isim_soyisim')
     .eq('id', authUser.id)
     .single()
   if (!me) redirect('/login')
@@ -65,6 +65,7 @@ export default async function UTumGorevlerPage() {
         base="/u"
         firmaId={firmaId}
         meId={me.id}
+        meName={me.isim_soyisim ?? undefined}
         readonly={readonly}
         yetkiliLokIds={yetkiliLokIds}
         projeId={projeId ?? null}

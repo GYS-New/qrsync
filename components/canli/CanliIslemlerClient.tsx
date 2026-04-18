@@ -29,6 +29,7 @@ interface Props {
   kullanicilar: { id: string; isim_soyisim: string; profil_foto?: string }[]
   initialGorevler: any[]
   meId: string
+  meName?: string  // SA gibi farklı firma_id'li kullanıcıların join ile görünmeyeceği durumlar için fallback
   readonly: boolean
   projeId?: string | null
   showTumGorevler?: boolean  // false yapılırsa "Tüm Görevler" linki gizlenir
@@ -173,7 +174,7 @@ function LiveHeader({
   )
 }
 
-export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, readonly, projeId, showTumGorevler = true, yetkiliLokIds, canliAkisSureSaat = 8 }: Props) {
+export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, meName, readonly, projeId, showTumGorevler = true, yetkiliLokIds, canliAkisSureSaat = 8 }: Props) {
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -802,7 +803,18 @@ useEffect(() => {
     const fs = fontSize ? `${fontSize}px` : undefined
     const getIslemiYapan = () => {
       if (g.islemi_yapan?.isim_soyisim) return g.islemi_yapan.isim_soyisim
-      if (g.durum === 'TAMAMLANDI') return g.tamamlayan?.isim_soyisim ?? '—'
+      // SA gibi farklı firma_id'li kullanıcılar join ile gelmez; elimizdeki bilgiyle fallback:
+      if (g.islemi_yapan_id) {
+        if (g.islemi_yapan_id === meId && meName) return meName
+        const u = kullanicilar.find(k => k.id === g.islemi_yapan_id)
+        if (u) return u.isim_soyisim
+      }
+      if (g.tamamlayan?.isim_soyisim) return g.tamamlayan.isim_soyisim
+      if (g.tamamlayan_kullanici_id) {
+        if (g.tamamlayan_kullanici_id === meId && meName) return meName
+        const u = kullanicilar.find(k => k.id === g.tamamlayan_kullanici_id)
+        if (u) return u.isim_soyisim
+      }
       if (g.durum === 'IPTAL') return g.iptalEden?.isim_soyisim ?? '—'
       return g.olusturan?.isim_soyisim ?? '—'
     }

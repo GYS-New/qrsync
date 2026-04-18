@@ -15,7 +15,7 @@ export default async function UserCanliIslemler() {
 
   const { data: me } = await supabase
     .from('users')
-    .select('id,firma_id,proje_id,rol')
+    .select('id,firma_id,proje_id,rol,isim_soyisim')
     .eq('id', authUser.id)
     .single()
   if (!me) redirect('/login')
@@ -61,6 +61,7 @@ export default async function UserCanliIslemler() {
         kullanicilar={kullanicilar ?? []}
         initialGorevler={canliGorevler ?? []}
         meId={me.id}
+        meName={me.isim_soyisim ?? undefined}
         projeId={projeId ?? null}
         readonly={readonly}
         showTumGorevler={tumGorevlerYetki.gorebilir}
