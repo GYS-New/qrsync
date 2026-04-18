@@ -64,7 +64,7 @@ export async function GET(req: Request) {
     // ─────────────────────────────────────────────────────────────────────
     let query = admin
       .from('device_tokens')
-      .select('user_id, isim_soyisim, proje_id, firma_id, son_kullanim')
+      .select('id, device_token, user_id, isim_soyisim, proje_id, firma_id, son_kullanim')
       .eq('device_id', deviceId)
       .eq('aktif', true)
       .order('son_kullanim', { ascending: false, nullsFirst: false })
@@ -111,14 +111,21 @@ export async function GET(req: Request) {
       firmaAdi = firma?.firma_adi || firma?.ticari_unvan || null
     }
 
+    // Aktif kullanım anı — cihaz tekrar tanınıyor
+    await admin
+      .from('device_tokens')
+      .update({ son_kullanim: new Date().toISOString() })
+      .eq('id', mevcutKayit.id)
+
     return NextResponse.json({
       ok: true,
       eskiKayit: {
-        user_id: mevcutKayit.user_id,
+        user_id:      mevcutKayit.user_id,
         isim_soyisim: mevcutKayit.isim_soyisim,
-        proje_id: mevcutKayit.proje_id,
-        firma_id: mevcutKayit.firma_id,
-        firma_adi: firmaAdi,
+        proje_id:     mevcutKayit.proje_id,
+        firma_id:     mevcutKayit.firma_id,
+        firma_adi:    firmaAdi,
+        device_token: mevcutKayit.device_token,
       },
     }, { headers: CORS_HEADERS })
 

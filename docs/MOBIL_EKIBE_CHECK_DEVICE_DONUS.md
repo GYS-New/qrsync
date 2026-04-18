@@ -1,9 +1,19 @@
-# MOBİL EKİBE NOT — check-device Cihaz Tabanlı Firma Çözümleme (Hazır)
+# MOBİL EKİBE NOT — check-device Cihaz Tabanlı Auto-Login (Güncel)
 
-**Tarih:** 2026-04-19
-**Durum:** Backend tamamlandı, sizin kullanıma hazır.
+**Tarih:** 2026-04-19 (revizyon)
+**Durum:** Backend tamamlandı.
 
-İstediğiniz gibi `/api/app/check-device` endpoint'i `firma_id` parametresi olmadan da çalışacak şekilde güncellendi. Geriye uyumlu, eski akışlar kırılmadı.
+---
+
+## ÖNEMLİ REVİZYON
+
+İlk dönüşte "re-install sonrası şifre ekranı göster" demiştik. **Revizyon:**
+
+> **Cihaz daha önce bu backend'e kayıt olduysa, re-install sonrası HİÇBİR doğrulama olmadan direkt ana ekrana geçilir.**
+
+**Neden:** Şifre doğrulaması "rastgele isim-cihaz eşleştirmesini" önlemek içindi. Re-install senaryosunda cihaz ve bağlı kullanıcı zaten eşleşmiş durumda — yeni pairing yok, rastgele eşleşme riski yok. Aynı fiziksel cihaz, aynı bağlı kullanıcı.
+
+Şifre sadece **ilk kez cihaz-kullanıcı bağlaması** sırasında (yeni register) sorulur.
 
 ---
 
@@ -15,32 +25,33 @@
 
 | Parametre | Zorunlu mu? | Açıklama |
 |---|---|---|
-| `device_id` | ✅ Evet | Android `Settings.Secure.ANDROID_ID` veya eşdeğer benzersiz cihaz ID'si |
-| `firma_id` | Opsiyonel | Yeni mobil — firma kodu çözümü sonrası elinde varsa gönder |
+| `device_id` | ✅ Evet | Android `Settings.Secure.ANDROID_ID` veya eşdeğer |
+| `firma_id` | Opsiyonel | Yeni mobil — firma kodu çözümü sonrası varsa gönder |
 | `firma` | Opsiyonel | Eski mobil — `app_download_links.link_token` (geriye uyumluluk) |
 
 **Davranış:**
 
-1. **firma_id VERİLDİ** → o firma için device_id eşleşmesi ara.
-2. **firma (token) VERİLDİ** → token'dan firma_id çöz, o firma için eşleşme ara.
-3. **HİÇBİRİ VERİLMEDİ** → yalnızca `device_id` ile ara, birden fazla varsa **en son `son_kullanim`** kaydını döndür.
+1. `firma_id` verildi → o firma için device_id eşleşmesi ara.
+2. `firma` (token) verildi → token'dan firma_id çöz, o firma için eşleşme ara.
+3. Hiçbiri verilmedi → yalnızca `device_id` ile ara, birden fazla varsa **en son `son_kullanim`** kaydını döndür.
 
-### Başarılı yanıt (kayıt bulunduğunda)
+### Başarılı yanıt (eşleşme bulundu — auto-login!)
 
 ```json
 {
   "ok": true,
   "eskiKayit": {
-    "user_id":     "uuid",
-    "isim_soyisim":"Ad Soyad",
-    "proje_id":    "uuid",
-    "firma_id":    "uuid",
-    "firma_adi":   "ATALİAN"
+    "user_id":      "uuid",
+    "isim_soyisim": "Ad Soyad",
+    "proje_id":     "uuid",
+    "firma_id":     "uuid",
+    "firma_adi":    "ATALİAN",
+    "device_token": "token-string"
   }
 }
 ```
 
-**Yeni:** `firma_id` ve `firma_adi` her zaman yanıtta yer alır (eski sürümlerde yoktu — geriye uyumsuzluk yaratmaz; eski mobil okumazsa yok sayar).
+**YENİ:** `device_token` eklendi. Mobil bu token ile register'ı bypass edip direkt ana ekrana geçer.
 
 ### Kayıt yok / cihaz silinmiş / firma pasif
 
@@ -48,94 +59,105 @@
 { "ok": true, "eskiKayit": null }
 ```
 
-Mobil bu durumda firma kodu giriş ekranını gösterir.
+Mobil firma kodu giriş ekranını gösterir → normal kayıt akışı (firma kodu → proje → isim → şifre → register).
 
 ### Hatalı istek
 
 ```json
 { "ok": false, "error": "device_id gerekli" }
 ```
-HTTP 400.
 
 ---
 
-## 2. Önerdiğiniz mobil init akışı
-
-Sizin taslağınız bire bir uygulanabilir:
+## 2. Mobil init akışı (GÜNCEL)
 
 ```javascript
-const savedFirmaId = await getFromStorage('firma_id')
-
-const url = savedFirmaId
-  ? `/api/app/check-device?device_id=${deviceId}&firma_id=${savedFirmaId}`
-  : `/api/app/check-device?device_id=${deviceId}`
-
-const res = await fetch(url).then(r => r.json())
+const res = await fetch(`/api/app/check-device?device_id=${deviceId}`)
+  .then(r => r.json())
 
 if (res.ok && res.eskiKayit) {
-  // Auto-restore:
-  //   firma_id, firma_adi, user_id, isim_soyisim, proje_id → storage
-  //   proje/isim seçim ekranlarını atla, direkt şifre ekranı göster
-  // Şifre doğrulaması /api/app/register'da zaten var — mevcut akış.
+  // ✓ Cihaz tanındı — auto-login, ŞİFRE SORMA
+  await saveToStorage({
+    firma_id:     res.eskiKayit.firma_id,
+    firma_adi:    res.eskiKayit.firma_adi,
+    user_id:      res.eskiKayit.user_id,
+    isim_soyisim: res.eskiKayit.isim_soyisim,
+    proje_id:     res.eskiKayit.proje_id,
+    device_token: res.eskiKayit.device_token,
+  })
+  goToMainScreen()
 } else {
-  // Firma kodu giriş ekranından başla
+  // Yeni kurulum / silinmiş cihaz → firma kodu ekranı
+  goToFirmaKoduScreen()
 }
 ```
 
----
-
-## 3. "Birden fazla firma" senaryosu
-
-Şimdilik backend **her zaman en son `son_kullanim`'a sahip kaydı** dönüyor (most-recent-wins). Cihaz birden fazla firmaya bağlıysa da sadece en son kullanılanı döner.
-
-Eğer ilerde "birden fazla firma var, kullanıcı seçsin" akışı isterseniz backend'de ayrı bir endpoint açılabilir (ör. `/api/app/check-device-tum` veya body parametresi). Şimdilik gerek görmedik, ihtiyaç olursa söyleyin.
+Mobil zaten `firma_id`'yi storage'da tutuyorsa ilk çağrıda ekleyebilirsin — ama gerek yok, sadece `device_id` yeterli.
 
 ---
 
-## 4. Güvenlik — şifre kontrolünü bypass etmez
+## 3. Şifre akışı ne zaman devreye girer?
 
-Auto-restore sadece **bilgi getirme** işlemi. Asıl auth hâlâ `/api/app/register`'da, `sifre` alanı zorunlu:
+**Sadece yeni pairing sırasında:**
 
-1. check-device → eski kayıt bilgileri cevap olarak döner
-2. Mobil `firma_id, user_id, proje_id, isim_soyisim` bilgilerini elde
-3. Kullanıcıya **sadece şifre** sorulur
-4. Mobil `/api/app/register` çağırır → sifre doğrulanır → auth tamamlanır
+1. Firma kodu girişi (yeni cihaz / silindikten sonra eşleşme yok)
+2. Proje seç
+3. İsim seç
+4. **Şifre ekranı** ← sadece burada
+5. `/api/app/register` → doğru şifre → device_tokens row'u oluşur
 
-Yani cihaz tanınsa bile şifre olmadan auth yok. Mevcut güvenlik zincirini koruduk.
+**Re-install sonrası:**
 
-**Not:** Register endpoint'i de `firma_id`'yi zaten alıyordu (soft rollout ile); ek değişiklik gerekmez.
+1. check-device → eskiKayit dolu
+2. Direkt ana ekran (şifre yok)
 
 ---
 
-## 5. Pasif firma / silinmiş kullanıcı durumu
+## 4. Birden fazla firma senaryosu
 
-Backend iki durumda `eskiKayit: null` döner:
+Cihaz farklı firmalara da bağlı olabilir (nadir ama mümkün — IT/test cihazı vs). Backend **en son son_kullanim** kaydını döndürüyor. İhtiyaç olursa liste dönebilen ayrı endpoint açarız.
+
+---
+
+## 5. Pasif firma / silinmiş kullanıcı
+
+Backend `eskiKayit: null` döner şu durumlarda:
 
 - Eşleşen `device_tokens` kaydı yok
 - Kullanıcı pasif (`users.aktif = false`)
-- **YENİ:** Firma pasif (`firmalar.aktif = false`) — rebrand/çıkış sonrası otomatik yeniden onboard akışı
+- Firma pasif (`firmalar.aktif = false`)
 
-Bu durumlarda mobil, firma kodu ekranını gösterir. Yeni firmaya geçmek isteyen kullanıcılar böylece engelsiz yeni kod girebilir.
+Bu durumlarda mobil firma kodu ekranına döner. Eski cihaz yeni firma için temiz başlar.
 
 ---
 
-## 6. Test
+## 6. Güvenlik dengesi
+
+**Tercih edilen model:**
+- Cihaz tabanlı kimlik: `device_id` + `device_token` (Android storage'da saklanır, ama backend DB'de de var)
+- Şifre: sadece ilk pairing'de (proje/isim seçiminde random matching'i engellemek için)
+- Re-install: cihaz tanımlıysa auto-login
+
+**Risk:** Cihaz çalınırsa/verilirse, yeni kişi önceki hesaba erişir. Ama bu zaten Android ANDROID_ID modelinin doğası. Kullanıcı IT'den cihaz silme isteyebilir → TA, ilgili device_tokens row'unu `aktif=false` yapar → bir sonraki check-device `eskiKayit: null` döner.
+
+TA için "Cihazı Kaldır" butonu gerekliyse backend'de eklenebilir — söyleyin.
+
+---
+
+## 7. Test
 
 ```bash
-# Yeni akış: sadece device_id
+# Auto-login testi (cihaz daha önce kayıtlı)
 curl "https://app.iogys.com.tr/api/app/check-device?device_id=test-dev-1"
 
-# firma_id ile
-curl "https://app.iogys.com.tr/api/app/check-device?device_id=test-dev-1&firma_id=<UUID>"
-
-# Eski akış (firma token) hâlâ çalışıyor
-curl "https://app.iogys.com.tr/api/app/check-device?device_id=test-dev-1&firma=<LINK_TOKEN>"
+# Yanıtta eskiKayit.device_token gelirse → mobil direkt ana ekran
 ```
 
 ---
 
-## 7. Deploy
+## Özet
 
-Commit ile birlikte Railway otomatik deploy alacak (yaklaşık 1-2 dk). Deploy sonrası test edebilirsiniz.
+- **Yeni pairing** (ilk kurulum, firma değişimi): firma kodu + proje + isim + **ŞİFRE** zorunlu.
+- **Re-install** (aynı cihaz, silinip yeniden kurulum): `device_id` yeterli, **ŞİFRE YOK**, device_token otomatik döner.
 
-Soru veya ek istek olursa dönün.
+Soru olursa dönün.

@@ -1,8 +1,14 @@
 # MOBİL EKİBE NOT — Personel İsim-Cihaz Eşleştirmesinde Şifre Doğrulama
 
-**Tarih:** 2026-04-17
+**Tarih:** 2026-04-17 (revizyon: 2026-04-19)
 **Backend commit:** (bu notun yanındaki commit hash'i)
 **Durum:** Backend tarafı hazır — mobil güncelleme bekleniyor.
+
+## ÖNEMLİ (2026-04-19 revizyonu)
+
+Şifre doğrulaması **yalnızca YENİ pairing** sırasında sorulur (firma kodu → proje → isim → **şifre** → register).
+
+**Re-install senaryosu:** Cihaz daha önce kayıtlıysa `/api/app/check-device` ile auto-login olur, şifre sorulmaz. Detay için `MOBIL_EKIBE_CHECK_DEVICE_DONUS.md`.
 
 ---
 
