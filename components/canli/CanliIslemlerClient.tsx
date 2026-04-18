@@ -154,8 +154,8 @@ function LiveHeader({
       <style>{`
         @keyframes canliPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.65)} }
         @keyframes canliScan { 0%{top:-100%} 100%{top:100%} }
-        @keyframes rowGlow { 0%{background:#fef9c3} 100%{background:transparent} }
-        .row-new { animation: rowGlow 5s ease-out forwards; }
+        @keyframes rowGlow { 0%{background:#fde68a} 60%{background:#fef3c7} 100%{background:transparent} }
+        tr.row-new > td { animation: rowGlow 3s ease-out forwards; }
       `}</style>
     </div>
   )
@@ -427,14 +427,17 @@ useEffect(() => {
 
     const data = res.data
     if (data) {
-      // Yeni gelen görev (en üst) 3-4 sn vurgulansın
-      const prevTopId = liveFlowGorevler?.[0]?.id
+      // Yeni gelen görev (en üst) 3 sn vurgulansın — prev state'e functional setter ile eriş
+      // (setInterval closure'ı eski liveFlowGorevler'ı kilitliyordu, bu yüzden highlight hiç fire etmezdi)
       const nextTopId = data?.[0]?.id
-      if (nextTopId && nextTopId !== prevTopId) {
-        setHighlightId(nextTopId)
-        setTimeout(() => setHighlightId((cur) => (cur === nextTopId ? null : cur)), 5000)
-      }
-      setLiveFlowGorevler(data)
+      setLiveFlowGorevler(prev => {
+        const prevTopId = prev?.[0]?.id
+        if (nextTopId && nextTopId !== prevTopId) {
+          setHighlightId(nextTopId)
+          setTimeout(() => setHighlightId(cur => cur === nextTopId ? null : cur), 3000)
+        }
+        return data
+      })
     }
   }
 
