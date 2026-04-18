@@ -274,6 +274,7 @@ useEffect(() => {
     if (streamState === 'stopped') {
       setLiveFlowGorevler([])
       setLiveKpiRows([])
+      lastTopIdRef.current = null
       return
     }
 
@@ -428,17 +429,17 @@ useEffect(() => {
 
     const data = res.data
     if (data) {
-      // Yeni gelen görev (en üst) 3 sn vurgulansın — prev state'e functional setter ile eriş
-      // (setInterval closure'ı eski liveFlowGorevler'ı kilitliyordu, bu yüzden highlight hiç fire etmezdi)
-      const nextTopId = data?.[0]?.id
-      setLiveFlowGorevler(prev => {
-        const prevTopId = prev?.[0]?.id
-        if (nextTopId && nextTopId !== prevTopId) {
-          setHighlightId(nextTopId)
-          setTimeout(() => setHighlightId(cur => cur === nextTopId ? null : cur), 3000)
-        }
-        return data
-      })
+      // Yeni gelen görev (en üst) 3 sn vurgulansın.
+      // useRef ile önceki top id'yi tut — setInterval closure bağımlılığı yok,
+      // StrictMode double-render'ı sorun çıkarmaz.
+      const nextTopId = data?.[0]?.id ?? null
+      if (nextTopId && nextTopId !== lastTopIdRef.current) {
+        const targetId = nextTopId
+        setHighlightId(targetId)
+        setTimeout(() => setHighlightId(cur => cur === targetId ? null : cur), 3000)
+      }
+      lastTopIdRef.current = nextTopId
+      setLiveFlowGorevler(data)
     }
   }
 
@@ -711,6 +712,9 @@ useEffect(() => {
       if (g.durum === 'IPTAL') return g.iptalEden?.isim_soyisim ?? '—'
       return g.olusturan?.isim_soyisim ?? '—'
     }
+    // Highlight efekti — her td'ye direkt bg ver (tr bg bazı tarayıcılarda render olmuyor)
+    const hlBg = highlight ? '#fde68a' : undefined
+    const tdHL = { backgroundColor: hlBg, transition: 'background-color 0.8s ease-out' }
     return (
       <tr
         key={g.id}
@@ -718,24 +722,24 @@ useEffect(() => {
           setSelectedId(g.id)
           setSelectedGorev(g)
         }}
-        className={highlight ? 'row-new' : ''}
         style={{
           cursor: 'pointer',
           backgroundColor: highlight ? '#fde68a' : (isSel ? '#f9fafb' : undefined),
           transition: 'background-color 0.8s ease-out',
+          boxShadow: highlight ? 'inset 0 0 0 2px #f59e0b' : undefined,
         }}
       >
-        <td style={{ fontWeight: 500, fontSize: fs }}>{g.tanim}</td>
-        <td style={{ color: '#4b5563', fontSize: fs }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-        <td style={{ color: '#4b5563', fontSize: fs }}>{g.atanan?.isim_soyisim ?? '—'}</td>
-        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px' }}>{formatDateTime(g.aktif_olma_tarihi)}</td>
-        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px' }}>{formatDateTime(g.durum_degisim_tarihi ?? g.olusturma_tarihi ?? g.aktif_olma_tarihi)}</td>
-        <td style={{ fontSize: fs }}>
+        <td style={{ fontWeight: 500, fontSize: fs, ...tdHL }}>{g.tanim}</td>
+        <td style={{ color: '#4b5563', fontSize: fs, ...tdHL }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
+        <td style={{ color: '#4b5563', fontSize: fs, ...tdHL }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatDateTime(g.aktif_olma_tarihi)}</td>
+        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatDateTime(g.durum_degisim_tarihi ?? g.olusturma_tarihi ?? g.aktif_olma_tarihi)}</td>
+        <td style={{ fontSize: fs, ...tdHL }}>
           <span style={{ fontSize: fs }} className={`verde-badge ${durumRenk[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
         </td>
         {/* "İşlemi Yapan" sadece canlı akış tablosunda gösterilsin */}
         {showActor && (
-          <td style={{ color: '#4b5563', fontSize: fs }}>
+          <td style={{ color: '#4b5563', fontSize: fs, ...tdHL }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <span style={{ fontSize: fs, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>{getIslemiYapan()}</span>
 
