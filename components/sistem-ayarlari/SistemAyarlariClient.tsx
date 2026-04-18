@@ -588,17 +588,49 @@ function UygulamaAyarlariPanel() {
 }
 
 function SistemKonfigurasyonPanel() {
+  // Şifre kapısı state
+  const [dogrulandi, setDogrulandi] = useState(false)
+  const [sifre, setSifre] = useState('')
+  const [dogrulaLoading, setDogrulaLoading] = useState(false)
+  const [dogrulaHata, setDogrulaHata] = useState<string | null>(null)
+
+  // Form state
   const [form, setForm] = useState({ uygulama_domain: 'app.iogys.com.tr', firebase_project_id: '', firebase_client_email: '', firebase_private_key: '', cron_secret: '' })
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetch('/api/sistem-ayarlari/konfigurasyon')
-      .then(r => r.json())
-      .then(j => { if (j.uygulama_domain) setForm(j); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+  const doDogrula = async () => {
+    if (!sifre) { setDogrulaHata('Şifre girin'); return }
+    setDogrulaLoading(true); setDogrulaHata(null)
+    try {
+      const res = await fetch('/api/auth/sa-dogrula', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sifre }) })
+      const j = await res.json()
+      if (!res.ok || !j.ok) {
+        if (j.kilitli) setDogrulaHata(`Çok fazla yanlış deneme. ${j.kalan_sn}sn sonra deneyin.`)
+        else if (j.sifre_hatali) setDogrulaHata('Şifre hatalı')
+        else setDogrulaHata(j.error ?? 'Doğrulanamadı')
+        return
+      }
+      setDogrulandi(true)
+      setSifre('')
+      setLoading(true)
+      const r2 = await fetch('/api/sistem-ayarlari/konfigurasyon')
+      const j2 = await r2.json()
+      if (j2.uygulama_domain !== undefined) setForm({
+        uygulama_domain: j2.uygulama_domain ?? '',
+        firebase_project_id: j2.firebase_project_id ?? '',
+        firebase_client_email: j2.firebase_client_email ?? '',
+        firebase_private_key: j2.firebase_private_key ?? '',
+        cron_secret: j2.cron_secret ?? '',
+      })
+      setLoading(false)
+    } catch (e: any) {
+      setDogrulaHata(e?.message ?? 'Hata')
+    } finally {
+      setDogrulaLoading(false)
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true); setMsg(null)
@@ -609,6 +641,42 @@ function SistemKonfigurasyonPanel() {
       setMsg('Konfigürasyon kaydedildi.')
     } catch (e: any) { setMsg('Hata: ' + e.message) }
     setSaving(false)
+  }
+
+  // ── Şifre kapısı ──────────────────────────────────────────────────────────
+  if (!dogrulandi) {
+    return (
+      <div style={{ width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <div style={{ width: 4, height: 20, borderRadius: 2, background: '#7c3aed' }} />
+          <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>Sistem Konfigürasyonu</h3>
+        </div>
+        <div style={{ maxWidth: 480, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '24px 28px' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>🔒 Hassas bölge</div>
+          <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 18, lineHeight: 1.5 }}>
+            Bu sayfa sistem kritik ayarları (domain, FCM anahtarları, cron secret) içerir. Devam etmek için kendi şifrenizi girin.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+              type="password"
+              value={sifre}
+              onChange={e => { setSifre(e.target.value); setDogrulaHata(null) }}
+              onKeyDown={e => { if (e.key === 'Enter') doDogrula() }}
+              placeholder="Şifrenizi girin"
+              autoFocus
+              style={{ height: 40, padding: '0 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}
+            />
+            {dogrulaHata && (
+              <div style={{ fontSize: 12.5, color: '#dc2626', fontWeight: 600 }}>{dogrulaHata}</div>
+            )}
+            <button onClick={doDogrula} disabled={dogrulaLoading}
+              style={{ height: 40, marginTop: 4, borderRadius: 8, background: '#7c3aed', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13.5, cursor: 'pointer', opacity: dogrulaLoading ? 0.6 : 1 }}>
+              {dogrulaLoading ? 'Doğrulanıyor…' : 'Devam Et'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
@@ -624,6 +692,10 @@ function SistemKonfigurasyonPanel() {
       <div style={{ padding: '10px 14px', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 8, fontSize: 12.5, color: '#6b21a8', lineHeight: 1.6, marginBottom: 16 }}>
         Bu ayarlar sunucu, domain veya altyapı değişikliğinde kullanılır. Yanlış değer girilirse sistem çalışmayabilir.
         Değişiklik yapmadan önce mevcut değerleri not alın.
+      </div>
+      <div style={{ padding: '10px 14px', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, fontSize: 12.5, color: '#92400e', lineHeight: 1.6, marginBottom: 16 }}>
+        ℹ️ Boş bırakılan alanlar için sistem Railway environment variable'larından fallback değer okur.
+        Bu sayfadaki değerler DB'deki mevcut kayıtlardır — boş ise <strong>env'den geliyor</strong> demektir.
       </div>
 
       {/* Uygulama */}
