@@ -595,7 +595,7 @@ function SistemKonfigurasyonPanel() {
   const [dogrulaHata, setDogrulaHata] = useState<string | null>(null)
 
   // Form state
-  const [form, setForm] = useState({ uygulama_domain: 'app.iogys.com.tr', firebase_project_id: '', firebase_client_email: '', firebase_private_key: '', cron_secret: '' })
+  const [form, setForm] = useState({ uygulama_domain: 'app.iogys.com.tr', firebase_project_id: '', firebase_client_email: '', firebase_private_key: '', cron_secret: '', anthropic_api_key: '', resend_api_key: '' })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -623,6 +623,8 @@ function SistemKonfigurasyonPanel() {
         firebase_client_email: j2.firebase_client_email ?? '',
         firebase_private_key: j2.firebase_private_key ?? '',
         cron_secret: j2.cron_secret ?? '',
+        anthropic_api_key: j2.anthropic_api_key ?? '',
+        resend_api_key: j2.resend_api_key ?? '',
       })
       setLoading(false)
     } catch (e: any) {
@@ -737,6 +739,26 @@ function SistemKonfigurasyonPanel() {
           <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Cron Secret Token</span>
           <input value={form.cron_secret} onChange={e => setForm(f => ({ ...f, cron_secret: e.target.value }))} style={{ ...sinp, fontFamily: 'monospace' }} placeholder="Otomatik görevler için güvenlik anahtarı" />
           <span style={{ fontSize: 11, color: '#64748b' }}>Zamanlanmış görevlerin (arşivleme, bildirim, rapor) yetkisiz çalıştırılmasını engeller</span>
+        </label>
+      </div>
+
+      {/* Anthropic (İO Asistan) */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>İO Asistan (Anthropic Claude)</div>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Anthropic API Key</span>
+          <input value={form.anthropic_api_key} onChange={e => setForm(f => ({ ...f, anthropic_api_key: e.target.value }))} style={{ ...sinp, fontFamily: 'monospace' }} placeholder="sk-ant-..." />
+          <span style={{ fontSize: 11, color: '#64748b' }}>İO Asistan chat için Claude API anahtarı. Boşsa Railway ANTHROPIC_API_KEY env'i kullanılır.</span>
+        </label>
+      </div>
+
+      {/* Resend (Email) */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>E-posta Gönderimi (Resend)</div>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Resend API Key</span>
+          <input value={form.resend_api_key} onChange={e => setForm(f => ({ ...f, resend_api_key: e.target.value }))} style={{ ...sinp, fontFamily: 'monospace' }} placeholder="re_..." />
+          <span style={{ fontSize: 11, color: '#64748b' }}>Resend servisi üzerinden e-posta göndermek için. Boşsa Railway RESEND_API_KEY env'i; o da yoksa SMTP ayarlarına fallback.</span>
         </label>
       </div>
 

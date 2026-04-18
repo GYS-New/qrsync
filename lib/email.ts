@@ -3,7 +3,7 @@
  * Fallback: nodemailer (SMTP) — DB veya env'dan ayar okur
  */
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY
+import { getSistemKonfig } from '@/lib/config/getSistemKonfig'
 
 interface MailOpts {
   to: string
@@ -14,7 +14,7 @@ interface MailOpts {
 }
 
 // Resend HTTP API ile gönder
-async function sendViaResend(opts: MailOpts, from: string): Promise<{ ok: true } | { ok: false; error: string }> {
+async function sendViaResend(opts: MailOpts, from: string, apiKey: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const body: Record<string, unknown> = {
     from,
     to: [opts.to],
@@ -33,7 +33,7 @@ async function sendViaResend(opts: MailOpts, from: string): Promise<{ ok: true }
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -123,9 +123,11 @@ export async function sendMail(opts: MailOpts) {
     }
   } catch {}
 
-  // Resend API varsa onu kullan
-  if (RESEND_API_KEY) {
-    return sendViaResend(opts, from)
+  // Resend API varsa onu kullan — önce DB, sonra env
+  const konfig = await getSistemKonfig()
+  const resendKey = konfig.resend_api_key
+  if (resendKey) {
+    return sendViaResend(opts, from, resendKey)
   }
 
   // Yoksa SMTP fallback

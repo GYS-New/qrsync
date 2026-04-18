@@ -13,6 +13,8 @@ export async function getSistemKonfig(): Promise<{
   firebase_client_email: string
   firebase_private_key: string
   cron_secret: string
+  anthropic_api_key: string
+  resend_api_key: string
 }> {
   const now = Date.now()
   if (cache && now - cacheTime < CACHE_TTL) return cache as any
@@ -22,20 +24,23 @@ export async function getSistemKonfig(): Promise<{
 
   if (supabaseUrl && supabaseKey) {
     try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/sistem_konfigurasyon?limit=1&select=uygulama_domain,firebase_project_id,firebase_client_email,firebase_private_key,cron_secret`, {
+      const res = await fetch(`${supabaseUrl}/rest/v1/sistem_konfigurasyon?limit=1&select=uygulama_domain,firebase_project_id,firebase_client_email,firebase_private_key,cron_secret,anthropic_api_key,resend_api_key`, {
         headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
       })
       const rows = await res.json()
       if (Array.isArray(rows) && rows.length > 0) {
-        cache = rows[0]
-        cacheTime = now
-        return {
+        const sonuc = {
           uygulama_domain: rows[0].uygulama_domain || 'app.iogys.com.tr',
           firebase_project_id: rows[0].firebase_project_id || process.env.FIREBASE_PROJECT_ID || '',
           firebase_client_email: rows[0].firebase_client_email || process.env.FIREBASE_CLIENT_EMAIL || '',
           firebase_private_key: rows[0].firebase_private_key || process.env.FIREBASE_PRIVATE_KEY || '',
           cron_secret: rows[0].cron_secret || process.env.CRON_SECRET || '',
+          anthropic_api_key: rows[0].anthropic_api_key || process.env.ANTHROPIC_API_KEY || '',
+          resend_api_key: rows[0].resend_api_key || process.env.RESEND_API_KEY || '',
         }
+        cache = sonuc
+        cacheTime = now
+        return sonuc
       }
     } catch {}
   }
@@ -47,5 +52,7 @@ export async function getSistemKonfig(): Promise<{
     firebase_client_email: process.env.FIREBASE_CLIENT_EMAIL || '',
     firebase_private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
     cron_secret: process.env.CRON_SECRET || '',
+    anthropic_api_key: process.env.ANTHROPIC_API_KEY || '',
+    resend_api_key: process.env.RESEND_API_KEY || '',
   }
 }

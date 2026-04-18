@@ -1,7 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' })
+import { getSistemKonfig } from '@/lib/config/getSistemKonfig'
 
 // Rate limiter
 const rateLimitMap = new Map<string, number[]>()
@@ -1036,6 +1035,10 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Anthropic client — API key DB'den, yoksa env
+    const konfig = await getSistemKonfig()
+    const anthropic = new Anthropic({ apiKey: konfig.anthropic_api_key })
+
     // İlk çağrı — tool use olabilir
     let response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
