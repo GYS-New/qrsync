@@ -154,9 +154,19 @@ function LiveHeader({
       <style>{`
         @keyframes canliPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.65)} }
         @keyframes canliScan { 0%{top:-100%} 100%{top:100%} }
-        /* Parlama efekti: <tr>'ye inline style ile veriliyor (TableRow içinde).
-           td background rengi için de yedek CSS — tarayıcı tr bg'yi gösteremezse. */
-        tr.row-new > td { background-color: #fde68a !important; transition: background-color 0.8s ease-out; }
+        /* Parlama efekti — 3 katman: data-attribute, class, element hover bypass */
+        .verde-table tbody tr[data-highlight="1"],
+        .verde-table tbody tr.row-new,
+        tr[data-highlight="1"] {
+          background-color: #fde68a !important;
+          box-shadow: inset 0 0 0 2px #f59e0b !important;
+        }
+        .verde-table tbody tr[data-highlight="1"] > td,
+        .verde-table tbody tr.row-new > td,
+        tr[data-highlight="1"] > td {
+          background-color: #fde68a !important;
+          transition: background-color 0.8s ease-out;
+        }
       `}</style>
     </div>
   )
@@ -722,6 +732,8 @@ useEffect(() => {
     return (
       <tr
         key={g.id}
+        data-highlight={highlight ? '1' : '0'}
+        className={highlight ? 'row-new' : ''}
         onClick={() => {
           setSelectedId(g.id)
           setSelectedGorev(g)
