@@ -225,12 +225,26 @@ const getLocPath = useMemo(() => {
 
   // NÜKLEER FIX: React render zinciri bir sebepten parlamayı DOM'a yansıtamıyor
   // (muhtemelen #422 hydration sorunu). highlightId değişince DOM'u direkt boyayalım.
+  // Her data refresh'te (1sn) tr remount oluyor; deps'e liveFlowGorevler ekleyerek
+  // stil 3sn boyunca her render'da yeniden uygulanır.
+  const highlightedIdRef = useRef<string | null>(null)
   useEffect(() => {
+    // Önceki highlightId'yi temizle
+    const prev = highlightedIdRef.current
+    if (prev && prev !== highlightId) {
+      document.querySelectorAll<HTMLTableRowElement>(`tr[data-gid="${prev}"]`).forEach(tr => {
+        tr.style.removeProperty('background-color')
+        tr.style.removeProperty('box-shadow')
+        tr.querySelectorAll<HTMLTableCellElement>('td').forEach(td => {
+          td.style.removeProperty('background-color')
+        })
+      })
+    }
+    highlightedIdRef.current = highlightId
     if (!highlightId) return
-    // Render döngüsü bitsin, sonra DOM'u yakala
-    const t = setTimeout(() => {
+    // Yeni highlightId'yi uygula (data refresh'te de tekrar çalışır, deps yüzünden)
+    const apply = () => {
       const rows = document.querySelectorAll<HTMLTableRowElement>(`tr[data-gid="${highlightId}"]`)
-      console.log('[LiveFlow DOM]', rows.length, 'satır bulundu', highlightId)
       rows.forEach(tr => {
         tr.style.setProperty('background-color', '#fde68a', 'important')
         tr.style.setProperty('box-shadow', 'inset 0 0 0 2px #f59e0b', 'important')
@@ -240,18 +254,19 @@ const getLocPath = useMemo(() => {
           td.style.setProperty('transition', 'background-color 0.8s ease-out', 'important')
         })
       })
-    }, 50)
-    const clear = setTimeout(() => {
-      const rows = document.querySelectorAll<HTMLTableRowElement>(`tr[data-gid="${highlightId}"]`)
-      rows.forEach(tr => {
-        tr.style.removeProperty('background-color')
-        tr.style.removeProperty('box-shadow')
-        tr.querySelectorAll<HTMLTableCellElement>('td').forEach(td => {
-          td.style.removeProperty('background-color')
-        })
-      })
-    }, 3000)
-    return () => { clearTimeout(t); clearTimeout(clear) }
+    }
+    apply()
+    // Bir sonraki frame'de de uygula (tr henüz mount olmadıysa yakalar)
+    const raf = requestAnimationFrame(apply)
+    return () => cancelAnimationFrame(raf)
+  }, [highlightId, liveFlowGorevler])
+
+  // 3sn sonra highlight'ı temizle (ayrı effect: data refresh deps'i etkilemesin)
+  useEffect(() => {
+    if (!highlightId) return
+    const target = highlightId
+    const t = setTimeout(() => setHighlightId(cur => cur === target ? null : cur), 3000)
+    return () => clearTimeout(t)
   }, [highlightId])
   const [checklistGorev, setChecklistGorev] = useState<{ id: string; type: 'canli_gorevler' } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -478,10 +493,7 @@ useEffect(() => {
         const targetId = nextTopId
         console.log('[LiveFlow] HIGHLIGHT SET →', targetId)
         setHighlightId(targetId)
-        setTimeout(() => {
-          console.log('[LiveFlow] HIGHLIGHT CLEARED →', targetId)
-          setHighlightId(cur => cur === targetId ? null : cur)
-        }, 3000)
+        // 3sn sonra temizleme useEffect'te (DOM tarafı).
       }
       lastTopIdRef.current = nextTopId
       setLiveFlowGorevler(data)
