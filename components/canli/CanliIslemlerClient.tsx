@@ -222,6 +222,37 @@ const getLocPath = useMemo(() => {
   const [liveKpiRows, setLiveKpiRows] = useState<{ durum: string }[]>([])
   const [highlightId, setHighlightId] = useState<string | null>(null)
   const lastTopIdRef = useRef<string | null>(null)
+
+  // NÜKLEER FIX: React render zinciri bir sebepten parlamayı DOM'a yansıtamıyor
+  // (muhtemelen #422 hydration sorunu). highlightId değişince DOM'u direkt boyayalım.
+  useEffect(() => {
+    if (!highlightId) return
+    // Render döngüsü bitsin, sonra DOM'u yakala
+    const t = setTimeout(() => {
+      const rows = document.querySelectorAll<HTMLTableRowElement>(`tr[data-gid="${highlightId}"]`)
+      console.log('[LiveFlow DOM]', rows.length, 'satır bulundu', highlightId)
+      rows.forEach(tr => {
+        tr.style.setProperty('background-color', '#fde68a', 'important')
+        tr.style.setProperty('box-shadow', 'inset 0 0 0 2px #f59e0b', 'important')
+        tr.style.setProperty('transition', 'background-color 0.8s ease-out', 'important')
+        tr.querySelectorAll<HTMLTableCellElement>('td').forEach(td => {
+          td.style.setProperty('background-color', '#fde68a', 'important')
+          td.style.setProperty('transition', 'background-color 0.8s ease-out', 'important')
+        })
+      })
+    }, 50)
+    const clear = setTimeout(() => {
+      const rows = document.querySelectorAll<HTMLTableRowElement>(`tr[data-gid="${highlightId}"]`)
+      rows.forEach(tr => {
+        tr.style.removeProperty('background-color')
+        tr.style.removeProperty('box-shadow')
+        tr.querySelectorAll<HTMLTableCellElement>('td').forEach(td => {
+          td.style.removeProperty('background-color')
+        })
+      })
+    }, 3000)
+    return () => { clearTimeout(t); clearTimeout(clear) }
+  }, [highlightId])
   const [checklistGorev, setChecklistGorev] = useState<{ id: string; type: 'canli_gorevler' } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedGorev, setSelectedGorev] = useState<any | null>(null)
@@ -732,6 +763,7 @@ useEffect(() => {
     return (
       <tr
         key={g.id}
+        data-gid={g.id}
         data-highlight={highlight ? '1' : '0'}
         className={highlight ? 'row-new' : ''}
         onClick={() => {
