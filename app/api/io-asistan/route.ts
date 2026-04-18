@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' })
 
@@ -374,16 +374,39 @@ async function executeTool(
 
       case 'checklist_ozeti': {
         const tarih = (input.tarih as string) || today
-        const { data, error } = await supabase
+        // Not: checklist_sonuc_basliklari tablosunda firma_id/skor kolonu yok;
+        // Firma scope'u lokasyonlar üzerinden sağlıyoruz.
+        let lokasyonIds: string[] | null = null
+        if (!ctx.isSA && ctx.firmaId) {
+          let lokQ = supabase.from('lokasyonlar').select('id').eq('firma_id', ctx.firmaId)
+          if (projeId) lokQ = lokQ.eq('proje_id', projeId)
+          const { data: loks } = await lokQ
+          lokasyonIds = (loks ?? []).map((l: { id: string }) => l.id)
+          if (!lokasyonIds.length) return `Bu kriterle lokasyon yok — çeklist özeti hesaplanamaz${projeLabel}.`
+        } else if (projeId) {
+          let lokQ = supabase.from('lokasyonlar').select('id').eq('proje_id', projeId)
+          const { data: loks } = await lokQ
+          lokasyonIds = (loks ?? []).map((l: { id: string }) => l.id)
+          if (!lokasyonIds.length) return `Bu projede lokasyon yok — çeklist özeti hesaplanamaz${projeLabel}.`
+        }
+
+        let q = supabase
           .from('checklist_sonuc_basliklari')
-          .select('skor')
-          .gte('created_at', `${tarih}T00:00:00`)
-          .lte('created_at', `${tarih}T23:59:59`)
+          .select('id,kanal', { count: 'exact' })
+          .gte('kayit_tarihi', `${tarih}T00:00:00`)
+          .lte('kayit_tarihi', `${tarih}T23:59:59`)
+        if (lokasyonIds) q = q.in('lokasyon_id', lokasyonIds)
+        const { data, count, error } = await q
         if (error) return `Hata: ${error.message}`
-        if (!data?.length) return `${tarih} tarihinde tamamlanmış çeklist yok.`
-        const skorlar = data.map((r: { skor: number | null }) => r.skor).filter((s): s is number => s !== null)
-        const avg = skorlar.length ? skorlar.reduce((a, b) => a + b, 0) / skorlar.length : 0
-        return `${tarih} Çeklist Özeti:\n• Toplam: ${data.length}\n• Ortalama Skor: %${avg.toFixed(0)}\n• En Düşük: %${Math.min(...skorlar)}\n• En Yüksek: %${Math.max(...skorlar)}`
+        const toplam = count ?? 0
+        if (!toplam) return `${tarih} tarihinde tamamlanmış çeklist yok${projeLabel}.`
+        const kanalDagilim: Record<string, number> = {}
+        for (const r of (data ?? []) as { kanal?: string }[]) {
+          const k = r.kanal || 'diğer'
+          kanalDagilim[k] = (kanalDagilim[k] || 0) + 1
+        }
+        const kanalStr = Object.entries(kanalDagilim).map(([k, v]) => `• ${k}: ${v}`).join('\n')
+        return `${tarih} Çeklist Özeti${projeLabel}:\n• Toplam tamamlanan: ${toplam}${kanalStr ? `\n\nKanal dağılımı:\n${kanalStr}` : ''}`
       }
 
       case 'personel_basari_analizi': {
@@ -481,26 +504,46 @@ async function executeTool(
       case 'arsiv_ozeti': {
         const tablo = input.tablo as string | undefined
         const results: string[] = []
+        // Firma scope uygulanabilen tablolar için filter helper
+        const applyScope = (q: any) => {
+          if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+          return q
+        }
 
         if (!tablo || tablo === 'personel_mesai') {
-          const { count } = await supabase.from('personel_mesai_kayitlari_arsiv').select('id', { count: 'exact', head: true })
+          const { count } = await applyScope(supabase.from('personel_mesai_kayitlari_arsiv').select('id', { count: 'exact', head: true }))
           results.push(`• Mesai Arşivi: ${count ?? 0} kayıt`)
         }
         if (!tablo || tablo === 'musteri') {
-          const { count } = await supabase.from('musteri_degerlendirmeleri_arsiv').select('id', { count: 'exact', head: true })
+          const { count } = await applyScope(supabase.from('musteri_degerlendirmeleri_arsiv').select('id', { count: 'exact', head: true }))
           results.push(`• Müşteri Değerlendirme Arşivi: ${count ?? 0} kayıt`)
         }
         if (!tablo || tablo === 'gorevler') {
-          const { count } = await supabase.from('gorevler_arsiv').select('id', { count: 'exact', head: true })
+          const { count } = await applyScope(supabase.from('gorevler_arsiv').select('id', { count: 'exact', head: true }))
           results.push(`• Spesifik Görev Arşivi: ${count ?? 0} kayıt`)
         }
         if (!tablo || tablo === 'checklist') {
-          const { count: baslikCount } = await supabase.from('checklist_sonuc_basliklari_arsiv').select('id', { count: 'exact', head: true })
-          const { count: maddeCount } = await supabase.from('checklist_sonuc_maddeleri_arsiv').select('id', { count: 'exact', head: true })
-          results.push(`• Çeklist Arşivi: ${baslikCount ?? 0} başlık, ${maddeCount ?? 0} madde`)
+          const { data: basliklar, count: baslikCount } = await applyScope(
+            supabase.from('checklist_sonuc_basliklari_arsiv').select('id', { count: 'exact' })
+          )
+          // maddeleri_arsiv tablosunda firma_id yok — firma'nın başlık_id'lerine göre say
+          let maddeCount = 0
+          const baslikIds = (basliklar ?? []).map((b: { id: string }) => b.id)
+          if (baslikIds.length) {
+            const { count: mc } = await supabase
+              .from('checklist_sonuc_maddeleri_arsiv')
+              .select('id', { count: 'exact', head: true })
+              .in('sonuc_id', baslikIds)
+            maddeCount = mc ?? 0
+          } else if (ctx.isSA) {
+            const { count: mc } = await supabase
+              .from('checklist_sonuc_maddeleri_arsiv')
+              .select('id', { count: 'exact', head: true })
+            maddeCount = mc ?? 0
+          }
+          results.push(`• Çeklist Arşivi: ${baslikCount ?? 0} başlık, ${maddeCount} madde`)
         }
 
-        // canli_gorevler arşivi (ana arşiv tablosu olmayabilir, gorevler_arsiv zaten var)
         return results.length ? `Arşiv Özeti:\n${results.join('\n')}` : 'Arşiv verisi bulunamadı.'
       }
 
@@ -524,17 +567,34 @@ async function executeTool(
         ]
         if (!izinliTablolar.includes(tablo)) return `"${tablo}" tablosuna erişim izni yok.`
 
+        // firma_id/proje_id kolonu OLMAYAN tablolar (blind filter uygulanırsa hata/kapsam dışı dönüş)
+        const firmaIdsizTablolar = new Set([
+          'lokasyon_grup_uyeleri', 'checklist_madde_secenekleri', 'checklist_sablon_maddeleri',
+          'checklist_sonuc_basliklari', 'checklist_sonuc_maddeleri',
+          'checklist_sonuc_basliklari_arsiv', 'checklist_sonuc_maddeleri_arsiv',
+          'personel_destek_personeller',
+        ])
+        const projeIdsizTablolar = new Set([
+          'firmalar', 'users', 'dashboard_bloklar', 'cron_log',
+          ...firmaIdsizTablolar,
+        ])
+        const tabloFirmaIdsiz = firmaIdsizTablolar.has(tablo)
+        const tabloProjeIdsiz = projeIdsizTablolar.has(tablo)
+        // Güvenlik: TA/U firma_id içermeyen tabloları sorgulayamasın (scope aşımı riski)
+        if (!ctx.isSA && tabloFirmaIdsiz) {
+          return `"${tablo}" tablosunda firma kapsamı olmadığı için sadece sistem yöneticisi sorgulayabilir.`
+        }
+
         const selectCols = (input.select as string) || '*'
         const limit = Math.min((input.limit as number) || 20, 100)
         const sadeceSay = input.sadece_say as boolean
 
         if (sadeceSay) {
           let q = supabase.from(tablo).select('id', { count: 'exact', head: true })
-          if (!ctx.isSA && ctx.firmaId) {
-            // firma_id kolonu olan tablolarda filtrele
+          if (!ctx.isSA && ctx.firmaId && !tabloFirmaIdsiz) {
             q = q.eq('firma_id', ctx.firmaId)
           }
-          if (projeId) q = q.eq('proje_id', projeId)
+          if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
           // Filtreleri uygula
           const filtreler = (input.filtreler as Array<{ kolon: string; operator: string; deger: string }>) || []
           for (const f of filtreler) {
@@ -556,8 +616,8 @@ async function executeTool(
         }
 
         let q = supabase.from(tablo).select(selectCols).limit(limit)
-        if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
-        if (projeId) q = q.eq('proje_id', projeId)
+        if (!ctx.isSA && ctx.firmaId && !tabloFirmaIdsiz) q = q.eq('firma_id', ctx.firmaId)
+        if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
 
         // Filtreleri uygula
         const filtreler = (input.filtreler as Array<{ kolon: string; operator: string; deger: string }>) || []
@@ -604,7 +664,14 @@ async function executeTool(
 }
 
 // ── System Prompt ──
-function buildSystemPrompt(user: { isim_soyisim: string; rol: string }): string {
+function buildSystemPrompt(user: {
+  isim_soyisim: string
+  rol: string
+  firma_id?: string | null
+  proje_id?: string | null
+  firma_adi?: string | null
+  proje_adi?: string | null
+}): string {
   const roleMap: Record<string, string> = {
     super_admin: 'Sistem yöneticisi — tüm firma ve projelere tam erişim',
     alt_super_admin: 'Alt sistem yöneticisi — tüm firma ve projelere erişim',
@@ -714,7 +781,16 @@ Aşağıdaki tablolar sorgulanabilir. Kolon adlarını AYNEN kullan:
 - **checklist_sonuc_basliklari_arsiv**: çeklist başlık arşivi
 - **checklist_sonuc_maddeleri_arsiv**: çeklist madde arşivi
 
-## Kullanıcı: ${user.isim_soyisim} | Rol: ${roleMap[user.rol] || user.rol}
+## AKTİF KULLANICI VE BAĞLAM
+- Kullanıcı: ${user.isim_soyisim}
+- Rol: ${roleMap[user.rol] || user.rol}
+- Firma: ${user.firma_adi ?? 'Belirtilmemiş'}${user.firma_id ? ` (id: ${user.firma_id})` : ''}
+- Aktif Proje: ${user.proje_adi ?? 'Belirtilmemiş'}${user.proje_id ? ` (id: ${user.proje_id})` : ''}
+
+Veri sorgularında:
+- SA değilse → firma_id'yi mutlaka bu kullanıcının firma_id'sine sabitleyerek tool çağır.
+- Kullanıcının birden fazla projesi olabilir; eğer soruda proje belirtilmediyse ve tek bir aktif proje varsa onu kullan, belirsizse önce "Hangi proje?" diye sor.
+- Aktif proje bilgisi yukarıda varsa varsayılan olarak onu kullan, soru açıkça başka proje demiyorsa.
 
 ## HALÜSİNASYON ÖNLEME (ÇOK ÖNEMLİ)
 - E-posta, telefon, URL, domain, adres, kişi adı, sürüm numarası, fiyat gibi spesifik bilgileri BİLMİYORSAN ASLA UYDURMA.
@@ -725,13 +801,30 @@ Aşağıdaki tablolar sorgulanabilir. Kolon adlarını AYNEN kullan:
 - Sistem içi sayfa/özellik belirtirken emin değilsen "menüyü kontrol edin" de, yer uydurma.
 - Kurala uymayan bir varsayımda bulunursan hatalı bilgi verirsin; bu kullanıcıya zarar verir.
 
-## Kurallar
-- Türkçe yanıt ver, kısa ve net
-- Veri sorusu gelince tool çağır, tahmin etme — veritabani_sorgula tool'u ile herhangi bir tablo sorgulanabilir
-- Sidebar menü isimlerini AYNEN kullan
-- Adım adım rehberlik et
-- Kullanıcının rolüne uygun öneriler ver
-- Emoji az kullan`
+## TOOL KULLANIM ZORUNLULUĞU
+Aşağıdaki soru tiplerinde CEVAP VERMEDEN ÖNCE mutlaka bir tool çağır — tahmin etme, genelleme yapma:
+- "Kaç X var?" / "Kaç tane …" → ilgili tool (veritabani_sorgula, arsiv_ozeti vs.)
+- "Hangi kullanıcı / lokasyon / görev …" → veritabani_sorgula
+- "Dün/bugün tamamlananlar" → veritabani_sorgula (durum+tarih filtresi)
+- "En başarılı / en çok X yapan …" → personel_basari_analizi
+- "Aktif / online personel" → veritabani_sorgula (device_tokens üzerinden)
+- Spesifik isim/rakam/tarih beklenen her soruda → önce tool
+Eğer tool çağrısı sonucu boş/null dönerse: "Bu kriterle kayıt bulunamadı" de, uydurma.
+
+## YANIT UZUNLUK ve TON
+- Varsayılan: 2-4 cümle. Gerekmedikçe uzatma.
+- Selam/açılış mesajı: 1-2 satır yeter. Menü listesi KUSMA, uzun "Ne istersin?" soruları sor-ma.
+- Liste gerekiyorsa: en fazla 5 madde, her biri tek satır.
+- Her cevabın sonuna "Başka bir şey ister misin?" gibi kalıp EKLEME.
+- Emoji maksimum 1 tane, gerekliyse. Süslemeyi azalt.
+- Sayı verirken kaynak tool'u belirtme (kullanıcı zaten sordu, sayıyı ver, tamam).
+
+## Genel Kurallar
+- Türkçe yanıt ver
+- Veri sorusu → tool. Hep öyle.
+- Sidebar menü isimlerini AYNEN kullan (yukarıdaki liste)
+- Adım adım rehberlik et (ama kısa)
+- Kullanıcının rolüne uygun öneriler ver`
 }
 
 // ── API Route ──
@@ -754,6 +847,12 @@ export async function POST(request: Request) {
   }
 
   if (!checkRateLimit(me.id)) {
+    // async log — yanıtı bekletmez
+    createAdminClient()
+      .from('io_asistan_hata_log')
+      .insert({ user_id: me.id, firma_id: me.firma_id ?? null, proje_id: me.proje_id ?? null, tip: 'rate_limit', mesaj: 'Kullanıcı rate limit aşıldı' })
+      .then(() => {})
+      .then(undefined, () => {})
     return new Response(JSON.stringify({ error: 'rate_limit' }), { status: 429 })
   }
 
@@ -767,12 +866,48 @@ export async function POST(request: Request) {
   const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
   const toolCtx: ToolContext = { firmaId: me.firma_id, projeId: me.proje_id, isSA }
 
+  // Firma/proje adlarını context'e al (prompt'a ekleyeceğiz)
+  const admin = createAdminClient()
+  let firmaAdi: string | null = null
+  let projeAdi: string | null = null
+  if (me.firma_id) {
+    const { data: firma } = await admin
+      .from('firmalar')
+      .select('firma_adi, ticari_unvan')
+      .eq('id', me.firma_id)
+      .single()
+    firmaAdi = firma?.firma_adi || firma?.ticari_unvan || null
+  }
+  if (me.proje_id) {
+    const { data: proje } = await admin
+      .from('projeler')
+      .select('ad')
+      .eq('id', me.proje_id)
+      .single()
+    projeAdi = proje?.ad || null
+  }
+  const promptUser = { ...me, firma_adi: firmaAdi, proje_adi: projeAdi }
+
+  // Sessiz hata logger — kullanıcıya yanıt etkilemiyor
+  const logHata = async (tip: string, mesaj: string, detay?: Record<string, unknown>) => {
+    try {
+      await admin.from('io_asistan_hata_log').insert({
+        user_id:  me.id,
+        firma_id: me.firma_id ?? null,
+        proje_id: me.proje_id ?? null,
+        tip,
+        mesaj:    mesaj.slice(0, 2000),
+        detay:    detay ?? null,
+      })
+    } catch { /* yut — log başarısızlığı asıl akışı bozmasın */ }
+  }
+
   try {
     // İlk çağrı — tool use olabilir
     let response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
-      system: buildSystemPrompt(me),
+      system: buildSystemPrompt(promptUser),
       tools,
       messages,
     })
@@ -792,11 +927,18 @@ export async function POST(request: Request) {
 
       // Tool sonuçlarını çalıştır
       const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
-        toolBlocks.map(async (tb) => ({
-          type: 'tool_result' as const,
-          tool_use_id: tb.id,
-          content: await executeTool(tb.name, tb.input as Record<string, unknown>, toolCtx, supabase),
-        }))
+        toolBlocks.map(async (tb) => {
+          const toolOutput = await executeTool(tb.name, tb.input as Record<string, unknown>, toolCtx, supabase)
+          // tool çıktısı "Hata:" ile başlıyorsa logla
+          if (typeof toolOutput === 'string' && toolOutput.startsWith('Hata:')) {
+            logHata('tool_error', toolOutput, { tool: tb.name, input: tb.input })
+          }
+          return {
+            type: 'tool_result' as const,
+            tool_use_id: tb.id,
+            content: toolOutput,
+          }
+        })
       )
 
       allMessages.push({ role: 'user', content: toolResults })
@@ -805,9 +947,16 @@ export async function POST(request: Request) {
       response = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
-        system: buildSystemPrompt(me),
+        system: buildSystemPrompt(promptUser),
         tools,
         messages: allMessages,
+      })
+    }
+
+    // max iterasyona ulaşıldı mı
+    if (iterations >= 3 && response.stop_reason === 'tool_use') {
+      logHata('max_iter', '3 iterasyonda da tool_use devam etti — yanıt kesildi', {
+        son_response_stop_reason: response.stop_reason,
       })
     }
 
@@ -835,6 +984,9 @@ export async function POST(request: Request) {
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
     console.error('[io-asistan] API error:', errMsg)
+    logHata('api_error', errMsg, {
+      stack: err instanceof Error ? err.stack?.slice(0, 2000) : undefined,
+    })
     return new Response(JSON.stringify({ error: 'api_error', detail: errMsg }), { status: 500 })
   }
 }
