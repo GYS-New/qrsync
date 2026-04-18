@@ -516,25 +516,47 @@ function openCreate() {
 
     if (!islenecekIds.length) return
 
-    const patch: any = {
-      durum: bulkDuzenleDurum,
-      durum_degisim_tarihi: nowIso,
-      islemi_yapan_id: meId,
-    }
-    if (bulkDuzenleDurum === 'TAMAMLANDI') {
-      patch.tamamlayan_kullanici_id = meId
-      patch.tamamlanma_tarihi = nowIso
-    } else if (['IPTAL', 'KAPATILDI', 'SILINDI'].includes(bulkDuzenleDurum)) {
-      patch.iptal_eden_id = meId
-      patch.iptal_tarihi = nowIso
-    }
     try {
-      const { error } = await supabase
-        .from('canli_gorevler')
-        .update(patch)
-        .in('id', islenecekIds)
-        .eq('firma_id', firmaId)
-      if (error) throw error
+      // TAMAMLANDI için her görevin gerçek durumu (aktif_olma_tarihi + elapsed ile) hesaplanır;
+      // 8 saat geçtiyse veya BEKLEMEDE ise ZAMANINDA_YAPILAMAYAN (sapma) olur.
+      if (bulkDuzenleDurum === 'TAMAMLANDI') {
+        const { data: tasks } = await supabase
+          .from('canli_gorevler')
+          .select('id, durum, aktif_olma_tarihi, durum_degisim_tarihi')
+          .in('id', islenecekIds)
+          .eq('firma_id', firmaId)
+        const gruplar: Record<string, string[]> = {}
+        for (const t of (tasks ?? []) as any[]) {
+          const resolved = resolveLiveCompletionStatusByTask(t, nowIso)
+          if (resolved === 'ZAMANI_GECMIS') continue // tamamla kabul edilmez
+          ;(gruplar[resolved] = gruplar[resolved] ?? []).push(t.id)
+        }
+        for (const [status, ids] of Object.entries(gruplar)) {
+          await supabase.from('canli_gorevler').update({
+            durum: status,
+            tamamlayan_kullanici_id: meId,
+            tamamlanma_tarihi: nowIso,
+            durum_degisim_tarihi: nowIso,
+            islemi_yapan_id: meId,
+          }).in('id', ids).eq('firma_id', firmaId)
+        }
+      } else {
+        const patch: any = {
+          durum: bulkDuzenleDurum,
+          durum_degisim_tarihi: nowIso,
+          islemi_yapan_id: meId,
+        }
+        if (['IPTAL', 'KAPATILDI', 'SILINDI'].includes(bulkDuzenleDurum)) {
+          patch.iptal_eden_id = meId
+          patch.iptal_tarihi = nowIso
+        }
+        const { error } = await supabase
+          .from('canli_gorevler')
+          .update(patch)
+          .in('id', islenecekIds)
+          .eq('firma_id', firmaId)
+        if (error) throw error
+      }
       toast({ type: 'success', title: 'Başarılı', message: `${islenecekIds.length} görevin durumu güncellendi.` })
       setBulkDuzenlePopup(false)
       setBulkDuzenleMode(false)

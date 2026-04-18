@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
+import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -314,14 +315,22 @@ export async function POST(req: Request) {
       sureSaniye = Math.max(0, Math.floor(ms / 1000))
     }
 
+    // canli_gorevler için süreli/sapma kontrolü: aktifleşmeden 8 saat geçtiyse
+    // veya BEKLEMEDE durumdaysa → ZAMANINDA_YAPILAMAYAN; gorevler (spesifik) için
+    // süre kontrolü yok, direkt TAMAMLANDI.
+    const nextDurum = gorevTipi === 'canli_gorevler'
+      ? resolveLiveCompletionStatusByTask(gorev as any, nowIso)
+      : 'TAMAMLANDI'
+
     const { error: updateErr } = await admin
       .from(gorevTipi)
       .update({
-        durum:                    'TAMAMLANDI',
+        durum:                    nextDurum,
         durum_degisim_tarihi:     nowIso,
         tamamlanma_tarihi:        nowIso,
         tamamlanma_suresi_saniye: sureSaniye,
         islemi_yapan_id:          userId,
+        ...(gorevTipi === 'canli_gorevler' ? { tamamlayan_kullanici_id: userId } : {}),
         son_tamamlama_kanali:     'MOBIL',
       } as any)
       .eq('id', gorevId)
