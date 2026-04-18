@@ -154,8 +154,9 @@ function LiveHeader({
       <style>{`
         @keyframes canliPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.65)} }
         @keyframes canliScan { 0%{top:-100%} 100%{top:100%} }
-        @keyframes rowGlow { 0%{background:#fde68a} 60%{background:#fef3c7} 100%{background:transparent} }
-        tr.row-new > td { animation: rowGlow 3s ease-out forwards; }
+        /* Parlama efekti: <tr>'ye inline style ile veriliyor (TableRow içinde).
+           td background rengi için de yedek CSS — tarayıcı tr bg'yi gösteremezse. */
+        tr.row-new > td { background-color: #fde68a !important; transition: background-color 0.8s ease-out; }
       `}</style>
     </div>
   )
@@ -718,7 +719,11 @@ useEffect(() => {
           setSelectedGorev(g)
         }}
         className={highlight ? 'row-new' : ''}
-        style={{ cursor: 'pointer', background: isSel ? '#f9fafb' : undefined }}
+        style={{
+          cursor: 'pointer',
+          backgroundColor: highlight ? '#fde68a' : (isSel ? '#f9fafb' : undefined),
+          transition: 'background-color 0.8s ease-out',
+        }}
       >
         <td style={{ fontWeight: 500, fontSize: fs }}>{g.tanim}</td>
         <td style={{ color: '#4b5563', fontSize: fs }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
