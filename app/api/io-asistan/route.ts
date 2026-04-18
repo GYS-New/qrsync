@@ -568,6 +568,7 @@ async function executeTool(
         if (!izinliTablolar.includes(tablo)) return `"${tablo}" tablosuna erişim izni yok.`
 
         // firma_id/proje_id kolonu OLMAYAN tablolar (blind filter uygulanırsa hata/kapsam dışı dönüş)
+        // NOT: 'firmalar' burada DEĞİL çünkü özel işlenir (scope: .eq('id', firmaId))
         const firmaIdsizTablolar = new Set([
           'lokasyon_grup_uyeleri', 'checklist_madde_secenekleri', 'checklist_sablon_maddeleri',
           'checklist_sonuc_basliklari', 'checklist_sonuc_maddeleri',
@@ -580,6 +581,8 @@ async function executeTool(
         ])
         const tabloFirmaIdsiz = firmaIdsizTablolar.has(tablo)
         const tabloProjeIdsiz = projeIdsizTablolar.has(tablo)
+        // Firmalar tablosu özel: TA sadece kendi firmasını görebilir (filter: id = firmaId)
+        const isFirmalarTable = tablo === 'firmalar'
         // Güvenlik: TA/U firma_id içermeyen tabloları sorgulayamasın (scope aşımı riski)
         if (!ctx.isSA && tabloFirmaIdsiz) {
           return `"${tablo}" tablosunda firma kapsamı olmadığı için sadece sistem yöneticisi sorgulayabilir.`
@@ -592,7 +595,8 @@ async function executeTool(
         if (sadeceSay) {
           let q = supabase.from(tablo).select('id', { count: 'exact', head: true })
           if (!ctx.isSA && ctx.firmaId && !tabloFirmaIdsiz) {
-            q = q.eq('firma_id', ctx.firmaId)
+            // firmalar tablosu özel: id = firmaId (TA kendi firmasını görür)
+            q = isFirmalarTable ? q.eq('id', ctx.firmaId) : q.eq('firma_id', ctx.firmaId)
           }
           if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
           // Filtreleri uygula
@@ -616,7 +620,9 @@ async function executeTool(
         }
 
         let q = supabase.from(tablo).select(selectCols).limit(limit)
-        if (!ctx.isSA && ctx.firmaId && !tabloFirmaIdsiz) q = q.eq('firma_id', ctx.firmaId)
+        if (!ctx.isSA && ctx.firmaId && !tabloFirmaIdsiz) {
+          q = isFirmalarTable ? q.eq('id', ctx.firmaId) : q.eq('firma_id', ctx.firmaId)
+        }
         if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
 
         // Filtreleri uygula
@@ -793,13 +799,26 @@ Veri sorgularında:
 - Aktif proje bilgisi yukarıda varsa varsayılan olarak onu kullan, soru açıkça başka proje demiyorsa.
 
 ## HALÜSİNASYON ÖNLEME (ÇOK ÖNEMLİ)
-- E-posta, telefon, URL, domain, adres, kişi adı, sürüm numarası, fiyat gibi spesifik bilgileri BİLMİYORSAN ASLA UYDURMA.
+- E-posta, telefon, URL, domain, adres, kişi adı, firma adı, sürüm numarası, fiyat gibi spesifik bilgileri BİLMİYORSAN ASLA UYDURMA.
 - "tahmini", "sanırım", "olabilir", "muhtemelen" ifadeleriyle belirsiz bilgi sunma. Emin değilsen açıkça "Bu bilgiye sahip değilim" de.
 - İletişim bilgisi sorulursa: "Firma yöneticinize (TA) veya sistem yöneticisine (SA) danışın" de — e-posta/telefon uydurma.
 - Kaynak kod / teknik detay sorulursa: "Ben kullanıcı arayüzü üzerinden veri sorguluyorum, kod erişimim yok. Teknik detaylar için sistem yöneticinize başvurun" yeterli. E-posta yönlendirmesi yapma.
-- Veritabanı soruları için tool çağır, tahmin etme.
+- Veritabanı soruları için tool çağır, tahmin etme. Bir isim/sayı/liste üretmeden ÖNCE mutlaka bir tool çağrısı olmalı; yoksa cevap verme, "bu bilgiye erişimim yok" de.
 - Sistem içi sayfa/özellik belirtirken emin değilsen "menüyü kontrol edin" de, yer uydurma.
+- ASLA uydurma firma/proje/kullanıcı/lokasyon ismi üretme. Bu liste DB'de var mı yok mu tool ile kontrol et.
 - Kurala uymayan bir varsayımda bulunursan hatalı bilgi verirsin; bu kullanıcıya zarar verir.
+
+## KAPSAM (SCOPE) KURALLARI — ÇOK ÖNEMLİ
+Kullanıcının rolüne göre ERİŞEBİLECEĞİ VERİ SINIRLIDIR. Bu sınırı asla aşma:
+
+- **SA / Alt SA:** Tüm firmalara ve projelere erişim var.
+- **TA (Firma Yöneticisi):** SADECE kendi firmasının verisine erişim var. Başka firmaların adını, sayısını, personelini, projesini ASLA VERME/LİSTELEME.
+  - "Sistemde hangi firmalar var?" sorulursa: "Size sadece kendi firmanız ${'{'}firma_adi${'}'} görünüyor. Başka firmalar hakkında bilgi veremem."
+  - "Kaç firma var?" sorulursa aynı cevap.
+- **TU / U (Saha Personeli):** SADECE kendi firmasının + atandığı lokasyonların verisi. Aynı kural geçerli.
+- **Müşteri (M):** SADECE kendi firmasına bağlı değerlendirme verileri.
+
+Kural ihlali = güvenlik ihlali. Herhangi bir soru bu sınırı aşıyorsa "Size bu veri görünmez" de.
 
 ## TOOL KULLANIM ZORUNLULUĞU
 Aşağıdaki soru tiplerinde CEVAP VERMEDEN ÖNCE mutlaka bir tool çağır — tahmin etme, genelleme yapma:
