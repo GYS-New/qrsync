@@ -918,7 +918,7 @@ export default function CeklistRaporlariClient({
                 <th>Dolduran</th>
                 <th>Doldurulma</th>
                 {filtreMod && <th>Segment</th>}
-                <th style={{ textAlign: 'center' }}>İşlemler</th>
+                <th style={{ textAlign: 'right', paddingRight: 14 }}>İşlemler</th>
               </tr>
             </thead>
             <tbody>
@@ -995,8 +995,8 @@ export default function CeklistRaporlariClient({
                           </span>
                         </td>
                       )}
-                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: 14 }}>
+                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
                         {/* Görüntüle — her zaman görünür */}
                         <button
                           onClick={() => setModalGorev({
