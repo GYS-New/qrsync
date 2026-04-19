@@ -8,6 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,20 +37,21 @@ export async function POST(req: NextRequest) {
     if (action === 'sil') {
       if (!id) return NextResponse.json({ error: 'id gerekli' }, { status: 400 })
 
-      // Önce maddeleri sil (aktif + arşiv)
       await admin.from('checklist_sonuc_maddeleri').delete().eq('sonuc_id', id)
       await admin.from('checklist_sonuc_maddeleri_arsiv').delete().eq('sonuc_id', id)
-
-      // Sonra başlığı sil (aktif + arşiv)
       await admin.from('checklist_sonuc_basliklari').delete().eq('id', id)
       await admin.from('checklist_sonuc_basliklari_arsiv').delete().eq('id', id)
 
+      await auditLog({
+        tip: 'ceklist_arsiv_sil', tablo: 'checklist_sonuc_basliklari_arsiv',
+        kullanici_id: user.id, firma_id: hedefFirmaId,
+        detay: { silinen_baslik_id: id },
+      })
       return NextResponse.json({ ok: true })
     }
 
     // ── TOPLU SİL: tüm çeklist arşiv kayıtlarını sil ─────────────────────
     if (action === 'toplu-sil') {
-      // checklist_sonuc_basliklari_arsiv'deki firma kayıtlarını bul
       let q = admin.from('checklist_sonuc_basliklari_arsiv')
         .select('id').eq('firma_id', hedefFirmaId)
       if (proje_id) q = (q as any).eq('proje_id', proje_id)
@@ -63,8 +65,12 @@ export async function POST(req: NextRequest) {
         await admin.from('checklist_sonuc_basliklari_arsiv').delete().in('id', ids)
       }
 
-      // Ayrıca aktif tablodaki "arşiv" segmentindeki çeklist kayıtlarını da temizle
-      // (gorevler_arsiv veya canli_gorevler_arsiv içindeki görevlere ait olanlar)
+      await auditLog({
+        tip: 'ceklist_arsiv_toplu_sil', tablo: 'checklist_sonuc_basliklari_arsiv',
+        satir_sayisi: ids.length,
+        kullanici_id: user.id, firma_id: hedefFirmaId, proje_id: proje_id ?? null,
+        detay: { silinen: ids.length, ornek_ids: ids.slice(0, 10) },
+      })
       return NextResponse.json({ ok: true, silinen: ids.length })
     }
 

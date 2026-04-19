@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
+import { auditLog } from '@/lib/audit/log'
 
 // ── GET: Firmanın tüm kurallarını listele ────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -111,6 +112,23 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    await auditLog({
+      tip: 'kural_ekle', tablo: 'gorev_kurallari', basarili: false, hata_mesaji: error.message,
+      kullanici_id: user.id, firma_id: firmaId, proje_id: proje_id ?? lok.proje_id ?? null,
+      detay: { tanim, lokasyon_id, frekans_tipi },
+    })
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  await auditLog({
+    tip: 'kural_ekle', tablo: 'gorev_kurallari',
+    kullanici_id: user.id, firma_id: firmaId, proje_id: proje_id ?? lok.proje_id ?? null,
+    detay: {
+      kural_id: data.id, tanim: data.tanim, lokasyon_id: data.lokasyon_id,
+      frekans_tipi, gunluk_frekans_sayisi, haftalik_frekans_sayisi,
+      aktif_gunler, aktif_olma_saati: data.aktif_olma_saati,
+    },
+  })
   return NextResponse.json(data, { status: 201 })
 }

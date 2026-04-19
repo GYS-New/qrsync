@@ -56,5 +56,14 @@ export async function POST(req: NextRequest) {
     } catch {}
   }
 
+  if (gonderilen > 0) {
+    const { auditLog } = await import('@/lib/audit/log')
+    await auditLog({
+      tip: 'cron_bekleyen_islem', tablo: 'bildirimler',
+      satir_sayisi: gonderilen,
+      detay: { gonderilen, toplam: bekleyenler.length },
+    })
+  }
+
   return NextResponse.json({ ok: true, gonderilen, toplam: bekleyenler.length })
 }

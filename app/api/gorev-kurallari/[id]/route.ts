@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 async function authorize(req: NextRequest) {
   const supabase = createClient()
@@ -51,6 +52,12 @@ export async function PATCH(
   const { data, error } = await admin
     .from('gorev_kurallari').update(update).eq('id', params.id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await auditLog({
+    tip: 'kural_guncelle', tablo: 'gorev_kurallari',
+    kullanici_id: user.id, firma_id: kural.firma_id,
+    detay: { kural_id: params.id, degisen_alanlar: Object.keys(update), yeni_degerler: update },
+  })
   return NextResponse.json(data)
 }
 
@@ -72,6 +79,19 @@ export async function DELETE(
   }
 
   const { error } = await admin.from('gorev_kurallari').delete().eq('id', params.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    await auditLog({
+      tip: 'kural_sil', tablo: 'gorev_kurallari', basarili: false, hata_mesaji: error.message,
+      kullanici_id: auth.user.id, firma_id: kural.firma_id,
+      detay: { kural_id: params.id, tanim: kural.tanim },
+    })
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  await auditLog({
+    tip: 'kural_sil', tablo: 'gorev_kurallari',
+    kullanici_id: auth.user.id, firma_id: kural.firma_id,
+    detay: { kural_id: params.id, tanim: kural.tanim },
+  })
   return NextResponse.json({ ok: true, tanim: kural.tanim })
 }

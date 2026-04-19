@@ -27,9 +27,15 @@ const TIP_RENK: Record<string, string> = {
   proje_guncelle: '#0284c7',
   proje_sil: '#dc2626',
   lokasyon_sil: '#dc2626',
+  lokasyon_grup_sil: '#dc2626',
   gorev_sil: '#dc2626',
   gorev_toplu_sil: '#dc2626',
   canli_gorev_sil: '#dc2626',
+  kural_ekle: '#059669',
+  kural_guncelle: '#0284c7',
+  kural_sil: '#dc2626',
+  ceklist_arsiv_sil: '#dc2626',
+  ceklist_arsiv_toplu_sil: '#dc2626',
   ayar_degis_firma: '#7c3aed',
   ayar_degis_proje: '#7c3aed',
   login_basarili: '#059669',
@@ -39,6 +45,10 @@ const TIP_RENK: Record<string, string> = {
   arsivle: '#0284c7',
   butunluk_kontrol: '#0284c7',
   manuel_butunluk_kontrol: '#7c3aed',
+  cron_max_sure: '#0284c7',
+  cron_simulasyon: '#0284c7',
+  cron_personel_destek: '#0284c7',
+  cron_bekleyen_islem: '#0284c7',
 }
 
 interface Props { isSA: boolean; firmalarListesi?: any[] }
@@ -85,9 +95,15 @@ export default function AuditLogClient({ isSA, firmalarListesi = [] }: Props) {
       proje_guncelle: '🗂 Proje Güncellendi',
       proje_sil: '🗑 Proje Silindi',
       lokasyon_sil: '📍 Lokasyon Silindi',
+      lokasyon_grup_sil: '🗺️ Lokasyon Grubu Silindi',
       gorev_sil: '✓ Görev Silindi',
       gorev_toplu_sil: '✓ Görev Toplu Silindi',
       canli_gorev_sil: '⚡ Canlı Görev Silindi',
+      kural_ekle: '⚡ Kural Eklendi',
+      kural_guncelle: '⚡ Kural Güncellendi',
+      kural_sil: '🗑 Kural Silindi',
+      ceklist_arsiv_sil: '🗑 Çeklist Arşiv Sil',
+      ceklist_arsiv_toplu_sil: '🗑 Çeklist Arşiv Toplu Sil',
       ayar_degis_firma: '🛠️ Firma Ayar Değişti',
       ayar_degis_proje: '🛠️ Proje Ayar Değişti',
       login_basarili: '✓ Giriş',
@@ -97,6 +113,10 @@ export default function AuditLogClient({ isSA, firmalarListesi = [] }: Props) {
       arsivle: '🗃 Arşiv',
       butunluk_kontrol: '🔍 Bütünlük Kontrol',
       manuel_butunluk_kontrol: '🔍 Manuel Bütünlük',
+      cron_max_sure: '⏰ Cron: Max Süre Kontrol',
+      cron_simulasyon: '🤖 Cron: Simülasyon',
+      cron_personel_destek: '👷 Cron: Personel Destek',
+      cron_bekleyen_islem: '📬 Cron: Bekleyen İşlem',
     }
     return m[t] ?? t
   }
@@ -120,20 +140,45 @@ export default function AuditLogClient({ isSA, firmalarListesi = [] }: Props) {
               {firmalarListesi.map(f => <option key={f.id} value={f.id}>{f.firma_adi ?? f.ticari_unvan}</option>)}
             </select>
           )}
-          <select className="verde-select" value={tip} onChange={e => setTip(e.target.value)} style={{ width: 180 }}>
+          <select className="verde-select" value={tip} onChange={e => setTip(e.target.value)} style={{ width: 200 }}>
             <option value="">İşlem Tipi (Tümü)</option>
-            <option value="kullanici_ekle">Kullanıcı Ekle</option>
-            <option value="kullanici_guncelle">Kullanıcı Güncelle</option>
-            <option value="kullanici_sil">Kullanıcı Sil</option>
-            <option value="kullanici_aktif_pasif">Aktif/Pasif</option>
-            <option value="proje_ekle">Proje Ekle</option>
-            <option value="proje_guncelle">Proje Güncelle</option>
-            <option value="proje_sil">Proje Sil</option>
-            <option value="ayar_degis_proje">Proje Ayar Değişim</option>
-            <option value="ayar_degis_firma">Firma Ayar Değişim</option>
-            <option value="arsivle">Arşivleme</option>
-            <option value="butunluk_kontrol">Bütünlük Kontrol</option>
-            <option value="manuel_yetim_temizlik">Yetim Temizlik</option>
+            <optgroup label="Kullanıcı">
+              <option value="kullanici_ekle">Ekle</option>
+              <option value="kullanici_guncelle">Güncelle</option>
+              <option value="kullanici_sil">Sil</option>
+              <option value="kullanici_aktif_pasif">Aktif/Pasif</option>
+            </optgroup>
+            <optgroup label="Proje">
+              <option value="proje_ekle">Ekle</option>
+              <option value="proje_guncelle">Güncelle</option>
+              <option value="proje_sil">Sil</option>
+            </optgroup>
+            <optgroup label="Lokasyon">
+              <option value="lokasyon_sil">Sil</option>
+              <option value="lokasyon_grup_sil">Grup Sil</option>
+            </optgroup>
+            <optgroup label="Kural">
+              <option value="kural_ekle">Ekle</option>
+              <option value="kural_guncelle">Güncelle</option>
+              <option value="kural_sil">Sil</option>
+            </optgroup>
+            <optgroup label="Ayar">
+              <option value="ayar_degis_proje">Proje Ayar</option>
+              <option value="ayar_degis_firma">Firma Ayar</option>
+            </optgroup>
+            <optgroup label="Arşiv & Bütünlük">
+              <option value="arsivle">Arşivleme</option>
+              <option value="butunluk_kontrol">Bütünlük Kontrol</option>
+              <option value="manuel_yetim_temizlik">Yetim Temizlik</option>
+              <option value="ceklist_arsiv_sil">Çeklist Arşiv Sil</option>
+              <option value="ceklist_arsiv_toplu_sil">Çeklist Arşiv Toplu Sil</option>
+            </optgroup>
+            <optgroup label="Cron">
+              <option value="cron_max_sure">Max Süre</option>
+              <option value="cron_simulasyon">Simülasyon</option>
+              <option value="cron_personel_destek">Personel Destek</option>
+              <option value="cron_bekleyen_islem">Bekleyen İşlem</option>
+            </optgroup>
           </select>
           <select className="verde-select" value={gun} onChange={e => setGun(Number(e.target.value))} style={{ width: 130 }}>
             <option value={1}>Son 1 gün</option>

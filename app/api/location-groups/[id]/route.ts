@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 async function resolve(req: NextRequest, id: string) {
   const supabase = createClient()
@@ -92,5 +93,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const { error: delErr } = await admin.from('lokasyon_gruplari').delete().eq('id', group.id)
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
 
+  await auditLog({
+    tip: 'lokasyon_grup_sil', tablo: 'lokasyon_gruplari',
+    kullanici_id: scope.me.id, firma_id: group.firma_id ?? null,
+    detay: { grup_id: group.id },
+  })
   return NextResponse.json({ ok: true })
 }

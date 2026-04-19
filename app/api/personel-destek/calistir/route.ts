@@ -39,9 +39,26 @@ export async function POST(req: Request) {
       sonuclar.push({ ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id, ust_lokasyon_id: ayar.ust_lokasyon_id, ...result })
     }
 
+    // Audit — tamamlanan görev varsa logla
+    const toplamTamamlanan = sonuclar.reduce((s: number, r: any) => s + (r.tamamlanan ?? 0), 0)
+    if (toplamTamamlanan > 0) {
+      const { auditLog } = await import('@/lib/audit/log')
+      await auditLog({
+        tip: 'cron_personel_destek', tablo: 'canli_gorevler',
+        satir_sayisi: toplamTamamlanan,
+        detay: { toplam_tamamlanan: toplamTamamlanan, ozet: sonuclar.filter((s: any) => (s.tamamlanan ?? 0) > 0) },
+      })
+    }
+
     return NextResponse.json({ ok: true, sonuclar }, { headers: CORS })
   } catch (e: any) {
     console.error('[PERSONEL-DESTEK] Hata:', e)
+    try {
+      const { auditLog } = await import('@/lib/audit/log')
+      await auditLog({
+        tip: 'cron_personel_destek', tablo: 'canli_gorevler', basarili: false, hata_mesaji: e.message,
+      })
+    } catch {}
     return NextResponse.json({ ok: false, error: e.message }, { status: 500, headers: CORS })
   }
 }

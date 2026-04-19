@@ -90,9 +90,26 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('[MAX-SURE-KONTROL]', now.toISOString(), results)
+
+    // Cron audit — sadece bir şey değiştiyse
+    const toplam = (results.gorevler_iptal ?? 0) + (results.canli_gorevler_iptal ?? 0)
+    if (toplam > 0) {
+      const { auditLog } = await import('@/lib/audit/log')
+      await auditLog({
+        tip: 'cron_max_sure', tablo: 'canli_gorevler',
+        satir_sayisi: toplam, detay: results,
+      })
+    }
+
     return NextResponse.json({ ok: true, ...results })
   } catch (err: any) {
     console.error('[max-sure-kontrol]', err)
+    try {
+      const { auditLog } = await import('@/lib/audit/log')
+      await auditLog({
+        tip: 'cron_max_sure', tablo: 'canli_gorevler', basarili: false, hata_mesaji: err?.message ?? 'hata',
+      })
+    } catch {}
     return NextResponse.json({ ok: false, error: err?.message ?? 'Sunucu hatası' }, { status: 500 })
   }
 }

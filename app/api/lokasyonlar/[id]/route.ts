@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 // Tüm alt lokasyon id'lerini DB'den recursive çeker
 async function getAllDescendantIds(adminSb: ReturnType<typeof createAdminClient>, rootId: string, firmaId: string): Promise<string[]> {
@@ -105,9 +106,29 @@ export async function DELETE(
       if (lokErr) throw new Error(`Lokasyon silinirken hata: ${lokErr.message}`)
     }
 
+    await auditLog({
+      tip: 'lokasyon_sil', tablo: 'lokasyonlar', satir_sayisi: allIds.length,
+      kullanici_id: user.id, firma_id: firmaId,
+      detay: {
+        silinen_id: lokId,
+        silinen_tanim: lok.tanim,
+        alt_lokasyon_sayisi: allIds.length - 1,
+        uyarı: 'Alt lokasyonlar, çeklist kayıtları ve görevler cascade silindi',
+      },
+    })
+
     return NextResponse.json({ ok: true, deleted: allIds.length, tanim: lok.tanim })
   } catch (err: any) {
     console.error('[lokasyon/delete]', err)
+    try {
+      const userSb = createClient()
+      const { data: { user } } = await userSb.auth.getUser()
+      await auditLog({
+        tip: 'lokasyon_sil', tablo: 'lokasyonlar', basarili: false, hata_mesaji: err?.message ?? 'hata',
+        kullanici_id: user?.id ?? null,
+        detay: { silinen_id: params.id },
+      })
+    } catch {}
     return NextResponse.json({ error: err.message ?? 'Sunucu hatası' }, { status: 500 })
   }
 }
