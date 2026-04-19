@@ -3,7 +3,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-const SEL = 'gorev_suresi_hedef_orani,arsiv_mesai_saat,arsiv_musteri_saat,arsiv_spesifik_saat,arsiv_frekansiyel_saat,spesifik_ceklist_aktif,spesifik_personel_atama_aktif,frekansiyel_personel_atama_aktif,ardisik_baslatma_suresi_dk,personel_takip_bildirim_dk,personel_takip_bildirim_alicilar,acik_bekleme_saat,bekleme_gecmis_saat,canli_akis_sure_saat,haftalik_acik_bekleme_saat,haftalik_bekleme_gecmis_saat'
+const SEL = 'gorev_suresi_hedef_orani,arsiv_mesai_saat,arsiv_musteri_saat,arsiv_spesifik_saat,arsiv_frekansiyel_saat,spesifik_ceklist_aktif,spesifik_personel_atama_aktif,frekansiyel_personel_atama_aktif,ardisik_baslatma_suresi_dk,personel_takip_bildirim_dk,personel_takip_bildirim_alicilar,acik_bekleme_saat,bekleme_gecmis_saat,canli_akis_sure_saat,haftalik_acik_bekleme_saat,haftalik_bekleme_gecmis_saat,manuel_push_aktif,manuel_push_u_rolu,manuel_push_m_rolu'
 
 const DEFAULTS: Record<string, number | boolean | null> = {
   gorev_suresi_hedef_orani: 10,
@@ -14,6 +14,7 @@ const DEFAULTS: Record<string, number | boolean | null> = {
   acik_bekleme_saat: 8, bekleme_gecmis_saat: 12,
   canli_akis_sure_saat: 8,
   haftalik_acik_bekleme_saat: null, haftalik_bekleme_gecmis_saat: null,
+  manuel_push_aktif: false, manuel_push_u_rolu: false, manuel_push_m_rolu: false,
 }
 
 const NUM_FIELDS: [string, number, number][] = [
