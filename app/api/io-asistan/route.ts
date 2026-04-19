@@ -95,11 +95,14 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: 'lokasyon_bilgisi',
-    description: 'Lokasyonların listesini veya detayını getirir. SA/TA tüm lokasyonları, U/M sadece atandığı (kullanici_lokasyon_yetkileri) üst lokasyonlar ve onların altlarını görür. Kullanıcı görev oluşturma akışında lokasyon seçmek istediğinde de bu tool çağırılır — sen yanıtına [SECENEKLER]lokasyon1|lokasyon2|...[/SECENEKLER] marker\'ı ekleyerek tıklanabilir buton göster.',
+    description: 'Lokasyonların listesini veya detayını getirir. SA/TA tüm lokasyonları, U/M sadece atandığı (kullanici_lokasyon_yetkileri) üst lokasyonlar ve onların altlarını görür. "Kaç lokasyonum var" sorusunda sadece_say=true kullan. Kullanıcı görev oluşturma akışında lokasyon seçmek istediğinde de bu tool çağırılır — yanıtına [SECENEKLER]lokasyon1|lokasyon2|...[/SECENEKLER] marker\'ı ekleyerek tıklanabilir buton göster (max 10 seçenek).',
     input_schema: {
       type: 'object' as const,
       properties: {
-        arama: { type: 'string', description: 'Lokasyon adıyla arama (opsiyonel)' },
+        arama: { type: 'string', description: 'Lokasyon adıyla arama — kelime bazlı ilike (opsiyonel)' },
+        limit: { type: 'number', description: 'Maks sonuç sayısı (varsayılan: 100, max: 500)' },
+        sadece_say: { type: 'boolean', description: 'true ise sadece toplam sayıyı döner' },
+        sadece_ust: { type: 'boolean', description: 'true ise sadece üst lokasyonları (parent_id = null) getirir' },
         ...PROJE_PARAM,
       },
       required: [],
@@ -421,16 +424,46 @@ async function executeTool(
       }
 
       case 'lokasyon_bilgisi': {
-        const arama = input.arama as string | undefined
+        const arama = (input.arama as string | undefined)?.trim()
+        const limit = Math.min((input.limit as number) || 100, 500)
+        const sadeceSay = input.sadece_say === true
+        const sadeceUst = input.sadece_ust === true
+
+        // Sadece say → count(*) döner
+        if (sadeceSay) {
+          let cq = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('aktif', true)
+          if (ctx.firmaId) cq = cq.eq('firma_id', ctx.firmaId)
+          if (projeId) cq = cq.eq('proje_id', projeId)
+          if (sadeceUst) cq = cq.is('parent_id', null)
+          if (arama) {
+            const kelimeler = arama.split(/\s+/).filter(k => k.length > 0)
+            for (const k of kelimeler) cq = cq.ilike('tanim', `%${k}%`)
+          }
+          if (!ctx.isSA && ctx.firmaId) {
+            const yetkiliIds = await getYetkiliLokasyonIds(supabase, ctx.firmaId, ctx.projeId)
+            if (yetkiliIds !== null) {
+              if (yetkiliIds.length === 0) return `Size atanmış lokasyon yok${projeLabel}.`
+              cq = cq.in('id', yetkiliIds)
+            }
+          }
+          const { count, error } = await cq
+          if (error) return `Hata: ${error.message}`
+          return `${projeLabel ? projeLabel.trim() + ' ' : ''}${arama ? `"${arama}" içeren ` : ''}${sadeceUst ? 'üst ' : ''}lokasyon sayısı: ${count ?? 0}`
+        }
+
         let q = supabase
           .from('lokasyonlar')
           .select('id,tanim,aktif,parent_id')
           .eq('aktif', true)
           .order('tanim')
-          .limit(30)
+          .limit(limit)
         if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         if (projeId) q = q.eq('proje_id', projeId)
-        if (arama) q = q.ilike('tanim', `%${arama}%`)
+        if (sadeceUst) q = q.is('parent_id', null)
+        if (arama) {
+          const kelimeler = arama.split(/\s+/).filter(k => k.length > 0)
+          for (const k of kelimeler) q = q.ilike('tanim', `%${k}%`)
+        }
         // U/M için kullanici_lokasyon_yetkileri tablosundan yetkili lokasyon id'lerini al
         if (!ctx.isSA && ctx.firmaId) {
           const yetkiliIds = await getYetkiliLokasyonIds(supabase, ctx.firmaId, ctx.projeId)
@@ -977,9 +1010,20 @@ async function executeTool(
         const isFirmalarTable = tablo === 'firmalar'
         // Projeler tablosu özel: TU/U sadece kendi projesini görebilir (filter: id = projeId)
         const isProjelerTable = tablo === 'projeler'
+        // Lokasyonlar tablosu özel: U/M kullanici_lokasyon_yetkileri ile sınırlı
+        const isLokasyonlarTable = tablo === 'lokasyonlar'
         // Güvenlik: TA/U firma_id içermeyen tabloları sorgulayamasın (scope aşımı riski)
         if (!ctx.isSA && tabloFirmaIdsiz) {
           return `"${tablo}" tablosunda firma kapsamı olmadığı için sadece sistem yöneticisi sorgulayabilir.`
+        }
+
+        // U/M için lokasyonlar tablosunda yetki scope'u (kullanici_lokasyon_yetkileri)
+        let yetkiliLokIds: string[] | null = null
+        if (isLokasyonlarTable && !ctx.isSA && ctx.firmaId) {
+          yetkiliLokIds = await getYetkiliLokasyonIds(supabase, ctx.firmaId, ctx.projeId)
+          if (yetkiliLokIds !== null && yetkiliLokIds.length === 0) {
+            return 'Size atanmış lokasyon bulunamadı.'
+          }
         }
 
         const selectCols = (input.select as string) || '*'
@@ -994,6 +1038,8 @@ async function executeTool(
           }
           // TU/U için projeler tablosunda id = projeId scope'u uygula
           if (isProjelerTable && !ctx.isSA && ctx.projeId) q = q.eq('id', ctx.projeId)
+          // U/M için lokasyonlar tablosu yetki scope'u
+          if (isLokasyonlarTable && yetkiliLokIds !== null) q = q.in('id', yetkiliLokIds)
           if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
           // Filtreleri uygula
           const filtreler = (input.filtreler as Array<{ kolon: string; operator: string; deger: string }>) || []
@@ -1021,6 +1067,8 @@ async function executeTool(
         }
         // TU/U için projeler tablosunda id = projeId scope'u uygula
         if (isProjelerTable && !ctx.isSA && ctx.projeId) q = q.eq('id', ctx.projeId)
+        // U/M için lokasyonlar tablosu yetki scope'u
+        if (isLokasyonlarTable && yetkiliLokIds !== null) q = q.in('id', yetkiliLokIds)
         if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
 
         // Filtreleri uygula
