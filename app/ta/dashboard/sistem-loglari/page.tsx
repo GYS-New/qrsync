@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
-import AuditLogClient from '@/components/audit-log/AuditLogClient'
+import SistemIzlemeClient from '@/components/sistem/SistemIzlemeClient'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +17,7 @@ export default async function TASistemLoglariPage() {
   return (
     <div>
       <Topbar title="Sistem Logları" base="/ta" breadcrumbs={[{ label: 'Sistem' }, { label: 'Sistem Logları' }]} />
-      <AuditLogClient isSA={false} />
+      <SistemIzlemeClient isSA={false} showUyarilar={false} />
     </div>
   )
 }
