@@ -50,6 +50,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(body.spesifik_personel_atama_aktif !== undefined && { spesifik_personel_atama_aktif: body.spesifik_personel_atama_aktif }),
       ...(body.frekansiyel_personel_atama_aktif !== undefined && { frekansiyel_personel_atama_aktif: body.frekansiyel_personel_atama_aktif }),
       ...(body.frekansiyel_ceklist_aktif !== undefined && { frekansiyel_ceklist_aktif: body.frekansiyel_ceklist_aktif }),
+      ...(body.manuel_push_aktif !== undefined && { manuel_push_aktif: body.manuel_push_aktif }),
+      ...(body.manuel_push_u_rolu !== undefined && { manuel_push_u_rolu: body.manuel_push_u_rolu }),
+      ...(body.manuel_push_m_rolu !== undefined && { manuel_push_m_rolu: body.manuel_push_m_rolu }),
       ...(body.varsayilan_ayarlar !== undefined && { varsayilan_ayarlar: body.varsayilan_ayarlar }),
     })
     .eq('id', params.id)

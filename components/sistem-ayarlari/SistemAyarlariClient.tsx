@@ -235,6 +235,62 @@ function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
             </div>
           )
         })}
+
+        {/* ═══ Manuel Push Bildirimleri (hiyerarşik) ═══ */}
+        {(() => {
+          const ana = !!proje.manuel_push_aktif
+          const uRolu = !!proje.manuel_push_u_rolu
+          const mRolu = !!proje.manuel_push_m_rolu
+          const SwitchBtn = ({ field, val, busy }: { field: string; val: boolean; busy: boolean }) => (
+            <>
+              <button
+                onClick={() => toggle(field, val)}
+                disabled={busy}
+                style={{ width: 52, height: 28, borderRadius: 14, border: 'none', cursor: busy ? 'not-allowed' : 'pointer', flexShrink: 0, background: val ? '#111827' : '#cbd5e1', position: 'relative', transition: 'background .2s' }}
+              >
+                <div style={{ width: 22, height: 22, borderRadius: 11, background: '#fff', position: 'absolute', top: 3, left: val ? 27 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }} />
+              </button>
+              <span style={{ fontSize: 12, fontWeight: 600, color: val ? '#111827' : '#94a3b8', minWidth: 36 }}>{val ? 'Açık' : 'Kapalı'}</span>
+            </>
+          )
+          return (
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+              {/* Ana toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                    <span style={{ fontSize: 16 }}>🔔</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>Manuel Push Bildirimleri</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
+                    Kullanıcılar sayfasından personele manuel push bildirim gönderme özelliği. Kapalıyken hiç kimse (TA/SA dahil) gönderemez. Açıldığında TA ve SA varsayılan olarak gönderebilir; U ve M rolü için alt ayarları açmak gerekir.
+                  </div>
+                </div>
+                <SwitchBtn field="manuel_push_aktif" val={ana} busy={savingKey === 'manuel_push_aktif'} />
+              </div>
+
+              {/* Alt toggle'lar — sadece ana açıkken göster */}
+              {ana && (
+                <div style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '12px 18px 14px 40px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a' }}>└─ U rolü bildirim gönderebilir</div>
+                      <div style={{ fontSize: 11.5, color: '#64748b' }}>Firma tenant_user rolündeki kullanıcılar da manuel bildirim gönderebilir.</div>
+                    </div>
+                    <SwitchBtn field="manuel_push_u_rolu" val={uRolu} busy={savingKey === 'manuel_push_u_rolu'} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a' }}>└─ M rolü bildirim gönderebilir</div>
+                      <div style={{ fontSize: 11.5, color: '#64748b' }}>Müşteri rolündeki kullanıcılar da manuel bildirim gönderebilir.</div>
+                    </div>
+                    <SwitchBtn field="manuel_push_m_rolu" val={mRolu} busy={savingKey === 'manuel_push_m_rolu'} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )

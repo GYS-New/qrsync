@@ -42,6 +42,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
         { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
         { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
         { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
+        { label: 'Push Bildirim Geçmişi', href: `${base}/dashboard/push-log`, icon: '🔔' },
       ]
     : isTA
       ? [
@@ -57,6 +58,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
+          { label: 'Push Bildirim Geçmişi', href: `${base}/dashboard/push-log`, icon: '🔔' },
         ]
       : isMusteri
       ? [
@@ -71,6 +73,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
+          { label: 'Push Bildirim Geçmişi', href: `${base}/dashboard/push-log`, icon: '🔔' },
         ]
       : [
           { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
@@ -85,6 +88,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
+          { label: 'Push Bildirim Geçmişi', href: `${base}/dashboard/push-log`, icon: '🔔' },
         ]
 
   return [

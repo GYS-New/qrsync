@@ -12,6 +12,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
 import PasswordInput from '@/components/ui/PasswordInput'
 import { useYetki } from '@/lib/yetki/useYetki'
+import PushBildirimModal from '@/components/push/PushBildirimModal'
 
 const ROL_LABEL: Record<UserRole, string> = {
   super_admin: 'Süper Admin',
@@ -88,6 +89,12 @@ export default function KullanicilarClient({
   const reqId = useRef(0)
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
+  // Manuel push bildirim yetkisi (proje/firma ayarından)
+  const [pushYetki, setPushYetki] = useState<{ aktif: boolean; benGonderebilirim: boolean }>({ aktif: false, benGonderebilirim: false })
+  const [pushToplu, setPushToplu] = useState(false)
+  const [pushSeciliIds, setPushSeciliIds] = useState<Set<string>>(new Set())
+  const [pushModalAlicilar, setPushModalAlicilar] = useState<{ id: string; isim_soyisim: string }[] | null>(null)
+
   // SSR yeni initialUsers getirince (firma/proje değişimi) sync et
   useEffect(() => { setUsers(initialUsers) }, [initialUsers])
 
@@ -102,6 +109,33 @@ export default function KullanicilarClient({
       })
       .catch(() => {})
   }, [firmaId])
+
+  // Manuel push yetkisini yükle (proje > firma ayarı + mevcut kullanıcının rolü)
+  useEffect(() => {
+    if (!firmaId) return
+    const q = new URLSearchParams({ firmaId })
+    if (projeId) q.set('projeId', projeId)
+    const fetchRol = (async () => {
+      const { data } = await supabase.auth.getUser()
+      if (!data.user) return null
+      const { data: me } = await supabase.from('users').select('rol').eq('id', data.user.id).single()
+      return me?.rol ?? null
+    })()
+    Promise.all([
+      fetch(`/api/sistem-ayarlari/genel?${q}`).then(r => r.json()).catch(() => null),
+      fetchRol,
+    ]).then(([ayarRes, rol]) => {
+      const ayar = ayarRes?.efektif ?? {}
+      const aktif = !!ayar.manuel_push_aktif
+      let ben = false
+      if (aktif) {
+        if (rol === 'super_admin' || rol === 'alt_super_admin' || rol === 'tenant_admin') ben = true
+        else if (rol === 'tenant_user') ben = !!ayar.manuel_push_u_rolu
+        else if (rol === 'musteri') ben = !!ayar.manuel_push_m_rolu
+      }
+      setPushYetki({ aktif, benGonderebilirim: ben })
+    })
+  }, [firmaId, projeId, supabase])
 
   // Modal state'leri
   const [openCreate, setOpenCreate] = useState(false)
@@ -398,8 +432,26 @@ export default function KullanicilarClient({
             {canCreate && yetki.ekleyebilir && !topluSilModu && (
               <Button variant="primary" onClick={() => setOpenCreate(true)} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>＋ Kullanıcı Ekle</Button>
             )}
-            {canDelete && yetki.silebilir && !topluSilModu && (
+            {canDelete && yetki.silebilir && !topluSilModu && !pushToplu && (
               <Button variant="ghost" onClick={() => { setTopluSilModu(true); setSeciliIds(new Set()) }} className="text-[15px]" style={{ ...IMPORT_EXPORT_BUTTON_STYLE, color: '#dc2626', borderColor: '#fca5a5' }}>🗑 Toplu Sil</Button>
+            )}
+            {pushYetki.benGonderebilirim && !topluSilModu && !pushToplu && (
+              <Button variant="ghost" onClick={() => { setPushToplu(true); setPushSeciliIds(new Set()) }} className="text-[15px]" style={{ ...IMPORT_EXPORT_BUTTON_STYLE, color: '#7c3aed', borderColor: '#c4b5fd' }}>🔔 Toplu Bildirim</Button>
+            )}
+            {pushToplu && (
+              <>
+                {pushSeciliIds.size > 0 ? (
+                  <Button variant="ghost" onClick={() => {
+                    const sec = filtered.filter(u => pushSeciliIds.has(u.id)).map(u => ({ id: u.id, isim_soyisim: u.isim_soyisim ?? '—' }))
+                    setPushModalAlicilar(sec)
+                  }} className="text-[15px]" style={{ ...IMPORT_EXPORT_BUTTON_STYLE, background: '#7c3aed', color: '#fff', borderColor: '#7c3aed' }}>🔔 {pushSeciliIds.size} Seçili Kişiye Gönder</Button>
+                ) : (
+                  <Button variant="ghost" onClick={() => { setPushToplu(false); setPushSeciliIds(new Set()) }} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>Vazgeç</Button>
+                )}
+                {pushSeciliIds.size > 0 && (
+                  <Button variant="ghost" onClick={() => { setPushToplu(false); setPushSeciliIds(new Set()) }} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>Vazgeç</Button>
+                )}
+              </>
             )}
             {topluSilModu && (
               <>
@@ -426,6 +478,16 @@ export default function KullanicilarClient({
                     style={{ width: 16, height: 16, cursor: 'pointer' }} />
                 </th>
               )}
+              {pushToplu && (
+                <th style={{ width: 36 }}>
+                  <input type="checkbox" checked={filtered.length > 0 && pushSeciliIds.size === filtered.length}
+                    onChange={() => {
+                      if (pushSeciliIds.size === filtered.length) setPushSeciliIds(new Set())
+                      else setPushSeciliIds(new Set(filtered.map(u => u.id)))
+                    }}
+                    style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#7c3aed' }} />
+                </th>
+              )}
               <th>Kullanıcı</th>
               <th>Rol</th>
               <th>Üst Lokasyon</th>
@@ -438,11 +500,18 @@ export default function KullanicilarClient({
           </thead>
           <tbody>
             {filtered.map(u => (
-              <tr key={u.id} style={{ background: topluSilModu && seciliIds.has(u.id) ? '#fef2f2' : undefined }}>
+              <tr key={u.id} style={{ background: (topluSilModu && seciliIds.has(u.id)) ? '#fef2f2' : (pushToplu && pushSeciliIds.has(u.id)) ? '#f5f3ff' : undefined }}>
                 {topluSilModu && (
                   <td>
                     <input type="checkbox" checked={seciliIds.has(u.id)} onChange={() => toggleSecim(u.id)}
                       style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                  </td>
+                )}
+                {pushToplu && (
+                  <td>
+                    <input type="checkbox" checked={pushSeciliIds.has(u.id)}
+                      onChange={() => setPushSeciliIds(prev => { const s = new Set(prev); s.has(u.id) ? s.delete(u.id) : s.add(u.id); return s })}
+                      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#7c3aed' }} />
                   </td>
                 )}
                 <td>
@@ -535,6 +604,9 @@ export default function KullanicilarClient({
                       </RowActionButton>
                       {yetki.duzenleyebilir && <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '', cinsiyet: (u as any).cinsiyet ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>}
                       <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
+                      {pushYetki.benGonderebilirim && deviceTokenMap[u.id] && (
+                        <RowActionButton variant="base" onClick={() => setPushModalAlicilar([{ id: u.id, isim_soyisim: u.isim_soyisim ?? '—' }])}>🔔 Bildirim</RowActionButton>
+                      )}
                       {deviceTokenMap[u.id] && (
                         <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>
                       )}
@@ -545,7 +617,7 @@ export default function KullanicilarClient({
               </tr>
             ))}
             {!filtered.length && (
-              <tr><td colSpan={canManage ? 6 : 5} style={{ textAlign: 'center', color: '#6b7280', padding: '36px 0' }}>Kayıt bulunamadı</td></tr>
+              <tr><td colSpan={(canManage ? 8 : 7) + ((topluSilModu || pushToplu) ? 1 : 0)} style={{ textAlign: 'center', color: '#6b7280', padding: '36px 0' }}>Kayıt bulunamadı</td></tr>
             )}
           </tbody>
         </table>
@@ -744,6 +816,18 @@ export default function KullanicilarClient({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Push Bildirim Modal */}
+      {pushModalAlicilar && (
+        <PushBildirimModal
+          alicilar={pushModalAlicilar}
+          onClose={() => {
+            setPushModalAlicilar(null)
+            setPushToplu(false)
+            setPushSeciliIds(new Set())
+          }}
+        />
       )}
     </div>
   )

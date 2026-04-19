@@ -17,6 +17,9 @@ const DEFAULTS = {
   bekleme_gecmis_saat: 12,
   haftalik_acik_bekleme_saat: null as number | null,
   haftalik_bekleme_gecmis_saat: null as number | null,
+  manuel_push_aktif: false,
+  manuel_push_u_rolu: false,
+  manuel_push_m_rolu: false,
 }
 
 const SEL = Object.keys(DEFAULTS).join(',')
