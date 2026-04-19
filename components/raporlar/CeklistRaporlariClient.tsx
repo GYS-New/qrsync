@@ -172,6 +172,19 @@ export default function CeklistRaporlariClient({
     })
   }, [satirlar, aramaQ, durumF, kanaliF])
 
+  // ── 50'li sayfalama (render performansı için) ─────────────────────
+  const PER_PAGE = 50
+  const [sayfa, setSayfa] = useState(1)
+  const toplamSayfa = Math.max(1, Math.ceil(filtreData.length / PER_PAGE))
+  // Filtre/arama/veri değiştiğinde 1. sayfaya dön
+  useEffect(() => { setSayfa(1) }, [aramaQ, durumF, kanaliF, satirlar])
+  // Sayfa overflow
+  useEffect(() => { if (sayfa > toplamSayfa) setSayfa(toplamSayfa) }, [toplamSayfa, sayfa])
+  const sayfaliData = useMemo(
+    () => filtreData.slice((sayfa - 1) * PER_PAGE, sayfa * PER_PAGE),
+    [filtreData, sayfa]
+  )
+
   function segmentEtiket(r: Kayit): string {
     if (filtreMod && r.segment) return r.segment === 'tablo' ? 'Tablo' : 'Arşiv'
     if (r.kaynak === 'spesifik') return 'Spesifik'
@@ -905,7 +918,7 @@ export default function CeklistRaporlariClient({
                   Çeklist raporu bulunamadı.
                 </td></tr>
               ) : (
-                filtreData.map(r => {
+                sayfaliData.map(r => {
                   const durumStil = DURUM_RENK[r.gorev_durum] ?? { bg: '#f1f5f9', color: '#475569' }
                   const kanalStil = KANAL_RENK[r.kanal] ?? { bg: '#f1f5f9', color: '#475569' }
                   const oran = pct(r.doldurulan_madde, r.toplam_madde)
@@ -1024,6 +1037,42 @@ export default function CeklistRaporlariClient({
             </tbody>
           </table>
         </div>
+
+        {/* 50'li sayfalama navigasyonu */}
+        {filtreData.length > PER_PAGE && (
+          <div style={{
+            marginTop: 12, padding: '10px 14px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0',
+            fontSize: 12.5, color: '#475569',
+          }}>
+            <div>
+              <strong>{(sayfa - 1) * PER_PAGE + 1}</strong>–<strong>{Math.min(sayfa * PER_PAGE, filtreData.length)}</strong>
+              {' '}arası · Toplam <strong>{filtreData.length}</strong> kayıt
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <button onClick={() => setSayfa(1)} disabled={sayfa === 1}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: sayfa === 1 ? '#f8fafc' : '#fff', cursor: sayfa === 1 ? 'default' : 'pointer', fontSize: 12 }}>
+                «
+              </button>
+              <button onClick={() => setSayfa(s => Math.max(1, s - 1))} disabled={sayfa === 1}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: sayfa === 1 ? '#f8fafc' : '#fff', cursor: sayfa === 1 ? 'default' : 'pointer', fontSize: 12 }}>
+                ‹
+              </button>
+              <span style={{ padding: '0 10px', fontWeight: 600 }}>
+                {sayfa} / {toplamSayfa}
+              </span>
+              <button onClick={() => setSayfa(s => Math.min(toplamSayfa, s + 1))} disabled={sayfa === toplamSayfa}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: sayfa === toplamSayfa ? '#f8fafc' : '#fff', cursor: sayfa === toplamSayfa ? 'default' : 'pointer', fontSize: 12 }}>
+                ›
+              </button>
+              <button onClick={() => setSayfa(toplamSayfa)} disabled={sayfa === toplamSayfa}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: sayfa === toplamSayfa ? '#f8fafc' : '#fff', cursor: sayfa === toplamSayfa ? 'default' : 'pointer', fontSize: 12 }}>
+                »
+              </button>
+            </div>
+          </div>
+        )}
 
         {!filtreMod && filtreData.length > 0 && (
           <div style={{
