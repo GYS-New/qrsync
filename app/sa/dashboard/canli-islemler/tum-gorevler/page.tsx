@@ -71,6 +71,7 @@ export default async function SATumGorevlerPage() {
         kullanicilar={(kullanicilar as any) ?? []}
         initialGorevler={(gorevler as any) ?? []}
         personelAtamaAktif={ayarlar.frekansiyel_personel_atama_aktif}
+        ceklistAktif={ayarlar.frekansiyel_ceklist_aktif}
       />
     </div>
   )

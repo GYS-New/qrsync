@@ -35,6 +35,7 @@ interface Props {
   showTumGorevler?: boolean  // false yapılırsa "Tüm Görevler" linki gizlenir
   yetkiliLokIds?: string[] | null
   canliAkisSureSaat?: number  // canlı akış listeleme süresi (varsayılan 8)
+  ceklistAktif?: boolean  // proje bazlı: frekansiyel görev çeklist aç/kapat
 }
 
 type BrowseFilter = 'ACIK' | 'IPTAL' | 'KAPALI' | 'TARIHI_GECMIS'
@@ -174,7 +175,7 @@ function LiveHeader({
   )
 }
 
-export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, meName, readonly, projeId, showTumGorevler = true, yetkiliLokIds, canliAkisSureSaat = 8 }: Props) {
+export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, meName, readonly, projeId, showTumGorevler = true, yetkiliLokIds, canliAkisSureSaat = 8, ceklistAktif = true }: Props) {
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -852,8 +853,8 @@ useEffect(() => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <span style={{ fontSize: fs, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>{getIslemiYapan()}</span>
 
-              {/* Çeklist butonu — her durumda, lokasyonda şablon varsa */}
-              {lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) && (
+              {/* Çeklist butonu — her durumda, lokasyonda şablon varsa + proje ayarında aktifse */}
+              {ceklistAktif && lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setChecklistGorev({ id: g.id, type: 'canli_gorevler' }) }}
                   style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontSize: 11, color: '#1d4ed8', flexShrink: 0 }}

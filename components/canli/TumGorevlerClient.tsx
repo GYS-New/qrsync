@@ -71,6 +71,7 @@ export default function TumGorevlerClient({
   initialGorevler,
   projeId,
   personelAtamaAktif = true,
+  ceklistAktif = true,
   yetkiliLokIds,
 }: {
   base: '/sa' | '/ta' | '/u'
@@ -83,6 +84,7 @@ export default function TumGorevlerClient({
   initialGorevler: any[]
   projeId?: string | null
   personelAtamaAktif?: boolean
+  ceklistAktif?: boolean
   yetkiliLokIds?: string[] | null
 }) {
   const yetki = useYetki('tum-gorevler')
@@ -1185,7 +1187,7 @@ async function del() {
                   <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
                 </td>
                 <td style={{ textAlign: 'center' }}>
-                  {!isArsiv && lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) ? (
+                  {ceklistAktif && !isArsiv && lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); setChecklistGorev({ id: g.id, type: 'canli_gorevler' }) }}
                       style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 7px', cursor: 'pointer', fontSize: 11, color: '#1d4ed8' }}
@@ -1530,7 +1532,7 @@ async function del() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 14 }}>
               <div>
-                {modal === 'edit' && selected && lokasyonlar.find((l: any) => l.id === form.lokasyon_id && (l as any).checklist_sablon_id) && (
+                {ceklistAktif && modal === 'edit' && selected && lokasyonlar.find((l: any) => l.id === form.lokasyon_id && (l as any).checklist_sablon_id) && (
                   <button
                     type="button"
                     onClick={() => { setChecklistGorev({ id: selected.id, type: 'canli_gorevler', duzenleme: true }) }}

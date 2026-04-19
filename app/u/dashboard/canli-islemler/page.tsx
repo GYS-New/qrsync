@@ -52,6 +52,8 @@ export default async function UserCanliIslemler() {
 
   const readonly = !canliYetki.ekleyebilir && !canliYetki.duzenleyebilir && !canliYetki.silebilir
 
+  const efektifAyar = await getEfektifAyar(firmaId!, projeId)
+
   return (
     <div>
       <Topbar title="Frekansiyel Görevler" base="/u" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Frekansiyel Görevler' }]} />
@@ -66,7 +68,8 @@ export default async function UserCanliIslemler() {
         readonly={readonly}
         showTumGorevler={tumGorevlerYetki.gorebilir}
         yetkiliLokIds={yetkiliLokIds}
-        canliAkisSureSaat={(await getEfektifAyar(firmaId!, projeId)).canli_akis_sure_saat}
+        canliAkisSureSaat={efektifAyar.canli_akis_sure_saat}
+        ceklistAktif={efektifAyar.frekansiyel_ceklist_aktif}
       />
     </div>
   )

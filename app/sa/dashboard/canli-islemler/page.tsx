@@ -53,6 +53,8 @@ export default async function SACanliIslemlerPage() {
     gorevQ,
   ])
 
+  const efektifAyar = firmaId ? await getEfektifAyar(firmaId, projeId) : null
+
   return (
     <div>
       <Topbar title="Frekansiyel Görevler" base="/sa" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Frekansiyel Görevler' }]} />
@@ -65,7 +67,8 @@ export default async function SACanliIslemlerPage() {
         meName={me.isim_soyisim ?? undefined}
         projeId={projeId}
         readonly={false}
-        canliAkisSureSaat={firmaId ? (await getEfektifAyar(firmaId, projeId)).canli_akis_sure_saat : 8}
+        canliAkisSureSaat={efektifAyar?.canli_akis_sure_saat ?? 8}
+        ceklistAktif={efektifAyar?.frekansiyel_ceklist_aktif ?? true}
       />
     </div>
   )

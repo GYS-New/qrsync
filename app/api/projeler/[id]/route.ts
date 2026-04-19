@@ -49,6 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(body.spesifik_ceklist_aktif !== undefined && { spesifik_ceklist_aktif: body.spesifik_ceklist_aktif }),
       ...(body.spesifik_personel_atama_aktif !== undefined && { spesifik_personel_atama_aktif: body.spesifik_personel_atama_aktif }),
       ...(body.frekansiyel_personel_atama_aktif !== undefined && { frekansiyel_personel_atama_aktif: body.frekansiyel_personel_atama_aktif }),
+      ...(body.frekansiyel_ceklist_aktif !== undefined && { frekansiyel_ceklist_aktif: body.frekansiyel_ceklist_aktif }),
       ...(body.varsayilan_ayarlar !== undefined && { varsayilan_ayarlar: body.varsayilan_ayarlar }),
     })
     .eq('id', params.id)

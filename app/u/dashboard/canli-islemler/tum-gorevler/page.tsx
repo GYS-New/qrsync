@@ -73,6 +73,7 @@ export default async function UTumGorevlerPage() {
         kullanicilar={(kullanicilar as any) ?? []}
         initialGorevler={(gorevler as any) ?? []}
         personelAtamaAktif={ayarlar.frekansiyel_personel_atama_aktif}
+        ceklistAktif={ayarlar.frekansiyel_ceklist_aktif}
       />
     </div>
   )

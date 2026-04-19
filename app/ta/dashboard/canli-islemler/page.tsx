@@ -30,6 +30,8 @@ export default async function CanliIslemlerPage() {
     supabase.from('canli_gorevler').select('*,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)').eq('firma_id', firmaId).or(`proje_id.eq.${aktifProje.id},proje_id.is.null`).order('olusturma_tarihi', { ascending: false }).limit(50),
   ])
 
+  const efektifAyar = await getEfektifAyar(firmaId, aktifProje.id)
+
   return (
     <div>
       <Topbar
@@ -46,7 +48,8 @@ export default async function CanliIslemlerPage() {
         meName={me.isim_soyisim ?? undefined}
         projeId={aktifProje.id}
         readonly={me.rol === 'tenant_user'}
-        canliAkisSureSaat={(await getEfektifAyar(firmaId, aktifProje.id)).canli_akis_sure_saat}
+        canliAkisSureSaat={efektifAyar.canli_akis_sure_saat}
+        ceklistAktif={efektifAyar.frekansiyel_ceklist_aktif}
       />
     </div>
   )

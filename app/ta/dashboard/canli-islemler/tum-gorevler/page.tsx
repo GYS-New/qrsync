@@ -65,6 +65,7 @@ export default async function TATumGorevlerPage() {
         initialGorevler={(gorevler as any) ?? []}
         projeId={aktifProje.id}
         personelAtamaAktif={ayarlar.frekansiyel_personel_atama_aktif}
+        ceklistAktif={ayarlar.frekansiyel_ceklist_aktif}
       />
     </div>
   )
