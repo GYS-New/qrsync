@@ -8,6 +8,15 @@ interface Message {
   content: string
 }
 
+// [SECENEKLER]a|b|c[/SECENEKLER] marker'ını ayıklar, metin + seçenekleri döner
+function parseSecim(content: string): { text: string; secenekler: string[] | null } {
+  const m = content.match(/\[SECENEKLER\]([\s\S]*?)\[\/SECENEKLER\]/)
+  if (!m) return { text: content, secenekler: null }
+  const secenekler = m[1].split('|').map(s => s.trim()).filter(Boolean)
+  const text = content.replace(m[0], '').trim()
+  return { text, secenekler: secenekler.length ? secenekler : null }
+}
+
 export default function IoAsistan({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'Merhaba! Ben İO Asistan 👋\nİOGYS hakkında size nasıl yardımcı olabilirim?' },
@@ -35,14 +44,14 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
     }
   }, [open])
 
-  async function handleSend() {
-    const text = input.trim()
+  async function handleSend(override?: string) {
+    const text = (override ?? input).trim()
     if (!text || loading) return
 
     const userMsg: Message = { role: 'user', content: text }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
-    setInput('')
+    if (!override) setInput('')
     setLoading(true)
     setStreamingText('')
 
@@ -172,25 +181,51 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
         flex: 1, overflowY: 'auto', padding: '16px 14px',
         display: 'flex', flexDirection: 'column', gap: 10,
       }}>
-        {messages.map((msg, i) => (
-          <div key={i} style={{
-            display: 'flex',
-            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-          }}>
-            <div
-              className={msg.role === 'user' ? 'io-msg-user' : 'io-msg-assistant'}
-              style={{
-                padding: '10px 14px', maxWidth: '82%',
-                fontSize: 13.5, lineHeight: 1.55, fontWeight: 450,
-                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-              }}
-            >
-              {msg.content}
+        {messages.map((msg, i) => {
+          const isLast = i === messages.length - 1
+          const parsed = msg.role === 'assistant' ? parseSecim(msg.content) : { text: msg.content, secenekler: null }
+          const showButtons = isLast && parsed.secenekler && !loading
+          return (
+            <div key={i} style={{
+              display: 'flex', flexDirection: 'column',
+              alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              gap: 6,
+            }}>
+              <div
+                className={msg.role === 'user' ? 'io-msg-user' : 'io-msg-assistant'}
+                style={{
+                  padding: '10px 14px', maxWidth: '82%',
+                  fontSize: 13.5, lineHeight: 1.55, fontWeight: 450,
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                }}
+              >
+                {parsed.text}
+              </div>
+              {showButtons && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxWidth: '82%' }}>
+                  {parsed.secenekler!.map((s, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSend(s)}
+                      style={{
+                        padding: '6px 12px', borderRadius: 16,
+                        border: '1.5px solid #378ADD', background: '#fff',
+                        color: '#185FA5', fontSize: 12.5, fontWeight: 600,
+                        cursor: 'pointer', transition: 'all 0.15s',
+                      }}
+                      onMouseOver={e => { e.currentTarget.style.background = '#185FA5'; e.currentTarget.style.color = '#fff' }}
+                      onMouseOut={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#185FA5' }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
 
-        {/* Streaming */}
+        {/* Streaming — [SECENEKLER] geldikten sonrasını gizle (bittiğinde butonlarla gelir) */}
         {loading && streamingText && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
             <div className="io-msg-assistant" style={{
@@ -198,7 +233,7 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
               fontSize: 13.5, lineHeight: 1.55, fontWeight: 450,
               whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             }}>
-              {streamingText}
+              {streamingText.replace(/\[SECENEKLER\][\s\S]*?(\[\/SECENEKLER\]|$)/, '').trim() || '…'}
             </div>
           </div>
         )}
@@ -242,7 +277,7 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
           onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
         />
         <button
-          onClick={handleSend}
+          onClick={() => handleSend()}
           disabled={loading || !input.trim()}
           style={{
             width: 38, height: 38, borderRadius: 10,

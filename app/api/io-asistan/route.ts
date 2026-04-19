@@ -80,7 +80,7 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: 'personel_listesi',
-    description: 'Aktif personel listesini getirir. İsim, rol, email bilgileri.',
+    description: 'Aktif personel listesini getirir. İsim, rol, email bilgileri. Görev oluşturma akışında kullanıcının atanacak personel seçimi yapması gerektiğinde de bu tool çağırılır — yanıtına [SECENEKLER]isim1|isim2|...[/SECENEKLER] marker\'ı ekleyerek tıklanabilir buton göster.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -92,7 +92,7 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: 'lokasyon_bilgisi',
-    description: 'Lokasyonların listesini veya detayını getirir.',
+    description: 'Lokasyonların listesini veya detayını getirir. SA/TA tüm lokasyonları, U/M sadece atandığı (kullanici_lokasyon_yetkileri) üst lokasyonlar ve onların altlarını görür. Kullanıcı görev oluşturma akışında lokasyon seçmek istediğinde de bu tool çağırılır — sen yanıtına [SECENEKLER]lokasyon1|lokasyon2|...[/SECENEKLER] marker\'ı ekleyerek tıklanabilir buton göster.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -1199,6 +1199,22 @@ Kullanıcı bir şey "ekle / oluştur / yarat" dediğinde:
 7. Kullanıcı "lokasyonları listele" / "kullanıcıları göster" derse, yazma akışını duraklatıp ilgili listeleme tool'unu çağır (lokasyon_bilgisi, personel_listesi). Sonra kullanıcı lokasyon seçtiğinde yazma akışına devam et.
 
 8. Bir lokasyon eşleşmediğinde kullanıcıya mevcut lokasyonları göstermek için lokasyon_bilgisi tool'unu çağır.
+
+## SEÇİM BUTONLARI (UI İÇİN)
+Kullanıcının bir listeden seçim yapması gerektiği anlarda (lokasyon seç, personel seç, görev tipi seç vs.) yanıtına aşağıdaki markeri ekle — UI bu markeri tespit edip tıklanabilir butonlar olarak gösterecek:
+
+[SECENEKLER]Seçenek 1|Seçenek 2|Seçenek 3[/SECENEKLER]
+
+Kurallar:
+- Seçenekler | (pipe) ile ayrılır
+- Her seçenek 1 satırda, kısa ve net olsun (lokasyon tanımı, kullanıcı ismi vs.)
+- Maksimum 10 seçenek önerilir (daha fazlası için kullanıcıdan daralma iste)
+- Marker satırı ayrı olsun, açıklama metninden sonra gelsin
+- Örnek:
+  "Hangi lokasyonda görev oluşturalım?
+  [SECENEKLER]Zemin Kat WC|A Blok Kat 1|B Blok Kat 2[/SECENEKLER]"
+- Kullanıcı butona tıklayınca seçim metni ham girdi gibi gelir, sen tool'u onunla çağırırsın.
+- Liste çok uzunsa (30+) marker yerine ilk 10 seçeneği göster + "Daha fazla için arama yapabilirsin" de.
 
 ## YÖNETİCİ İLETİŞİMİ (DB sorgulu — yonetici_iletisim tool'u kullan)
 Kullanıcı şu tip sorular sorduğunda yonetici_iletisim tool'unu çağır, UYDURMA:
