@@ -161,17 +161,20 @@ export async function POST(req: NextRequest) {
             const batch = gorevler.slice(i, i + BATCH)
             const batchIds = batch.map(g => g.id)
 
-            // Çeklist sonuçlarını arşivle
+            // Çeklist sonuçlarını arşivle (her adımda error kontrolü — başarısızsa DELETE etme)
             try {
-              const { data: basliklar } = await admin.from('checklist_sonuc_basliklari').select('*').in('canli_gorev_id', batchIds)
+              const { data: basliklar, error: bErr } = await admin.from('checklist_sonuc_basliklari').select('*').in('canli_gorev_id', batchIds)
+              if (bErr) throw new Error('basliklar select: ' + bErr.message)
               if (basliklar?.length) {
                 const bIds = basliklar.map(b => b.id)
-                const { data: maddeler } = await admin.from('checklist_sonuc_maddeleri').select('*').in('sonuc_id', bIds)
+                const { data: maddeler, error: mErr } = await admin.from('checklist_sonuc_maddeleri').select('*').in('sonuc_id', bIds)
+                if (mErr) throw new Error('maddeler select: ' + mErr.message)
                 if (maddeler?.length) {
-                  await admin.from('checklist_sonuc_maddeleri_arsiv').upsert(maddeler, { onConflict: 'id', ignoreDuplicates: true })
-                  await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', bIds)
+                  const { error: mUpsertErr } = await admin.from('checklist_sonuc_maddeleri_arsiv').upsert(maddeler, { onConflict: 'id', ignoreDuplicates: true })
+                  if (mUpsertErr) throw new Error('maddeler arsiv upsert: ' + mUpsertErr.message)
+                  const { error: mDelErr } = await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', bIds)
+                  if (mDelErr) throw new Error('maddeler delete: ' + mDelErr.message)
                 }
-                // firma_id: görevden al (checklist_sonuc_basliklari'nda firma_id yok)
                 const gorevFirmaMap: Record<string, string> = {}
                 for (const g of batch) gorevFirmaMap[g.id] = g.firma_id
                 const arsivBasliklar = basliklar.map(b => ({
@@ -179,16 +182,34 @@ export async function POST(req: NextRequest) {
                   arsiv_tarihi: new Date().toISOString(),
                   firma_id: gorevFirmaMap[b.canli_gorev_id] ?? null,
                 }))
-                await admin.from('checklist_sonuc_basliklari_arsiv').upsert(arsivBasliklar, { onConflict: 'id', ignoreDuplicates: true })
-                await admin.from('checklist_sonuc_basliklari').delete().in('id', bIds)
+                const { error: bUpsertErr } = await admin.from('checklist_sonuc_basliklari_arsiv').upsert(arsivBasliklar, { onConflict: 'id', ignoreDuplicates: true })
+                if (bUpsertErr) throw new Error('basliklar arsiv upsert: ' + bUpsertErr.message)
+                const { error: bDelErr } = await admin.from('checklist_sonuc_basliklari').delete().in('id', bIds)
+                if (bDelErr) throw new Error('basliklar delete: ' + bDelErr.message)
                 ceklistToplam += basliklar.length
               }
             } catch (e: any) { r.ceklist_err = e.message }
 
-            // Görevleri arşivle
+            // Görevleri arşivle — önce upsert, başarılı olursa DELETE et
             const arsivRows = batch.map(g => ({ ...g, arsiv_tarihi: new Date().toISOString(), arsiv_nedeni: 'cron_saat' }))
-            await admin.from('canli_gorevler_arsiv').upsert(arsivRows, { onConflict: 'id', ignoreDuplicates: true })
-            await admin.from('canli_gorevler').delete().in('id', batchIds)
+            const { error: upsertErr } = await admin.from('canli_gorevler_arsiv').upsert(arsivRows, { onConflict: 'id', ignoreDuplicates: true })
+            if (upsertErr) {
+              r.frekansiyel_err = (r.frekansiyel_err ? r.frekansiyel_err + '; ' : '') + 'upsert: ' + upsertErr.message
+              console.error('[arsivle] canli_gorevler_arsiv upsert başarısız, DELETE atlandı:', upsertErr.message, 'batch:', batchIds.length)
+              continue  // Bu batch'i atla, DELETE'e geçme
+            }
+            // Arşive başarıyla yazıldığını doğrula — arşivdeki kayıt sayısını kontrol et
+            const { count: arsivCount, error: cErr } = await admin
+              .from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true }).in('id', batchIds)
+            if (cErr || (arsivCount ?? 0) < batchIds.length) {
+              r.frekansiyel_err = (r.frekansiyel_err ? r.frekansiyel_err + '; ' : '') + `doğrulama: arsivde ${arsivCount ?? 0}/${batchIds.length}`
+              console.error('[arsivle] doğrulama başarısız, DELETE atlandı:', r.frekansiyel_err)
+              continue
+            }
+            const { error: delErr } = await admin.from('canli_gorevler').delete().in('id', batchIds)
+            if (delErr) {
+              r.frekansiyel_err = (r.frekansiyel_err ? r.frekansiyel_err + '; ' : '') + 'delete: ' + delErr.message
+            }
           }
           r.frekansiyel = gorevler.length
           if (ceklistToplam > 0) r.ceklist = ceklistToplam
