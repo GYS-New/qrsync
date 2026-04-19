@@ -854,19 +854,20 @@ async function executeTool(
           if (projeId) altQ = altQ.eq('proje_id', projeId)
           const { data: altData } = await altQ
           if (altData?.length) {
-            return `"${lokasyonAdi}" ile tam eşleşen lokasyon bulunamadı. Benzer lokasyonlar:\n${altData.map((l: any) => `• ${l.tanim}`).join('\n')}\nLütfen tam lokasyon adını seçip belirtin.`
+            const opts = altData.slice(0, 8).map((l: any) => l.tanim).join('|')
+            return `"${lokasyonAdi}" ile tam eşleşen lokasyon yok. Benzer lokasyonlar:\n[SECENEKLER]${opts}[/SECENEKLER]\nLütfen listeden tam adı seçin.`
           }
           return `"${lokasyonAdi}" ile eşleşen lokasyon bulunamadı. Farklı bir isim deneyin veya önce "lokasyonları listele" dedirterek mevcut listeyi görün.`
         }
-        if (loks.length > 1) {
-          const exact = loks.find((l: any) => l.tanim.toLowerCase() === lokasyonAdi.toLowerCase())
-          if (!exact) {
-            return `Birden fazla lokasyon eşleşti:\n${loks.map((l: any) => `• ${l.tanim}`).join('\n')}\nTam adı belirtir misiniz?`
-          }
+        // TAM EŞLEŞME ZORUNLU — sessizce ilk kaydı seçmek tehlikeli
+        const exactLok = loks.find((l: any) => l.tanim.toLowerCase() === lokasyonAdi.toLowerCase())
+        if (!exactLok) {
+          const opts = loks.slice(0, 8).map((l: any) => l.tanim).join('|')
+          return `"${lokasyonAdi}" ile tam eşleşme yok. Benzer lokasyonlar:\n[SECENEKLER]${opts}[/SECENEKLER]\nLütfen listeden tam adı seçin.`
         }
-        const lokasyon = loks.find((l: any) => l.tanim.toLowerCase() === lokasyonAdi.toLowerCase()) ?? loks[0]
+        const lokasyon = exactLok
 
-        // 4) Atanan kullanıcı çözümle (opsiyonel) — kelime bazlı fuzzy
+        // 4) Atanan kullanıcı çözümle (opsiyonel) — kelime bazlı fuzzy + güvenlik kontrolü
         let atananId: string | null = null
         let atananLabel = '—'
         if (atananIsim) {
@@ -875,24 +876,30 @@ async function executeTool(
           if (projeId) uQ = uQ.eq('proje_id', projeId)
           for (const k of kelimeler) uQ = uQ.ilike('isim_soyisim', `%${k}%`)
           let { data: users } = await uQ
-          // Eşleşme yoksa sadece ilk kelimeyle dene (soyadı olmayabilir)
-          if (!users?.length && kelimeler.length > 0) {
-            let fbQ = supabase.from('users').select('id,isim_soyisim').ilike('isim_soyisim', `%${kelimeler[0]}%`).eq('firma_id', ctx.firmaId).eq('aktif', true).limit(10)
-            if (projeId) fbQ = fbQ.eq('proje_id', projeId)
-            const { data: fbData } = await fbQ
-            users = fbData
-          }
-          if (!users?.length) return `"${atananIsim}" ile eşleşen kullanıcı bulunamadı. "personelleri listele" diyerek geçerli isimleri görebilirsiniz.`
-          if (users.length > 1) {
-            const exactU = users.find((u: any) => u.isim_soyisim.toLowerCase() === atananIsim.toLowerCase())
-            if (!exactU) {
+          const exactMatchStrict = users?.find((u: any) => u.isim_soyisim.toLowerCase() === atananIsim.toLowerCase())
+
+          // Tam eşleşme yoksa: fallback etme, kullanıcıya seçim sun
+          if (!exactMatchStrict) {
+            // Önce kelime bazlı tam eşleşmeye bakmadık — bu dallanmada kelime bazlı eşleşen BİRDEN ÇOK user olabilir
+            // veya tek kişi ama tam isim farklı. Her durumda SESSİZCE SEÇMEME — kullanıcıya sor.
+            if (users?.length) {
               const opts = users.slice(0, 8).map((u: any) => u.isim_soyisim).join('|')
-              return `Birden fazla kullanıcı eşleşti, hangisini atamak istersiniz?\n[SECENEKLER]${opts}[/SECENEKLER]`
+              return `"${atananIsim}" ile tam eşleşme yok. Muhtemel kullanıcılar:\n[SECENEKLER]${opts}[/SECENEKLER]\nLütfen listeden tam adı seçin.`
             }
+            // Hiç eşleşme yoksa ilk kelimeyle dene, sonuçları kullanıcıya göster (yine sessiz seçme yok)
+            if (kelimeler.length > 0) {
+              let fbQ = supabase.from('users').select('id,isim_soyisim').ilike('isim_soyisim', `%${kelimeler[0]}%`).eq('firma_id', ctx.firmaId).eq('aktif', true).limit(10)
+              if (projeId) fbQ = fbQ.eq('proje_id', projeId)
+              const { data: fbData } = await fbQ
+              if (fbData?.length) {
+                const opts = fbData.slice(0, 8).map((u: any) => u.isim_soyisim).join('|')
+                return `"${atananIsim}" bulunamadı. Benzer kullanıcılar:\n[SECENEKLER]${opts}[/SECENEKLER]\nLütfen listeden tam adı seçin.`
+              }
+            }
+            return `"${atananIsim}" ile eşleşen kullanıcı bulunamadı. "personelleri listele" diyerek geçerli isimleri görebilirsiniz.`
           }
-          const picked = users.find((u: any) => u.isim_soyisim.toLowerCase() === atananIsim.toLowerCase()) ?? users[0]
-          atananId = picked.id
-          atananLabel = picked.isim_soyisim
+          atananId = exactMatchStrict.id
+          atananLabel = exactMatchStrict.isim_soyisim
         }
 
         // 5) onayla=false ise özet göster
@@ -1272,6 +1279,12 @@ Kullanıcı bir şey "ekle / oluştur / yarat" dediğinde:
 7. Kullanıcı "lokasyonları listele" / "kullanıcıları göster" derse, yazma akışını duraklatıp ilgili listeleme tool'unu çağır (lokasyon_bilgisi, personel_listesi). Sonra kullanıcı lokasyon seçtiğinde yazma akışına devam et.
 
 8. Bir lokasyon eşleşmediğinde kullanıcıya mevcut lokasyonları göstermek için lokasyon_bilgisi tool'unu çağır.
+
+## İSİM HALÜSİNASYONU ÖNLEME (ÇOK KRİTİK)
+- Tool'dan dönen personel/lokasyon isimlerini TEK KARAKTER değiştirmeden, AYNEN butona/listeye aktar.
+- Tool listesinde olmayan bir ismi (örn. "MENİFE YEŞILTEPE" ama DB'de sadece "MENİFE YILDIZ" var) ASLA uydurma.
+- Eğer kullanıcı yanlış bir isim söylerse, tool doğru isimleri [SECENEKLER] ile geri getirir — kullanıcıya o seçenekleri ver, kendi yorumun ile değiştirme.
+- gorev_olustur tool'u isim tam eşleşmediğinde kayıt yapmaz, [SECENEKLER] döner — bu response'u AYNEN kullanıcıya göster, ATLAMA.
 
 ## SEÇİM BUTONLARI (UI İÇİN)
 Kullanıcının bir listeden seçim yapması gerektiği anlarda (lokasyon seç, personel seç, görev tipi seç vs.) yanıtına aşağıdaki markeri ekle — UI bu markeri tespit edip tıklanabilir butonlar olarak gösterecek:
