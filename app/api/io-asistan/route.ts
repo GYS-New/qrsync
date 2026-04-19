@@ -559,16 +559,21 @@ async function executeTool(
             `\n\nGenel iletişim: info@iogys.com.tr | www.iogys.com.tr`
         } else if (tip === 'firma') {
           if (!ctx.firmaId) return 'Firma kapsamınız yok; firma yöneticisi bilgisi gösterilemiyor.'
-          const { data, error } = await supabase
+          let q = supabase
             .from('users')
-            .select('isim_soyisim,email,telefon')
+            .select('isim_soyisim,email,telefon,proje_id')
             .eq('rol', 'tenant_admin')
             .eq('firma_id', ctx.firmaId)
             .eq('aktif', true)
             .order('isim_soyisim')
+          // U/M/TU rolleri: sadece firma geneli (proje_id null) VEYA kendi projesine atanmış TA'lar
+          if (!ctx.isSA && ctx.projeId) {
+            q = q.or(`proje_id.is.null,proje_id.eq.${ctx.projeId}`)
+          }
+          const { data, error } = await q
           if (error) return `Hata: ${error.message}`
           if (!data?.length) return 'Firmanızın aktif yöneticisi bulunamadı.'
-          return `Firma Yöneticileri:\n` +
+          return `Firma Yöneticileri (Sistem Yöneticileri):\n` +
             data.map((u: Record<string, unknown>) => {
               const lines = [`• ${u.isim_soyisim}`]
               if (u.email)   lines.push(`  E-posta: ${u.email}`)
@@ -1026,8 +1031,10 @@ Veri sorgularında:
 
 ## YÖNETİCİ İLETİŞİMİ (DB sorgulu — yonetici_iletisim tool'u kullan)
 Kullanıcı şu tip sorular sorduğunda yonetici_iletisim tool'unu çağır, UYDURMA:
-- "İO Teknoloji destek / sistem yöneticisi / SA kim / e-posta-telefon?" → tool tip="sistem"
-- "Firma yöneticim kim / firma admin iletişim / TA'ma nasıl ulaşırım?" → tool tip="firma"
+- "İO Teknoloji destek / İO Teknoloji sistem yöneticisi / SA kim?" → tool tip="sistem"
+- "Firma yöneticim kim / firma admin / sistem yöneticisi / yönetici iletişim / nasıl ulaşırım?" → tool tip="firma"
+- ÖNEMLİ: TU/U/TM/M rolündeki kullanıcı "sistem yöneticisi" dediğinde, onların "sistem yöneticisi" dediği şey firma'larının TA'larıdır (yani tip="firma"). İO Teknoloji SA'ları değil. Emin değilsen her iki tool'u da sırayla çağır.
+- tip="firma" sonucunda gelen kişiler kullanıcının projesiyle eşleşen/firma geneli TA'lardır (proje scope otomatik uygulanır).
 Kurumsal genel iletişim (info@, web) sorularında da resmi listedeki bilgileri verebilirsin — ancak spesifik kişi sorulursa tool şart.
 
 ## HALÜSİNASYON ÖNLEME (ÇOK ÖNEMLİ)
