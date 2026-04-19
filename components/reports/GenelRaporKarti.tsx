@@ -293,21 +293,25 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
     const toplamGerceklesen = data.toplamTamamlanan + data.toplamSapma
     const genelOran = toplamHedef > 0 ? Math.round(toplamGerceklesen / toplamHedef * 100) : 0
 
-    // Personel bazlı tamamlanan (yalnızca proje personeli — boş personel atlanır)
+    // Personel bazlı tamamlanan (Üst Lokasyon - Personel formatında, boş personel atlanır)
     const persSayac = new Map<string, number>()
     for (const r of data.tamamlananGorevler) {
       if (!r.personel) continue
-      persSayac.set(r.personel, (persSayac.get(r.personel) ?? 0) + 1)
+      const ust = r.ustLokasyon || '—'
+      const key = `${ust} - ${r.personel}`
+      persSayac.set(key, (persSayac.get(key) ?? 0) + 1)
     }
     const persBazli = [...persSayac.entries()]
       .map(([personel, sayi]) => ({ personel, sayi }))
       .sort((a, b) => b.sayi - a.sayi).slice(0, 10)
 
-    // Lokasyon bazlı tamamlanan
+    // Lokasyon bazlı tamamlanan (Üst Lokasyon - Lokasyon formatında)
     const lokSayac = new Map<string, number>()
     for (const r of data.tamamlananGorevler) {
-      const k = r.lokasyon || 'Bilinmiyor'
-      lokSayac.set(k, (lokSayac.get(k) ?? 0) + 1)
+      const lok = r.lokasyon || 'Bilinmiyor'
+      const ust = r.ustLokasyon || '—'
+      const key = `${ust} - ${lok}`
+      lokSayac.set(key, (lokSayac.get(key) ?? 0) + 1)
     }
     const lokBazli = [...lokSayac.entries()]
       .map(([lokasyon, sayi]) => ({ lokasyon, sayi }))
@@ -343,21 +347,25 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       .map(([grup, v]) => ({ grup, ...v }))
       .sort((a, b) => b.tamamlanan - a.tamamlanan)
 
-    // Kayıp frekanslar – lokasyon bazlı (ilk 10)
+    // Kayıp frekanslar – lokasyon bazlı (Üst Lokasyon - Lokasyon, ilk 10)
     const kayipLokSayac = new Map<string, number>()
     for (const r of data.kayipGorevler) {
-      const k = r.lokasyon || 'Bilinmiyor'
-      kayipLokSayac.set(k, (kayipLokSayac.get(k) ?? 0) + 1)
+      const lok = r.lokasyon || 'Bilinmiyor'
+      const ust = r.ustLokasyon || '—'
+      const key = `${ust} - ${lok}`
+      kayipLokSayac.set(key, (kayipLokSayac.get(key) ?? 0) + 1)
     }
     const kayipLokBazli = [...kayipLokSayac.entries()]
       .map(([lokasyon, sayi]) => ({ lokasyon, sayi }))
       .sort((a, b) => b.sayi - a.sayi).slice(0, 10)
 
-    // Sapma frekanslar – lokasyon bazlı (ilk 10)
+    // Sapma frekanslar – lokasyon bazlı (Üst Lokasyon - Lokasyon, ilk 10)
     const sapmaLokSayac = new Map<string, number>()
     for (const r of data.sapmaGorevler) {
-      const k = r.lokasyon || 'Bilinmiyor'
-      sapmaLokSayac.set(k, (sapmaLokSayac.get(k) ?? 0) + 1)
+      const lok = r.lokasyon || 'Bilinmiyor'
+      const ust = r.ustLokasyon || '—'
+      const key = `${ust} - ${lok}`
+      sapmaLokSayac.set(key, (sapmaLokSayac.get(key) ?? 0) + 1)
     }
     const sapmaLokBazli = [...sapmaLokSayac.entries()]
       .map(([lokasyon, sayi]) => ({ lokasyon, sayi }))
