@@ -14,6 +14,9 @@ interface Alert {
   cozuldu: boolean
   cozum_tarihi: string | null
   detay: any
+  kategori: string | null
+  son_kontrol_tarihi: string | null
+  tekrar_sayisi: number | null
 }
 
 const SEVIYE_STYLE: Record<string, { bg: string; color: string; border: string; etiket: string }> = {
@@ -140,13 +143,13 @@ export default function SistemAlertsClient() {
           <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Sistem Uyarıları</div>
           {cozulmeyen.length > 0 && (
             <span style={{ padding: '3px 10px', borderRadius: 12, background: '#fee2e2', color: '#991b1b', fontSize: 12, fontWeight: 700 }}>
-              {cozulmeyen.length} çözülmemiş
+              ⏳ {cozulmeyen.length} devam ediyor
             </span>
           )}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select className="verde-select" value={cozuldu} onChange={e => setCozuldu(e.target.value as any)} style={{ width: 170 }}>
-              <option value="false">Sadece çözülmemiş</option>
-              <option value="true">Sadece çözülmüş</option>
+            <select className="verde-select" value={cozuldu} onChange={e => setCozuldu(e.target.value as any)} style={{ width: 180 }}>
+              <option value="false">⏳ Devam Edenler</option>
+              <option value="true">✓ Düzeltilmiş</option>
               <option value="">Tümü</option>
             </select>
             <button onClick={yukle} disabled={loading} className="verde-btn-outline-strong" style={{ padding: '7px 14px', fontSize: 13 }}>
@@ -174,31 +177,48 @@ export default function SistemAlertsClient() {
                       background: a.cozuldu ? '#f9fafb' : s.bg,
                       border: `1px solid ${a.cozuldu ? '#e5e7eb' : s.border}`,
                       borderRadius: 10, padding: '12px 14px',
-                      cursor: 'pointer', opacity: a.cozuldu ? 0.6 : 1,
+                      cursor: 'pointer', opacity: a.cozuldu ? 0.65 : 1,
                       display: 'flex', alignItems: 'center', gap: 12,
                     }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 11, fontWeight: 800, color: s.color }}>{s.etiket}</span>
+                        {/* Durum etiketi */}
+                        {a.cozuldu ? (
+                          <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: '#dcfce7', color: '#166534', fontWeight: 700 }}>
+                            ✓ DÜZELTİLDİ
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: '#fee2e2', color: '#991b1b', fontWeight: 700 }}>
+                            ⏳ DEVAM EDİYOR
+                          </span>
+                        )}
                         <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{a.baslik}</span>
                         {a.kaynak && (
                           <span style={{ fontSize: 10.5, padding: '1px 6px', borderRadius: 4, background: '#e5e7eb', color: '#4b5563' }}>{a.kaynak}</span>
                         )}
-                        {a.cozuldu && (
-                          <span style={{ fontSize: 10.5, padding: '1px 6px', borderRadius: 4, background: '#dcfce7', color: '#166534', fontWeight: 700 }}>✓ Çözüldü</span>
+                        {(a.tekrar_sayisi ?? 1) > 1 && !a.cozuldu && (
+                          <span style={{ fontSize: 10.5, padding: '1px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
+                            {a.tekrar_sayisi}× tekrar teyit
+                          </span>
                         )}
                       </div>
                       <div style={{ fontSize: 12.5, color: '#4b5563', lineHeight: 1.5, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                         {a.mesaj}
                       </div>
                     </div>
-                    <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{tarihFormat(a.tarih)}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      <span>İlk: {tarihFormat(a.tarih)}</span>
+                      {a.son_kontrol_tarihi && a.son_kontrol_tarihi !== a.tarih && (
+                        <span>Son: {tarihFormat(a.son_kontrol_tarihi)}</span>
+                      )}
+                    </div>
                     {!a.cozuldu && (
                       <button
                         onClick={(e) => { e.stopPropagation(); cozIsaretle(a.id) }}
                         style={{ padding: '5px 10px', fontSize: 12, borderRadius: 6, border: '1px solid #16a34a', background: '#dcfce7', color: '#166534', cursor: 'pointer', fontWeight: 600 }}
                       >
-                        Çözüldü
+                        ✓ Düzeltildi
                       </button>
                     )}
                   </div>
