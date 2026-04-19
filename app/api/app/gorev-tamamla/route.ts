@@ -76,7 +76,9 @@ export async function POST(req: Request) {
     const gorevId   = body?.gorev_id as string | undefined
     const gorevTipi = (body?.gorev_tipi as string | undefined) ?? 'gorevler'
     const maddeler  = body?.maddeler ?? []
-    const scanToken = body?.scan_token as string | undefined  // QR/NFC token (mobil gönderir)
+    // iOS bazı QR okuyucular token sonuna \n, \r veya boşluk ekleyebilir — trim şart
+    const scanTokenRaw = body?.scan_token as string | undefined
+    const scanToken = typeof scanTokenRaw === 'string' ? scanTokenRaw.trim() : scanTokenRaw
 
     if (!gorevId) {
       return NextResponse.json({ ok: false, error: 'gorev_id gerekli' }, { status: 400, headers: CORS })

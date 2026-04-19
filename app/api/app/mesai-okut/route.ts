@@ -70,7 +70,9 @@ export async function POST(req: Request) {
       )
     }
 
-    const mesaiToken = body?.token as string | undefined
+    // iOS bazı QR/NFC okuyucular token sonuna \n veya boşluk ekleyebilir — trim şart
+    const mesaiTokenRaw = body?.token as string | undefined
+    const mesaiToken = typeof mesaiTokenRaw === 'string' ? mesaiTokenRaw.trim() : mesaiTokenRaw
     if (!mesaiToken) {
       return NextResponse.json(
         { ok: false, error: 'token alanı gerekli' },

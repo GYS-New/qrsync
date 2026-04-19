@@ -24,9 +24,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Pasif durumdasınız! Lütfen sistem yöneticiniz ile iletişime geçin.', code: 'USER_PASIF' }, { status: 403 })
     }
 
-    const p     = new URL(req.url).searchParams
-    const token = p.get('token')
-    const kanal = p.get('kanal') as 'QR' | 'NFC'
+    const p        = new URL(req.url).searchParams
+    const tokenRaw = p.get('token')
+    // iOS bazı okuyucular token'a whitespace/newline ekleyebilir — trim
+    const token    = typeof tokenRaw === 'string' ? tokenRaw.trim() : tokenRaw
+    const kanal    = p.get('kanal') as 'QR' | 'NFC'
     if (!token || !kanal) return NextResponse.json({ ok: false, error: 'token ve kanal gerekli' }, { status: 400 })
 
     const admin = createAdminClient()
