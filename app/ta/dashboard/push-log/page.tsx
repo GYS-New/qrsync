@@ -31,7 +31,7 @@ export default async function TAPushLogPage() {
         base="/ta"
         breadcrumbs={[{ label: 'Yönetim' }, { label: aktifProje.ad }, { label: 'Push Bildirim Geçmişi' }]}
       />
-      <PushLogClient firmaId={firmaId} projeId={aktifProje.id} />
+      <PushLogClient firmaId={firmaId} projeId={aktifProje.id} canDelete={true} />
     </div>
   )
 }

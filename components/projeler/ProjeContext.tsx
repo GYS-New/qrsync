@@ -13,6 +13,9 @@ export type Proje = {
   birim_fiyat_aktif?: boolean
   personel_takibi_aktif?: boolean
   sureli_gorev_aktif?: boolean
+  manuel_push_aktif?: boolean
+  manuel_push_u_rolu?: boolean
+  manuel_push_m_rolu?: boolean
 }
 
 type ProjeCtx = {

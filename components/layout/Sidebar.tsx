@@ -272,6 +272,25 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
   const personelTakibiAktif = aktifProje
     ? aktifProje.personel_takibi_aktif !== false
     : true
+  // Manuel push: proje varsa proje, yoksa firma ayarından. Rol bazlı alt toggle.
+  const manuelPushAktif = (() => {
+    const baseAktif = aktifProje
+      ? aktifProje.manuel_push_aktif === true
+      : isSA ? aktifFirma?.manuel_push_aktif === true : false
+    if (!baseAktif) return false
+    if (isSA || user.rol === 'tenant_admin') return true
+    if (user.rol === 'tenant_user') {
+      return aktifProje
+        ? aktifProje.manuel_push_u_rolu === true
+        : aktifFirma?.manuel_push_u_rolu === true
+    }
+    if (user.rol === 'musteri') {
+      return aktifProje
+        ? aktifProje.manuel_push_m_rolu === true
+        : aktifFirma?.manuel_push_m_rolu === true
+    }
+    return false
+  })()
 
   // Fetch sidebar badge counts
   useEffect(() => {
@@ -464,6 +483,8 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
             if (item.href.includes('/birim-fiyatlar')) return birimFiyatAktif
             // personel-takibi: sadece aktif proje'de personel_takibi_aktif=true ise göster
             if (item.href.includes('/personel-takibi')) return personelTakibiAktif
+            // push-log: manuel_push_aktif ayarına göre (proje varsa proje, yoksa firma)
+            if (item.href.includes('/push-log')) return manuelPushAktif
             return true
           })
 
