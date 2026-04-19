@@ -241,6 +241,8 @@ async function executeTool(
       case 'projeleri_listele': {
         let q = supabase.from('projeler').select('id,ad,firmalar!firma_id(firma_adi)').order('ad')
         if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        // TU/U gibi belirli proje'ye atanmış kullanıcılar sadece kendi projelerini görmeli
+        if (!ctx.isSA && ctx.projeId) q = q.eq('id', ctx.projeId)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
         if (!data?.length) return 'Erişebileceğiniz proje bulunamadı.'
@@ -788,13 +790,15 @@ async function executeTool(
           'personel_destek_personeller',
         ])
         const projeIdsizTablolar = new Set([
-          'firmalar', 'users', 'dashboard_bloklar', 'cron_log',
+          'firmalar', 'users', 'dashboard_bloklar', 'cron_log', 'projeler',
           ...firmaIdsizTablolar,
         ])
         const tabloFirmaIdsiz = firmaIdsizTablolar.has(tablo)
         const tabloProjeIdsiz = projeIdsizTablolar.has(tablo)
         // Firmalar tablosu özel: TA sadece kendi firmasını görebilir (filter: id = firmaId)
         const isFirmalarTable = tablo === 'firmalar'
+        // Projeler tablosu özel: TU/U sadece kendi projesini görebilir (filter: id = projeId)
+        const isProjelerTable = tablo === 'projeler'
         // Güvenlik: TA/U firma_id içermeyen tabloları sorgulayamasın (scope aşımı riski)
         if (!ctx.isSA && tabloFirmaIdsiz) {
           return `"${tablo}" tablosunda firma kapsamı olmadığı için sadece sistem yöneticisi sorgulayabilir.`
@@ -810,6 +814,8 @@ async function executeTool(
             // firmalar tablosu özel: id = firmaId (TA kendi firmasını görür)
             q = isFirmalarTable ? q.eq('id', ctx.firmaId) : q.eq('firma_id', ctx.firmaId)
           }
+          // TU/U için projeler tablosunda id = projeId scope'u uygula
+          if (isProjelerTable && !ctx.isSA && ctx.projeId) q = q.eq('id', ctx.projeId)
           if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
           // Filtreleri uygula
           const filtreler = (input.filtreler as Array<{ kolon: string; operator: string; deger: string }>) || []
@@ -835,6 +841,8 @@ async function executeTool(
         if (ctx.firmaId && !tabloFirmaIdsiz) {
           q = isFirmalarTable ? q.eq('id', ctx.firmaId) : q.eq('firma_id', ctx.firmaId)
         }
+        // TU/U için projeler tablosunda id = projeId scope'u uygula
+        if (isProjelerTable && !ctx.isSA && ctx.projeId) q = q.eq('id', ctx.projeId)
         if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
 
         // Filtreleri uygula
@@ -1039,7 +1047,7 @@ Kullanıcının rolüne göre ERİŞEBİLECEĞİ VERİ SINIRLIDIR. Bu sınırı 
 - **TA (Firma Yöneticisi):** SADECE kendi firmasının verisine erişim var. Başka firmaların adını, sayısını, personelini, projesini ASLA VERME/LİSTELEME.
   - "Sistemde hangi firmalar var?" sorulursa: "Size sadece kendi firmanız ${'{'}firma_adi${'}'} görünüyor. Başka firmalar hakkında bilgi veremem."
   - "Kaç firma var?" sorulursa aynı cevap.
-- **TU / U (Saha Personeli):** SADECE kendi firmasının + atandığı lokasyonların verisi. Aynı kural geçerli.
+- **TU / U (Saha Personeli):** SADECE kendi firmasının + kendi projesinin + atandığı lokasyonların verisi. Başka projelerin adını/verisini ASLA listeleme. "Sistemde hangi projeler var?" sorulursa sadece kendi projesini listele.
 - **Müşteri (M):** SADECE kendi firmasına bağlı değerlendirme verileri.
 
 Kural ihlali = güvenlik ihlali. Herhangi bir soru bu sınırı aşıyorsa "Size bu veri görünmez" de.
