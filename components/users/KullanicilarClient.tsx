@@ -95,7 +95,7 @@ export default function KullanicilarClient({
   const [pushYetki, setPushYetki] = useState<{ aktif: boolean; benGonderebilirim: boolean }>({ aktif: false, benGonderebilirim: false })
   const [pushToplu, setPushToplu] = useState(false)
   const [pushSeciliIds, setPushSeciliIds] = useState<Set<string>>(new Set())
-  const [pushModalAlicilar, setPushModalAlicilar] = useState<{ id: string; isim_soyisim: string }[] | null>(null)
+  const [pushModalAlicilar, setPushModalAlicilar] = useState<{ id: string; isim_soyisim: string; bildirim_izni?: boolean | null }[] | null>(null)
 
   // SSR yeni initialUsers getirince (firma/proje değişimi) sync et
   useEffect(() => { setUsers(initialUsers) }, [initialUsers])
