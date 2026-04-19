@@ -253,23 +253,40 @@ export default function GorevKurallariClient({
 
     if (lokIdler.length === 0) return toast({ type: 'error', title: 'Hata', message: 'En az bir lokasyon seçin' })
 
+    // Haftalık kural: tüm lokasyonlarda Frekans Sayıları → Haftalık değeri dolu olmalı
+    if (form.frekans_tipi === 'haftalik') {
+      const eksikler = lokIdler.filter(id => {
+        const l = lokasyonlar.find(x => x.id === id)
+        const v = (l as any)?.haftalik_frekans_sayisi
+        return !v || v < 1
+      })
+      if (eksikler.length > 0) {
+        const isimler = eksikler.map(id => lokasyonlar.find(x => x.id === id)?.tanim ?? '—').join(', ')
+        return toast({ type: 'error', title: 'Eksik haftalık frekans', message: `Önce Frekans Sayıları → Haftalık sekmesinden değer girin: ${isimler}` })
+      }
+      // Frekans ≤ izinli gün sayısı kontrolü
+      const enBuyukFrekans = Math.max(...lokIdler.map(id => (lokasyonlar.find(x => x.id === id) as any)?.haftalik_frekans_sayisi ?? 0))
+      if (enBuyukFrekans > form.aktif_gunler.length) {
+        return toast({ type: 'error', title: 'Hata', message: `Haftalık frekans (${enBuyukFrekans}), izinli gün sayısından (${form.aktif_gunler.length}) fazla olamaz. Daha fazla gün seç veya frekansı düşür.` })
+      }
+    }
+
     setSaving(true)
     try {
       if (modal === 'create') {
         const yeniKurallar: any[] = []
         for (const lokId of lokIdler) {
-          // Her lokasyonun kendi frekans sayısını kullan (tipe göre)
+          // Her lokasyonun Frekans Sayıları değerini kullan
           const lok = lokasyonlar.find(l => l.id === lokId)
           const isHaftalik = form.frekans_tipi === 'haftalik'
           const lokGunluk = (lok as any)?.gunluk_frekans_sayisi ?? 1
-          const lokHaftalik = (lok as any)?.haftalik_frekans_sayisi ?? form.haftalik_frekans_sayisi
-          const effHaftalik = lokHaftalik && lokHaftalik > 0 ? lokHaftalik : form.haftalik_frekans_sayisi
+          const lokHaftalik = (lok as any)?.haftalik_frekans_sayisi ?? 0
           const body: any = {
             firma_id: firmaId, tanim: form.tanim.trim(), lokasyon_id: lokId,
             atanan_kullanici_id: form.atanan_kullanici_id || null,
             frekans_tipi: form.frekans_tipi,
             gunluk_frekans_sayisi: isHaftalik ? null : lokGunluk,
-            haftalik_frekans_sayisi: isHaftalik ? effHaftalik : null,
+            haftalik_frekans_sayisi: isHaftalik ? lokHaftalik : null,
             aktif_gunler: form.aktif_gunler, aktif_olma_saati: form.aktif_olma_saati,
             baslangic_tarihi: form.baslangic_tarihi, bitis_tarihi: form.bitis_tarihi || null,
             ...(projeId ? { proje_id: projeId } : {}),
@@ -283,12 +300,15 @@ export default function GorevKurallariClient({
         toast({ type: 'success', title: 'Başarılı', message: `${yeniKurallar.length} lokasyon için kural oluşturuldu` })
       } else if (modal === 'edit' && editId) {
         const isHaftalik = form.frekans_tipi === 'haftalik'
+        const lok = lokasyonlar.find(l => l.id === lokIdler[0])
+        const lokHaftalik = (lok as any)?.haftalik_frekans_sayisi ?? 0
+        const lokGunluk = (lok as any)?.gunluk_frekans_sayisi ?? 1
         const body: any = {
           firma_id: firmaId, tanim: form.tanim.trim(), lokasyon_id: lokIdler[0],
           atanan_kullanici_id: form.atanan_kullanici_id || null,
           frekans_tipi: form.frekans_tipi,
-          gunluk_frekans_sayisi: isHaftalik ? null : form.gunluk_frekans_sayisi,
-          haftalik_frekans_sayisi: isHaftalik ? form.haftalik_frekans_sayisi : null,
+          gunluk_frekans_sayisi: isHaftalik ? null : lokGunluk,
+          haftalik_frekans_sayisi: isHaftalik ? lokHaftalik : null,
           aktif_gunler: form.aktif_gunler, aktif_olma_saati: form.aktif_olma_saati,
           baslangic_tarihi: form.baslangic_tarihi, bitis_tarihi: form.bitis_tarihi || null,
           ...(projeId ? { proje_id: projeId } : {}),
@@ -918,22 +938,46 @@ export default function GorevKurallariClient({
                 </div>
               </div>
 
-              {form.frekans_tipi === 'haftalik' && (
-                <div>
-                  <label style={lbl}>Haftalık Frekans Sayısı *</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button type="button" style={stepBtn} onClick={() => setForm(p => ({ ...p, haftalik_frekans_sayisi: Math.max(1, p.haftalik_frekans_sayisi - 1) }))}>−</button>
-                    <input type="number" className="verde-input" min={1} max={20} style={{ width: 80, textAlign: 'center' }}
-                      value={form.haftalik_frekans_sayisi}
-                      onChange={e => setForm(p => ({ ...p, haftalik_frekans_sayisi: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))} />
-                    <button type="button" style={stepBtn} onClick={() => setForm(p => ({ ...p, haftalik_frekans_sayisi: Math.min(20, p.haftalik_frekans_sayisi + 1) }))}>+</button>
-                    <span style={{ fontSize: 12.5, color: '#6b7280' }}>kez / hafta (Pzt–Paz)</span>
+              {form.frekans_tipi === 'haftalik' && (() => {
+                // Seçili lokasyon(lar)ın Frekans Sayıları → Haftalık değerlerini topla
+                const lokIdler = form.lokasyon_idler.length > 0 ? form.lokasyon_idler : (form.lokasyon_id ? [form.lokasyon_id] : [])
+                const haftalikDegerler = lokIdler.map(id => {
+                  const l = lokasyonlar.find(x => x.id === id)
+                  return { id, tanim: l?.tanim ?? '—', val: (l as any)?.haftalik_frekans_sayisi ?? 0 }
+                })
+                const eksikler = haftalikDegerler.filter(x => !x.val || x.val < 1)
+                const hepsiAyni = haftalikDegerler.length > 0 && haftalikDegerler.every(x => x.val === haftalikDegerler[0].val)
+
+                if (lokIdler.length === 0) {
+                  return (
+                    <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#92400e' }}>
+                      Haftalık frekans sayısı, seçilen lokasyonun <strong>Frekans Sayıları → Haftalık</strong> sekmesindeki değerden alınır. Önce yukarıdan lokasyon seç.
+                    </div>
+                  )
+                }
+                if (eksikler.length > 0) {
+                  return (
+                    <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#991b1b' }}>
+                      <strong>Eksik haftalık frekans:</strong> Aşağıdaki lokasyon(lar) için önce <strong>Frekans Sayıları → Haftalık</strong> sekmesinden değer gir:
+                      <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
+                        {eksikler.map(x => <li key={x.id}>{x.tanim}</li>)}
+                      </ul>
+                    </div>
+                  )
+                }
+                return (
+                  <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#6d28d9' }}>
+                    <strong>Haftalık Frekans:</strong>{' '}
+                    {hepsiAyni
+                      ? <>seçilen lokasyon(lar) için <strong>{haftalikDegerler[0].val}× / hafta</strong> üretilecek</>
+                      : <>her lokasyon kendi Frekans Sayıları değerini kullanır: {haftalikDegerler.map(x => `${x.tanim}: ${x.val}×`).join(', ')}</>
+                    }
+                    <div style={{ fontSize: 11, color: '#7c3aed', marginTop: 4 }}>
+                      Değiştirmek için: Sistem Ayarları → Frekans Sayıları → Haftalık sekmesi.
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                    Hafta başı Pazartesi 00:00'dır. Aşağıda seçilen izinli günlerden sırayla üretilir, hedef dolunca durur.
-                  </div>
-                </div>
-              )}
+                )
+              })()}
 
               <div>
                 <label style={lbl}>{form.frekans_tipi === 'haftalik' ? 'İzin Verilen Günler *' : 'Aktif Günler *'}</label>
@@ -975,21 +1019,26 @@ export default function GorevKurallariClient({
                 </select>
               </div>
               )}
-              {form.lokasyon_id && form.aktif_gunler.length > 0 && (
-                <div style={{ background: form.frekans_tipi === 'haftalik' ? '#faf5ff' : '#f9fafb', border: `1px solid ${form.frekans_tipi === 'haftalik' ? '#e9d5ff' : '#e5e7eb'}`, borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#2a4a2a' }}>
-                  <strong>Özet:</strong>{' '}
-                  {form.frekans_tipi === 'haftalik' ? (
-                    <>
-                      {gunEtiket(form.aktif_gunler)} içinde saat {form.aktif_olma_saati}'de, <strong>haftada {form.haftalik_frekans_sayisi}×</strong> "{form.tanim || '…'}" görevi üretilir (hedefe ulaşınca durur).
-                    </>
-                  ) : (
-                    <>
-                      {gunEtiket(form.aktif_gunler)}, saat {form.aktif_olma_saati}'de, günde <strong>{form.gunluk_frekans_sayisi}×</strong> "{form.tanim || '…'}" görevi üretilir.
-                    </>
-                  )}
-                  {form.bitis_tarihi ? ` ${form.baslangic_tarihi} – ${form.bitis_tarihi}.` : ` ${form.baslangic_tarihi} tarihinden süresiz.`}
-                </div>
-              )}
+              {form.lokasyon_id && form.aktif_gunler.length > 0 && (() => {
+                const lok = lokasyonlar.find(l => l.id === form.lokasyon_id)
+                const lokGunluk = (lok as any)?.gunluk_frekans_sayisi ?? form.gunluk_frekans_sayisi
+                const lokHaftalik = (lok as any)?.haftalik_frekans_sayisi ?? 0
+                return (
+                  <div style={{ background: form.frekans_tipi === 'haftalik' ? '#faf5ff' : '#f9fafb', border: `1px solid ${form.frekans_tipi === 'haftalik' ? '#e9d5ff' : '#e5e7eb'}`, borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#2a4a2a' }}>
+                    <strong>Özet:</strong>{' '}
+                    {form.frekans_tipi === 'haftalik' ? (
+                      <>
+                        {gunEtiket(form.aktif_gunler)} içinde saat {form.aktif_olma_saati}'de, <strong>haftada {lokHaftalik || '?'}×</strong> "{form.tanim || '…'}" görevi üretilir (hedefe ulaşınca durur).
+                      </>
+                    ) : (
+                      <>
+                        {gunEtiket(form.aktif_gunler)}, saat {form.aktif_olma_saati}'de, günde <strong>{lokGunluk}×</strong> "{form.tanim || '…'}" görevi üretilir.
+                      </>
+                    )}
+                    {form.bitis_tarihi ? ` ${form.baslangic_tarihi} – ${form.bitis_tarihi}.` : ` ${form.baslangic_tarihi} tarihinden süresiz.`}
+                  </div>
+                )
+              })()}
             </div>
             <div style={{ padding: '12px 18px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setModal(null)} className="verde-btn-outline-strong" disabled={saving}>İptal</button>
