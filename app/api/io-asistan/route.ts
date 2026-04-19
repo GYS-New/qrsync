@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getSistemKonfig } from '@/lib/config/getSistemKonfig'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 
 // Rate limiter
 const rateLimitMap = new Map<string, number[]>()
@@ -171,6 +172,22 @@ const tools: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'gorev_olustur',
+    description: 'Spesifik (tek seferlik) görev oluşturur. Yetki kontrolü yapılır — "ekleyebilir" yetkisi yoksa reddedilir. Çok adımlı akış: önce kullanıcıya görev tipi, tanım, lokasyon vb. sorulur. Kullanıcı onaylayana kadar onayla=false ile çağır (özet gösterir). Son onayda onayla=true ile çağırınca kayıt eklenir. Frekansiyel görev oluşturma için bu tool kullanılmaz — sadece spesifik.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tanim: { type: 'string', description: 'Görev tanımı/adı (zorunlu)' },
+        lokasyon_adi: { type: 'string', description: 'Lokasyon adı — firma kapsamında aranır (zorunlu)' },
+        atanan_isim: { type: 'string', description: 'Görevi atayacağınız kullanıcının adı (opsiyonel)' },
+        aciklama: { type: 'string', description: 'Görev açıklaması (opsiyonel)' },
+        onayla: { type: 'boolean', description: 'false = özet göster + onay iste, true = kaydet' },
+        ...PROJE_PARAM,
+      },
+      required: ['tanim', 'lokasyon_adi', 'onayla'],
+    },
+  },
+  {
     name: 'veritabani_sorgula',
     description: 'Herhangi bir veritabanı tablosunu sorgular. Filtre, sıralama, limit ve count destekler. Tablo şemasını system prompt\'ta bulabilirsin. Diğer tool\'ların kapsamadığı sorular için kullan.',
     input_schema: {
@@ -201,7 +218,7 @@ const tools: Anthropic.Tool[] = [
 ]
 
 // ── Tool çalıştırıcılar ──
-type ToolContext = { firmaId: string | null; projeId: string | null; isSA: boolean }
+type ToolContext = { firmaId: string | null; projeId: string | null; isSA: boolean; userId: string; rol: string }
 
 // Proje adından ID çözümle
 async function resolveProjeId(
@@ -743,6 +760,107 @@ async function executeTool(
         return results.length ? `Arşiv Özeti:\n${results.join('\n')}` : 'Arşiv verisi bulunamadı.'
       }
 
+      case 'gorev_olustur': {
+        // 1) Firma kapsamı zorunlu
+        if (!ctx.firmaId) return 'Firma kapsamınız yok; görev oluşturamazsınız.'
+
+        // 2) Yetki kontrolü — "gorevler" sayfasında ekleyebilir?
+        const yetki = await sayfaYetkileri(ctx.rol, 'gorevler', ctx.firmaId)
+        if (!yetki.ekleyebilir) {
+          // Audit log
+          const admin = createAdminClient()
+          await admin.from('io_asistan_islem_log').insert({
+            user_id: ctx.userId, firma_id: ctx.firmaId, proje_id: ctx.projeId,
+            islem_tipi: 'gorev_olustur', sonuc: 'yetki_yok',
+            input: input as any, mesaj: 'Spesifik görev ekleme yetkisi yok',
+          })
+          return 'Bu işlemi yapmak için yetkiniz yok. Spesifik görev ekleyebilmek için yöneticinizin yetki tanımlaması gerekir.'
+        }
+
+        const tanim = (input.tanim as string || '').trim()
+        const lokasyonAdi = (input.lokasyon_adi as string || '').trim()
+        const atananIsim = (input.atanan_isim as string || '').trim()
+        const aciklama = (input.aciklama as string || '').trim()
+        const onayla = input.onayla === true
+
+        if (!tanim) return 'Görev tanımı boş olamaz. Lütfen görev adını belirtin.'
+        if (!lokasyonAdi) return 'Lokasyon belirtmelisiniz.'
+
+        // 3) Lokasyon çözümle (firma + proje scope)
+        let lokQ = supabase.from('lokasyonlar').select('id,tanim').ilike('tanim', `%${lokasyonAdi}%`).eq('firma_id', ctx.firmaId).eq('aktif', true).limit(5)
+        if (projeId) lokQ = lokQ.eq('proje_id', projeId)
+        const { data: loks } = await lokQ
+        if (!loks?.length) return `"${lokasyonAdi}" ile eşleşen lokasyon bulunamadı. Farklı bir isim deneyin.`
+        if (loks.length > 1) {
+          const exact = loks.find((l: any) => l.tanim.toLowerCase() === lokasyonAdi.toLowerCase())
+          if (!exact) {
+            return `Birden fazla lokasyon eşleşti: ${loks.map((l: any) => l.tanim).join(', ')}. Tam adı belirtir misiniz?`
+          }
+        }
+        const lokasyon = loks.find((l: any) => l.tanim.toLowerCase() === lokasyonAdi.toLowerCase()) ?? loks[0]
+
+        // 4) Atanan kullanıcı çözümle (opsiyonel)
+        let atananId: string | null = null
+        let atananLabel = '—'
+        if (atananIsim) {
+          let uQ = supabase.from('users').select('id,isim_soyisim').ilike('isim_soyisim', `%${atananIsim}%`).eq('firma_id', ctx.firmaId).eq('aktif', true).limit(5)
+          if (projeId) uQ = uQ.eq('proje_id', projeId)
+          const { data: users } = await uQ
+          if (!users?.length) return `"${atananIsim}" ile eşleşen kullanıcı bulunamadı.`
+          if (users.length > 1) {
+            const exactU = users.find((u: any) => u.isim_soyisim.toLowerCase() === atananIsim.toLowerCase())
+            if (!exactU) return `Birden fazla kullanıcı eşleşti: ${users.map((u: any) => u.isim_soyisim).join(', ')}. Tam adı belirtir misiniz?`
+          }
+          const picked = users.find((u: any) => u.isim_soyisim.toLowerCase() === atananIsim.toLowerCase()) ?? users[0]
+          atananId = picked.id
+          atananLabel = picked.isim_soyisim
+        }
+
+        // 5) onayla=false ise özet göster
+        if (!onayla) {
+          return `Görev oluşturulacak, onaylıyor musunuz?\n\n` +
+            `• Tanım: ${tanim}\n` +
+            `• Lokasyon: ${lokasyon.tanim}\n` +
+            `• Atanan: ${atananLabel}\n` +
+            (aciklama ? `• Açıklama: ${aciklama}\n` : '') +
+            `• Durum: AÇIK\n\n` +
+            `Onaylıyorsanız "evet, onaylıyorum" deyin.`
+        }
+
+        // 6) onayla=true → kayıt
+        const admin = createAdminClient()
+        const payload: Record<string, any> = {
+          firma_id: ctx.firmaId,
+          tanim, lokasyon_id: lokasyon.id,
+          durum: 'ACIK',
+          olusturan_id: ctx.userId,
+          islemi_yapan_id: ctx.userId,
+          olusturma_tarihi: new Date().toISOString(),
+        }
+        if (projeId) payload.proje_id = projeId
+        if (atananId) payload.atanan_kullanici_id = atananId
+        if (aciklama) payload.aciklama = aciklama
+
+        const { data: inserted, error: insErr } = await admin.from('gorevler').insert(payload).select('id').maybeSingle()
+        if (insErr) {
+          await admin.from('io_asistan_islem_log').insert({
+            user_id: ctx.userId, firma_id: ctx.firmaId, proje_id: ctx.projeId,
+            islem_tipi: 'gorev_olustur', sonuc: 'hata',
+            input: input as any, mesaj: insErr.message,
+          })
+          return `Görev kaydedilirken hata oluştu: ${insErr.message}`
+        }
+
+        await admin.from('io_asistan_islem_log').insert({
+          user_id: ctx.userId, firma_id: ctx.firmaId, proje_id: ctx.projeId,
+          islem_tipi: 'gorev_olustur', hedef_tablo: 'gorevler', hedef_id: inserted?.id ?? null,
+          sonuc: 'basarili', input: input as any,
+          mesaj: `Spesifik görev oluşturuldu: ${tanim} @ ${lokasyon.tanim}`,
+        })
+
+        return `✓ Görev başarıyla oluşturuldu.\n\n• Tanım: ${tanim}\n• Lokasyon: ${lokasyon.tanim}\n• Atanan: ${atananLabel}\n• Durum: AÇIK`
+      }
+
       case 'veritabani_sorgula': {
         const tablo = input.tablo as string
         if (!tablo) return 'Tablo adı belirtilmedi.'
@@ -1038,6 +1156,17 @@ Veri sorgularında:
 - **Uygulama:** app.iogys.com.tr
 - **Konum:** Türkiye
 
+## YAZMA İŞLEMLERİ (ÇOK ÖNEMLİ)
+Kullanıcı bir şey "ekle / oluştur / yarat" dediğinde:
+1. Hangi tip olduğunu netleştir (şu an sadece SPESİFİK GÖREV destekleniyor). Frekansiyel görev, kullanıcı, lokasyon vs. ekleme şu an desteklenmiyor — bunları sorarsa "Şu an bu tür kayıt İO üzerinden eklenemez, panel'den yapabilirsiniz" de.
+2. Eksik parametreleri TEK TEK sor, hepsini aynı anda istemez:
+   - Zorunlu: tanim, lokasyon_adi
+   - Opsiyonel: atanan_isim, aciklama
+3. Tüm zorunlu bilgiler toplandıktan sonra tool'u **onayla=false** ile çağır — tool özet + onay sorusu döndürür.
+4. Kullanıcı "evet / onaylıyorum / kaydet" deyince tool'u **onayla=true** ile çağır.
+5. Yetki yoksa tool otomatik reddeder, sen de "Bu işlemi yapmak için yetkiniz yok" mesajını KULLANICIYA AYNEN GÖSTER, tekrar denemeye çalışma.
+6. ASLA otomatik onayla=true ile çağırma. Kullanıcının açık onayı şart.
+
 ## YÖNETİCİ İLETİŞİMİ (DB sorgulu — yonetici_iletisim tool'u kullan)
 Kullanıcı şu tip sorular sorduğunda yonetici_iletisim tool'unu çağır, UYDURMA:
 - "İO Teknoloji destek / İO Teknoloji sistem yöneticisi / SA kim?" → tool tip="sistem"
@@ -1148,7 +1277,7 @@ export async function POST(request: Request) {
   // TA/U için: users.firma_id kullanılır (cookie set olsa bile kendi firma'larının dışına çıkamaz)
   const aktifFirmaId = isSA ? getAktifFirmaId() : null
   const scopedFirmaId = me.firma_id ?? aktifFirmaId
-  const toolCtx: ToolContext = { firmaId: scopedFirmaId, projeId: me.proje_id, isSA }
+  const toolCtx: ToolContext = { firmaId: scopedFirmaId, projeId: me.proje_id, isSA, userId: me.id, rol: me.rol }
 
   // Firma/proje adlarını context'e al (prompt'a ekleyeceğiz)
   const admin = createAdminClient()
