@@ -48,6 +48,12 @@ const inp: React.CSSProperties = {
 }
 
 // ── Yatay bar chart (horizontal) — hover tooltip ─────────────────────────
+// 30 karakter üstünü ... ile kapatır; title attribute tam metni tutar
+function kisalt(s: string, n = 30): string {
+  if (!s) return ''
+  return s.length > n ? s.slice(0, n - 1) + '…' : s
+}
+
 function BarChart({
   data, valueKey, labelKey, color,
 }: {
@@ -67,9 +73,10 @@ function BarChart({
         const pct = (val / max) * 100
         const totalPct = total > 0 ? Math.round(val / total * 100) : 0
         const label = String(d[labelKey] ?? '')
+        const kisaLabel = kisalt(label, 30)
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }} title={`${label}: ${val} (%${totalPct})`}>
-            <div style={{ width: 130, fontSize: 13, fontWeight: 600, color: T.text, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>{label}</div>
+            <div style={{ width: 200, fontSize: 12.5, fontWeight: 600, color: T.text, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>{kisaLabel}</div>
             <div style={{ flex: 1, height: 28, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${Math.max(pct, 2)}%`, background: `linear-gradient(90deg, ${barClr}99, ${barClr})`, borderRadius: 6, transition: 'width 0.5s ease' }} />
             </div>
