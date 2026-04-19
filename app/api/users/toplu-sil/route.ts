@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 export async function POST(req: Request) {
   const supabase = createClient()
@@ -56,6 +57,18 @@ export async function POST(req: Request) {
     const { error } = await admin.auth.admin.deleteUser(id)
     if (!error) authSilinen++
   }
+
+  await auditLog({
+    tip: 'kullanici_sil', tablo: 'users', satir_sayisi: silinecekIds.length,
+    kullanici_id: user.id,
+    firma_id: me.firma_id ?? null,
+    detay: {
+      islem: 'toplu_sil',
+      silinen_ids: silinecekIds.slice(0, 20),
+      toplam: silinecekIds.length,
+      auth_silinen: authSilinen,
+    },
+  })
 
   return NextResponse.json({ ok: true, silinen: silinecekIds.length, auth_silinen: authSilinen })
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 export const dynamic = 'force-dynamic'
 
@@ -130,6 +131,14 @@ export async function PATCH(req: NextRequest) {
   const id    = hedef === 'proje' ? projeId : firmaId
   const { error } = await admin.from(table).update(update).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await auditLog({
+    tip: hedef === 'proje' ? 'ayar_degis_proje' : 'ayar_degis_firma',
+    tablo: table,
+    firma_id: firmaId, proje_id: hedef === 'proje' ? projeId : null,
+    kullanici_id: user.id,
+    detay: { degisen_alanlar: Object.keys(update), yeni_degerler: update },
+  })
 
   return NextResponse.json({ ok: true, hedef, ...update })
 }

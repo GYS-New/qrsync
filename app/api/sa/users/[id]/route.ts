@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 function isSA(role?: string | null) {
   return role === 'super_admin' || role === 'alt_super_admin'
@@ -46,6 +47,14 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 400 })
   }
 
+  const aktifPasifTip = aktif === true ? 'kullanici_aktif_pasif' : aktif === false ? 'kullanici_aktif_pasif' : 'kullanici_guncelle'
+  await auditLog({
+    tip: aktifPasifTip as any,
+    tablo: 'users',
+    kullanici_id: me.id,
+    detay: { hedef_user_id: userId, degisen_alanlar: Object.keys(updatePayload), yeni_degerler: updatePayload },
+  })
+
   return NextResponse.json({ ok: true })
 }
 
@@ -60,10 +69,31 @@ export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
   const userId = String(ctx.params.id)
   const admin = createAdminClient()
 
-  // First delete public row (ignore error), then Auth user
+  // Silinen kullanıcının bilgilerini al (audit için)
+  const { data: silinecek } = await admin.from('users').select('isim_soyisim,email,rol,firma_id').eq('id', userId).single()
+
   await admin.from('users').delete().eq('id', userId)
   const { error: delErr } = await admin.auth.admin.deleteUser(userId)
-  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 })
+  if (delErr) {
+    await auditLog({
+      tip: 'kullanici_sil', tablo: 'users', basarili: false,
+      hata_mesaji: delErr.message, kullanici_id: me.id,
+      firma_id: silinecek?.firma_id ?? null,
+      detay: { hedef_user_id: userId, hedef_isim: silinecek?.isim_soyisim },
+    })
+    return NextResponse.json({ error: delErr.message }, { status: 400 })
+  }
+
+  await auditLog({
+    tip: 'kullanici_sil', tablo: 'users',
+    kullanici_id: me.id, firma_id: silinecek?.firma_id ?? null,
+    detay: {
+      hedef_user_id: userId,
+      hedef_isim: silinecek?.isim_soyisim,
+      hedef_email: silinecek?.email,
+      hedef_rol: silinecek?.rol,
+    },
+  })
 
   return NextResponse.json({ ok: true })
 }

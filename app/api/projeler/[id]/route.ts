@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -60,6 +61,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Ayar toggle değişiklikleri önemli → audit log
+  const ayarAlanlari = ['spesifik_ceklist_aktif', 'spesifik_personel_atama_aktif', 'frekansiyel_personel_atama_aktif', 'frekansiyel_ceklist_aktif', 'manuel_push_aktif', 'manuel_push_u_rolu', 'manuel_push_m_rolu', 'personel_takibi_aktif', 'qr_sistemi_aktif', 'nfc_sistemi_aktif', 'birim_fiyat_aktif']
+  const degisenAyarlar = Object.keys(body).filter(k => ayarAlanlari.includes(k))
+  await auditLog({
+    tip: degisenAyarlar.length > 0 ? 'ayar_degis_proje' : 'proje_guncelle',
+    tablo: 'projeler',
+    proje_id: params.id, firma_id: data?.firma_id ?? null,
+    kullanici_id: user.id,
+    detay: { proje_adi: data?.ad, degisen_alanlar: Object.keys(body), yeni_degerler: body },
+  })
   return NextResponse.json(data)
 }
 
@@ -134,12 +146,35 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     }
 
     // 7. Projeyi sil
+    const { data: projeBilgi } = await admin.from('projeler').select('ad,firma_id').eq('id', projeId).single()
     const { error } = await admin.from('projeler').delete().eq('id', projeId)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      await auditLog({
+        tip: 'proje_sil', tablo: 'projeler', basarili: false, hata_mesaji: error.message,
+        proje_id: projeId, firma_id: projeBilgi?.firma_id ?? null, kullanici_id: user.id,
+        detay: { proje_adi: projeBilgi?.ad },
+      })
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    await auditLog({
+      tip: 'proje_sil', tablo: 'projeler',
+      proje_id: projeId, firma_id: projeBilgi?.firma_id ?? null, kullanici_id: user.id,
+      detay: {
+        proje_adi: projeBilgi?.ad,
+        silinen_personel: personelIds.length,
+        uyarı: 'CASCADE silme — tüm görevler, çeklistler, lokasyonlar vs. silindi',
+      },
+    })
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
     console.error('[proje-sil]', err)
+    await auditLog({
+      tip: 'proje_sil', tablo: 'projeler', basarili: false,
+      hata_mesaji: err?.message ?? 'Silme hatası',
+      proje_id: params.id, kullanici_id: user.id,
+    })
     return NextResponse.json({ error: err?.message ?? 'Silme işlemi başarısız.' }, { status: 500 })
   }
 }

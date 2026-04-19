@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 // Creates a new Supabase Auth user + inserts into public.users
 // Allowed:
@@ -111,8 +112,20 @@ export async function POST(req: Request) {
 
   if (insertErr) {
     await admin.auth.admin.deleteUser(userId)
+    await auditLog({
+      tip: 'kullanici_ekle', tablo: 'users', basarili: false, hata_mesaji: insertErr.message,
+      kullanici_id: me.id, firma_id: firma_id ?? me.firma_id ?? null,
+      detay: { email, isim_soyisim, rol, hedef_firma: firma_id, hedef_proje: body_proje_id },
+    })
     return NextResponse.json({ error: insertErr.message }, { status: 400 })
   }
+
+  await auditLog({
+    tip: 'kullanici_ekle', tablo: 'users',
+    kullanici_id: me.id, firma_id: firma_id ?? me.firma_id ?? null,
+    proje_id: body_proje_id,
+    detay: { eklenen_id: userId, email, isim_soyisim, rol },
+  })
 
   return NextResponse.json({ ok: true, id: userId })
 }

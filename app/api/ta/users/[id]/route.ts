@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 function isTA(role?: string | null) {
   return role === 'tenant_admin'
@@ -49,6 +50,12 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 400 })
   }
 
+  const tip = aktif !== undefined ? 'kullanici_aktif_pasif' : 'kullanici_guncelle'
+  await auditLog({
+    tip, tablo: 'users', kullanici_id: me.id, firma_id: me.firma_id,
+    detay: { hedef_user_id: userId, degisen_alanlar: Object.keys(updatePayload), yeni_degerler: updatePayload },
+  })
+
   return NextResponse.json({ ok: true })
 }
 
@@ -69,9 +76,29 @@ export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
   if (target.rol === 'super_admin' || target.rol === 'alt_super_admin') return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
   if (target.firma_id !== me.firma_id) return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
 
+  const { data: silinecek } = await admin.from('users').select('isim_soyisim,email,rol').eq('id', userId).single()
+
   await admin.from('users').delete().eq('id', userId)
   const { error: delErr } = await admin.auth.admin.deleteUser(userId)
-  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 })
+  if (delErr) {
+    await auditLog({
+      tip: 'kullanici_sil', tablo: 'users', basarili: false, hata_mesaji: delErr.message,
+      kullanici_id: me.id, firma_id: me.firma_id,
+      detay: { hedef_user_id: userId, hedef_isim: silinecek?.isim_soyisim },
+    })
+    return NextResponse.json({ error: delErr.message }, { status: 400 })
+  }
+
+  await auditLog({
+    tip: 'kullanici_sil', tablo: 'users',
+    kullanici_id: me.id, firma_id: me.firma_id,
+    detay: {
+      hedef_user_id: userId,
+      hedef_isim: silinecek?.isim_soyisim,
+      hedef_email: silinecek?.email,
+      hedef_rol: silinecek?.rol,
+    },
+  })
 
   return NextResponse.json({ ok: true })
 }
