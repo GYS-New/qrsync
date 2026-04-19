@@ -415,28 +415,9 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
         <OverrideBadge ayarKey="personel_takip_bildirim_dk" />
       </div>
 
-      {/* Toggle'lar — 2'li grid */}
-      <div style={{ fontSize: 13, fontWeight: 700, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Spesifik Görevler</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-        <ToggleKart
-          ayarKey="spesifik_ceklist_aktif"
-          label="Çeklist Kullanımı"
-          desc="Pasif yapılırsa spesifik görevlerde lokasyonda tanımlı çeklist olsa dahi gösterilmez."
-        />
-        <ToggleKart
-          ayarKey="spesifik_personel_atama_aktif"
-          label="Personel Atama"
-          desc="Pasif yapılırsa spesifik görev oluştururken personel atama alanı ve zorunluluğu kaldırılır."
-        />
-      </div>
-
-      <div style={{ fontSize: 13, fontWeight: 700, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekansiyel Görevler</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28 }}>
-        <ToggleKart
-          ayarKey="frekansiyel_personel_atama_aktif"
-          label="Personel Atama"
-          desc="Pasif yapılırsa frekansiyel görev kuralı oluştururken personel atama alanı ve zorunluluğu kaldırılır."
-        />
+      {/* Bilgi notu: Spesifik/Frekansiyel görev ayarları Proje Ayarları sekmesine taşındı */}
+      <div style={{ padding: '12px 16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, marginBottom: 20, fontSize: 13, color: '#1e40af', lineHeight: 1.6 }}>
+        <strong>ℹ️ Bilgi:</strong> Spesifik görev (çeklist + personel atama) ve frekansiyel görev (personel atama) ayarları <strong>Proje Ayarları</strong> sekmesine taşındı. Artık her proje için ayrı ayrı yönetilir.
       </div>
 
       {/* Durum Geçiş Süreleri */}

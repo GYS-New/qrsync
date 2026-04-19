@@ -180,13 +180,16 @@ function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
   if (!proje) return <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>Proje bulunamadı.</div>
 
-  const items: { key: string; label: string; desc: string; icon: string }[] = [
+  const items: { key: string; label: string; desc: string; icon: string; defaultTrue?: boolean }[] = [
     { key: 'aktif', label: 'Proje Durumu', desc: 'Proje aktif/pasif durumu. Pasif projeler kullanıcılar tarafından görüntülenemez.', icon: '🔄' },
     { key: 'personel_takibi_aktif', label: 'Personel Takibi', desc: 'Personel mesai giriş/çıkış takibi. Aktif olduğunda QR/NFC ile mesai okutma yapılabilir.', icon: '👷' },
     { key: 'qr_sistemi_aktif', label: 'QR Sistemi', desc: 'QR kod ile görev başlatma, tamamlama ve mesai okutma.', icon: '📷' },
     { key: 'nfc_sistemi_aktif', label: 'NFC Sistemi', desc: 'NFC tag ile görev başlatma, tamamlama ve mesai okutma.', icon: '📶' },
     { key: 'birim_fiyat_aktif', label: 'Birim Fiyat Sistemi', desc: 'Lokasyon ve gruplar için birim fiyat tanımlama ve hakediş hesaplama.', icon: '💰' },
     { key: 'sureli_gorev_aktif', label: 'Süreli Görev Takibi', desc: 'Projedeki tüm lokasyonlarda süreli görev takibini toplu aç/kapat. Aktif olduğunda görev başlatma ve tamamlanma süreleri ölçülür.', icon: '⚡' },
+    { key: 'spesifik_ceklist_aktif', label: 'Spesifik Görev · Çeklist', desc: 'Proje bazlı. Pasif yapılırsa spesifik görevlerde lokasyonda tanımlı çeklist olsa dahi gösterilmez.', icon: '📋', defaultTrue: true },
+    { key: 'spesifik_personel_atama_aktif', label: 'Spesifik Görev · Personel Atama', desc: 'Proje bazlı. Pasif yapılırsa spesifik görev oluştururken personel atama alanı ve zorunluluğu kaldırılır.', icon: '👤', defaultTrue: true },
+    { key: 'frekansiyel_personel_atama_aktif', label: 'Frekansiyel Görev · Personel Atama', desc: 'Proje bazlı. Pasif yapılırsa frekansiyel görev kuralı oluştururken personel atama alanı ve zorunluluğu kaldırılır.', icon: '👥', defaultTrue: true },
   ]
 
   return (
@@ -198,7 +201,9 @@ function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {items.map(item => {
-          const val = proje[item.key] ?? false
+          // null ise: defaultTrue için true göster (henüz override yok, default davranış)
+          const raw = proje[item.key]
+          const val = raw === null || raw === undefined ? (item.defaultTrue ?? false) : raw
           const busy = savingKey === item.key
           return (
             <div key={item.key} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
