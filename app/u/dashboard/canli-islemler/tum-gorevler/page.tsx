@@ -47,7 +47,7 @@ export default async function UTumGorevlerPage() {
   })
 
   let lokQ = supabase
-    .from('lokasyonlar').select('id,tanim')
+    .from('lokasyonlar').select('id,tanim,parent_id,checklist_sablon_id')
     .eq('firma_id', firmaId).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
   if (yetkiliLokIds) lokQ = lokQ.in('id', yetkiliLokIds)
