@@ -1,5 +1,19 @@
 import { getSistemKonfig } from '@/lib/config/getSistemKonfig'
 
+const BRAND_PREFIX = 'İO-GYS'
+
+/**
+ * FCM title'a marka prefix'i ekle.
+ * Başlık zaten "İO-GYS" ile başlıyorsa tekrar eklenmez.
+ * Mobil app AndroidManifest label'ı "ProATA" gibi bir şey gösterse bile
+ * bildirim başlığının ilk kelimesi "İO-GYS" olarak net görünür.
+ */
+function brandedTitle(t: string): string {
+  if (!t) return BRAND_PREFIX
+  if (t.startsWith(BRAND_PREFIX)) return t
+  return `${BRAND_PREFIX} • ${t}`
+}
+
 export async function sendFCMToUser(userId: string, title: string, body: string, channelId: string = 'default') {
   try {
     const konfig = await getSistemKonfig()
@@ -63,7 +77,7 @@ export async function sendFCMToUser(userId: string, title: string, body: string,
           body: JSON.stringify({
             message: {
               token: d.fcm_token,
-              notification: { title, body },
+              notification: { title: brandedTitle(title), body },
               android: {
                 priority: 'high',
                 notification: {
@@ -74,7 +88,7 @@ export async function sendFCMToUser(userId: string, title: string, body: string,
               apns: {
                 payload: {
                   aps: {
-                    alert: { title, body },
+                    alert: { title: brandedTitle(title), body },
                     sound: soundName === 'default' ? 'default' : `${soundName}.wav`,
                     badge: 1,
                     'content-available': 1,
