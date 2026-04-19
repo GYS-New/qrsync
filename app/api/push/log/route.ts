@@ -87,7 +87,7 @@ export async function DELETE(req: NextRequest) {
   let delQ = admin.from('push_bildirim_log').delete().in('id', ids)
   if (me.rol === 'tenant_admin') delQ = delQ.eq('firma_id', me.firma_id)
 
-  const { error, count } = await delQ.select('id', { count: 'exact', head: true })
+  const { data, error } = await delQ.select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, silinen: count ?? ids.length })
+  return NextResponse.json({ ok: true, silinen: data?.length ?? 0 })
 }
