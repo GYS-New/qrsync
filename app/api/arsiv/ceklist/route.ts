@@ -148,11 +148,11 @@ export async function GET(req: NextRequest) {
     for (const m of data ?? []) sablonMaddeMap[m.sablon_id] = (sablonMaddeMap[m.sablon_id] ?? 0) + 1
   }
 
-  // Sonuç
+  // Sonuç — yetim kayıtları (görev silinmiş) "Görev bulunamadı" olarak göster, filtreleme
   const sonuclar = filtreliBsl.map(b => {
     const gorevId = b.canli_gorev_id || b.gorev_id
     const gorev = gorevId ? gorevMap[gorevId] : null
-    if (gorevId && !gorev) return null
+    const yetim = !!gorevId && !gorev
 
     const sablonId = b.sablon_id
     const toplam = sablonId ? (sablonMaddeMap[sablonId] ?? 0) : 0
@@ -160,7 +160,7 @@ export async function GET(req: NextRequest) {
 
     return {
       id: b.id,
-      gorev_tanim: gorev?.tanim ?? '—',
+      gorev_tanim: gorev?.tanim ?? (yetim ? '⚠️ Görev silinmiş' : '—'),
       gorev_durum: gorev?.durum ?? '—',
       lokasyon_yol: getLocPath(b.lokasyon_id),
       lokasyon_id: b.lokasyon_id,
@@ -174,12 +174,13 @@ export async function GET(req: NextRequest) {
       canli_gorev_id: b.canli_gorev_id,
       gorev_id: b.gorev_id,
       dbKaynak: gorev?.dbKaynak ?? 'arsiv',
+      yetim,
     }
-  }).filter(Boolean)
+  })
 
   // Arama filtresi (server-side)
   const filtered = q
-    ? sonuclar.filter(r => [r!.gorev_tanim, r!.lokasyon_yol, r!.kullanici, r!.sablon_adi].join(' ').toLowerCase().includes(q))
+    ? sonuclar.filter(r => [r.gorev_tanim, r.lokasyon_yol, r.kullanici, r.sablon_adi].join(' ').toLowerCase().includes(q))
     : sonuclar
 
   return NextResponse.json({ data: filtered, total: total ?? 0, page, limit })
