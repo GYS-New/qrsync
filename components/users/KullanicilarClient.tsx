@@ -85,6 +85,8 @@ export default function KullanicilarClient({
     device_token: string
     device_id: string
     son_kullanim: string | null
+    bildirim_izni?: boolean | null
+    bildirim_izni_son_kontrol?: string | null
   }>>({})
   const reqId = useRef(0)
   const importInputRef = useRef<HTMLInputElement | null>(null)
@@ -442,7 +444,11 @@ export default function KullanicilarClient({
               <>
                 {pushSeciliIds.size > 0 ? (
                   <Button variant="ghost" onClick={() => {
-                    const sec = filtered.filter(u => pushSeciliIds.has(u.id)).map(u => ({ id: u.id, isim_soyisim: u.isim_soyisim ?? '—' }))
+                    const sec = filtered.filter(u => pushSeciliIds.has(u.id)).map(u => ({
+                      id: u.id,
+                      isim_soyisim: u.isim_soyisim ?? '—',
+                      bildirim_izni: deviceTokenMap[u.id]?.bildirim_izni ?? null,
+                    }))
                     setPushModalAlicilar(sec)
                   }} className="text-[15px]" style={{ ...IMPORT_EXPORT_BUTTON_STYLE, background: '#7c3aed', color: '#fff', borderColor: '#7c3aed' }}>🔔 {pushSeciliIds.size} Seçili Kişiye Gönder</Button>
                 ) : (
@@ -571,12 +577,40 @@ export default function KullanicilarClient({
                     const sonKullanim = d.son_kullanim
                       ? new Date(d.son_kullanim).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
                       : null
+                    const bIzni = d.bildirim_izni
+                    const bKontrol = d.bildirim_izni_son_kontrol
+                      ? new Date(d.bildirim_izni_son_kontrol).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+                      : null
+                    let izinBadge: React.ReactNode = null
+                    if (bIzni === true) {
+                      izinBadge = (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: 12, width: 'fit-content' }}
+                          title={bKontrol ? `Son kontrol: ${bKontrol}` : undefined}>
+                          🔔 Bildirim Açık
+                        </span>
+                      )
+                    } else if (bIzni === false) {
+                      izinBadge = (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#991b1b', background: '#fee2e2', padding: '2px 8px', borderRadius: 12, width: 'fit-content' }}
+                          title={bKontrol ? `Son kontrol: ${bKontrol}` : undefined}>
+                          🔕 Bildirim Kapalı
+                        </span>
+                      )
+                    } else {
+                      izinBadge = (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 12, width: 'fit-content' }}
+                          title="Mobil henüz bildirim izni durumunu raporlamadı">
+                          ⚠️ İzin Bilinmiyor
+                        </span>
+                      )
+                    }
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#166534', background: '#dcfce7', padding: '3px 10px', borderRadius: 20, width: 'fit-content' }}>
                           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />
                           Cihaz Eşleşti
                         </span>
+                        {izinBadge}
                         <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }} title={d.device_token}>
                           {d.device_token.substring(0, 12)}…
                         </span>
@@ -605,7 +639,7 @@ export default function KullanicilarClient({
                       {yetki.duzenleyebilir && <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '', cinsiyet: (u as any).cinsiyet ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>}
                       <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
                       {pushYetki.benGonderebilirim && deviceTokenMap[u.id] && (
-                        <RowActionButton variant="base" onClick={() => setPushModalAlicilar([{ id: u.id, isim_soyisim: u.isim_soyisim ?? '—' }])}>🔔 Bildirim</RowActionButton>
+                        <RowActionButton variant="base" onClick={() => setPushModalAlicilar([{ id: u.id, isim_soyisim: u.isim_soyisim ?? '—', bildirim_izni: deviceTokenMap[u.id]?.bildirim_izni ?? null }])}>🔔 Bildirim</RowActionButton>
                       )}
                       {deviceTokenMap[u.id] && (
                         <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>

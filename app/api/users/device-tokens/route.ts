@@ -26,19 +26,21 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await admin
     .from('device_tokens')
-    .select('user_id, device_token, device_id, aktif, son_kullanim')
+    .select('user_id, device_token, device_id, aktif, son_kullanim, bildirim_izni, bildirim_izni_son_kontrol')
     .eq('firma_id', firmaId)
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
   // user_id → device_token map
-  const map: Record<string, { device_token: string; device_id: string; son_kullanim: string | null }> = {}
+  const map: Record<string, { device_token: string; device_id: string; son_kullanim: string | null; bildirim_izni: boolean | null; bildirim_izni_son_kontrol: string | null }> = {}
   for (const row of data ?? []) {
     if (row.user_id) {
       map[row.user_id] = {
         device_token: row.device_token,
         device_id:    row.device_id,
         son_kullanim: row.son_kullanim,
+        bildirim_izni: (row as any).bildirim_izni ?? null,
+        bildirim_izni_son_kontrol: (row as any).bildirim_izni_son_kontrol ?? null,
       }
     }
   }

@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useToast } from '@/components/ui/ToastProvider'
 
-interface Alici { id: string; isim_soyisim: string }
+interface Alici { id: string; isim_soyisim: string; bildirim_izni?: boolean | null }
 
 interface Props {
   alicilar: Alici[]
@@ -49,6 +49,8 @@ export default function PushBildirimModal({ alicilar, onClose }: Props) {
   }
 
   const tek = alicilar.length === 1
+  const kapaliAlicilar = alicilar.filter(a => a.bildirim_izni === false)
+  const bilinmeyenAlicilar = alicilar.filter(a => a.bildirim_izni == null)
 
   return (
     <div
@@ -68,8 +70,42 @@ export default function PushBildirimModal({ alicilar, onClose }: Props) {
 
         <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {!tek && (
-            <div style={{ fontSize: 12, color: '#6b7280', background: '#f9fafb', padding: '8px 12px', borderRadius: 8, maxHeight: 70, overflowY: 'auto' }}>
-              <strong>Alıcılar:</strong> {alicilar.map(a => a.isim_soyisim).join(', ')}
+            <div style={{ fontSize: 12, color: '#6b7280', background: '#f9fafb', padding: '8px 12px', borderRadius: 8, maxHeight: 90, overflowY: 'auto' }}>
+              <div style={{ marginBottom: 4 }}><strong>Alıcılar ({alicilar.length}):</strong></div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {alicilar.map(a => {
+                  const kapali = a.bildirim_izni === false
+                  const bilinmeyen = a.bildirim_izni == null
+                  return (
+                    <span key={a.id}
+                      style={{
+                        fontSize: 11.5, padding: '2px 8px', borderRadius: 10,
+                        background: kapali ? '#fee2e2' : bilinmeyen ? '#fef3c7' : '#dcfce7',
+                        color: kapali ? '#991b1b' : bilinmeyen ? '#92400e' : '#166534',
+                        fontWeight: 600,
+                      }}
+                      title={kapali ? 'Bildirim izni kapalı' : bilinmeyen ? 'İzin durumu bilinmiyor' : 'Bildirim izni açık'}
+                    >
+                      {kapali && '🔕 '}{bilinmeyen && '⚠️ '}{a.isim_soyisim}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          {tek && alicilar[0].bildirim_izni === false && (
+            <div style={{ fontSize: 12.5, background: '#fee2e2', border: '1px solid #fca5a5', color: '#991b1b', padding: '10px 12px', borderRadius: 8, lineHeight: 1.5 }}>
+              🔕 <strong>{alicilar[0].isim_soyisim}</strong> cihazının bildirim izni <strong>kapalı</strong>. Bildirim gönderilse bile büyük ihtimalle görmeyecek.
+            </div>
+          )}
+          {kapaliAlicilar.length > 0 && !tek && (
+            <div style={{ fontSize: 12.5, background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', padding: '8px 12px', borderRadius: 8 }}>
+              🔕 <strong>{kapaliAlicilar.length} alıcının</strong> bildirim izni kapalı. Bu kişiler büyük ihtimalle bildirimi görmeyecek.
+            </div>
+          )}
+          {bilinmeyenAlicilar.length > 0 && !tek && (
+            <div style={{ fontSize: 12, background: '#fef9e7', border: '1px solid #fcd34d', color: '#92400e', padding: '8px 12px', borderRadius: 8 }}>
+              ⚠️ <strong>{bilinmeyenAlicilar.length} alıcının</strong> izin durumu bilinmiyor (mobil app henüz bildirim iznini raporlamadı).
             </div>
           )}
 
