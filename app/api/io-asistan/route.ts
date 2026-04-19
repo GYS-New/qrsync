@@ -128,6 +128,22 @@ const tools: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'gorev_sure_analizi',
+    description: 'Görev tamamlanma sürelerini analiz eder. "En uzun süren görev", "en kısa süren görev", "dün en uzun süren" gibi sorularda mutlaka bu tool\'u kullan. canli_gorevler (frekansiyel) + gorevler (spesifik) + arşiv tablolarını birlikte tarar, görev adı, lokasyon, yapan kişi ve süre bilgisini döndürür.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tarih_baslangic: { type: 'string', description: 'Başlangıç tarihi YYYY-MM-DD (varsayılan: bugün)' },
+        tarih_bitis: { type: 'string', description: 'Bitiş tarihi YYYY-MM-DD (varsayılan: tarih_baslangic)' },
+        siralama: { type: 'string', description: '"desc" = en uzun süren (varsayılan), "asc" = en kısa süren' },
+        limit: { type: 'number', description: 'Kaç görev gösterilsin (varsayılan: 5, max: 20)' },
+        gorev_tipi: { type: 'string', description: '"frekansiyel" / "spesifik" / "hepsi" (varsayılan: hepsi)' },
+        ...PROJE_PARAM,
+      },
+      required: [],
+    },
+  },
+  {
     name: 'arsiv_ozeti',
     description: 'Arşiv tablolarındaki kayıt sayılarını getirir.',
     input_schema: {
@@ -561,6 +577,110 @@ async function executeTool(
         return 'Geçersiz tip. "sistem" veya "firma" olmalı.'
       }
 
+      case 'gorev_sure_analizi': {
+        const tarihBas = (input.tarih_baslangic as string) || today
+        const tarihBit = (input.tarih_bitis as string) || tarihBas
+        const siralama = ((input.siralama as string) || 'desc').toLowerCase()
+        const topN = Math.min((input.limit as number) || 5, 20)
+        const gorevTipi = ((input.gorev_tipi as string) || 'hepsi').toLowerCase()
+        const ascending = siralama === 'asc'
+
+        // Kaynaklar: frekansiyel canlı+arşiv, spesifik canlı+arşiv
+        type Row = { id: string; tanim: string | null; tamamlanma_suresi_saniye: number | null; tamamlanma_tarihi: string | null; lokasyon_id: string | null; userId: string | null; kaynak: string }
+        const toplananlar: Row[] = []
+
+        const frekTablolar = gorevTipi === 'spesifik' ? [] : ['canli_gorevler', 'canli_gorevler_arsiv']
+        const spesifikTablolar = gorevTipi === 'frekansiyel' ? [] : ['gorevler', 'gorevler_arsiv']
+
+        for (const t of frekTablolar) {
+          let q = supabase
+            .from(t)
+            .select('id,tanim,tamamlanma_suresi_saniye,tamamlanma_tarihi,lokasyon_id,tamamlayan_kullanici_id,islemi_yapan_id')
+            .gte('tamamlanma_tarihi', `${tarihBas}T00:00:00`)
+            .lte('tamamlanma_tarihi', `${tarihBit}T23:59:59`)
+            .not('tamamlanma_suresi_saniye', 'is', null)
+            .gt('tamamlanma_suresi_saniye', 0)
+            .order('tamamlanma_suresi_saniye', { ascending })
+            .limit(topN)
+          if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+          if (projeId) q = q.eq('proje_id', projeId)
+          const { data } = await q
+          for (const r of (data ?? []) as Record<string, any>[]) {
+            toplananlar.push({
+              id: r.id, tanim: r.tanim, tamamlanma_suresi_saniye: r.tamamlanma_suresi_saniye,
+              tamamlanma_tarihi: r.tamamlanma_tarihi, lokasyon_id: r.lokasyon_id,
+              userId: r.tamamlayan_kullanici_id ?? r.islemi_yapan_id ?? null,
+              kaynak: t.includes('arsiv') ? 'frek-arşiv' : 'frek',
+            })
+          }
+        }
+
+        for (const t of spesifikTablolar) {
+          let q = supabase
+            .from(t)
+            .select('id,tanim,tamamlanma_suresi_saniye,tamamlanma_tarihi,lokasyon_id,islemi_yapan_id')
+            .eq('durum', 'TAMAMLANDI')
+            .gte('tamamlanma_tarihi', `${tarihBas}T00:00:00`)
+            .lte('tamamlanma_tarihi', `${tarihBit}T23:59:59`)
+            .not('tamamlanma_suresi_saniye', 'is', null)
+            .gt('tamamlanma_suresi_saniye', 0)
+            .order('tamamlanma_suresi_saniye', { ascending })
+            .limit(topN)
+          if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+          if (projeId) q = q.eq('proje_id', projeId)
+          const { data } = await q
+          for (const r of (data ?? []) as Record<string, any>[]) {
+            toplananlar.push({
+              id: r.id, tanim: r.tanim, tamamlanma_suresi_saniye: r.tamamlanma_suresi_saniye,
+              tamamlanma_tarihi: r.tamamlanma_tarihi, lokasyon_id: r.lokasyon_id,
+              userId: r.islemi_yapan_id ?? null,
+              kaynak: t.includes('arsiv') ? 'sp-arşiv' : 'sp',
+            })
+          }
+        }
+
+        if (!toplananlar.length) {
+          return `${tarihBas === tarihBit ? tarihBas : `${tarihBas} — ${tarihBit}`} arasında tamamlanmış görev (süre bilgili) bulunamadı${projeLabel}.`
+        }
+
+        // Toplu sıralama (global top N)
+        toplananlar.sort((a, b) => {
+          const av = a.tamamlanma_suresi_saniye ?? 0
+          const bv = b.tamamlanma_suresi_saniye ?? 0
+          return ascending ? av - bv : bv - av
+        })
+        const top = toplananlar.slice(0, topN)
+
+        // İsim ve lokasyon çözümle
+        const userIds = Array.from(new Set(top.map(r => r.userId).filter(Boolean))) as string[]
+        const lokIds = Array.from(new Set(top.map(r => r.lokasyon_id).filter(Boolean))) as string[]
+        const [{ data: users }, { data: loks }] = await Promise.all([
+          userIds.length ? supabase.from('users').select('id,isim_soyisim').in('id', userIds) : Promise.resolve({ data: [] as Record<string, any>[] }),
+          lokIds.length ? supabase.from('lokasyonlar').select('id,tanim').in('id', lokIds) : Promise.resolve({ data: [] as Record<string, any>[] }),
+        ])
+        const userMap = new Map((users ?? []).map((u: Record<string, any>) => [u.id, u.isim_soyisim]))
+        const lokMap = new Map((loks ?? []).map((l: Record<string, any>) => [l.id, l.tanim]))
+
+        const fmt = (sn: number) => {
+          const dk = Math.floor(sn / 60)
+          const kalanSn = sn % 60
+          const sa = Math.floor(dk / 60)
+          const kalanDk = dk % 60
+          if (sa > 0) return `${sa}sa ${kalanDk}dk ${kalanSn}sn`
+          return `${dk}dk ${kalanSn}sn`
+        }
+
+        const etiket = ascending ? 'en kısa süren' : 'en uzun süren'
+        const tarihEtiket = tarihBas === tarihBit ? tarihBas : `${tarihBas} — ${tarihBit}`
+        const satirlar = top.map((r, i) => {
+          const isim = r.userId ? (userMap.get(r.userId) ?? '—') : '—'
+          const lok = r.lokasyon_id ? (lokMap.get(r.lokasyon_id) ?? '—') : '—'
+          const sure = r.tamamlanma_suresi_saniye ? fmt(r.tamamlanma_suresi_saniye) : '—'
+          return `${i + 1}. ${r.tanim ?? 'İsimsiz görev'} — ${lok} — ${isim} — ${sure}`
+        })
+        return `${tarihEtiket} ${etiket} görev${top.length > 1 ? 'ler' : ''}${projeLabel}:\n${satirlar.join('\n')}`
+      }
+
       case 'arsiv_ozeti': {
         const tablo = input.tablo as string | undefined
         const results: string[] = []
@@ -942,6 +1062,7 @@ Aşağıdaki soru tiplerinde CEVAP VERMEDEN ÖNCE mutlaka bir tool çağır — 
 - "Hangi kullanıcı / lokasyon / görev …" → veritabani_sorgula
 - "Dün/bugün tamamlananlar" → veritabani_sorgula (durum+tarih filtresi)
 - "En başarılı / en çok X yapan …" → personel_basari_analizi
+- "En uzun süren / en kısa süren görev" / "dün/bugün en uzun görev hangisi" → gorev_sure_analizi
 - "Aktif / online personel" → veritabani_sorgula (device_tokens üzerinden)
 - Spesifik isim/rakam/tarih beklenen her soruda → önce tool
 Eğer tool çağrısı sonucu boş/null dönerse: "Bu kriterle kayıt bulunamadı" de, uydurma.
