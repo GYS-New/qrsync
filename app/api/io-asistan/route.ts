@@ -80,11 +80,14 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: 'personel_listesi',
-    description: 'Aktif personel listesini getirir. İsim, rol, email bilgileri. Görev oluşturma akışında kullanıcının atanacak personel seçimi yapması gerektiğinde de bu tool çağırılır — yanıtına [SECENEKLER]isim1|isim2|...[/SECENEKLER] marker\'ı ekleyerek tıklanabilir buton göster.',
+    description: 'Aktif personel listesini getirir. İsim, rol, email bilgileri. Görev oluşturma akışında kullanıcının atanacak personel seçimi yapması gerektiğinde de bu tool çağırılır — yanıtına [SECENEKLER]isim1|isim2|...[/SECENEKLER] marker\'ı ekleyerek tıklanabilir buton göster. Kullanıcı bayan/erkek filtresi isterse cinsiyet parametresini kullan (K/E). İsim arıyorsa arama parametresini kullan.',
     input_schema: {
       type: 'object' as const,
       properties: {
         sadece_aktif: { type: 'boolean', description: 'Sadece aktif kullanıcıları getir (varsayılan: true)' },
+        cinsiyet: { type: 'string', description: 'Cinsiyet filtresi: "K" (kadın/bayan) veya "E" (erkek). Boş bırakılırsa hepsi.' },
+        arama: { type: 'string', description: 'İsim içinde arama (ilike). Örn: "nur" → NUR DEMİREL, NURCAN, ONUR...' },
+        limit: { type: 'number', description: 'Maks sonuç sayısı (varsayılan: 200)' },
         ...PROJE_PARAM,
       },
       required: [],
@@ -391,19 +394,29 @@ async function executeTool(
 
       case 'personel_listesi': {
         const sadece_aktif = input.sadece_aktif !== false
+        const cinsiyet = (input.cinsiyet as string | undefined)?.toUpperCase()
+        const arama = (input.arama as string | undefined)?.trim()
+        const limit = Math.min((input.limit as number) || 200, 500)
         let q = supabase
           .from('users')
-          .select('isim_soyisim,email,rol,aktif')
+          .select('isim_soyisim,email,rol,aktif,cinsiyet')
           .in('rol', ['tenant_user', 'tenant_admin'])
           .order('isim_soyisim')
-          .limit(50)
+          .limit(limit)
         if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         if (projeId) q = q.eq('proje_id', projeId)
         if (sadece_aktif) q = q.eq('aktif', true)
+        if (cinsiyet === 'K' || cinsiyet === 'E') q = q.eq('cinsiyet', cinsiyet)
+        if (arama) {
+          // Kelime bazlı: her kelime ayrı ilike
+          const kelimeler = arama.split(/\s+/).filter(k => k.length > 0)
+          for (const k of kelimeler) q = q.ilike('isim_soyisim', `%${k}%`)
+        }
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
-        if (!data?.length) return `Kayıtlı personel bulunamadı${projeLabel}.`
-        return `Personel Listesi${projeLabel} (${data.length} kişi):\n` +
+        if (!data?.length) return `${arama ? `"${arama}" ile eşleşen personel yok${projeLabel}.` : `Kayıtlı personel bulunamadı${projeLabel}.`}`
+        const cinsiyetEtiket = cinsiyet === 'K' ? ' (Bayan)' : cinsiyet === 'E' ? ' (Bay)' : ''
+        return `Personel Listesi${projeLabel}${cinsiyetEtiket} (${data.length} kişi):\n` +
           data.map((r: Record<string, unknown>) => `• ${r.isim_soyisim} (${r.rol === 'tenant_admin' ? 'Yönetici' : 'Personel'}) — ${r.email}`).join('\n')
       }
 
@@ -820,17 +833,29 @@ async function executeTool(
         }
         const lokasyon = loks.find((l: any) => l.tanim.toLowerCase() === lokasyonAdi.toLowerCase()) ?? loks[0]
 
-        // 4) Atanan kullanıcı çözümle (opsiyonel)
+        // 4) Atanan kullanıcı çözümle (opsiyonel) — kelime bazlı fuzzy
         let atananId: string | null = null
         let atananLabel = '—'
         if (atananIsim) {
-          let uQ = supabase.from('users').select('id,isim_soyisim').ilike('isim_soyisim', `%${atananIsim}%`).eq('firma_id', ctx.firmaId).eq('aktif', true).limit(5)
+          const kelimeler = atananIsim.split(/\s+/).filter(k => k.length > 0)
+          let uQ = supabase.from('users').select('id,isim_soyisim').eq('firma_id', ctx.firmaId).eq('aktif', true).limit(10)
           if (projeId) uQ = uQ.eq('proje_id', projeId)
-          const { data: users } = await uQ
-          if (!users?.length) return `"${atananIsim}" ile eşleşen kullanıcı bulunamadı.`
+          for (const k of kelimeler) uQ = uQ.ilike('isim_soyisim', `%${k}%`)
+          let { data: users } = await uQ
+          // Eşleşme yoksa sadece ilk kelimeyle dene (soyadı olmayabilir)
+          if (!users?.length && kelimeler.length > 0) {
+            let fbQ = supabase.from('users').select('id,isim_soyisim').ilike('isim_soyisim', `%${kelimeler[0]}%`).eq('firma_id', ctx.firmaId).eq('aktif', true).limit(10)
+            if (projeId) fbQ = fbQ.eq('proje_id', projeId)
+            const { data: fbData } = await fbQ
+            users = fbData
+          }
+          if (!users?.length) return `"${atananIsim}" ile eşleşen kullanıcı bulunamadı. "personelleri listele" diyerek geçerli isimleri görebilirsiniz.`
           if (users.length > 1) {
             const exactU = users.find((u: any) => u.isim_soyisim.toLowerCase() === atananIsim.toLowerCase())
-            if (!exactU) return `Birden fazla kullanıcı eşleşti: ${users.map((u: any) => u.isim_soyisim).join(', ')}. Tam adı belirtir misiniz?`
+            if (!exactU) {
+              const opts = users.slice(0, 8).map((u: any) => u.isim_soyisim).join('|')
+              return `Birden fazla kullanıcı eşleşti, hangisini atamak istersiniz?\n[SECENEKLER]${opts}[/SECENEKLER]`
+            }
           }
           const picked = users.find((u: any) => u.isim_soyisim.toLowerCase() === atananIsim.toLowerCase()) ?? users[0]
           atananId = picked.id
