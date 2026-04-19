@@ -36,6 +36,12 @@ const TIP_RENK: Record<string, string> = {
   kural_sil: '#dc2626',
   ceklist_arsiv_sil: '#dc2626',
   ceklist_arsiv_toplu_sil: '#dc2626',
+  gorev_arsiv_sil: '#dc2626',
+  canli_gorev_arsiv_sil: '#dc2626',
+  checklist_sablon_ekle: '#059669',
+  checklist_sablon_guncelle: '#0284c7',
+  checklist_sablon_sil: '#dc2626',
+  checklist_madde_sil: '#dc2626',
   ayar_degis_firma: '#7c3aed',
   ayar_degis_proje: '#7c3aed',
   login_basarili: '#059669',
@@ -104,6 +110,12 @@ export default function AuditLogClient({ isSA, firmalarListesi = [] }: Props) {
       kural_sil: '🗑 Kural Silindi',
       ceklist_arsiv_sil: '🗑 Çeklist Arşiv Sil',
       ceklist_arsiv_toplu_sil: '🗑 Çeklist Arşiv Toplu Sil',
+      gorev_arsiv_sil: '🗃 Görev Arşiv Sil',
+      canli_gorev_arsiv_sil: '🗃 Canlı Görev Arşiv Sil',
+      checklist_sablon_ekle: '🧾 Şablon Eklendi',
+      checklist_sablon_guncelle: '🧾 Şablon Güncellendi',
+      checklist_sablon_sil: '🗑 Şablon Silindi',
+      checklist_madde_sil: '🗑 Şablon Maddesi Silindi',
       ayar_degis_firma: '🛠️ Firma Ayar Değişti',
       ayar_degis_proje: '🛠️ Proje Ayar Değişti',
       login_basarili: '✓ Giriş',
@@ -165,6 +177,18 @@ export default function AuditLogClient({ isSA, firmalarListesi = [] }: Props) {
             <optgroup label="Ayar">
               <option value="ayar_degis_proje">Proje Ayar</option>
               <option value="ayar_degis_firma">Firma Ayar</option>
+            </optgroup>
+            <optgroup label="Görev">
+              <option value="gorev_sil">Spesifik Görev Sil</option>
+              <option value="canli_gorev_sil">Canlı Görev Sil</option>
+              <option value="gorev_arsiv_sil">Arşiv Görev Sil</option>
+              <option value="canli_gorev_arsiv_sil">Arşiv Canlı Görev Sil</option>
+            </optgroup>
+            <optgroup label="Çeklist Şablon">
+              <option value="checklist_sablon_ekle">Şablon Ekle</option>
+              <option value="checklist_sablon_guncelle">Şablon Güncelle</option>
+              <option value="checklist_sablon_sil">Şablon Sil</option>
+              <option value="checklist_madde_sil">Şablon Madde Sil</option>
             </optgroup>
             <optgroup label="Arşiv & Bütünlük">
               <option value="arsivle">Arşivleme</option>

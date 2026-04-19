@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 /**
  * DELETE /api/checklist/sablon?id=...
@@ -31,7 +32,7 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ ok: false, error: 'id gerekli' }, { status: 400 })
 
   // Şablonun bu kullanıcının firmasına ait olduğunu doğrula
-  const { data: sablon } = await admin.from('checklist_sablonlari').select('firma_id').eq('id', id).single()
+  const { data: sablon } = await admin.from('checklist_sablonlari').select('firma_id,baslik,tanim,versiyon').eq('id', id).single()
   if (!sablon) return NextResponse.json({ ok: false, error: 'Şablon bulunamadı' }, { status: 404 })
   if (!isSA && sablon.firma_id !== me.firma_id) {
     return NextResponse.json({ ok: false, error: 'Yetki yetersiz' }, { status: 403 })
@@ -58,7 +59,29 @@ export async function DELETE(req: NextRequest) {
 
   // 4. Şablonu sil
   const { error } = await admin.from('checklist_sablonlari').delete().eq('id', id)
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  if (error) {
+    await auditLog({
+      tip: 'checklist_sablon_sil', tablo: 'checklist_sablonlari',
+      basarili: false, hata_mesaji: error.message,
+      kullanici_id: user.id, firma_id: sablon.firma_id ?? null,
+      detay: { sablon_id: id, baslik: sablon.baslik },
+    })
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  }
+
+  await auditLog({
+    tip: 'checklist_sablon_sil', tablo: 'checklist_sablonlari',
+    kullanici_id: user.id, firma_id: sablon.firma_id ?? null,
+    detay: {
+      sablon_id: id,
+      baslik: sablon.baslik,
+      tanim: sablon.tanim,
+      versiyon: sablon.versiyon,
+      silinen_baslik: baslikIds.length,
+      silinen_madde: maddeIds.length,
+      uyarı: 'Şablonla ilgili tüm sonuç kayıtları + maddeler cascade silindi',
+    },
+  })
 
   return NextResponse.json({ ok: true })
 }

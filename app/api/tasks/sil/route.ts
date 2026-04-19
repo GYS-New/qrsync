@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 type GorevTablo = 'gorevler' | 'gorevler_arsiv' | 'canli_gorevler' | 'canli_gorevler_arsiv'
 
@@ -68,9 +69,33 @@ export async function POST(req: NextRequest) {
     const { error: gorevErr } = await admin.from(tablo).delete().in('id', ids)
     if (gorevErr) throw gorevErr
 
+    // Audit log
+    const isArsiv = tablo === 'gorevler_arsiv' || tablo === 'canli_gorevler_arsiv'
+    const tip = isCanli
+      ? (isArsiv ? 'canli_gorev_arsiv_sil' : 'canli_gorev_sil')
+      : (isArsiv ? 'gorev_arsiv_sil' : 'gorev_sil')
+    await auditLog({
+      tip, tablo, satir_sayisi: ids.length,
+      kullanici_id: user.id, firma_id: hedefFirmaId,
+      detay: {
+        silinen_sayi: ids.length,
+        ornek_ids: ids.slice(0, 10),
+        cekList_aktif_sil: aktifBasliklar?.length ?? 0,
+        ceklist_arsiv_sil: arsivBasliklar?.length ?? 0,
+      },
+    })
+
     return NextResponse.json({ ok: true, silinen: ids.length })
   } catch (err: any) {
     console.error('[tasks/sil]', err)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      await auditLog({
+        tip: 'gorev_sil', tablo: 'gorevler', basarili: false, hata_mesaji: err?.message ?? 'hata',
+        kullanici_id: user?.id ?? null,
+      })
+    } catch {}
     return NextResponse.json({ error: err?.message ?? 'Sunucu hatası' }, { status: 500 })
   }
 }
