@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatDateTime } from '@/lib/utils'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useFirma } from '@/components/layout/FirmaContext'
@@ -176,10 +176,18 @@ export default function CeklistRaporlariClient({
   const PER_PAGE = 50
   const [sayfa, setSayfa] = useState(1)
   const toplamSayfa = Math.max(1, Math.ceil(filtreData.length / PER_PAGE))
+  const tableWrapRef = useRef<HTMLDivElement>(null)
   // Filtre/arama/veri değiştiğinde 1. sayfaya dön
   useEffect(() => { setSayfa(1) }, [aramaQ, durumF, kanaliF, satirlar])
   // Sayfa overflow
   useEffect(() => { if (sayfa > toplamSayfa) setSayfa(toplamSayfa) }, [toplamSayfa, sayfa])
+  // Sayfa değişince tabloyu başa kaydır (yatay scroll dahil)
+  useEffect(() => {
+    if (tableWrapRef.current) {
+      tableWrapRef.current.scrollLeft = 0
+      tableWrapRef.current.scrollTop = 0
+    }
+  }, [sayfa])
   const sayfaliData = useMemo(
     () => filtreData.slice((sayfa - 1) * PER_PAGE, sayfa * PER_PAGE),
     [filtreData, sayfa]
@@ -884,8 +892,21 @@ export default function CeklistRaporlariClient({
         </div>
 
         {/* Tablo */}
-        <div className="verde-table-wrap">
-          <table className="verde-table">
+        <div ref={tableWrapRef} className="verde-table-wrap" style={{ overflowX: 'auto' }}>
+          <table className="verde-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: 1100 }}>
+            <colgroup>
+              <col style={{ width: 130 }} />   {/* Kayıt Tarihi */}
+              <col style={{ width: 'auto' }} /> {/* Görev */}
+              <col style={{ width: 'auto' }} /> {/* Lokasyon */}
+              <col style={{ width: 140 }} />   {/* Şablon */}
+              <col style={{ width: 100 }} />   {/* Durum */}
+              <col style={{ width: 80 }} />    {/* Kanal */}
+              <col style={{ width: 120 }} />   {/* Kullanıcı */}
+              <col style={{ width: 100 }} />   {/* Tarih */}
+              <col style={{ width: 110 }} />   {/* Doldurma */}
+              {filtreMod && <col style={{ width: 80 }} />}  {/* Segment */}
+              <col style={{ width: 100 }} />   {/* İşlemler */}
+            </colgroup>
             <thead>
               <tr>
                 <th>Kayıt Tarihi</th>
@@ -930,9 +951,9 @@ export default function CeklistRaporlariClient({
                       <td style={{ whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 12 }}>
                         {r.kayit_tarihi ? formatDateTime(r.kayit_tarihi) : '—'}
                       </td>
-                      <td style={{ fontWeight: 600, fontSize: 13 }}>{r.gorev_tanim}</td>
-                      <td style={{ color: '#64748b', fontSize: 12.5 }}>{r.lokasyon_tanim}</td>
-                      <td style={{ color: '#64748b', fontSize: 12 }}>{r.sablon_baslik}</td>
+                      <td style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.gorev_tanim}>{r.gorev_tanim}</td>
+                      <td style={{ color: '#64748b', fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.lokasyon_tanim}>{r.lokasyon_tanim}</td>
+                      <td style={{ color: '#64748b', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.sablon_baslik}>{r.sablon_baslik}</td>
                       <td>
                         <span style={{
                           padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 700,
