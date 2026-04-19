@@ -332,35 +332,64 @@ async function kayitlarGetir(
     for (const u of users ?? []) kullaniciMap[u.id] = u.isim_soyisim
   }
 
-  // 6. Madde sayıları (from both tables)
+  // 6. Madde sayıları (from both tables) — artık secenek_degeri de çekiyoruz
+  //    "Doldurma oranı" = ilk seçenek (olumlu) işaretlenen madde sayısı / toplam madde
   const baslikIds = allBasliklar.map((b: any) => b.id)
-  const maddeSayilari: any[] = []
+  const maddeSayilari: { sonuc_id: string; madde_id: string; secenek_degeri: string | null }[] = []
   for (let i = 0; i < baslikIds.length; i += BATCH) {
     const chunk = baslikIds.slice(i, i + BATCH)
-    const { data } = await admin.from('checklist_sonuc_maddeleri').select('sonuc_id').in('sonuc_id', chunk)
-    if (data) maddeSayilari.push(...data)
+    const { data } = await admin.from('checklist_sonuc_maddeleri').select('sonuc_id,madde_id,secenek_degeri').in('sonuc_id', chunk)
+    if (data) maddeSayilari.push(...(data as any))
   }
 
   // Arşiv maddeleri
-  const arMaddeSayilari: any[] = []
+  const arMaddeSayilari: { sonuc_id: string; madde_id: string; secenek_degeri: string | null }[] = []
   for (let i = 0; i < baslikIds.length; i += BATCH) {
     const chunk = baslikIds.slice(i, i + BATCH)
-    const { data } = await admin.from('checklist_sonuc_maddeleri_arsiv').select('sonuc_id').in('sonuc_id', chunk)
-    if (data) arMaddeSayilari.push(...data)
-  }
-
-  const doldurulanMap: Record<string, number> = {}
-  for (const m of [...maddeSayilari, ...arMaddeSayilari]) {
-    doldurulanMap[m.sonuc_id] = (doldurulanMap[m.sonuc_id] ?? 0) + 1
+    const { data } = await admin.from('checklist_sonuc_maddeleri_arsiv').select('sonuc_id,madde_id,secenek_degeri').in('sonuc_id', chunk)
+    if (data) arMaddeSayilari.push(...(data as any))
   }
 
   const sablonMaddeMap: Record<string, number> = {}
+  const tumMaddeIdleri = new Set<string>()
   if (sablonIds.size > 0) {
     const { data: sablonMaddeler } = await admin.from('checklist_sablon_maddeleri')
-      .select('sablon_id')
+      .select('id,sablon_id')
       .in('sablon_id', [...sablonIds])
-    for (const m of sablonMaddeler ?? []) {
+    for (const m of (sablonMaddeler ?? []) as { id: string; sablon_id: string }[]) {
       sablonMaddeMap[m.sablon_id] = (sablonMaddeMap[m.sablon_id] ?? 0) + 1
+      tumMaddeIdleri.add(m.id)
+    }
+  }
+
+  // Her madde için ilk seçeneğin (sira_no ASC) değerini al
+  // madde_id → ilk_secenek_deger
+  const ilkSecenekMap: Record<string, string> = {}
+  if (tumMaddeIdleri.size > 0) {
+    const ids = [...tumMaddeIdleri]
+    const secenekler: { madde_id: string; deger: string; sira_no: number }[] = []
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const chunk = ids.slice(i, i + BATCH)
+      const { data } = await admin.from('checklist_madde_secenekleri')
+        .select('madde_id,deger,sira_no')
+        .in('madde_id', chunk)
+        .order('sira_no', { ascending: true })
+      if (data) secenekler.push(...(data as any))
+    }
+    // Her madde_id için en küçük sira_no'lu olanı map'le (zaten sıralı geliyor, ilk görülen ilk seçenek)
+    for (const s of secenekler) {
+      if (!(s.madde_id in ilkSecenekMap)) ilkSecenekMap[s.madde_id] = (s.deger ?? '').toString()
+    }
+  }
+
+  // sonuc_id → pozitif (ilk seçenek işaretli) madde sayısı
+  const doldurulanMap: Record<string, number> = {}
+  for (const m of [...maddeSayilari, ...arMaddeSayilari]) {
+    const ilk = ilkSecenekMap[m.madde_id]
+    const secilen = (m.secenek_degeri ?? '').toString()
+    // İlk seçenek işaretlendiyse pozitif say; boşsa veya farklıysa sayma
+    if (ilk !== undefined && secilen !== '' && secilen === ilk) {
+      doldurulanMap[m.sonuc_id] = (doldurulanMap[m.sonuc_id] ?? 0) + 1
     }
   }
 
