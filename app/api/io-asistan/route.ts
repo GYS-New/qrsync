@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getSistemKonfig } from '@/lib/config/getSistemKonfig'
+import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 
 // Rate limiter
 const rateLimitMap = new Map<string, number[]>()
@@ -192,11 +193,13 @@ async function resolveProjeId(
   ctx: ToolContext
 ): Promise<string | null> {
   if (!projeAdi) return ctx.projeId
-  const { data } = await supabase
+  let q = supabase
     .from('projeler')
     .select('id,ad')
     .ilike('ad', `%${projeAdi}%`)
     .limit(5)
+  if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+  const { data } = await q
   if (!data?.length) return null
   if (data.length === 1) return data[0].id
   // Tam eşleşme ara
@@ -221,7 +224,7 @@ async function executeTool(
     switch (name) {
       case 'projeleri_listele': {
         let q = supabase.from('projeler').select('id,ad,firmalar!firma_id(firma_adi)').order('ad')
-        if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
         if (!data?.length) return 'Erişebileceğiniz proje bulunamadı.'
@@ -243,7 +246,7 @@ async function executeTool(
           .eq('arsivlendi', false)
           .order('giris_saati', { ascending: true })
           .limit(50)
-        if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         if (projeId) q = q.eq('proje_id', projeId)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
@@ -266,7 +269,7 @@ async function executeTool(
           .select('durum')
           .gte('olusturma_tarihi', `${tarih}T00:00:00`)
           .lte('olusturma_tarihi', `${tarih}T23:59:59`)
-        if (!ctx.isSA && ctx.firmaId) qOlusturulan = qOlusturulan.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) qOlusturulan = qOlusturulan.eq('firma_id', ctx.firmaId)
         if (projeId) qOlusturulan = qOlusturulan.eq('proje_id', projeId)
         // Tamamlanan görevler (farklı günde oluşturulmuş olabilir)
         let qTamamlanan = supabase
@@ -274,7 +277,7 @@ async function executeTool(
           .select('id')
           .gte('tamamlanma_tarihi', `${tarih}T00:00:00`)
           .lte('tamamlanma_tarihi', `${tarih}T23:59:59`)
-        if (!ctx.isSA && ctx.firmaId) qTamamlanan = qTamamlanan.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) qTamamlanan = qTamamlanan.eq('firma_id', ctx.firmaId)
         if (projeId) qTamamlanan = qTamamlanan.eq('proje_id', projeId)
 
         const [olusRes, tamRes] = await Promise.all([qOlusturulan, qTamamlanan])
@@ -299,7 +302,7 @@ async function executeTool(
           .select('durum')
           .gte('aktif_olma_tarihi', `${tarih}T00:00:00`)
           .lte('aktif_olma_tarihi', `${tarih}T23:59:59`)
-        if (!ctx.isSA && ctx.firmaId) qOlusturulan = qOlusturulan.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) qOlusturulan = qOlusturulan.eq('firma_id', ctx.firmaId)
         if (projeId) qOlusturulan = qOlusturulan.eq('proje_id', projeId)
         const durumFiltre = input.durum as string | undefined
         if (durumFiltre) qOlusturulan = qOlusturulan.eq('durum', durumFiltre)
@@ -309,7 +312,7 @@ async function executeTool(
           .select('id')
           .gte('tamamlanma_tarihi', `${tarih}T00:00:00`)
           .lte('tamamlanma_tarihi', `${tarih}T23:59:59`)
-        if (!ctx.isSA && ctx.firmaId) qTamamlanan = qTamamlanan.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) qTamamlanan = qTamamlanan.eq('firma_id', ctx.firmaId)
         if (projeId) qTamamlanan = qTamamlanan.eq('proje_id', projeId)
 
         const [olusRes, tamRes] = await Promise.all([qOlusturulan, qTamamlanan])
@@ -336,7 +339,7 @@ async function executeTool(
           .select('yildiz,yorum,ad_soyad,olusturma_tarihi,lokasyonlar!lokasyon_id(tanim)')
           .order('olusturma_tarihi', { ascending: false })
           .limit(limit)
-        if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         if (projeId) q = q.eq('proje_id', projeId)
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
@@ -358,7 +361,7 @@ async function executeTool(
           .in('rol', ['tenant_user', 'tenant_admin'])
           .order('isim_soyisim')
           .limit(50)
-        if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         if (projeId) q = q.eq('proje_id', projeId)
         if (sadece_aktif) q = q.eq('aktif', true)
         const { data, error } = await q
@@ -376,7 +379,7 @@ async function executeTool(
           .eq('aktif', true)
           .order('tanim')
           .limit(30)
-        if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         if (projeId) q = q.eq('proje_id', projeId)
         if (arama) q = q.ilike('tanim', `%${arama}%`)
         const { data, error } = await q
@@ -391,7 +394,7 @@ async function executeTool(
         // Not: checklist_sonuc_basliklari tablosunda firma_id/skor kolonu yok;
         // Firma scope'u lokasyonlar üzerinden sağlıyoruz.
         let lokasyonIds: string[] | null = null
-        if (!ctx.isSA && ctx.firmaId) {
+        if (ctx.firmaId) {
           let lokQ = supabase.from('lokasyonlar').select('id').eq('firma_id', ctx.firmaId)
           if (projeId) lokQ = lokQ.eq('proje_id', projeId)
           const { data: loks } = await lokQ
@@ -434,7 +437,7 @@ async function executeTool(
           .gte('tamamlanma_tarihi', `${tarih}T00:00:00`)
           .lte('tamamlanma_tarihi', `${tarih}T23:59:59`)
           .not('tamamlayan_kullanici_id', 'is', null)
-        if (!ctx.isSA && ctx.firmaId) qFrek = qFrek.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) qFrek = qFrek.eq('firma_id', ctx.firmaId)
         if (projeId) qFrek = qFrek.eq('proje_id', projeId)
 
         let qSpesifik = supabase
@@ -443,7 +446,7 @@ async function executeTool(
           .eq('durum', 'TAMAMLANDI')
           .gte('tamamlanma_tarihi', `${tarih}T00:00:00`)
           .lte('tamamlanma_tarihi', `${tarih}T23:59:59`)
-        if (!ctx.isSA && ctx.firmaId) qSpesifik = qSpesifik.eq('firma_id', ctx.firmaId)
+        if (ctx.firmaId) qSpesifik = qSpesifik.eq('firma_id', ctx.firmaId)
         if (projeId) qSpesifik = qSpesifik.eq('proje_id', projeId)
 
         const [frekRes, spRes] = await Promise.all([qFrek, qSpesifik])
@@ -476,7 +479,7 @@ async function executeTool(
             .select('id,isim_soyisim')
             .in('rol', ['tenant_user', 'tenant_admin'])
             .eq('aktif', true)
-          if (!ctx.isSA && ctx.firmaId) qUsers = qUsers.eq('firma_id', ctx.firmaId)
+          if (ctx.firmaId) qUsers = qUsers.eq('firma_id', ctx.firmaId)
           if (projeId) qUsers = qUsers.eq('proje_id', projeId)
           const { data: allUsers } = await qUsers
           for (const u of (allUsers ?? []) as Record<string, unknown>[]) {
@@ -563,7 +566,7 @@ async function executeTool(
         const results: string[] = []
         // Firma scope uygulanabilen tablolar için filter helper
         const applyScope = (q: any) => {
-          if (!ctx.isSA && ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
+          if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
           return q
         }
 
@@ -683,7 +686,7 @@ async function executeTool(
 
         if (sadeceSay) {
           let q = supabase.from(tablo).select('id', { count: 'exact', head: true })
-          if (!ctx.isSA && ctx.firmaId && !tabloFirmaIdsiz) {
+          if (ctx.firmaId && !tabloFirmaIdsiz) {
             // firmalar tablosu özel: id = firmaId (TA kendi firmasını görür)
             q = isFirmalarTable ? q.eq('id', ctx.firmaId) : q.eq('firma_id', ctx.firmaId)
           }
@@ -709,7 +712,7 @@ async function executeTool(
         }
 
         let q = supabase.from(tablo).select(selectCols).limit(limit)
-        if (!ctx.isSA && ctx.firmaId && !tabloFirmaIdsiz) {
+        if (ctx.firmaId && !tabloFirmaIdsiz) {
           q = isFirmalarTable ? q.eq('id', ctx.firmaId) : q.eq('firma_id', ctx.firmaId)
         }
         if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
@@ -996,7 +999,11 @@ export async function POST(request: Request) {
   }
 
   const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
-  const toolCtx: ToolContext = { firmaId: me.firma_id, projeId: me.proje_id, isSA }
+  // SA için: users.firma_id null → aktif firma seçiminden (cookie) oku
+  // TA/U için: users.firma_id kullanılır (cookie set olsa bile kendi firma'larının dışına çıkamaz)
+  const aktifFirmaId = isSA ? getAktifFirmaId() : null
+  const scopedFirmaId = me.firma_id ?? aktifFirmaId
+  const toolCtx: ToolContext = { firmaId: scopedFirmaId, projeId: me.proje_id, isSA }
 
   // Firma/proje adlarını context'e al (prompt'a ekleyeceğiz)
   const admin = createAdminClient()
