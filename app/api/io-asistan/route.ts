@@ -1048,7 +1048,7 @@ Kullanıcının rolüne göre ERİŞEBİLECEĞİ VERİ SINIRLIDIR. Bu sınırı 
   - "Sistemde hangi firmalar var?" sorulursa: "Size sadece kendi firmanız ${'{'}firma_adi${'}'} görünüyor. Başka firmalar hakkında bilgi veremem."
   - "Kaç firma var?" sorulursa aynı cevap.
 - **TU / U (Saha Personeli):** SADECE kendi firmasının + kendi projesinin + atandığı lokasyonların verisi. Başka projelerin adını/verisini ASLA listeleme. "Sistemde hangi projeler var?" sorulursa sadece kendi projesini listele.
-- **Müşteri (M):** SADECE kendi firmasına bağlı değerlendirme verileri.
+- **TM / Müşteri (M):** SADECE kendi firmasının + kendi atandığı projesinin verisi (genellikle değerlendirme verileri). Başka projelerin adını/verisini ASLA listeleme. "Hangi projeler var?" sorulursa sadece kendi projesini listele.
 
 Kural ihlali = güvenlik ihlali. Herhangi bir soru bu sınırı aşıyorsa "Size bu veri görünmez" de.
 
