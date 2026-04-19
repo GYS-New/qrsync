@@ -50,10 +50,13 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const {
-    lokasyon_id, tanim, aktif_gunler, gunluk_frekans_sayisi,
+    lokasyon_id, tanim, aktif_gunler, gunluk_frekans_sayisi, haftalik_frekans_sayisi,
+    frekans_tipi: frekansTipiRaw,
     aktif_olma_saati, baslangic_tarihi, bitis_tarihi, atanan_kullanici_id,
     proje_id,
   } = body
+
+  const frekans_tipi: 'gunluk' | 'haftalik' = frekansTipiRaw === 'haftalik' ? 'haftalik' : 'gunluk'
 
   // Validasyon
   if (!lokasyon_id || !tanim?.trim()) {
@@ -62,8 +65,14 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(aktif_gunler) || aktif_gunler.length === 0) {
     return NextResponse.json({ error: 'En az bir aktif gün seçin' }, { status: 400 })
   }
-  if (!gunluk_frekans_sayisi || gunluk_frekans_sayisi < 1 || gunluk_frekans_sayisi > 24) {
-    return NextResponse.json({ error: 'Günlük frekans 1-24 arasında olmalı' }, { status: 400 })
+  if (frekans_tipi === 'gunluk') {
+    if (!gunluk_frekans_sayisi || gunluk_frekans_sayisi < 1 || gunluk_frekans_sayisi > 24) {
+      return NextResponse.json({ error: 'Günlük frekans 1-24 arasında olmalı' }, { status: 400 })
+    }
+  } else {
+    if (!haftalik_frekans_sayisi || haftalik_frekans_sayisi < 1 || haftalik_frekans_sayisi > 20) {
+      return NextResponse.json({ error: 'Haftalık frekans 1-20 arasında olmalı' }, { status: 400 })
+    }
   }
 
   // Lokasyonun firmaya ait olduğunu doğrula
@@ -88,7 +97,9 @@ export async function POST(req: NextRequest) {
       lokasyon_id,
       tanim: tanim.trim(),
       aktif_gunler,
-      gunluk_frekans_sayisi,
+      frekans_tipi,
+      gunluk_frekans_sayisi: frekans_tipi === 'gunluk' ? gunluk_frekans_sayisi : null,
+      haftalik_frekans_sayisi: frekans_tipi === 'haftalik' ? haftalik_frekans_sayisi : null,
       aktif_olma_saati: aktif_olma_saati ?? '08:00',
       baslangic_tarihi: baslangic_tarihi ?? new Date().toISOString().slice(0, 10),
       bitis_tarihi: bitis_tarihi ?? null,

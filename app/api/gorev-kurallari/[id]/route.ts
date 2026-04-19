@@ -35,13 +35,18 @@ export async function PATCH(
 
   // İzin verilen güncelleme alanları
   const allowed = [
-    'tanim', 'aktif_gunler', 'gunluk_frekans_sayisi', 'aktif_olma_saati',
+    'tanim', 'aktif_gunler', 'gunluk_frekans_sayisi', 'haftalik_frekans_sayisi',
+    'frekans_tipi', 'aktif_olma_saati',
     'baslangic_tarihi', 'bitis_tarihi', 'atanan_kullanici_id', 'aktif',
   ]
   const update: Record<string, any> = { guncelleme_tarihi: new Date().toISOString() }
   for (const k of allowed) {
     if (k in body) update[k] = body[k]
   }
+
+  // frekans_tipi geçişinde diğer frekans kolonunu null yap (CHECK constraint)
+  if (body.frekans_tipi === 'gunluk') update.haftalik_frekans_sayisi = null
+  if (body.frekans_tipi === 'haftalik') update.gunluk_frekans_sayisi = null
 
   const { data, error } = await admin
     .from('gorev_kurallari').update(update).eq('id', params.id).select().single()

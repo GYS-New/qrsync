@@ -35,7 +35,7 @@ function saatLabel(saat: number): string {
 }
 
 type AllKey = string
-type AllValues = Record<string, number | boolean>
+type AllValues = Record<string, number | boolean | null>
 
 const NUM_DEFAULTS: Record<string, number> = {
   gorev_suresi_hedef_orani: 10,
@@ -44,10 +44,13 @@ const NUM_DEFAULTS: Record<string, number> = {
   acik_bekleme_saat: 8, bekleme_gecmis_saat: 12, canli_akis_sure_saat: 8,
   arsiv_mesai_saat: 24, arsiv_musteri_saat: 24, arsiv_spesifik_saat: 48, arsiv_frekansiyel_saat: 24,
 }
+const NULLABLE_DEFAULTS: Record<string, null> = {
+  haftalik_acik_bekleme_saat: null, haftalik_bekleme_gecmis_saat: null,
+}
 const BOOL_DEFAULTS: Record<string, boolean> = {
   spesifik_ceklist_aktif: true, spesifik_personel_atama_aktif: true, frekansiyel_personel_atama_aktif: true,
 }
-const ALL_DEFAULTS: AllValues = { ...NUM_DEFAULTS, ...BOOL_DEFAULTS }
+const ALL_DEFAULTS: AllValues = { ...NUM_DEFAULTS, ...BOOL_DEFAULTS, ...NULLABLE_DEFAULTS }
 
 /** Üst lokasyon bazlı bildirim alıcıları bileşeni */
 function LokasyonBazliBildirimAlicilar({ firmaId, projeId, kullanicilar }: { firmaId: string; projeId?: string | null; kullanicilar: { id: string; isim_soyisim: string }[] }) {
@@ -172,7 +175,7 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
 
   useEffect(() => { fetchAyarlar() }, [fetchAyarlar])
 
-  const handleSave = async (key: AllKey, value: number | boolean) => {
+  const handleSave = async (key: AllKey, value: number | boolean | null) => {
     if (!currentFirmaId) return
     setSavingKey(key)
     try {
@@ -422,10 +425,13 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
 
       {/* Durum Geçiş Süreleri */}
       <div style={{ fontSize: 13, fontWeight: 700, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Durum Geçiş Süreleri</div>
-      <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 20px', marginBottom: 28 }}>
+      <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
         <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.6, marginBottom: 16 }}>
           Frekansiyel görevlerin otomatik durum geçiş süreleri. Görev aktif olduktan sonra belirtilen süreler sonunda durum otomatik değişir.
         </div>
+
+        {/* Günlük görevler */}
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.green, marginBottom: 10 }}>Günlük Görevler</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div style={{ background: T.grayLight, borderRadius: 8, padding: '14px 16px' }}>
             <label style={{ fontSize: 14, fontWeight: 700, color: T.text, display: 'block', marginBottom: 4 }}>Açık → Beklemede</label>
@@ -453,7 +459,63 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
           </div>
         </div>
         <div style={{ marginTop: 12, padding: '10px 14px', background: '#eff6ff', borderRadius: 8, fontSize: 12.5, color: '#1e40af', lineHeight: 1.6 }}>
-          <strong>Toplam ömür:</strong> Bir görev aktif olduktan sonra en fazla <strong>{(efektif.acik_bekleme_saat as number) + (efektif.bekleme_gecmis_saat as number)} saat</strong> ({saatLabel((efektif.acik_bekleme_saat as number) + (efektif.bekleme_gecmis_saat as number))}) içinde ZAMANI GEÇMİŞ durumuna geçer.
+          <strong>Toplam ömür (günlük):</strong> Bir görev aktif olduktan sonra en fazla <strong>{(efektif.acik_bekleme_saat as number) + (efektif.bekleme_gecmis_saat as number)} saat</strong> ({saatLabel((efektif.acik_bekleme_saat as number) + (efektif.bekleme_gecmis_saat as number))}) içinde ZAMANI GEÇMİŞ durumuna geçer.
+        </div>
+
+        {/* Haftalık görevler */}
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#8b5cf6', marginTop: 22, marginBottom: 10 }}>Haftalık Görevler</div>
+        <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.6, marginBottom: 12 }}>
+          Haftalık frekansla üretilen görevlerin durum geçiş süreleri. Boş bırakılırsa günlük görev süreleri kullanılır.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {(['haftalik_acik_bekleme_saat', 'haftalik_bekleme_gecmis_saat'] as const).map(key => {
+            const isAcik = key === 'haftalik_acik_bekleme_saat'
+            const val = efektif[key] as number | null
+            const fallback = (isAcik ? efektif.acik_bekleme_saat : efektif.bekleme_gecmis_saat) as number
+            return (
+              <div key={key} style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 8, padding: '14px 16px' }}>
+                <label style={{ fontSize: 14, fontWeight: 700, color: T.text, display: 'block', marginBottom: 4 }}>
+                  {isAcik ? 'Açık → Beklemede' : 'Beklemede → Zamanı Geçmiş'}
+                </label>
+                <div style={{ fontSize: 12, color: T.textSoft, marginBottom: 10 }}>
+                  {isAcik
+                    ? 'Haftalık görev aktif olduktan kaç saat sonra BEKLEMEDE olsun?'
+                    : 'BEKLEMEDE\'ye geçtikten kaç saat sonra ZAMANI GEÇMİŞ olsun?'}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="number" min={1} max={240}
+                    value={val ?? ''}
+                    placeholder={`${fallback} (günlük)`}
+                    onChange={e => {
+                      const s = e.target.value.trim()
+                      setEfektif(prev => ({ ...prev, [key]: s === '' ? null : Math.max(1, Math.min(240, Number(s))) }))
+                    }}
+                    style={{ ...inpStyle, width: 100 }} />
+                  <span style={{ fontSize: 14, color: T.textSoft, fontWeight: 600 }}>saat</span>
+                  <SaveBtn id={key} onClick={() => handleSave(key, val)} />
+                  {val != null && (
+                    <button
+                      type="button"
+                      onClick={() => { setEfektif(prev => ({ ...prev, [key]: null })); handleSave(key, null) }}
+                      style={{ fontSize: 12, padding: '4px 10px', background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer' }}
+                    >Temizle</button>
+                  )}
+                </div>
+                <div style={{ marginTop: 6, fontSize: 11.5, color: '#7c3aed', fontWeight: 600 }}>
+                  {val != null ? `Özel değer: ${val} saat` : `Günlük değer kullanılıyor (${fallback} saat)`}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ marginTop: 12, padding: '10px 14px', background: '#f5f3ff', borderRadius: 8, fontSize: 12.5, color: '#6d28d9', lineHeight: 1.6 }}>
+          <strong>Toplam ömür (haftalık):</strong> <strong>{
+            ((efektif.haftalik_acik_bekleme_saat ?? efektif.acik_bekleme_saat) as number) +
+            ((efektif.haftalik_bekleme_gecmis_saat ?? efektif.bekleme_gecmis_saat) as number)
+          } saat</strong> ({saatLabel(
+            ((efektif.haftalik_acik_bekleme_saat ?? efektif.acik_bekleme_saat) as number) +
+            ((efektif.haftalik_bekleme_gecmis_saat ?? efektif.bekleme_gecmis_saat) as number)
+          )}) içinde ZAMANI GEÇMİŞ durumuna geçer.
         </div>
       </div>
 

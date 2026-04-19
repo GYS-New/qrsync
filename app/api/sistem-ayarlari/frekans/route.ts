@@ -14,8 +14,13 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 })
 
   const body = await req.json()
-  // body: { updates: [{ id: string, gunluk_frekans_sayisi: number }] }
-  const updates: { id: string; gunluk_frekans_sayisi: number }[] = body.updates
+  // body: { updates: [{ id: string, gunluk_frekans_sayisi?: number, haftalik_frekans_sayisi?: number }], tip?: 'gunluk'|'haftalik' }
+  const tip: 'gunluk' | 'haftalik' = body.tip === 'haftalik' ? 'haftalik' : 'gunluk'
+  const kolon = tip === 'haftalik' ? 'haftalik_frekans_sayisi' : 'gunluk_frekans_sayisi'
+  const maxVal = tip === 'haftalik' ? 20 : 99
+  const minVal = tip === 'haftalik' ? 0 : 1 // haftalıkta 0 = "henüz atanmadı/iptal" kabulü
+
+  const updates: { id: string; [k: string]: any }[] = body.updates
   if (!Array.isArray(updates) || updates.length === 0)
     return NextResponse.json({ error: 'Güncellenecek lokasyon yok' }, { status: 400 })
 
@@ -23,11 +28,17 @@ export async function PATCH(req: NextRequest) {
   let updated = 0
 
   for (const u of updates) {
-    const val = Number(u.gunluk_frekans_sayisi)
-    if (isNaN(val) || val < 1 || val > 99) continue
-    const { error } = await admin.from('lokasyonlar').update({ gunluk_frekans_sayisi: val }).eq('id', u.id)
+    const raw = u[kolon]
+    if (raw === null && tip === 'haftalik') {
+      const { error } = await admin.from('lokasyonlar').update({ [kolon]: null }).eq('id', u.id)
+      if (!error) updated++
+      continue
+    }
+    const val = Number(raw)
+    if (isNaN(val) || val < minVal || val > maxVal) continue
+    const { error } = await admin.from('lokasyonlar').update({ [kolon]: val }).eq('id', u.id)
     if (!error) updated++
   }
 
-  return NextResponse.json({ ok: true, updated })
+  return NextResponse.json({ ok: true, updated, tip })
 }

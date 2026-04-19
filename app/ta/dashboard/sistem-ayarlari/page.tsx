@@ -44,7 +44,7 @@ export default async function TASistemAyarlariPage() {
   const admin = createAdminClient()
   const [{ data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
     supabase.from('lokasyonlar')
-      .select('id, tanim, parent_id, aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika, gunluk_frekans_sayisi')
+      .select('id, tanim, parent_id, aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika, gunluk_frekans_sayisi, haftalik_frekans_sayisi')
       .eq('firma_id', firmaId).eq('proje_id', aktifProje.id).order('tanim', { ascending: true }),
     supabase.from('users')
       .select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true)

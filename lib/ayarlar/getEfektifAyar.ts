@@ -13,6 +13,10 @@ const DEFAULTS = {
   ardisik_baslatma_suresi_dk: 0,
   personel_takip_bildirim_dk: 0,
   canli_akis_sure_saat: 8,
+  acik_bekleme_saat: 8,
+  bekleme_gecmis_saat: 12,
+  haftalik_acik_bekleme_saat: null as number | null,
+  haftalik_bekleme_gecmis_saat: null as number | null,
 }
 
 const SEL = Object.keys(DEFAULTS).join(',')

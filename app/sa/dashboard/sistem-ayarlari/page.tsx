@@ -37,7 +37,7 @@ export default async function SASistemAyarlariPage() {
   if (firmaId) {
     let q = supabase
       .from('lokasyonlar')
-      .select('id, tanim, parent_id, aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika, gunluk_frekans_sayisi')
+      .select('id, tanim, parent_id, aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika, gunluk_frekans_sayisi, haftalik_frekans_sayisi')
       .eq('firma_id', firmaId)
       .order('tanim', { ascending: true })
     if (projeId) q = (q as any).eq('proje_id', projeId)

@@ -17,7 +17,7 @@ type Props = {
   firmaId: string | null
   meId: string
   initialKuralar: any[]
-  lokasyonlar: { id: string; tanim: string; parent_id?: string | null; gunluk_frekans_sayisi?: number | null }[]
+  lokasyonlar: { id: string; tanim: string; parent_id?: string | null; gunluk_frekans_sayisi?: number | null; haftalik_frekans_sayisi?: number | null }[]
   kullanicilar: { id: string; isim_soyisim: string }[]
   readonly: boolean
   embedded?: boolean
@@ -27,7 +27,10 @@ type Props = {
 
 const BOSH_FORM = {
   tanim: '', lokasyon_id: '', lokasyon_idler: [] as string[], atanan_kullanici_id: '',
-  gunluk_frekans_sayisi: 1, aktif_gunler: IS_GUNLERI,
+  frekans_tipi: 'gunluk' as 'gunluk' | 'haftalik',
+  gunluk_frekans_sayisi: 1,
+  haftalik_frekans_sayisi: 1,
+  aktif_gunler: IS_GUNLERI,
   aktif_olma_saati: '08:00',
   baslangic_tarihi: new Date().toISOString().slice(0, 10),
   bitis_tarihi: '',
@@ -127,11 +130,18 @@ export default function GorevKurallariClient({
     const hasChildren = lokasyonlar.some(l => l.parent_id === id)
     const seciliLok = lokasyonlar.find(l => l.id === id)
     const lokFrekans = seciliLok?.gunluk_frekans_sayisi ?? 1
+    const lokHaftalik = seciliLok?.haftalik_frekans_sayisi ?? 1
     // Toplu seçim modunda (create) alt lokasyonları checkbox ile seçilecek
     if (modal === 'create' && hasChildren) {
-      setForm(p => ({ ...p, lokasyon_id: '', lokasyon_idler: [], gunluk_frekans_sayisi: p.gunluk_frekans_sayisi }))
+      setForm(p => ({ ...p, lokasyon_id: '', lokasyon_idler: [] }))
     } else {
-      setForm(p => ({ ...p, lokasyon_id: hasChildren ? '' : id, lokasyon_idler: [], gunluk_frekans_sayisi: hasChildren ? p.gunluk_frekans_sayisi : lokFrekans }))
+      setForm(p => ({
+        ...p,
+        lokasyon_id: hasChildren ? '' : id,
+        lokasyon_idler: [],
+        gunluk_frekans_sayisi: hasChildren ? p.gunluk_frekans_sayisi : lokFrekans,
+        haftalik_frekans_sayisi: hasChildren ? p.haftalik_frekans_sayisi : (lokHaftalik > 0 ? lokHaftalik : 1),
+      }))
     }
   }
 
@@ -212,7 +222,9 @@ export default function GorevKurallariClient({
     setForm({
       tanim: k.tanim ?? '', lokasyon_id: k.lokasyon_id ?? '', lokasyon_idler: [],
       atanan_kullanici_id: k.atanan_kullanici_id ?? '',
+      frekans_tipi: k.frekans_tipi === 'haftalik' ? 'haftalik' : 'gunluk',
       gunluk_frekans_sayisi: k.gunluk_frekans_sayisi ?? 1,
+      haftalik_frekans_sayisi: k.haftalik_frekans_sayisi ?? 1,
       aktif_gunler: k.aktif_gunler ?? IS_GUNLERI,
       aktif_olma_saati: k.aktif_olma_saati?.slice(0, 5) ?? '08:00',
       baslangic_tarihi: k.baslangic_tarihi ?? new Date().toISOString().slice(0, 10),
@@ -246,13 +258,18 @@ export default function GorevKurallariClient({
       if (modal === 'create') {
         const yeniKurallar: any[] = []
         for (const lokId of lokIdler) {
-          // Her lokasyonun kendi günlük frekans sayısını kullan
+          // Her lokasyonun kendi frekans sayısını kullan (tipe göre)
           const lok = lokasyonlar.find(l => l.id === lokId)
-          const lokFrekans = (lok as any)?.gunluk_frekans_sayisi ?? 1
-          const body = {
+          const isHaftalik = form.frekans_tipi === 'haftalik'
+          const lokGunluk = (lok as any)?.gunluk_frekans_sayisi ?? 1
+          const lokHaftalik = (lok as any)?.haftalik_frekans_sayisi ?? form.haftalik_frekans_sayisi
+          const effHaftalik = lokHaftalik && lokHaftalik > 0 ? lokHaftalik : form.haftalik_frekans_sayisi
+          const body: any = {
             firma_id: firmaId, tanim: form.tanim.trim(), lokasyon_id: lokId,
             atanan_kullanici_id: form.atanan_kullanici_id || null,
-            gunluk_frekans_sayisi: lokFrekans,
+            frekans_tipi: form.frekans_tipi,
+            gunluk_frekans_sayisi: isHaftalik ? null : lokGunluk,
+            haftalik_frekans_sayisi: isHaftalik ? effHaftalik : null,
             aktif_gunler: form.aktif_gunler, aktif_olma_saati: form.aktif_olma_saati,
             baslangic_tarihi: form.baslangic_tarihi, bitis_tarihi: form.bitis_tarihi || null,
             ...(projeId ? { proje_id: projeId } : {}),
@@ -265,10 +282,13 @@ export default function GorevKurallariClient({
         setKuralar(p => [...yeniKurallar, ...p])
         toast({ type: 'success', title: 'Başarılı', message: `${yeniKurallar.length} lokasyon için kural oluşturuldu` })
       } else if (modal === 'edit' && editId) {
-        const body = {
+        const isHaftalik = form.frekans_tipi === 'haftalik'
+        const body: any = {
           firma_id: firmaId, tanim: form.tanim.trim(), lokasyon_id: lokIdler[0],
           atanan_kullanici_id: form.atanan_kullanici_id || null,
-          gunluk_frekans_sayisi: form.gunluk_frekans_sayisi,
+          frekans_tipi: form.frekans_tipi,
+          gunluk_frekans_sayisi: isHaftalik ? null : form.gunluk_frekans_sayisi,
+          haftalik_frekans_sayisi: isHaftalik ? form.haftalik_frekans_sayisi : null,
           aktif_gunler: form.aktif_gunler, aktif_olma_saati: form.aktif_olma_saati,
           baslangic_tarihi: form.baslangic_tarihi, bitis_tarihi: form.bitis_tarihi || null,
           ...(projeId ? { proje_id: projeId } : {}),
@@ -517,7 +537,11 @@ export default function GorevKurallariClient({
                   <span style={{ fontSize: 10, color: '#92400e', marginLeft: 6 }}>⏸</span>
                 )}
               </span>
-              <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{k.gunluk_frekans_sayisi}× {k.aktif_olma_saati?.slice(0, 5) ?? ''}</span>
+              {k.frekans_tipi === 'haftalik' ? (
+                <span style={{ fontSize: 11.5, color: '#7c3aed', whiteSpace: 'nowrap', fontWeight: 700, background: '#faf5ff', padding: '1px 7px', borderRadius: 4, border: '1px solid #e9d5ff' }}>H:{k.haftalik_frekans_sayisi}× {k.aktif_olma_saati?.slice(0, 5) ?? ''}</span>
+              ) : (
+                <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{k.gunluk_frekans_sayisi}× {k.aktif_olma_saati?.slice(0, 5) ?? ''}</span>
+              )}
               <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{gunEtiket(k.aktif_gunler ?? [])}</span>
               {o && <span style={{ fontSize: 10, background: '#e8f0ff', color: '#0f4c81', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>{o.uretilen}↑ {o.tamamlandi}✓</span>}
               {!readonly && (
@@ -669,7 +693,8 @@ export default function GorevKurallariClient({
           <span>Toplam <strong>{kuralar.length}</strong> kural</span>
           <span>Aktif <strong style={{ color: '#374151' }}>{kuralar.filter(k => k.aktif).length}</strong></span>
           <span>Pasif <strong style={{ color: '#9ca3af' }}>{kuralar.filter(k => !k.aktif).length}</strong></span>
-          <span>Günlük üretim kapasitesi: <strong style={{ color: '#374151' }}>{kuralar.filter(k => k.aktif).reduce((s, k) => s + (k.gunluk_frekans_sayisi ?? 0), 0)} görev/gün</strong></span>
+          <span>Günlük üretim kapasitesi: <strong style={{ color: '#374151' }}>{kuralar.filter(k => k.aktif && (k.frekans_tipi ?? 'gunluk') === 'gunluk').reduce((s, k) => s + (k.gunluk_frekans_sayisi ?? 0), 0)} görev/gün</strong></span>
+          <span>Haftalık üretim kapasitesi: <strong style={{ color: '#7c3aed' }}>{kuralar.filter(k => k.aktif && k.frekans_tipi === 'haftalik').reduce((s, k) => s + (k.haftalik_frekans_sayisi ?? 0), 0)} görev/hafta</strong></span>
         </div>
       )}
 
@@ -869,7 +894,49 @@ export default function GorevKurallariClient({
                 )}
               </div>
               <div>
-                <label style={lbl}>Aktif Günler *</label>
+                <label style={lbl}>Frekans Tipi *</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['gunluk', 'haftalik'] as const).map(t => {
+                    const sec = form.frekans_tipi === t
+                    const renk = t === 'haftalik' ? '#7c3aed' : '#059669'
+                    return (
+                      <button key={t} type="button" onClick={() => setForm(p => ({ ...p, frekans_tipi: t }))}
+                        style={{
+                          flex: 1, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                          fontSize: 13, fontWeight: 700,
+                          border: sec ? `2px solid ${renk}` : '1.5px solid #e5e7eb',
+                          background: sec ? (t === 'haftalik' ? '#faf5ff' : '#ecfdf5') : '#fff',
+                          color: sec ? renk : '#4b5563',
+                        }}>
+                        {t === 'gunluk' ? '📅 Günlük' : '🗓️ Haftalık'}
+                        <div style={{ fontSize: 11, fontWeight: 400, marginTop: 3, color: sec ? renk : '#6b7280' }}>
+                          {t === 'gunluk' ? 'Her gün üret' : 'Haftada X kez üret'}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {form.frekans_tipi === 'haftalik' && (
+                <div>
+                  <label style={lbl}>Haftalık Frekans Sayısı *</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button type="button" style={stepBtn} onClick={() => setForm(p => ({ ...p, haftalik_frekans_sayisi: Math.max(1, p.haftalik_frekans_sayisi - 1) }))}>−</button>
+                    <input type="number" className="verde-input" min={1} max={20} style={{ width: 80, textAlign: 'center' }}
+                      value={form.haftalik_frekans_sayisi}
+                      onChange={e => setForm(p => ({ ...p, haftalik_frekans_sayisi: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))} />
+                    <button type="button" style={stepBtn} onClick={() => setForm(p => ({ ...p, haftalik_frekans_sayisi: Math.min(20, p.haftalik_frekans_sayisi + 1) }))}>+</button>
+                    <span style={{ fontSize: 12.5, color: '#6b7280' }}>kez / hafta (Pzt–Paz)</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                    Hafta başı Pazartesi 00:00'dır. Aşağıda seçilen izinli günlerden sırayla üretilir, hedef dolunca durur.
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label style={lbl}>{form.frekans_tipi === 'haftalik' ? 'İzin Verilen Günler *' : 'Aktif Günler *'}</label>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
                   {GUN_TAM.map((label, i) => {
                     const sec = form.aktif_gunler.includes(i)
@@ -909,8 +976,17 @@ export default function GorevKurallariClient({
               </div>
               )}
               {form.lokasyon_id && form.aktif_gunler.length > 0 && (
-                <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#2a4a2a' }}>
-                  <strong>Özet:</strong> {gunEtiket(form.aktif_gunler)}, saat {form.aktif_olma_saati}'de, günde <strong>{form.gunluk_frekans_sayisi}×</strong> "{form.tanim || '…'}" görevi üretilir.
+                <div style={{ background: form.frekans_tipi === 'haftalik' ? '#faf5ff' : '#f9fafb', border: `1px solid ${form.frekans_tipi === 'haftalik' ? '#e9d5ff' : '#e5e7eb'}`, borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#2a4a2a' }}>
+                  <strong>Özet:</strong>{' '}
+                  {form.frekans_tipi === 'haftalik' ? (
+                    <>
+                      {gunEtiket(form.aktif_gunler)} içinde saat {form.aktif_olma_saati}'de, <strong>haftada {form.haftalik_frekans_sayisi}×</strong> "{form.tanim || '…'}" görevi üretilir (hedefe ulaşınca durur).
+                    </>
+                  ) : (
+                    <>
+                      {gunEtiket(form.aktif_gunler)}, saat {form.aktif_olma_saati}'de, günde <strong>{form.gunluk_frekans_sayisi}×</strong> "{form.tanim || '…'}" görevi üretilir.
+                    </>
+                  )}
                   {form.bitis_tarihi ? ` ${form.baslangic_tarihi} – ${form.bitis_tarihi}.` : ` ${form.baslangic_tarihi} tarihinden süresiz.`}
                 </div>
               )}

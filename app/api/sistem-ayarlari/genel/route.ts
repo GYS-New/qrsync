@@ -3,9 +3,9 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-const SEL = 'gorev_suresi_hedef_orani,arsiv_mesai_saat,arsiv_musteri_saat,arsiv_spesifik_saat,arsiv_frekansiyel_saat,spesifik_ceklist_aktif,spesifik_personel_atama_aktif,frekansiyel_personel_atama_aktif,ardisik_baslatma_suresi_dk,personel_takip_bildirim_dk,personel_takip_bildirim_alicilar,acik_bekleme_saat,bekleme_gecmis_saat,canli_akis_sure_saat'
+const SEL = 'gorev_suresi_hedef_orani,arsiv_mesai_saat,arsiv_musteri_saat,arsiv_spesifik_saat,arsiv_frekansiyel_saat,spesifik_ceklist_aktif,spesifik_personel_atama_aktif,frekansiyel_personel_atama_aktif,ardisik_baslatma_suresi_dk,personel_takip_bildirim_dk,personel_takip_bildirim_alicilar,acik_bekleme_saat,bekleme_gecmis_saat,canli_akis_sure_saat,haftalik_acik_bekleme_saat,haftalik_bekleme_gecmis_saat'
 
-const DEFAULTS: Record<string, number | boolean> = {
+const DEFAULTS: Record<string, number | boolean | null> = {
   gorev_suresi_hedef_orani: 10,
   arsiv_mesai_saat: 24, arsiv_musteri_saat: 24, arsiv_spesifik_saat: 48, arsiv_frekansiyel_saat: 24,
   spesifik_ceklist_aktif: true, spesifik_personel_atama_aktif: true, frekansiyel_personel_atama_aktif: true,
@@ -13,6 +13,7 @@ const DEFAULTS: Record<string, number | boolean> = {
   personel_takip_bildirim_dk: 0,
   acik_bekleme_saat: 8, bekleme_gecmis_saat: 12,
   canli_akis_sure_saat: 8,
+  haftalik_acik_bekleme_saat: null, haftalik_bekleme_gecmis_saat: null,
 }
 
 const NUM_FIELDS: [string, number, number][] = [
@@ -23,11 +24,12 @@ const NUM_FIELDS: [string, number, number][] = [
   ['personel_takip_bildirim_dk', 0, 1440],
   ['acik_bekleme_saat', 1, 48], ['bekleme_gecmis_saat', 1, 48],
   ['canli_akis_sure_saat', 1, 24],
+  ['haftalik_acik_bekleme_saat', 1, 240], ['haftalik_bekleme_gecmis_saat', 1, 240],
 ]
 const BOOL_FIELDS = ['spesifik_ceklist_aktif', 'spesifik_personel_atama_aktif', 'frekansiyel_personel_atama_aktif']
 
-function buildAyar(row: any): Record<string, number | boolean> {
-  const r: Record<string, number | boolean> = {}
+function buildAyar(row: any): Record<string, number | boolean | null> {
+  const r: Record<string, number | boolean | null> = {}
   for (const [k, def] of Object.entries(DEFAULTS)) r[k] = row?.[k] ?? def
   return r
 }
@@ -66,7 +68,7 @@ export async function GET(req: NextRequest) {
   const efektif = { ...firmaAyar }
   if (projeAyar) {
     for (const k of Object.keys(efektif)) {
-      if (projeAyar[k] != null) efektif[k] = projeAyar[k] as number | boolean
+      if (projeAyar[k] != null) efektif[k] = projeAyar[k] as number | boolean | null
     }
   }
 
@@ -93,10 +95,13 @@ export async function PATCH(req: NextRequest) {
 
   const update: Record<string, any> = {}
 
+  // Haftalık alanlar firma seviyesinde de null olabilir (null = günlük değere fallback)
+  const NULLABLE_ON_FIRMA = new Set(['haftalik_acik_bekleme_saat', 'haftalik_bekleme_gecmis_saat'])
+
   // Sayısal alanlar
   for (const [key, min, max] of NUM_FIELDS) {
     if (body[key] !== undefined) {
-      if (hedef === 'proje' && body[key] === null) { update[key] = null; continue }
+      if (body[key] === null && (hedef === 'proje' || NULLABLE_ON_FIRMA.has(key))) { update[key] = null; continue }
       const v = Number(body[key])
       if (isNaN(v) || v < min || v > max) return NextResponse.json({ error: `${key}: ${min}-${max} arasında olmalıdır` }, { status: 400 })
       update[key] = v
