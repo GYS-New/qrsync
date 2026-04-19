@@ -786,15 +786,36 @@ async function executeTool(
         if (!tanim) return 'Görev tanımı boş olamaz. Lütfen görev adını belirtin.'
         if (!lokasyonAdi) return 'Lokasyon belirtmelisiniz.'
 
-        // 3) Lokasyon çözümle (firma + proje scope)
-        let lokQ = supabase.from('lokasyonlar').select('id,tanim').ilike('tanim', `%${lokasyonAdi}%`).eq('firma_id', ctx.firmaId).eq('aktif', true).limit(5)
+        // 3) Lokasyon çözümle (firma + proje scope) — ilk olarak tam substring
+        let lokQ = supabase.from('lokasyonlar').select('id,tanim').ilike('tanim', `%${lokasyonAdi}%`).eq('firma_id', ctx.firmaId).eq('aktif', true).limit(10)
         if (projeId) lokQ = lokQ.eq('proje_id', projeId)
-        const { data: loks } = await lokQ
-        if (!loks?.length) return `"${lokasyonAdi}" ile eşleşen lokasyon bulunamadı. Farklı bir isim deneyin.`
+        let { data: loks } = await lokQ
+        // Eşleşme yoksa: kelime bazlı arama (tüm kelimelerin tanim'da geçmesi)
+        if (!loks?.length) {
+          const kelimeler = lokasyonAdi.split(/\s+/).filter(k => k.length > 1)
+          if (kelimeler.length >= 2) {
+            let kQ = supabase.from('lokasyonlar').select('id,tanim').eq('firma_id', ctx.firmaId).eq('aktif', true).limit(30)
+            if (projeId) kQ = kQ.eq('proje_id', projeId)
+            for (const k of kelimeler) kQ = kQ.ilike('tanim', `%${k}%`)
+            const { data: kData } = await kQ
+            loks = kData
+          }
+        }
+        if (!loks?.length) {
+          // Alternatif liste ver (ilk kelimeyle)
+          const ilk = lokasyonAdi.split(/\s+/)[0]
+          let altQ = supabase.from('lokasyonlar').select('id,tanim').ilike('tanim', `%${ilk}%`).eq('firma_id', ctx.firmaId).eq('aktif', true).limit(10)
+          if (projeId) altQ = altQ.eq('proje_id', projeId)
+          const { data: altData } = await altQ
+          if (altData?.length) {
+            return `"${lokasyonAdi}" ile tam eşleşen lokasyon bulunamadı. Benzer lokasyonlar:\n${altData.map((l: any) => `• ${l.tanim}`).join('\n')}\nLütfen tam lokasyon adını seçip belirtin.`
+          }
+          return `"${lokasyonAdi}" ile eşleşen lokasyon bulunamadı. Farklı bir isim deneyin veya önce "lokasyonları listele" dedirterek mevcut listeyi görün.`
+        }
         if (loks.length > 1) {
           const exact = loks.find((l: any) => l.tanim.toLowerCase() === lokasyonAdi.toLowerCase())
           if (!exact) {
-            return `Birden fazla lokasyon eşleşti: ${loks.map((l: any) => l.tanim).join(', ')}. Tam adı belirtir misiniz?`
+            return `Birden fazla lokasyon eşleşti:\n${loks.map((l: any) => `• ${l.tanim}`).join('\n')}\nTam adı belirtir misiniz?`
           }
         }
         const lokasyon = loks.find((l: any) => l.tanim.toLowerCase() === lokasyonAdi.toLowerCase()) ?? loks[0]
@@ -1156,16 +1177,28 @@ Veri sorgularında:
 - **Uygulama:** app.iogys.com.tr
 - **Konum:** Türkiye
 
-## YAZMA İŞLEMLERİ (ÇOK ÖNEMLİ)
+## YAZMA İŞLEMLERİ — ÇOK ÖNEMLİ KURALLAR
 Kullanıcı bir şey "ekle / oluştur / yarat" dediğinde:
-1. Hangi tip olduğunu netleştir (şu an sadece SPESİFİK GÖREV destekleniyor). Frekansiyel görev, kullanıcı, lokasyon vs. ekleme şu an desteklenmiyor — bunları sorarsa "Şu an bu tür kayıt İO üzerinden eklenemez, panel'den yapabilirsiniz" de.
-2. Eksik parametreleri TEK TEK sor, hepsini aynı anda istemez:
+
+1. **Hangi tip olduğunu netleştir.** Şu an sadece SPESİFİK GÖREV destekleniyor. Frekansiyel görev, kullanıcı, lokasyon vs. ekleme desteklenmiyor — bunları isterse "Şu an bu tür kayıt İO üzerinden eklenemez, panel'den yapabilirsiniz" de.
+
+2. **Eksik parametreleri TEK TEK sor**, hepsini aynı anda isteme:
    - Zorunlu: tanim, lokasyon_adi
    - Opsiyonel: atanan_isim, aciklama
-3. Tüm zorunlu bilgiler toplandıktan sonra tool'u **onayla=false** ile çağır — tool özet + onay sorusu döndürür.
-4. Kullanıcı "evet / onaylıyorum / kaydet" deyince tool'u **onayla=true** ile çağır.
-5. Yetki yoksa tool otomatik reddeder, sen de "Bu işlemi yapmak için yetkiniz yok" mesajını KULLANICIYA AYNEN GÖSTER, tekrar denemeye çalışma.
-6. ASLA otomatik onayla=true ile çağırma. Kullanıcının açık onayı şart.
+
+3. **ÖZETİ ASLA KENDİN YAZMA.** Tüm zorunlu bilgiler toplanınca mutlaka gorev_olustur tool'unu **onayla=false** ile çağır. Tool'un döndürdüğü özet + onay sorusunu kullanıcıya AYNEN göster.
+   - Tool eğer "lokasyon bulunamadı" / "kullanıcı bulunamadı" / "yetkiniz yok" gibi hata dönerse, bu mesajı AYNEN göster, ÖZET ÜRETME. Kullanıcıdan düzeltme iste.
+   - Kullanıcının söylediği lokasyon/kullanıcı isimleri kendin uyduramazsın. Tool çağır, DB'den çözülsün.
+
+4. Kullanıcı "evet / onaylıyorum / kaydet" deyince tool'u **onayla=true** ile çağır. Tool'un başarı/hata mesajını göster.
+
+5. **Yetki yoksa** tool otomatik reddeder, mesajı KULLANICIYA AYNEN GÖSTER, tekrar denemeye çalışma.
+
+6. **ASLA otomatik onayla=true ile çağırma.** Kullanıcının açık onayı şart.
+
+7. Kullanıcı "lokasyonları listele" / "kullanıcıları göster" derse, yazma akışını duraklatıp ilgili listeleme tool'unu çağır (lokasyon_bilgisi, personel_listesi). Sonra kullanıcı lokasyon seçtiğinde yazma akışına devam et.
+
+8. Bir lokasyon eşleşmediğinde kullanıcıya mevcut lokasyonları göstermek için lokasyon_bilgisi tool'unu çağır.
 
 ## YÖNETİCİ İLETİŞİMİ (DB sorgulu — yonetici_iletisim tool'u kullan)
 Kullanıcı şu tip sorular sorduğunda yonetici_iletisim tool'unu çağır, UYDURMA:
