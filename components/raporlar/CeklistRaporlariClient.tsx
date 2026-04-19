@@ -893,7 +893,7 @@ export default function CeklistRaporlariClient({
 
         {/* Tablo */}
         <div ref={tableWrapRef} className="verde-table-wrap" style={{ overflowX: 'auto' }}>
-          <table className="verde-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: 1100 }}>
+          <table className="verde-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: 1200 }}>
             <colgroup>
               <col style={{ width: 130 }} />   {/* Kayıt Tarihi */}
               <col style={{ width: 'auto' }} /> {/* Görev */}
@@ -901,11 +901,11 @@ export default function CeklistRaporlariClient({
               <col style={{ width: 140 }} />   {/* Şablon */}
               <col style={{ width: 100 }} />   {/* Durum */}
               <col style={{ width: 80 }} />    {/* Kanal */}
-              <col style={{ width: 120 }} />   {/* Kullanıcı */}
+              <col style={{ width: 140 }} />   {/* Kullanıcı */}
               <col style={{ width: 100 }} />   {/* Tarih */}
               <col style={{ width: 110 }} />   {/* Doldurma */}
               {filtreMod && <col style={{ width: 80 }} />}  {/* Segment */}
-              <col style={{ width: 100 }} />   {/* İşlemler */}
+              <col style={{ width: 130 }} />   {/* İşlemler */}
             </colgroup>
             <thead>
               <tr>
@@ -995,7 +995,8 @@ export default function CeklistRaporlariClient({
                           </span>
                         </td>
                       )}
-                      <td style={{ textAlign: 'center', display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
                         {/* Görüntüle — her zaman görünür */}
                         <button
                           onClick={() => setModalGorev({
@@ -1050,6 +1051,7 @@ export default function CeklistRaporlariClient({
                             {deletingId === r.id ? '⏳' : '✕'}
                           </button>
                         )}
+                        </div>
                       </td>
                     </tr>
                   )
