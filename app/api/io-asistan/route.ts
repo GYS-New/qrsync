@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getSistemKonfig } from '@/lib/config/getSistemKonfig'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
+import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 
 // Rate limiter
 const rateLimitMap = new Map<string, number[]>()
@@ -393,18 +394,26 @@ async function executeTool(
         const arama = input.arama as string | undefined
         let q = supabase
           .from('lokasyonlar')
-          .select('id,tanim,aktif,ust_lokasyon_id')
+          .select('id,tanim,aktif,parent_id')
           .eq('aktif', true)
           .order('tanim')
           .limit(30)
         if (ctx.firmaId) q = q.eq('firma_id', ctx.firmaId)
         if (projeId) q = q.eq('proje_id', projeId)
         if (arama) q = q.ilike('tanim', `%${arama}%`)
+        // U/M için kullanici_lokasyon_yetkileri tablosundan yetkili lokasyon id'lerini al
+        if (!ctx.isSA && ctx.firmaId) {
+          const yetkiliIds = await getYetkiliLokasyonIds(supabase, ctx.firmaId, ctx.projeId)
+          if (yetkiliIds !== null) {
+            if (yetkiliIds.length === 0) return `Size atanmış lokasyon bulunamadı${projeLabel}.`
+            q = q.in('id', yetkiliIds)
+          }
+        }
         const { data, error } = await q
         if (error) return `Hata: ${error.message}`
         if (!data?.length) return arama ? `"${arama}" ile eşleşen lokasyon bulunamadı${projeLabel}.` : `Kayıtlı lokasyon yok${projeLabel}.`
         return `Lokasyonlar${projeLabel} (${data.length}):\n` +
-          data.map((r: Record<string, unknown>) => `• ${r.tanim}${r.ust_lokasyon_id ? ' (alt lokasyon)' : ''}`).join('\n')
+          data.map((r: Record<string, unknown>) => `• ${r.tanim}${r.parent_id ? ' (alt lokasyon)' : ''}`).join('\n')
       }
 
       case 'checklist_ozeti': {
@@ -970,7 +979,7 @@ Kullanıcılara yönlendirme yaparken bu menü isimlerini AYNEN kullan:
 Aşağıdaki tablolar sorgulanabilir. Kolon adlarını AYNEN kullan:
 
 ### Kullanıcılar & Firmalar
-- **users**: id, isim_soyisim, email, telefon, rol, firma_id, proje_id, aktif, profil_foto, last_seen_at, is_online, ust_lokasyon_id, cinsiyet, kayit_tarihi
+- **users**: id, isim_soyisim, email, telefon, rol, firma_id, proje_id, aktif, profil_foto, last_seen_at, is_online, parent_id, cinsiyet, kayit_tarihi
 - **firmalar**: id, firma_adi, ticari_unvan, vergi_no, yetkili_isim, yetkili_tel, aktif, logo_url, personel_takibi_aktif, qr_sistemi_aktif, nfc_sistemi_aktif, kayit_tarihi
 - **projeler**: id, firma_id, ad, aciklama, aktif, personel_takibi_aktif, sureli_gorev_aktif, kayit_tarihi
 
@@ -981,7 +990,7 @@ Aşağıdaki tablolar sorgulanabilir. Kolon adlarını AYNEN kullan:
 
 ### Lokasyonlar
 - **lokasyonlar**: id, firma_id, proje_id, parent_id, tanim, aktif, qr_veri, nfc_token, checklist_sablon_id, sureli_gorev_aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika, gunluk_frekans_sayisi
-- **lokasyon_gruplari**: id, firma_id, proje_id, ad, aktif, ust_lokasyon_id
+- **lokasyon_gruplari**: id, firma_id, proje_id, ad, aktif, parent_id
 - **lokasyon_grup_uyeleri**: id, grup_id, lokasyon_id
 
 ### Çeklist
