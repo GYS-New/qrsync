@@ -161,55 +161,40 @@ export async function POST(req: NextRequest) {
             const batch = gorevler.slice(i, i + BATCH)
             const batchIds = batch.map(g => g.id)
 
-            // Çeklist sonuçlarını arşivle (her adımda error kontrolü — başarısızsa DELETE etme)
-            try {
-              const { data: basliklar, error: bErr } = await admin.from('checklist_sonuc_basliklari').select('*').in('canli_gorev_id', batchIds)
-              if (bErr) throw new Error('basliklar select: ' + bErr.message)
-              if (basliklar?.length) {
-                const bIds = basliklar.map(b => b.id)
-                const { data: maddeler, error: mErr } = await admin.from('checklist_sonuc_maddeleri').select('*').in('sonuc_id', bIds)
-                if (mErr) throw new Error('maddeler select: ' + mErr.message)
-                if (maddeler?.length) {
-                  const { error: mUpsertErr } = await admin.from('checklist_sonuc_maddeleri_arsiv').upsert(maddeler, { onConflict: 'id', ignoreDuplicates: true })
-                  if (mUpsertErr) throw new Error('maddeler arsiv upsert: ' + mUpsertErr.message)
-                  const { error: mDelErr } = await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', bIds)
-                  if (mDelErr) throw new Error('maddeler delete: ' + mDelErr.message)
-                }
-                const gorevFirmaMap: Record<string, string> = {}
-                for (const g of batch) gorevFirmaMap[g.id] = g.firma_id
-                const arsivBasliklar = basliklar.map(b => ({
-                  ...b,
-                  arsiv_tarihi: new Date().toISOString(),
-                  firma_id: gorevFirmaMap[b.canli_gorev_id] ?? null,
-                }))
-                const { error: bUpsertErr } = await admin.from('checklist_sonuc_basliklari_arsiv').upsert(arsivBasliklar, { onConflict: 'id', ignoreDuplicates: true })
-                if (bUpsertErr) throw new Error('basliklar arsiv upsert: ' + bUpsertErr.message)
-                const { error: bDelErr } = await admin.from('checklist_sonuc_basliklari').delete().in('id', bIds)
-                if (bDelErr) throw new Error('basliklar delete: ' + bDelErr.message)
-                ceklistToplam += basliklar.length
-              }
-            } catch (e: any) { r.ceklist_err = e.message }
-
-            // Görevleri arşivle — önce upsert, başarılı olursa DELETE et
-            const arsivRows = batch.map(g => ({ ...g, arsiv_tarihi: new Date().toISOString(), arsiv_nedeni: 'cron_saat' }))
-            const { error: upsertErr } = await admin.from('canli_gorevler_arsiv').upsert(arsivRows, { onConflict: 'id', ignoreDuplicates: true })
-            if (upsertErr) {
-              r.frekansiyel_err = (r.frekansiyel_err ? r.frekansiyel_err + '; ' : '') + 'upsert: ' + upsertErr.message
-              console.error('[arsivle] canli_gorevler_arsiv upsert başarısız, DELETE atlandı:', upsertErr.message, 'batch:', batchIds.length)
-              continue  // Bu batch'i atla, DELETE'e geçme
-            }
-            // Arşive başarıyla yazıldığını doğrula — arşivdeki kayıt sayısını kontrol et
-            const { count: arsivCount, error: cErr } = await admin
-              .from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true }).in('id', batchIds)
-            if (cErr || (arsivCount ?? 0) < batchIds.length) {
-              r.frekansiyel_err = (r.frekansiyel_err ? r.frekansiyel_err + '; ' : '') + `doğrulama: arsivde ${arsivCount ?? 0}/${batchIds.length}`
-              console.error('[arsivle] doğrulama başarısız, DELETE atlandı:', r.frekansiyel_err)
+            // ATOMİK ARŞİVLEME: PG fonksiyonu tek transaction içinde çalışır
+            // Hata olursa her şey rollback → veri kaybı imkansız
+            const { data: rpcRes, error: rpcErr } = await admin.rpc('arsivle_canli_gorevler_atomik', {
+              p_ids: batchIds,
+              p_arsiv_nedeni: 'cron_saat',
+            })
+            if (rpcErr || (rpcRes && rpcRes.ok === false)) {
+              const msg = rpcErr?.message ?? rpcRes?.hata ?? 'bilinmeyen hata'
+              r.frekansiyel_err = (r.frekansiyel_err ? r.frekansiyel_err + '; ' : '') + msg
+              console.error('[arsivle] atomik rpc başarısız (rollback):', msg, 'batch:', batchIds.length)
+              // audit_log ve sistem_alerts kaydı
+              await admin.from('audit_log').insert({
+                tip: 'arsivle', tablo: 'canli_gorevler', satir_sayisi: batchIds.length,
+                basarili: false, hata_mesaji: msg,
+                firma_id: s.firmaId, proje_id: s.projeId ?? null,
+                detay: { batch_ids: batchIds.slice(0, 10), total: batchIds.length },
+              })
+              await admin.from('sistem_alerts').insert({
+                seviye: 'kritik',
+                baslik: 'Arşivleme Başarısız',
+                mesaj: `${batchIds.length} görev arşivlenemedi. Hata: ${msg}`,
+                firma_id: s.firmaId,
+                kaynak: 'arsivle_cron',
+                detay: { batch_ids: batchIds.slice(0, 10), total: batchIds.length, hata: msg },
+              })
               continue
             }
-            const { error: delErr } = await admin.from('canli_gorevler').delete().in('id', batchIds)
-            if (delErr) {
-              r.frekansiyel_err = (r.frekansiyel_err ? r.frekansiyel_err + '; ' : '') + 'delete: ' + delErr.message
-            }
+            // Başarı logu
+            await admin.from('audit_log').insert({
+              tip: 'arsivle', tablo: 'canli_gorevler', satir_sayisi: batchIds.length,
+              basarili: true, firma_id: s.firmaId, proje_id: s.projeId ?? null,
+              detay: rpcRes ?? null,
+            })
+            ceklistToplam += (rpcRes?.baslik_tasinan ?? 0)
           }
           r.frekansiyel = gorevler.length
           if (ceklistToplam > 0) r.ceklist = ceklistToplam

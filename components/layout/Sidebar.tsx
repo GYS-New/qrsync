@@ -43,6 +43,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
         { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
         { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
         { label: 'Push Bildirim Geçmişi', href: `${base}/dashboard/push-log`, icon: '🔔' },
+        { label: 'Sistem Uyarıları', href: `${base}/dashboard/sistem-uyarilari`, icon: '⚠️' },
       ]
     : isTA
       ? [
