@@ -28,47 +28,55 @@ export async function GET(req: NextRequest) {
   try {
     const admin = createAdminClient()
 
-    // PG fonksiyonu: yetim kayıtları firma bazlı getir
-    const { data: yetimler, error: rpcErr } = await admin.rpc('yetim_ceklist_kayitlari')
-    if (rpcErr) throw new Error('yetim kontrol: ' + rpcErr.message)
+    // Tüm kategorileri tarayan kapsamlı PG fonksiyonu
+    const { data: bulgular, error: rpcErr } = await admin.rpc('veri_butunluk_kontrol_tam')
+    if (rpcErr) throw new Error('butunluk kontrol: ' + rpcErr.message)
 
-    const toplam = (yetimler ?? []).reduce((s: number, y: any) => s + Number(y.yetim_sayi ?? 0), 0)
+    const toplam = (bulgular ?? []).reduce((s: number, b: any) => s + Number(b.sayi ?? 0), 0)
+    const kategoriSayisi = (bulgular ?? []).length
 
-    // Audit log
+    // Audit log — tek satır, detayda tüm kategoriler
     await admin.from('audit_log').insert({
-      tip: 'butunluk_kontrol', tablo: 'checklist_sonuc_basliklari_arsiv',
+      tip: 'butunluk_kontrol', tablo: 'coklu',
       satir_sayisi: toplam, basarili: true,
-      detay: { firma_bazli: yetimler, toplam },
+      detay: { kategoriler: bulgular, toplam_sayi: toplam, kategori_sayisi: kategoriSayisi },
     })
 
-    // Yetim varsa alert + FCM
-    if (toplam > 0 && yetimler) {
-      const alertRows = yetimler.map((y: any) => ({
-        seviye: 'yuksek',
-        baslik: 'Yetim Çeklist Kayıtları Tespit Edildi',
-        mesaj: `${Number(y.yetim_sayi)} adet çeklist kaydının görevi bulunamıyor. İlk kayıt: ${y.en_eski}, son: ${y.en_yeni}`,
-        firma_id: y.firma_id,
+    // Her bulgu için ayrı alert
+    if (toplam > 0 && bulgular) {
+      const alertRows = bulgular.map((b: any) => ({
+        seviye: (['kritik', 'yuksek', 'orta', 'dusuk'].includes(b.seviye) ? b.seviye : 'orta'),
+        baslik: `Veri Bütünlük: ${b.kategori}`,
+        mesaj: `${Number(b.sayi)} adet kayıt — ${b.aciklama}${b.en_eski ? ` (ilk: ${b.en_eski}, son: ${b.en_yeni})` : ''}`,
+        firma_id: b.firma_id,
         kaynak: 'veri_butunluk_kontrol',
-        detay: { yetim_sayi: Number(y.yetim_sayi), en_eski: y.en_eski, en_yeni: y.en_yeni },
+        detay: {
+          kategori: b.kategori,
+          sayi: Number(b.sayi),
+          en_eski: b.en_eski,
+          en_yeni: b.en_yeni,
+          aciklama: b.aciklama,
+        },
       }))
       await admin.from('sistem_alerts').insert(alertRows)
 
-      // SA kullanıcılarına FCM push
+      // SA kullanıcılarına FCM push — bir kere, özet
+      const kritikSayi = bulgular.filter((b: any) => b.seviye === 'kritik').length
       const { data: saUsers } = await admin.from('users')
         .select('id').in('rol', ['super_admin', 'alt_super_admin']).eq('aktif', true)
       for (const u of saUsers ?? []) {
         try {
           await sendFCMToUser(
             u.id,
-            '⚠️ Veri Bütünlük Uyarısı',
-            `${toplam} yetim çeklist kaydı tespit edildi. Detay için Sistem Uyarıları paneline bakın.`,
+            kritikSayi > 0 ? '🔴 KRİTİK: Veri Bütünlük Uyarısı' : '⚠️ Veri Bütünlük Uyarısı',
+            `${kategoriSayisi} kategoride toplam ${toplam} yetim/tutarsız kayıt tespit edildi${kritikSayi > 0 ? ` (${kritikSayi} kritik)` : ''}. Sistem Uyarıları paneline bakın.`,
             'gorev_uyari'
           )
         } catch {}
       }
     }
 
-    return NextResponse.json({ ok: true, toplam, firmalar: yetimler ?? [] })
+    return NextResponse.json({ ok: true, toplam, kategori_sayisi: kategoriSayisi, bulgular: bulgular ?? [] })
   } catch (err: any) {
     console.error('[veri-butunluk-kontrol] HATA:', err.message)
     // Hata alertı

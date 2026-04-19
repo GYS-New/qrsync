@@ -18,17 +18,17 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient()
-  const { data: yetimler, error } = await admin.rpc('yetim_ceklist_kayitlari')
+  const { data: bulgular, error } = await admin.rpc('veri_butunluk_kontrol_tam')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const toplam = (yetimler ?? []).reduce((s: number, y: any) => s + Number(y.yetim_sayi ?? 0), 0)
+  const toplam = (bulgular ?? []).reduce((s: number, b: any) => s + Number(b.sayi ?? 0), 0)
+  const kategoriSayisi = (bulgular ?? []).length
 
-  // Audit log
   await admin.from('audit_log').insert({
-    tip: 'manuel_butunluk_kontrol', tablo: 'checklist_sonuc_basliklari_arsiv',
+    tip: 'manuel_butunluk_kontrol', tablo: 'coklu',
     satir_sayisi: toplam, basarili: true, kullanici_id: user.id,
-    detay: { firma_bazli: yetimler, toplam },
+    detay: { kategoriler: bulgular, toplam_sayi: toplam, kategori_sayisi: kategoriSayisi },
   })
 
-  return NextResponse.json({ ok: true, toplam, firmalar: yetimler ?? [] })
+  return NextResponse.json({ ok: true, toplam, kategori_sayisi: kategoriSayisi, bulgular: bulgular ?? [] })
 }

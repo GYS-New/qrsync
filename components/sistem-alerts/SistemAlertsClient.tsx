@@ -68,7 +68,7 @@ export default function SistemAlertsClient() {
   }
 
   const cozulmeyen = data.filter(a => !a.cozuldu)
-  const [butunluk, setButunluk] = useState<{ toplam: number; firmalar: any[] } | null>(null)
+  const [butunluk, setButunluk] = useState<{ toplam: number; kategori_sayisi: number; bulgular: any[] } | null>(null)
   const [butunlukLoading, setButunlukLoading] = useState(false)
 
   async function butunlukKontrolEt() {
@@ -77,11 +77,11 @@ export default function SistemAlertsClient() {
       const res = await fetch('/api/sistem-alerts/butunluk-kontrol', { method: 'POST' })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error)
-      setButunluk({ toplam: j.toplam, firmalar: j.firmalar ?? [] })
+      setButunluk({ toplam: j.toplam, kategori_sayisi: j.kategori_sayisi ?? 0, bulgular: j.bulgular ?? [] })
       toast({
         type: j.toplam > 0 ? 'warning' as any : 'success',
-        title: j.toplam > 0 ? 'Yetim kayıt bulundu' : 'Her şey yolunda',
-        message: j.toplam > 0 ? `${j.toplam} yetim çeklist kaydı var` : 'Yetim kayıt bulunamadı',
+        title: j.toplam > 0 ? 'Sorun tespit edildi' : 'Her şey yolunda',
+        message: j.toplam > 0 ? `${j.kategori_sayisi ?? 0} kategoride toplam ${j.toplam} yetim/tutarsız kayıt` : 'Tüm tablolar temiz, yetim kayıt yok',
       })
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
@@ -97,7 +97,7 @@ export default function SistemAlertsClient() {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 3 }}>🔍 Veri Bütünlük Kontrolü</div>
             <div style={{ fontSize: 12.5, color: '#64748b' }}>
-              Çeklist arşivinde yetim kalmış kayıtları taramak için "Şimdi Kontrol Et" butonuna bas. Her gece 02:00'de otomatik çalışır.
+              12 kritik tablo (görevler, çeklistler, mesai, müşteri, device, firma, lokasyon, kullanıcı ilişkileri) taranır. Yetim/duplicate/tutarsız kayıtları tespit eder. Her gece 02:00'de otomatik çalışır.
             </div>
           </div>
           <button onClick={butunlukKontrolEt} disabled={butunlukLoading}
@@ -109,18 +109,27 @@ export default function SistemAlertsClient() {
           <div style={{ marginTop: 12, padding: '10px 14px', background: butunluk.toplam > 0 ? '#fef3c7' : '#dcfce7', border: `1px solid ${butunluk.toplam > 0 ? '#fcd34d' : '#86efac'}`, borderRadius: 8, fontSize: 13 }}>
             {butunluk.toplam > 0 ? (
               <>
-                <strong>⚠️ {butunluk.toplam} yetim çeklist kaydı tespit edildi</strong>
-                <div style={{ fontSize: 12, marginTop: 4, color: '#78350f' }}>
-                  {butunluk.firmalar.map((f: any) => (
-                    <div key={f.firma_id}>
-                      <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{f.firma_id?.slice(0, 8)}…</span> — <strong>{f.yetim_sayi}</strong> yetim
-                      (ilk: {new Date(f.en_eski).toLocaleString('tr-TR')}, son: {new Date(f.en_yeni).toLocaleString('tr-TR')})
-                    </div>
-                  ))}
+                <strong>⚠️ {butunluk.kategori_sayisi} kategoride toplam {butunluk.toplam} sorun tespit edildi</strong>
+                <div style={{ fontSize: 11.5, marginTop: 6, color: '#78350f', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {butunluk.bulgular.map((b: any, i: number) => {
+                    const sev = b.seviye ?? 'orta'
+                    const sevColor = sev === 'kritik' ? '#dc2626' : sev === 'yuksek' ? '#ea580c' : sev === 'orta' ? '#ca8a04' : '#2563eb'
+                    return (
+                      <div key={i} style={{ background: 'rgba(255,255,255,0.5)', padding: '6px 10px', borderRadius: 6, borderLeft: `3px solid ${sevColor}` }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontWeight: 700, color: sevColor, fontSize: 10, textTransform: 'uppercase' }}>{sev}</span>
+                          <code style={{ fontSize: 11, color: '#1f2937' }}>{b.kategori}</code>
+                          <span style={{ fontWeight: 700 }}>×{Number(b.sayi)}</span>
+                          {b.firma_id && <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8' }}>firma:{b.firma_id.slice(0, 8)}</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#4b5563', marginTop: 2 }}>{b.aciklama}</div>
+                      </div>
+                    )
+                  })}
                 </div>
               </>
             ) : (
-              <><strong>✓ Her şey yolunda</strong> — yetim kayıt tespit edilmedi.</>
+              <><strong>✓ Her şey yolunda</strong> — 12 kategorinin hepsinde sorun tespit edilmedi.</>
             )}
           </div>
         )}
