@@ -109,7 +109,7 @@ export default function CanliAkisIzlemeBlock({
   }, [firmaId, projeId, limit])
 
   return (
-    <div className="verde-card h-[420px] flex flex-col">
+    <div className="verde-card dashboard-border-intro h-[420px] flex flex-col">
       <div style={{
         padding: '16px 18px 12px', borderBottom: '1px solid #f3f4f6',
         display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12,

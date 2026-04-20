@@ -203,25 +203,39 @@ html, body {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
-@keyframes borderGlowIntro {
-  0% {
-    box-shadow:
-      0 0 0 2px rgba(37, 99, 235, 0.95),
-      0 0 22px 4px rgba(37, 99, 235, 0.55),
-      0 0 42px 10px rgba(37, 99, 235, 0.25);
-  }
-  55% {
-    box-shadow:
-      0 0 0 1.5px rgba(37, 99, 235, 0.45),
-      0 0 14px 2px rgba(37, 99, 235, 0.28),
-      0 0 0 rgba(37, 99, 235, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
-  }
+@property --border-sweep {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes borderDrawIntro {
+  0%   { --border-sweep: 0deg;   opacity: 1; }
+  70%  { --border-sweep: 360deg; opacity: 1; }
+  100% { --border-sweep: 360deg; opacity: 0; }
 }
 .dashboard-border-intro {
-  animation: borderGlowIntro 1.5s ease-out backwards;
+  position: relative;
+}
+.dashboard-border-intro::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--border-sweep, 0deg),
+    transparent 0deg,
+    transparent 260deg,
+    rgba(96, 165, 250, 0.85) 300deg,
+    #2563eb 345deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: borderDrawIntro 1.4s ease-out backwards;
+  pointer-events: none;
+  z-index: 2;
 }
 .animate-fade-up {
   animation: fadeUp 0.4s ease both;

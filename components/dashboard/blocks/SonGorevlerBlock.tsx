@@ -42,7 +42,7 @@ export default async function SonGorevlerBlock({ firmaId, projeId,
   const padded = Array.from({ length: limit }).map((_, i) => rows[i] ?? null)
 
   return (
-    <div className="verde-card h-[420px] flex flex-col">
+    <div className="verde-card dashboard-border-intro h-[420px] flex flex-col">
       {/* Header */}
       <div
         style={{

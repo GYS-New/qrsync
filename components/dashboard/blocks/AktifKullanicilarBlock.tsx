@@ -53,7 +53,7 @@ export default function AktifKullanicilarBlock({
   }, [limit, firmaId, projeId])
 
   return (
-    <div className="verde-card h-[420px] flex flex-col">
+    <div className="verde-card dashboard-border-intro h-[420px] flex flex-col">
       <div
         style={{
           padding: '16px 18px 12px',
