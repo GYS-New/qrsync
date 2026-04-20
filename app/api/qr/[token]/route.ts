@@ -4,6 +4,7 @@ import { resolveScanContext } from '@/lib/scan/core'
 import { completeTask } from '@/lib/tasks/completeTask'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
+import { lokasyonBugunTamamlananlar } from '@/lib/scan/bugunTamamlananlar'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -61,7 +62,14 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     // Firma/Proje kontrolü
     const fpHata = checkFirmaProje(context, user)
     if (fpHata) return NextResponse.json(fpHata, { status: 403, headers: CORS_HEADERS })
-    return NextResponse.json({ ok: true, ...context }, { headers: CORS_HEADERS })
+
+    // Ekstra frekansiyel modal'ı için: bu lokasyonda bugün tamamlanan kural görevlerinin
+    // dağılımını ekle (tanim + adet). Mobil bunu dropdown'da kullanır.
+    const bugun_tamamlananlar = context.lokasyon?.id
+      ? await lokasyonBugunTamamlananlar(supabase, context.lokasyon.id)
+      : []
+
+    return NextResponse.json({ ok: true, ...context, bugun_tamamlananlar }, { headers: CORS_HEADERS })
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message ?? 'İşlem başarısız' }, { status: 400, headers: CORS_HEADERS })
   }

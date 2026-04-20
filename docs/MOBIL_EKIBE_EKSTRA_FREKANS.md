@@ -64,18 +64,34 @@ Body:
 
 ## 4. Mobil UX akışı
 
-1. **QR/NFC okutma** — normal akış (`/api/app/aktif-gorev` veya başlatma endpoint'i)
-2. Backend'in dönüşüne göre:
-   - Aktif kural görevi varsa → mevcut UI (başlat/tamamla butonları)
-   - Yoksa → **"Ekstra Görev Yap"** butonu göster
-3. Butona basıldığında modal aç:
-   - **Görev Tanımı** alanı (TextInput)
-     - Opsiyon A: Kullanıcı manuel yazar (min 3 char)
-     - Opsiyon B: O lokasyonun frekans kurallarından (tanım listesi) dropdown seçimi + custom input
+1. **QR/NFC okutma** → `GET /api/qr/{token}` veya `GET /api/nfc/{token}`
+2. Response içinde artık `bugun_tamamlananlar` alanı geliyor (2026-04-20 eklendi):
+   ```json
+   {
+     "ok": true,
+     "lokasyon": {...},
+     "tasks": [...],
+     "bugun_tamamlananlar": [
+       { "tanim": "WC Temizliği", "adet": 9 },
+       { "tanim": "Çöp Boşaltma", "adet": 3 }
+     ]
+   }
+   ```
+   - Bugün (TR takvim günü 00:00 itibariyle) o lokasyonda tamamlanmış **kural-tabanlı** (`kural_id NOT NULL`) görevlerin distinct tanımları + adetleri
+   - `canli_gorevler` + `canli_gorevler_arsiv` birleşik taranır
+   - `adet DESC` sıralı
+   - Hiç tamamlanan yoksa boş array: `[]`
+3. Backend'in dönüşüne göre:
+   - Aktif kural görevi varsa (`tasks` dolu) → mevcut UI (başlat/tamamla butonları)
+   - Yoksa ve `bugun_tamamlananlar.length > 0` → **"Ekstra Görev Yap"** butonu göster
+   - Yoksa ve `bugun_tamamlananlar` boşsa → buton gösterme (hangi tanım seçileceği belirsiz)
+4. Butona basıldığında modal aç:
+   - **Dropdown:** `bugun_tamamlananlar` öğelerini "WC Temizliği (9 kez)" formatında listele
+   - Seçim zorunlu — operatör serbest yazmaz (yazım farklılığı raporu bozar)
    - "Vazgeç" / "Kaydet" butonları
-4. "Kaydet" → `POST /api/app/ekstra-frekans` (gorev_tanim + lokasyon_id + varsa scan_token)
-5. **Başarı yanıtı** → toast "Ekstra görev kaydedildi" + listeyi/ekranı yenile
-6. `AKTIF_KURAL_GOREV_VAR` hatası → uyarı göster ("Önce mevcut görevinizi tamamlayın"), modal kapansın
+5. "Kaydet" → `POST /api/app/ekstra-frekans` body `{ lokasyon_id, gorev_tanim: <seçilen tanım>, scan_token }`
+6. **Başarı yanıtı** → toast "Ekstra görev kaydedildi" + QR ekranını yenile (bugun_tamamlananlar güncellensin)
+7. `AKTIF_KURAL_GOREV_VAR` hatası → uyarı göster ("Önce mevcut görevinizi tamamlayın"), modal kapansın
 
 ## 5. "Ekstra butonu" gösterim kuralı
 

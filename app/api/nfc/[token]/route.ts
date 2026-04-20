@@ -4,6 +4,7 @@ import { resolveScanContext } from '@/lib/scan/core'
 import { completeTask } from '@/lib/tasks/completeTask'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
+import { lokasyonBugunTamamlananlar } from '@/lib/scan/bugunTamamlananlar'
 
 async function getAuthUser(req: Request) {
   const deviceToken = req.headers.get('X-Device-Token')
@@ -45,7 +46,13 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'NFC', userId: user.id })
     const fpHata = checkFirmaProje(context, user)
     if (fpHata) return NextResponse.json(fpHata, { status: 403 })
-    return NextResponse.json({ ok: true, ...context })
+
+    // Ekstra frekansiyel modal'ı için: bu lokasyonda bugün tamamlanan kural görevlerinin dağılımı
+    const bugun_tamamlananlar = context.lokasyon?.id
+      ? await lokasyonBugunTamamlananlar(supabase, context.lokasyon.id)
+      : []
+
+    return NextResponse.json({ ok: true, ...context, bugun_tamamlananlar })
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message ?? 'İşlem başarısız' }, { status: 400 })
   }
