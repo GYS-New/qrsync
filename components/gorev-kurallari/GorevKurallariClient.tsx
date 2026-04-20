@@ -409,8 +409,13 @@ export default function GorevKurallariClient({
       fd.append('file', importFile)
       if (firmaId) fd.append('firmaId', firmaId)
       const res  = await fetch('/api/import-export/gorev-kurallari/import', { method: 'POST', body: fd, cache: 'no-store' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Import başarısız')
+      // Response JSON olmayabilir (proxy timeout, server crash vs.) — önce text al, sonra parse dene
+      const rawText = await res.text()
+      let data: any = {}
+      try { data = JSON.parse(rawText) } catch {
+        throw new Error(`Sunucu cevabı geçersiz (HTTP ${res.status}). Yanıt: ${rawText.slice(0, 300)}`)
+      }
+      if (!res.ok) throw new Error(data.error ?? `Import başarısız (HTTP ${res.status})`)
       const refreshRes = await fetch(`/api/gorev-kurallari?firma_id=${firmaId}&t=${Date.now()}`, { cache: 'no-store' })
       if (refreshRes.ok) setKuralar(await refreshRes.json())
       toast({
