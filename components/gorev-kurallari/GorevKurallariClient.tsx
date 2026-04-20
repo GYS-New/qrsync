@@ -413,7 +413,13 @@ export default function GorevKurallariClient({
       if (!res.ok) throw new Error(data.error ?? 'Import başarısız')
       const refreshRes = await fetch(`/api/gorev-kurallari?firma_id=${firmaId}`)
       if (refreshRes.ok) setKuralar(await refreshRes.json())
-      toast({ type: 'success', title: 'Tamamlandı', message: `${data.created} kural içe aktarıldı${data.failed ? `, ${data.failed} satır atlandı` : ''}` })
+      toast({
+        type: 'success',
+        title: 'Tamamlandı',
+        message: `${data.created ?? 0} yeni eklendi` +
+                 (data.updated ? `, ${data.updated} kural güncellendi` : '') +
+                 (data.failed ? `, ${data.failed} satır atlandı` : ''),
+      })
       setImportOpen(false); setImportFile(null)
       if (fileRef.current) fileRef.current.value = ''
     } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message }) }

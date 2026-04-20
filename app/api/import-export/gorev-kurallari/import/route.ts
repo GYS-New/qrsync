@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     const userMap = new Map((users ?? []).map((x: any) => [String(x.email).toLowerCase(), x.id]))
 
     let created = 0
+    let updated = 0
     const errors: string[] = []
 
     for (let i = 0; i < parsed.rows.length; i++) {
@@ -90,29 +91,51 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      const { error: insertErr } = await scope.admin.from('gorev_kurallari').insert({
+      const saatNorm = saat.length === 5 ? saat + ':00' : saat
+
+      // Upsert: aynı firma + lokasyon + tanım + aktif_olma_saati varsa üzerine yaz
+      const { data: mevcut } = await scope.admin.from('gorev_kurallari')
+        .select('id')
+        .eq('firma_id', scope.firmaId)
+        .eq('lokasyon_id', lokId)
+        .eq('tanim', tanim)
+        .eq('aktif_olma_saati', saatNorm)
+        .maybeSingle()
+
+      const payload = {
         firma_id: scope.firmaId,
         lokasyon_id: lokId,
         tanim,
         aktif_gunler: gunler,
         gunluk_frekans_sayisi: locFrekansMap.get(lokId) ?? 1,
-        aktif_olma_saati: saat.length === 5 ? saat + ':00' : saat,
+        aktif_olma_saati: saatNorm,
         baslangic_tarihi: baslangic,
         bitis_tarihi: bitis || null,
         atanan_kullanici_id: atananId,
-        olusturan_id: scope.me.id,
         kaynak: 'import',
         aktif: true,
-      })
-
-      if (insertErr) {
-        errors.push(`Satır ${rowNo}: ${insertErr.message}`)
-        continue
       }
-      created++
+
+      if (mevcut?.id) {
+        const { error: updateErr } = await scope.admin.from('gorev_kurallari')
+          .update(payload).eq('id', mevcut.id)
+        if (updateErr) {
+          errors.push(`Satır ${rowNo}: ${updateErr.message}`)
+          continue
+        }
+        updated++
+      } else {
+        const { error: insertErr } = await scope.admin.from('gorev_kurallari')
+          .insert({ ...payload, olusturan_id: scope.me.id })
+        if (insertErr) {
+          errors.push(`Satır ${rowNo}: ${insertErr.message}`)
+          continue
+        }
+        created++
+      }
     }
 
-    return NextResponse.json({ ok: true, created, failed: errors.length, errors })
+    return NextResponse.json({ ok: true, created, updated, failed: errors.length, errors })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
