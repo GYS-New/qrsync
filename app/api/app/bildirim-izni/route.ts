@@ -24,13 +24,25 @@ export async function POST(req: NextRequest) {
   const ua = req.headers.get('user-agent') ?? ''
 
   // Hafif log — mobilin entegrasyonu doğrulanıyor. Tüm çağrılar loglanır, hata olsa bile.
-  console.log('[bildirim-izni]', JSON.stringify({
-    user_id: userId ? userId.slice(0, 8) + '…' : null,
-    device_token: deviceToken ? deviceToken.slice(0, 8) + '…' : null,
+  const logPayload = {
+    user_id_preview: userId ? String(userId).slice(0, 8) + '…' : null,
+    device_token_preview: deviceToken ? String(deviceToken).slice(0, 8) + '…' : null,
     bildirim_izni: bildirimIzni,
     body_keys: Object.keys(body ?? {}),
-    ua: ua.slice(0, 80),
-  }))
+    ua: ua.slice(0, 120),
+  }
+  console.log('[bildirim-izni]', JSON.stringify(logPayload))
+
+  // Audit log — Railway log'u yanında DB'ye de iz bırak (mobil deploy takibi için)
+  try {
+    const adminLog = createAdminClient()
+    await adminLog.from('audit_log').insert({
+      tip: 'mobil_bildirim_izni_rapor',
+      tablo: 'device_tokens',
+      basarili: true,
+      detay: logPayload,
+    })
+  } catch {}
 
   if (!userId || typeof userId !== 'string') {
     return NextResponse.json({ error: 'user_id gerekli' }, { status: 400 })
