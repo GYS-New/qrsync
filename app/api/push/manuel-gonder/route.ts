@@ -83,6 +83,8 @@ export async function POST(req: NextRequest) {
   const logKayitlari: any[] = []
   let basariliSayisi = 0
 
+  const nowIso = new Date().toISOString()
+
   for (const a of alicilar) {
     // Cihaz sayısını öğren (log için)
     const { count: cihazSayisi } = await admin
@@ -90,6 +92,18 @@ export async function POST(req: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', a.id).eq('aktif', true)
       .not('fcm_token', 'is', null)
+
+    // Mobil uygulamanın "Bildirimler" sayfasında kalıcı görünmesi için
+    // bildirimler tablosuna kayıt at. FCM başarısız olsa bile kayıt durur —
+    // kullanıcı uygulamayı açtığında bildirimi sayfasında görür.
+    await admin.from('bildirimler').insert({
+      alici_id: a.id,
+      baslik: title,
+      mesaj: icerik,
+      tip: 'manuel_push',
+      okundu: false,
+      tarih: nowIso,
+    })
 
     try {
       await sendFCMToUser(a.id, title, icerik, kanal)
