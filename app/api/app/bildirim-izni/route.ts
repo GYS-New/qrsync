@@ -21,6 +21,9 @@ export async function POST(req: NextRequest) {
   const userId: string | undefined = body.user_id
   const deviceToken: string | undefined = body.device_token
   const bildirimIzni = body.bildirim_izni
+  const appVersion: string | null = typeof body.app_version === 'string' && body.app_version.trim()
+    ? body.app_version.trim().slice(0, 20)
+    : null
   const ua = req.headers.get('user-agent') ?? ''
 
   // Hafif log — mobilin entegrasyonu doğrulanıyor. Tüm çağrılar loglanır, hata olsa bile.
@@ -74,6 +77,7 @@ export async function POST(req: NextRequest) {
     .update({
       bildirim_izni: bildirimIzni,
       bildirim_izni_son_kontrol: new Date().toISOString(),
+      ...(appVersion ? { app_version: appVersion } : {}),
     })
     .eq('id', dt.id)
 

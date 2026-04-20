@@ -39,6 +39,9 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const { firma_token, firma_id: firmaIdParam, device_id, user_id, isim_soyisim, proje_id, sifre } = body
+    const appVersion: string | null = typeof body.app_version === 'string' && body.app_version.trim()
+      ? body.app_version.trim().slice(0, 20)
+      : null
 
     if ((!firma_token && !firmaIdParam) || !device_id || !user_id || !isim_soyisim) {
       return NextResponse.json({ ok: false, error: 'Eksik parametreler (firma_token veya firma_id gerekli)' }, { status: 400, headers: CORS_HEADERS })
@@ -164,6 +167,7 @@ export async function POST(req: Request) {
           proje_id: proje_id || null,
           aktif: true,
           son_kullanim: new Date().toISOString(),
+          ...(appVersion ? { app_version: appVersion } : {}),
         })
         .eq('id', mevcutKayit.id)
     } else {
@@ -177,6 +181,7 @@ export async function POST(req: Request) {
           proje_id: proje_id || null,
           aktif: true,
           kayit_tarihi: new Date().toISOString(),
+          ...(appVersion ? { app_version: appVersion } : {}),
         })
         .select('device_token')
         .single()
