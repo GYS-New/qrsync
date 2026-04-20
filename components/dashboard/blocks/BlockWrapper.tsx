@@ -10,6 +10,8 @@ type Props = {
   clip?: boolean;
   /** Optional override for the outer container height class (e.g. "h-[560px]"). */
   heightClassName?: string;
+  /** Optional stagger delay (ms) for the initial border-glow intro animation. */
+  introDelay?: number;
 };
 
 const HEIGHTS = {
@@ -24,9 +26,13 @@ export default function BlockWrapper({
   children,
   clip = true,
   heightClassName,
+  introDelay = 0,
 }: Props) {
   return (
-    <div className={`rounded-xl border bg-white p-4 flex flex-col ${heightClassName ?? HEIGHTS[size]}`}>
+    <div
+      className={`rounded-xl border bg-white p-4 flex flex-col dashboard-border-intro ${heightClassName ?? HEIGHTS[size]}`}
+      style={{ animationDelay: `${introDelay}ms` }}
+    >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold">{title}</h3>
         <Link href={href} className="text-xs text-primary hover:underline">

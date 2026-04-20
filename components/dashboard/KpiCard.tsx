@@ -39,7 +39,7 @@ export default function KpiCard({
 
   return (
     <div
-      className="kpi-card animate-fade-up"
+      className="kpi-card animate-fade-up dashboard-border-intro"
       style={{
         animationDelay: `${delay}ms`,
         background: '#ffffff',

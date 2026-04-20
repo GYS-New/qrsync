@@ -117,6 +117,7 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
         iconBg="#e5e7eb"
         showToday
         percent={pct(anlikTamam, anlikToplam)}
+        delay={0}
       />
       <KpiCard
         label="Frekansiyel Görevler"
@@ -127,6 +128,7 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
         iconBg="#e5e7eb"
         showToday
         percent={pct(canliTamam, canliToplam)}
+        delay={100}
       />
       <KpiCard
         label="Kullanıcılar"
@@ -136,6 +138,7 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
         icon="👥"
         iconBg="#e5e7eb"
         percent={pct(kullaniciOnline, kullaniciToplam)}
+        delay={200}
       />
       <KpiCard
         label="Lokasyonlar"
@@ -145,6 +148,7 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
         icon="📍"
         iconBg="#e5e7eb"
         percent={pct(lokasyonGorevli, lokasyonToplam)}
+        delay={300}
       />
     </div>
   )
