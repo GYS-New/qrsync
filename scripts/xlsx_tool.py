@@ -69,7 +69,21 @@ def has_visible_style(style):
 
 
 def cmd_read(path):
-    wb = load_workbook(path, data_only=True)
+    try:
+        wb = load_workbook(path, data_only=True)
+    except Exception as e:
+        # Geçersiz/bozuk .xlsx veya yanlış format (örn. .xml, .csv, eski .xls)
+        sys.stderr.write(
+            f"Dosya geçerli bir Excel (.xlsx) dosyası değil. "
+            f"Lütfen önce 'Şablon' butonu ile örnek dosyayı indirip Excel'de düzenleyin ve "
+            f".xlsx olarak kaydedin. (Detay: {type(e).__name__}: {e})\n"
+        )
+        sys.exit(2)
+    if not wb.sheetnames:
+        sys.stderr.write(
+            "Excel dosyasında sayfa bulunamadı. Dosya bozuk olabilir — şablondan tekrar oluşturun.\n"
+        )
+        sys.exit(2)
     ws = wb[wb.sheetnames[0]]
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
