@@ -238,7 +238,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
 
   // 3. Görevleri çek: aktif tablo + arşiv tablosu birleşik
   // Arşiv tablosu terminal durumları (TAMAMLANDI, ZAMANI_GECMIS vb.) tutar
-  const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,tamamlanma_tarihi,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi'
+  const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,tamamlanma_tarihi,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep'
 
   const baslangicUTC = filters.raporBaslangic ? new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString() : null
   const bitisUTC = filters.raporBitis ? new Date(filters.raporBitis + 'T23:59:59+03:00').toISOString() : null
@@ -574,6 +574,11 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     .filter((g: any) => !KAYIP_HARIC_DURUMLAR.has(g.durum))
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
+      // IPTAL durumunda kullanıcı tarafından girilen iptal_sebep varsa onu kullan
+      const iptalSebep = typeof g.iptal_sebep === 'string' ? g.iptal_sebep.trim() : ''
+      const kayipNedeni = (g.durum === 'IPTAL' && iptalSebep)
+        ? iptalSebep
+        : (kayipNedeniLabel[g.durum] ?? g.durum)
       return {
         sn: i + 1,
         ustLokasyon: getContextUstLokasyon(g.lokasyon_id),
@@ -582,7 +587,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         gorevTanimi: g.tanim ?? '',
         tarihSaat: formatDate(g.aktif_olma_tarihi),
         durum: durumLabel[g.durum] ?? g.durum,
-        kayipNedeni: kayipNedeniLabel[g.durum] ?? g.durum,
+        kayipNedeni,
       }
     })
 
