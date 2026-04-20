@@ -1061,14 +1061,14 @@ export default function GorevKurallariClient({
               <div style={{ background: '#f6fbf6', border: '1px solid #d6e9d6', borderRadius: 8, padding: 12, fontSize: 12.5, color: '#4b5563', lineHeight: 1.7 }}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Nasıl kullanılır?</div>
                 <ol style={{ margin: 0, paddingLeft: 16 }}>
-                  <li>Önce <strong>Şablon</strong> düğmesiyle örnek dosyayı indirin.</li>
+                  <li>Önce <strong>Şablon</strong> düğmesiyle örnek dosyayı (.xlsx) indirin.</li>
                   <li>Her satıra bir kural girin (lokasyon, günler, frekans, saat…).</li>
-                  <li>Excel XML formatında kaydedin ve buraya yükleyin.</li>
+                  <li>Excel (.xlsx) olarak kaydedin ve buraya yükleyin.</li>
                 </ol>
               </div>
               <div>
-                <label style={lbl}>Excel XML Dosyası</label>
-                <input ref={fileRef} type="file" accept=".xml,text/xml,application/xml" onChange={e => setImportFile(e.target.files?.[0] ?? null)} className="verde-input" style={{ padding: 10, height: 'auto' }} />
+                <label style={lbl}>Excel Dosyası (.xlsx)</label>
+                <input ref={fileRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e => setImportFile(e.target.files?.[0] ?? null)} className="verde-input" style={{ padding: 10, height: 'auto' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button onClick={() => setImportOpen(false)} className="verde-btn-outline-strong" disabled={importing}>İptal</button>

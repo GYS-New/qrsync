@@ -123,8 +123,8 @@ export default function ExcelImportExportControls({
               <div style={{ fontSize: 13, color: '#486348', lineHeight: 1.6 }}>
                 <div style={{ marginBottom: 8, fontWeight: 600 }}>İşlem adımları</div>
                 <ol style={{ margin: 0, paddingLeft: 18 }}>
-                  <li>Önce Excel şablonunu indirip doldurun.</li>
-                  <li>Dosyayı Excel XML formatında saklayın ve buradan yükleyin.</li>
+                  <li>Önce Excel şablonunu (.xlsx) indirip doldurun.</li>
+                  <li>Dosyayı Excel (.xlsx) olarak kaydedin ve buradan yükleyin.</li>
                   <li>Sistem hatalı satırları atlar, geçerli satırları içe aktarır.</li>
                 </ol>
               </div>
@@ -139,17 +139,17 @@ export default function ExcelImportExportControls({
               </div>
 
               <div>
-                <label className="verde-label">Excel XML dosyası</label>
+                <label className="verde-label">Excel dosyası (.xlsx)</label>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xml,text/xml,application/xml"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   className="verde-input"
                   style={{ padding: 10, height: 'auto' }}
                 />
                 <div style={{ marginTop: 6, fontSize: 12, color: '#6b7280' }}>
-                  Desteklenen format: Excel 2003 XML (.xml)
+                  Desteklenen format: Excel (.xlsx)
                 </div>
               </div>
 
