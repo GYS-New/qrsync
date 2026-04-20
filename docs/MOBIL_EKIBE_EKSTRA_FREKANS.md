@@ -65,7 +65,7 @@ Body:
 ## 4. Mobil UX akışı
 
 1. **QR/NFC okutma** → `GET /api/qr/{token}` veya `GET /api/nfc/{token}`
-2. Response içinde artık `bugun_tamamlananlar` alanı geliyor (2026-04-20 eklendi):
+2. Response içinde iki dropdown alanı geliyor (2026-04-20 eklendi):
    ```json
    {
      "ok": true,
@@ -74,19 +74,36 @@ Body:
      "bugun_tamamlananlar": [
        { "tanim": "WC Temizliği", "adet": 9 },
        { "tanim": "Çöp Boşaltma", "adet": 3 }
+     ],
+     "lokasyon_kurallari": [
+       { "tanim": "Çöp Boşaltma",    "adet": 0 },
+       { "tanim": "Lavabo Temizliği","adet": 0 },
+       { "tanim": "WC Temizliği",    "adet": 0 }
      ]
    }
    ```
+
+   **`bugun_tamamlananlar`** (adet DESC):
    - Bugün (TR takvim günü 00:00 itibariyle) o lokasyonda tamamlanmış **kural-tabanlı** (`kural_id NOT NULL`) görevlerin distinct tanımları + adetleri
-   - `canli_gorevler` + `canli_gorevler_arsiv` birleşik taranır
-   - `adet DESC` sıralı
-   - Hiç tamamlanan yoksa boş array: `[]`
+   - `canli_gorevler` + `canli_gorevler_arsiv` birleşik
+   - Hiç iş yapılmamışsa `[]`
+
+   **`lokasyon_kurallari`** (tanım alfabetik):
+   - O lokasyona tanımlı **aktif frekans kuralları** — distinct tanım, `adet: 0`
+   - Bugün tamamlanmış olmasına BAĞIMSIZ — lokasyon kuralı varsa her zaman dolu
+   - Lokasyonda hiç kural yoksa `[]`
+
 3. Backend'in dönüşüne göre:
    - Aktif kural görevi varsa (`tasks` dolu) → mevcut UI (başlat/tamamla butonları)
-   - Yoksa ve `bugun_tamamlananlar.length > 0` → **"Ekstra Görev Yap"** butonu göster
-   - Yoksa ve `bugun_tamamlananlar` boşsa → buton gösterme (hangi tanım seçileceği belirsiz)
+   - Aktif görev yoksa ve `lokasyon_kurallari.length > 0` → **"Ekstra Görev Yap"** butonu göster
+   - Hem `tasks` hem `lokasyon_kurallari` boşsa → buton gösterme (bu lokasyona hiç frekans kuralı atanmamış)
+
 4. Butona basıldığında modal aç:
-   - **Dropdown:** `bugun_tamamlananlar` öğelerini "WC Temizliği (9 kez)" formatında listele
+   - **Dropdown kaynağı tercihi:**
+     - İlk seçenek olarak `bugun_tamamlananlar`'ı göster (bugün yapılan işler — adet bilgisi var)
+     - Onlarda yoksa veya operatör farklı bir iş yapmak isterse `lokasyon_kurallari`'na geç
+     - İkisini birleştirebilir (distinct tanım bazında) veya sekmeli/ayrılmış gösterebilirsiniz
+   - **Format:** "WC Temizliği (9 kez yapılmış)" veya adet=0 için sadece "WC Temizliği"
    - Seçim zorunlu — operatör serbest yazmaz (yazım farklılığı raporu bozar)
    - "Vazgeç" / "Kaydet" butonları
 5. "Kaydet" → `POST /api/app/ekstra-frekans` body `{ lokasyon_id, gorev_tanim: <seçilen tanım>, scan_token }`

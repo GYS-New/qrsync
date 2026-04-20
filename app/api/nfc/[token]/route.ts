@@ -4,7 +4,7 @@ import { resolveScanContext } from '@/lib/scan/core'
 import { completeTask } from '@/lib/tasks/completeTask'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
-import { lokasyonBugunTamamlananlar } from '@/lib/scan/bugunTamamlananlar'
+import { lokasyonEkstraFrekansDropdown } from '@/lib/scan/bugunTamamlananlar'
 
 async function getAuthUser(req: Request) {
   const deviceToken = req.headers.get('X-Device-Token')
@@ -47,12 +47,12 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const fpHata = checkFirmaProje(context, user)
     if (fpHata) return NextResponse.json(fpHata, { status: 403 })
 
-    // Ekstra frekansiyel modal'ı için: bu lokasyonda bugün tamamlanan kural görevlerinin dağılımı
-    const bugun_tamamlananlar = context.lokasyon?.id
-      ? await lokasyonBugunTamamlananlar(supabase, context.lokasyon.id)
-      : []
+    // Ekstra frekansiyel modal dropdown'u (bugun_tamamlananlar + lokasyon_kurallari)
+    const { bugun_tamamlananlar, lokasyon_kurallari } = context.lokasyon?.id
+      ? await lokasyonEkstraFrekansDropdown(supabase, context.lokasyon.id)
+      : { bugun_tamamlananlar: [], lokasyon_kurallari: [] }
 
-    return NextResponse.json({ ok: true, ...context, bugun_tamamlananlar })
+    return NextResponse.json({ ok: true, ...context, bugun_tamamlananlar, lokasyon_kurallari })
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message ?? 'İşlem başarısız' }, { status: 400 })
   }
