@@ -408,10 +408,10 @@ export default function GorevKurallariClient({
       const fd = new FormData()
       fd.append('file', importFile)
       if (firmaId) fd.append('firmaId', firmaId)
-      const res  = await fetch('/api/import-export/gorev-kurallari/import', { method: 'POST', body: fd })
+      const res  = await fetch('/api/import-export/gorev-kurallari/import', { method: 'POST', body: fd, cache: 'no-store' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Import başarısız')
-      const refreshRes = await fetch(`/api/gorev-kurallari?firma_id=${firmaId}`)
+      const refreshRes = await fetch(`/api/gorev-kurallari?firma_id=${firmaId}&t=${Date.now()}`, { cache: 'no-store' })
       if (refreshRes.ok) setKuralar(await refreshRes.json())
       toast({
         type: 'success',

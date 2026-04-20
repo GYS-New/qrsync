@@ -68,6 +68,8 @@ export async function POST(req: NextRequest) {
       const saat        = normalizeText(row.aktif_olma_saati ?? '08:00')
       const baslangic   = normalizeText(row.baslangic_tarihi ?? new Date().toISOString().slice(0, 10))
       const bitis       = normalizeText(row.bitis_tarihi ?? '')
+      const frekansRaw  = normalizeText(row.gunluk_frekans_sayisi ?? '')
+      const frekansExcel = frekansRaw ? Number(frekansRaw) : NaN
       if (!tanim || !lokYolu) {
         errors.push(`Satır ${rowNo}: tanim ve lokasyon_yolu zorunludur.`)
         continue
@@ -102,12 +104,17 @@ export async function POST(req: NextRequest) {
         .eq('aktif_olma_saati', saatNorm)
         .maybeSingle()
 
+      // Frekans sayısı: Excel'de geçerli bir sayı varsa onu kullan, yoksa lokasyondan
+      const gunlukFrekans = Number.isFinite(frekansExcel) && frekansExcel > 0
+        ? Math.floor(frekansExcel)
+        : (locFrekansMap.get(lokId) ?? 1)
+
       const payload = {
         firma_id: scope.firmaId,
         lokasyon_id: lokId,
         tanim,
         aktif_gunler: gunler,
-        gunluk_frekans_sayisi: locFrekansMap.get(lokId) ?? 1,
+        gunluk_frekans_sayisi: gunlukFrekans,
         aktif_olma_saati: saatNorm,
         baslangic_tarihi: baslangic,
         bitis_tarihi: bitis || null,
@@ -118,7 +125,8 @@ export async function POST(req: NextRequest) {
 
       if (mevcut?.id) {
         const { error: updateErr } = await scope.admin.from('gorev_kurallari')
-          .update(payload).eq('id', mevcut.id)
+          .update({ ...payload, guncelleme_tarihi: new Date().toISOString() })
+          .eq('id', mevcut.id)
         if (updateErr) {
           errors.push(`Satır ${rowNo}: ${updateErr.message}`)
           continue
