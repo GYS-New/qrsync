@@ -275,6 +275,8 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
   const personelTakibiAktif = aktifProje
     ? aktifProje.personel_takibi_aktif !== false
     : true
+  // İO Asistan: aktifProje varsa o projenin ayarı, yoksa varsayılan açık (proje seçilmediyse gösterilmesin sorunu yaşanmasın)
+  const ioAsistanAktif = aktifProje ? aktifProje.io_asistan_aktif !== false : true
   // Manuel push: proje varsa proje, yoksa firma ayarından. Rol bazlı alt toggle.
   const manuelPushAktif = (() => {
     const baseAktif = aktifProje
@@ -457,14 +459,16 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                 transform: rotate(45deg);
               }
             `}</style>
-            <div className="io-avatar-wrap">
-              <div className="io-avatar" onClick={() => setAsistanOpen(true)} title="İO Asistan" style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14, cursor: 'pointer' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {ioAsistanAktif && (
+              <div className="io-avatar-wrap">
+                <div className="io-avatar" onClick={() => setAsistanOpen(true)} title="İO Asistan" style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14, cursor: 'pointer' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+                <div className="io-ground-shadow" style={{ marginLeft: -14 }} />
+                <IoThinkingBubble />
               </div>
-              <div className="io-ground-shadow" style={{ marginLeft: -14 }} />
-              <IoThinkingBubble />
-            </div>
+            )}
             <div style={{ flex: 1, height: 48, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={projeLogo} alt="Proje" style={{ maxWidth: '100%', maxHeight: 40, objectFit: 'contain' }} />
@@ -596,7 +600,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         </div>
       </div>
     </aside>
-    <IoAsistan open={asistanOpen} onClose={() => setAsistanOpen(false)} />
+    {ioAsistanAktif && <IoAsistan open={asistanOpen} onClose={() => setAsistanOpen(false)} />}
     </>
   )
 }

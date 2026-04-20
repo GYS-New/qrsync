@@ -16,6 +16,7 @@ export type Proje = {
   manuel_push_aktif?: boolean
   manuel_push_u_rolu?: boolean
   manuel_push_m_rolu?: boolean
+  io_asistan_aktif?: boolean
 }
 
 type ProjeCtx = {

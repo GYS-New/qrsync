@@ -54,6 +54,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(body.manuel_push_aktif !== undefined && { manuel_push_aktif: body.manuel_push_aktif }),
       ...(body.manuel_push_u_rolu !== undefined && { manuel_push_u_rolu: body.manuel_push_u_rolu }),
       ...(body.manuel_push_m_rolu !== undefined && { manuel_push_m_rolu: body.manuel_push_m_rolu }),
+      ...(body.io_asistan_aktif !== undefined && { io_asistan_aktif: body.io_asistan_aktif }),
       ...(body.varsayilan_ayarlar !== undefined && { varsayilan_ayarlar: body.varsayilan_ayarlar }),
     })
     .eq('id', params.id)
@@ -63,7 +64,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Ayar toggle değişiklikleri önemli → audit log
-  const ayarAlanlari = ['spesifik_ceklist_aktif', 'spesifik_personel_atama_aktif', 'frekansiyel_personel_atama_aktif', 'frekansiyel_ceklist_aktif', 'manuel_push_aktif', 'manuel_push_u_rolu', 'manuel_push_m_rolu', 'personel_takibi_aktif', 'qr_sistemi_aktif', 'nfc_sistemi_aktif', 'birim_fiyat_aktif']
+  const ayarAlanlari = ['spesifik_ceklist_aktif', 'spesifik_personel_atama_aktif', 'frekansiyel_personel_atama_aktif', 'frekansiyel_ceklist_aktif', 'manuel_push_aktif', 'manuel_push_u_rolu', 'manuel_push_m_rolu', 'personel_takibi_aktif', 'qr_sistemi_aktif', 'nfc_sistemi_aktif', 'birim_fiyat_aktif', 'io_asistan_aktif']
   const degisenAyarlar = Object.keys(body).filter(k => ayarAlanlari.includes(k))
   await auditLog({
     tip: degisenAyarlar.length > 0 ? 'ayar_degis_proje' : 'proje_guncelle',
