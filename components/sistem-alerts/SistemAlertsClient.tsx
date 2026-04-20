@@ -73,6 +73,7 @@ export default function SistemAlertsClient() {
   const cozulmeyen = data.filter(a => !a.cozuldu)
   const [butunluk, setButunluk] = useState<{ toplam: number; kategori_sayisi: number; bulgular: any[] } | null>(null)
   const [butunlukLoading, setButunlukLoading] = useState(false)
+  const [temizlikLoading, setTemizlikLoading] = useState(false)
 
   async function butunlukKontrolEt() {
     setButunlukLoading(true)
@@ -91,6 +92,34 @@ export default function SistemAlertsClient() {
     }
     setButunlukLoading(false)
   }
+
+  // Yetim çeklist kayıtlarını temizle (başlık + bağlı maddeler; aktif + arşiv)
+  async function yetimTemizle() {
+    if (!confirm('Yetim çeklist kayıtları (başlık + bağlı maddeler) kalıcı olarak silinecek. Devam edilsin mi?')) return
+    setTemizlikLoading(true)
+    try {
+      const res = await fetch('/api/sistem-alerts/yetim-temizle', { method: 'POST' })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? 'Temizlik başarısız')
+      const s = j.silinen ?? {}
+      toast({
+        type: 'success',
+        title: 'Temizlik tamamlandı',
+        message: `${s.toplam_baslik ?? 0} başlık + ${s.toplam_madde ?? 0} madde silindi`,
+      })
+      // Bütünlük kontrolünü otomatik yeniden çalıştır
+      await butunlukKontrolEt()
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setTemizlikLoading(false)
+  }
+
+  // Yetim çeklist tespiti var mı?
+  const yetimBulgu = butunluk?.bulgular?.find((b: any) =>
+    String(b.kategori ?? '').includes('ceklist_baslik_yetim')
+  )
+  const yetimSayi = yetimBulgu ? Number(yetimBulgu.sayi ?? 0) : 0
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -133,6 +162,17 @@ export default function SistemAlertsClient() {
               </>
             ) : (
               <><strong>✓ Her şey yolunda</strong> — 12 kategorinin hepsinde sorun tespit edilmedi.</>
+            )}
+            {yetimSayi > 0 && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, color: '#78350f' }}>
+                  🧹 <strong>{yetimSayi}</strong> yetim çeklist başlığı (görevi silinmiş) tespit edildi. Tek tıkla temizleyebilirsiniz:
+                </span>
+                <button onClick={yetimTemizle} disabled={temizlikLoading}
+                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ea580c', background: '#ea580c', color: '#fff', fontSize: 12, fontWeight: 700, cursor: temizlikLoading ? 'not-allowed' : 'pointer', opacity: temizlikLoading ? 0.6 : 1 }}>
+                  {temizlikLoading ? 'Temizleniyor…' : '🧹 Yetim Kayıtları Temizle'}
+                </button>
+              </div>
             )}
           </div>
         )}

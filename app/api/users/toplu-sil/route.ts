@@ -35,7 +35,31 @@ export async function POST(req: Request) {
   if (silinecekIds.length === 0)
     return NextResponse.json({ error: 'Silinebilecek kullanıcı bulunamadı (TA/SA korumalı)' }, { status: 400 })
 
-  // FK bağımlılıkları temizle
+  // FK bağımlılıkları temizle — GÖREV SİLMEDEN ÖNCE bağlı çeklistleri temizle (yetim düşmesin)
+  // Kullanıcıya atanmış spesifik görevlerin id'lerini al
+  const { data: kullaniciGorevAktif } = await admin
+    .from('gorevler').select('id').in('atanan_kullanici_id', silinecekIds)
+  const { data: kullaniciGorevArsiv } = await admin
+    .from('gorevler_arsiv').select('id').in('atanan_kullanici_id', silinecekIds)
+  const silinecekGorevIds = [
+    ...(kullaniciGorevAktif ?? []).map((g: any) => g.id),
+    ...(kullaniciGorevArsiv ?? []).map((g: any) => g.id),
+  ]
+  if (silinecekGorevIds.length > 0) {
+    // Aktif + arşiv çeklist başlıklarını + bağlı maddeleri temizle
+    for (const tbl of ['checklist_sonuc_basliklari', 'checklist_sonuc_basliklari_arsiv'] as const) {
+      const madde_tbl = tbl === 'checklist_sonuc_basliklari'
+        ? 'checklist_sonuc_maddeleri'
+        : 'checklist_sonuc_maddeleri_arsiv'
+      const { data: basliklar } = await admin.from(tbl).select('id').in('gorev_id', silinecekGorevIds)
+      if (basliklar?.length) {
+        const baslikIds = basliklar.map((b: any) => b.id)
+        await admin.from(madde_tbl).delete().in('sonuc_id', baslikIds)
+      }
+      await admin.from(tbl).delete().in('gorev_id', silinecekGorevIds)
+    }
+  }
+
   await admin.from('gorevler').delete().in('atanan_kullanici_id', silinecekIds)
   await admin.from('gorevler_arsiv').delete().in('atanan_kullanici_id', silinecekIds)
   await admin.from('personel_mesai_kayitlari').delete().in('user_id', silinecekIds)

@@ -101,20 +101,53 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     await admin.from('lokasyon_gruplari').delete().eq('proje_id', projeId)
 
     // 2. Checklist sonuç başlıkları → önce maddeleri sil (aktif + arşiv)
-    const [{ data: cBasliklari }, { data: cBasliklariArsiv }] = await Promise.all([
-      admin.from('checklist_sonuc_basliklari').select('id').eq('proje_id', projeId),
-      admin.from('checklist_sonuc_basliklari_arsiv').select('id').eq('proje_id', projeId),
+    // NOT: checklist_sonuc_basliklari tablosunda proje_id YOK — gorev_id/canli_gorev_id üzerinden
+    // projeye ait tüm görevlerin id'lerini toplayarak cascade ile silmeliyiz.
+    const [
+      { data: spesifikAktif },
+      { data: spesifikArsiv },
+      { data: canliAktif },
+      { data: canliArsiv },
+    ] = await Promise.all([
+      admin.from('gorevler').select('id').eq('proje_id', projeId),
+      admin.from('gorevler_arsiv').select('id').eq('proje_id', projeId),
+      admin.from('canli_gorevler').select('id').eq('proje_id', projeId),
+      admin.from('canli_gorevler_arsiv').select('id').eq('proje_id', projeId),
     ])
-    const cIds      = (cBasliklari ?? []).map((r: any) => r.id)
-    const cIdsArsiv = (cBasliklariArsiv ?? []).map((r: any) => r.id)
-    if (cIds.length > 0)
-      await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', cIds)
-    if (cIdsArsiv.length > 0)
-      await admin.from('checklist_sonuc_maddeleri_arsiv').delete().in('sonuc_id', cIdsArsiv)
-    await Promise.all([
-      admin.from('checklist_sonuc_basliklari').delete().eq('proje_id', projeId),
-      admin.from('checklist_sonuc_basliklari_arsiv').delete().eq('proje_id', projeId),
-    ])
+    const spesifikIds = [
+      ...(spesifikAktif ?? []).map((r: any) => r.id),
+      ...(spesifikArsiv ?? []).map((r: any) => r.id),
+    ]
+    const canliIds = [
+      ...(canliAktif ?? []).map((r: any) => r.id),
+      ...(canliArsiv ?? []).map((r: any) => r.id),
+    ]
+
+    // Bu görev id'lerine bağlı çeklist başlıklarını topla (aktif + arşiv)
+    async function baslikIds(tbl: 'checklist_sonuc_basliklari' | 'checklist_sonuc_basliklari_arsiv'): Promise<string[]> {
+      const out: string[] = []
+      if (spesifikIds.length > 0) {
+        const { data } = await admin.from(tbl).select('id').in('gorev_id', spesifikIds)
+        out.push(...(data ?? []).map((r: any) => r.id))
+      }
+      if (canliIds.length > 0) {
+        const { data } = await admin.from(tbl).select('id').in('canli_gorev_id', canliIds)
+        out.push(...(data ?? []).map((r: any) => r.id))
+      }
+      return out
+    }
+
+    const aktifBaslikIds = await baslikIds('checklist_sonuc_basliklari')
+    const arsivBaslikIds = await baslikIds('checklist_sonuc_basliklari_arsiv')
+
+    if (aktifBaslikIds.length > 0) {
+      await admin.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', aktifBaslikIds)
+      await admin.from('checklist_sonuc_basliklari').delete().in('id', aktifBaslikIds)
+    }
+    if (arsivBaslikIds.length > 0) {
+      await admin.from('checklist_sonuc_maddeleri_arsiv').delete().in('sonuc_id', arsivBaslikIds)
+      await admin.from('checklist_sonuc_basliklari_arsiv').delete().in('id', arsivBaslikIds)
+    }
 
     // 3. Görevler (aktif + arşiv) — frekansiyel ve spesifik
     await Promise.all([
