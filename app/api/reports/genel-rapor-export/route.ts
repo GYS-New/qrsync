@@ -121,8 +121,8 @@ export async function GET(req: NextRequest) {
     for (const gm of data.grupMetrikleri) {
       const m = grupBirlesik.get(gm.grup) ?? { hedef: 0, kayip: 0, fazla: 0 }
       m.hedef += gm.hedef; m.kayip += gm.kayip
-      const f = gm.tamamlanan + gm.sapma - gm.hedef
-      m.fazla += f > 0 ? f : 0
+      // Fazla = ekstra frekansiyel (kural dışı tamamlanan)
+      m.fazla += gm.ekstra ?? 0
       grupBirlesik.set(gm.grup, m)
     }
     for (const [grupAd, m] of grupBirlesik) {
@@ -155,11 +155,8 @@ export async function GET(req: NextRequest) {
   }
   const mergedGruplar = Array.from(birlesikGruplar.values())
 
-  // ── 7. Frekans fazlası hesabı ─────────────────────────────────────────
-  const fazlaTop = mergedGruplar.reduce((s, g) => {
-    const f = g.tamamlanan + g.sapma - g.hedef
-    return s + (f > 0 ? f : 0)
-  }, 0)
+  // ── 7. Frekans fazlası hesabı (ekstra frekansiyel toplamı) ─────────────
+  const fazlaTop = mergedGruplar.reduce((s, g) => s + (g.ekstra ?? 0), 0)
 
   // ═══ ŞABLON DOLDURMA ═══════════════════════════════════════════════════
   const sheets: SheetData[] = []
@@ -186,9 +183,9 @@ export async function GET(req: NextRequest) {
     c('E', r, gm.hedef > 0 ? Math.round(gm.tamamlanan / gm.hedef * 100) / 100 : 0) // oran
     c('F', r, gm.sapma)
     c('G', r, gm.kayip)
-    const gF = gm.tamamlanan + gm.sapma - gm.hedef
-    c('H', r, gF > 0 ? gF : 0)
-    c('I', r, gm.hedef > 0 ? Math.round((gm.tamamlanan + gm.sapma) / gm.hedef * 100) / 100 : 0)
+    // Fazla = ekstra frekansiyel (kural dışı tamamlanan)
+    c('H', r, gm.ekstra ?? 0)
+    c('I', r, gm.hedef > 0 ? Math.round((gm.tamamlanan + gm.sapma + (gm.ekstra ?? 0)) / gm.hedef * 100) / 100 : 0)
   }
 
   // Hakediş Faktörleri (K-R, satır 12'den)

@@ -23,6 +23,7 @@ export interface GrupMetrik {
   tamamlanan: number
   sapma: number
   kayip: number
+  ekstra: number        // Ekstra frekansiyel (kural dışı) tamamlanan sayısı
   basariOrani: string
   genelOran: string
 }
@@ -92,11 +93,12 @@ export interface GenelRaporData {
   gunSayisi: number
   raporuAlan: string
   // Özet
-  toplamGorev: number
-  toplamTamamlanan: number
-  toplamSapma: number
-  toplamKayip: number
-  genelBasari: number
+  toplamGorev: number        // Hedef: kural-üretimli görev sayısı
+  toplamTamamlanan: number   // Kural tamamlanan + ekstra tamamlanan (başarıya katılır)
+  toplamSapma: number        // Sadece kural-üretimli
+  toplamKayip: number        // Sadece kural-üretimli
+  toplamEkstra: number       // kural_id IS NULL & TAMAMLANDI
+  genelBasari: number        // Ekstra dahil (>%100 olabilir)
   // Tablo verileri
   grupMetrikleri: GrupMetrik[]
   tamamlananGorevler: TamamlananRow[]
@@ -238,7 +240,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
 
   // 3. Görevleri çek: aktif tablo + arşiv tablosu birleşik
   // Arşiv tablosu terminal durumları (TAMAMLANDI, ZAMANI_GECMIS vb.) tutar
-  const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,tamamlanma_tarihi,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep'
+  const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,tamamlanma_tarihi,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
 
   const baslangicUTC = filters.raporBaslangic ? new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString() : null
   const bitisUTC = filters.raporBitis ? new Date(filters.raporBitis + 'T23:59:59+03:00').toISOString() : null
@@ -263,6 +265,12 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   const tumGorevler = Array.from(arsivMap.values()).filter((g: any) =>
     withinRange(g.aktif_olma_tarihi, filters.raporBaslangic, filters.raporBitis)
   )
+
+  // KURAL ÜRETİMLİ vs EKSTRA FREKANSİYEL AYRIMI
+  //   kural_id IS NOT NULL → kural tarafından üretilmiş frekansiyel görev (hedef hesabına girer)
+  //   kural_id IS NULL     → mobilden eklenen ekstra frekansiyel (hedefe girmez, tamamlanan'a eklenir)
+  const kuralGorevler  = tumGorevler.filter((g: any) => g.kural_id != null)
+  const ekstraGorevler = tumGorevler.filter((g: any) => g.kural_id == null)
 
   // 4. Kullanıcı isimleri + proje personel ID seti
   const userIds = Array.from(new Set(tumGorevler.flatMap((g: any) =>
@@ -329,7 +337,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     kayip: number
   }>()
 
-  for (const g of tumGorevler) {
+  // Metric hesabı SADECE kural-üretimli görevler üzerinden yapılır.
+  // Ekstra frekansiyel (kural_id IS NULL) hedef/kayıp hesabına girmez.
+  for (const g of kuralGorevler) {
     const lid = (g as any).lokasyon_id
     if (!lid) continue
     if (!lokGorevCount.has(lid)) lokGorevCount.set(lid, { gunlukFrekansToplamı: 0, tamamlanan: 0, sapma: 0, kayip: 0 })
@@ -357,6 +367,15 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     else if (durum === 'ZAMANINDA_YAPILAMAYAN') entry.sapma++
     else if (durum === 'ZAMANI_GECMIS' || durum === 'IPTAL' || durum === 'SILINDI' || durum === 'BEKLEMEDE') entry.kayip++
   }
+
+  // EKSTRA FREKANSİYEL: lokasyon başına tamamlanan ekstra sayısı (rapor özetinde gösterilir)
+  const lokEkstraCount = new Map<string, number>()
+  for (const g of ekstraGorevler) {
+    if ((g as any).durum !== 'TAMAMLANDI') continue
+    const lid = (g as any).lokasyon_id
+    if (!lid) continue
+    lokEkstraCount.set(lid, (lokEkstraCount.get(lid) ?? 0) + 1)
+  }
   // Günlük frekans = günlükFrekansToplamı / gunSayisi
   // (11 gün × 6/gün = 66 → toplam 66 kayıt, 66/11 = 6 günlük frekans)
 
@@ -370,13 +389,14 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     lokTanim: string,
     ustLokasyon: string,
   ): GrupMetrik | null {
-    let tamamlanan = 0, sapma = 0, kayip = 0
+    let tamamlanan = 0, sapma = 0, kayip = 0, ekstra = 0
     for (const id of ids) {
       const e = lokGorevCount.get(id)
       if (!e) continue
       tamamlanan += e.tamamlanan
       sapma      += e.sapma
       kayip      += e.kayip
+      ekstra     += lokEkstraCount.get(id) ?? 0
     }
     // Vardiya frekans: lokasyonlar tablosundaki gunluk_frekans_sayisi toplamı
     let gunlukFrekans = 0
@@ -384,7 +404,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       const lok = lokMap.get(id) as any
       if (lok?.gunluk_frekans_sayisi) gunlukFrekans += lok.gunluk_frekans_sayisi
     }
-    const hazirAcik = (tumGorevler as any[]).filter((g: any) =>
+    // Hazır/Açık/İşlemde sadece kural-üretimli görevlerden sayılır
+    const hazirAcik = (kuralGorevler as any[]).filter((g: any) =>
       ids.includes(g.lokasyon_id) && (g.durum === 'HAZIR' || g.durum === 'ACIK' || g.durum === 'ISLEMDE')
     ).length
     const hedef = tamamlanan + sapma + kayip + hazirAcik
@@ -392,9 +413,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     if (gunlukFrekans === 0 && hedef > 0) {
       gunlukFrekans = gunSayisi > 0 ? Math.round(hedef / gunSayisi) : hedef
     }
-    // Unique görev tanımı sayısı (kural sayısı)
+    // Unique görev tanımı sayısı (kural sayısı) — sadece kural-üretimli görevler
     const taninCounts = new Map<string, number>()
-    for (const g of tumGorevler) {
+    for (const g of kuralGorevler) {
       if (ids.includes((g as any).lokasyon_id)) {
         const t = (g as any).tanim ?? ''
         if (t) taninCounts.set(t, (taninCounts.get(t) ?? 0) + 1)
@@ -403,11 +424,13 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     const kuralSayisi = taninCounts.size
     const gorevTanimi = taninCounts.size > 0
       ? Array.from(taninCounts.entries()).sort((a, b) => b[1] - a[1])[0][0] : ''
-    const basariOran = hedef > 0 ? Math.round((tamamlanan / hedef) * 100) : 0
-    const genelOran  = hedef > 0 ? Math.round(((tamamlanan + sapma) / hedef) * 100) : 0
+    // Başarı = (kural tamamlanan + ekstra) / hedef → ekstra başarıyı ARTIRIR, hedefi değiştirmez
+    const gerceklesen = tamamlanan + ekstra
+    const basariOran = hedef > 0 ? Math.round((gerceklesen / hedef) * 100) : 0
+    const genelOran  = hedef > 0 ? Math.round(((gerceklesen + sapma) / hedef) * 100) : 0
     return {
       grup: grupAd, ustLokasyon, lokasyon: lokTanim, gorevTanimi,
-      gunlukFrekans, kuralSayisi, hedef, tamamlanan, sapma, kayip,
+      gunlukFrekans, kuralSayisi, hedef, tamamlanan, sapma, kayip, ekstra,
       basariOrani: `%${basariOran}`, genelOran: `%${genelOran}`,
     }
   }
@@ -454,13 +477,15 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       } else {
         const yH = m.hedef + gm.hedef, yT = m.tamamlanan + gm.tamamlanan
         const yS = m.sapma + gm.sapma,  yK = m.kayip + gm.kayip, yG = m.gunlukFrekans + gm.gunlukFrekans
+        const yE = m.ekstra + gm.ekstra
         const yKS = m.kuralSayisi + gm.kuralSayisi
+        const yGer = yT + yE
         birlesik.set(gm.grup, {
           grup: gm.grup, ustLokasyon: 'Tümü', lokasyon: 'Tümü',
           gorevTanimi: m.gorevTanimi || gm.gorevTanimi,
-          gunlukFrekans: yG, kuralSayisi: yKS, hedef: yH, tamamlanan: yT, sapma: yS, kayip: yK,
-          basariOrani: `%${yH > 0 ? Math.round(yT / yH * 100) : 0}`,
-          genelOran:   `%${yH > 0 ? Math.round((yT + yS) / yH * 100) : 0}`,
+          gunlukFrekans: yG, kuralSayisi: yKS, hedef: yH, tamamlanan: yT, sapma: yS, kayip: yK, ekstra: yE,
+          basariOrani: `%${yH > 0 ? Math.round(yGer / yH * 100) : 0}`,
+          genelOran:   `%${yH > 0 ? Math.round((yGer + yS) / yH * 100) : 0}`,
         })
       }
     }
@@ -471,52 +496,62 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   // Grup yoksa genel toplamı göster
   if (grupMetrikleri.length === 0) {
     let hedef = 0, tamamlanan = 0, sapma = 0, kayip = 0
-    for (const g of tumGorevler) {
+    // Hedef/kayıp/sapma: sadece kural-üretimli görevler üzerinden
+    for (const g of kuralGorevler) {
       const durum = (g as any).durum
-      hedef++  // TÜM görevler hedefe dahil (duruma bakılmaz)
+      hedef++
       if (durum === 'TAMAMLANDI') tamamlanan++
       else if (durum === 'ZAMANINDA_YAPILAMAYAN') sapma++
       else if (durum === 'ZAMANI_GECMIS' || durum === 'IPTAL' || durum === 'SILINDI' || durum === 'BEKLEMEDE') kayip++
       // HAZIR, ACIK, ISLEMDE: hedefe girer ama kategoriye girmez
     }
-    if (hedef > 0) {
+    // Ekstra: tüm tamamlanan ekstra frekansiyeller
+    const ekstra = ekstraGorevler.filter((g: any) => g.durum === 'TAMAMLANDI').length
+    if (hedef > 0 || ekstra > 0) {
       // Lokasyonlar tablosundan frekans topla
-      const gorevLokIds = new Set(tumGorevler.map((g: any) => g.lokasyon_id).filter(Boolean))
-      let lokFrekTop = 0, lokFrekCount = 0
+      const gorevLokIds = new Set(kuralGorevler.map((g: any) => g.lokasyon_id).filter(Boolean))
+      let lokFrekTop = 0
       for (const lid of gorevLokIds) {
         const lok = lokMap.get(lid) as any
-        if (lok?.gunluk_frekans_sayisi > 0) { lokFrekTop += lok.gunluk_frekans_sayisi; lokFrekCount++ }
+        if (lok?.gunluk_frekans_sayisi > 0) { lokFrekTop += lok.gunluk_frekans_sayisi }
       }
+      const gerceklesen = tamamlanan + ekstra
       grupMetrikleri.push({
         grup: 'Genel',
         ustLokasyon: '',
         lokasyon: ustLokTanim || altLokTanim || 'Tüm Lokasyonlar',
         gunlukFrekans: lokFrekTop > 0 ? lokFrekTop : Math.round(hedef / gunSayisi),
-        kuralSayisi: new Set(tumGorevler.map((g: any) => g.tanim).filter(Boolean)).size,
+        kuralSayisi: new Set(kuralGorevler.map((g: any) => g.tanim).filter(Boolean)).size,
         hedef,
         tamamlanan,
         sapma,
         kayip,
-        basariOrani: `%${hedef > 0 ? Math.round((tamamlanan / hedef) * 100) : 0}`,
-        genelOran: `%${hedef > 0 ? Math.round(((tamamlanan + sapma) / hedef) * 100) : 0}`,
+        ekstra,
+        basariOrani: `%${hedef > 0 ? Math.round((gerceklesen / hedef) * 100) : 0}`,
+        genelOran:   `%${hedef > 0 ? Math.round(((gerceklesen + sapma) / hedef) * 100) : 0}`,
         gorevTanimi: '',
       })
     }
   }
 
   // 8. Özet toplamlar
-  // Hedef = TÜM görevler (duruma bakılmaz) — rapor tarih aralığında kaydedilen tümü
-  const toplamGorev      = tumGorevler.length
-  const toplamTamamlanan = tumGorevler.filter((g: any) => g.durum === 'TAMAMLANDI').length
-  const toplamSapma      = tumGorevler.filter((g: any) => g.durum === 'ZAMANINDA_YAPILAMAYAN').length
-  // Kayıp: ZAMANI_GECMIS + IPTAL + SILINDI + BEKLEMEDE (HAZIR/ACIK/ISLEMDE aktif sayılır, kayıp değil)
-  const toplamKayip      = tumGorevler.filter((g: any) =>
+  // Hedef = kural-üretimli görevler (kural_id IS NOT NULL) — duruma bakılmaz
+  // Tamamlanan = kural tamamlanan + ekstra tamamlanan (başarıya katılır)
+  // Ekstra     = kural_id IS NULL olan ve TAMAMLANDI — hedefi değiştirmez, başarı oranını artırır
+  // Sapma/Kayıp = sadece kural-üretimli
+  const toplamGorev          = kuralGorevler.length
+  const toplamTamamlananKural = kuralGorevler.filter((g: any) => g.durum === 'TAMAMLANDI').length
+  const toplamEkstra         = ekstraGorevler.filter((g: any) => g.durum === 'TAMAMLANDI').length
+  const toplamTamamlanan     = toplamTamamlananKural + toplamEkstra
+  const toplamSapma          = kuralGorevler.filter((g: any) => g.durum === 'ZAMANINDA_YAPILAMAYAN').length
+  const toplamKayip          = kuralGorevler.filter((g: any) =>
     g.durum === 'ZAMANI_GECMIS' || g.durum === 'IPTAL' || g.durum === 'SILINDI' || g.durum === 'BEKLEMEDE'
   ).length
+  // Başarı: ekstra dahil tamamlanan / hedef → ekstra varsa %100'ü geçebilir (örn %115)
   const genelBasari  = toplamGorev > 0 ? Math.round((toplamTamamlanan / toplamGorev) * 100) : 0
 
-  // 9. Tamamlanan görevler
-  const tamamlananGorevler: TamamlananRow[] = tumGorevler
+  // 9. Tamamlanan görevler (sadece kural-üretimli — ekstra olanlar Frekans Dışı bölümünde)
+  const tamamlananGorevler: TamamlananRow[] = kuralGorevler
     .filter((g: any) => g.durum === 'TAMAMLANDI')
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
@@ -535,9 +570,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       }
     })
 
-  // 10. Sapma görevleri
+  // 10. Sapma görevleri (sadece kural-üretimli — ekstra'da sapma olmaz)
   // Sapma: sadece ZAMANINDA_YAPILAMAYAN
-  const sapmaGorevler: SapmaRow[] = tumGorevler
+  const sapmaGorevler: SapmaRow[] = kuralGorevler
     .filter((g: any) => g.durum === 'ZAMANINDA_YAPILAMAYAN')
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
@@ -570,7 +605,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     BEKLEMEDE: 'Beklemede kaldı',
     KAPATILDI: 'Kapatıldı',
   }
-  const kayipGorevler: KayipRow[] = tumGorevler
+  // Kayıp görevler: sadece kural-üretimli (ekstra'da kayıp olmaz, TAMAMLANDI olarak açılır)
+  const kayipGorevler: KayipRow[] = kuralGorevler
     .filter((g: any) => !KAYIP_HARIC_DURUMLAR.has(g.durum))
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
@@ -591,17 +627,18 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       }
     })
 
-  // 11. Frekans dışı görevler (gorevler tablosu — spesifik görevler)
+  // 11. Frekans dışı görevler — mobilden eklenen EKSTRA FREKANSİYEL
+  // (canli_gorevler WHERE kural_id IS NULL AND durum = 'TAMAMLANDI')
+  // Spesifik görevler (gorevler tablosu) bu rapora dahil değildir.
   const frekansDisiGorevler: FrekansDisiRow[] = []
-  if (targetLokasyonIds && targetLokasyonIds.length > 0 || !filters.ustLokasyonId) {
-    // Grup → lokasyon → üst lokasyon haritası (frekans dışı için)
-    const lokGrupMap = new Map<string, string>() // lokasyon_id → grup adı
-    const lokUstMap  = new Map<string, string>() // lokasyon_id → üst lokasyon adı
+  {
+    // Lokasyon → grup adı / üst lokasyon haritası
+    const lokGrupMap = new Map<string, string>()
+    const lokUstMap  = new Map<string, string>()
     for (const [grupId, lokIds] of grupLokMap) {
       const grup = (gruplar ?? []).find((g: any) => g.id === grupId) as any
       for (const lid of lokIds) {
         if (grup) lokGrupMap.set(lid, grup.ad ?? '')
-        // Üst lokasyon: en tepedeki parent
         let cur = lokMap.get(lid) as any
         let ust = cur
         while (cur?.parent_id) { cur = lokMap.get(cur.parent_id) as any; if (cur) ust = cur }
@@ -609,39 +646,32 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       }
     }
 
-    let spQ = admin
-      .from('gorevler')
-      .select('id,tanim,lokasyon_id,islemi_yapan_id,atanan_kullanici_id,tamamlanma_tarihi,olusturma_tarihi,durum,aciklama')
-      .eq('firma_id', filters.firmaId)
-    if (filters.projeId) spQ = (spQ as any).eq('proje_id', filters.projeId)
-    if (targetLokasyonIds?.length) spQ = spQ.in('lokasyon_id', targetLokasyonIds)
-    if (filters.raporBaslangic) spQ = spQ.gte('olusturma_tarihi', filters.raporBaslangic)
-    if (filters.raporBitis) spQ = spQ.lte('olusturma_tarihi', filters.raporBitis + 'T23:59:59')
-    const { data: spGorevler } = await spQ
-
-    // Spesifik görevlerin kullanıcı id'lerini topla
-    const spUserIds = Array.from(new Set(
-      (spGorevler ?? []).flatMap((g: any) => [g.islemi_yapan_id, g.atanan_kullanici_id].filter(Boolean))
+    const ekstraTamamlanan = ekstraGorevler.filter((g: any) => g.durum === 'TAMAMLANDI')
+    // Ekstra görevleri kullanan personel id'lerini topla (userMap'te eksik olanlar için)
+    const ekstraUserIds = Array.from(new Set(
+      ekstraTamamlanan.flatMap((g: any) =>
+        [g.islemi_yapan_id, g.tamamlayan_kullanici_id].filter(Boolean)
+      )
     ))
-    if (spUserIds.length > 0) {
-      const { data: spUsers } = await admin.from('users').select('id,isim_soyisim').in('id', spUserIds)
-      for (const u of spUsers ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
+    const missingEkstraUserIds = ekstraUserIds.filter(id => !userMap.has(id))
+    if (missingEkstraUserIds.length > 0) {
+      const { data: eu } = await admin.from('users').select('id,isim_soyisim').in('id', missingEkstraUserIds)
+      for (const u of eu ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
     }
 
-    for (let i = 0; i < (spGorevler ?? []).length; i++) {
-      const g = (spGorevler as any[])[i]
+    ekstraTamamlanan.forEach((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
-      const personelId = g.islemi_yapan_id ?? g.atanan_kullanici_id ?? ''
+      const personelId = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? ''
       frekansDisiGorevler.push({
         sn: i + 1,
         ustLokasyon: lokUstMap.get(g.lokasyon_id) ?? '',
         grupTanimi: lokGrupMap.get(g.lokasyon_id) ?? '',
         lokasyonTanimi: lok?.tanim ?? '',
         personel: userMap.get(personelId) ?? '',
-        tarihSaat: formatDate(g.tamamlanma_tarihi ?? g.olusturma_tarihi),
-        aciklama: g.aciklama ?? g.tanim ?? '',
+        tarihSaat: formatDate(g.tamamlanma_tarihi ?? g.durum_degisim_tarihi),
+        aciklama: g.tanim ?? '',
       })
-    }
+    })
   }
 
   // 12. Atanan frekanslar: atanan_kullanici_id dolu olan tüm canli_gorevler
@@ -661,7 +691,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     for (const u of extraUsers ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
   }
 
-  const atananFrekanslar: AtananFrekanRow[] = tumGorevler
+  // Atanan Frekanslar: sadece kural-üretimli (ekstra atanamaz)
+  const atananFrekanslar: AtananFrekanRow[] = kuralGorevler
     .filter((g: any) => g.atanan_kullanici_id)
     .sort((a: any, b: any) => new Date(b.olusturma_tarihi ?? 0).getTime() - new Date(a.olusturma_tarihi ?? 0).getTime())
     .map((g: any, i: number) => {
@@ -708,6 +739,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     toplamTamamlanan,
     toplamSapma,
     toplamKayip,
+    toplamEkstra,
     genelBasari,
     grupMetrikleri,
     tamamlananGorevler,

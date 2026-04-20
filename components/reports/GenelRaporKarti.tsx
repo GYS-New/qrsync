@@ -20,7 +20,7 @@ type Lokasyon = { id: string; tanim: string; parent_id: string | null }
 
 type GrupMetrik = {
   grup: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gunlukFrekans: number; kuralSayisi: number
-  hedef: number; tamamlanan: number; sapma: number; kayip: number
+  hedef: number; tamamlanan: number; sapma: number; kayip: number; ekstra: number
   basariOrani: string; genelOran: string
 }
 type TamamlananRow  = { sn: number; personel: string; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string }
@@ -33,7 +33,7 @@ type RaporData = {
   firmaAdi: string; projeAdi: string; ustLokTanim: string; altLokTanim: string
   raporTarihLabel: string; gunSayisi: number; raporuAlan: string
   toplamGorev: number; toplamTamamlanan: number; toplamSapma: number
-  toplamKayip: number; genelBasari: number
+  toplamKayip: number; toplamEkstra: number; genelBasari: number
   grupMetrikleri: GrupMetrik[]
   tamamlananGorevler: TamamlananRow[]
   sapmaGorevler: SapmaRow[]
@@ -685,11 +685,11 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 {data.frekansDisiGorevler.length > 0 && (
                   <div className="verde-card" style={{ padding: '16px 20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Spesifik Görevler)</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Ekstra Frekansiyel)</div>
                       <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{data.frekansDisiGorevler.length} kayıt</span>
                     </div>
                     <DataTable
-                      headers={['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH-SAAT', 'AÇIKLAMA']}
+                      headers={['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH-SAAT', 'GÖREV TANIMI']}
                       rows={data.frekansDisiGorevler.map(r => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarihSaat, r.aciklama])}
                     />
                   </div>
@@ -712,14 +712,17 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   const tTam    = data.grupMetrikleri.reduce((s, g) => s + g.tamamlanan, 0)
                   const tSap    = data.grupMetrikleri.reduce((s, g) => s + g.sapma, 0)
                   const tKay    = data.grupMetrikleri.reduce((s, g) => s + g.kayip, 0)
-                  const tBas    = tHedef > 0 ? Math.round(tTam / tHedef * 100) : 0
-                  const tGenel  = tHedef > 0 ? Math.round((tTam + tSap) / tHedef * 100) : 0
+                  const tEks    = data.grupMetrikleri.reduce((s, g) => s + (g.ekstra ?? 0), 0)
+                  const tGer    = tTam + tEks
+                  const tBas    = tHedef > 0 ? Math.round(tGer / tHedef * 100) : 0
+                  const tGenel  = tHedef > 0 ? Math.round((tGer + tSap) / tHedef * 100) : 0
                   return (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px,1fr))', gap: 8, marginBottom: 14, padding: '10px 12px', background: T.greenLight, borderRadius: 8, border: `1px solid #bbf7d0` }}>
                       {[
                         { label: 'Vardiya Frekans', value: tGunluk, color: T.blue },
                         { label: 'Hedef',          value: tHedef,  color: T.blue },
                         { label: 'Tamamlanan',     value: tTam,    color: T.green },
+                        { label: 'Ekstra',         value: tEks,    color: T.blueMid },
                         { label: 'Sapma',          value: tSap,    color: T.amber },
                         { label: 'Kayıp',          value: tKay,    color: T.red },
                         { label: 'Başarı',         value: `%${tBas}`, color: T.green },
@@ -737,9 +740,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   headers={['SN', 'GRUP',
                     altAltLokasyonId ? 'ALT LOKASYON' : altLokasyonId ? 'ÜST LOKASYON' : 'ÜST LOKASYON',
                     altAltLokasyonId ? 'ALT-ALT LOKASYON' : altLokasyonId ? 'ALT LOKASYON' : 'LOKASYON',
-                    'VARDİYA FREKANS', !ustLokasyonId ? 'VARDİYA SAYISI' : 'GÜNLÜK VARDİYA', 'HEDEF', 'TAMAMLANAN', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
-                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, !ustLokasyonId ? g.kuralSayisi * (data.gunSayisi || 1) : g.kuralSayisi, g.hedef, g.tamamlanan, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
-                  accentCol={10} accentColor={T.greenMid} leftCols={[1, 2, 3]}
+                    'VARDİYA FREKANS', !ustLokasyonId ? 'VARDİYA SAYISI' : 'GÜNLÜK VARDİYA', 'HEDEF', 'TAMAMLANAN', 'EKSTRA', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
+                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, !ustLokasyonId ? g.kuralSayisi * (data.gunSayisi || 1) : g.kuralSayisi, g.hedef, g.tamamlanan, g.ekstra ?? 0, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
+                  accentCol={11} accentColor={T.greenMid} leftCols={[1, 2, 3]}
                 />
               </div>
             )}
@@ -790,7 +793,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {activeTab === 'Frekans Dışı' && (
               <div className="verde-card" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Spesifik Görevler)</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Ekstra Frekansiyel)</div>
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{data.frekansDisiGorevler.length} kayıt</span>
                 </div>
                 <DataTable
