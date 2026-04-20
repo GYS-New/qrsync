@@ -493,7 +493,14 @@ async function simuleCeklistTamamla(admin: any, gorevId: string, sablonId: strin
       }
     })
 
-    await admin.from('checklist_sonuc_maddeleri').insert(maddeRows)
+    // Madde insert hatasında başlığı da rollback et — maddesiz orphan başlık kalmasın
+    // (18 Nisan incident kökü: hata sessizce yutuluyordu, başlık kaldı, maddeler yok)
+    const { error: maddeErr } = await admin.from('checklist_sonuc_maddeleri').insert(maddeRows)
+    if (maddeErr) {
+      await admin.from('checklist_sonuc_basliklari').delete().eq('id', sonucRow.id)
+      console.error(`[SIMULASYON] Madde insert basarisiz, baslik rollback edildi (gorev: ${gorevId}):`, maddeErr.message)
+      return
+    }
   } catch (e: any) {
     console.error(`[SIMULASYON] Çeklist hata (görev: ${gorevId}):`, e.message)
   }
