@@ -9,6 +9,7 @@ import ProataLogo, { ProataMark } from '@/components/brand/ProataLogo'
 import { useProje } from '@/components/projeler/ProjeContext'
 import { useFirma } from '@/components/layout/FirmaContext'
 import IoAsistan from './IoAsistan'
+import IoMascot from './IoMascot'
 
 interface NavItem {
   label: string
@@ -135,13 +136,19 @@ type SidebarCounts = {
 
 /** İO düşünce baloncuğu — boşta iken rastgele düşünceler gösterir */
 const IO_THOUGHTS = ['🤔', '...?', '💭', 'hmm...', '✨', '🔍', '...!', '💡']
-function IoThinkingBubble() {
+/**
+ * İO Asistan avatar bloğu — sidebar'da gösterilen maskot + düşünce baloncuğu.
+ * Baloncuk periyodik olarak belirir ve eş zamanlı olarak maskotu "thinking" ifadesine sokar,
+ * baloncuk kaybolunca maskot kendi otomatik ifade döngüsüne geri döner.
+ */
+function IoAsistanAvatar({ onClick }: { onClick: () => void }) {
   const [thought, setThought] = useState<string | null>(null)
   const [phase, setPhase] = useState<'show' | 'hide'>('show')
 
   useEffect(() => {
     let showTimeout: ReturnType<typeof setTimeout>
     let hideTimeout: ReturnType<typeof setTimeout>
+    let clearTimeoutId: ReturnType<typeof setTimeout>
 
     function schedule() {
       // 8-15 saniye arası rastgele bekle
@@ -153,17 +160,29 @@ function IoThinkingBubble() {
         // 2.5-4 saniye göster sonra kapat
         hideTimeout = setTimeout(() => {
           setPhase('hide')
-          setTimeout(() => { setThought(null); schedule() }, 300)
+          clearTimeoutId = setTimeout(() => { setThought(null); schedule() }, 300)
         }, 2500 + Math.random() * 1500)
       }, delay)
     }
 
     schedule()
-    return () => { clearTimeout(showTimeout); clearTimeout(hideTimeout) }
+    return () => { clearTimeout(showTimeout); clearTimeout(hideTimeout); clearTimeout(clearTimeoutId) }
   }, [])
 
-  if (!thought) return null
-  return <div className={`io-thought-bubble ${phase}`}>{thought}</div>
+  return (
+    <div className="io-avatar-wrap">
+      <div
+        className="io-avatar"
+        onClick={onClick}
+        title="İO Asistan"
+        style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14, cursor: 'pointer' }}
+      >
+        <IoMascot size={86} expression={thought ? 'thinking' : undefined} />
+      </div>
+      <div className="io-ground-shadow" style={{ marginLeft: -14 }} />
+      {thought && <div className={`io-thought-bubble ${phase}`}>{thought}</div>}
+    </div>
+  )
 }
 
 
@@ -460,14 +479,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
               }
             `}</style>
             {ioAsistanAktif && (
-              <div className="io-avatar-wrap">
-                <div className="io-avatar" onClick={() => setAsistanOpen(true)} title="İO Asistan" style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14, cursor: 'pointer' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-                <div className="io-ground-shadow" style={{ marginLeft: -14 }} />
-                <IoThinkingBubble />
-              </div>
+              <IoAsistanAvatar onClick={() => setAsistanOpen(true)} />
             )}
             <div style={{ flex: 1, height: 48, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}

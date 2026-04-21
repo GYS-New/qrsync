@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import IoMascot, { type IoExpression } from './IoMascot'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -24,11 +25,38 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [streamingText, setStreamingText] = useState('')
+  const [mascotExpression, setMascotExpression] = useState<IoExpression | undefined>(undefined)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
+
+  // Chat açılınca maskot kısa süreli "happy" yapar, sonra kendi otomatik döngüsüne döner
+  useEffect(() => {
+    if (!open) return
+    setMascotExpression('happy')
+    const t = setTimeout(() => setMascotExpression(undefined), 2000)
+    return () => clearTimeout(t)
+  }, [open])
+
+  // Loading sırasında "thinking" ifadesi
+  useEffect(() => {
+    if (loading) {
+      setMascotExpression('thinking')
+    } else {
+      // loading bittiğinde — hata tetiklenmemişse — otomatik döngüye bırak
+      setMascotExpression(prev => (prev === 'thinking' ? undefined : prev))
+    }
+  }, [loading])
+
+  // Geçici ifadeleri (sad, surprised, happy) belirli süre sonra temizle
+  const expressionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  function flashExpression(expr: IoExpression, ms = 2200) {
+    if (expressionTimerRef.current) clearTimeout(expressionTimerRef.current)
+    setMascotExpression(expr)
+    expressionTimerRef.current = setTimeout(() => setMascotExpression(undefined), ms)
+  }
 
   // Auto-scroll
   useEffect(() => {
@@ -65,8 +93,10 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
         if (errData.error === 'rate_limit') {
+          flashExpression('surprised', 2500)
           setMessages(prev => [...prev, { role: 'assistant', content: 'Çok fazla mesaj gönderdiniz. Lütfen biraz bekleyin. ⏳' }])
         } else {
+          flashExpression('sad', 2500)
           console.error('[io-asistan] Error:', errData)
           setMessages(prev => [...prev, { role: 'assistant', content: `Bir hata oluştu (${errData.error || res.status}). Lütfen tekrar deneyin.` }])
         }
@@ -104,6 +134,7 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
         setMessages(prev => [...prev, { role: 'assistant', content: fullText }])
       }
     } catch {
+      flashExpression('sad', 2500)
       setMessages(prev => [...prev, { role: 'assistant', content: 'Bağlantı hatası. Lütfen tekrar deneyin.' }])
     } finally {
       setLoading(false)
@@ -150,9 +181,8 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
         background: 'linear-gradient(135deg, #042C53, #0C447C)',
         padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12,
       }}>
-        <div style={{ width: 42, height: 42, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/io.gif" alt="İO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div style={{ width: 42, height: 42, borderRadius: 12, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)' }}>
+          <IoMascot size={42} expression={mascotExpression} />
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>İO Asistan</div>
