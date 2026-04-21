@@ -274,11 +274,11 @@ export default function ReportsHubClient({
     // hakedis ve yeni rapor kartları firma_rapor_turleri dışında yönetilir
     const FIRMA_RAPOR_DISI = new Set(['hakedis', 'frekansiyel_rapor', 'spesifik_rapor'])
 
-    const OZELLESTIR_IDS = new Set(['rapor_ozellestir', 'frekansiyel_rapor', 'spesifik_rapor'])
     const kartlar = RAPOR_KARTLARI
       .filter(k => k.id !== 'hakedis' || hakedisGoster)
-      // Firma ayarı rapor_ozellestir_aktif = false ise 3 kart gizlensin
-      .filter(k => !OZELLESTIR_IDS.has(k.id) || ozellestirGoster)
+      // Firma ayarı rapor_ozellestir_aktif = false ise SADECE ana kartı gizle.
+      // Frekansiyel/Spesifik rapor kartları temel özellik, etkilenmez.
+      .filter(k => k.id !== 'rapor_ozellestir' || ozellestirGoster)
       // SA için frekansiyel/spesifik her zaman görünür; TA/U için prop'tan gelir
       .filter(k => {
         if (!isSA) {
