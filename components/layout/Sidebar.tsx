@@ -140,9 +140,13 @@ const IO_THOUGHTS = ['🤔', '...?', '💭', 'hmm...', '✨', '🔍', '...!', '�
  * Baloncuk periyodik olarak belirir ve eş zamanlı olarak maskotu "thinking" ifadesine sokar,
  * baloncuk kaybolunca maskot kendi otomatik ifade döngüsüne geri döner.
  */
+const IO_HOVER_MESSAGE = 'Merhaba! Ben dijital asistanınız İO, size nasıl yardımcı olabilirim?'
+
 function IoAsistanAvatar({ onClick }: { onClick: () => void }) {
   const [thought, setThought] = useState<string | null>(null)
   const [phase, setPhase] = useState<'show' | 'hide'>('show')
+  const [hover, setHover] = useState(false)
+  const [typed, setTyped] = useState('')
 
   useEffect(() => {
     let showTimeout: ReturnType<typeof setTimeout>
@@ -168,18 +172,41 @@ function IoAsistanAvatar({ onClick }: { onClick: () => void }) {
     return () => { clearTimeout(showTimeout); clearTimeout(hideTimeout); clearTimeout(clearTimeoutId) }
   }, [])
 
+  // Daktilo efekti — hover başlayınca harfleri sırayla ekle, hover biterse sıfırla
+  useEffect(() => {
+    if (!hover) { setTyped(''); return }
+    let i = 0
+    const timer = setInterval(() => {
+      i++
+      setTyped(IO_HOVER_MESSAGE.slice(0, i))
+      if (i >= IO_HOVER_MESSAGE.length) clearInterval(timer)
+    }, 32)
+    return () => clearInterval(timer)
+  }, [hover])
+
+  // Baloncuk içeriği: hover aktifse daktilo yazısı, değilse rastgele düşünce emojisi
+  const bubbleContent = hover ? typed : thought
+  const bubbleClass = hover ? 'io-hover-bubble show' : `io-thought-bubble ${phase}`
+
   return (
     <div className="io-avatar-wrap">
       <div
         className="io-avatar"
         onClick={onClick}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
         title="İO Asistan"
         style={{ width: 110, height: 110, borderRadius: 12, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
       >
-        <IoMascot size={110} expression={thought ? 'thinking' : undefined} />
+        <IoMascot size={110} expression={hover ? 'happy' : (thought ? 'thinking' : undefined)} />
       </div>
       <div className="io-ground-shadow" />
-      {thought && <div className={`io-thought-bubble ${phase}`}>{thought}</div>}
+      {bubbleContent && (
+        <div className={bubbleClass}>
+          {bubbleContent}
+          {hover && typed.length < IO_HOVER_MESSAGE.length && <span className="io-caret">|</span>}
+        </div>
+      )}
     </div>
   )
 }
@@ -449,30 +476,50 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
               }
               .io-avatar-wrap { position: relative; }
               .io-avatar { animation: ioFloat 3s ease-in-out infinite; transition: filter 0.3s ease, transform 0.3s ease; }
-              .io-avatar:hover { filter: drop-shadow(0 0 12px rgba(55,138,221,0.6)); transform: scale(1.08) !important; animation-play-state: paused; }
+              .io-avatar:hover { filter: drop-shadow(0 0 16px rgba(55,138,221,0.7)); transform: scale(1.62) !important; animation-play-state: paused; }
               .io-ground-shadow {
                 width: 64px; height: 12px; border-radius: 50%;
                 background: radial-gradient(ellipse, rgba(0,0,0,0.3) 0%, transparent 70%);
                 margin: 0 auto 0; animation: ioShadowPulse 3s ease-in-out infinite;
               }
-              .io-thought-bubble {
-                position: absolute; top: 50%; left: calc(100% + 14px);
+              .io-thought-bubble, .io-hover-bubble {
+                position: absolute; top: 50%; left: calc(100% + 18px);
                 transform: translateY(-50%);
                 background: #fff; border: 2px solid #cbd5e1;
-                border-radius: 14px; padding: 6px 14px;
-                font-size: 16px; color: #475569; font-weight: 700;
-                box-shadow: 0 4px 14px rgba(0,0,0,0.12);
-                pointer-events: none; white-space: nowrap;
+                border-radius: 14px;
+                color: #334155; font-weight: 700;
+                box-shadow: 0 6px 18px rgba(0,0,0,0.14);
+                pointer-events: none;
                 z-index: 10;
+              }
+              .io-thought-bubble {
+                padding: 8px 16px;
+                font-size: 18px;
+                white-space: nowrap;
+              }
+              .io-hover-bubble {
+                padding: 10px 14px;
+                font-size: 14px;
+                line-height: 1.35;
+                max-width: 220px;
+                min-width: 180px;
+                white-space: normal;
+                color: #1f2937;
               }
               .io-thought-bubble.show { animation: ioBubbleInRight 0.35s ease forwards; }
               .io-thought-bubble.hide { animation: ioBubbleOutRight 0.3s ease forwards; }
-              .io-thought-bubble::after {
+              .io-hover-bubble.show { animation: ioBubbleInRight 0.3s ease forwards; }
+              .io-thought-bubble::after, .io-hover-bubble::after {
                 content: ''; position: absolute; left: -6px; top: 50%;
                 width: 10px; height: 10px; background: #fff;
                 border-left: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1;
                 transform: translateY(-50%) rotate(45deg);
               }
+              .io-caret {
+                display: inline-block; width: 2px; margin-left: 1px;
+                animation: ioCaretBlink 0.9s steps(2) infinite;
+              }
+              @keyframes ioCaretBlink { 0%,100% { opacity: 1 } 50% { opacity: 0 } }
               @keyframes ioBubbleInRight {
                 0% { opacity: 0; transform: translateY(-50%) scale(0.3) translateX(-4px); }
                 50% { opacity: 1; transform: translateY(-50%) scale(1.05) translateX(1px); }
