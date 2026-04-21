@@ -79,6 +79,20 @@ export async function POST(req: Request) {
     // iOS bazı QR okuyucular token sonuna \n, \r veya boşluk ekleyebilir — trim şart
     const scanTokenRaw = body?.scan_token as string | undefined
     const scanToken = typeof scanTokenRaw === 'string' ? scanTokenRaw.trim() : scanTokenRaw
+    // Offline queue senkronu — mobil çevrimdışı tamamlanmış işi sonradan gönderiyorsa
+    const offlineSenkron = body?.offline === true
+    // Cihazın yerel zaman damgası (ISO string). Makul aralıkta ise tamamlanma_tarihi olarak
+    // kullanılır. Saati ileri olan cihazlara karşı 5 dk tolerans, çok eskiye 7 gün sınır.
+    const yerelZamanRaw = typeof body?.yerel_zaman === 'string' ? body.yerel_zaman : null
+    const yerelZamanValid = (() => {
+      if (!yerelZamanRaw) return null
+      const t = new Date(yerelZamanRaw).getTime()
+      if (!Number.isFinite(t)) return null
+      const simdi = Date.now()
+      if (t > simdi + 5 * 60 * 1000) return null           // gelecek > 5dk → reddet
+      if (t < simdi - 7 * 24 * 60 * 60 * 1000) return null // 7 günden eski → reddet
+      return new Date(t).toISOString()
+    })()
 
     if (!gorevId) {
       return NextResponse.json({ ok: false, error: 'gorev_id gerekli' }, { status: 400, headers: CORS })
@@ -311,9 +325,13 @@ export async function POST(req: Request) {
       }
     }
 
+    // Tamamlanma zaman damgası: offline senkronda cihazın yerel zamanı kullanılır
+    // (ağ geldiğinde gönderim anı değil, gerçek tamamlama anı). Aksi durumda server now.
+    const tamamlanmaIso = (offlineSenkron && yerelZamanValid) ? yerelZamanValid : nowIso
+
     let sureSaniye: number | null = null
     if (gorev.baslatilma_tarihi) {
-      const ms = new Date(nowIso).getTime() - new Date(gorev.baslatilma_tarihi).getTime()
+      const ms = new Date(tamamlanmaIso).getTime() - new Date(gorev.baslatilma_tarihi).getTime()
       sureSaniye = Math.max(0, Math.floor(ms / 1000))
     }
 
@@ -321,19 +339,19 @@ export async function POST(req: Request) {
     // veya BEKLEMEDE durumdaysa → ZAMANINDA_YAPILAMAYAN; gorevler (spesifik) için
     // süre kontrolü yok, direkt TAMAMLANDI.
     const nextDurum = gorevTipi === 'canli_gorevler'
-      ? resolveLiveCompletionStatusByTask(gorev as any, nowIso)
+      ? resolveLiveCompletionStatusByTask(gorev as any, tamamlanmaIso)
       : 'TAMAMLANDI'
 
     const { error: updateErr } = await admin
       .from(gorevTipi)
       .update({
         durum:                    nextDurum,
-        durum_degisim_tarihi:     nowIso,
-        tamamlanma_tarihi:        nowIso,
+        durum_degisim_tarihi:     tamamlanmaIso,
+        tamamlanma_tarihi:        tamamlanmaIso,
         tamamlanma_suresi_saniye: sureSaniye,
         islemi_yapan_id:          userId,
         ...(gorevTipi === 'canli_gorevler' ? { tamamlayan_kullanici_id: userId } : {}),
-        son_tamamlama_kanali:     'MOBIL',
+        son_tamamlama_kanali:     offlineSenkron ? 'MOBIL_OFFLINE' : 'MOBIL',
       } as any)
       .eq('id', gorevId)
 

@@ -64,6 +64,18 @@ export async function POST(req: Request) {
     const gorevTanim     = typeof gorevTanimRaw === 'string' ? gorevTanimRaw.trim() : ''
     const scanTokenRaw   = body?.scan_token
     const scanToken      = typeof scanTokenRaw === 'string' ? scanTokenRaw.trim() : scanTokenRaw
+    // Offline queue senkronu — mobil çevrimdışı ekstra görevi sonradan gönderiyorsa
+    const offlineSenkron = body?.offline === true
+    const yerelZamanRaw  = typeof body?.yerel_zaman === 'string' ? body.yerel_zaman : null
+    const yerelZamanValid = (() => {
+      if (!yerelZamanRaw) return null
+      const t = new Date(yerelZamanRaw).getTime()
+      if (!Number.isFinite(t)) return null
+      const simdi = Date.now()
+      if (t > simdi + 5 * 60 * 1000) return null
+      if (t < simdi - 7 * 24 * 60 * 60 * 1000) return null
+      return new Date(t).toISOString()
+    })()
 
     if (!lokasyonId) {
       return NextResponse.json({ ok: false, error: 'lokasyon_id gerekli' }, { status: 400, headers: CORS })
@@ -138,6 +150,8 @@ export async function POST(req: Request) {
 
     // Kayıt oluştur
     const nowIso = new Date().toISOString()
+    // Offline senkronda cihazın yerel zamanı tercih edilir (gerçek tamamlanma anı)
+    const eylemIso = (offlineSenkron && yerelZamanValid) ? yerelZamanValid : nowIso
     const { data: insertedRows, error: insertErr } = await admin
       .from('canli_gorevler')
       .insert({
@@ -148,17 +162,17 @@ export async function POST(req: Request) {
         durum:                   'TAMAMLANDI',
         kural_id:                null,
         gunluk_frekans_sayisi:   0,
-        aktif_olma_tarihi:       nowIso,
+        aktif_olma_tarihi:       eylemIso,
         olusturma_tarihi:        nowIso,
-        durum_degisim_tarihi:    nowIso,
-        tamamlanma_tarihi:       nowIso,
-        baslatilma_tarihi:       nowIso,
+        durum_degisim_tarihi:    eylemIso,
+        tamamlanma_tarihi:       eylemIso,
+        baslatilma_tarihi:       eylemIso,
         olusturan_id:            userId,
         baslatan_kullanici_id:   userId,
         islemi_yapan_id:         userId,
         tamamlayan_kullanici_id: userId,
         tamamlanma_suresi_saniye: 0,
-        son_tamamlama_kanali:    'MOBIL',
+        son_tamamlama_kanali:    offlineSenkron ? 'MOBIL_OFFLINE' : 'MOBIL',
       } as any)
       .select('id')
 
@@ -196,7 +210,7 @@ export async function POST(req: Request) {
       gorev_id: yeniGorevId,
       tanim: gorevTanim,
       lokasyon_id: lokasyonId,
-      tamamlanma_tarihi: nowIso,
+      tamamlanma_tarihi: eylemIso,
     }, { headers: CORS })
 
   } catch (error: any) {
