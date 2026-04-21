@@ -121,14 +121,31 @@ export async function fillXlsxTemplate(
       }
     }
 
+    // Şablondaki referans satırın ham içeriğini (stilli hücreler) bir kez hesapla
+    // Self-closing row'lar bu referans ile genişletilecek → stil/border/fill korunur.
+    let refRowCells: string | null = null
+    if (sd.templateDataRow) {
+      const refRowRegex = new RegExp(`<row r="${sd.templateDataRow}"[^>]*>([\\s\\S]*?)</row>`)
+      const refMatch0 = xml.match(refRowRegex)
+      if (refMatch0) refRowCells = refMatch0[1]
+    }
+
     // Her hücreyi güncelle
     for (const [rowNum, cols] of rowMap) {
-      // Önce self-closing row'u genişletilmiş forma çevir (<row r="9"/> → <row r="9"></row>)
-      // Aksi halde rowRegex yakalayamaz, alt dalda duplicate row yazılır ve Excel bozulur.
+      // Self-closing row'u genişletilmiş forma çevir + template stillerini kopyala
+      // <row r="9"/> → <row r="9"><c r="A9" s="7"/><c r="B9" s="7"/>...</row>
+      // Böylece border/fill/font template'ten gelir, cell değerleri sonra override eder.
       const selfRegex = new RegExp(`<row r="${rowNum}"([^/>]*?)/>`)
       const selfMatch = xml.match(selfRegex)
       if (selfMatch) {
-        xml = xml.replace(selfMatch[0], `<row r="${rowNum}"${selfMatch[1]}></row>`)
+        let inner = ''
+        if (refRowCells) {
+          // Referans hücrelerini bu satıra kopyala: ref="A4" → r="A9"
+          inner = refRowCells
+            .replace(/r="([A-Z]+)\d+"/g, (_, col) => `r="${col}${rowNum}"`)
+            .replace(/<v>[^<]*<\/v>/g, '') // değerleri temizle, stil kalsın
+        }
+        xml = xml.replace(selfMatch[0], `<row r="${rowNum}"${selfMatch[1]}>${inner}</row>`)
       }
 
       // Satır var mı?
