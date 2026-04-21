@@ -35,37 +35,58 @@ export async function POST(req: NextRequest) {
     .lte('sonraki_gonderim_tarihi', now.toISOString())
     .limit(20)
 
+  // TR takvim günü hesabı için helper'lar — server UTC'de ama operasyon TR'de.
+  // Eski kod now.getDay()/getMonth() kullanıyordu → gece 21-23 UTC (00-02 TR)
+  // aralığında çalışırsa yanlış gün/hafta/ay sınırlarıyla veri toplanıyordu.
+  const TR_TZ = 'Europe/Istanbul'
+  const trDate = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone: TR_TZ }) // YYYY-MM-DD
+  // TR günü (0=Pazar...6=Cumartesi)
+  const trDayOfWeek = (d: Date) => {
+    const trIso = d.toLocaleString('en-CA', { timeZone: TR_TZ, year: 'numeric', month: '2-digit', day: '2-digit' })
+    const [y, m, dd] = trIso.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, dd)).getUTCDay()
+  }
+  // TR yıl/ay
+  const trYearMonth = (d: Date) => {
+    const iso = d.toLocaleString('en-CA', { timeZone: TR_TZ, year: 'numeric', month: '2-digit', day: '2-digit' })
+    const [y, m] = iso.split('-').map(Number)
+    return { y, m: m - 1 }
+  }
+
   for (const z of zamanlamalar ?? []) {
     try {
-      // Rapor tarih aralığı — önceki dönem bazlı
+      // Rapor tarih aralığı — önceki dönem bazlı (TR takvimi)
       let baslangic: string, bitis: string
       if (z.tekrar_tipi === 'tek_sefer' && z.rapor_baslangic && z.rapor_bitis) {
         baslangic = z.rapor_baslangic
         bitis = z.rapor_bitis
       } else if (z.tekrar_tipi === 'gunluk') {
-        // Önceki gün
+        // Önceki gün (TR)
         const oncekiGun = new Date(now.getTime() - 86400000)
-        baslangic = oncekiGun.toISOString().slice(0, 10)
+        baslangic = trDate(oncekiGun)
         bitis = baslangic
       } else if (z.tekrar_tipi === 'haftalik') {
-        // Önceki hafta (Pazartesi-Pazar)
-        const bugun = now.getDay() // 0=Pazar
-        const pazartesiOffset = bugun === 0 ? 6 : bugun - 1
+        // Önceki hafta (TR Pazartesi-Pazar)
+        const bugunGun = trDayOfWeek(now) // 0=Pazar
+        const pazartesiOffset = bugunGun === 0 ? 6 : bugunGun - 1
         const buPazartesi = new Date(now.getTime() - pazartesiOffset * 86400000)
         const oncekiPazar = new Date(buPazartesi.getTime() - 86400000)
         const oncekiPazartesi = new Date(oncekiPazar.getTime() - 6 * 86400000)
-        baslangic = oncekiPazartesi.toISOString().slice(0, 10)
-        bitis = oncekiPazar.toISOString().slice(0, 10)
+        baslangic = trDate(oncekiPazartesi)
+        bitis = trDate(oncekiPazar)
       } else if (z.tekrar_tipi === 'aylik') {
-        // Önceki ay (1. gün - son gün)
-        const oncekiAy = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-        const oncekiAySon = new Date(now.getFullYear(), now.getMonth(), 0)
-        baslangic = oncekiAy.toISOString().slice(0, 10)
-        bitis = oncekiAySon.toISOString().slice(0, 10)
+        // Önceki ay (TR 1. gün - son gün)
+        const { y, m } = trYearMonth(now)
+        const oncekiAyYil = m === 0 ? y - 1 : y
+        const oncekiAy = m === 0 ? 11 : m - 1
+        const sonGun = new Date(y, m, 0).getDate() // bu ay'ın 0. günü = önceki ayın son günü
+        const pad = (n: number) => String(n).padStart(2, '0')
+        baslangic = `${oncekiAyYil}-${pad(oncekiAy + 1)}-01`
+        bitis     = `${oncekiAyYil}-${pad(oncekiAy + 1)}-${pad(sonGun)}`
       } else {
-        // Fallback: son 30 gün
-        bitis = now.toISOString().slice(0, 10)
-        baslangic = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10)
+        // Fallback: son 30 gün (TR bugün)
+        bitis = trDate(now)
+        baslangic = trDate(new Date(now.getTime() - 30 * 86400000))
       }
 
       // Kullanıcı adını çek
