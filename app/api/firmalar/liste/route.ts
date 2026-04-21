@@ -14,7 +14,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('firmalar')
-    .select('id, firma_adi, ticari_unvan, birim_fiyat_aktif, manuel_push_aktif, manuel_push_u_rolu, manuel_push_m_rolu')
+    .select('id, firma_adi, ticari_unvan, birim_fiyat_aktif, rapor_ozellestir_aktif, manuel_push_aktif, manuel_push_u_rolu, manuel_push_m_rolu')
     .eq('aktif', true)
     .order('firma_adi')
 

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 const STORAGE_KEY = 'qrsync_sa_firma_id'
 const COOKIE_KEY = 'qrsync_sa_firma_id'
 
-type Firma = { id: string; firma_adi?: string; ticari_unvan?: string; birim_fiyat_aktif?: boolean; manuel_push_aktif?: boolean; manuel_push_u_rolu?: boolean; manuel_push_m_rolu?: boolean }
+type Firma = { id: string; firma_adi?: string; ticari_unvan?: string; birim_fiyat_aktif?: boolean; rapor_ozellestir_aktif?: boolean; manuel_push_aktif?: boolean; manuel_push_u_rolu?: boolean; manuel_push_m_rolu?: boolean }
 
 type FirmaCtx = {
   firmaId: string | null

@@ -159,6 +159,7 @@ export default function ReportsHubClient({
   initialFirmaId,
   sureliGorevAktif,
   birimFiyatAktif,
+  raporOzellestirAktif,
   frekanRaporYetki,
   spesifRaporYetki,
 }: {
@@ -169,6 +170,7 @@ export default function ReportsHubClient({
   initialFirmaId?: string | null
   sureliGorevAktif?: boolean
   birimFiyatAktif?: boolean      // Hakediş kartı görünürlüğü
+  raporOzellestirAktif?: boolean // Rapor Özelleştir + frekansiyel/spesifik rapor kartları (TA/U SSR'dan gelir)
   frekanRaporYetki?: boolean     // Frekansiyel rapor yetki (TA/U SSR'dan gelir)
   spesifRaporYetki?: boolean     // Spesifik rapor yetki (TA/U SSR'dan gelir)
 }) {
@@ -193,6 +195,12 @@ export default function ReportsHubClient({
   const hakedisGoster = aktifProje
     ? aktifProje.birim_fiyat_aktif === true
     : isSA ? saBirimFiyatAktif : birimFiyatAktif === true
+
+  // Rapor Özelleştir görünürlüğü: firma ayarı false ise rapor_ozellestir + alt kartları gizlenir.
+  // SA için dinamik context'ten, TA/U için SSR prop'undan. Default true (eski davranış).
+  const ozellestirGoster = isSA
+    ? (saFirmalar?.find(f => f.id === saFirmaId)?.rapor_ozellestir_aktif !== false)
+    : (raporOzellestirAktif !== false)
 
   // SA: dinamik firma değişimine göre yüklenen aktif türler
   // TA: hiç kullanılmaz — initialRaporTurleri prop'undan direkt hesaplanır
@@ -266,8 +274,11 @@ export default function ReportsHubClient({
     // hakedis ve yeni rapor kartları firma_rapor_turleri dışında yönetilir
     const FIRMA_RAPOR_DISI = new Set(['hakedis', 'frekansiyel_rapor', 'spesifik_rapor'])
 
+    const OZELLESTIR_IDS = new Set(['rapor_ozellestir', 'frekansiyel_rapor', 'spesifik_rapor'])
     const kartlar = RAPOR_KARTLARI
       .filter(k => k.id !== 'hakedis' || hakedisGoster)
+      // Firma ayarı rapor_ozellestir_aktif = false ise 3 kart gizlensin
+      .filter(k => !OZELLESTIR_IDS.has(k.id) || ozellestirGoster)
       // SA için frekansiyel/spesifik her zaman görünür; TA/U için prop'tan gelir
       .filter(k => {
         if (!isSA) {
@@ -296,7 +307,7 @@ export default function ReportsHubClient({
     if (aktifIdler.size === 0) return kartlar
     // hakedis + frekansiyel/spesifik rapor firma_rapor_turleri'nde kayıtlı değil
     return kartlar.filter(k => FIRMA_RAPOR_DISI.has(k.id) || aktifIdler.has(k.id))
-  }, [isSA, saAktifTurler, base, initialRaporTurleri, hakedisGoster, frekanRaporYetki, spesifRaporYetki])
+  }, [isSA, saAktifTurler, base, initialRaporTurleri, hakedisGoster, ozellestirGoster, frekanRaporYetki, spesifRaporYetki])
   // ↑ TA için: sadece `base` veya `initialRaporTurleri` prop'u değişirse yeniden hesaplanır
   //   ProjeContext, FirmaContext, Sidebar, Topbar yeniden render'ı bu hesaplamayı ETKİLEMEZ
 
