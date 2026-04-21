@@ -123,6 +123,14 @@ export async function fillXlsxTemplate(
 
     // Her hücreyi güncelle
     for (const [rowNum, cols] of rowMap) {
+      // Önce self-closing row'u genişletilmiş forma çevir (<row r="9"/> → <row r="9"></row>)
+      // Aksi halde rowRegex yakalayamaz, alt dalda duplicate row yazılır ve Excel bozulur.
+      const selfRegex = new RegExp(`<row r="${rowNum}"([^/>]*?)/>`)
+      const selfMatch = xml.match(selfRegex)
+      if (selfMatch) {
+        xml = xml.replace(selfMatch[0], `<row r="${rowNum}"${selfMatch[1]}></row>`)
+      }
+
       // Satır var mı?
       const rowRegex = new RegExp(`(<row r="${rowNum}"[^>]*>)([\\s\\S]*?)(</row>)`)
       const rowMatch = xml.match(rowRegex)
