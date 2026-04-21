@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import UserAvatar from './UserAvatar'
 import type { User, UserRole } from '@/types'
 import { useRouteLoading } from '@/components/ui/RouteLoadingProvider'
 import ProataLogo, { ProataMark } from '@/components/brand/ProataLogo'
@@ -349,10 +348,6 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
     return pathname === href || pathname.startsWith(href + '/')
   }
 
-  const firmaLabel = firma?.firma_adi || firma?.ticari_unvan || ''
-  // Footer: SA → 'Sistem', diğerleri → aktif proje adı (yoksa firma adı)
-  const projeLabel = aktifProje?.ad || projeAdiProp || null
-  const footerSubLabel = isSA ? 'Sistem' : (projeLabel || firmaLabel)
 
   const go = (href: string) => {
     // If already on the target route, don't start the loader (otherwise it can get stuck).
@@ -431,9 +426,9 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
-        {/* Brand label — İO GIF + proje logosu yan yana */}
-        {projeLogo ? (
-          <div style={{ padding: '2px 14px', margin: '2px 6px 2px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* İO maskot — geniş alan, ortalı */}
+        {ioAsistanAktif && (
+          <div style={{ padding: '8px 14px 12px', display: 'flex', justifyContent: 'center' }}>
             <style>{`
               @keyframes ioFloat {
                 0%, 100% { transform: translateY(0px); }
@@ -478,15 +473,9 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                 transform: rotate(45deg);
               }
             `}</style>
-            {ioAsistanAktif && (
-              <IoAsistanAvatar onClick={() => setAsistanOpen(true)} />
-            )}
-            <div style={{ flex: 1, height: 48, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={projeLogo} alt="Proje" style={{ maxWidth: '100%', maxHeight: 40, objectFit: 'contain' }} />
-            </div>
+            <IoAsistanAvatar onClick={() => setAsistanOpen(true)} />
           </div>
-        ) : null}
+        )}
 
         {groups.map((g) => {
           // U ve M rolleri için yetki filtresi uygula + birim-fiyatlar proje bayrağı kontrolü
@@ -572,41 +561,23 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         })}
       </nav>
 
-      {/* Footer */}
+      {/* Footer — proje logosu + copyright */}
       <div style={{ padding: 12, borderTop: '1px solid #f3f4f6' }}>
-        <div
-          onClick={() => go(`${base}/dashboard/ayarlar`)}
-          style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 6, cursor: 'pointer' }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#f9fafb')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-        >
-          <UserAvatar name={user.isim_soyisim} photoUrl={user.profil_foto} size={40} />
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 800,
-                color: '#111827',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {user.isim_soyisim}
-            </div>
-            <div
-              style={{
-                fontSize: 13.5,
-                color: '#6b7280',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {footerSubLabel}
-            </div>
+        {projeLogo && (
+          <div style={{
+            height: 56,
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '6px 10px',
+          }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={projeLogo} alt="Proje" style={{ maxWidth: '100%', maxHeight: 44, objectFit: 'contain' }} />
           </div>
-        </div>
+        )}
         <div style={{ textAlign: 'center', padding: '8px 10px 4px', fontSize: 10, color: '#b0b0b0', letterSpacing: '0.02em' }}>
           © 2026 İO Teknoloji
         </div>
