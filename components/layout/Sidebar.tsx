@@ -174,11 +174,11 @@ function IoAsistanAvatar({ onClick }: { onClick: () => void }) {
         className="io-avatar"
         onClick={onClick}
         title="İO Asistan"
-        style={{ width: 86, height: 86, borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -14, cursor: 'pointer' }}
+        style={{ width: 110, height: 110, borderRadius: 12, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
       >
-        <IoMascot size={86} expression={thought ? 'thinking' : undefined} />
+        <IoMascot size={110} expression={thought ? 'thinking' : undefined} />
       </div>
-      <div className="io-ground-shadow" style={{ marginLeft: -14 }} />
+      <div className="io-ground-shadow" />
       {thought && <div className={`io-thought-bubble ${phase}`}>{thought}</div>}
     </div>
   )
@@ -426,9 +426,9 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
-        {/* İO maskot — geniş alan, ortalı */}
+        {/* İO maskot — sola yaslı, sağında baloncuk için alan */}
         {ioAsistanAktif && (
-          <div style={{ padding: '8px 14px 12px', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ padding: '8px 14px 12px', display: 'flex', justifyContent: 'flex-start', overflow: 'visible' }}>
             <style>{`
               @keyframes ioFloat {
                 0%, 100% { transform: translateY(0px); }
@@ -456,21 +456,31 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                 margin: 0 auto 0; animation: ioShadowPulse 3s ease-in-out infinite;
               }
               .io-thought-bubble {
-                position: absolute; top: -14px; right: -18px;
+                position: absolute; top: 50%; left: calc(100% + 14px);
+                transform: translateY(-50%);
                 background: #fff; border: 2px solid #cbd5e1;
-                border-radius: 14px; padding: 5px 12px;
+                border-radius: 14px; padding: 6px 14px;
                 font-size: 16px; color: #475569; font-weight: 700;
                 box-shadow: 0 4px 14px rgba(0,0,0,0.12);
                 pointer-events: none; white-space: nowrap;
                 z-index: 10;
               }
-              .io-thought-bubble.show { animation: ioBubbleIn 0.35s ease forwards; }
-              .io-thought-bubble.hide { animation: ioBubbleOut 0.3s ease forwards; }
+              .io-thought-bubble.show { animation: ioBubbleInRight 0.35s ease forwards; }
+              .io-thought-bubble.hide { animation: ioBubbleOutRight 0.3s ease forwards; }
               .io-thought-bubble::after {
-                content: ''; position: absolute; bottom: -6px; left: 14px;
+                content: ''; position: absolute; left: -6px; top: 50%;
                 width: 10px; height: 10px; background: #fff;
-                border-right: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1;
-                transform: rotate(45deg);
+                border-left: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1;
+                transform: translateY(-50%) rotate(45deg);
+              }
+              @keyframes ioBubbleInRight {
+                0% { opacity: 0; transform: translateY(-50%) scale(0.3) translateX(-4px); }
+                50% { opacity: 1; transform: translateY(-50%) scale(1.05) translateX(1px); }
+                100% { opacity: 1; transform: translateY(-50%) scale(1) translateX(0); }
+              }
+              @keyframes ioBubbleOutRight {
+                0% { opacity: 1; transform: translateY(-50%) scale(1); }
+                100% { opacity: 0; transform: translateY(-50%) scale(0.5) translateX(-4px); }
               }
             `}</style>
             <IoAsistanAvatar onClick={() => setAsistanOpen(true)} />
