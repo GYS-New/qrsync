@@ -49,46 +49,65 @@ export async function POST(req: NextRequest) {
   if (!['tek_sefer', 'gunluk', 'haftalik', 'aylik'].includes(tekrarTipi))
     return NextResponse.json({ error: 'Geçersiz tekrar tipi' }, { status: 400 })
 
-  // Sonraki gönderim tarihini hesapla
+  // Sonraki gönderim tarihini hesapla — TR saatine göre (+03:00)
+  // Eski akış server timezone'u (UTC) kullanıyordu, kullanıcının saati 3 saat
+  // sonraya kayıyordu (örn 14:33 TR → 14:33 UTC = 17:33 TR). Fix: explicit offset.
   const saat = body.saat ?? '08:00'
   let sonrakiGonderim: string | null = null
   const gunSecimi = body.gun_secimi ?? null
-  const saatParts = saat.split(':')
-  const hh = parseInt(saatParts[0]), mm = parseInt(saatParts[1] ?? '0')
+
+  // TR tarihi (YYYY-MM-DD) — sv-SE locale ISO 8601 format döner
+  const trDateStr = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
+  // TR saatindeki "tarih saat" → UTC ISO string
+  const trToUtcIso = (tarihStr: string, saatStr: string) =>
+    new Date(`${tarihStr}T${saatStr}:00+03:00`).toISOString()
+
+  const now = new Date()
+  const trBugun = trDateStr(now)
 
   if (tekrarTipi === 'tek_sefer') {
-    const tarih = body.gonderim_tarihi ?? new Date().toISOString().slice(0, 10)
-    sonrakiGonderim = `${tarih}T${saat}:00`
+    const tarih = body.gonderim_tarihi ?? trBugun
+    sonrakiGonderim = trToUtcIso(tarih, saat)
   } else if (tekrarTipi === 'gunluk') {
-    const d = new Date()
-    d.setHours(hh, mm, 0, 0)
-    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
-    sonrakiGonderim = d.toISOString()
-  } else if (tekrarTipi === 'haftalik' && gunSecimi?.[0] != null) {
-    // Sonraki seçilen haftanın gününü bul
-    const hedefGun = gunSecimi[0] // 0=Pazar...6=Cumartesi
-    const d = new Date()
-    d.setHours(hh, mm, 0, 0)
-    const bugun = d.getDay()
-    let fark = hedefGun - bugun
-    if (fark < 0 || (fark === 0 && d.getTime() <= Date.now())) fark += 7
-    d.setDate(d.getDate() + fark)
-    sonrakiGonderim = d.toISOString()
-  } else if (tekrarTipi === 'aylik' && gunSecimi?.[0] != null) {
-    // Sonraki ayın seçilen gününü bul
-    const hedefGun = gunSecimi[0]
-    const d = new Date()
-    d.setHours(hh, mm, 0, 0)
-    if (d.getDate() > hedefGun || (d.getDate() === hedefGun && d.getTime() <= Date.now())) {
-      d.setMonth(d.getMonth() + 1)
+    let iso = trToUtcIso(trBugun, saat)
+    if (new Date(iso).getTime() <= now.getTime()) {
+      const yarin = trDateStr(new Date(now.getTime() + 86400000))
+      iso = trToUtcIso(yarin, saat)
     }
-    d.setDate(Math.min(hedefGun, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()))
-    sonrakiGonderim = d.toISOString()
+    sonrakiGonderim = iso
+  } else if (tekrarTipi === 'haftalik' && gunSecimi?.[0] != null) {
+    // Sonraki seçilen haftanın gününü bul (TR günü bazlı)
+    const hedefGun = gunSecimi[0] // 0=Pazar...6=Cumartesi
+    // TR günü
+    const trNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
+    const bugunGun = trNow.getDay()
+    let fark = hedefGun - bugunGun
+    const bugunIso = trToUtcIso(trBugun, saat)
+    if (fark < 0 || (fark === 0 && new Date(bugunIso).getTime() <= now.getTime())) fark += 7
+    const hedefDate = new Date(now.getTime() + fark * 86400000)
+    sonrakiGonderim = trToUtcIso(trDateStr(hedefDate), saat)
+  } else if (tekrarTipi === 'aylik' && gunSecimi?.[0] != null) {
+    const hedefGun = gunSecimi[0]
+    const trNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
+    let yil = trNow.getFullYear()
+    let ay  = trNow.getMonth()
+    const bugunGun = trNow.getDate()
+    const bugunHedefIso = trToUtcIso(`${yil}-${String(ay + 1).padStart(2, '0')}-${String(hedefGun).padStart(2, '0')}`, saat)
+    if (bugunGun > hedefGun || (bugunGun === hedefGun && new Date(bugunHedefIso).getTime() <= now.getTime())) {
+      ay += 1
+      if (ay > 11) { ay = 0; yil += 1 }
+    }
+    const sonGun = new Date(yil, ay + 1, 0).getDate()
+    const gunClamped = Math.min(hedefGun, sonGun)
+    const tarihStr = `${yil}-${String(ay + 1).padStart(2, '0')}-${String(gunClamped).padStart(2, '0')}`
+    sonrakiGonderim = trToUtcIso(tarihStr, saat)
   } else {
-    const d = new Date()
-    d.setHours(hh, mm, 0, 0)
-    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
-    sonrakiGonderim = d.toISOString()
+    let iso = trToUtcIso(trBugun, saat)
+    if (new Date(iso).getTime() <= now.getTime()) {
+      const yarin = trDateStr(new Date(now.getTime() + 86400000))
+      iso = trToUtcIso(yarin, saat)
+    }
+    sonrakiGonderim = iso
   }
 
   const admin = createAdminClient()
