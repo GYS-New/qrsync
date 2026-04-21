@@ -428,7 +428,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
       <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
         {/* İO maskot — sola yaslı, sağında baloncuk için alan */}
         {ioAsistanAktif && (
-          <div style={{ padding: '8px 14px 12px', display: 'flex', justifyContent: 'flex-start', overflow: 'visible' }}>
+          <div style={{ padding: '2px 14px 4px', display: 'flex', justifyContent: 'flex-start', overflow: 'visible' }}>
             <style>{`
               @keyframes ioFloat {
                 0%, 100% { transform: translateY(0px); }
