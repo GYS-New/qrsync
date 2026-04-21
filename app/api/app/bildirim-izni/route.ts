@@ -3,6 +3,16 @@ import { createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Device-Token',
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS })
+}
+
 /**
  * POST /api/app/bildirim-izni
  * Mobil uygulama açılışında (veya izin değişiminde) bildirim iznini raporlar.
@@ -48,13 +58,13 @@ export async function POST(req: NextRequest) {
   } catch {}
 
   if (!userId || typeof userId !== 'string') {
-    return NextResponse.json({ error: 'user_id gerekli' }, { status: 400 })
+    return NextResponse.json({ error: 'user_id gerekli' }, { status: 400, headers: CORS_HEADERS })
   }
   if (!deviceToken || typeof deviceToken !== 'string') {
-    return NextResponse.json({ error: 'device_token gerekli' }, { status: 400 })
+    return NextResponse.json({ error: 'device_token gerekli' }, { status: 400, headers: CORS_HEADERS })
   }
   if (typeof bildirimIzni !== 'boolean') {
-    return NextResponse.json({ error: 'bildirim_izni boolean olmalı' }, { status: 400 })
+    return NextResponse.json({ error: 'bildirim_izni boolean olmalı' }, { status: 400, headers: CORS_HEADERS })
   }
 
   const admin = createAdminClient()
@@ -69,7 +79,7 @@ export async function POST(req: NextRequest) {
 
   if (!dt) {
     console.warn('[bildirim-izni] eşleşen cihaz YOK — user_id/device_token tutmuyor olabilir')
-    return NextResponse.json({ error: 'Cihaz bulunamadı' }, { status: 404 })
+    return NextResponse.json({ error: 'Cihaz bulunamadı' }, { status: 404, headers: CORS_HEADERS })
   }
 
   const { error } = await admin
@@ -83,8 +93,8 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error('[bildirim-izni] update hata:', error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500, headers: CORS_HEADERS })
   }
 
-  return NextResponse.json({ ok: true, bildirim_izni: bildirimIzni })
+  return NextResponse.json({ ok: true, bildirim_izni: bildirimIzni }, { headers: CORS_HEADERS })
 }

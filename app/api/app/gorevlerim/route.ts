@@ -7,13 +7,23 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Device-Token',
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS })
+}
+
 export async function GET(req: Request) {
   try {
     const admin = createAdminClient()
 
     const deviceToken = req.headers.get('X-Device-Token')
     if (!deviceToken) {
-      return NextResponse.json({ ok: false, error: 'X-Device-Token gerekli', kod: 'ESLESMEDI' }, { status: 401 })
+      return NextResponse.json({ ok: false, error: 'X-Device-Token gerekli', kod: 'ESLESMEDI' }, { status: 401, headers: CORS_HEADERS })
     }
 
     const { data: tokenData, error: tokenErr } = await admin
@@ -23,7 +33,7 @@ export async function GET(req: Request) {
       .single()
 
     if (tokenErr || !tokenData) {
-      return NextResponse.json({ ok: false, error: 'Geçersiz cihaz token', kod: 'ESLESMEDI' }, { status: 401 })
+      return NextResponse.json({ ok: false, error: 'Geçersiz cihaz token', kod: 'ESLESMEDI' }, { status: 401, headers: CORS_HEADERS })
     }
 
     const { user_id: userId, firma_id: firmaId, proje_id: personelProjeId } = tokenData
@@ -33,7 +43,7 @@ export async function GET(req: Request) {
     if (!userData || userData.aktif === false) {
       return NextResponse.json(
         { ok: false, error: 'Pasif durumdasınız! Lütfen sistem yöneticiniz ile iletişime geçin.', code: 'USER_PASIF' },
-        { status: 403 }
+        { status: 403, headers: CORS_HEADERS }
       )
     }
 
@@ -56,7 +66,7 @@ export async function GET(req: Request) {
         if (!mesai) {
           return NextResponse.json(
             { ok: false, error: 'Lütfen önce iş başı QR/NFC kodunu okutunuz.', code: 'MESAI_YOK' },
-            { status: 403 }
+            { status: 403, headers: CORS_HEADERS }
           )
         }
       }
@@ -171,9 +181,9 @@ export async function GET(req: Request) {
           : null,
         checklist: buildChecklist(g.lokasyonlar),
       })),
-    })
+    }, { headers: CORS_HEADERS })
 
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message ?? 'Sunucu hatası' }, { status: 500 })
+    return NextResponse.json({ ok: false, error: error?.message ?? 'Sunucu hatası' }, { status: 500, headers: CORS_HEADERS })
   }
 }
