@@ -28,9 +28,66 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
   const [mascotExpression, setMascotExpression] = useState<IoExpression | undefined>(undefined)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const widgetRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  // Drag & drop state — kullanıcı widget'ı sürükleyebilir, konum localStorage'da kalıcı
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+
+  useEffect(() => {
+    setMounted(true)
+    // Son konum localStorage'dan yüklensin
+    try {
+      const saved = localStorage.getItem('io_chat_pos')
+      if (saved) setPos(JSON.parse(saved))
+    } catch {}
+  }, [])
+
+  // Drag handlers — window seviyesinde (widget dışına çıksa da takip eder)
+  useEffect(() => {
+    if (!dragging) return
+    const onMove = (e: MouseEvent) => {
+      const w = widgetRef.current?.offsetWidth ?? 380
+      const h = widgetRef.current?.offsetHeight ?? 520
+      // Ekran içinde kalmasını sağla
+      const maxLeft = Math.max(0, window.innerWidth - w)
+      const maxTop  = Math.max(0, window.innerHeight - h)
+      const nextLeft = Math.min(maxLeft, Math.max(0, e.clientX - dragOffset.current.x))
+      const nextTop  = Math.min(maxTop,  Math.max(0, e.clientY - dragOffset.current.y))
+      setPos({ top: nextTop, left: nextLeft })
+    }
+    const onUp = () => setDragging(false)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'grabbing'
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+    }
+  }, [dragging])
+
+  // Drag bittiğinde konumu kaydet
+  useEffect(() => {
+    if (!dragging && pos) {
+      try { localStorage.setItem('io_chat_pos', JSON.stringify(pos)) } catch {}
+    }
+  }, [dragging, pos])
+
+  function startDrag(e: React.MouseEvent) {
+    // Kapat butonu veya diğer interaktif öğelere tıklandıysa drag başlatma
+    if ((e.target as HTMLElement).closest('button')) return
+    const rect = widgetRef.current?.getBoundingClientRect()
+    if (!rect) return
+    dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    if (!pos) setPos({ top: rect.top, left: rect.left })
+    setDragging(true)
+    e.preventDefault()
+  }
 
   // Chat açılınca maskot kısa süreli "happy" yapar, sonra kendi otomatik döngüsüne döner
   useEffect(() => {
@@ -152,15 +209,18 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
   if (!mounted || !open) return null
 
   const widget = (
-    <div style={{
-      position: 'fixed', bottom: 20, left: 270, zIndex: 9999,
+    <div ref={widgetRef} style={{
+      position: 'fixed',
+      ...(pos ? { top: pos.top, left: pos.left } : { bottom: 20, left: 270 }),
+      zIndex: 99999,
       width: 380, height: 520,
       background: '#fff', borderRadius: 20,
       boxShadow: '0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden',
-      animation: 'ioSlideUp 0.3s ease',
+      animation: dragging ? 'none' : 'ioSlideUp 0.3s ease',
       fontFamily: "'Inter', system-ui, sans-serif",
+      transition: dragging ? 'none' : undefined,
     }}>
       <style>{`
         @keyframes ioSlideUp {
@@ -176,11 +236,16 @@ export default function IoAsistan({ open, onClose }: { open: boolean; onClose: (
         .io-msg-assistant { background: #f1f5f9; color: #1e293b; border-radius: 16px 16px 16px 4px; }
       `}</style>
 
-      {/* Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, #042C53, #0C447C)',
-        padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12,
-      }}>
+      {/* Header — sürükleme tutamacı */}
+      <div
+        onMouseDown={startDrag}
+        title="Sürükleyerek taşı"
+        style={{
+          background: 'linear-gradient(135deg, #042C53, #0C447C)',
+          padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12,
+          cursor: dragging ? 'grabbing' : 'grab',
+          userSelect: 'none',
+        }}>
         <div style={{ width: 42, height: 42, borderRadius: 12, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)' }}>
           <IoMascot size={42} expression={mascotExpression} />
         </div>
