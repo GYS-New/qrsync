@@ -28,8 +28,9 @@ Aşağıdaki 4 endpoint'in body'sine `offline` + `yerel_zaman` alanları ekleneb
 ```jsonc
 {
   // ... mevcut alanlar (gorev_id, iptal_sebep, lokasyon_id, vs.)
-  "offline": true,                              // bool — çevrimdışı kuyruktan geliyorsa true
-  "yerel_zaman": "2026-04-21T09:17:43+03:00"    // ISO 8601 — eylemin cihazdaki gerçek anı
+  "offline": true,                                      // bool — çevrimdışı kuyruktan geliyorsa true
+  "yerel_zaman": "2026-04-21T09:17:43+03:00",           // ISO 8601 — eylemin cihazdaki gerçek anı
+  "baslatilma_yerel_zaman": "2026-04-21T09:05:12+03:00" // ISO 8601 — görevin cihazda başlatıldığı an (opsiyonel)
 }
 ```
 
@@ -49,6 +50,19 @@ Aşağıdaki 4 endpoint'in body'sine `offline` + `yerel_zaman` alanları ekleneb
     - ✓ Aralıkta → `durum_degisim_tarihi`, `tamamlanma_tarihi` (veya `iptal` için tarih) olarak yazılır
   - Önemli: `olusturma_tarihi` her zaman sunucu zamanı kalır (DB insert anı). Sadece **eylem
     zamanları** (tamamlanma, iptal, başlama) yerel zaman'a çevrilir.
+
+- **`baslatilma_yerel_zaman`** (string, opsiyonel — hem online hem offline akışlarda gönderilebilir)
+  - Format + validasyon: `yerel_zaman` ile aynı kurallar.
+  - Kullanımı: Mobil lokal QR ile görevi başlattığında cihazda storage'a yazdığı zamandır.
+  - Backend davranışı:
+    - `gorev.baslatilma_tarihi` **DB'de dolu ise** → bu alan **yok sayılır**. Sunucunun bildiği
+      başlatma zamanı her zaman öncelikli (web kullanıcısı veya çevrimiçi mobil üzerinden yazılmış).
+    - `gorev.baslatilma_tarihi` **NULL ise** ve `baslatilma_yerel_zaman` geçerliyse →
+      `baslatilma_tarihi` DB'ye yazılır + `baslatan_kullanici_id = userId` set edilir.
+      `tamamlanma_suresi_saniye` artık bu yerel başlatma zamanından hesaplanır.
+    - Ardışık başlatma kontrolü (ARDISIK_BEKLEME) yerel zamanla senkron edilen geçmiş başlatmada
+      atlanır — senkron anında konrol etmek anlamsız; çakışma zaten offline'da oluşmaz.
+  - Kapsanan endpoint'ler: `gorev-tamamla`, `qr/[token]` (`action=basla` + tamamlama yolları).
 
 ---
 

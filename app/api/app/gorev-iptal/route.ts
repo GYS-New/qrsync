@@ -144,7 +144,7 @@ export async function POST(req: Request) {
         lokasyon_id: gorev.lokasyon_id ?? null,
         onceki_durum: gorev.durum,
         iptal_sebep: iptalSebep,
-        kanal: 'MOBIL',
+        kanal: offlineSenkron ? 'MOBIL_OFFLINE' : 'MOBIL',
       },
     })
 

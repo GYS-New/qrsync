@@ -200,7 +200,7 @@ export async function POST(req: Request) {
         lokasyon_id: lokasyonId,
         lokasyon_tanim: lok.tanim ?? null,
         tanim: gorevTanim,
-        kanal: 'MOBIL',
+        kanal: offlineSenkron ? 'MOBIL_OFFLINE' : 'MOBIL',
       },
     })
 

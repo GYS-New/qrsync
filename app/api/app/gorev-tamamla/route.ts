@@ -83,16 +83,20 @@ export async function POST(req: Request) {
     const offlineSenkron = body?.offline === true
     // Cihazın yerel zaman damgası (ISO string). Makul aralıkta ise tamamlanma_tarihi olarak
     // kullanılır. Saati ileri olan cihazlara karşı 5 dk tolerans, çok eskiye 7 gün sınır.
-    const yerelZamanRaw = typeof body?.yerel_zaman === 'string' ? body.yerel_zaman : null
-    const yerelZamanValid = (() => {
-      if (!yerelZamanRaw) return null
-      const t = new Date(yerelZamanRaw).getTime()
+    const validateYerelIso = (raw: unknown): string | null => {
+      if (typeof raw !== 'string' || !raw) return null
+      const t = new Date(raw).getTime()
       if (!Number.isFinite(t)) return null
       const simdi = Date.now()
       if (t > simdi + 5 * 60 * 1000) return null           // gelecek > 5dk → reddet
       if (t < simdi - 7 * 24 * 60 * 60 * 1000) return null // 7 günden eski → reddet
       return new Date(t).toISOString()
-    })()
+    }
+    const yerelZamanValid = validateYerelIso(body?.yerel_zaman)
+    // Görevin başlatılma anının yerel zamanı (offline veya hiç DB'ye yazılmamış
+    // başlatma için). gorev.baslatilma_tarihi NULL ise bu değer doldurulur ve
+    // tamamlanma_suresi_saniye hesabında kullanılır. Aynı validasyon — 5dk/7gün.
+    const baslatilmaYerelValid = validateYerelIso(body?.baslatilma_yerel_zaman)
 
     if (!gorevId) {
       return NextResponse.json({ ok: false, error: 'gorev_id gerekli' }, { status: 400, headers: CORS })
@@ -247,8 +251,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: `Görev zaten ${gorev.durum} durumunda` }, { status: 409, headers: CORS })
     }
 
-    // Ardışık başlatma kontrolü — henüz başlatılmamış (ACIK) görev tamamlanmaya çalışılırsa
-    if (!gorev.baslatilma_tarihi) {
+    // Ardışık başlatma kontrolü — henüz başlatılmamış (ACIK) görev tamamlanmaya çalışılırsa.
+    // Mobil offline başlatma zamanını gönderiyorsa görev geçmişte zaten başlatılmış demektir;
+    // ardışık kontrolü senkron anında anlamsız olur — atla.
+    if (!gorev.baslatilma_tarihi && !baslatilmaYerelValid) {
       const ardisikHata = await ardisikBaslatmaKontrol(admin, userId, firmaId, (gorev as any).proje_id)
       if (ardisikHata) {
         return NextResponse.json({ ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' }, { status: 429, headers: CORS })
@@ -270,7 +276,7 @@ export async function POST(req: Request) {
         lokasyon_id:      gorev.lokasyon_id,
         sablon_id:        checklistSablonId,
         template_version: templateVersion,
-        kanal:            'MOBİL',
+        kanal:            offlineSenkron ? 'MOBIL_OFFLINE' : 'MOBİL',
         kullanici_id:     userId,
       }
       if (gorevTipi === 'gorevler') sonucPayload.gorev_id = gorevId
@@ -329,9 +335,16 @@ export async function POST(req: Request) {
     // (ağ geldiğinde gönderim anı değil, gerçek tamamlama anı). Aksi durumda server now.
     const tamamlanmaIso = (offlineSenkron && yerelZamanValid) ? yerelZamanValid : nowIso
 
+    // Başlatma zamanı: DB'de yoksa mobilin gönderdiği yerel zaman kullanılır. Offline
+    // akışta mobil lokalde QR ile başlatıp server'a değmeden tamamlayabiliyor; bu durumda
+    // baslatilma_tarihi NULL gelir ve sureSaniye hesaplanamazdı. baslatilma_yerel_zaman
+    // varsa hem DB'ye yazılır hem süre hesabında kullanılır.
+    const yeniBaslatilma = !gorev.baslatilma_tarihi && baslatilmaYerelValid ? baslatilmaYerelValid : null
+    const effectiveBaslatilma = gorev.baslatilma_tarihi ?? yeniBaslatilma
+
     let sureSaniye: number | null = null
-    if (gorev.baslatilma_tarihi) {
-      const ms = new Date(tamamlanmaIso).getTime() - new Date(gorev.baslatilma_tarihi).getTime()
+    if (effectiveBaslatilma) {
+      const ms = new Date(tamamlanmaIso).getTime() - new Date(effectiveBaslatilma).getTime()
       sureSaniye = Math.max(0, Math.floor(ms / 1000))
     }
 
@@ -351,6 +364,7 @@ export async function POST(req: Request) {
         tamamlanma_suresi_saniye: sureSaniye,
         islemi_yapan_id:          userId,
         ...(gorevTipi === 'canli_gorevler' ? { tamamlayan_kullanici_id: userId } : {}),
+        ...(yeniBaslatilma ? { baslatilma_tarihi: yeniBaslatilma, baslatan_kullanici_id: userId } : {}),
         son_tamamlama_kanali:     offlineSenkron ? 'MOBIL_OFFLINE' : 'MOBIL',
       } as any)
       .eq('id', gorevId)

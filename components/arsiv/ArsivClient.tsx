@@ -1144,10 +1144,16 @@ const CEKLIST_DURUM_RENK: Record<string, { bg: string; color: string }> = {
 }
 
 const CEKLIST_KANAL_RENK: Record<string, { bg: string; color: string }> = {
-  WEB:   { bg: '#e0f2fe', color: '#0369a1' },
-  QR:    { bg: '#ede9fe', color: '#5b21b6' },
-  NFC:   { bg: '#fce7f3', color: '#9d174d' },
-  MOBİL: { bg: '#f9fafb', color: '#166534' },
+  WEB:           { bg: '#e0f2fe', color: '#0369a1' },
+  QR:            { bg: '#ede9fe', color: '#5b21b6' },
+  NFC:           { bg: '#fce7f3', color: '#9d174d' },
+  MOBİL:         { bg: '#f9fafb', color: '#166534' },
+  MOBIL_OFFLINE: { bg: '#fef3c7', color: '#92400e' },
+}
+
+// Kanal etiket: DB'de MOBIL_OFFLINE olarak saklanır; kullanıcıya "Mobil (Offline)" gösterilir.
+const CEKLIST_KANAL_LABEL: Record<string, string> = {
+  MOBIL_OFFLINE: 'Mobil (Offline)',
 }
 
 function ckPct(dol: number, top: number) {
@@ -1450,12 +1456,13 @@ function CeklistArsivSekme({
           <option value="TAMAMLANDI">Tamamlandı</option>
           <option value="ZAMANINDA_YAPILAMAYAN">Gecikmeli Tamamlandı</option>
         </select>
-        <select value={kanaliF} onChange={e => setKanaliF(e.target.value)} style={{ ...inp, minWidth: 120 }}>
+        <select value={kanaliF} onChange={e => setKanaliF(e.target.value)} style={{ ...inp, minWidth: 140 }}>
           <option value="">Kanal (Tümü)</option>
           <option value="WEB">WEB</option>
           <option value="QR">QR</option>
           <option value="NFC">NFC</option>
           <option value="MOBİL">MOBİL</option>
+          <option value="MOBIL_OFFLINE">Mobil (Offline)</option>
         </select>
         <input type="date" value={fromD} onChange={e => setFromD(e.target.value)} style={inp} />
         <span style={{ color: '#94a3b8' }}>—</span>
@@ -1523,7 +1530,7 @@ function CeklistArsivSekme({
                         padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 700,
                         background: kanalS.bg, color: kanalS.color,
                       }}>
-                        {r.kanal}
+                        {CEKLIST_KANAL_LABEL[r.kanal] ?? r.kanal}
                       </span>
                     </td>
                     <td style={{ color: '#475569', fontSize: 12.5 }}>{r.kullanici}</td>
