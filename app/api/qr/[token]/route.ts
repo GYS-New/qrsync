@@ -88,11 +88,12 @@ export async function POST(req: Request, { params }: { params: { token: string }
     const selectedTaskId   = body?.taskId   as string | undefined
     const selectedTaskType = body?.taskType as 'gorevler' | 'canli_gorevler' | undefined
     const checklistResults = Array.isArray(body?.checklistResults) ? body.checklistResults : []
-    // Mobil offline: cihazda kaydedilen başlatma zamanı. DB'de baslatilma_tarihi yoksa
-    // bu değer ISLEMDE'ye geçiş + süre hesabı için kullanılır. Validasyon: 5dk future,
-    // 7 gün past tolerans (diğer yerel zaman alanlarıyla aynı).
-    const baslatilmaYerelValid = (() => {
-      const raw = body?.baslatilma_yerel_zaman
+    // Mobil cihaz tespiti — channel seçiminde kullanılır (web = 'QR', mobil = 'MOBIL'/'MOBIL_OFFLINE')
+    const isMobile = !!req.headers.get('X-Device-Token')
+    // Offline queue senkronu — cihaz çevrimdışıyken yapılan işi sonradan gönderiyorsa
+    const offlineSenkron = body?.offline === true
+    // Yerel zaman validasyonu — +5dk future, -7gün past (diğer endpoint'lerle aynı)
+    const validateYerelIso = (raw: unknown): string | null => {
       if (typeof raw !== 'string' || !raw) return null
       const t = new Date(raw).getTime()
       if (!Number.isFinite(t)) return null
@@ -100,7 +101,13 @@ export async function POST(req: Request, { params }: { params: { token: string }
       if (t > simdi + 5 * 60 * 1000) return null
       if (t < simdi - 7 * 24 * 60 * 60 * 1000) return null
       return new Date(t).toISOString()
-    })()
+    }
+    const yerelZamanValid = validateYerelIso(body?.yerel_zaman)
+    const baslatilmaYerelValid = validateYerelIso(body?.baslatilma_yerel_zaman)
+    // Tamamlama kanalı: web → 'QR', mobil → 'MOBIL_OFFLINE' (offline senkron) veya 'MOBIL'
+    const completionChannel: 'QR' | 'MOBIL' | 'MOBIL_OFFLINE' = isMobile
+      ? (offlineSenkron ? 'MOBIL_OFFLINE' : 'MOBIL')
+      : 'QR'
     const supabase = createAdminClient()
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'QR', userId: user.id })
 
@@ -178,7 +185,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
         lokasyon_id: context.lokasyon.id,
         sablon_id: context.checklistTemplate.id,
         template_version: templateVersion,
-        kanal: 'QR',
+        kanal: completionChannel,
         kullanici_id: user.id,
       }
       baslikPayload[gorevIdKolonu] = task.id
@@ -218,8 +225,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
       }
     }
 
-    // Ardışık başlatma kontrolü — görev henüz başlatılmamışsa (ACIK durumda tamamlanıyor)
-    if (!task.baslatilma_tarihi) {
+    // Ardışık başlatma kontrolü — görev henüz başlatılmamışsa. Mobil offline
+    // senkronda başlatma zamanı geçmişteki gerçek andır; kontrol anlamsız.
+    if (!task.baslatilma_tarihi && !baslatilmaYerelValid) {
       const tablo = task.taskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'
       const { data: gorevRow } = await supabase.from(tablo).select('firma_id,proje_id').eq('id', task.id).maybeSingle()
       if (gorevRow) {
@@ -241,8 +249,16 @@ export async function POST(req: Request, { params }: { params: { token: string }
       // Local task objesini güncelle — completeTask süre hesaplasın
       ;(task as any).baslatilma_tarihi = baslatilmaIso
     }
-    await completeTask({ supabase, taskId: task.id, taskType: task.taskType, userId: user.id, channel: 'QR' })
-    return NextResponse.json({ ok: true, message: 'Görev QR ile tamamlandı' }, { headers: CORS_HEADERS })
+    await completeTask({
+      supabase,
+      taskId: task.id,
+      taskType: task.taskType,
+      userId: user.id,
+      channel: completionChannel,
+      yerelZamanIso: (offlineSenkron && yerelZamanValid) ? yerelZamanValid : null,
+      baslatilmaYerelIso: baslatilmaYerelValid,
+    })
+    return NextResponse.json({ ok: true, message: 'Görev tamamlandı', kanal: completionChannel }, { headers: CORS_HEADERS })
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message ?? 'İşlem başarısız' }, { status: 400, headers: CORS_HEADERS })
   }
