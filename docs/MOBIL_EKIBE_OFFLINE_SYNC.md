@@ -115,59 +115,101 @@ POST /api/app/mesai-okut
 - `giris_tipi` / `cikis_tipi` → `'MOBIL_OFFLINE'`.
 - Açık kayıt çakışması (`zaten_acik`) kontrolü de `yerel_zaman`'ın TR günü üzerinden yapılır.
 
-### Senaryo E — QR/NFC scan (görev başlatma + tamamlama) çevrimdışı
+### Senaryo E — QR/NFC scan offline (iki farklı akış: PT AKTİF / PT PASİF)
 
-Bu akışta mobil cihaz vardiya-paketi'ni çoktan indirmiş olmalı (lokal IndexedDB'de görevler
-ve lokasyon tokenları var). Kullanıcı çevrimdışıyken QR/NFC okuttuğunda mobil kendi kendine
-start + complete adımlarını yerelde yürütür, senkron anında ikisini birden gönderir.
+⚠️ **Kritik:** Projenin **Personel Takibi (PT)** ayarına göre mobilin izlemesi gereken
+iki ayrı akış var. Gözlemlenen bug: mobil her iki senaryoda da "direkt tamamlandı" yaparken,
+PT aktif olan projede görev **başlatma + çalışma süresi + tamamlama** adımları ayrı yürümeli.
 
-**Mobil akış (önerilen):**
+**PT durumu tespiti:** `GET /api/app/proje-ayarlar` → `personel_takibi_aktif: boolean` alanı
+(ayrıca vardiya-paketi başarılı 200 dönüyorsa PT aktif, 400 `PERSONEL_TAKIBI_KAPALI` dönüyorsa
+PT pasif — iki kaynak aynı değeri verir).
 
-1. **Scan (offline):** Kullanıcı QR/NFC okutur.
-   - Mobil, token'ı **lokal IndexedDB'deki `lokasyonlar` tablosundan** arar (QR zaten kapsanmış
-     olmalı — vardiya-paketi yetkili lokasyonları indirdi).
-   - Token eşleşince lokasyonun aktif görevlerini lokalden çeker.
+---
 
-2. **Görev başlat (offline):** Kullanıcı bir görev seçer.
-   - Mobil **cihaza `baslatilma_${gorev.id}` storage key'i** yazar (unix ms).
-   - Görev lokalde `durum = ISLEMDE` olarak işaretlenir (UI için).
-   - **Backend çağrısı yapılmaz** — kuyruğa `gorev-basladi` satırı da eklenmez; tek seferlik
-     sync'te start + complete birlikte gider.
+#### E1 — PT PASİF (short-circuit akış — mevcut davranış, doğru çalışıyor ✅)
 
-3. **Çeklist doldurma (offline):** Kullanıcı maddeleri yanıtlar. Fotoğraflar cihaz depoda tutulur.
+Personel takibi yoksa görev başlama anı ve süresi takip edilmiyor; sadece çeklist/tamamlama kaydı tutulur.
 
-4. **Görev tamamla (offline):** Kullanıcı "tamamla"ya basar.
-   - `baslatilma_${gorev.id}` okunur, ISO'ya çevrilir → `baslatilma_yerel_zaman`
-   - `Date.now()` ISO → `yerel_zaman`
-   - Queue'ya eklenir (aşağıdaki şema ile).
-
-5. **Sync (online):** Kuyruktaki kayıt şu body ile gönderilir:
+1. **Scan (offline):** QR/NFC okut → lokal lokasyon tablosundan token ara → görev listele
+2. **Çeklist doldur (offline):** maddeler + fotoğraflar lokalde tutulur
+3. **Tamamla (offline):** Queue'ya `offline: true` + `yerel_zaman` ekle (başlatma kaydı yok)
+4. **Sync:** `POST /api/qr/{token}` ya da `/api/app/gorev-tamamla` ile gönder:
    ```json
-   POST /api/qr/{token}       // veya /nfc/{token} — orijinal scan'a göre
-   Headers: X-Device-Token: ...
-   Body: {
-     "taskId": "...",
-     "taskType": "canli_gorevler",
-     "checklistResults": [...],
-     "offline": true,
-     "yerel_zaman": "2026-04-21T09:17:43.000Z",
-     "baslatilma_yerel_zaman": "2026-04-21T09:05:12.000Z"
+   { "taskId": "...", "taskType": "canli_gorevler", "checklistResults": [...],
+     "offline": true, "yerel_zaman": "..." }
+   ```
+   Backend: `son_tamamlama_kanali = 'MOBIL_OFFLINE'`, `tamamlanma_tarihi = yerel_zaman`,
+   `baslatilma_tarihi` NULL kalır, `tamamlanma_suresi_saniye` NULL kalır (PT yok → süre yok).
+
+---
+
+#### E2 — PT AKTİF (full offline flow — mevcut bug, düzeltilmeli ❌→✅)
+
+Personel takibi aktifse görev başlama ve süresi kayda geçmeli. Mobil **online akışı taklit etmeli**:
+scan → BAŞLAT → çalış → çeklist → TAMAMLA, hepsi cihazda, tek sync'te toplu gönder.
+
+**Doğru akış:**
+
+1. **Vardiya başı:** `GET /api/app/vardiya-paketi` ile lokasyonlar + görevler + çeklist şablonları
+   IndexedDB'ye indirilir. Cihaz bu noktadan itibaren offline çalışabilir.
+
+2. **Scan (offline):** QR/NFC okut → lokal `lokasyonlar` tablosundan token bul → görevleri listele.
+
+3. **GÖREV BAŞLAT (offline):** Kullanıcı görev seçip "başlat"a basar:
+   - Cihazda `baslatilma_${gorev.id}` storage key'ine **unix ms** yaz
+   - Görev lokal state `durum = 'ISLEMDE'` — UI'da zamanlayıcı/timer başlasın
+   - **Backend çağrısı YAPILMAZ** — `gorev-basladi` queue'ya eklenmez
+   - Ekran "iş başladı, tamamlamak için tekrar dokun" gibi görünür
+
+4. **Çalışma süresi (offline):** Kullanıcı işi yapar. Min/max süre bildirimi cihazda çalıştırılmalı
+   (backend zamanlaması offline'da yok). Çeklist ekranı açılmaya başlanabilir.
+
+5. **Çeklist doldurma (offline):** Maddeler + fotoğraflar lokalde tutulur.
+
+6. **TAMAMLA (offline):** Kullanıcı "tamamla"ya basar:
+   - `baslatilma_${gorev.id}` oku → ISO → `baslatilma_yerel_zaman`
+   - `Date.now()` ISO → `yerel_zaman`
+   - Queue'ya şu kayıt eklenir:
+   ```json
+   {
+     "endpoint": "/api/qr/{token}",
+     "body": {
+       "taskId": "...",
+       "taskType": "canli_gorevler",
+       "checklistResults": [...],
+       "offline": true,
+       "yerel_zaman": "2026-04-22T09:17:43.000Z",
+       "baslatilma_yerel_zaman": "2026-04-22T09:05:12.000Z",
+       "confirm_scan_token": "..."
+     }
    }
    ```
-   Backend:
-   - `completionChannel = 'MOBIL_OFFLINE'` (çünkü offline:true + device-token var)
-   - `baslatilma_tarihi` DB'de NULL ise `baslatilma_yerel_zaman` yazılır, aksi halde yok sayılır
-   - `tamamlanma_tarihi` = `yerel_zaman`
-   - `son_tamamlama_kanali` = `'MOBIL_OFFLINE'`
-   - `tamamlanma_suresi_saniye` = `yerel_zaman - baslatilma_tarihi`
-   - `checklist_sonuc_basliklari.kanal` = `'MOBIL_OFFLINE'`
-   - Ardışık başlatma kontrolü atlanır (geçmişteki başlatma için kontrol anlamsız)
+   - Lokal state `durum = 'TAMAMLANDI'` (UI için) — sync sonra gidecek
 
-**YANLIŞ akış (önceki gözlem, düzeltilmeli):**
-- ❌ Offline scan → görev direkt `TAMAMLANDI`'ya çekiliyor (start atlanıyor, süre NULL)
-- ❌ Lokal IndexedDB sorgulanmıyor, cihaz online sanıp API çağırıyor → fail → boşa düşüyor
-- ✅ Doğrusu: yukarıdaki 5 adımlı akış; backend hazır, mobilin lokal lookup + start+complete
-  ikilisini yerelde yürütmesi yeterli.
+7. **Sync (online dönüşte):** Queue drain eder, tek çağrıda backend **start + complete**'i yürütür:
+   - `completionChannel = 'MOBIL_OFFLINE'`
+   - `baslatilma_tarihi` DB'de NULL olduğu için `baslatilma_yerel_zaman` DB'ye yazılır
+   - `tamamlanma_tarihi = yerel_zaman`
+   - `tamamlanma_suresi_saniye = yerel_zaman − baslatilma_yerel_zaman` (gerçek çalışma süresi!)
+   - `son_tamamlama_kanali = 'MOBIL_OFFLINE'`
+   - `checklist_sonuc_basliklari.kanal = 'MOBIL_OFFLINE'`
+   - Ardışık başlatma kontrolü atlanır (geçmişteki başlatma için anlamsız)
+
+**PT Aktif'te mobil'in yaptığı hata (şu an):**
+- ❌ QR okutunca görev **direkt tamamlanıyor** — başlatma ekranı/timer atlanıyor
+- ❌ Queue'ya sadece `yerel_zaman` gidiyor, `baslatilma_yerel_zaman` eksik
+- ❌ Sonuç: DB'de `baslatilma_tarihi = NULL`, `tamamlanma_suresi_saniye = NULL` → rapor eksik
+
+**Kontrol:** PT aktif projede offline görev yaptıktan sonra:
+```sql
+SELECT id, tanim, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
+       son_tamamlama_kanali
+FROM canli_gorevler
+WHERE son_tamamlama_kanali = 'MOBIL_OFFLINE'
+ORDER BY tamamlanma_tarihi DESC LIMIT 5;
+```
+Doğru akış çalışıyorsa: `baslatilma_tarihi` dolu, `tamamlanma_suresi_saniye` hesaplanmış.
 
 ---
 
