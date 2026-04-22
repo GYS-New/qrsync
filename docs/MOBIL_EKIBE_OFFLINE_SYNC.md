@@ -12,15 +12,14 @@ nasıl göndermeniz gerektiğini açıklar.
 
 ## 1. Kapsanan Endpoint'ler
 
-Aşağıdaki 3 endpoint'in body'sine `offline` + `yerel_zaman` alanları eklenebilir:
+Aşağıdaki 4 endpoint'in body'sine `offline` + `yerel_zaman` alanları eklenebilir:
 
 | Endpoint | Amaç |
 |---|---|
 | `POST /api/app/gorev-tamamla` | Frekans/spesifik görev tamamlama |
 | `POST /api/app/gorev-iptal` | Manuel görev iptali (sebep ile) |
 | `POST /api/app/ekstra-frekans` | Ekstra (kural dışı) frekansiyel görev |
-
-**Kapsam dışı (şimdilik):** `mesai-okut` — mesai akışı daha sonraki bir sürümde ele alınacak.
+| `POST /api/app/mesai-okut` | Mesai giriş/çıkış QR/NFC okutma |
 
 ---
 
@@ -81,6 +80,21 @@ POST /api/app/gorev-iptal
 ```
 Kanal: `MOBIL_OFFLINE` (işaretleme yine yapılır). Tamamlanma/iptal zamanı: sunucunun o anki saati.
 
+### Senaryo D — Mesai okut (giriş/çıkış) çevrimdışı
+```json
+POST /api/app/mesai-okut
+{
+  "token": "…",
+  "offline": true,
+  "yerel_zaman": "2026-04-21T08:03:22+03:00"
+}
+```
+- `giris_saati` / `cikis_saati` → `yerel_zaman` (geçerliyse).
+- `kayit_tarihi` → `yerel_zaman`'ın TR günü (Europe/Istanbul). Bu, TR 02:00'de okutulup TR 08:00'de
+  senkron edilen kaydın **doğru güne** düşmesini sağlar (aksi halde +6 saat sapmayla yanlış güne yazılırdı).
+- `giris_tipi` / `cikis_tipi` → `'MOBIL_OFFLINE'`.
+- Açık kayıt çakışması (`zaten_acik`) kontrolü de `yerel_zaman`'ın TR günü üzerinden yapılır.
+
 ---
 
 ## 4. Raporlama Tarafında Ne Görünür?
@@ -116,7 +130,11 @@ async function offlineKuyrukGonder(kayit: OfflineRecord) {
 **Önerilen kayıt yapısı (yerel DB / AsyncStorage):**
 ```ts
 interface OfflineRecord {
-  endpoint: '/api/app/gorev-tamamla' | '/api/app/gorev-iptal' | '/api/app/ekstra-frekans'
+  endpoint:
+    | '/api/app/gorev-tamamla'
+    | '/api/app/gorev-iptal'
+    | '/api/app/ekstra-frekans'
+    | '/api/app/mesai-okut'
   body: Record<string, any>
   yapildigiAn: Date  // eylemin gerçek anı — gönderime kadar korunmalı
 }

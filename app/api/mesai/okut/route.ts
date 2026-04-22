@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const body = await req.json()
   const { user_id, proje_id, tip } = body
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
 
   const { data: kayit } = await supabase
     .from('personel_mesai_kayitlari')

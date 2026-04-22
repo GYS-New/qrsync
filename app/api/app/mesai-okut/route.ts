@@ -3,7 +3,11 @@
  * Mobil uygulama — QR veya NFC okutulduğunda mesai giriş/çıkışı kaydeder.
  *
  * Header: X-Device-Token  — kayıtlı cihaz token'ı (zorunlu)
- * Body:   { token: string }  — mesai QR/NFC kodu
+ * Body:
+ *   token: string                   — mesai QR/NFC kodu
+ *   offline?: true                  — çevrimdışı kuyruktan geliyorsa
+ *   yerel_zaman?: ISO string        — cihazın okutma anındaki zamanı (offline'da giris/cikis_saati
+ *                                     ve kayit_tarihi bu zamana göre yazılır)
  *
  * Yanıt:
  *   { ok: true,  sonuc: 'giris'|'cikis', isim: string, tip: 'GIRIS'|'CIKIS' }
@@ -79,6 +83,21 @@ export async function POST(req: Request) {
         { status: 400, headers: CORS }
       )
     }
+
+    // Offline queue senkronu — cihaz çevrimdışıyken okutulan mesai sonradan geliyorsa.
+    // `yerel_zaman` cihazın okutma anındaki ISO damgası; kayit_tarihi ve giris/cikis_saati
+    // bu damgaya göre yazılır. Clock skew için 5dk future, 7 gün past tolerans.
+    const offlineSenkron = body?.offline === true
+    const yerelZamanRaw = typeof body?.yerel_zaman === 'string' ? body.yerel_zaman : null
+    const yerelZamanValid = (() => {
+      if (!yerelZamanRaw) return null
+      const t = new Date(yerelZamanRaw).getTime()
+      if (!Number.isFinite(t)) return null
+      const now = Date.now()
+      if (t > now + 5 * 60 * 1000) return null
+      if (t < now - 7 * 24 * 60 * 60 * 1000) return null
+      return new Date(t).toISOString()
+    })()
 
     // ── 3. Mesai QR/NFC kaydını bul ───────────────────────────────────────────
     const { data: qrByToken } = await admin
@@ -158,17 +177,21 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── 5. TRT bugün ──────────────────────────────────────────────────────────
-    const trtNow = new Date(Date.now() + 3 * 60 * 60 * 1000)
-    const bugun  = trtNow.toISOString().split('T')[0]
+    // ── 5. Olay zamanı ve TR günü ─────────────────────────────────────────────
+    // Offline senkronda cihazın yerel zamanı kullanılır (ağ geldiğinde gönderim
+    // anı değil, gerçek okutma anı). TR günü bu zamana göre hesaplanır ki
+    // çevrimdışı kayıtlar doğru güne yazılsın.
     const simdi  = new Date().toISOString()
+    const eventIso = (offlineSenkron && yerelZamanValid) ? yerelZamanValid : simdi
+    const eventTrDay = new Date(eventIso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
+    const kanal = offlineSenkron ? 'MOBIL_OFFLINE' : 'MOBIL'
 
-    // ── 6. Bugünkü en son açık kayıt ─────────────────────────────────────────
+    // ── 6. İlgili güne ait en son açık kayıt ─────────────────────────────────
     let mevQ = admin
       .from('personel_mesai_kayitlari')
       .select('id, giris_saati, cikis_saati')
       .eq('user_id', userId)
-      .eq('kayit_tarihi', bugun)
+      .eq('kayit_tarihi', eventTrDay)
       .is('cikis_saati', null)
       .order('giris_saati', { ascending: false })
       .limit(1)
@@ -190,15 +213,15 @@ export async function POST(req: Request) {
         user_id:      userId,
         firma_id:     firmaId,
         proje_id:     qr.proje_id ?? null,
-        kayit_tarihi: bugun,
-        giris_saati:  simdi,
-        giris_tipi:   'MOBIL',
+        kayit_tarihi: eventTrDay,
+        giris_saati:  eventIso,
+        giris_tipi:   kanal,
       })
       if (error) {
         return NextResponse.json({ ok: false, error: error.message }, { status: 500, headers: CORS })
       }
 
-      // Cihaz son kullanım güncelle
+      // Cihaz son kullanım güncelle — server now, offline olsa bile gerçek temas anı
       await admin.from('device_tokens')
         .update({ son_kullanim: simdi })
         .eq('device_token', deviceToken)
@@ -219,7 +242,7 @@ export async function POST(req: Request) {
       }
       const { error } = await admin
         .from('personel_mesai_kayitlari')
-        .update({ cikis_saati: simdi, cikis_tipi: 'MOBIL' })
+        .update({ cikis_saati: eventIso, cikis_tipi: kanal })
         .eq('id', mevcut.id)
       if (error) {
         return NextResponse.json({ ok: false, error: error.message }, { status: 500, headers: CORS })

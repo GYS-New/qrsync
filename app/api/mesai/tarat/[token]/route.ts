@@ -149,8 +149,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     }
   }
 
-  const trtNow = new Date(Date.now() + 3 * 60 * 60 * 1000)
-  const bugun  = trtNow.toISOString().split('T')[0]
+  const bugun  = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
   const simdi  = new Date().toISOString()
 
   // Kanal: mobil mi web mi?

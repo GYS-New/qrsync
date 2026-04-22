@@ -58,6 +58,15 @@ export async function POST(req: NextRequest) {
 
   // TR tarihi (YYYY-MM-DD) — sv-SE locale ISO 8601 format döner
   const trDateStr = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
+  // TR tarih parçaları (yıl, ay 0-idx, gün 1-idx) — sv-SE ISO 8601'i böler
+  const trParts = (d: Date) => {
+    const [y, m, dd] = trDateStr(d).split('-').map(Number)
+    return { year: y, month: m - 1, date: dd }
+  }
+  // TR haftanın günü (0=Pazar ... 6=Cumartesi)
+  const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+  const trWeekday = (d: Date) =>
+    weekdayMap[d.toLocaleDateString('en-US', { timeZone: 'Europe/Istanbul', weekday: 'short' })] ?? 0
   // TR saatindeki "tarih saat" → UTC ISO string
   const trToUtcIso = (tarihStr: string, saatStr: string) =>
     new Date(`${tarihStr}T${saatStr}:00+03:00`).toISOString()
@@ -78,9 +87,7 @@ export async function POST(req: NextRequest) {
   } else if (tekrarTipi === 'haftalik' && gunSecimi?.[0] != null) {
     // Sonraki seçilen haftanın gününü bul (TR günü bazlı)
     const hedefGun = gunSecimi[0] // 0=Pazar...6=Cumartesi
-    // TR günü
-    const trNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
-    const bugunGun = trNow.getDay()
+    const bugunGun = trWeekday(now)
     let fark = hedefGun - bugunGun
     const bugunIso = trToUtcIso(trBugun, saat)
     if (fark < 0 || (fark === 0 && new Date(bugunIso).getTime() <= now.getTime())) fark += 7
@@ -88,10 +95,10 @@ export async function POST(req: NextRequest) {
     sonrakiGonderim = trToUtcIso(trDateStr(hedefDate), saat)
   } else if (tekrarTipi === 'aylik' && gunSecimi?.[0] != null) {
     const hedefGun = gunSecimi[0]
-    const trNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
-    let yil = trNow.getFullYear()
-    let ay  = trNow.getMonth()
-    const bugunGun = trNow.getDate()
+    const trP = trParts(now)
+    let yil = trP.year
+    let ay  = trP.month
+    const bugunGun = trP.date
     const bugunHedefIso = trToUtcIso(`${yil}-${String(ay + 1).padStart(2, '0')}-${String(hedefGun).padStart(2, '0')}`, saat)
     if (bugunGun > hedefGun || (bugunGun === hedefGun && new Date(bugunHedefIso).getTime() <= now.getTime())) {
       ay += 1

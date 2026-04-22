@@ -14,8 +14,15 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 function fmt(v: string | null | undefined) {
   if (!v) return '—'
   const d = new Date(v); if (isNaN(d.getTime())) return '—'
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`
+  // TR timezone — önceki akış server timezone (UTC) kullanıyordu; rapor export'ta
+  // "TARİH-SAAT" kolonunda kullanıcı 3 saat sapma görüyordu.
+  const parts = new Intl.DateTimeFormat('tr-TR', {
+    timeZone: 'Europe/Istanbul',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(d)
+  const g = (t: string) => parts.find(x => x.type === t)?.value ?? ''
+  return `${g('day')}.${g('month')}.${g('year')} ${g('hour')}:${g('minute')}`
 }
 
 export async function GET(req: NextRequest) {
