@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateTime, CANLI_DURUM_LABEL } from '@/lib/utils'
+import { KanalBadge } from '@/components/shared/KanalBadge'
 
 const DURUM_RENK: Record<string, string> = {
   HAZIR: 'status-hazir', ACIK: 'status-acik', BEKLEMEDE: 'status-beklemede', ISLEMDE: 'status-islemde',
@@ -219,7 +220,9 @@ export default function TumGorevlerClient({
           <thead>
             <tr>
               <th>Görev</th><th>Lokasyon</th><th>Atanan</th>
-              <th>Aktif Saat</th><th>Durum</th><th>İşlemi Yapan</th>
+              <th>Aktif Saat</th><th>Durum</th>
+              <th>Kanal</th>
+              <th>İşlemi Yapan</th>
             </tr>
           </thead>
           <tbody>
@@ -234,11 +237,12 @@ export default function TumGorevlerClient({
                     {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
                   </span>
                 </td>
+                <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                 <td style={{ color:'#6b7280', fontSize:13 }}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
               </tr>
             ))}
             {!displayRows.length && (
-              <tr><td colSpan={6} style={{ textAlign:'center', color:'#6b7280', padding:'26px 0', fontSize: 14 }}>
+              <tr><td colSpan={7} style={{ textAlign:'center', color:'#6b7280', padding:'26px 0', fontSize: 14 }}>
                 {filtered ? 'Kriterlere uygun aktif kayıt bulunamadı.' : 'Görev bulunamadı.'}
               </td></tr>
             )}
@@ -257,7 +261,9 @@ export default function TumGorevlerClient({
               <thead>
                 <tr>
                   <th>Görev</th><th>Lokasyon</th><th>Atanan</th>
-                  <th>Aktif Saat</th><th>Durum</th><th>Arşiv Tarihi</th>
+                  <th>Aktif Saat</th><th>Durum</th>
+                  <th>Kanal</th>
+                  <th>Arşiv Tarihi</th>
                 </tr>
               </thead>
               <tbody>
@@ -272,11 +278,12 @@ export default function TumGorevlerClient({
                         {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
                       </span>
                     </td>
+                    <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                     <td style={{ color:'#94a3b8', whiteSpace:'nowrap', fontSize: 13 }}>{g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—'}</td>
                   </tr>
                 ))}
                 {!displayArsiv.length && (
-                  <tr><td colSpan={6} style={{ textAlign:'center', color:'#6b7280', padding:'20px 0', fontSize: 14 }}>
+                  <tr><td colSpan={7} style={{ textAlign:'center', color:'#6b7280', padding:'20px 0', fontSize: 14 }}>
                     Kriterlere uygun arşiv kaydı bulunamadı.
                   </td></tr>
                 )}

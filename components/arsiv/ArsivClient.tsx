@@ -9,6 +9,7 @@ import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 import { useYetki } from '@/lib/yetki/useYetki'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
+import { KANAL_RENK, KANAL_LABEL } from '@/components/shared/KanalBadge'
 import {
   Trash2, RotateCcw, Download, FileSpreadsheet, Printer,
   RefreshCw, Archive, Users, Star, ClipboardList, ClipboardCheck,
@@ -1143,18 +1144,9 @@ const CEKLIST_DURUM_RENK: Record<string, { bg: string; color: string }> = {
   ZAMANINDA_YAPILAMAYAN: { bg: '#fef9c3', color: '#854d0e' },
 }
 
-const CEKLIST_KANAL_RENK: Record<string, { bg: string; color: string }> = {
-  WEB:           { bg: '#e0f2fe', color: '#0369a1' },
-  QR:            { bg: '#ede9fe', color: '#5b21b6' },
-  NFC:           { bg: '#fce7f3', color: '#9d174d' },
-  MOBİL:         { bg: '#f9fafb', color: '#166534' },
-  MOBIL_OFFLINE: { bg: '#fef3c7', color: '#92400e' },
-}
-
-// Kanal etiket: DB'de MOBIL_OFFLINE olarak saklanır; kullanıcıya "Mobil (Offline)" gösterilir.
-const CEKLIST_KANAL_LABEL: Record<string, string> = {
-  MOBIL_OFFLINE: 'Mobil (Offline)',
-}
+// Kanal rozetleri shared helper'da — components/shared/KanalBadge.tsx
+const CEKLIST_KANAL_RENK = KANAL_RENK
+const CEKLIST_KANAL_LABEL = KANAL_LABEL
 
 function ckPct(dol: number, top: number) {
   if (!top) return 0

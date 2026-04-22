@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { X, CheckCircle, Minus, AlertCircle, RefreshCw } from 'lucide-react'
+import { KanalBadge } from '@/components/shared/KanalBadge'
 
 interface Props {
   taskId: string
@@ -132,14 +133,8 @@ export function ChecklistTablo({ sonuclar, mesaj, sablonBaslik }: {
               {s.tarih && (
                 <span style={{ fontSize: 11, color: '#64748b', flexShrink: 0 }}>
                   {s.kanal && (
-                    <span style={{
-                      marginRight: 4,
-                      fontWeight: 700,
-                      color: s.kanal === 'QR' ? '#1d4ed8'
-                           : s.kanal === 'MOBIL_OFFLINE' ? '#92400e'
-                           : '#15803d',
-                    }}>
-                      {s.kanal === 'MOBIL_OFFLINE' ? 'MOBİL (Offline)' : s.kanal}
+                    <span style={{ marginRight: 4 }}>
+                      <KanalBadge value={s.kanal} size="sm" />
                     </span>
                   )}
                   {fmtTarih(s.tarih)}

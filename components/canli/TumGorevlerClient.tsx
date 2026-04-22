@@ -12,6 +12,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { useYetki } from '@/lib/yetki/useYetki'
+import { KanalBadge } from '@/components/shared/KanalBadge'
 
 type SortKey = 'tanim' | 'lokasyon' | 'atanan' | 'aktif' | 'islem' | 'durum' | 'actor'
 
@@ -1113,6 +1114,7 @@ async function del() {
               <th style={{ paddingLeft: 22 }}>{thBtn('Aktif Saat', 'aktif')}</th>
               <th>{thBtn('İŞLEM TARİH-SAAT', 'islem')}</th>
               <th>{thBtn('İşlemi Yapan', 'actor')}</th>
+              <th>Kanal</th>
               <th>{thBtn('Durum', 'durum')}</th>
               <th style={{ textAlign:'center' }}>Çeklist</th>
             </tr>
@@ -1183,6 +1185,7 @@ async function del() {
                     : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
                 </td>
                 <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g, { meId, meName, kullanicilar })}</td>
+                <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                 <td>
                   <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
                 </td>
@@ -1201,7 +1204,7 @@ async function del() {
             })}
             {!combinedRows.length && (
               <tr>
-                <td colSpan={(bulkMode || bulkDuzenleMode) ? (arsivAktif ? 11 : 10) : (arsivAktif ? 10 : 9)} style={{ textAlign: 'center', color: '#6b7280', padding: '26px 0', fontSize: 13 }}>
+                <td colSpan={(bulkMode || bulkDuzenleMode) ? (arsivAktif ? 12 : 11) : (arsivAktif ? 11 : 10)} style={{ textAlign: 'center', color: '#6b7280', padding: '26px 0', fontSize: 13 }}>
                   Kriterlere uygun görev bulunamadı
                 </td>
               </tr>
@@ -1241,11 +1244,12 @@ async function del() {
             <table className="verde-table">
               <thead><tr>
                 <th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th>
+                <th>Kanal</th>
                 <th>Arşiv Tarihi</th><th>İşlemi Yapan</th>
               </tr></thead>
               <tbody>
                 {arsivDisplayRows.length === 0 ? (
-                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                  <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
                     {arsivLoading ? 'Yükleniyor...' : 'Arşiv kaydı bulunamadı.'}
                   </td></tr>
                 ) : arsivDisplayRows.map((g: any) => (
@@ -1254,6 +1258,7 @@ async function del() {
                     <td style={{ color: '#64748b', fontSize: 12.5 }}>{g.lokasyonlar?.tanim ?? '—'}</td>
                     <td style={{ color: '#64748b', fontSize: 12.5 }}>{g.atanan?.isim_soyisim ?? '—'}</td>
                     <td><span className={`verde-badge ${g.durum === 'TAMAMLANDI' ? 'status-tamamlandi' : g.durum === 'IPTAL' ? 'status-iptal' : 'status-islemde'}`} style={{ fontSize: 11 }}>{g.durum}</span></td>
+                    <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                     <td style={{ whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 12 }}>{g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—'}</td>
                     <td style={{ color: '#64748b', fontSize: 12.5 }}>{g.islemi_yapan?.isim_soyisim ?? g.tamamlayan?.isim_soyisim ?? '—'}</td>
                   </tr>
