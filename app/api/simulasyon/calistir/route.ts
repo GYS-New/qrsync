@@ -259,16 +259,18 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     return { tamamlanan: 0, iptal: 0, mesaj: `Hedef zaten sağlandı: ${tamamlananSayi}/${hedefMax}` }
   }
 
-  // ── Doğal akış: vardiya kalan süresine göre dakika başına görev oranı ──
-  // Kalan görev / kalan dakika — vardiya sonuna kadar tüm görevler tamamlanmalı
+  // ── Eşit dağılım: sabit dakika başına oran ─────────────────────────────
+  // gorevPerDk = vardiyaHedefMax / vardiyaDk — vardiya boyunca SABİT tempo.
+  // Eski formül (kalanHedef / kalanDk) vardiya sonuna yaklaştıkça kalanDk küçüldüğü
+  // için gorevPerDk patlıyordu (07:45'te 48 görev, 08:00'da 95 görev gözlendi).
+  // Gerçek personel vardiya sonunda hızlanmaz; kalan görevleri personel-destek
+  // cron'u kapatır. Bu yüzden SİM'in sabit hızda yürümesi daha doğru bir model.
   const kalanHedef = vardiyaHedefMax - vardiyaTamamlanan
   const gecenDk = Math.max(1, Math.round((now - vardiyaBaslangic) / 60000))
   const kalanDk = Math.max(1, vardiyaDk - gecenDk)
-  const gorevPerDk = kalanHedef / kalanDk
+  const gorevPerDk = vardiyaHedefMax / vardiyaDk
   // Doğal dağılım: tam kısmı garanti, kalan ondalık kısmı olasılıklı.
   // Örn 0.3 → %30 şans 1 görev | 1.6 → garanti 1 + %60 şans 2 | 2.4 → garanti 2 + %40 şans 3
-  // Vardiya sonuna yaklaştıkça kalanDk küçülür, gorevPerDk doğal olarak artar → son saatte hızlanır.
-  // Sabit +%15 boost KALDIRILDI — 8 saatlik vardiya 3 saatte bitiyor problemine yol açıyordu.
   const tamKisim = Math.floor(gorevPerDk)
   const kalan = gorevPerDk - tamKisim
   const maxIslem = tamKisim + (Math.random() < kalan ? 1 : 0)
