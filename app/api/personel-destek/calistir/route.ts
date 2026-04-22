@@ -124,8 +124,20 @@ async function destekCalistir(admin: any, ayar: any) {
     .gte('aktif_olma_tarihi', gunBaslangicUTC)
     .lte('aktif_olma_tarihi', gunBitisUTC)
 
-  const tumGorevler = gorevler ?? []
-  if (tumGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bugünkü görev yok' }
+  const gunlukTumGorevler = gorevler ?? []
+  if (gunlukTumGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bugünkü görev yok' }
+
+  // ── Vardiya filtresi: yalnızca BİTMİŞ vardiyaların görevlerini işle ─────
+  // Bugünkü farklı aktif_olma_tarihi değerleri ayrı vardiyaları temsil eder
+  // (örn. gece 00:05, sabah 08:00, akşam 16:00). Son (en geç) olan = aktif vardiya.
+  // Aktif vardiyayı hariç tutarak yeni vardiyanın taze görevlerinin yutulmasını engelleriz.
+  const distinctAktifOlma = [...new Set(gunlukTumGorevler.map((g: any) => g.aktif_olma_tarihi))].sort()
+  if (distinctAktifOlma.length < 2) {
+    return { tamamlanan: 0, mesaj: 'Aktif vardiya sürüyor — bitmiş vardiya yok, işlem yapılmadı' }
+  }
+  const aktifVardiyaTs = distinctAktifOlma[distinctAktifOlma.length - 1]
+  const tumGorevler = gunlukTumGorevler.filter((g: any) => g.aktif_olma_tarihi !== aktifVardiyaTs)
+  if (tumGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bitmiş vardiyada görev yok' }
 
   const tamamlananSayi = tumGorevler.filter((g: any) =>
     ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum)
