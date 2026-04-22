@@ -212,6 +212,7 @@ async function destekCalistir(admin: any, ayar: any) {
         iptal_eden_id: personelId,
         iptal_tarihi: new Date().toISOString(),
         islemi_yapan_id: personelId,
+        iptal_sebep: 'Otomatik iptal — personel destek (vardiya bitti)',
       } as any).eq('id', gorev.id)
       iptalAdet++
       continue
