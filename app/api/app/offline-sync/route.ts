@@ -89,6 +89,26 @@ function sureSaniye(baslangic: string, bitis: string): number | null {
   return Math.max(0, Math.floor((e - b) / 1000))
 }
 
+/**
+ * Sanity check — cihaz saati yanlışsa rejection.
+ * Kurallar:
+ *   - baslatilma < bitirme zorunlu
+ *   - bitirme gelecekte ≤ 5 dk (clock skew toleransı)
+ *   - baslatilma son 25 saat içinde (20 saat TTL + 5 saat pay)
+ *
+ * Dönüş: null = OK, string = hata mesajı.
+ */
+function zamanSanityCheck(baslatilma: string, bitirme: string): string | null {
+  const b = new Date(baslatilma).getTime()
+  const e = new Date(bitirme).getTime()
+  if (!Number.isFinite(b) || !Number.isFinite(e)) return 'Geçersiz ISO zaman damgası'
+  if (e <= b) return 'bitirme_zamani baslatilma_zamani\'ndan sonra olmalı'
+  const simdi = Date.now()
+  if (e > simdi + 5 * 60 * 1000) return 'Cihaz saati ileri (bitirme gelecekte)'
+  if (b < simdi - 25 * 60 * 60 * 1000) return 'Kayıt TTL dışında (25 saatten eski)'
+  return null
+}
+
 /** Bir lokasyonun checklist şablonu var mı — çeklist kaydı için gerekli */
 async function lokasyonCeklistSablon(admin: any, lokasyonId: string): Promise<string | null> {
   const { data } = await admin.from('lokasyonlar').select('checklist_sablon_id').eq('id', lokasyonId).maybeSingle()
@@ -104,6 +124,22 @@ async function normalGoreviTamamla(
 ): Promise<Sonuc> {
   if (!kayit.gorev_id) {
     return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'hata', error: 'gorev_id gerekli (ekstra değilse)' }
+  }
+
+  // Idempotency — bu mobil_kayit_id daha önce işlenmiş mi?
+  const { data: mevcutSync } = await admin
+    .from(kayit.gorev_tipi)
+    .select('id')
+    .eq('mobil_kayit_id', kayit._mobil_kayit_id)
+    .maybeSingle()
+  if (mevcutSync) {
+    return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'ok', mesaj: 'Zaten senkron edilmiş (idempotent)' }
+  }
+
+  // Zaman damgası sanity check
+  const sanityHata = zamanSanityCheck(kayit.baslatilma_zamani, kayit.bitirme_zamani)
+  if (sanityHata) {
+    return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'hata', error: sanityHata }
   }
 
   // Görevi çek
@@ -194,6 +230,7 @@ async function normalGoreviTamamla(
       ...(gorev.baslatilma_tarihi ? {} : { baslatilma_tarihi: baslatilmaIso, baslatan_kullanici_id: userId }),
       ...(kayit.gorev_tipi === 'canli_gorevler' ? { tamamlayan_kullanici_id: userId } : {}),
       son_tamamlama_kanali: 'OFFLINE',
+      mobil_kayit_id: kayit._mobil_kayit_id,
     } as any)
     .eq('id', kayit.gorev_id)
 
@@ -212,6 +249,22 @@ async function ekstraGoreviOlustur(
   personelProjeId: string | null,
   kayit: OfflineKayit,
 ): Promise<Sonuc> {
+  // Idempotency — bu mobil_kayit_id daha önce ekstra olarak kaydedilmiş mi?
+  const { data: mevcutSync } = await admin
+    .from('canli_gorevler')
+    .select('id')
+    .eq('mobil_kayit_id', kayit._mobil_kayit_id)
+    .maybeSingle()
+  if (mevcutSync) {
+    return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'ok', mesaj: 'Zaten senkron edilmiş (idempotent)' }
+  }
+
+  // Zaman damgası sanity check
+  const sanityHata = zamanSanityCheck(kayit.baslatilma_zamani, kayit.bitirme_zamani)
+  if (sanityHata) {
+    return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'hata', error: sanityHata }
+  }
+
   const tanim = typeof kayit.tanim === 'string' ? kayit.tanim.trim() : ''
   if (!tanim) {
     return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'hata', error: 'ekstra görev için tanim gerekli' }
@@ -252,6 +305,7 @@ async function ekstraGoreviOlustur(
       tamamlayan_kullanici_id: userId,
       tamamlanma_suresi_saniye: sure,
       son_tamamlama_kanali:    'OFFLINE',
+      mobil_kayit_id:          kayit._mobil_kayit_id,
     } as any)
     .select('id')
 
