@@ -174,7 +174,9 @@ async function destekCalistir(admin: any, ayar: any) {
     cinsiyet: u.cinsiyet ?? null,
   }))
 
-  // Mesai kontrolü: personel takibi aktifse sadece mesaide olanları al
+  // Mesai kontrolü: PT aktifse önce mesaili personelleri tercih et; yoksa atanan
+  // personellerle devam (SIM ile tutarlı fallback — aksi halde hiç kimse iş başı
+  // yapmamışsa görevler hiç kapanmaz, BEKLEMEDE'de kalır).
   if (proje_id) {
     const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', proje_id).single()
     if (proje?.personel_takibi_aktif === true) {
@@ -185,7 +187,12 @@ async function destekCalistir(admin: any, ayar: any) {
         .eq('kayit_tarihi', bugun)
         .is('cikis_saati', null)
       const mesailiSet = new Set((mesailar ?? []).map((m: any) => m.user_id))
-      uygunPersonel = uygunPersonel.filter(p => mesailiSet.has(p.id))
+      const mesailiPersonel = uygunPersonel.filter(p => mesailiSet.has(p.id))
+      if (mesailiPersonel.length > 0) {
+        uygunPersonel = mesailiPersonel
+      } else {
+        console.log(`[PERSONEL-DESTEK] Mesaili personel yok — atanan personellerle devam (${uygunPersonel.length} kişi)`)
+      }
     }
   }
 
