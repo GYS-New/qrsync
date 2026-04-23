@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
 
 export type SupportedTaskType = 'gorevler' | 'canli_gorevler'
-export type CompletionChannel = 'QR' | 'NFC' | 'MOBIL' | 'MOBIL_OFFLINE'
+export type CompletionChannel = 'QR' | 'NFC'
 
 type CompleteTaskInput = {
   supabase: SupabaseClient
@@ -10,10 +10,6 @@ type CompleteTaskInput = {
   taskType: SupportedTaskType
   userId: string
   channel: CompletionChannel
-  /** Offline senkron anında cihaz yerel zamanı (ISO). Tamamlanma damgasında kullanılır. */
-  yerelZamanIso?: string | null
-  /** Offline senkronda görev DB'de başlamamışsa cihazda kaydedilen başlatma zamanı. */
-  baslatilmaYerelIso?: string | null
 }
 
 function calcDurationSeconds(startedAt?: string | null, nowIso?: string) {
@@ -25,10 +21,8 @@ function calcDurationSeconds(startedAt?: string | null, nowIso?: string) {
 }
 
 export async function completeTask(input: CompleteTaskInput) {
-  const { supabase, taskId, taskType, userId, channel, yerelZamanIso, baslatilmaYerelIso } = input
-  const serverNow = new Date().toISOString()
-  // Offline senkronda cihazın yerel zamanı; aksi halde server now
-  const nowIso = yerelZamanIso ?? serverNow
+  const { supabase, taskId, taskType, userId, channel } = input
+  const nowIso = new Date().toISOString()
 
   if (taskType === 'gorevler') {
     // Önce görevi çek (lokasyon join olmadan — join hatası "Görev bulunamadı" maskelemesini önler)
@@ -57,21 +51,14 @@ export async function completeTask(input: CompleteTaskInput) {
       sureli = !!(lok as any)?.sureli_gorev_aktif
     }
 
-    // Başlatma zamanı: DB'de dolu ise öncelikli. Boşsa:
-    //   - mobil offline baslatilmaYerelIso göndermişse o kullanılır
-    //   - süreli görev ise otomatik başlatma (nowIso)
-    //   - aksi halde null bırakılır (sureSaniye hesaplanamaz)
-    const baslatilmaTarihi =
-      task.baslatilma_tarihi
-      ?? baslatilmaYerelIso
-      ?? (sureli ? nowIso : null)
+    const baslatilmaTarihi = task.baslatilma_tarihi ?? (sureli ? nowIso : null)
 
-    if (!task.baslatilma_tarihi && baslatilmaTarihi) {
+    if (sureli && !task.baslatilma_tarihi) {
       await supabase.from('gorevler').update({
-        baslatilma_tarihi: baslatilmaTarihi,
+        baslatilma_tarihi: nowIso,
         baslatan_kullanici_id: userId,
         durum: 'ISLEMDE',
-        durum_degisim_tarihi: baslatilmaTarihi,
+        durum_degisim_tarihi: nowIso,
       } as any).eq('id', taskId)
     }
 
@@ -83,7 +70,6 @@ export async function completeTask(input: CompleteTaskInput) {
         tamamlanma_tarihi: nowIso,
         tamamlanma_suresi_saniye: calcDurationSeconds(baslatilmaTarihi, nowIso),
         islemi_yapan_id: userId,
-        son_tamamlama_kanali: channel,
       } as any)
       .eq('id', taskId)
 
@@ -129,17 +115,14 @@ export async function completeTask(input: CompleteTaskInput) {
     sureli = !!(lok as any)?.sureli_gorev_aktif
   }
 
-  const liveBaslatilmaTarihi =
-    liveTask.baslatilma_tarihi
-    ?? baslatilmaYerelIso
-    ?? (sureli ? nowIso : null)
+  const liveBaslatilmaTarihi = liveTask.baslatilma_tarihi ?? (sureli ? nowIso : null)
 
-  if (!liveTask.baslatilma_tarihi && liveBaslatilmaTarihi) {
+  if (sureli && !liveTask.baslatilma_tarihi) {
     await supabase.from('canli_gorevler').update({
-      baslatilma_tarihi: liveBaslatilmaTarihi,
+      baslatilma_tarihi: nowIso,
       baslatan_kullanici_id: userId,
       durum: 'ISLEMDE',
-      durum_degisim_tarihi: liveBaslatilmaTarihi,
+      durum_degisim_tarihi: nowIso,
     } as any).eq('id', taskId)
   }
 
@@ -154,7 +137,6 @@ export async function completeTask(input: CompleteTaskInput) {
       tamamlanma_suresi_saniye: calcDurationSeconds(liveBaslatilmaTarihi, nowIso),
       tamamlayan_kullanici_id: userId,
       islemi_yapan_id: userId,
-      son_tamamlama_kanali: channel,
     } as any)
     .eq('id', taskId)
 

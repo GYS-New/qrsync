@@ -3,28 +3,23 @@
  *
  * Kanallar (DB değeri):
  *   WEB | QR | NFC      — web veya tarayıcıdan scan
- *   MOBİL | MOBIL       — online mobil tamamlama (historik iki yazım da desteklenir)
- *   MOBIL_OFFLINE       — çevrimdışı yapılmış, sonradan senkron edilmiş
+ *   MOBİL | MOBIL       — mobil tamamlama (historik iki yazım da desteklenir)
  *
  * `checklist_sonuc_basliklari.kanal` ve `gorevler/canli_gorevler.son_tamamlama_kanali`
- * kolonlarında kullanılır; görsel ayırt etmeye yarar — özellikle MOBIL_OFFLINE için
- * amber ton + "(Offline)" etiketi adminin offline senkron akışını doğrulamasını sağlar.
+ * kolonlarında kullanılır.
  */
 
 type KanalStyle = { bg: string; color: string }
 
 export const KANAL_RENK: Record<string, KanalStyle> = {
-  WEB:           { bg: '#e0f2fe', color: '#0369a1' },
-  QR:            { bg: '#ede9fe', color: '#5b21b6' },
-  NFC:           { bg: '#fce7f3', color: '#9d174d' },
-  MOBİL:         { bg: '#f9fafb', color: '#166534' },
-  MOBIL:         { bg: '#f9fafb', color: '#166534' },
-  MOBIL_OFFLINE: { bg: '#fef3c7', color: '#92400e' },
+  WEB:   { bg: '#e0f2fe', color: '#0369a1' },
+  QR:    { bg: '#ede9fe', color: '#5b21b6' },
+  NFC:   { bg: '#fce7f3', color: '#9d174d' },
+  MOBİL: { bg: '#f9fafb', color: '#166534' },
+  MOBIL: { bg: '#f9fafb', color: '#166534' },
 }
 
-export const KANAL_LABEL: Record<string, string> = {
-  MOBIL_OFFLINE: 'Mobil (Offline)',
-}
+export const KANAL_LABEL: Record<string, string> = {}
 
 export function kanalLabel(value: string | null | undefined): string {
   if (!value) return '—'

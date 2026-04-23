@@ -88,26 +88,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
     const selectedTaskId   = body?.taskId   as string | undefined
     const selectedTaskType = body?.taskType as 'gorevler' | 'canli_gorevler' | undefined
     const checklistResults = Array.isArray(body?.checklistResults) ? body.checklistResults : []
-    // Mobil cihaz tespiti — channel seçiminde kullanılır (web = 'QR', mobil = 'MOBIL'/'MOBIL_OFFLINE')
-    const isMobile = !!req.headers.get('X-Device-Token')
-    // Offline queue senkronu — cihaz çevrimdışıyken yapılan işi sonradan gönderiyorsa
-    const offlineSenkron = body?.offline === true
-    // Yerel zaman validasyonu — +5dk future, -7gün past (diğer endpoint'lerle aynı)
-    const validateYerelIso = (raw: unknown): string | null => {
-      if (typeof raw !== 'string' || !raw) return null
-      const t = new Date(raw).getTime()
-      if (!Number.isFinite(t)) return null
-      const simdi = Date.now()
-      if (t > simdi + 5 * 60 * 1000) return null
-      if (t < simdi - 7 * 24 * 60 * 60 * 1000) return null
-      return new Date(t).toISOString()
-    }
-    const yerelZamanValid = validateYerelIso(body?.yerel_zaman)
-    const baslatilmaYerelValid = validateYerelIso(body?.baslatilma_yerel_zaman)
-    // Tamamlama kanalı: web → 'QR', mobil → 'MOBIL_OFFLINE' (offline senkron) veya 'MOBIL'
-    const completionChannel: 'QR' | 'MOBIL' | 'MOBIL_OFFLINE' = isMobile
-      ? (offlineSenkron ? 'MOBIL_OFFLINE' : 'MOBIL')
-      : 'QR'
     const supabase = createAdminClient()
     const context = await resolveScanContext({ supabase, token: params.token, kanal: 'QR', userId: user.id })
 
@@ -118,23 +98,22 @@ export async function POST(req: Request, { params }: { params: { token: string }
     // ── action: 'basla' → görevi sadece başlat, tamamlama ───────────────────
     if (action === 'basla' && selectedTaskId) {
       const tablo = selectedTaskType === 'canli_gorevler' ? 'canli_gorevler' : 'gorevler'
-      // Mobil offline senkronda baslatilma_yerel_zaman gönderir; yoksa şimdi kullan.
-      const baslatilmaIso = baslatilmaYerelValid ?? new Date().toISOString()
+      const nowIso = new Date().toISOString()
       // Zaten başlatılmış mı kontrol et
       const { data: gorev } = await supabase.from(tablo).select('id,baslatilma_tarihi,durum,firma_id,proje_id').eq('id', selectedTaskId).maybeSingle()
       if (gorev?.baslatilma_tarihi) {
         return NextResponse.json({ ok: true, baslatilma_tarihi: gorev.baslatilma_tarihi, mesaj: 'Zaten başlatılmış' }, { headers: CORS_HEADERS })
       }
-      // Ardışık başlatma kontrolü — yerel zamanla senkron edilen geçmiş başlatma için atla
-      if (gorev && !baslatilmaYerelValid) {
+      // Ardışık başlatma kontrolü
+      if (gorev) {
         const ardisikHata = await ardisikBaslatmaKontrol(supabase, user.id, gorev.firma_id, (gorev as any).proje_id)
         if (ardisikHata) {
           return NextResponse.json({ ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' }, { status: 429, headers: CORS_HEADERS })
         }
       }
-      const updatePayload: any = { baslatilma_tarihi: baslatilmaIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: baslatilmaIso, durum: 'ISLEMDE' }
+      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
       await supabase.from(tablo).update(updatePayload).eq('id', selectedTaskId)
-      return NextResponse.json({ ok: true, baslatilma_tarihi: baslatilmaIso, mesaj: 'Görev başlatıldı' }, { headers: CORS_HEADERS })
+      return NextResponse.json({ ok: true, baslatilma_tarihi: nowIso, mesaj: 'Görev başlatıldı' }, { headers: CORS_HEADERS })
     }
 
     // taskType gelmemişse id'ye göre her iki tipte ara
@@ -185,7 +164,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
         lokasyon_id: context.lokasyon.id,
         sablon_id: context.checklistTemplate.id,
         template_version: templateVersion,
-        kanal: completionChannel,
+        kanal: 'QR',
         kullanici_id: user.id,
       }
       baslikPayload[gorevIdKolonu] = task.id
@@ -225,9 +204,8 @@ export async function POST(req: Request, { params }: { params: { token: string }
       }
     }
 
-    // Ardışık başlatma kontrolü — görev henüz başlatılmamışsa. Mobil offline
-    // senkronda başlatma zamanı geçmişteki gerçek andır; kontrol anlamsız.
-    if (!task.baslatilma_tarihi && !baslatilmaYerelValid) {
+    // Ardışık başlatma kontrolü — görev henüz başlatılmamışsa (ACIK durumda tamamlanıyor)
+    if (!task.baslatilma_tarihi) {
       const tablo = task.taskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'
       const { data: gorevRow } = await supabase.from(tablo).select('firma_id,proje_id').eq('id', task.id).maybeSingle()
       if (gorevRow) {
@@ -238,27 +216,17 @@ export async function POST(req: Request, { params }: { params: { token: string }
       }
     }
 
-    // Süreli görev: baslatilma_tarihi yoksa otomatik başlat. Mobil offline
-    // senkronunda baslatilma_yerel_zaman gönderirse gerçek başlama anı kullanılır;
-    // aksi halde sunucu şu anı yazılır (web ve online mobil akışlar için).
-    if (!task.baslatilma_tarihi && (context.lokasyon.sureli_gorev_aktif || baslatilmaYerelValid)) {
-      const baslatilmaIso = baslatilmaYerelValid ?? new Date().toISOString()
+    // Süreli görev: baslatilma_tarihi yoksa otomatik başlat
+    if (context.lokasyon.sureli_gorev_aktif && !task.baslatilma_tarihi) {
+      const nowIso = new Date().toISOString()
       const tablo = task.taskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'
-      const updatePayload: any = { baslatilma_tarihi: baslatilmaIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: baslatilmaIso, durum: 'ISLEMDE' }
+      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
       await supabase.from(tablo).update(updatePayload).eq('id', task.id)
       // Local task objesini güncelle — completeTask süre hesaplasın
-      ;(task as any).baslatilma_tarihi = baslatilmaIso
+      ;(task as any).baslatilma_tarihi = nowIso
     }
-    await completeTask({
-      supabase,
-      taskId: task.id,
-      taskType: task.taskType,
-      userId: user.id,
-      channel: completionChannel,
-      yerelZamanIso: (offlineSenkron && yerelZamanValid) ? yerelZamanValid : null,
-      baslatilmaYerelIso: baslatilmaYerelValid,
-    })
-    return NextResponse.json({ ok: true, message: 'Görev tamamlandı', kanal: completionChannel }, { headers: CORS_HEADERS })
+    await completeTask({ supabase, taskId: task.id, taskType: task.taskType, userId: user.id, channel: 'QR' })
+    return NextResponse.json({ ok: true, message: 'Görev QR ile tamamlandı' }, { headers: CORS_HEADERS })
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message ?? 'İşlem başarısız' }, { status: 400, headers: CORS_HEADERS })
   }

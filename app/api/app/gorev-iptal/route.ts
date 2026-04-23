@@ -50,18 +50,6 @@ export async function POST(req: Request) {
     const gorevTipi    = (body?.gorev_tipi as string | undefined) ?? 'gorevler'
     const iptalSebepRaw = body?.iptal_sebep
     const iptalSebep   = typeof iptalSebepRaw === 'string' ? iptalSebepRaw.trim() : ''
-    // Offline queue senkronu — mobil çevrimdışı iptal'i sonradan gönderiyorsa
-    const offlineSenkron = body?.offline === true
-    const yerelZamanRaw = typeof body?.yerel_zaman === 'string' ? body.yerel_zaman : null
-    const yerelZamanValid = (() => {
-      if (!yerelZamanRaw) return null
-      const t = new Date(yerelZamanRaw).getTime()
-      if (!Number.isFinite(t)) return null
-      const simdi = Date.now()
-      if (t > simdi + 5 * 60 * 1000) return null
-      if (t < simdi - 7 * 24 * 60 * 60 * 1000) return null
-      return new Date(t).toISOString()
-    })()
 
     if (!gorevId) {
       return NextResponse.json({ ok: false, error: 'gorev_id gerekli' }, { status: 400, headers: CORS })
@@ -109,17 +97,14 @@ export async function POST(req: Request) {
     }
 
     const nowIso = new Date().toISOString()
-    // Offline senkronda cihazın yerel zamanı tercih edilir (gerçek iptal anı)
-    const iptalIso = (offlineSenkron && yerelZamanValid) ? yerelZamanValid : nowIso
 
     const { error: updateErr } = await admin
       .from(gorevTipi)
       .update({
         durum:                'IPTAL',
-        durum_degisim_tarihi: iptalIso,
+        durum_degisim_tarihi: nowIso,
         iptal_sebep:          iptalSebep,
         islemi_yapan_id:      userId,
-        ...(offlineSenkron ? { son_tamamlama_kanali: 'MOBIL_OFFLINE' } : {}),
       } as any)
       .eq('id', gorevId)
 
@@ -144,7 +129,7 @@ export async function POST(req: Request) {
         lokasyon_id: gorev.lokasyon_id ?? null,
         onceki_durum: gorev.durum,
         iptal_sebep: iptalSebep,
-        kanal: offlineSenkron ? 'MOBIL_OFFLINE' : 'MOBIL',
+        kanal: 'MOBIL',
       },
     })
 
