@@ -3,14 +3,22 @@
  *
  * Mobil çevrimdışı (offline) çalışma modu için vardiya snapshot endpoint'i.
  * İş başı (mesai-okut) yapıldıktan sonra cihaz tek çağrıda o vardiyada
- * ihtiyaç duyacağı tüm bilgileri indirir:
- *   - Atanmış açık görevler (gorevler + canli_gorevler)
- *   - Yetkili lokasyonlar + QR/NFC token'ları + süre meta verisi
- *   - Çeklist şablonları (normalize, ayrı array)
+ * ihtiyaç duyabileceği TÜM proje verisini indirir (2026-04-23 itibarıyla):
+ *   - Proje'nin tüm aktif lokasyonları + QR/NFC token'ları + süre meta verisi
+ *   - Proje'nin tüm açık spesifik görevleri (ACIK, ISLEMDE)
+ *   - Proje'nin tüm açık canlı görevleri (ACIK, ISLEMDE, BEKLEMEDE)
+ *   - Lokasyonlarda referans edilen çeklist şablonları (normalize, ayrı array)
  *   - Vardiya ayarları + sunucu zamanı
  *
- * Sadece personel takibi aktif projeler için çalışır. Mobil tarafı
- * bu endpoint'i yalnızca "offline kuyruğa alınacak vardiya" başında çağırır.
+ * Önemli: Kullanıcı bazlı filtre YOKTUR. Sahada yardımlaşma/devir nedeniyle
+ * operatörün atanmamış görevleri de görmesi gerekiyor. Lokasyon yetkisi ve
+ * görev sahipliği tamamlama/iptal anında sunucuda kontrol edilir (mobil
+ * yetkisiz bir gönderim yaparsa backend reddeder). Kapsam değişikliği mobil
+ * ekip talebi, 2026-04-23.
+ *
+ * Sadece personel takibi aktif projeler için çalışır. PT pasif projelerde
+ * 400 `PERSONEL_TAKIBI_KAPALI` döner; mobil bu durumda mevcut online akışını
+ * kullanır.
  *
  * Header: X-Device-Token
  */
@@ -112,76 +120,42 @@ export async function GET(req: Request) {
       .eq('id', firmaId)
       .single()
 
-    // ── Lokasyon scope'u — yetkili üst lokasyonlar + BFS ile altları ────────
-    // Amaç: Personelin QR/NFC okutabileceği ve ekstra frekans oluşturabileceği
-    // tüm lokasyonları offline cihaza indirmek. Veri patlamasını önlemek için
-    // sadece kullanıcının yetkili olduğu üst lokasyonların alt ağacıyla sınırlı.
-    const { data: yetkiRows } = await admin
-      .from('kullanici_lokasyon_yetkileri')
-      .select('ust_lokasyon_id')
-      .eq('user_id', userId)
+    // ── Proje geneli kapsam ─────────────────────────────────────────────────
+    // Önceden kullanıcı-lokasyon yetkilerine göre BFS yapılıyordu; offline sahada
+    // yardımlaşma/devir senaryoları nedeniyle mobil operatörün TÜM proje verisini
+    // görmesi gerekiyor (atanmamış görevler dahil). Lokasyon yetkisi ve görev
+    // sahipliği tamamlama/iptal anında sunucuda kontrol edildiği için güvenli.
+    // Ref: 2026-04-23 mobil ekip kapsam talebi.
 
-    const yetkiliUstLokIds = (yetkiRows ?? []).map((r: any) => r.ust_lokasyon_id as string)
-    const lokasyonIdSet = new Set<string>()
+    // ── Proje'nin tüm aktif lokasyonları ────────────────────────────────────
+    const { data: lokRows } = await admin
+      .from('lokasyonlar')
+      .select('id, tanim, parent_id, qr_veri, nfc_token, tamamlama_qr_zorunlu, sureli_gorev_aktif, min_sure_dakika, max_sure_dakika, hedef_sure_dakika, aktif, checklist_sablon_id')
+      .eq('firma_id', firmaId)
+      .eq('proje_id', personelProjeId)
+      .eq('aktif', true)
+    const lokasyonlar = (lokRows ?? []) as any[]
 
-    if (yetkiliUstLokIds.length > 0) {
-      // Proje içinde BFS — kullanıcının yetkili üst lokasyonlarının tüm altları
-      const { data: tumLoks } = await admin
-        .from('lokasyonlar')
-        .select('id, parent_id')
-        .eq('firma_id', firmaId)
-        .eq('proje_id', personelProjeId)
-
-      for (const id of yetkiliUstLokIds) lokasyonIdSet.add(id)
-      const queue = [...yetkiliUstLokIds]
-      while (queue.length > 0) {
-        const cur = queue.shift()!
-        for (const l of (tumLoks ?? []) as any[]) {
-          if (l.parent_id === cur && !lokasyonIdSet.has(l.id)) {
-            lokasyonIdSet.add(l.id)
-            queue.push(l.id)
-          }
-        }
-      }
-    }
-    // Not: Yetki kaydı yoksa lokasyonIdSet boş kalır; aşağıda görevlerin
-    // lokasyon_id'leri eklenerek en az "mevcut görevlerim" scope'u garanti edilir.
-
-    // ── Atanan görevler (gorevlerim filtresiyle aynı mantık) ────────────────
-    const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
+    // ── Proje'nin tüm açık görevleri ────────────────────────────────────────
     const [gorevlerRes, canliGorevlerRes] = await Promise.all([
       admin.from('gorevler').select(`
-        id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi, lokasyon_id,
+        id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi, lokasyon_id, atanan_kullanici_id,
         lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
-      `).eq('firma_id', firmaId).eq('atanan_kullanici_id', userId)
-        .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
+      `).eq('firma_id', firmaId)
+        .eq('proje_id', personelProjeId)
+        .in('durum', ['ACIK', 'ISLEMDE'])
         .order('olusturma_tarihi', { ascending: false }),
       admin.from('canli_gorevler').select(`
-        id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, tamamlanma_tarihi, lokasyon_id,
+        id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, tamamlanma_tarihi, lokasyon_id, atanan_kullanici_id,
         lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
-      `).eq('firma_id', firmaId).eq('atanan_kullanici_id', userId)
-        .or(`durum.in.(ACIK,ISLEMDE,BEKLEMEDE),and(durum.in.(TAMAMLANDI,ZAMANINDA_TAMAMLANDI),tamamlanma_tarihi.gt.${sinir24s})`)
+      `).eq('firma_id', firmaId)
+        .eq('proje_id', personelProjeId)
+        .in('durum', ['ACIK', 'ISLEMDE', 'BEKLEMEDE'])
         .order('aktif_olma_tarihi', { ascending: false }),
     ])
 
     const gorevler = (gorevlerRes.data ?? []) as any[]
     const canliGorevler = (canliGorevlerRes.data ?? []) as any[]
-
-    // Görevlerin referans ettiği lokasyonları da scope'a ekle (yetki kaydı yoksa fallback)
-    for (const g of [...gorevler, ...canliGorevler]) {
-      if (g.lokasyon_id) lokasyonIdSet.add(g.lokasyon_id)
-    }
-
-    // ── Lokasyon detayları (QR/NFC + süre meta) ─────────────────────────────
-    let lokasyonlar: any[] = []
-    if (lokasyonIdSet.size > 0) {
-      const { data: lokRows } = await admin
-        .from('lokasyonlar')
-        .select('id, tanim, parent_id, qr_veri, nfc_token, tamamlama_qr_zorunlu, sureli_gorev_aktif, min_sure_dakika, max_sure_dakika, hedef_sure_dakika, aktif, checklist_sablon_id')
-        .in('id', [...lokasyonIdSet])
-      lokasyonlar = (lokRows ?? []) as any[]
-    }
 
     // Parent tanımları — set içindeki lokasyonların parent_id'leri seti dışındaysa ekstra çek
     const parentTanimMap = new Map<string, string>()
@@ -205,7 +179,8 @@ export async function GET(req: Request) {
     for (const l of lokasyonlar) {
       if (l.checklist_sablon_id) sablonIdSet.add(l.checklist_sablon_id)
     }
-    // Görevlerin lokasyonlarından da şablon ID'si gelebilir (yetki scope'u dışında kalan durumlar)
+    // Görevlerin lokasyonlarından da şablon ID'si gelebilir (inaktif lokasyon olsa bile
+    // açık görev var olabilir — o lokasyonun şablonunu offline'da göstermek için)
     for (const g of [...gorevler, ...canliGorevler]) {
       const sid = g.lokasyonlar?.checklist_sablon_id
       if (sid) sablonIdSet.add(sid)
@@ -277,28 +252,30 @@ export async function GET(req: Request) {
       },
       vardiya_ayarlari: (firma as any)?.tum_vardiya_ayarlari ?? null,
       gorevler: gorevler.map((g: any) => ({
-        id:               g.id,
-        gorev_tipi:       'gorevler',
-        tanim:            g.tanim,
-        durum:            g.durum,
-        olusturma_tarihi: g.olusturma_tarihi,
-        baslatilma_tarihi: g.baslatilma_tarihi,
-        tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
-        lokasyon_id:      g.lokasyon_id,
+        id:                   g.id,
+        gorev_tipi:           'gorevler',
+        tanim:                g.tanim,
+        durum:                g.durum,
+        olusturma_tarihi:     g.olusturma_tarihi,
+        baslatilma_tarihi:    g.baslatilma_tarihi,
+        tamamlanma_tarihi:    g.tamamlanma_tarihi ?? null,
+        lokasyon_id:          g.lokasyon_id,
+        atanan_kullanici_id:  g.atanan_kullanici_id ?? null,
         lokasyon: g.lokasyonlar
           ? { id: g.lokasyonlar.id, tanim: g.lokasyonlar.tanim, ust_tanim: g.lokasyonlar.ust_tanim?.tanim ?? null }
           : null,
         checklist_sablon_id: g.lokasyonlar?.checklist_sablon_id ?? null,
       })),
       canli_gorevler: canliGorevler.map((g: any) => ({
-        id:                g.id,
-        gorev_tipi:        'canli_gorevler',
-        tanim:             g.tanim,
-        durum:             g.durum,
-        olusturma_tarihi:  g.aktif_olma_tarihi,
-        baslatilma_tarihi: g.baslatilma_tarihi,
-        tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
-        lokasyon_id:       g.lokasyon_id,
+        id:                   g.id,
+        gorev_tipi:           'canli_gorevler',
+        tanim:                g.tanim,
+        durum:                g.durum,
+        olusturma_tarihi:     g.aktif_olma_tarihi,
+        baslatilma_tarihi:    g.baslatilma_tarihi,
+        tamamlanma_tarihi:    g.tamamlanma_tarihi ?? null,
+        lokasyon_id:          g.lokasyon_id,
+        atanan_kullanici_id:  g.atanan_kullanici_id ?? null,
         lokasyon: g.lokasyonlar
           ? { id: g.lokasyonlar.id, tanim: g.lokasyonlar.tanim, ust_tanim: g.lokasyonlar.ust_tanim?.tanim ?? null }
           : null,
