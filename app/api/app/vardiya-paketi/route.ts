@@ -27,6 +27,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { bugunTRISO } from '@/lib/scan/bugunTamamlananlar'
+import { aktifVardiyaAraligi } from '@/lib/scan/vardiya'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -116,12 +117,20 @@ export async function GET(req: Request) {
       )
     }
 
-    // ── Firma vardiya ayarları ──────────────────────────────────────────────
+    // ── Firma vardiya ayarları + aktif vardiya tespiti ──────────────────────
     const { data: firma } = await admin
       .from('firmalar')
-      .select('tum_vardiya_ayarlari')
+      .select('tum_vardiya_ayarlari, vardiya_sayisi')
       .eq('id', firmaId)
       .single()
+
+    // Şu an hangi vardiyadayız? (Mustafa 20:06'da iş başı yaparsa vardiya 3: 16:00-00:00)
+    // Aktif vardiya tespit edilemezse mobil tarafı 0 görev görür (beklenen davranış —
+    // ayar eksikse veya vardiya dışındaysa boş paket).
+    const aktifVardiya = aktifVardiyaAraligi(
+      (firma as any)?.vardiya_sayisi,
+      (firma as any)?.tum_vardiya_ayarlari,
+    )
 
     // ── Proje geneli kapsam ─────────────────────────────────────────────────
     // Önceden kullanıcı-lokasyon yetkilerine göre BFS yapılıyordu; offline sahada
@@ -139,22 +148,39 @@ export async function GET(req: Request) {
       .eq('aktif', true)
     const lokasyonlar = (lokRows ?? []) as any[]
 
-    // ── Proje'nin tüm açık görevleri ────────────────────────────────────────
+    // ── Proje'nin aktif vardiyaya ait yapılabilir görevleri ─────────────────
+    // Mobil ekip talebi (2026-04-23): Sadece şu anki vardiyaya ait + henüz
+    // başlamamış (HAZIR/ACIK) görevler. Diğer vardiyaları veya ISLEMDE/BEKLEMEDE
+    // durumları getirme. canli_gorevler için aktif_olma_tarihi vardiya aralığında
+    // olmalı. Spesifik gorevler vardiya-bağımsız olduğundan sadece durum filtresi.
+    let canliGorevlerQuery = admin.from('canli_gorevler').select(`
+      id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, tamamlanma_tarihi, lokasyon_id, atanan_kullanici_id,
+      lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
+    `).eq('firma_id', firmaId)
+      .eq('proje_id', personelProjeId)
+      .in('durum', ['HAZIR', 'ACIK'])
+      .order('aktif_olma_tarihi', { ascending: false })
+
+    if (aktifVardiya) {
+      canliGorevlerQuery = canliGorevlerQuery
+        .gte('aktif_olma_tarihi', aktifVardiya.baslangicISO)
+        .lt('aktif_olma_tarihi', aktifVardiya.bitisISO)
+    } else {
+      // Aktif vardiya yoksa (ayar eksik veya vardiya dışı) boş liste döndür.
+      // Bu durumda sorgu sonucu teknik olarak önemsiz, güvenlik için imkansız
+      // filtre ekle (aktif_olma_tarihi = epoch 0).
+      canliGorevlerQuery = canliGorevlerQuery.lt('aktif_olma_tarihi', '1970-01-01T00:00:00Z')
+    }
+
     const [gorevlerRes, canliGorevlerRes] = await Promise.all([
       admin.from('gorevler').select(`
         id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi, lokasyon_id, atanan_kullanici_id,
         lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
       `).eq('firma_id', firmaId)
         .eq('proje_id', personelProjeId)
-        .in('durum', ['ACIK', 'ISLEMDE'])
+        .in('durum', ['HAZIR', 'ACIK'])
         .order('olusturma_tarihi', { ascending: false }),
-      admin.from('canli_gorevler').select(`
-        id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, tamamlanma_tarihi, lokasyon_id, atanan_kullanici_id,
-        lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
-      `).eq('firma_id', firmaId)
-        .eq('proje_id', personelProjeId)
-        .in('durum', ['ACIK', 'ISLEMDE', 'BEKLEMEDE'])
-        .order('aktif_olma_tarihi', { ascending: false }),
+      canliGorevlerQuery,
     ])
 
     const gorevler = (gorevlerRes.data ?? []) as any[]
@@ -320,6 +346,12 @@ export async function GET(req: Request) {
         mesai_kayit_id: (mesai as any).id,
         kayit_tarihi: (mesai as any).kayit_tarihi,
         giris_saati: (mesai as any).giris_saati,
+        // Aktif vardiya tespiti — firma.tum_vardiya_ayarlari'ndan alınan
+        // şu an içinde bulunulan vardiyanın meta bilgisi. Null ise ayar eksik
+        // veya vardiya dışı (bu durumda canli_gorevler listesi boş gelir).
+        aktif_vardiya: aktifVardiya
+          ? { no: aktifVardiya.no, baslangic: aktifVardiya.baslangic, bitis: aktifVardiya.bitis }
+          : null,
       },
       vardiya_ayarlari: (firma as any)?.tum_vardiya_ayarlari ?? null,
       gorevler: gorevler.map((g: any) => ({
