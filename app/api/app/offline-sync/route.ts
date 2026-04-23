@@ -94,7 +94,11 @@ function sureSaniye(baslangic: string, bitis: string): number | null {
  * Kurallar:
  *   - baslatilma < bitirme zorunlu
  *   - bitirme gelecekte ≤ 5 dk (clock skew toleransı)
- *   - baslatilma son 25 saat içinde (20 saat TTL + 5 saat pay)
+ *   - baslatilma son 49 saat içinde (48 saat TTL + 1 saat pay)
+ *
+ * Mobil spec (2026-04-24 kapanış): TTL 48 saat. 48 saat önceye kadar retry
+ * edilir, sonrasında kullanıcı uyarısı + silme. Backend 48h + 1h pay ile
+ * retry anında reject etmez.
  *
  * Dönüş: null = OK, string = hata mesajı.
  */
@@ -105,7 +109,7 @@ function zamanSanityCheck(baslatilma: string, bitirme: string): string | null {
   if (e <= b) return 'bitirme_zamani baslatilma_zamani\'ndan sonra olmalı'
   const simdi = Date.now()
   if (e > simdi + 5 * 60 * 1000) return 'Cihaz saati ileri (bitirme gelecekte)'
-  if (b < simdi - 25 * 60 * 60 * 1000) return 'Kayıt TTL dışında (25 saatten eski)'
+  if (b < simdi - 49 * 60 * 60 * 1000) return 'Kayıt TTL dışında (49 saatten eski)'
   return null
 }
 
