@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import AuditLogClient from '@/components/audit-log/AuditLogClient'
 import SistemAlertsClient from '@/components/sistem-alerts/SistemAlertsClient'
+import SistemSaglikWidget from '@/components/sistem/SistemSaglikWidget'
 
 interface Props {
   isSA: boolean
@@ -15,11 +16,19 @@ export default function SistemIzlemeClient({ isSA, firmalarListesi = [], showUya
 
   if (!showUyarilar) {
     // TA: sadece log gösterilir, sekme yok
-    return <AuditLogClient isSA={isSA} firmalarListesi={firmalarListesi} />
+    return (
+      <>
+        {isSA && <SistemSaglikWidget />}
+        <AuditLogClient isSA={isSA} firmalarListesi={firmalarListesi} />
+      </>
+    )
   }
 
   return (
     <div>
+      {/* Sistem sağlık özeti (Loglar sekmesi aktifse üstte gösterilir) */}
+      {tab === 'loglar' && <SistemSaglikWidget />}
+
       {/* Sekme başlıkları */}
       <div style={{ padding: '12px 24px 0', display: 'flex', gap: 6, borderBottom: '1px solid #e5e7eb', background: '#fff' }}>
         <button
