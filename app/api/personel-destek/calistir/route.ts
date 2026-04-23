@@ -219,6 +219,10 @@ async function destekCalistir(admin: any, ayar: any) {
   const shuffled = acikGorevler.sort(() => Math.random() - 0.5).slice(0, kalanHedef)
   let tamamlananAdet = 0
   let iptalAdet = 0
+  let skipPersonelCount = 0
+  let updateErrorCount = 0
+  const logPrefix = `[PD-${ayar.id.slice(0, 8)}]`
+  console.log(`${logPrefix} DÖNGÜ BAŞLIYOR — shuffled=${shuffled.length}, uygunPersonel=${uygunPersonel.length}, ilkAtanan=${shuffled[0]?.atanan_kullanici_id ?? 'NULL'}, ilkLok=${shuffled[0]?.lokasyon_id?.slice(0, 8) ?? 'NULL'}`)
   const now = Date.now()
 
   for (const gorev of shuffled) {
@@ -226,11 +230,14 @@ async function destekCalistir(admin: any, ayar: any) {
     // Öncelik: atanan personel, yoksa cinsiyet eşleştirmeli rastgele seç
     const personelId = gorev.atanan_kullanici_id
       || cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
-    if (!personelId) continue
+    if (!personelId) {
+      skipPersonelCount++
+      continue
+    }
 
     // %1 iptal olasılığı (doğallık)
     if (Math.random() < 0.01) {
-      await admin.from('canli_gorevler').update({
+      const { error: iptalErr } = await admin.from('canli_gorevler').update({
         durum: 'IPTAL',
         durum_degisim_tarihi: new Date().toISOString(),
         iptal_eden_id: personelId,
@@ -238,6 +245,7 @@ async function destekCalistir(admin: any, ayar: any) {
         islemi_yapan_id: personelId,
         iptal_sebep: 'Otomatik iptal — personel destek (vardiya bitti)',
       } as any).eq('id', gorev.id)
+      if (iptalErr) { updateErrorCount++; console.log(`${logPrefix} IPTAL HATA: ${iptalErr.message}`) }
       iptalAdet++
       continue
     }
@@ -250,7 +258,7 @@ async function destekCalistir(admin: any, ayar: any) {
     const tamamlanmaIso = new Date().toISOString()
     const baslatmaIso = new Date(now - sureSaniye * 1000).toISOString()
 
-    await admin.from('canli_gorevler').update({
+    const { error: tamamErr } = await admin.from('canli_gorevler').update({
       durum: 'TAMAMLANDI',
       durum_degisim_tarihi: tamamlanmaIso,
       baslatilma_tarihi: gorev.baslatilma_tarihi || baslatmaIso,
@@ -262,6 +270,12 @@ async function destekCalistir(admin: any, ayar: any) {
       son_tamamlama_kanali: 'MOBIL',
     } as any).eq('id', gorev.id)
 
+    if (tamamErr) {
+      updateErrorCount++
+      console.log(`${logPrefix} UPDATE HATA: gorev=${gorev.id.slice(0,8)}, msg=${tamamErr.message}`)
+      continue
+    }
+
     // Çeklist varsa tamamla
     if (lok?.checklist_sablon_id) {
       await ceklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)
@@ -270,12 +284,15 @@ async function destekCalistir(admin: any, ayar: any) {
     tamamlananAdet++
   }
 
+  console.log(`${logPrefix} DÖNGÜ BİTTİ — tamamlanan=${tamamlananAdet}, iptal=${iptalAdet}, skipPersonel=${skipPersonelCount}, updateError=${updateErrorCount}`)
+
   return {
     tamamlanan: tamamlananAdet,
     iptal: iptalAdet,
     toplam: tumGorevler.length,
     mevcut_tamamlanan: tamamlananSayi,
     hedef_max: hedefMax,
+    debug: { skipPersonel: skipPersonelCount, updateError: updateErrorCount, shuffled: shuffled.length },
   }
 }
 
