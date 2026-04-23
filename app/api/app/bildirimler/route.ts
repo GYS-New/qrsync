@@ -30,15 +30,18 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
 
   const admin = createAdminClient()
-  const ucGunOnce = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  // Mobil ekip talebi (2026-04-23): Push bildirimleri 8 saat sonra silinsin.
+  // Lazy cleanup — her mobil GET'inde 8 saatten eski kayıtları sil (okundu farketmez).
+  // Push bildirimler zaten anlık iletildiği için 8 saatlik geçmiş yeterli.
+  const sekizSaatOnce = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
 
-  await admin.from('bildirimler').delete().eq('alici_id', user.id).eq('okundu', true).lt('tarih', ucGunOnce)
+  await admin.from('bildirimler').delete().eq('alici_id', user.id).lt('tarih', sekizSaatOnce)
 
   const { data, error } = await admin
     .from('bildirimler')
     .select('*')
     .eq('alici_id', user.id)
-    .gte('tarih', ucGunOnce)
+    .gte('tarih', sekizSaatOnce)
     .order('tarih', { ascending: false })
     .limit(50)
 

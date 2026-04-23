@@ -8,6 +8,8 @@
  *   - Proje'nin tüm açık spesifik görevleri (ACIK, ISLEMDE)
  *   - Proje'nin tüm açık canlı görevleri (ACIK, ISLEMDE, BEKLEMEDE)
  *   - Lokasyonlarda referans edilen çeklist şablonları (normalize, ayrı array)
+ *   - Her lokasyon için ekstra-frekans dropdown verisi (kurallar + bugün
+ *     tamamlananlar) — offline ekstra görev ekleme ekranı için
  *   - Vardiya ayarları + sunucu zamanı
  *
  * Önemli: Kullanıcı bazlı filtre YOKTUR. Sahada yardımlaşma/devir nedeniyle
@@ -24,6 +26,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { bugunTRISO } from '@/lib/scan/bugunTamamlananlar'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -174,6 +177,74 @@ export async function GET(req: Request) {
       for (const p of (parentRows ?? []) as any[]) parentTanimMap.set(p.id, p.tanim)
     }
 
+    // ── Ekstra-frekans dropdown verisi (tüm proje lokasyonları için batch) ──
+    // Mobil ekip talebi (2026-04-23): Offline modda ekstra görev ekleme ekranı
+    // için her lokasyonun kuralları ve bugün tamamlanmış kural-tabanlı görevleri
+    // gerekli. N lokasyon için N ayrı query yerine 3 toplu sorgu ile getirip
+    // lokasyon_id bazında grupluyoruz.
+    const projeLokIds = lokasyonlar.map((l: any) => l.id).filter(Boolean)
+    const ekstraFrekansDropdown: Record<string, {
+      kurallari: { tanim: string; adet: number }[]
+      bugun_tamamlananlar: { tanim: string; adet: number }[]
+    }> = {}
+    if (projeLokIds.length > 0) {
+      const bugunBaslangic = bugunTRISO()
+      const [kuralRes, aktifRes, arsivRes] = await Promise.all([
+        admin.from('gorev_kurallari')
+          .select('tanim, lokasyon_id')
+          .in('lokasyon_id', projeLokIds)
+          .eq('aktif', true),
+        admin.from('canli_gorevler')
+          .select('tanim, lokasyon_id')
+          .in('lokasyon_id', projeLokIds)
+          .not('kural_id', 'is', null)
+          .eq('durum', 'TAMAMLANDI')
+          .gte('tamamlanma_tarihi', bugunBaslangic),
+        admin.from('canli_gorevler_arsiv')
+          .select('tanim, lokasyon_id')
+          .in('lokasyon_id', projeLokIds)
+          .not('kural_id', 'is', null)
+          .eq('durum', 'TAMAMLANDI')
+          .gte('tamamlanma_tarihi', bugunBaslangic),
+      ])
+
+      // Init entries for all project locations (boş da olsa key olsun)
+      for (const id of projeLokIds) ekstraFrekansDropdown[id] = { kurallari: [], bugun_tamamlananlar: [] }
+
+      // Kurallar — her lokasyon için distinct tanım
+      const kuralMap = new Map<string, Set<string>>()
+      for (const r of (kuralRes.data ?? []) as any[]) {
+        const lid = r.lokasyon_id
+        const t = typeof r.tanim === 'string' ? r.tanim.trim() : ''
+        if (!lid || !t) continue
+        if (!kuralMap.has(lid)) kuralMap.set(lid, new Set())
+        kuralMap.get(lid)!.add(t)
+      }
+      for (const [lid, set] of kuralMap.entries()) {
+        if (!ekstraFrekansDropdown[lid]) continue
+        ekstraFrekansDropdown[lid].kurallari = [...set]
+          .map(tanim => ({ tanim, adet: 0 }))
+          .sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr'))
+      }
+
+      // Bugün tamamlananlar — lokasyon × tanım bazında adet
+      const bugunMap = new Map<string, Map<string, number>>()
+      for (const r of [...(aktifRes.data ?? []), ...(arsivRes.data ?? [])] as any[]) {
+        const lid = r.lokasyon_id
+        const t = typeof r.tanim === 'string' ? r.tanim.trim() : ''
+        if (!lid || !t) continue
+        if (!bugunMap.has(lid)) bugunMap.set(lid, new Map())
+        const m = bugunMap.get(lid)!
+        m.set(t, (m.get(t) ?? 0) + 1)
+      }
+      for (const [lid, m] of bugunMap.entries()) {
+        if (!ekstraFrekansDropdown[lid]) continue
+        ekstraFrekansDropdown[lid].bugun_tamamlananlar = [...m.entries()]
+          .map(([tanim, adet]) => ({ tanim, adet }))
+          .sort((a, b) => b.adet - a.adet)
+      }
+    }
+
     // ── Çeklist şablonları (normalize, ayrı array) ──────────────────────────
     const sablonIdSet = new Set<string>()
     for (const l of lokasyonlar) {
@@ -297,6 +368,12 @@ export async function GET(req: Request) {
         checklist_sablon_id:   l.checklist_sablon_id ?? null,
       })),
       checklist_sablonlari,
+      // Her proje lokasyonu için ekstra-frekans ekleme dropdown'u:
+      //   { <lokasyonId>: { kurallari: [...], bugun_tamamlananlar: [...] } }
+      // Mobil offline "ekstra görev ekle" ekranı bu sözlükten çeker; qr/[token]
+      // GET response'undaki bugun_tamamlananlar + lokasyon_kurallari ile aynı
+      // yapı (sadece proje geneli tek paketle geliyor).
+      ekstra_frekans_dropdown: ekstraFrekansDropdown,
     }, { headers: CORS })
 
   } catch (error: any) {
