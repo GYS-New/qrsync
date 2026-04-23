@@ -1448,12 +1448,13 @@ function CeklistArsivSekme({
           <option value="TAMAMLANDI">Tamamlandı</option>
           <option value="ZAMANINDA_YAPILAMAYAN">Gecikmeli Tamamlandı</option>
         </select>
-        <select value={kanaliF} onChange={e => setKanaliF(e.target.value)} style={{ ...inp, minWidth: 120 }}>
+        <select value={kanaliF} onChange={e => setKanaliF(e.target.value)} style={{ ...inp, minWidth: 130 }}>
           <option value="">Kanal (Tümü)</option>
           <option value="WEB">WEB</option>
           <option value="QR">QR</option>
           <option value="NFC">NFC</option>
           <option value="MOBİL">MOBİL</option>
+          <option value="OFFLINE">Çevrimdışı</option>
         </select>
         <input type="date" value={fromD} onChange={e => setFromD(e.target.value)} style={inp} />
         <span style={{ color: '#94a3b8' }}>—</span>

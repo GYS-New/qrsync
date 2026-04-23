@@ -4,6 +4,7 @@
  * Kanallar (DB değeri):
  *   WEB | QR | NFC      — web veya tarayıcıdan scan
  *   MOBİL | MOBIL       — mobil tamamlama (historik iki yazım da desteklenir)
+ *   OFFLINE             — mobil çevrimdışı yapılıp sonradan senkron edilmiş
  *
  * `checklist_sonuc_basliklari.kanal` ve `gorevler/canli_gorevler.son_tamamlama_kanali`
  * kolonlarında kullanılır.
@@ -12,14 +13,17 @@
 type KanalStyle = { bg: string; color: string }
 
 export const KANAL_RENK: Record<string, KanalStyle> = {
-  WEB:   { bg: '#e0f2fe', color: '#0369a1' },
-  QR:    { bg: '#ede9fe', color: '#5b21b6' },
-  NFC:   { bg: '#fce7f3', color: '#9d174d' },
-  MOBİL: { bg: '#f9fafb', color: '#166534' },
-  MOBIL: { bg: '#f9fafb', color: '#166534' },
+  WEB:     { bg: '#e0f2fe', color: '#0369a1' },
+  QR:      { bg: '#ede9fe', color: '#5b21b6' },
+  NFC:     { bg: '#fce7f3', color: '#9d174d' },
+  MOBİL:   { bg: '#f9fafb', color: '#166534' },
+  MOBIL:   { bg: '#f9fafb', color: '#166534' },
+  OFFLINE: { bg: '#fef3c7', color: '#92400e' },
 }
 
-export const KANAL_LABEL: Record<string, string> = {}
+export const KANAL_LABEL: Record<string, string> = {
+  OFFLINE: 'Çevrimdışı',
+}
 
 export function kanalLabel(value: string | null | undefined): string {
   if (!value) return '—'
