@@ -11,6 +11,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { aktifVardiyaAraligi } from '@/lib/scan/vardiya'
 
 const CORS = {} // Cron endpoint — CORS gereksiz
 
@@ -127,16 +128,28 @@ async function destekCalistir(admin: any, ayar: any) {
   const gunlukTumGorevler = gorevler ?? []
   if (gunlukTumGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bugünkü görev yok' }
 
-  // ── Vardiya filtresi: yalnızca BİTMİŞ vardiyaların görevlerini işle ─────
-  // Bugünkü farklı aktif_olma_tarihi değerleri ayrı vardiyaları temsil eder
-  // (örn. gece 00:05, sabah 08:00, akşam 16:00). Son (en geç) olan = aktif vardiya.
-  // Aktif vardiyayı hariç tutarak yeni vardiyanın taze görevlerinin yutulmasını engelleriz.
-  const distinctAktifOlma = [...new Set(gunlukTumGorevler.map((g: any) => g.aktif_olma_tarihi))].sort()
-  if (distinctAktifOlma.length < 2) {
-    return { tamamlanan: 0, mesaj: 'Aktif vardiya sürüyor — bitmiş vardiya yok, işlem yapılmadı' }
+  // ── Vardiya filtresi: SAAT ARALIĞI bazlı (firma.tum_vardiya_ayarlari) ────
+  // Eski mantık distinct aktif_olma_tarihi timestamp'lerine bakıyordu; her kural
+  // ayrı saatte tetiklendiği için bir vardiyada onlarca distinct timestamp olabilir,
+  // ve yanlış olarak sadece 'en geç tek timestamp' aktif vardiya sayılırdı.
+  // Doğrusu: firma'nın tanımlı vardiya saatlerinden şu an içinde olunan vardiyayı
+  // bul, aktif_olma_tarihi bu aralıkta olan görevleri 'aktif vardiya' kabul edip
+  // hariç tut — böylece bitmiş vardiyaların tüm görevleri doğru toplanır.
+  const { data: firmaAyar } = await admin
+    .from('firmalar')
+    .select('vardiya_sayisi, tum_vardiya_ayarlari')
+    .eq('id', firma_id)
+    .single()
+  const aktifVardiya = aktifVardiyaAraligi(
+    (firmaAyar as any)?.vardiya_sayisi,
+    (firmaAyar as any)?.tum_vardiya_ayarlari,
+  )
+  if (!aktifVardiya) {
+    return { tamamlanan: 0, mesaj: 'Aktif vardiya tespit edilemedi (firma ayarı eksik)' }
   }
-  const aktifVardiyaTs = distinctAktifOlma[distinctAktifOlma.length - 1]
-  const tumGorevler = gunlukTumGorevler.filter((g: any) => g.aktif_olma_tarihi !== aktifVardiyaTs)
+  const tumGorevler = gunlukTumGorevler.filter((g: any) =>
+    g.aktif_olma_tarihi < aktifVardiya.baslangicISO || g.aktif_olma_tarihi >= aktifVardiya.bitisISO
+  )
   if (tumGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bitmiş vardiyada görev yok' }
 
   const tamamlananSayi = tumGorevler.filter((g: any) =>
