@@ -113,17 +113,21 @@ async function destekCalistir(admin: any, ayar: any) {
     if (altLokIds.has(l.id)) lokMap.set(l.id, l)
   }
 
-  // Bugünkü görevleri çek (TRT)
-  const gunBaslangicUTC = new Date(bugun + 'T00:00:00+03:00').toISOString()
-  const gunBitisUTC = new Date(bugun + 'T23:59:59+03:00').toISOString()
+  // Son 24 saatin görevlerini çek — TR gün kayması problemini önler.
+  // Örnek: 00:05 TRT cron çalışırsa dünün V3 (16:00-00:00) kalanları 'bugun' dışında
+  // kalıyordu. Son 24 saat window ile önceki akşam vardiyası da yakalanır.
+  // (Gelecek zamanlı HAZIR görevler filter'a girer ama acikGorevler = ACIK/ISLEMDE/BEKLEMEDE
+  // filter'ında dışarıda kalır, kapatma denemesi olmaz.)
+  const yirmiDortSaatOnceUTC = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const simdiUTC = new Date().toISOString()
 
   const { data: gorevler } = await admin
     .from('canli_gorevler')
     .select('id, durum, lokasyon_id, tanim, aktif_olma_tarihi, baslatilma_tarihi, atanan_kullanici_id')
     .eq('firma_id', firma_id)
     .in('lokasyon_id', lokIds)
-    .gte('aktif_olma_tarihi', gunBaslangicUTC)
-    .lte('aktif_olma_tarihi', gunBitisUTC)
+    .gte('aktif_olma_tarihi', yirmiDortSaatOnceUTC)
+    .lte('aktif_olma_tarihi', simdiUTC)
 
   const gunlukTumGorevler = gorevler ?? []
   if (gunlukTumGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bugünkü görev yok' }
