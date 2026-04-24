@@ -13,7 +13,8 @@
  *     tüm HAZIR/ACIK görevler döner.
  *
  * Kullanıcı yetkisi: kullanici_lokasyon_yetkileri.ust_lokasyon_id + BFS ile alt ağaç.
- * Yetki kaydı yoksa snapshot boş döner (kullanıcı hiçbir lokasyona atanmamış demek).
+ * Yetki kaydı YOKSA → tüm proje lokasyonlarına erişim (sistem genelindeki konvansiyon,
+ * lib/yetki/getLokasyonYetki.ts ile hizalı; online akış da aynı şekilde davranır).
  *
  * Header: X-Device-Token
  */
@@ -114,6 +115,7 @@ export async function POST(req: Request) {
     const lokasyonIdSet = new Set<string>()
 
     if (yetkiliUstLokIds.length > 0) {
+      // Yetki kaydı var → sadece yetkili üst lokasyonlar + BFS alt ağacı
       let tumLokQ = admin
         .from('lokasyonlar')
         .select('id, parent_id, aktif')
@@ -133,6 +135,19 @@ export async function POST(req: Request) {
           }
         }
       }
+    } else {
+      // Yetki kaydı yok = tüm proje lokasyonlarına erişim.
+      // Sistem konvansiyonu: lib/yetki/getLokasyonYetki.ts ids.length===0 → null (tümü).
+      // Online akış (scan/tamamla, gorev-tamamla) zaten bu tabloyu okumuyor; snapshot
+      // da aynı davranışa hizalanır.
+      let tumLokQ = admin
+        .from('lokasyonlar')
+        .select('id')
+        .eq('firma_id', firmaId)
+        .eq('aktif', true)
+      if (personelProjeId) tumLokQ = (tumLokQ as any).eq('proje_id', personelProjeId)
+      const { data: tumLoks } = await tumLokQ
+      for (const l of ((tumLoks ?? []) as any[])) lokasyonIdSet.add(l.id)
     }
 
     const yetkiliLokIds = [...lokasyonIdSet]
