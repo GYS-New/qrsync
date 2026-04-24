@@ -151,24 +151,36 @@ export async function POST(req: Request) {
     }
 
     const yetkiliLokIds = [...lokasyonIdSet]
+    const yetkiKaydiVar = yetkiliUstLokIds.length > 0
 
     // ── Bekleyen görevler ────────────────────────────────────────────────────
     // PT aktif: vardiya aralığında (ACIK) VEYA (HAZIR + aktif_olma_tarihi ∈ vardiya)
     // PT pasif: tüm HAZIR + ACIK (vardiya kısıtı yok)
+    //
+    // Kapsam filtresi:
+    //   yetkiKaydiVar → .in('lokasyon_id', yetkiliLokIds) (küçük liste)
+    //   yetki yok    → .eq('proje_id', personelProjeId) (tek eq — URL limit'i aşmaz)
+    // Neden: PostgREST .in() 400+ UUID'de URL limit'e (~8KB) takılır ve sessizce
+    // boş sonuç döner. Fallback'te 397 lokasyon bu limiti aşıyordu.
     let bekleyenGorevler: any[] = []
     let bekleyenCanli: any[] = []
 
     if (yetkiliLokIds.length > 0) {
       const [spesifikRes, canliRes] = await Promise.all([
         // Spesifik görevler — vardiya bağımsız, sadece durum filtresi
-        admin.from('gorevler').select(`
-          id, tanim, durum, olusturma_tarihi, aktif_olma_tarihi, baslatilma_tarihi, lokasyon_id,
-          lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
-        `)
-          .eq('firma_id', firmaId)
-          .in('lokasyon_id', yetkiliLokIds)
-          .in('durum', ['HAZIR', 'ACIK'])
-          .order('olusturma_tarihi', { ascending: false }),
+        (() => {
+          let q = admin.from('gorevler').select(`
+            id, tanim, durum, olusturma_tarihi, aktif_olma_tarihi, baslatilma_tarihi, lokasyon_id,
+            lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
+          `)
+            .eq('firma_id', firmaId)
+            .in('durum', ['HAZIR', 'ACIK'])
+            .order('olusturma_tarihi', { ascending: false })
+          q = yetkiKaydiVar
+            ? q.in('lokasyon_id', yetkiliLokIds)
+            : (personelProjeId ? (q as any).eq('proje_id', personelProjeId) : q)
+          return q
+        })(),
 
         // Canlı görevler — PT aktifte vardiya, PT pasifte tümü
         (() => {
@@ -177,9 +189,12 @@ export async function POST(req: Request) {
             lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
           `)
             .eq('firma_id', firmaId)
-            .in('lokasyon_id', yetkiliLokIds)
             .in('durum', ['HAZIR', 'ACIK'])
             .order('aktif_olma_tarihi', { ascending: false })
+
+          q = yetkiKaydiVar
+            ? q.in('lokasyon_id', yetkiliLokIds)
+            : (personelProjeId ? (q as any).eq('proje_id', personelProjeId) : q)
 
           if (vardiyaBilgi) {
             // Vardiya pencere filtresi: aktif_olma_tarihi vardiya aralığında
@@ -199,11 +214,14 @@ export async function POST(req: Request) {
     // ekstra görev ekle" akışı için o lokasyonun kuralları lazım.
     let lokasyonlar: any[] = []
     if (yetkiliLokIds.length > 0) {
-      const { data: lokRows } = await admin
+      let lokQ = admin
         .from('lokasyonlar')
         .select('id, tanim, parent_id, qr_veri, nfc_token, tamamlama_qr_zorunlu, sureli_gorev_aktif, min_sure_dakika, max_sure_dakika, hedef_sure_dakika, aktif, checklist_sablon_id')
-        .in('id', yetkiliLokIds)
         .eq('aktif', true)
+      lokQ = yetkiKaydiVar
+        ? lokQ.in('id', yetkiliLokIds)
+        : (personelProjeId ? (lokQ as any).eq('proje_id', personelProjeId).eq('firma_id', firmaId) : lokQ)
+      const { data: lokRows } = await lokQ
       lokasyonlar = (lokRows ?? []) as any[]
     }
 
@@ -227,11 +245,14 @@ export async function POST(req: Request) {
     // ── Lokasyon ekstra frekans kuralları (batch) ───────────────────────────
     const kuralMap = new Map<string, Set<string>>()
     if (yetkiliLokIds.length > 0) {
-      const { data: kuralRows } = await admin
+      let kuralQ = admin
         .from('gorev_kurallari')
         .select('tanim, lokasyon_id')
-        .in('lokasyon_id', yetkiliLokIds)
         .eq('aktif', true)
+      kuralQ = yetkiKaydiVar
+        ? kuralQ.in('lokasyon_id', yetkiliLokIds)
+        : (personelProjeId ? (kuralQ as any).eq('proje_id', personelProjeId).eq('firma_id', firmaId) : kuralQ)
+      const { data: kuralRows } = await kuralQ
       for (const r of (kuralRows ?? []) as any[]) {
         const lid = r.lokasyon_id
         const t = typeof r.tanim === 'string' ? r.tanim.trim() : ''
