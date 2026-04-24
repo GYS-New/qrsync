@@ -309,13 +309,6 @@ export async function POST(req: Request) {
       ok: true,
       sunucu_zamani: nowIso,
       mod: ptAktif ? 'pt_aktif' : 'pt_pasif',
-      _debug: {
-        yetki_kayit_sayi: yetkiliUstLokIds.length,
-        yetkili_lok_sayi: yetkiliLokIds.length,
-        bekleyen_spes_sayi: bekleyenGorevler.length,
-        bekleyen_canli_sayi: bekleyenCanli.length,
-        commit_marker: '4d30484-fallback-active',
-      },
       kullanici: {
         id: userId,
         isim_soyisim: (tokenData as any).isim_soyisim,
