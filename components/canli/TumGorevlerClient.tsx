@@ -14,7 +14,7 @@ import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { useYetki } from '@/lib/yetki/useYetki'
 import { KanalBadge } from '@/components/shared/KanalBadge'
 
-type SortKey = 'tanim' | 'lokasyon' | 'atanan' | 'aktif' | 'islem' | 'durum' | 'actor'
+type SortKey = 'grup' | 'tanim' | 'lokasyon' | 'atanan' | 'aktif' | 'islem' | 'durum' | 'actor'
 
 
 function toDateTimeLocalValue(d: Date) {
@@ -772,7 +772,7 @@ async function del() {
     await arsivYukle(1)
   }
 
-  const [sortKey, setSortKey] = useState<SortKey>('aktif')
+  const [sortKey, setSortKey] = useState<SortKey>('grup')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const actorOptions = useMemo(() => {
@@ -828,6 +828,37 @@ async function del() {
   }, [q, lokasyonSet, atananId, durum, actor, from, to, islemFrom, islemTo, gorevler])
 
   const sorted = useMemo(() => {
+    // Varsayılan 3-seviyeli grup sıralaması:
+    //   Grup 1 (üst):  İşlem görmüş (TAMAMLANDI/IPTAL/ZAMANINDA_YAPILAMAYAN/ZAMANI_GECMIS/KAPATILDI/SILINDI)
+    //                  → durum_degisim_tarihi desc (son işlem önce)
+    //   Grup 2 (orta): Aktif (ACIK/ISLEMDE/BEKLEMEDE)
+    //                  → aktif_olma_tarihi desc
+    //   Grup 3 (alt):  HAZIR (aktifleşmeyi bekleyenler)
+    //                  → aktif_olma_tarihi desc (en yakın aktifleşecek önce)
+    if (sortKey === 'grup') {
+      const gorevGrup = (g: any): number => {
+        const d = g.durum
+        if (d === 'HAZIR') return 3
+        if (d === 'ACIK' || d === 'ISLEMDE' || d === 'BEKLEMEDE') return 2
+        return 1 // TAMAMLANDI, ZAMANINDA_YAPILAMAYAN, IPTAL, vs — işlem görmüş
+      }
+      const tarih = (g: any): number => {
+        if (gorevGrup(g) === 1) {
+          return g.durum_degisim_tarihi ? new Date(g.durum_degisim_tarihi).getTime() : 0
+        }
+        return g.aktif_olma_tarihi ? new Date(g.aktif_olma_tarihi).getTime() : 0
+      }
+      const arr = [...filtered]
+      arr.sort((a, b) => {
+        const ga = gorevGrup(a)
+        const gb = gorevGrup(b)
+        if (ga !== gb) return ga - gb // üst grup önce (1 → 2 → 3)
+        return tarih(b) - tarih(a) // aynı grupta en yeni önce
+      })
+      return arr
+    }
+
+    // Tek kolon sıralaması — kullanıcı başlığa tıkladığında
     const dir = sortDir === 'asc' ? 1 : -1
     const getVal = (g: any): any => {
       if (sortKey === 'tanim') return (g.tanim ?? '').toString()
@@ -835,6 +866,7 @@ async function del() {
       if (sortKey === 'atanan') return (g.atanan?.isim_soyisim ?? '').toString()
       if (sortKey === 'durum') return (CANLI_DURUM_LABEL[g.durum] ?? g.durum ?? '').toString()
       if (sortKey === 'actor') return (getIslemiYapan(g, { meId, meName, kullanicilar }) ?? '').toString()
+      if (sortKey === 'islem') return g.durum_degisim_tarihi ? new Date(g.durum_degisim_tarihi).getTime() : 0
       // aktif
       return g.aktif_olma_tarihi ? new Date(g.aktif_olma_tarihi).getTime() : 0
     }
@@ -847,7 +879,7 @@ async function del() {
       return va.toString().localeCompare(vb.toString(), 'tr') * dir
     })
     return arr
-  }, [filtered, sortKey, sortDir, sortDir])
+  }, [filtered, sortKey, sortDir, meId, meName, kullanicilar])
 
   // Tablo satırları (aktif görevler) — client-side pagination
   const tabloRows = useMemo(() => sorted.map(r => ({ ...r, _source: 'tablo' as const })), [sorted])
@@ -887,6 +919,8 @@ async function del() {
     setIslemTo('')
     setArsivRows([])
     setArsivAktif(false)
+    setSortKey('grup')
+    setSortDir('desc')
   }
 
   const thBtn = (label: string, key: SortKey) => (
