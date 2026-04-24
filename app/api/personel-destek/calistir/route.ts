@@ -145,16 +145,29 @@ async function destekCalistir(admin: any, ayar: any) {
     .select('vardiya_sayisi, tum_vardiya_ayarlari')
     .eq('id', firma_id)
     .single()
+  // PD vardiya bitişine 30 dk kala çalışır. Referansı "şu an + 30 dk" yaparak
+  // "bitmek üzere olan vardiya"nın tam sonuna denk gelen ana taşınır → aktifVardiya
+  // olarak YENI başlayacak vardiya tespit edilir, filter bunu hariç tutup BİTMEKTE
+  // OLAN vardiyayı işler. Aksi halde 23:30'da 3. vardiya hâlâ aktif sayılıp filter
+  // dışlardı → 3. vardiya hiç kapanmazdı.
+  const refIso = new Date(Date.now() + 30 * 60 * 1000).toISOString()
   const aktifVardiya = aktifVardiyaAraligi(
     (firmaAyar as any)?.vardiya_sayisi,
     (firmaAyar as any)?.tum_vardiya_ayarlari,
+    refIso,
   )
   if (!aktifVardiya) {
     return { tamamlanan: 0, mesaj: 'Aktif vardiya tespit edilemedi (firma ayarı eksik)' }
   }
-  const tumGorevler = gunlukTumGorevler.filter((g: any) =>
-    g.aktif_olma_tarihi < aktifVardiya.baslangicISO || g.aktif_olma_tarihi >= aktifVardiya.bitisISO
-  )
+  // Ms karşılaştırması şart — ISO string formatları farklı gelebiliyor
+  // (Supabase "05:00:00+00:00" vs Date.toISOString() "05:00:00.000Z"). String compare'de
+  // "+" < "." olduğu için sınır görevler yanlış tarafa düşüyordu (228 görev bug'ı).
+  const basMs = new Date(aktifVardiya.baslangicISO).getTime()
+  const bitMs = new Date(aktifVardiya.bitisISO).getTime()
+  const tumGorevler = gunlukTumGorevler.filter((g: any) => {
+    const aktifMs = new Date(g.aktif_olma_tarihi).getTime()
+    return aktifMs < basMs || aktifMs >= bitMs
+  })
   if (tumGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bitmiş vardiyada görev yok' }
 
   const tamamlananSayi = tumGorevler.filter((g: any) =>
