@@ -442,14 +442,18 @@ async function kontrolVeriButunlugu(admin: any, nowMs: number): Promise<SistemRa
 async function kontrolOfflineMod(admin: any, nowMs: number): Promise<SistemRaporu> {
   const sorunlar: SorunDetayi[] = []
   const yediGunOnce = new Date(nowMs - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const yirmidortSaatOnce = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
+  const kirkSekizSaatOnce = new Date(nowMs - 48 * 60 * 60 * 1000).toISOString()
+  const birSaatOnce = new Date(nowMs - 60 * 60 * 1000).toISOString()
 
+  // ─── A) Veri Tutarlılığı ────────────────────────────────────────────────
   // Anomali 1: OFFLINE kanal kayıtlarında baslatilma > tamamlanma (ters süre)
   const { data: offlineKayitlar } = await admin
     .from('canli_gorevler')
-    .select('id, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye')
+    .select('id, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, mobil_kayit_id')
     .eq('son_tamamlama_kanali', 'OFFLINE')
     .gte('tamamlanma_tarihi', yediGunOnce)
-    .limit(500)
+    .limit(1000)
   const tersOffline = (offlineKayitlar ?? []).filter((g: any) =>
     g.baslatilma_tarihi && g.tamamlanma_tarihi &&
     new Date(g.baslatilma_tarihi).getTime() > new Date(g.tamamlanma_tarihi).getTime()
@@ -474,10 +478,66 @@ async function kontrolOfflineMod(admin: any, nowMs: number): Promise<SistemRapor
     })
   }
 
-  // Anomali 3: mobil_kayit_id aynı olup farklı görev için kullanılmış (idempotency ihlali)
-  const { data: dupMobilKayit } = await admin.rpc('check_dup_mobil_kayit_id').catch(() => ({ data: null }))
-  // RPC yoksa bu check atlanır — future work
+  // Anomali 3: OFFLINE kayıtta mobil_kayit_id EKSİK (idempotency korumasız)
+  const kayitIdsiz = (offlineKayitlar ?? []).filter((g: any) => !g.mobil_kayit_id).length
+  if (kayitIdsiz > 0) {
+    sorunlar.push({
+      kod: 'OFFLINE_KAYIT_ID_YOK',
+      mesaj: `${kayitIdsiz} OFFLINE kayıt mobil_kayit_id olmadan yazılmış (idempotency koruması yok, duplike riski)`,
+      adet: kayitIdsiz,
+    })
+  }
 
+  // Anomali 4: mobil_kayit_id duplikasyonu (idempotency ihlali) — canlı + ekstra birleşik
+  const idMap = new Map<string, number>()
+  for (const g of (offlineKayitlar ?? []) as any[]) {
+    if (g.mobil_kayit_id) idMap.set(g.mobil_kayit_id, (idMap.get(g.mobil_kayit_id) ?? 0) + 1)
+  }
+  const dupKayitId = [...idMap.values()].filter(n => n > 1).length
+  if (dupKayitId > 0) {
+    sorunlar.push({
+      kod: 'OFFLINE_DUPLIKE_KAYIT_ID',
+      mesaj: `${dupKayitId} mobil_kayit_id birden fazla kayda bağlanmış (unique index kaçağı)`,
+      adet: dupKayitId,
+    })
+  }
+
+  // Anomali 5: 48 saat sonrası tamamlanma süresi — TTL aşan kayıtlar
+  // (offline TTL 48 saat + 1 saat pay, üstü şüpheli — ya cihaz saati yanlış ya bypass)
+  const ttlAsan = (offlineKayitlar ?? []).filter((g: any) => {
+    if (!g.baslatilma_tarihi || !g.tamamlanma_tarihi) return false
+    const sure = new Date(g.tamamlanma_tarihi).getTime() - new Date(g.baslatilma_tarihi).getTime()
+    return sure > 49 * 60 * 60 * 1000
+  }).length
+  if (ttlAsan > 0) {
+    sorunlar.push({
+      kod: 'OFFLINE_TTL_ASAN',
+      mesaj: `${ttlAsan} OFFLINE kayıt 49+ saat boşlukla yazılmış (TTL kontrolü bypass edilmiş veya cihaz saati hatalı)`,
+      adet: ttlAsan,
+    })
+  }
+
+  // ─── B) Operasyonel Sinyaller ───────────────────────────────────────────
+  // Anomali 6: Son 24 saatte offline-snapshot auth veya yetki regresyon sinyali
+  // (audit_log'dan snapshot hatalarını sayabilirsek — şu an audit'e yazılmıyor, future work)
+
+  // Anomali 7: Son 24 saatte PT-aktif kullanıcılar arasında snapshot BOŞ dönen var mı?
+  // Proksi: OFFLINE kayıt gönderimi var ama device_tokens son_kullanim yakın (snapshot çalıştı varsayımı)
+  // Bu tespit snapshot hatalarını TAM yakalayamaz — ama toplam ölçüm olarak:
+  const { count: offlineSon24h } = await admin
+    .from('canli_gorevler')
+    .select('id', { count: 'exact', head: true })
+    .eq('son_tamamlama_kanali', 'OFFLINE')
+    .gte('tamamlanma_tarihi', yirmidortSaatOnce)
+
+  // Anomali 8: Son 1 saatte OFFLINE kanal veri akışı (mobil aktif mi göstergesi)
+  const { count: offlineSon1h } = await admin
+    .from('canli_gorevler')
+    .select('id', { count: 'exact', head: true })
+    .eq('son_tamamlama_kanali', 'OFFLINE')
+    .gte('tamamlanma_tarihi', birSaatOnce)
+
+  // ─── C) Genel Sayım ─────────────────────────────────────────────────────
   const { count: toplamOffline } = await admin
     .from('canli_gorevler')
     .select('id', { count: 'exact', head: true })
@@ -487,13 +547,18 @@ async function kontrolOfflineMod(admin: any, nowMs: number): Promise<SistemRapor
   const metrikler = {
     ters_sure: tersOffline,
     negatif_sure: negatifSure,
+    kayit_idsiz: kayitIdsiz,
+    duplike_kayit_id: dupKayitId,
+    ttl_asan: ttlAsan,
+    son_1h: offlineSon1h ?? 0,
+    son_24h: offlineSon24h ?? 0,
     toplam_7g: toplamOffline ?? 0,
   }
 
   if (sorunlar.length > 0) return raporla('Offline Mod', sorunlar, '', metrikler)
 
   if ((toplamOffline ?? 0) > 0) {
-    return raporla('Offline Mod', [], `Son 7 günde ${toplamOffline} offline kayıt tutarlı değerlerle geldi`, metrikler)
+    return raporla('Offline Mod', [], `Son 7 günde ${toplamOffline} offline kayıt tutarlı (son 24h: ${offlineSon24h ?? 0}, son 1h: ${offlineSon1h ?? 0})`, metrikler)
   }
   return raporla('Offline Mod', [], '', metrikler, 'Son 7 günde offline kayıt yok — mobil henüz aktif kullanmıyor')
 }
