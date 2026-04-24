@@ -137,6 +137,40 @@ export async function POST(req: Request) {
       )
     }
 
+    // Görev tanımı doğrulama: lokasyonun aktif kurallarında var olan bir tanım olmalı.
+    // Ekstra görev = mevcut kural görevinin tekrarı; serbest metin kabul edilmez.
+    const { data: lokKurallar } = await admin
+      .from('gorev_kurallari')
+      .select('tanim')
+      .eq('lokasyon_id', lokasyonId)
+      .eq('aktif', true)
+    const izinliTanimlar = new Set(
+      ((lokKurallar ?? []) as any[])
+        .map((k: any) => (typeof k.tanim === 'string' ? k.tanim.trim() : ''))
+        .filter(Boolean)
+    )
+    if (izinliTanimlar.size === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Bu lokasyonda tanımlı kural görevi yok — ekstra görev başlatılamaz.',
+          code: 'KURAL_YOK',
+        },
+        { status: 409, headers: CORS }
+      )
+    }
+    if (!izinliTanimlar.has(gorevTanim)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Görev tanımı bu lokasyonun tanımlı kural listesinden biri olmalı.',
+          code: 'GOREV_TANIM_GECERSIZ',
+          izinli_tanimlar: [...izinliTanimlar],
+        },
+        { status: 400, headers: CORS }
+      )
+    }
+
     // Kayıt oluştur
     const nowIso = new Date().toISOString()
     const { data: insertedRows, error: insertErr } = await admin

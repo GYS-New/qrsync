@@ -243,16 +243,23 @@ export async function POST(req: Request) {
     }
 
     // ── Lokasyon ekstra frekans kuralları (batch) ───────────────────────────
+    // Not: gorev_kurallari.proje_id tarihsel olarak NULL kayıtlar içeriyor (schema
+    // evrimi). Bu yüzden fallback'te .eq('proje_id') yerine firma_id ile çekip
+    // memory'de lokasyonIdSet ile filtrele. Yetki varken IN filter doğrudan çalışır.
     const kuralMap = new Map<string, Set<string>>()
     if (yetkiliLokIds.length > 0) {
       let kuralQ = admin
         .from('gorev_kurallari')
         .select('tanim, lokasyon_id')
         .eq('aktif', true)
-      kuralQ = yetkiKaydiVar
-        ? kuralQ.in('lokasyon_id', yetkiliLokIds)
-        : (personelProjeId ? (kuralQ as any).eq('proje_id', personelProjeId).eq('firma_id', firmaId) : kuralQ)
-      const { data: kuralRows } = await kuralQ
+        .eq('firma_id', firmaId)
+      if (yetkiKaydiVar) {
+        kuralQ = kuralQ.in('lokasyon_id', yetkiliLokIds)
+      }
+      const { data: kuralRowsRaw } = await kuralQ
+      const kuralRows = yetkiKaydiVar
+        ? (kuralRowsRaw ?? [])
+        : ((kuralRowsRaw ?? []) as any[]).filter((r: any) => lokasyonIdSet.has(r.lokasyon_id))
       for (const r of (kuralRows ?? []) as any[]) {
         const lid = r.lokasyon_id
         const t = typeof r.tanim === 'string' ? r.tanim.trim() : ''

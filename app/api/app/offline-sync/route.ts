@@ -286,6 +286,26 @@ async function ekstraGoreviOlustur(
   if (lok.firma_id !== firmaId) return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'hata', error: 'Yetki yok' }
   if (lok.aktif === false) return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'hata', error: 'Lokasyon pasif' }
 
+  // Ekstra görev tanımı doğrulama: lokasyonun aktif kural listesinde var olmalı
+  // (ekstra = mevcut kural görevinin tekrarı; serbest metin yasak)
+  const { data: lokKurallar } = await admin
+    .from('gorev_kurallari')
+    .select('tanim')
+    .eq('lokasyon_id', kayit.lokasyon_id)
+    .eq('aktif', true)
+  const izinliTanimlar = new Set(
+    ((lokKurallar ?? []) as any[])
+      .map((k: any) => (typeof k.tanim === 'string' ? k.tanim.trim() : ''))
+      .filter(Boolean)
+  )
+  if (!izinliTanimlar.has(tanim)) {
+    return {
+      _mobil_kayit_id: kayit._mobil_kayit_id,
+      status: 'hata',
+      error: 'Görev tanımı lokasyonun kural listesinden biri olmalı (ekstra = tekrar)',
+    }
+  }
+
   const nowIso = new Date().toISOString()
   const sure = sureSaniye(kayit.baslatilma_zamani, kayit.bitirme_zamani) ?? 0
 
