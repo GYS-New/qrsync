@@ -6,8 +6,13 @@
  * Body:   { token: string }  — mesai QR/NFC kodu
  *
  * Yanıt:
- *   { ok: true,  sonuc: 'giris'|'cikis', isim: string, tip: 'GIRIS'|'CIKIS' }
- *   { ok: false, error: string }
+ *   GIRIS: { ok: true, sonuc: 'giris', tip: 'GIRIS', isim, mesai: { mesai_kayit_id, kayit_tarihi, giris_saati } }
+ *   CIKIS: { ok: true, sonuc: 'cikis', tip: 'CIKIS', isim, mesai: null }
+ *   Hata:  { ok: false, error: string }
+ *
+ * Not: mesai objesi offline-snapshot response'undaki mesai ile aynı formattadır.
+ * Mobil, iş başı sonrası bu alanı lokal snapshot'a patch edebilir → offline'da
+ * "önce iş başı" uyarısı almamak için snapshot'ı tekrar online indirmek gerekmez.
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -185,14 +190,14 @@ export async function POST(req: Request) {
           { status: 409, headers: CORS }
         )
       }
-      const { error } = await admin.from('personel_mesai_kayitlari').insert({
+      const { data: yeniMesai, error } = await admin.from('personel_mesai_kayitlari').insert({
         user_id:      userId,
         firma_id:     firmaId,
         proje_id:     qr.proje_id ?? null,
         kayit_tarihi: bugun,
         giris_saati:  simdi,
         giris_tipi:   'MOBIL',
-      })
+      }).select('id, kayit_tarihi, giris_saati').single()
       if (error) {
         return NextResponse.json({ ok: false, error: error.message }, { status: 500, headers: CORS })
       }
@@ -201,8 +206,16 @@ export async function POST(req: Request) {
         .update({ son_kullanim: simdi })
         .eq('device_token', deviceToken)
 
+      // mesai objesi: offline-snapshot response'undaki mesai alanıyla AYNI format.
+      // Mobil bunu lokal snapshot.mesai'ye patch edip uçak moduna geçince
+      // "önce iş başı" uyarısı almaz — snapshot'ı tekrar online indirmeye gerek kalmaz.
       return NextResponse.json(
-        { ok: true, sonuc: 'giris', tip: 'GIRIS', isim },
+        {
+          ok: true, sonuc: 'giris', tip: 'GIRIS', isim,
+          mesai: yeniMesai
+            ? { mesai_kayit_id: yeniMesai.id, kayit_tarihi: yeniMesai.kayit_tarihi, giris_saati: yeniMesai.giris_saati }
+            : null,
+        },
         { headers: CORS }
       )
     }
@@ -227,8 +240,9 @@ export async function POST(req: Request) {
         .update({ son_kullanim: simdi })
         .eq('device_token', deviceToken)
 
+      // Çıkışta mobil lokal snapshot.mesai'yi temizlesin — null gönderiyoruz.
       return NextResponse.json(
-        { ok: true, sonuc: 'cikis', tip: 'CIKIS', isim },
+        { ok: true, sonuc: 'cikis', tip: 'CIKIS', isim, mesai: null },
         { headers: CORS }
       )
     }
