@@ -154,10 +154,16 @@ export async function POST(req: Request) {
     const yetkiKaydiVar = yetkiliUstLokIds.length > 0
 
     // ── Bekleyen görevler ────────────────────────────────────────────────────
-    // PT aktif: vardiya aralığında (ACIK) VEYA (HAZIR + aktif_olma_tarihi ∈ vardiya)
-    // PT pasif: tüm HAZIR + ACIK (vardiya kısıtı yok)
+    // Snapshot kapsam politikası:
+    //   - Sıradaki 1 saat penceresi: aktif_olma_tarihi <= (şimdi + 1 saat)
+    //     → ACIK görevler (zaten aktifleşmiş) ve HAZIR görevler (1 saat içinde
+    //       aktifleşecek olanlar) alınır. Daha ileri tarihli HAZIR görevler
+    //       (sistem 24 saat ilerisi için üretir) snapshot DIŞINDA kalır.
+    //   - Vardiya belli ise ek olarak vardiya penceresi uygulanır.
+    //   - Vardiya belli değilse (iş başı saat toleransı dışında) sadece 1 saat
+    //     penceresi çalışır — snapshot boyutu makul kalır.
     //
-    // Kapsam filtresi:
+    // Lokasyon kapsam filtresi:
     //   yetkiKaydiVar → .in('lokasyon_id', yetkiliLokIds) (küçük liste)
     //   yetki yok    → .eq('proje_id', personelProjeId) (tek eq — URL limit'i aşmaz)
     // Neden: PostgREST .in() 400+ UUID'de URL limit'e (~8KB) takılır ve sessizce
@@ -165,9 +171,12 @@ export async function POST(req: Request) {
     let bekleyenGorevler: any[] = []
     let bekleyenCanli: any[] = []
 
+    // Sıradaki 1 saat penceresi sınırı — operatörün önündeki iş yükü
+    const siradakiSinirIso = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+
     if (yetkiliLokIds.length > 0) {
       const [spesifikRes, canliRes] = await Promise.all([
-        // Spesifik görevler — vardiya bağımsız, sadece durum filtresi
+        // Spesifik görevler — vardiya bağımsız
         (() => {
           let q = admin.from('gorevler').select(`
             id, tanim, durum, olusturma_tarihi, aktif_olma_tarihi, baslatilma_tarihi, lokasyon_id,
@@ -175,6 +184,7 @@ export async function POST(req: Request) {
           `)
             .eq('firma_id', firmaId)
             .in('durum', ['HAZIR', 'ACIK'])
+            .lte('aktif_olma_tarihi', siradakiSinirIso)
             .order('olusturma_tarihi', { ascending: false })
           q = yetkiKaydiVar
             ? q.in('lokasyon_id', yetkiliLokIds)
@@ -182,7 +192,7 @@ export async function POST(req: Request) {
           return q
         })(),
 
-        // Canlı görevler — PT aktifte vardiya, PT pasifte tümü
+        // Canlı görevler — PT aktifte vardiya içi, PT pasifte vardiya filtresi yok
         (() => {
           let q = admin.from('canli_gorevler').select(`
             id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, lokasyon_id,
@@ -190,6 +200,7 @@ export async function POST(req: Request) {
           `)
             .eq('firma_id', firmaId)
             .in('durum', ['HAZIR', 'ACIK'])
+            .lte('aktif_olma_tarihi', siradakiSinirIso)
             .order('aktif_olma_tarihi', { ascending: false })
 
           q = yetkiKaydiVar
