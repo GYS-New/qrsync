@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
+import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -328,15 +329,15 @@ export async function POST(req: Request) {
 
     const { error: updateErr } = await admin
       .from(gorevTipi)
-      .update({
-        durum:                    nextDurum,
-        durum_degisim_tarihi:     tamamlanmaIso,
-        tamamlanma_tarihi:        tamamlanmaIso,
-        tamamlanma_suresi_saniye: sureSaniye,
-        islemi_yapan_id:          userId,
-        ...(gorevTipi === 'canli_gorevler' ? { tamamlayan_kullanici_id: userId } : {}),
-        son_tamamlama_kanali:     'MOBIL',
-      } as any)
+      .update(gorevDurumPayload(nextDurum as any, 'MOBIL', {
+        at: tamamlanmaIso,
+        ek: {
+          tamamlanma_tarihi:        tamamlanmaIso,
+          tamamlanma_suresi_saniye: sureSaniye,
+          islemi_yapan_id:          userId,
+          ...(gorevTipi === 'canli_gorevler' ? { tamamlayan_kullanici_id: userId } : {}),
+        },
+      }) as any)
       .eq('id', gorevId)
 
     if (updateErr) {

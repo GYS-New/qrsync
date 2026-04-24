@@ -12,6 +12,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { aktifVardiyaAraligi } from '@/lib/scan/vardiya'
+import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 
 const CORS = {} // Cron endpoint — CORS gereksiz
 
@@ -237,15 +238,16 @@ async function destekCalistir(admin: any, ayar: any) {
 
     // %1 iptal olasılığı (doğallık)
     if (Math.random() < 0.01) {
-      const { error: iptalErr } = await admin.from('canli_gorevler').update({
-        durum: 'IPTAL',
-        durum_degisim_tarihi: new Date().toISOString(),
-        iptal_eden_id: personelId,
-        iptal_tarihi: new Date().toISOString(),
-        islemi_yapan_id: personelId,
+      const iptalIso = new Date().toISOString()
+      const { error: iptalErr } = await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'MOBIL', {
+        at: iptalIso,
         iptal_sebep: 'Otomatik iptal — personel destek (vardiya bitti)',
-        son_tamamlama_kanali: 'MOBIL',
-      } as any).eq('id', gorev.id)
+        ek: {
+          iptal_eden_id: personelId,
+          iptal_tarihi: iptalIso,
+          islemi_yapan_id: personelId,
+        },
+      }) as any).eq('id', gorev.id)
       if (iptalErr) { updateErrorCount++; console.log(`${logPrefix} IPTAL HATA: ${iptalErr.message}`) }
       iptalAdet++
       continue
@@ -259,17 +261,17 @@ async function destekCalistir(admin: any, ayar: any) {
     const tamamlanmaIso = new Date().toISOString()
     const baslatmaIso = new Date(now - sureSaniye * 1000).toISOString()
 
-    const { error: tamamErr } = await admin.from('canli_gorevler').update({
-      durum: 'TAMAMLANDI',
-      durum_degisim_tarihi: tamamlanmaIso,
-      baslatilma_tarihi: gorev.baslatilma_tarihi || baslatmaIso,
-      baslatan_kullanici_id: personelId,
-      tamamlanma_tarihi: tamamlanmaIso,
-      tamamlayan_kullanici_id: personelId,
-      islemi_yapan_id: personelId,
-      tamamlanma_suresi_saniye: sureSaniye,
-      son_tamamlama_kanali: 'MOBIL',
-    } as any).eq('id', gorev.id)
+    const { error: tamamErr } = await admin.from('canli_gorevler').update(gorevDurumPayload('TAMAMLANDI', 'MOBIL', {
+      at: tamamlanmaIso,
+      ek: {
+        baslatilma_tarihi: gorev.baslatilma_tarihi || baslatmaIso,
+        baslatan_kullanici_id: personelId,
+        tamamlanma_tarihi: tamamlanmaIso,
+        tamamlayan_kullanici_id: personelId,
+        islemi_yapan_id: personelId,
+        tamamlanma_suresi_saniye: sureSaniye,
+      },
+    }) as any).eq('id', gorev.id)
 
     if (tamamErr) {
       updateErrorCount++

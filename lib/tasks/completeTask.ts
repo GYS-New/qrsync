@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
+import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 
 export type SupportedTaskType = 'gorevler' | 'canli_gorevler'
 export type CompletionChannel = 'QR' | 'NFC'
@@ -64,13 +65,14 @@ export async function completeTask(input: CompleteTaskInput) {
 
     const { error: updateError } = await supabase
       .from('gorevler')
-      .update({
-        durum: 'TAMAMLANDI',
-        durum_degisim_tarihi: nowIso,
-        tamamlanma_tarihi: nowIso,
-        tamamlanma_suresi_saniye: calcDurationSeconds(baslatilmaTarihi, nowIso),
-        islemi_yapan_id: userId,
-      } as any)
+      .update(gorevDurumPayload('TAMAMLANDI', channel, {
+        at: nowIso,
+        ek: {
+          tamamlanma_tarihi: nowIso,
+          tamamlanma_suresi_saniye: calcDurationSeconds(baslatilmaTarihi, nowIso),
+          islemi_yapan_id: userId,
+        },
+      }) as any)
       .eq('id', taskId)
 
     if (updateError) throw new Error(updateError.message)
@@ -130,14 +132,15 @@ export async function completeTask(input: CompleteTaskInput) {
 
   const { error: liveUpdateError } = await supabase
     .from('canli_gorevler')
-    .update({
-      durum: liveCompletionStatus,
-      durum_degisim_tarihi: nowIso,
-      tamamlanma_tarihi: nowIso,
-      tamamlanma_suresi_saniye: calcDurationSeconds(liveBaslatilmaTarihi, nowIso),
-      tamamlayan_kullanici_id: userId,
-      islemi_yapan_id: userId,
-    } as any)
+    .update(gorevDurumPayload(liveCompletionStatus as any, channel, {
+      at: nowIso,
+      ek: {
+        tamamlanma_tarihi: nowIso,
+        tamamlanma_suresi_saniye: calcDurationSeconds(liveBaslatilmaTarihi, nowIso),
+        tamamlayan_kullanici_id: userId,
+        islemi_yapan_id: userId,
+      },
+    }) as any)
     .eq('id', taskId)
 
   if (liveUpdateError) throw new Error(liveUpdateError.message)

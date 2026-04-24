@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
+import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -145,12 +146,10 @@ export async function POST(req: Request) {
         proje_id:                lok.proje_id ?? personelProjeId ?? null,
         lokasyon_id:             lokasyonId,
         tanim:                   gorevTanim,
-        durum:                   'TAMAMLANDI',
         kural_id:                null,
         gunluk_frekans_sayisi:   0,
         aktif_olma_tarihi:       nowIso,
         olusturma_tarihi:        nowIso,
-        durum_degisim_tarihi:    nowIso,
         tamamlanma_tarihi:       nowIso,
         baslatilma_tarihi:       nowIso,
         olusturan_id:            userId,
@@ -158,7 +157,7 @@ export async function POST(req: Request) {
         islemi_yapan_id:         userId,
         tamamlayan_kullanici_id: userId,
         tamamlanma_suresi_saniye: 0,
-        son_tamamlama_kanali:    'MOBIL',
+        ...gorevDurumPayload('TAMAMLANDI', 'MOBIL', { at: nowIso }),
       } as any)
       .select('id')
 

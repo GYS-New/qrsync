@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
+import { gorevDurumPayload, type Kanal } from '@/lib/gorev/durum-degistir'
 
 export async function POST(req: Request) {
   try {
@@ -60,6 +61,10 @@ export async function POST(req: Request) {
     if (!gorev_id || !kaynak || !kanal || !lokasyon_id) {
       return NextResponse.json({ ok: false, error: 'gorev_id, kaynak, kanal, lokasyon_id gerekli' }, { status: 400 })
     }
+    if (kanal !== 'QR' && kanal !== 'NFC') {
+      return NextResponse.json({ ok: false, error: 'kanal QR veya NFC olmalı' }, { status: 400 })
+    }
+    const scanKanal: Kanal = kanal
 
     const admin  = createAdminClient()
     const nowIso = new Date().toISOString()
@@ -119,27 +124,29 @@ export async function POST(req: Request) {
 
     // ── Görev durumunu güncelle ──────────────────────────────────────────────
     if (kaynak === 'gorevler') {
-      const { error: updErr } = await admin.from('gorevler').update({
-        durum:                    'TAMAMLANDI',
-        islemi_yapan_id:          me.id,
-        durum_degisim_tarihi:     nowIso,
-        tamamlanma_tarihi:        nowIso,
-        tamamlanma_suresi_saniye: sureSaniye,
-      } as any).eq('id', gorev_id)
+      const { error: updErr } = await admin.from('gorevler').update(gorevDurumPayload('TAMAMLANDI', scanKanal, {
+        at: nowIso,
+        ek: {
+          islemi_yapan_id:          me.id,
+          tamamlanma_tarihi:        nowIso,
+          tamamlanma_suresi_saniye: sureSaniye,
+        },
+      }) as any).eq('id', gorev_id)
       if (updErr) throw new Error(updErr.message)
     } else {
       const nextStatus = resolveLiveCompletionStatusByTask(gorev as any, nowIso)
       if (nextStatus === 'ZAMANI_GECMIS') {
         return NextResponse.json({ ok: false, error: 'Zamanı geçmiş görev tamamlanamaz' }, { status: 409 })
       }
-      const { error: updErr } = await admin.from('canli_gorevler').update({
-        durum:                    nextStatus,
-        tamamlayan_kullanici_id:  me.id,
-        islemi_yapan_id:          me.id,
-        tamamlanma_tarihi:        nowIso,
-        durum_degisim_tarihi:     nowIso,
-        tamamlanma_suresi_saniye: sureSaniye,
-      } as any).eq('id', gorev_id)
+      const { error: updErr } = await admin.from('canli_gorevler').update(gorevDurumPayload(nextStatus as any, scanKanal, {
+        at: nowIso,
+        ek: {
+          tamamlayan_kullanici_id:  me.id,
+          islemi_yapan_id:          me.id,
+          tamamlanma_tarihi:        nowIso,
+          tamamlanma_suresi_saniye: sureSaniye,
+        },
+      }) as any).eq('id', gorev_id)
       if (updErr) throw new Error(updErr.message)
     }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendFCMToUser } from '@/lib/fcm-sender'
+import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -44,12 +45,10 @@ export async function POST(req: Request) {
     // Görevi iptal et
     await admin
       .from(tablo)
-      .update({
-        durum: 'IPTAL',
-        durum_degisim_tarihi: nowIso,
+      .update(gorevDurumPayload('IPTAL', 'MOBIL', {
+        at: nowIso,
         iptal_sebep: 'Otomatik iptal — mobil süre aşımı',
-        son_tamamlama_kanali: 'MOBIL',
-      })
+      }) as any)
       .eq('id', taskId)
       .eq('durum', 'ISLEMDE')
 

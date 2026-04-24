@@ -44,6 +44,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
 import { auditLog } from '@/lib/audit/log'
+import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -225,17 +226,17 @@ async function normalGoreviTamamla(
   // Görev güncelle
   const { error: updErr } = await admin
     .from(kayit.gorev_tipi)
-    .update({
-      durum: nextDurum,
-      durum_degisim_tarihi: tamamlanmaIso,
-      tamamlanma_tarihi: tamamlanmaIso,
-      tamamlanma_suresi_saniye: sure,
-      islemi_yapan_id: userId,
-      ...(gorev.baslatilma_tarihi ? {} : { baslatilma_tarihi: baslatilmaIso, baslatan_kullanici_id: userId }),
-      ...(kayit.gorev_tipi === 'canli_gorevler' ? { tamamlayan_kullanici_id: userId } : {}),
-      son_tamamlama_kanali: 'OFFLINE',
-      mobil_kayit_id: kayit._mobil_kayit_id,
-    } as any)
+    .update(gorevDurumPayload(nextDurum as any, 'OFFLINE', {
+      at: tamamlanmaIso,
+      ek: {
+        tamamlanma_tarihi: tamamlanmaIso,
+        tamamlanma_suresi_saniye: sure,
+        islemi_yapan_id: userId,
+        ...(gorev.baslatilma_tarihi ? {} : { baslatilma_tarihi: baslatilmaIso, baslatan_kullanici_id: userId }),
+        ...(kayit.gorev_tipi === 'canli_gorevler' ? { tamamlayan_kullanici_id: userId } : {}),
+        mobil_kayit_id: kayit._mobil_kayit_id,
+      },
+    }) as any)
     .eq('id', kayit.gorev_id)
 
   if (updErr) {
@@ -295,12 +296,10 @@ async function ekstraGoreviOlustur(
       proje_id:                lok.proje_id ?? personelProjeId ?? null,
       lokasyon_id:             kayit.lokasyon_id,
       tanim:                   tanim,
-      durum:                   'TAMAMLANDI',
       kural_id:                null,
       gunluk_frekans_sayisi:   0,
       aktif_olma_tarihi:       kayit.baslatilma_zamani,
       olusturma_tarihi:        nowIso,
-      durum_degisim_tarihi:    kayit.bitirme_zamani,
       tamamlanma_tarihi:       kayit.bitirme_zamani,
       baslatilma_tarihi:       kayit.baslatilma_zamani,
       olusturan_id:            userId,
@@ -308,8 +307,8 @@ async function ekstraGoreviOlustur(
       islemi_yapan_id:         userId,
       tamamlayan_kullanici_id: userId,
       tamamlanma_suresi_saniye: sure,
-      son_tamamlama_kanali:    'OFFLINE',
       mobil_kayit_id:          kayit._mobil_kayit_id,
+      ...gorevDurumPayload('TAMAMLANDI', 'OFFLINE', { at: kayit.bitirme_zamani }),
     } as any)
     .select('id')
 

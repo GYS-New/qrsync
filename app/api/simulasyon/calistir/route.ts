@@ -11,6 +11,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 
 const CORS = {} // Cron endpoint — CORS gereksiz
 
@@ -322,27 +323,28 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
 
     // %1 iptal olasılığı
     if (Math.random() < (grupAyar.iptal_orani ?? 1) / 100) {
-      await admin.from('canli_gorevler').update({
-        durum: 'IPTAL', durum_degisim_tarihi: tamamlanmaIso,
-        iptal_eden_id: personelId, iptal_tarihi: tamamlanmaIso,
-        islemi_yapan_id: personelId, simule_tamamlandi: true,
+      await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'MOBIL', {
+        at: tamamlanmaIso,
         iptal_sebep: 'Otomatik iptal — simülasyon',
-        son_tamamlama_kanali: 'MOBIL',
-      } as any).eq('id', gorev.id)
+        ek: {
+          iptal_eden_id: personelId, iptal_tarihi: tamamlanmaIso,
+          islemi_yapan_id: personelId, simule_tamamlandi: true,
+        },
+      }) as any).eq('id', gorev.id)
       await personelAktiviteGuncelle(admin, personelId)
       iptalAdet++; islemSayaci++
       continue
     }
 
-    await admin.from('canli_gorevler').update({
-      durum: 'TAMAMLANDI',
-      durum_degisim_tarihi: tamamlanmaIso,
-      tamamlanma_tarihi: tamamlanmaIso,
-      tamamlayan_kullanici_id: personelId,
-      islemi_yapan_id: personelId,
-      tamamlanma_suresi_saniye: sureSaniye,
-      son_tamamlama_kanali: 'MOBIL',
-    } as any).eq('id', gorev.id)
+    await admin.from('canli_gorevler').update(gorevDurumPayload('TAMAMLANDI', 'MOBIL', {
+      at: tamamlanmaIso,
+      ek: {
+        tamamlanma_tarihi: tamamlanmaIso,
+        tamamlayan_kullanici_id: personelId,
+        islemi_yapan_id: personelId,
+        tamamlanma_suresi_saniye: sureSaniye,
+      },
+    }) as any).eq('id', gorev.id)
 
     if (lok?.checklist_sablon_id) {
       await simuleCeklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)
@@ -382,16 +384,17 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
 
       // %1 iptal olasılığı
       if (Math.random() < (grupAyar.iptal_orani ?? 1) / 100) {
-        await admin.from('canli_gorevler').update({
-          durum: 'IPTAL',
-          durum_degisim_tarihi: new Date().toISOString(),
-          iptal_eden_id: personelId,
-          iptal_tarihi: new Date().toISOString(),
-          islemi_yapan_id: personelId,
-          simule_tamamlandi: true,
+        const iptalIso = new Date().toISOString()
+        await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'MOBIL', {
+          at: iptalIso,
           iptal_sebep: 'Otomatik iptal — simülasyon',
-          son_tamamlama_kanali: 'MOBIL',
-        } as any).eq('id', gorev.id)
+          ek: {
+            iptal_eden_id: personelId,
+            iptal_tarihi: iptalIso,
+            islemi_yapan_id: personelId,
+            simule_tamamlandi: true,
+          },
+        }) as any).eq('id', gorev.id)
         await personelAktiviteGuncelle(admin, personelId)
         iptalAdet++
         continue
@@ -416,18 +419,18 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
         const tamamlanmaIso = new Date().toISOString()
         const baslatmaIso = new Date(Date.now() - sureSaniye * 1000).toISOString()
 
-        await admin.from('canli_gorevler').update({
-          durum: 'TAMAMLANDI',
-          durum_degisim_tarihi: tamamlanmaIso,
-          baslatilma_tarihi: baslatmaIso,
-          baslatan_kullanici_id: personelId,
-          tamamlanma_tarihi: tamamlanmaIso,
-          tamamlayan_kullanici_id: personelId,
-          islemi_yapan_id: personelId,
-          tamamlanma_suresi_saniye: sureSaniye,
-          son_tamamlama_kanali: 'MOBIL',
-          simule_tamamlandi: true,
-        } as any).eq('id', gorev.id)
+        await admin.from('canli_gorevler').update(gorevDurumPayload('TAMAMLANDI', 'MOBIL', {
+          at: tamamlanmaIso,
+          ek: {
+            baslatilma_tarihi: baslatmaIso,
+            baslatan_kullanici_id: personelId,
+            tamamlanma_tarihi: tamamlanmaIso,
+            tamamlayan_kullanici_id: personelId,
+            islemi_yapan_id: personelId,
+            tamamlanma_suresi_saniye: sureSaniye,
+            simule_tamamlandi: true,
+          },
+        }) as any).eq('id', gorev.id)
 
         if (lok?.checklist_sablon_id) {
           await simuleCeklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)

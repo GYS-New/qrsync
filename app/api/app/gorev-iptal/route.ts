@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
+import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -100,12 +101,11 @@ export async function POST(req: Request) {
 
     const { error: updateErr } = await admin
       .from(gorevTipi)
-      .update({
-        durum:                'IPTAL',
-        durum_degisim_tarihi: nowIso,
-        iptal_sebep:          iptalSebep,
-        islemi_yapan_id:      userId,
-      } as any)
+      .update(gorevDurumPayload('IPTAL', 'MOBIL', {
+        at: nowIso,
+        iptal_sebep: iptalSebep,
+        ek: { islemi_yapan_id: userId },
+      }) as any)
       .eq('id', gorevId)
 
     if (updateErr) {

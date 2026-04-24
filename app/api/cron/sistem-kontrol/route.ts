@@ -396,17 +396,19 @@ async function kontrolVeriButunlugu(admin: any, nowMs: number): Promise<SistemRa
   const birSaatOnce = new Date(nowMs - 60 * 60 * 1000).toISOString()
 
   // Anomali 1: Son 1 saatte durum_degisim olmuş canli_gorevler'de son_tamamlama_kanali NULL
-  // (TAMAMLANDI, IPTAL, ZAMANINDA_YAPILAMAYAN, ZAMANI_GECMIS kapanmış ama kanal yazılmamış)
+  // (TAMAMLANDI, IPTAL, ZAMANINDA_YAPILAMAYAN, KAPATILDI kapanmış ama kanal yazılmamış)
+  // NOT: ZAMANI_GECMIS hariç — bu hiç başlatılmamış/hiç dokunulmamış görevler için
+  //      syncLiveTaskStatuses tarafından sistem eylemi olarak set edilir; kanal NULL doğrudur.
   const { count: kanalEksikCanli } = await admin
     .from('canli_gorevler')
     .select('id', { count: 'exact', head: true })
-    .in('durum', ['TAMAMLANDI', 'IPTAL', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'KAPATILDI'])
+    .in('durum', ['TAMAMLANDI', 'IPTAL', 'ZAMANINDA_YAPILAMAYAN', 'KAPATILDI'])
     .is('son_tamamlama_kanali', null)
     .gte('durum_degisim_tarihi', birSaatOnce)
   if ((kanalEksikCanli ?? 0) > 0) {
     sorunlar.push({
       kod: 'KANAL_EKSIK_CANLI',
-      mesaj: `${kanalEksikCanli} canli_gorev kaydı kapalı durumda ama son_tamamlama_kanali NULL (son 1 saat içinde)`,
+      mesaj: `${kanalEksikCanli} canli_gorev kaydı kullanıcı eylemi ile kapanmış ama son_tamamlama_kanali NULL (son 1 saat içinde)`,
       adet: kanalEksikCanli ?? 0,
     })
   }
@@ -421,7 +423,7 @@ async function kontrolVeriButunlugu(admin: any, nowMs: number): Promise<SistemRa
   if ((kanalEksikSpes ?? 0) > 0) {
     sorunlar.push({
       kod: 'KANAL_EKSIK_SPES',
-      mesaj: `${kanalEksikSpes} spesifik görev kaydı kapalı durumda ama son_tamamlama_kanali NULL`,
+      mesaj: `${kanalEksikSpes} spesifik görev kaydı kullanıcı eylemi ile kapanmış ama son_tamamlama_kanali NULL`,
       adet: kanalEksikSpes ?? 0,
     })
   }
