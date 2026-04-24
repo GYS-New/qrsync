@@ -274,21 +274,32 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
   // Örn 0.3 → %30 şans 1 görev | 1.6 → garanti 1 + %60 şans 2 | 2.4 → garanti 2 + %40 şans 3
   const tamKisim = Math.floor(gorevPerDk)
   const kalan = gorevPerDk - tamKisim
-  const maxIslem = tamKisim + (Math.random() < kalan ? 1 : 0)
+  const rollKapasite = () => tamKisim + (Math.random() < kalan ? 1 : 0)
 
-  if (maxIslem <= 0) {
+  // SG aktif görevlerde bir görev 2 cron harcar (ACIK→ISLEMDE başlatma, sonra
+  // min_sure dolunca ISLEMDE→TAMAMLANDI). Eskiden tek maxIslem kapasitesi iki
+  // adım arasında paylaşılıyordu → SG aktif gruplarda throughput yarıya düşüyor,
+  // hedef %50 civarında kalıyordu.
+  //
+  // Fix: ADIM 1 ve ADIM 2 için bağımsız iki kapasite.
+  //   SG aktif grupta  → her cron: 1 tamamlama + 1 başlatma (pipeline, x2 işlem, net ×1 throughput)
+  //   SG pasif grupta  → ADIM 1 boş (ISLEMDE hiç olmaz), ADIM 2'de direkt tamamlama (x1 işlem)
+  const tamamlamaKapasite = rollKapasite()
+  const baslatmaKapasite  = rollKapasite()
+
+  if (tamamlamaKapasite <= 0 && baslatmaKapasite <= 0) {
     return { tamamlanan: 0, baslatilan: 0, iptal: 0, mesaj: 'Bu cron turunda sıra gelmedi', toplam: toplamGorev, hedef_max: hedefMax, vardiya_hedef: vardiyaHedefMax, vardiya_tamamlanan: vardiyaTamamlanan, kalan_dk: kalanDk, gorev_per_dk: gorevPerDk }
   }
 
   let tamamlananAdet = 0
   let baslatmaAdet = 0
   let iptalAdet = 0
-  let islemSayaci = 0 // bu cron'da yapılan toplam işlem
+  let tamamlamaSayaci = 0 // ADIM 1 sayacı
 
-  // ── ADIM 1: ISLEMDE görevlerden süresi dolanları tamamla (max 1 per cron) ──
+  // ── ADIM 1: ISLEMDE görevlerden süresi dolanları tamamla ──
   for (const gorev of islemdeGorevler) {
     if (tamamlananSayi + tamamlananAdet >= hedefMax) break
-    if (islemSayaci >= maxIslem) break
+    if (tamamlamaSayaci >= tamamlamaKapasite) break
     if (!gorev.baslatilma_tarihi) continue
 
     const baslatmaMs = new Date(gorev.baslatilma_tarihi).getTime()
@@ -332,7 +343,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
         },
       }) as any).eq('id', gorev.id)
       await personelAktiviteGuncelle(admin, personelId)
-      iptalAdet++; islemSayaci++
+      iptalAdet++; tamamlamaSayaci++
       continue
     }
 
@@ -351,12 +362,11 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     }
 
     await personelAktiviteGuncelle(admin, personelId)
-    tamamlananAdet++; islemSayaci++
+    tamamlananAdet++; tamamlamaSayaci++
   }
 
   // ── ADIM 2: ACIK görevleri başlat veya direkt tamamla ────────────────
-  const kalanIslem = maxIslem - islemSayaci
-  if (kalanIslem > 0 && acikGorevler.length > 0 && (tamamlananSayi + tamamlananAdet) < hedefMax) {
+  if (baslatmaKapasite > 0 && acikGorevler.length > 0 && (tamamlananSayi + tamamlananAdet) < hedefMax) {
     // Farklı lokasyonlardan dengeli seç (round-robin)
     const lokGruplari = new Map<string, any[]>()
     for (const g of acikGorevler) {
@@ -367,7 +377,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
     const lokKeys = [...lokGruplari.keys()].sort(() => Math.random() - 0.5)
     const secilen: any[] = []
     let idx = 0
-    while (secilen.length < kalanIslem && idx < acikGorevler.length) {
+    while (secilen.length < baslatmaKapasite && idx < acikGorevler.length) {
       const key = lokKeys[idx % lokKeys.length]
       const grp = lokGruplari.get(key)
       if (grp && grp.length > 0) {
