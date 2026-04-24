@@ -52,6 +52,7 @@ async function handle(req: Request) {
   sistemler.push(await kontrolSim(admin, nowMs))
   sistemler.push(await kontrolPersonelDestek(admin, nowMs))
   sistemler.push(await kontrolOfflineMod(admin, nowMs))
+  sistemler.push(await kontrolVeriButunlugu(admin, nowMs))
 
   const toplamSorun = sistemler.filter(s => s.durum === 'SORUN').length
   const toplamOk = sistemler.filter(s => s.durum === 'OK').length
@@ -386,6 +387,52 @@ async function kontrolPersonelDestek(admin: any, nowMs: number): Promise<SistemR
 
   if (sorunlar.length > 0) return raporla('Personel Destek', sorunlar, '', metrikler)
   return raporla('Personel Destek', [], 'Eski BEKLEMEDE/ISLEMDE yok, cron loglu çalışıyor', metrikler)
+}
+
+/* ────────────────────────── VERİ BÜTÜNLÜĞÜ ────────────────────────── */
+
+async function kontrolVeriButunlugu(admin: any, nowMs: number): Promise<SistemRaporu> {
+  const sorunlar: SorunDetayi[] = []
+  const birSaatOnce = new Date(nowMs - 60 * 60 * 1000).toISOString()
+
+  // Anomali 1: Son 1 saatte durum_degisim olmuş canli_gorevler'de son_tamamlama_kanali NULL
+  // (TAMAMLANDI, IPTAL, ZAMANINDA_YAPILAMAYAN, ZAMANI_GECMIS kapanmış ama kanal yazılmamış)
+  const { count: kanalEksikCanli } = await admin
+    .from('canli_gorevler')
+    .select('id', { count: 'exact', head: true })
+    .in('durum', ['TAMAMLANDI', 'IPTAL', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'KAPATILDI'])
+    .is('son_tamamlama_kanali', null)
+    .gte('durum_degisim_tarihi', birSaatOnce)
+  if ((kanalEksikCanli ?? 0) > 0) {
+    sorunlar.push({
+      kod: 'KANAL_EKSIK_CANLI',
+      mesaj: `${kanalEksikCanli} canli_gorev kaydı kapalı durumda ama son_tamamlama_kanali NULL (son 1 saat içinde)`,
+      adet: kanalEksikCanli ?? 0,
+    })
+  }
+
+  // Anomali 2: Aynı kontrol spesifik gorevler için
+  const { count: kanalEksikSpes } = await admin
+    .from('gorevler')
+    .select('id', { count: 'exact', head: true })
+    .in('durum', ['TAMAMLANDI', 'IPTAL', 'ZAMANINDA_YAPILAMAYAN', 'KAPATILDI'])
+    .is('son_tamamlama_kanali', null)
+    .gte('durum_degisim_tarihi', birSaatOnce)
+  if ((kanalEksikSpes ?? 0) > 0) {
+    sorunlar.push({
+      kod: 'KANAL_EKSIK_SPES',
+      mesaj: `${kanalEksikSpes} spesifik görev kaydı kapalı durumda ama son_tamamlama_kanali NULL`,
+      adet: kanalEksikSpes ?? 0,
+    })
+  }
+
+  const metrikler = {
+    kanal_eksik_canli: kanalEksikCanli ?? 0,
+    kanal_eksik_spesifik: kanalEksikSpes ?? 0,
+  }
+
+  if (sorunlar.length > 0) return raporla('Veri Bütünlüğü', sorunlar, '', metrikler)
+  return raporla('Veri Bütünlüğü', [], 'Son 1 saatte kapalı kayıtlar tutarlı (kanal dolu)', metrikler)
 }
 
 /* ────────────────────────── OFFLINE MOD ────────────────────────── */

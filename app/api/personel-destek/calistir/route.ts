@@ -244,6 +244,7 @@ async function destekCalistir(admin: any, ayar: any) {
         iptal_tarihi: new Date().toISOString(),
         islemi_yapan_id: personelId,
         iptal_sebep: 'Otomatik iptal — personel destek (vardiya bitti)',
+        son_tamamlama_kanali: 'MOBIL',
       } as any).eq('id', gorev.id)
       if (iptalErr) { updateErrorCount++; console.log(`${logPrefix} IPTAL HATA: ${iptalErr.message}`) }
       iptalAdet++

@@ -327,6 +327,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
         iptal_eden_id: personelId, iptal_tarihi: tamamlanmaIso,
         islemi_yapan_id: personelId, simule_tamamlandi: true,
         iptal_sebep: 'Otomatik iptal — simülasyon',
+        son_tamamlama_kanali: 'MOBIL',
       } as any).eq('id', gorev.id)
       await personelAktiviteGuncelle(admin, personelId)
       iptalAdet++; islemSayaci++
@@ -389,6 +390,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
           islemi_yapan_id: personelId,
           simule_tamamlandi: true,
           iptal_sebep: 'Otomatik iptal — simülasyon',
+          son_tamamlama_kanali: 'MOBIL',
         } as any).eq('id', gorev.id)
         await personelAktiviteGuncelle(admin, personelId)
         iptalAdet++

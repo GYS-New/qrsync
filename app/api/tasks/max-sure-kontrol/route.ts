@@ -51,7 +51,12 @@ export async function POST(req: NextRequest) {
     if (sgIptalIds.length > 0) {
       const { error: updErr } = await admin
         .from('gorevler')
-        .update({ durum: 'IPTAL', durum_degisim_tarihi: now.toISOString() })
+        .update({
+          durum: 'IPTAL',
+          durum_degisim_tarihi: now.toISOString(),
+          iptal_sebep: 'Otomatik iptal — max süre aşıldı',
+          son_tamamlama_kanali: 'MOBIL',
+        })
         .in('id', sgIptalIds)
       if (updErr) throw updErr
       results.gorevler_iptal = sgIptalIds.length
@@ -83,7 +88,12 @@ export async function POST(req: NextRequest) {
     if (fgIptalIds.length > 0) {
       const { error: updErr2 } = await admin
         .from('canli_gorevler')
-        .update({ durum: 'IPTAL', durum_degisim_tarihi: now.toISOString() })
+        .update({
+          durum: 'IPTAL',
+          durum_degisim_tarihi: now.toISOString(),
+          iptal_sebep: 'Otomatik iptal — max süre aşıldı',
+          son_tamamlama_kanali: 'MOBIL',
+        })
         .in('id', fgIptalIds)
       if (updErr2) throw updErr2
       results.canli_gorevler_iptal = fgIptalIds.length

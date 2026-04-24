@@ -44,7 +44,12 @@ export async function POST(req: Request) {
     // Görevi iptal et
     await admin
       .from(tablo)
-      .update({ durum: 'IPTAL', durum_degisim_tarihi: nowIso })
+      .update({
+        durum: 'IPTAL',
+        durum_degisim_tarihi: nowIso,
+        iptal_sebep: 'Otomatik iptal — mobil süre aşımı',
+        son_tamamlama_kanali: 'MOBIL',
+      })
       .eq('id', taskId)
       .eq('durum', 'ISLEMDE')
 
