@@ -389,10 +389,12 @@ export default function ArsivClient({
       } else if (topluSilSekme === 'personel' || topluSilSekme === 'musteri') {
         // Server-side endpoint — admin client RLS bypass eder + hem aktif tablodaki
         // arsivlendi=true artıkları hem _arsiv tablosunu siler.
+        // 'personel' UI etiketi → 'mesai' endpoint tip ismine map edilir
+        const tip = topluSilSekme === 'personel' ? 'mesai' : 'musteri'
         const res = await fetch('/api/arsiv/toplu-sil', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            tip: topluSilSekme,
+            tip,
             firma_id: firmaId,
             proje_id: projeId ?? undefined,
             from: fromISO ?? undefined,
