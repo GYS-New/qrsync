@@ -101,6 +101,7 @@ export default function GorevKurallariClient({
   const [saving, setSaving]         = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [bulkDeleting, setBulkDeleting] = useState<{ key: string; total: number; done: number } | null>(null)
   const [q, setQ]                   = useState('')
   const [importOpen, setImportOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -603,15 +604,35 @@ export default function GorevKurallariClient({
           )
         }
 
-        // Toplu sil fonksiyonu
-        async function topluSilGrup(kurallar: any[]) {
+        // Toplu sil fonksiyonu — paralel + ilerleme + chunk'lı (DB'yi boğmamak için)
+        async function topluSilGrup(kurallar: any[], key: string = 'global') {
+          if (bulkDeleting) return
           const ok = await confirm({ title: 'Toplu Sil', message: `${kurallar.length} kural silinecek. Onaylıyor musunuz?`, confirmText: 'Evet, Sil', variant: 'danger' })
           if (!ok) return
-          for (const k of kurallar) {
-            await fetch(`/api/gorev-kurallari/${k.id}`, { method: 'DELETE' })
-          }
-          setKuralar(prev => prev.filter(k => !kurallar.some(kk => kk.id === k.id)))
-          toast({ type: 'success', title: 'Silindi', message: `${kurallar.length} kural silindi.` })
+          setBulkDeleting({ key, total: kurallar.length, done: 0 })
+          const basariliIds: string[] = []
+          let hata = 0
+          // 10'lu chunk'lar halinde paralel — 150 kural ≈ 15 batch × ~500ms = ~8sn (eskiden 75sn)
+          const CHUNK = 10
+          try {
+            for (let i = 0; i < kurallar.length; i += CHUNK) {
+              const batch = kurallar.slice(i, i + CHUNK)
+              const sonuc = await Promise.all(batch.map(async (k: any) => {
+                try {
+                  const res = await fetch(`/api/gorev-kurallari/${k.id}`, { method: 'DELETE' })
+                  return res.ok ? k.id : null
+                } catch { return null }
+              }))
+              for (const id of sonuc) {
+                if (id) basariliIds.push(id)
+                else hata++
+              }
+              setBulkDeleting({ key, total: kurallar.length, done: i + batch.length })
+            }
+            if (basariliIds.length > 0) setKuralar(prev => prev.filter(k => !basariliIds.includes(k.id)))
+            if (hata === 0) toast({ type: 'success', title: 'Silindi', message: `${basariliIds.length} kural silindi.` })
+            else toast({ type: 'error', title: 'Kısmi başarı', message: `${basariliIds.length} silindi · ${hata} başarısız` })
+          } finally { setBulkDeleting(null) }
         }
 
         return (
@@ -655,14 +676,20 @@ export default function GorevKurallariClient({
                                 <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>{g.tanimlar.length} kural tanımı · {tumKurallar.length} kural · {aktifSayi} aktif</span>
                                 {grupDuraklat > 0 && <span style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 4, fontWeight: 700, marginLeft: 6 }}>⏸ {grupDuraklat}</span>}
                               </span>
-                              {!readonly && yetki.silebilir && (
-                                <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
-                                  <button onClick={() => topluSilGrup(tumKurallar)}
-                                    style={{ padding: '3px 10px', fontSize: 11, borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
-                                    Toplu Sil
-                                  </button>
-                                </div>
-                              )}
+                              {!readonly && yetki.silebilir && (() => {
+                                const bdKey = `grup::${g.grupId}`
+                                const aktif = bulkDeleting?.key === bdKey
+                                const disabled = !!bulkDeleting && !aktif
+                                return (
+                                  <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                                    <button onClick={() => topluSilGrup(tumKurallar, bdKey)} disabled={disabled || aktif}
+                                      style={{ padding: '3px 10px', fontSize: 11, borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', cursor: aktif || disabled ? 'wait' : 'pointer', color: '#dc2626', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5, opacity: disabled ? 0.5 : 1 }}>
+                                      {aktif && <span style={{ display: 'inline-block', width: 10, height: 10, border: '1.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />}
+                                      {aktif ? `Siliniyor… ${bulkDeleting!.done}/${bulkDeleting!.total}` : 'Toplu Sil'}
+                                    </button>
+                                  </div>
+                                )
+                              })()}
                             </div>
                             {/* Tanım bazlı alt gruplar */}
                             {gAcik && g.tanimlar.map((tg, ti) => {
@@ -690,12 +717,18 @@ export default function GorevKurallariClient({
                                         ⏸ Duraklat
                                       </button>
                                     )}
-                                    {!readonly && yetki.silebilir && (
-                                      <button onClick={() => topluSilGrup(tg.kurallar)}
-                                        style={{ padding: '2px 8px', fontSize: 10, borderRadius: 4, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
-                                        Sil
-                                      </button>
-                                    )}
+                                    {!readonly && yetki.silebilir && (() => {
+                                      const bdKey = `tanim::${tanimKey}`
+                                      const aktif = bulkDeleting?.key === bdKey
+                                      const disabled = !!bulkDeleting && !aktif
+                                      return (
+                                        <button onClick={() => topluSilGrup(tg.kurallar, bdKey)} disabled={disabled || aktif}
+                                          style={{ padding: '2px 8px', fontSize: 10, borderRadius: 4, border: '1px solid #fca5a5', background: '#fef2f2', cursor: aktif || disabled ? 'wait' : 'pointer', color: '#dc2626', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, opacity: disabled ? 0.5 : 1 }}>
+                                          {aktif && <span style={{ display: 'inline-block', width: 9, height: 9, border: '1.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />}
+                                          {aktif ? `${bulkDeleting!.done}/${bulkDeleting!.total}` : 'Sil'}
+                                        </button>
+                                      )
+                                    })()}
                                   </div>
                                 </div>
                                 {/* Lokasyonlar — açılır menü */}
