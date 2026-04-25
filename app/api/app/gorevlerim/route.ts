@@ -47,13 +47,26 @@ export async function GET(req: Request) {
       )
     }
 
+    // ── Çeklist ayarları (efektif: proje override > firma default > true) ───
+    const [firmaCfg, projeCfg] = await Promise.all([
+      admin.from('firmalar').select('frekansiyel_ceklist_aktif, spesifik_ceklist_aktif').eq('id', firmaId).single(),
+      personelProjeId
+        ? admin.from('projeler').select('personel_takibi_aktif, frekansiyel_ceklist_aktif, spesifik_ceklist_aktif').eq('id', personelProjeId).single()
+        : Promise.resolve({ data: null }),
+    ])
+    const efAyar = (k: string, defaultV = true): boolean => {
+      const p = (projeCfg.data as any)?.[k]
+      const f = (firmaCfg.data as any)?.[k]
+      if (p != null) return !!p
+      if (f != null) return !!f
+      return defaultV
+    }
+    const canliCeklistAktif    = efAyar('frekansiyel_ceklist_aktif')
+    const spesifikCeklistAktif = efAyar('spesifik_ceklist_aktif')
+
     // ── Mesai kontrolü (sadece proje bazlı) ─────────────────────────────────
     {
-      let personelTakibiAktif = false
-      if (personelProjeId) {
-        const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
-        personelTakibiAktif = proje?.personel_takibi_aktif === true
-      }
+      const personelTakibiAktif = (projeCfg.data as any)?.personel_takibi_aktif === true
       if (personelTakibiAktif) {
         const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
         const { data: mesai } = await admin
@@ -166,7 +179,8 @@ export async function GET(req: Request) {
         lokasyon: g.lokasyonlar
           ? { id: g.lokasyonlar.id, tanim: g.lokasyonlar.tanim, ust_tanim: g.lokasyonlar.ust_tanim?.tanim ?? null }
           : null,
-        checklist: buildChecklist(g.lokasyonlar),
+        // Spesifik ayar kapalıysa checklist yok
+        checklist: spesifikCeklistAktif ? buildChecklist(g.lokasyonlar) : null,
       })),
       canli_gorevler: canliGorevler.map((g: any) => ({
         id:               g.id,
@@ -179,8 +193,13 @@ export async function GET(req: Request) {
         lokasyon: g.lokasyonlar
           ? { id: g.lokasyonlar.id, tanim: g.lokasyonlar.tanim, ust_tanim: g.lokasyonlar.ust_tanim?.tanim ?? null }
           : null,
-        checklist: buildChecklist(g.lokasyonlar),
+        // Frekansiyel ayar kapalıysa checklist yok
+        checklist: canliCeklistAktif ? buildChecklist(g.lokasyonlar) : null,
       })),
+      ayarlar: {
+        frekansiyel_ceklist_aktif: canliCeklistAktif,
+        spesifik_ceklist_aktif:    spesifikCeklistAktif,
+      },
     }, { headers: CORS_HEADERS })
 
   } catch (error: any) {

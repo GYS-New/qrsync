@@ -120,12 +120,15 @@ async function lokasyonCeklistSablon(admin: any, lokasyonId: string): Promise<st
   return (data as any)?.checklist_sablon_id ?? null
 }
 
+type CeklistAyarlari = { frekansiyel: boolean; spesifik: boolean }
+
 /** Normal görev tamamlama (ekstra değil) */
 async function normalGoreviTamamla(
   admin: any,
   userId: string,
   firmaId: string,
   kayit: OfflineKayit,
+  ceklistAyarlari: CeklistAyarlari,
 ): Promise<Sonuc> {
   if (!kayit.gorev_id) {
     return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'hata', error: 'gorev_id gerekli (ekstra değilse)' }
@@ -180,8 +183,11 @@ async function normalGoreviTamamla(
     ? resolveLiveCompletionStatusByTask({ ...gorev, baslatilma_tarihi: baslatilmaIso } as any, tamamlanmaIso)
     : 'TAMAMLANDI'
 
-  // Çeklist (varsa)
-  if (Array.isArray(kayit.maddeler) && kayit.maddeler.length > 0) {
+  // Çeklist (varsa) — proje ayarı kapalıysa sessizce ihmal et
+  const ceklistAktifBuTip = kayit.gorev_tipi === 'gorevler'
+    ? ceklistAyarlari.spesifik
+    : ceklistAyarlari.frekansiyel
+  if (ceklistAktifBuTip && Array.isArray(kayit.maddeler) && kayit.maddeler.length > 0) {
     const sablonId = await lokasyonCeklistSablon(admin, kayit.lokasyon_id)
     if (sablonId) {
       const { data: sablonMeta } = await admin
@@ -253,6 +259,7 @@ async function ekstraGoreviOlustur(
   firmaId: string,
   personelProjeId: string | null,
   kayit: OfflineKayit,
+  ceklistAyarlari: CeklistAyarlari,
 ): Promise<Sonuc> {
   // Idempotency — bu mobil_kayit_id daha önce ekstra olarak kaydedilmiş mi?
   const { data: mevcutSync } = await admin
@@ -338,8 +345,8 @@ async function ekstraGoreviOlustur(
 
   const yeniGorevId = (inserted[0] as any).id as string
 
-  // Çeklist (varsa)
-  if (Array.isArray(kayit.maddeler) && kayit.maddeler.length > 0) {
+  // Çeklist (varsa) — ekstra görev frekansiyel sayılır, frekansiyel ayara bakılır
+  if (ceklistAyarlari.frekansiyel && Array.isArray(kayit.maddeler) && kayit.maddeler.length > 0) {
     const sablonId = await lokasyonCeklistSablon(admin, kayit.lokasyon_id)
     if (sablonId) {
       const { data: sablonMeta } = await admin
@@ -428,6 +435,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'kayitlar array olmalı' }, { status: 400, headers: CORS })
     }
 
+    // Çeklist ayarları (efektif: proje > firma > true) — tek seferde çek
+    const [firmaCfg, projeCfg] = await Promise.all([
+      admin.from('firmalar').select('frekansiyel_ceklist_aktif, spesifik_ceklist_aktif').eq('id', firmaId).single(),
+      personelProjeId
+        ? admin.from('projeler').select('frekansiyel_ceklist_aktif, spesifik_ceklist_aktif').eq('id', personelProjeId).single()
+        : Promise.resolve({ data: null }),
+    ])
+    const ceklistAyarlari: CeklistAyarlari = {
+      frekansiyel: ((projeCfg.data as any)?.frekansiyel_ceklist_aktif ?? (firmaCfg.data as any)?.frekansiyel_ceklist_aktif ?? true) === true,
+      spesifik:    ((projeCfg.data as any)?.spesifik_ceklist_aktif    ?? (firmaCfg.data as any)?.spesifik_ceklist_aktif    ?? true) === true,
+    }
+
     const sonuclar: Sonuc[] = []
 
     // Her kayıt bağımsız işlenir — biri hata verse diğerleri etkilenmez
@@ -452,9 +471,9 @@ export async function POST(req: Request) {
 
         let res: Sonuc
         if (kayit.ekstra_mi === true) {
-          res = await ekstraGoreviOlustur(admin, userId, firmaId, personelProjeId, kayit)
+          res = await ekstraGoreviOlustur(admin, userId, firmaId, personelProjeId, kayit, ceklistAyarlari)
         } else {
-          res = await normalGoreviTamamla(admin, userId, firmaId, kayit)
+          res = await normalGoreviTamamla(admin, userId, firmaId, kayit, ceklistAyarlari)
         }
         sonuclar.push(res)
       } catch (e: any) {

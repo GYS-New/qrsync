@@ -242,9 +242,25 @@ export async function POST(req: Request) {
       }
     }
 
+    // Proje ayarı kapalıysa çeklist maddelerini sessizce ihmal et
+    // (mobil eski snapshot'la geç gelmiş olabilir)
+    const ceklistAyarKolonu = gorevTipi === 'gorevler' ? 'spesifik_ceklist_aktif' : 'frekansiyel_ceklist_aktif'
+    const [firmaCfg2, projeCfg2] = await Promise.all([
+      admin.from('firmalar').select(ceklistAyarKolonu).eq('id', firmaId).single(),
+      personelProjeId
+        ? admin.from('projeler').select(ceklistAyarKolonu).eq('id', personelProjeId).single()
+        : Promise.resolve({ data: null }),
+    ])
+    const projeAyar = (projeCfg2.data as any)?.[ceklistAyarKolonu]
+    const firmaAyar2 = (firmaCfg2.data as any)?.[ceklistAyarKolonu]
+    const ceklistAktif = projeAyar != null ? !!projeAyar : (firmaAyar2 != null ? !!firmaAyar2 : true)
+    if (!ceklistAktif && maddeler && maddeler.length > 0) {
+      console.log(`[gorev-tamamla] Çeklist ayarı kapalı (${ceklistAyarKolonu}=false) — gönderilen ${maddeler.length} madde ihmal edildi`)
+    }
+
     // Çeklist: mobil uygulama checklist_cevaplari yazar; raporlar ise checklist_sonuc_basliklari okur
     // (QR/Web = scan/tamamla bu tablolara yazar). Her iki tabloyu da doldur ki Çeklist Raporu görünsün.
-    if (maddeler && maddeler.length > 0 && checklistSablonId) {
+    if (ceklistAktif && maddeler && maddeler.length > 0 && checklistSablonId) {
       let templateVersion = 1
       const { data: sablonMeta } = await admin
         .from('checklist_sablonlari')

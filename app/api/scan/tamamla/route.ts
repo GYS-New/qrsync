@@ -93,8 +93,23 @@ export async function POST(req: Request) {
       ? Math.max(0, Math.floor((new Date(nowIso).getTime() - new Date(gorev.baslatilma_tarihi).getTime()) / 1000))
       : null
 
+    // ── Proje çeklist ayarı kontrolü (fail-safe; UI zaten kontrol eder) ─────
+    let webCeklistAktif = true
+    {
+      const ayarKolonu = kaynak === 'gorevler' ? 'spesifik_ceklist_aktif' : 'frekansiyel_ceklist_aktif'
+      const [firmaCfg, projeCfg] = await Promise.all([
+        admin.from('firmalar').select(ayarKolonu).eq('id', me.firma_id).single(),
+        (me as any).proje_id
+          ? admin.from('projeler').select(ayarKolonu).eq('id', (me as any).proje_id).single()
+          : Promise.resolve({ data: null }),
+      ])
+      const p = (projeCfg.data as any)?.[ayarKolonu]
+      const f = (firmaCfg.data as any)?.[ayarKolonu]
+      webCeklistAktif = p != null ? !!p : (f != null ? !!f : true)
+    }
+
     // ── Çeklist sonuçlarını kaydet ───────────────────────────────────────────
-    if (sablon_id && maddeler?.length) {
+    if (webCeklistAktif && sablon_id && maddeler?.length) {
       const payload: any = {
         lokasyon_id,
         sablon_id,

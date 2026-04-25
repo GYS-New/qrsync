@@ -62,16 +62,28 @@ export async function POST(req: Request) {
       )
     }
 
-    // ── PT durumu: firma + proje seviyesinde ─────────────────────────────────
+    // ── PT durumu + çeklist ayarları: firma + proje seviyesinde ─────────────
     const [firmaRes, projeRes] = await Promise.all([
-      admin.from('firmalar').select('personel_takibi_aktif, vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single(),
+      admin.from('firmalar')
+        .select('personel_takibi_aktif, vardiya_sayisi, tum_vardiya_ayarlari, frekansiyel_ceklist_aktif, spesifik_ceklist_aktif')
+        .eq('id', firmaId).single(),
       personelProjeId
-        ? admin.from('projeler').select('personel_takibi_aktif').eq('id', personelProjeId).single()
+        ? admin.from('projeler')
+            .select('personel_takibi_aktif, frekansiyel_ceklist_aktif, spesifik_ceklist_aktif')
+            .eq('id', personelProjeId).single()
         : Promise.resolve({ data: null }),
     ])
     const firma = firmaRes.data as any
     const proje = projeRes.data as any
     const ptAktif = firma?.personel_takibi_aktif === true && proje?.personel_takibi_aktif === true
+    // Efektif ayar: proje override > firma default > true
+    const efAyar = (k: string, defaultV = true): boolean => {
+      if (proje?.[k] != null) return !!proje[k]
+      if (firma?.[k] != null) return !!firma[k]
+      return defaultV
+    }
+    const canliCeklistAktif    = efAyar('frekansiyel_ceklist_aktif')
+    const spesifikCeklistAktif = efAyar('spesifik_ceklist_aktif')
 
     // ── PT aktif ise: mesai kontrolü + vardiya tespiti ───────────────────────
     let vardiyaBilgi: {
@@ -281,11 +293,21 @@ export async function POST(req: Request) {
     }
 
     // ── Çeklist şablonları ──────────────────────────────────────────────────
+    // Proje ayarı kapalıysa o tipe ait şablonlar snapshot'a alınmaz
+    // (lokasyon meta'sı: ekstra görev frekansiyel sayıldığı için canli ayarına bakılır)
     const sablonIdSet = new Set<string>()
-    for (const l of lokasyonlar) if (l.checklist_sablon_id) sablonIdSet.add(l.checklist_sablon_id)
-    for (const g of [...bekleyenGorevler, ...bekleyenCanli]) {
-      const sid = g.lokasyonlar?.checklist_sablon_id
-      if (sid) sablonIdSet.add(sid)
+    if (canliCeklistAktif) {
+      for (const l of lokasyonlar) if (l.checklist_sablon_id) sablonIdSet.add(l.checklist_sablon_id)
+      for (const g of bekleyenCanli) {
+        const sid = g.lokasyonlar?.checklist_sablon_id
+        if (sid) sablonIdSet.add(sid)
+      }
+    }
+    if (spesifikCeklistAktif) {
+      for (const g of bekleyenGorevler) {
+        const sid = g.lokasyonlar?.checklist_sablon_id
+        if (sid) sablonIdSet.add(sid)
+      }
     }
 
     const checklist_sablonlari: any[] = []
@@ -350,7 +372,8 @@ export async function POST(req: Request) {
           lokasyon: g.lokasyonlar
             ? { id: g.lokasyonlar.id, tanim: g.lokasyonlar.tanim, ust_tanim: g.lokasyonlar.ust_tanim?.tanim ?? null }
             : null,
-          checklist_sablon_id: g.lokasyonlar?.checklist_sablon_id ?? null,
+          // Spesifik ayar kapalıysa şablon ID null — mobil çeklist butonu göstermez
+          checklist_sablon_id: spesifikCeklistAktif ? (g.lokasyonlar?.checklist_sablon_id ?? null) : null,
         })),
         ...bekleyenCanli.map((g: any) => ({
           gorev_id: g.id,
@@ -363,7 +386,8 @@ export async function POST(req: Request) {
           lokasyon: g.lokasyonlar
             ? { id: g.lokasyonlar.id, tanim: g.lokasyonlar.tanim, ust_tanim: g.lokasyonlar.ust_tanim?.tanim ?? null }
             : null,
-          checklist_sablon_id: g.lokasyonlar?.checklist_sablon_id ?? null,
+          // Frekansiyel ayar kapalıysa şablon ID null — mobil çeklist butonu göstermez
+          checklist_sablon_id: canliCeklistAktif ? (g.lokasyonlar?.checklist_sablon_id ?? null) : null,
         })),
       ],
       lokasyonlar: lokasyonlar.map((l: any) => ({
@@ -378,12 +402,18 @@ export async function POST(req: Request) {
         min_sure_dakika:       l.min_sure_dakika ?? null,
         max_sure_dakika:       l.max_sure_dakika ?? null,
         hedef_sure_dakika:     l.hedef_sure_dakika ?? null,
-        checklist_sablon_id:   l.checklist_sablon_id ?? null,
+        // Lokasyon meta'sındaki checklist_sablon_id ekstra görev (frekansiyel) için
+        // kullanılır → frekansiyel ayara bakılır
+        checklist_sablon_id:   canliCeklistAktif ? (l.checklist_sablon_id ?? null) : null,
         ekstra_frekans_kurallari: [...(kuralMap.get(l.id) ?? [])]
           .sort((a, b) => a.localeCompare(b, 'tr'))
           .map(tanim => ({ tanim })),
       })),
       checklist_sablonlari,
+      ayarlar: {
+        frekansiyel_ceklist_aktif: canliCeklistAktif,
+        spesifik_ceklist_aktif:    spesifikCeklistAktif,
+      },
     }, { headers: CORS })
 
   } catch (err: any) {
