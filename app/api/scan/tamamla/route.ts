@@ -124,6 +124,7 @@ export async function POST(req: Request) {
         .from('checklist_sonuc_basliklari').insert(payload).select('id').single()
       if (sonucErr || !sonucRow) {
         console.error('[scan/tamamla] checklist sonuc insert error:', sonucErr)
+        return NextResponse.json({ ok: false, error: 'Çeklist başlığı oluşturulamadı: ' + (sonucErr?.message ?? '') }, { status: 500 })
       } else {
         const itemPayload = maddeler.map((m: any) => ({
           sonuc_id:       sonucRow.id,
@@ -133,7 +134,13 @@ export async function POST(req: Request) {
           gorsel_url:     m.gorsel_url || null,
         }))
         const { error: itemErr } = await admin.from('checklist_sonuc_maddeleri').insert(itemPayload)
-        if (itemErr) console.error('[scan/tamamla] madde insert error:', itemErr)
+        if (itemErr) {
+          // ROLLBACK: madde insert fail olursa başlık da silinmeli — yetim/maddesiz başlık
+          // birikmesini engeller (gorev-tamamla ve SIM ile aynı pattern)
+          console.error('[scan/tamamla] madde insert error, başlık rollback:', itemErr)
+          await admin.from('checklist_sonuc_basliklari').delete().eq('id', sonucRow.id)
+          return NextResponse.json({ ok: false, error: 'Çeklist maddeleri kaydedilemedi: ' + itemErr.message }, { status: 500 })
+        }
       }
     }
 
