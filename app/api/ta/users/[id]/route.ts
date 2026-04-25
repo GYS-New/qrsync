@@ -78,15 +78,26 @@ export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
 
   const { data: silinecek } = await admin.from('users').select('isim_soyisim,email,rol').eq('id', userId).single()
 
-  await admin.from('users').delete().eq('id', userId)
+  // public.users'tan silmeyi dene — hata yakalanır
+  const { error: pubErr } = await admin.from('users').delete().eq('id', userId)
+  if (pubErr) {
+    await auditLog({
+      tip: 'kullanici_sil', tablo: 'users', basarili: false,
+      hata_mesaji: 'public.users: ' + pubErr.message, kullanici_id: me.id, firma_id: me.firma_id,
+      detay: { hedef_user_id: userId, hedef_isim: silinecek?.isim_soyisim, asama: 'public_users_delete' },
+    })
+    return NextResponse.json({ error: 'Kullanıcı silinemedi: ' + pubErr.message }, { status: 400 })
+  }
+
+  // Auth tarafından da sil
   const { error: delErr } = await admin.auth.admin.deleteUser(userId)
   if (delErr) {
     await auditLog({
-      tip: 'kullanici_sil', tablo: 'users', basarili: false, hata_mesaji: delErr.message,
-      kullanici_id: me.id, firma_id: me.firma_id,
-      detay: { hedef_user_id: userId, hedef_isim: silinecek?.isim_soyisim },
+      tip: 'kullanici_sil', tablo: 'users', basarili: false,
+      hata_mesaji: 'auth.users: ' + delErr.message, kullanici_id: me.id, firma_id: me.firma_id,
+      detay: { hedef_user_id: userId, hedef_isim: silinecek?.isim_soyisim, asama: 'auth_delete' },
     })
-    return NextResponse.json({ error: delErr.message }, { status: 400 })
+    return NextResponse.json({ error: 'Auth kullanıcısı silinemedi: ' + delErr.message }, { status: 400 })
   }
 
   await auditLog({
