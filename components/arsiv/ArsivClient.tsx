@@ -386,31 +386,25 @@ export default function ArsivClient({
         if (ids.length > 0) await silChunked(ids, 'canli_gorevler_arsiv')
         await yukle_frekansiyel()
 
-      } else if (topluSilSekme === 'personel') {
-        // ARŞİV tablosundan sil — cron eski 'arsivlendi=true' kayıtlarını
-        // personel_mesai_kayitlari_arsiv'a taşıyor; aktif tabloda arsivlendi=true
-        // pratikte hiç kayıt kalmaz → eski kod 0 satır etkileyip 'silindi' toast'u veriyordu
-        let q = supabase.from('personel_mesai_kayitlari_arsiv').delete({ count: 'exact' }).eq('firma_id', firmaId)
-        if (projeId) q = (q as any).eq('proje_id', projeId)
-        if (fromISO) q = (q as any).gte('giris_saati', fromISO)
-        if (toISO)   q = (q as any).lte('giris_saati', toISO)
-        const { error, count } = await q
-        if (error) throw error
-        await yukle_personel()
-        toast({ type: 'success', title: 'Tamamlandı', message: `${count ?? 0} mesai kaydı silindi.` })
-        setTopluSilSekme(null); setTopluSilFrom(''); setTopluSilTo('')
-        return
-
-      } else if (topluSilSekme === 'musteri') {
-        // ARŞİV tablosundan sil (aynı sebep)
-        let q = supabase.from('musteri_degerlendirmeleri_arsiv').delete({ count: 'exact' }).eq('firma_id', firmaId)
-        if (projeId) q = (q as any).eq('proje_id', projeId)
-        if (fromISO) q = (q as any).gte('olusturma_tarihi', fromISO)
-        if (toISO)   q = (q as any).lte('olusturma_tarihi', toISO)
-        const { error, count } = await q
-        if (error) throw error
-        await yukle_musteri()
-        toast({ type: 'success', title: 'Tamamlandı', message: `${count ?? 0} değerlendirme silindi.` })
+      } else if (topluSilSekme === 'personel' || topluSilSekme === 'musteri') {
+        // Server-side endpoint — admin client RLS bypass eder + hem aktif tablodaki
+        // arsivlendi=true artıkları hem _arsiv tablosunu siler.
+        const res = await fetch('/api/arsiv/toplu-sil', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tip: topluSilSekme,
+            firma_id: firmaId,
+            proje_id: projeId ?? undefined,
+            from: fromISO ?? undefined,
+            to: toISO ?? undefined,
+          }),
+        })
+        const json = await res.json()
+        if (!json.ok) throw new Error(json.error ?? 'Silinemedi')
+        if (topluSilSekme === 'personel') await yukle_personel()
+        else await yukle_musteri()
+        const ad = topluSilSekme === 'personel' ? 'mesai kaydı' : 'değerlendirme'
+        toast({ type: 'success', title: 'Tamamlandı', message: `${json.silinen ?? 0} ${ad} silindi.` })
         setTopluSilSekme(null); setTopluSilFrom(''); setTopluSilTo('')
         return
 
