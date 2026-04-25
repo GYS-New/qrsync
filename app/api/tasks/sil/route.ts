@@ -30,11 +30,36 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { ids, tablo, firma_id }: { ids: string[], tablo: GorevTablo, firma_id?: string } = body
 
-    if (!ids?.length) return NextResponse.json({ error: 'ids gerekli' }, { status: 400 })
-    if (!tablo) return NextResponse.json({ error: 'tablo gerekli' }, { status: 400 })
+    const VALID_TABLES: GorevTablo[] = ['gorevler', 'gorevler_arsiv', 'canli_gorevler', 'canli_gorevler_arsiv']
+    const debugCtx = { ids_count: ids?.length ?? 0, tablo, firma_id_received: firma_id ?? null, rol: me.rol }
+
+    if (!ids?.length) {
+      console.warn('[tasks/sil] 400 ids eksik', debugCtx)
+      return NextResponse.json({ error: 'ids gerekli (boş array veya yok)', debug: debugCtx }, { status: 400 })
+    }
+    if (!tablo) {
+      console.warn('[tasks/sil] 400 tablo eksik', debugCtx)
+      return NextResponse.json({ error: 'tablo gerekli', debug: debugCtx }, { status: 400 })
+    }
+    if (!VALID_TABLES.includes(tablo)) {
+      console.warn('[tasks/sil] 400 geçersiz tablo', debugCtx)
+      return NextResponse.json({ error: `Geçersiz tablo: "${tablo}". İzinli: ${VALID_TABLES.join(', ')}`, debug: debugCtx }, { status: 400 })
+    }
+    // Sadece UUID benzeri ID'leri kabul et — `[null]` veya `["abc"]` gibi yanlış girişleri yakala
+    const gecersizId = ids.find(id => !id || typeof id !== 'string' || id.length < 30)
+    if (gecersizId !== undefined) {
+      console.warn('[tasks/sil] 400 geçersiz id', { ...debugCtx, gecersiz: gecersizId })
+      return NextResponse.json({ error: `Geçersiz id formatı: ${gecersizId === null ? 'null' : `"${gecersizId}"`}`, debug: debugCtx }, { status: 400 })
+    }
 
     const hedefFirmaId = isSA ? firma_id : me.firma_id
-    if (!hedefFirmaId) return NextResponse.json({ error: 'Firma ID gerekli' }, { status: 400 })
+    if (!hedefFirmaId) {
+      console.warn('[tasks/sil] 400 firma_id eksik', debugCtx)
+      return NextResponse.json({
+        error: isSA ? 'Firma ID gerekli (SA için body.firma_id boş)' : 'Firma ID kullanıcı profilinde yok',
+        debug: debugCtx,
+      }, { status: 400 })
+    }
 
     // TA güvenliği: silmek istediği görevlerin firma_id'si kontrolü
     if (isTA) {
