@@ -428,9 +428,26 @@ async function kontrolVeriButunlugu(admin: any, nowMs: number): Promise<SistemRa
     })
   }
 
+  // Anomali 3: gorev_kurallari'nda proje_id NULL — Sistem Ayarları > Görev Kuralları
+  // sayfasının filtresi `.eq('proje_id', X)` ile NULL kayıtları dışlar, kuralar görüntülenmez.
+  // Yeni POST endpoint'i lokasyondan fallback alıyor; eski kayıt birikmesi izlensin.
+  const { count: kuralProjeNull } = await admin
+    .from('gorev_kurallari')
+    .select('id', { count: 'exact', head: true })
+    .is('proje_id', null)
+    .eq('aktif', true)
+  if ((kuralProjeNull ?? 0) > 0) {
+    sorunlar.push({
+      kod: 'KURAL_PROJE_NULL',
+      mesaj: `${kuralProjeNull} aktif gorev_kurallari kaydında proje_id=NULL (Sistem Ayarları > Görev Kuralları sayfası bunları gösteremez)`,
+      adet: kuralProjeNull ?? 0,
+    })
+  }
+
   const metrikler = {
     kanal_eksik_canli: kanalEksikCanli ?? 0,
     kanal_eksik_spesifik: kanalEksikSpes ?? 0,
+    kural_proje_null: kuralProjeNull ?? 0,
   }
 
   if (sorunlar.length > 0) return raporla('Veri Bütünlüğü', sorunlar, '', metrikler)
