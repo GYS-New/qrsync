@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) {
-    await auditLog({
+    void auditLog({
       tip: 'kural_ekle', tablo: 'gorev_kurallari', basarili: false, hata_mesaji: error.message,
       kullanici_id: user.id, firma_id: firmaId, proje_id: proje_id ?? lok.proje_id ?? null,
       detay: { tanim, lokasyon_id, frekans_tipi },
@@ -121,7 +121,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  await auditLog({
+  // Audit fire-and-forget — response'u geciktirmesin (~200-500ms tasarruf, çoklu lokasyonda paralel POST'larda kümülatif fayda)
+  void auditLog({
     tip: 'kural_ekle', tablo: 'gorev_kurallari',
     kullanici_id: user.id, firma_id: firmaId, proje_id: proje_id ?? lok.proje_id ?? null,
     detay: {
