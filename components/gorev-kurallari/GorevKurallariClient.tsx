@@ -99,6 +99,8 @@ export default function GorevKurallariClient({
   const [editId, setEditId]         = useState<string | null>(null)
   const [form, setForm]             = useState(BOSH_FORM)
   const [saving, setSaving]         = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
   const [q, setQ]                   = useState('')
   const [importOpen, setImportOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -274,11 +276,10 @@ export default function GorevKurallariClient({
     setSaving(true)
     try {
       if (modal === 'create') {
-        const yeniKurallar: any[] = []
-        for (const lokId of lokIdler) {
-          // Her lokasyonun Frekans Sayıları değerini kullan
+        // Çoklu lokasyon: PARALEL POST — sequential 10x süreyi 1x'e indirir
+        const isHaftalik = form.frekans_tipi === 'haftalik'
+        const sonuclar = await Promise.all(lokIdler.map(async (lokId) => {
           const lok = lokasyonlar.find(l => l.id === lokId)
-          const isHaftalik = form.frekans_tipi === 'haftalik'
           const lokGunluk = (lok as any)?.gunluk_frekans_sayisi ?? 1
           const lokHaftalik = (lok as any)?.haftalik_frekans_sayisi ?? 0
           const body: any = {
@@ -293,11 +294,11 @@ export default function GorevKurallariClient({
           }
           const res = await fetch('/api/gorev-kurallari', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
           const data = await res.json()
-          if (!res.ok) throw new Error(data.error)
-          yeniKurallar.push(data)
-        }
-        setKuralar(p => [...yeniKurallar, ...p])
-        toast({ type: 'success', title: 'Başarılı', message: `${yeniKurallar.length} lokasyon için kural oluşturuldu` })
+          if (!res.ok) throw new Error(data.error || `Lokasyon ${lokId} için ekleme başarısız`)
+          return data
+        }))
+        setKuralar(p => [...sonuclar, ...p])
+        toast({ type: 'success', title: 'Başarılı', message: `${sonuclar.length} lokasyon için kural oluşturuldu` })
       } else if (modal === 'edit' && editId) {
         const isHaftalik = form.frekans_tipi === 'haftalik'
         const lok = lokasyonlar.find(l => l.id === lokIdler[0])
@@ -325,14 +326,18 @@ export default function GorevKurallariClient({
   }
 
   async function toggleAktif(k: any) {
-    const res = await fetch(`/api/gorev-kurallari/${k.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ aktif: !k.aktif }),
-    })
-    if (res.ok) {
-      setKuralar(p => p.map(x => x.id === k.id ? { ...x, aktif: !k.aktif } : x))
-      toast({ type: 'success', title: 'Güncellendi', message: k.aktif ? 'Pasife alındı' : 'Aktif edildi' })
-    }
+    if (togglingId) return
+    setTogglingId(k.id)
+    try {
+      const res = await fetch(`/api/gorev-kurallari/${k.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aktif: !k.aktif }),
+      })
+      if (res.ok) {
+        setKuralar(p => p.map(x => x.id === k.id ? { ...x, aktif: !k.aktif } : x))
+        toast({ type: 'success', title: 'Güncellendi', message: k.aktif ? 'Pasife alındı' : 'Aktif edildi' })
+      }
+    } finally { setTogglingId(null) }
   }
 
   async function handleDuraklat() {
@@ -372,13 +377,16 @@ export default function GorevKurallariClient({
       confirmText: 'Evet, Sil', cancelText: 'İptal', variant: 'danger',
     })
     if (!ok) return
-    const res = await fetch(`/api/gorev-kurallari/${k.id}`, { method: 'DELETE' })
-    if (res.ok) {
-      setKuralar(p => p.filter(x => x.id !== k.id))
-      toast({ type: 'success', title: 'Silindi', message: `"${k.tanim}" silindi` })
-    } else {
-      toast({ type: 'error', title: 'Hata', message: (await res.json()).error })
-    }
+    setDeletingId(k.id)
+    try {
+      const res = await fetch(`/api/gorev-kurallari/${k.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setKuralar(p => p.filter(x => x.id !== k.id))
+        toast({ type: 'success', title: 'Silindi', message: `"${k.tanim}" silindi` })
+      } else {
+        toast({ type: 'error', title: 'Hata', message: (await res.json()).error })
+      }
+    } finally { setDeletingId(null) }
   }
 
   async function handleExport() {
@@ -576,14 +584,19 @@ export default function GorevKurallariClient({
               <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{gunEtiket(k.aktif_gunler ?? [])}</span>
               {o && <span style={{ fontSize: 10, background: '#e8f0ff', color: '#0f4c81', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>{o.uretilen}↑ {o.tamamlandi}✓</span>}
               {!readonly && (
-                <button onClick={() => toggleAktif(k)} style={{ width: 28, height: 16, borderRadius: 8, position: 'relative', background: k.aktif ? '#374151' : '#d1d5db', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                <button onClick={() => toggleAktif(k)} disabled={togglingId === k.id} style={{ width: 28, height: 16, borderRadius: 8, position: 'relative', background: k.aktif ? '#374151' : '#d1d5db', border: 'none', cursor: togglingId === k.id ? 'wait' : 'pointer', opacity: togglingId === k.id ? 0.5 : 1, flexShrink: 0 }}>
                   <span style={{ position: 'absolute', top: 2, left: k.aktif ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
                 </button>
               )}
               {!readonly && (
                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                   {yetki.duzenleyebilir && <button onClick={() => openEdit(k)} style={{ padding: '2px 8px', fontSize: 11, borderRadius: 5, border: '1px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', color: '#374151' }}>Düzenle</button>}
-                  {yetki.silebilir && <button onClick={() => handleDelete(k)} style={{ padding: '2px 8px', fontSize: 11, borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', color: '#dc2626' }}>Sil</button>}
+                  {yetki.silebilir && (
+                    <button onClick={() => handleDelete(k)} disabled={deletingId === k.id} style={{ padding: '2px 8px', fontSize: 11, borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', cursor: deletingId === k.id ? 'wait' : 'pointer', color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: 4, opacity: deletingId === k.id ? 0.7 : 1 }}>
+                      {deletingId === k.id && <span style={{ display: 'inline-block', width: 9, height: 9, border: '1.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />}
+                      {deletingId === k.id ? 'Siliniyor…' : 'Sil'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1053,7 +1066,10 @@ export default function GorevKurallariClient({
             </div>
             <div style={{ padding: '12px 18px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setModal(null)} className="verde-btn-outline-strong" disabled={saving}>İptal</button>
-              <button onClick={handleSave} className="verde-btn-primary" disabled={saving}>{saving ? 'Kaydediliyor…' : modal === 'create' ? 'Kural Oluştur' : 'Güncelle'}</button>
+              <button onClick={handleSave} className="verde-btn-primary" disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {saving && <span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />}
+                {saving ? 'Kaydediliyor…' : modal === 'create' ? 'Kural Oluştur' : 'Güncelle'}
+              </button>
             </div>
           </div>
         </div>
