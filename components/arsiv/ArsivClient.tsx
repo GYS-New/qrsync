@@ -128,6 +128,7 @@ export default function ArsivClient({
   const [topluSilFrom,   setTopluSilFrom]   = useState('')
   const [topluSilTo,     setTopluSilTo]     = useState('')
   const [topluSilYukleniyor, setTopluSilYukleniyor] = useState(false)
+  const [topluSilProgress, setTopluSilProgress] = useState<{ done: number; total: number } | null>(null)
 
   // ── Lokasyon hiyerarşisi ──────────────────────────────────────────────────
   const [lokasyonlarTum, setLokasyonlarTum] = useState<any[]>([])
@@ -352,9 +353,27 @@ export default function ArsivClient({
     })
     if (!ok) return
     setTopluSilYukleniyor(true)
+    setTopluSilProgress(null)
     try {
       const fromISO = topluSilFrom ? new Date(topluSilFrom + 'T00:00:00').toISOString() : null
       const toISO   = topluSilTo   ? new Date(topluSilTo   + 'T23:59:59').toISOString() : null
+
+      // Endpoint'in URL limit'ine takılmamak için 200'lü chunk halinde POST atılır
+      // (5000+ ID'lik tek istekler PostgREST .in() URL limit'ini aşıp 500 dönüyordu)
+      const CHUNK = 200
+      const silChunked = async (allIds: string[], tablo: 'canli_gorevler_arsiv' | 'gorevler') => {
+        setTopluSilProgress({ done: 0, total: allIds.length })
+        for (let i = 0; i < allIds.length; i += CHUNK) {
+          const batch = allIds.slice(i, i + CHUNK)
+          const res = await fetch('/api/tasks/sil', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: batch, tablo, firma_id: firmaId }),
+          })
+          const json = await res.json()
+          if (!json.ok) throw new Error(json.error ?? `Batch ${i / CHUNK + 1} silinemedi`)
+          setTopluSilProgress({ done: Math.min(i + batch.length, allIds.length), total: allIds.length })
+        }
+      }
 
       if (topluSilSekme === 'frekansiyel') {
         let q = supabase.from('canli_gorevler_arsiv').select('id').eq('firma_id', firmaId)
@@ -364,14 +383,7 @@ export default function ArsivClient({
         const { data: rows, error: selErr } = await q
         if (selErr) throw selErr
         const ids = (rows ?? []).map((r: any) => r.id)
-        if (ids.length > 0) {
-          const res = await fetch('/api/tasks/sil', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids, tablo: 'canli_gorevler_arsiv', firma_id: firmaId }),
-          })
-          const json = await res.json()
-          if (!json.ok) throw new Error(json.error ?? 'Silinemedi')
-        }
+        if (ids.length > 0) await silChunked(ids, 'canli_gorevler_arsiv')
         await yukle_frekansiyel()
 
       } else if (topluSilSekme === 'personel') {
@@ -400,14 +412,7 @@ export default function ArsivClient({
         const { data: rows, error: selErr } = await q
         if (selErr) throw selErr
         const ids = (rows ?? []).map((r: any) => r.id)
-        if (ids.length > 0) {
-          const res = await fetch('/api/tasks/sil', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids, tablo: 'gorevler', firma_id: firmaId }),
-          })
-          const json = await res.json()
-          if (!json.ok) throw new Error(json.error ?? 'Silinemedi')
-        }
+        if (ids.length > 0) await silChunked(ids, 'gorevler')
         await yukle_spesifik()
 
       }
@@ -415,7 +420,7 @@ export default function ArsivClient({
       toast({ type: 'success', title: 'Tamamlandı', message: 'Seçilen kayıtlar kalıcı olarak silindi.' })
       setTopluSilSekme(null); setTopluSilFrom(''); setTopluSilTo('')
     } catch (e: any) { toast({ type: 'error', title: 'Hata', message: e.message })
-    } finally { setTopluSilYukleniyor(false) }
+    } finally { setTopluSilYukleniyor(false); setTopluSilProgress(null) }
   }
 
   // ── Filtreli listeler ─────────────────────────────────────────────────────
@@ -1114,7 +1119,9 @@ export default function ArsivClient({
               <div style={{ display:'flex', gap:8 }}>
                 <button onClick={topluSilUygula} disabled={topluSilYukleniyor}
                   style={{ flex:1, height:38, borderRadius:8, border:'none', background:'#dc2626', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, opacity: topluSilYukleniyor ? 0.7 : 1 }}>
-                  {topluSilYukleniyor ? <><RefreshCw size={13} style={spinning} /> Siliniyor…</> : <><Trash2 size={13} /> Kalıcı Sil</>}
+                  {topluSilYukleniyor ? (
+                    <><RefreshCw size={13} style={spinning} /> {topluSilProgress ? `Siliniyor… ${topluSilProgress.done}/${topluSilProgress.total}` : 'Siliniyor…'}</>
+                  ) : <><Trash2 size={13} /> Kalıcı Sil</>}
                 </button>
                 <button onClick={() => setTopluSilSekme(null)} disabled={topluSilYukleniyor}
                   style={{ height:38, padding:'0 18px', borderRadius:8, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontSize:13 }}>
