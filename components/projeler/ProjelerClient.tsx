@@ -443,6 +443,20 @@ export default function ProjelerClient({
               {/* İşlemler */}
               {!readonly && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {yetki.duzenleyebilir && (
+                    <button
+                      onClick={() => toggleAktif(p)}
+                      title={p.aktif ? 'Pasife Al' : 'Aktife Al'}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                        border: p.aktif ? '1px solid #fbbf24' : '1px solid #16a34a',
+                        background: p.aktif ? '#fffbeb' : '#f0fdf4',
+                        color: p.aktif ? '#92400e' : '#166534',
+                      }}
+                    >
+                      {p.aktif ? '⏸ Pasife Al' : '▶ Aktife Al'}
+                    </button>
+                  )}
                   {isSA && (
                     <>
                       <button onClick={() => projeVarsayilaniKaydet(p)} title="Mevcut ayarları varsayılan olarak kaydet"
