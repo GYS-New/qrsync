@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import DynamicLogo from '@/components/ui/DynamicLogo'
@@ -36,7 +36,26 @@ export default function FirmaDetayClient({ firma }: { firma: Firma }) {
       ? new Date((firma as any).lisans_gecerlilik_tarihi).toISOString().slice(0, 10)
       : '',
     depolama_kapasitesi_mb: Number((firma as any).depolama_kapasitesi_mb ?? 1024),
+    max_kullanici_sayisi: (firma as any).max_kullanici_sayisi ?? '',
+    max_lokasyon_sayisi:  (firma as any).max_lokasyon_sayisi ?? '',
   })
+
+  // Lisans kullanım sayaçları (gerçek zamanlı)
+  const [mevcutKullanici, setMevcutKullanici] = useState<number | null>(null)
+  const [mevcutLokasyon, setMevcutLokasyon] = useState<number | null>(null)
+  useEffect(() => {
+    let iptal = false
+    ;(async () => {
+      const [u, l] = await Promise.all([
+        supabase.from('users').select('id', { count: 'exact', head: true }).eq('firma_id', firma.id),
+        supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('firma_id', firma.id),
+      ])
+      if (iptal) return
+      setMevcutKullanici(u.count ?? 0)
+      setMevcutLokasyon(l.count ?? 0)
+    })()
+    return () => { iptal = true }
+  }, [firma.id, supabase])
 
   const fileRef = useRef<HTMLInputElement | null>(null)
 
@@ -134,6 +153,15 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
           ? new Date(form.lisans_gecerlilik_tarihi + 'T23:59:59').toISOString()
           : null,
         depolama_kapasitesi_mb: Math.max(1, Math.round(form.depolama_kapasitesi_mb || 1024)),
+        // NULL = sınırsız; boş string'i veya 0/negatifi NULL'a çevir
+        max_kullanici_sayisi:
+          form.max_kullanici_sayisi === '' || Number(form.max_kullanici_sayisi) <= 0
+            ? null
+            : Math.round(Number(form.max_kullanici_sayisi)),
+        max_lokasyon_sayisi:
+          form.max_lokasyon_sayisi === '' || Number(form.max_lokasyon_sayisi) <= 0
+            ? null
+            : Math.round(Number(form.max_lokasyon_sayisi)),
       })
       .eq('id', firma.id)
 
@@ -430,6 +458,66 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
 
         <Row label="Mobil Firma Kodu">
           <MobilKoduPanel firmaId={firma.id} initialKod={(firma as any).mobil_firma_kodu ?? ''} />
+        </Row>
+
+        <Row label="Kullanıcı Limiti">
+          {edit ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                className="verde-input"
+                style={{ width: 140 }}
+                placeholder="Sınırsız"
+                value={form.max_kullanici_sayisi as any}
+                onChange={(e) => setForm({ ...form, max_kullanici_sayisi: e.target.value })}
+              />
+              <span style={{ fontSize: 12, color: '#64748b' }}>
+                Mevcut: <b>{mevcutKullanici ?? '...'}</b>
+                {form.max_kullanici_sayisi !== '' && Number(form.max_kullanici_sayisi) > 0 && mevcutKullanici != null && mevcutKullanici > Number(form.max_kullanici_sayisi) && (
+                  <span style={{ color: '#dc2626', marginLeft: 8, fontWeight: 700 }}>⚠ Mevcut kayıt sayısı bu limiti aşıyor</span>
+                )}
+                <span style={{ marginLeft: 8 }}>(boş bırak = sınırsız)</span>
+              </span>
+            </div>
+          ) : (
+            <span style={{ fontWeight: 600 }}>
+              {(firma as any).max_kullanici_sayisi
+                ? `${mevcutKullanici ?? '...'} / ${(firma as any).max_kullanici_sayisi}`
+                : `${mevcutKullanici ?? '...'} / Sınırsız`}
+            </span>
+          )}
+        </Row>
+
+        <Row label="Lokasyon Limiti">
+          {edit ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                className="verde-input"
+                style={{ width: 140 }}
+                placeholder="Sınırsız"
+                value={form.max_lokasyon_sayisi as any}
+                onChange={(e) => setForm({ ...form, max_lokasyon_sayisi: e.target.value })}
+              />
+              <span style={{ fontSize: 12, color: '#64748b' }}>
+                Mevcut: <b>{mevcutLokasyon ?? '...'}</b>
+                {form.max_lokasyon_sayisi !== '' && Number(form.max_lokasyon_sayisi) > 0 && mevcutLokasyon != null && mevcutLokasyon > Number(form.max_lokasyon_sayisi) && (
+                  <span style={{ color: '#dc2626', marginLeft: 8, fontWeight: 700 }}>⚠ Mevcut kayıt sayısı bu limiti aşıyor</span>
+                )}
+                <span style={{ marginLeft: 8 }}>(boş bırak = sınırsız)</span>
+              </span>
+            </div>
+          ) : (
+            <span style={{ fontWeight: 600 }}>
+              {(firma as any).max_lokasyon_sayisi
+                ? `${mevcutLokasyon ?? '...'} / ${(firma as any).max_lokasyon_sayisi}`
+                : `${mevcutLokasyon ?? '...'} / Sınırsız`}
+            </span>
+          )}
         </Row>
 
         <Row label="Depolama Kapasitesi">

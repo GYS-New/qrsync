@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Firma } from '@/types'
@@ -24,6 +24,28 @@ export default function FirmaAyarlarClient({ firma }: { firma: Firma }) {
     aciklama: firma.aciklama ?? '',
     logo_url: (firma as any).logo_url ?? null,
   })
+
+  // Lisans kullanım sayaçları (readonly bilgi)
+  const [mevcutKullanici, setMevcutKullanici] = useState<number | null>(null)
+  const [mevcutLokasyon, setMevcutLokasyon] = useState<number | null>(null)
+  useEffect(() => {
+    let iptal = false
+    ;(async () => {
+      const [u, l] = await Promise.all([
+        supabase.from('users').select('id', { count: 'exact', head: true }).eq('firma_id', firma.id),
+        supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('firma_id', firma.id),
+      ])
+      if (iptal) return
+      setMevcutKullanici(u.count ?? 0)
+      setMevcutLokasyon(l.count ?? 0)
+    })()
+    return () => { iptal = true }
+  }, [firma.id, supabase])
+
+  const maxK = (firma as any).max_kullanici_sayisi as number | null | undefined
+  const maxL = (firma as any).max_lokasyon_sayisi as number | null | undefined
+  const kullaniciYuzde = maxK && mevcutKullanici != null ? Math.min(100, Math.round((mevcutKullanici / maxK) * 100)) : null
+  const lokasyonYuzde  = maxL && mevcutLokasyon != null  ? Math.min(100, Math.round((mevcutLokasyon  / maxL) * 100)) : null
 
   const fileRef = useRef<HTMLInputElement | null>(null)
 
@@ -155,6 +177,28 @@ setForm((p) => ({ ...p, logo_url: null }))
           </div>
         </div>
       )}
+
+      {/* Lisans Kullanımı (readonly bilgi — TA değiştiremez) */}
+      <div className="verde-card" style={{ padding: 18 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#111827', marginBottom: 4 }}>Lisans Kullanımı</div>
+        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 14 }}>
+          Sistem yöneticisi tarafından belirlenmiş kullanıcı ve lokasyon limiti. Limit dolduğunda yeni kayıt eklenemez.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <KullanımKarti
+            etiket="Kullanıcı"
+            mevcut={mevcutKullanici}
+            limit={maxK ?? null}
+            yuzde={kullaniciYuzde}
+          />
+          <KullanımKarti
+            etiket="Lokasyon"
+            mevcut={mevcutLokasyon}
+            limit={maxL ?? null}
+            yuzde={lokasyonYuzde}
+          />
+        </div>
+      </div>
 
       <div className="verde-card" style={{ padding: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
@@ -310,6 +354,33 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 12, alignItems: 'center' }}>
       <div style={{ fontSize: 12, color: '#6b7280' }}>{label}</div>
       <div>{children}</div>
+    </div>
+  )
+}
+
+function KullanımKarti({ etiket, mevcut, limit, yuzde }: { etiket: string; mevcut: number | null; limit: number | null; yuzde: number | null }) {
+  const dolu = yuzde != null
+  const renk = !dolu ? '#16a34a' : yuzde! >= 100 ? '#dc2626' : yuzde! >= 80 ? '#f59e0b' : '#16a34a'
+  const arka = !dolu ? '#f0fdf4' : yuzde! >= 100 ? '#fef2f2' : yuzde! >= 80 ? '#fffbeb' : '#f0fdf4'
+  return (
+    <div style={{ background: arka, border: `1px solid ${renk}33`, borderRadius: 10, padding: '14px 16px' }}>
+      <div style={{ fontSize: 11.5, color: '#6b7280', fontWeight: 600, marginBottom: 4 }}>{etiket}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: '#111827', marginBottom: 6 }}>
+        {mevcut ?? '...'}
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#6b7280', marginLeft: 6 }}>
+          / {limit ?? 'Sınırsız'}
+        </span>
+      </div>
+      {dolu && (
+        <>
+          <div style={{ height: 6, background: '#fff', borderRadius: 3, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+            <div style={{ width: `${yuzde}%`, height: '100%', background: renk, transition: 'width .3s' }} />
+          </div>
+          <div style={{ fontSize: 11, color: renk, fontWeight: 700, marginTop: 4 }}>
+            %{yuzde} kullanıldı{yuzde! >= 100 && ' — limit dolu, yeni ekleme yapılamıyor'}
+          </div>
+        </>
+      )}
     </div>
   )
 }
