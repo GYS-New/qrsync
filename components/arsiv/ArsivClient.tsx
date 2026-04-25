@@ -387,20 +387,32 @@ export default function ArsivClient({
         await yukle_frekansiyel()
 
       } else if (topluSilSekme === 'personel') {
-        let q = supabase.from('personel_mesai_kayitlari').delete().eq('firma_id', firmaId).eq('arsivlendi', true)
+        // ARŞİV tablosundan sil — cron eski 'arsivlendi=true' kayıtlarını
+        // personel_mesai_kayitlari_arsiv'a taşıyor; aktif tabloda arsivlendi=true
+        // pratikte hiç kayıt kalmaz → eski kod 0 satır etkileyip 'silindi' toast'u veriyordu
+        let q = supabase.from('personel_mesai_kayitlari_arsiv').delete({ count: 'exact' }).eq('firma_id', firmaId)
+        if (projeId) q = (q as any).eq('proje_id', projeId)
         if (fromISO) q = (q as any).gte('giris_saati', fromISO)
         if (toISO)   q = (q as any).lte('giris_saati', toISO)
-        const { error } = await q
+        const { error, count } = await q
         if (error) throw error
         await yukle_personel()
+        toast({ type: 'success', title: 'Tamamlandı', message: `${count ?? 0} mesai kaydı silindi.` })
+        setTopluSilSekme(null); setTopluSilFrom(''); setTopluSilTo('')
+        return
 
       } else if (topluSilSekme === 'musteri') {
-        let q = supabase.from('musteri_degerlendirmeleri').delete().eq('firma_id', firmaId).eq('arsivlendi', true)
+        // ARŞİV tablosundan sil (aynı sebep)
+        let q = supabase.from('musteri_degerlendirmeleri_arsiv').delete({ count: 'exact' }).eq('firma_id', firmaId)
+        if (projeId) q = (q as any).eq('proje_id', projeId)
         if (fromISO) q = (q as any).gte('olusturma_tarihi', fromISO)
         if (toISO)   q = (q as any).lte('olusturma_tarihi', toISO)
-        const { error } = await q
+        const { error, count } = await q
         if (error) throw error
         await yukle_musteri()
+        toast({ type: 'success', title: 'Tamamlandı', message: `${count ?? 0} değerlendirme silindi.` })
+        setTopluSilSekme(null); setTopluSilFrom(''); setTopluSilTo('')
+        return
 
       } else if (topluSilSekme === 'spesifik') {
         const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
