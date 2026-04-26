@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>İO-GYS · Akıllı Operasyon ve Görev Yönetim Sistemi | İO Teknoloji</title>
 <meta name="description" content="İO-GYS; QR ve NFC tabanlı görev yönetimi, frekansiyel görev motoru, dijital çeklist ve derin süre analizi ile saha operasyonlarınızı tek platformda dijitalleştirir. İO Teknoloji tarafından geliştirilir." />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 68 68'><rect width='68' height='68' rx='15' fill='%230C447C'/><circle cx='14' cy='8' r='4' fill='white'/><rect x='11' y='16' width='6' height='36' rx='2.5' fill='white'/><circle cx='39' cy='34' r='18' fill='none' stroke='white' stroke-width='4.5'/></svg>">
@@ -54,7 +54,12 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; zoom: 1.32; }
+html { scroll-behavior: smooth; }
+/* Tasarım baseline'ı 1.32x büyük ekrana göre ayarlandı; mobil ve tabletlerde
+   zoom uygulanmıyor (overflow + bozuk ölçek). Sadece geniş desktop'ta uygula. */
+@media (min-width: 1200px) {
+  html { zoom: 1.32; }
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -753,6 +758,7 @@ footer {
   .clients-logos { gap: 24px; }
 }
 @media (max-width: 600px) {
+  .container { padding: 0 16px; }
   .strip-inner { grid-template-columns: 1fr; }
   .strip-item { border-right: none; border-bottom: 1px solid var(--line); }
   .features { grid-template-columns: 1fr; }
@@ -760,6 +766,11 @@ footer {
   .foot-grid { grid-template-columns: 1fr; }
   .hero { padding: 50px 0 80px; }
   .section { padding: 72px 0; }
+  .nav { height: 64px; }
+  .brand-img { height: 40px; }
+  .brand-svg { height: 40px; }
+  /* Tap target boyutu — mobil dokunma kolaylığı */
+  .btn { min-height: 44px; }
 }
 </style>
 </head>
