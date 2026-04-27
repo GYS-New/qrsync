@@ -3,9 +3,14 @@ const puppeteer = require('puppeteer')
 const fs = require('fs')
 const path = require('path')
 
-function buildHTML({ topColor, bottomColor, scale }) {
-  const W = 540 * scale
+function buildHTML({ topColor, bottomColor, scale, compact }) {
+  const VBW = compact ? 270 : 540
+  const W = VBW * scale
   const H = 110 * scale
+  const inner = compact
+    ? `<text x="98" y="71" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="46" letter-spacing="-1.4" font-weight="700" fill="${topColor}">İO-GYS</text>`
+    : `<text x="98" y="58" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="39" letter-spacing="-1.2" font-weight="700" fill="${topColor}">İO-GYS</text>
+       <text x="98" y="87" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="18" font-weight="400" fill="${bottomColor}">Akıllı Operasyon Görev Yönetim Sistemi</text>`
   return `<!doctype html>
 <html><head>
 <meta charset="utf-8">
@@ -18,15 +23,14 @@ function buildHTML({ topColor, bottomColor, scale }) {
   svg { display:block; width:${W}px; height:${H}px; }
 </style>
 </head><body>
-<svg id="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 110">
+<svg id="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VBW} 110">
   <g transform="translate(14,21)">
     <rect width="68" height="68" rx="15" fill="#185FA5"/>
     <circle cx="14" cy="8" r="4" fill="white"/>
     <rect x="11" y="16" width="6" height="36" rx="2.5" fill="white"/>
     <circle cx="39" cy="34" r="18" fill="none" stroke="white" stroke-width="4.5"/>
   </g>
-  <text x="98" y="58" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="39" letter-spacing="-1.2" font-weight="700" fill="${topColor}">İO-GYS</text>
-  <text x="98" y="87" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="18" font-weight="400" fill="${bottomColor}">Akıllı Operasyon Görev Yönetim Sistemi</text>
+  ${inner}
 </svg>
 </body></html>`
 }
@@ -36,7 +40,8 @@ fs.mkdirSync(outDir, { recursive: true })
 
 async function render(browser, opts, file) {
   const page = await browser.newPage()
-  const W = 540 * opts.scale
+  const VBW = opts.compact ? 270 : 540
+  const W = VBW * opts.scale
   const H = 110 * opts.scale
   await page.setViewport({ width: W, height: H, deviceScaleFactor: 1 })
   await page.setContent(buildHTML(opts), { waitUntil: 'networkidle0' })
@@ -49,11 +54,16 @@ async function render(browser, opts, file) {
 
 ;(async () => {
   const browser = await puppeteer.launch({ args: ['--no-sandbox'] })
-  // light = dark text on light bg, dark = white text on dark bg
+  // Full (icon + üst yazı + alt yazı)
   await render(browser, { topColor: '#0F2A4A', bottomColor: '#3B6FA8', scale: 2 }, 'iogys-logo-light.png')
   await render(browser, { topColor: '#0F2A4A', bottomColor: '#3B6FA8', scale: 4 }, 'iogys-logo-light@2x.png')
   await render(browser, { topColor: '#ffffff', bottomColor: '#85B7EB', scale: 2 }, 'iogys-logo-dark.png')
   await render(browser, { topColor: '#ffffff', bottomColor: '#85B7EB', scale: 4 }, 'iogys-logo-dark@2x.png')
+  // Compact (icon + üst yazı, alt yazı yok)
+  await render(browser, { topColor: '#0F2A4A', scale: 2, compact: true }, 'iogys-logo-light-compact.png')
+  await render(browser, { topColor: '#0F2A4A', scale: 4, compact: true }, 'iogys-logo-light-compact@2x.png')
+  await render(browser, { topColor: '#ffffff', scale: 2, compact: true }, 'iogys-logo-dark-compact.png')
+  await render(browser, { topColor: '#ffffff', scale: 4, compact: true }, 'iogys-logo-dark-compact@2x.png')
   await browser.close()
   console.log('\nPNG dosyaları: public/brand/')
 })().catch(e => { console.error(e); process.exit(1) })
