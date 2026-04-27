@@ -58,8 +58,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'firma_id gerekli' }, { status: 400 })
   }
 
-  const allowedRols = ['tenant_user', 'tenant_admin', 'musteri', ...(isSA ? ['alt_super_admin'] : [])]
+  // Alt SA, alt_super_admin rolü oluşturamaz (hiyerarşik kısıt — eşit yetki kopyalanamaz)
+  const isPureSA = me.rol === 'super_admin'
+  const allowedRols = ['tenant_user', 'tenant_admin', 'musteri', ...(isPureSA ? ['alt_super_admin'] : [])]
   if (!allowedRols.includes(rol)) {
+    if (rol === 'alt_super_admin' && me.rol === 'alt_super_admin') {
+      return NextResponse.json({ error: 'Alt yönetici, başka alt yönetici oluşturamaz' }, { status: 403 })
+    }
     return NextResponse.json({ error: 'Geçersiz rol' }, { status: 400 })
   }
 

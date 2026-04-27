@@ -19,6 +19,19 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   const userId = String(ctx.params.id)
   const body = await req.json().catch(() => ({} as any))
 
+  // Alt SA, SA kullanıcısını düzenleyemez (hiyerarşik kısıt)
+  if (me.rol === 'alt_super_admin') {
+    const admin0 = createAdminClient()
+    const { data: target } = await admin0.from('users').select('rol').eq('id', userId).single()
+    if (target?.rol === 'super_admin') {
+      return NextResponse.json({ error: 'Alt yönetici, ana yöneticiyi düzenleyemez' }, { status: 403 })
+    }
+    // Bir kullanıcının rolünü super_admin'e çıkarmak da yasak
+    if (body.rol === 'super_admin') {
+      return NextResponse.json({ error: 'Alt yönetici, super_admin rolü atayamaz' }, { status: 403 })
+    }
+  }
+
   const isim_soyisim = body.isim_soyisim !== undefined ? String(body.isim_soyisim).trim() : undefined
   const telefon = body.telefon !== undefined ? (body.telefon ? String(body.telefon).trim() : null) : undefined
   const aktif = body.aktif !== undefined ? Boolean(body.aktif) : undefined
@@ -71,6 +84,11 @@ export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
 
   // Silinen kullanıcının bilgilerini al (audit için)
   const { data: silinecek } = await admin.from('users').select('isim_soyisim,email,rol,firma_id').eq('id', userId).single()
+
+  // Alt SA, SA kullanıcısını silemez (hiyerarşik kısıt)
+  if (me.rol === 'alt_super_admin' && silinecek?.rol === 'super_admin') {
+    return NextResponse.json({ error: 'Alt yönetici, ana yöneticiyi silemez' }, { status: 403 })
+  }
 
   // public.users'tan silmeyi dene — hata yakalanır
   const { error: pubErr } = await admin.from('users').delete().eq('id', userId)
