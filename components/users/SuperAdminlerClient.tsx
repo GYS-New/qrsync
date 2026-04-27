@@ -17,10 +17,13 @@ const ROL_BADGE: Record<string, { bg: string; color: string; label: string }> = 
 export default function SuperAdminlerClient({
   initialUsers,
   currentUserId,
+  currentUserRol,
 }: {
   initialUsers: User[]
   currentUserId: string
+  currentUserRol: 'super_admin' | 'alt_super_admin'
 }) {
+  const isPureSA = currentUserRol === 'super_admin'
   const { toast } = useToast()
   const { confirm } = useConfirm()
 
@@ -207,9 +210,11 @@ export default function SuperAdminlerClient({
             <Button variant="ghost" size="sm" onClick={refresh} disabled={loading} style={{ fontSize: 15 }}>
               {loading ? 'Yükleniyor…' : '↻ Yenile'}
             </Button>
-            <Button variant="primary" onClick={() => setOpenCreate(true)} style={{ fontSize: 15 }}>
-              ＋ Süper Admin Ekle
-            </Button>
+            {isPureSA && (
+              <Button variant="primary" onClick={() => setOpenCreate(true)} style={{ fontSize: 15 }}>
+                ＋ Süper Admin Ekle
+              </Button>
+            )}
           </div>
         </div>
 
@@ -228,6 +233,9 @@ export default function SuperAdminlerClient({
             {filtered.map(u => {
               const badge = ROL_BADGE[u.rol]
               const isSelf = u.id === currentUserId
+              // Alt SA, super_admin satırlarında işlem yapamaz (read-only görünüm)
+              const isHedefSA = u.rol === 'super_admin'
+              const yonetebilir = isPureSA || !isHedefSA
               return (
                 <tr key={u.id}>
                   <td>
@@ -260,22 +268,28 @@ export default function SuperAdminlerClient({
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {!isSelf && (
-                        <RowActionButton variant={u.aktif ? 'warning' : 'success'} onClick={() => toggleAktif(u)}>
-                          {u.aktif ? 'Pasif Yap' : 'Aktif Yap'}
-                        </RowActionButton>
-                      )}
-                      <RowActionButton variant="base" onClick={() => {
-                        setTarget(u)
-                        setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '' })
-                        setOpenEdit(true)
-                      }}>Düzenle</RowActionButton>
-                      <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
-                      {deviceTokenMap[u.id] && (
-                        <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>
-                      )}
-                      {!isSelf && (
-                        <RowActionButton variant="danger" onClick={() => deleteUser(u)}>Sil</RowActionButton>
+                      {yonetebilir ? (
+                        <>
+                          {!isSelf && (
+                            <RowActionButton variant={u.aktif ? 'warning' : 'success'} onClick={() => toggleAktif(u)}>
+                              {u.aktif ? 'Pasif Yap' : 'Aktif Yap'}
+                            </RowActionButton>
+                          )}
+                          <RowActionButton variant="base" onClick={() => {
+                            setTarget(u)
+                            setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '' })
+                            setOpenEdit(true)
+                          }}>Düzenle</RowActionButton>
+                          <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
+                          {deviceTokenMap[u.id] && (
+                            <RowActionButton variant="danger" onClick={() => deleteDeviceToken(u)}>Cihaz Sil</RowActionButton>
+                          )}
+                          {!isSelf && (
+                            <RowActionButton variant="danger" onClick={() => deleteUser(u)}>Sil</RowActionButton>
+                          )}
+                        </>
+                      ) : (
+                        <span style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>—</span>
                       )}
                     </div>
                   </td>

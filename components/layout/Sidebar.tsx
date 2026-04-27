@@ -27,7 +27,7 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
 
   const mgmt: NavItem[] = isSA
     ? [
-        ...(rol === 'super_admin' ? [{ label: 'Süper Adminler', href: `${base}/dashboard/super-adminler`, icon: '🛡️' }] : []),
+        { label: 'Süper Adminler', href: `${base}/dashboard/super-adminler`, icon: '🛡️' },
         { label: 'Canlı Görev Akışı', href: `${base}/dashboard/canli-islemler`, icon: '📡' },
         { label: 'Firmalar', href: `${base}/dashboard/firmalar`, icon: '🏢' },
         { label: 'Firma Adminleri', href: `${base}/dashboard/firma-adminler`, icon: '👤' },

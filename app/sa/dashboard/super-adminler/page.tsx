@@ -13,8 +13,8 @@ export default async function SASuperAdminlerPage() {
 
   const { data: me } = await supabase.from('users').select('id,rol').eq('id', authUser.id).single()
 
-  // Sadece super_admin erişebilir (alt_super_admin bu sayfayı göremez)
-  if (!me || me.rol !== 'super_admin') {
+  // SA ve Alt SA erişebilir (Alt SA read-only — SA satırlarında işlem yapamaz)
+  if (!me || (me.rol !== 'super_admin' && me.rol !== 'alt_super_admin')) {
     redirect('/sa/dashboard')
   }
 
@@ -34,6 +34,7 @@ export default async function SASuperAdminlerPage() {
       <SuperAdminlerClient
         initialUsers={(users as any) ?? []}
         currentUserId={authUser.id}
+        currentUserRol={me.rol as 'super_admin' | 'alt_super_admin'}
       />
     </div>
   )
