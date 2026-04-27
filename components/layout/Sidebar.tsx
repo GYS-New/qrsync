@@ -652,7 +652,7 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           </div>
         )}
         <div style={{ textAlign: 'center', padding: '8px 10px 4px', fontSize: 10, color: '#b0b0b0', letterSpacing: '0.02em' }}>
-          © 2026 İO Teknoloji
+          2026@United Software Teknologies
         </div>
       </div>
     </aside>
