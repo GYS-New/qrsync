@@ -97,10 +97,8 @@ export default function KullanicilarClient({
   const isSA = base === '/sa'
   const lokMap = useMemo(() => new Map(ustLokasyonlar.map(l => [l.id, l.tanim])), [ustLokasyonlar])
 
-  function sonGorulmeLabel(userId: string): string {
-    const dt = deviceTokenMap[userId]
-    if (!dt?.son_kullanim) return '—'
-    const farkMs = Date.now() - new Date(dt.son_kullanim).getTime()
+  function relativeLabel(ms: number): string {
+    const farkMs = Date.now() - ms
     if (farkMs < 0) return 'Şimdi'
     const dk = Math.floor(farkMs / 60000)
     if (dk < 1) return 'Şimdi'
@@ -109,6 +107,16 @@ export default function KullanicilarClient({
     if (saat < 24) return `${saat} saat önce`
     const gun = Math.floor(saat / 24)
     return `${gun} gün önce`
+  }
+
+  // Kullanıcının son görülme zamanını web önceliğiyle döndürür.
+  // Web (users.last_seen_at) varsa onu, yoksa mobil device_token.son_kullanim'a düş.
+  function getSonGorulme(u: User) {
+    const webMs = u.last_seen_at ? new Date(u.last_seen_at).getTime() : 0
+    const dt = deviceTokenMap[u.id]
+    const mobilMs = dt?.son_kullanim ? new Date(dt.son_kullanim).getTime() : 0
+    const webOnline = webMs > 0 && (Date.now() - webMs) < 10 * 60 * 1000
+    return { webMs, mobilMs, webOnline }
   }
   const apiBase = base === '/sa' ? '/api/sa' : base === '/ta' ? '/api/ta' : '/api'
 
@@ -220,8 +228,21 @@ export default function KullanicilarClient({
     if (filtreDurum === 'aktif') list = list.filter(u => u.aktif)
     if (filtreDurum === 'pasif') list = list.filter(u => !u.aktif)
     if (filtreRol) list = list.filter(u => u.rol === filtreRol)
-    return list
-  }, [q, users, filtreLokasyon, filtreDurum, filtreRol])
+
+    // İki katmanlı sıralama:
+    //  1) Web last_seen_at olan kullanıcılar üstte (kendi aralarında web zamanı DESC)
+    //  2) Web yoksa: mobil son_kullanim DESC (yoksa kayit_tarihi gibi düş)
+    return [...list].sort((a, b) => {
+      const aWeb = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0
+      const bWeb = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0
+      if (aWeb > 0 && bWeb === 0) return -1
+      if (aWeb === 0 && bWeb > 0) return 1
+      if (aWeb > 0 && bWeb > 0) return bWeb - aWeb
+      const aMob = deviceTokenMap[a.id]?.son_kullanim ? new Date(deviceTokenMap[a.id].son_kullanim!).getTime() : 0
+      const bMob = deviceTokenMap[b.id]?.son_kullanim ? new Date(deviceTokenMap[b.id].son_kullanim!).getTime() : 0
+      return bMob - aMob
+    })
+  }, [q, users, filtreLokasyon, filtreDurum, filtreRol, deviceTokenMap])
 
   function showErr(msg: string) { toast({ type: 'error', title: 'Hata', message: msg }) }
   function showOk(msg: string)  { toast({ type: 'success', title: 'Başarılı', message: msg }) }
@@ -608,8 +629,39 @@ export default function KullanicilarClient({
                   )}
                 </td>
                 <td style={{ color: '#4b5563' }}>{u.telefon ?? '—'}</td>
-                <td style={{ fontSize: 12.5, color: '#4b5563', whiteSpace: 'nowrap' }}>
-                  {sonGorulmeLabel(u.id)}
+                <td style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>
+                  {(() => {
+                    const sg = getSonGorulme(u)
+                    if (sg.webMs > 0) {
+                      // Web kayıt varsa öncelik web — online ise yeşil + canlı nokta
+                      return (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          color: sg.webOnline ? '#059669' : '#4b5563',
+                          fontWeight: sg.webOnline ? 700 : 500,
+                        }}>
+                          {sg.webOnline && (
+                            <span style={{
+                              width: 7, height: 7, borderRadius: '50%',
+                              background: '#10b981',
+                              boxShadow: '0 0 5px rgba(16,185,129,0.7)',
+                            }} />
+                          )}
+                          {relativeLabel(sg.webMs)}
+                          <span style={{ fontSize: 10, color: sg.webOnline ? '#10b981' : '#94a3b8', fontWeight: 600 }}>web</span>
+                        </span>
+                      )
+                    }
+                    if (sg.mobilMs > 0) {
+                      return (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#6b7280' }}>
+                          {relativeLabel(sg.mobilMs)}
+                          <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>mobil</span>
+                        </span>
+                      )
+                    }
+                    return <span style={{ color: '#94a3b8' }}>—</span>
+                  })()}
                 </td>
                 <td>
                   {deviceTokenMap[u.id] ? (() => {
