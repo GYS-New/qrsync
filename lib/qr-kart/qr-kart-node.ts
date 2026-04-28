@@ -183,24 +183,24 @@ async function buildSablonluKartPng(
     .toBuffer()
 
   // QR koordinatları — Atalian Geri Bildirim şablonu (404×593 grid)
-  const qr_x = ayarlar.qr_x ?? 122
-  const qr_y = ayarlar.qr_y ?? 280
-  const qr_w = ayarlar.qr_w ?? 160
-  const qr_h = ayarlar.qr_h ?? 165
+  const qr_x = ayarlar.qr_x ?? 132
+  const qr_y = ayarlar.qr_y ?? 320
+  const qr_w = ayarlar.qr_w ?? 140
+  const qr_h = ayarlar.qr_h ?? 140
 
   // Balon koordinatları — alt "Alan Adı / Lokasyon" kutusu
   const metin_x  = ayarlar.metin_x         ?? 202   // balon merkez X
-  const metin_y  = ayarlar.metin_y         ?? 545   // balon merkez Y
-  const balonW   = ayarlar.balon_genislik  ?? 200   // iç genişlik
-  const balonH   = ayarlar.balon_yukseklik ?? 40    // iç yükseklik
+  const metin_y  = ayarlar.metin_y         ?? 520   // balon merkez Y
+  const balonW   = ayarlar.balon_genislik  ?? 300   // iç genişlik
+  const balonH   = ayarlar.balon_yukseklik ?? 30    // iç yükseklik
 
   // QR
   const qrRaw     = await QRCode.toBuffer(lok.qr_url, { type: 'png', width: qr_w * 2, margin: 1 })
   const qrResized = await sharp(qrRaw).resize(qr_w, qr_h).png().toBuffer()
 
-  // Metin
+  // Metin — uzun lokasyon adları (örn "1.KAT BÜYÜK BAY WC") için sabit fs=14
   const label = lok.tanim.toUpperCase()
-  const fs    = ayarlar.font_boyut ?? autoFontSize(label, balonW, balonH)
+  const fs    = ayarlar.font_boyut ?? 14
   const textPng = await buildTextPng(STD_W, STD_H, label, metin_x, metin_y, balonW, balonH, fs)
 
   return sharp(sablonStd)
