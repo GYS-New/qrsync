@@ -130,6 +130,16 @@ function autoFontSize(text: string, balonW: number, balonH: number, max = 20, mi
   return min
 }
 
+// Tek satırlık fit — şablonlu kart için (uzun lokasyon adlarını otomatik küçültür)
+// avgCharW 0.65: Inter Bold uppercase görsel olarak 0.58'den daha geniş
+function autoFontSizeSingleLine(text: string, maxW: number, maxFs = 16, minFs = 9): number {
+  const avgCharW = 0.65
+  for (let fs = maxFs; fs >= minFs; fs--) {
+    if (text.length * fs * avgCharW <= maxW) return fs
+  }
+  return minFs
+}
+
 // ── Minimal mod: beyaz arka plan + QR + metin ────────────────────────────────
 async function buildMinimalKartPng(lok: QrKartLokasyon, boyut = 320): Promise<Buffer> {
   const sharp = (await import('sharp')).default
@@ -198,9 +208,9 @@ async function buildSablonluKartPng(
   const qrRaw     = await QRCode.toBuffer(lok.qr_url, { type: 'png', width: qr_w * 2, margin: 1 })
   const qrResized = await sharp(qrRaw).resize(qr_w, qr_h).png().toBuffer()
 
-  // Metin — uzun lokasyon adları için sabit fs=16
+  // Metin — 16'dan başla, sığmıyorsa tek satır kalacak şekilde küçült
   const label = lok.tanim.toUpperCase()
-  const fs    = ayarlar.font_boyut ?? 16
+  const fs    = ayarlar.font_boyut ?? autoFontSizeSingleLine(label, balonW, 16, 9)
   const textPng = await buildTextPng(STD_W, STD_H, label, metin_x, metin_y, balonW, balonH, fs)
 
   // Şablondaki "Alan Adı / Lokasyon" placeholder'ını örten beyaz dolgu
