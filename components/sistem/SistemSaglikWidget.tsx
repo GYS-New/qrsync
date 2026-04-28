@@ -4,10 +4,14 @@ import React, { useEffect, useState } from 'react'
 import { RefreshCw, CheckCircle2, AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react'
 
 type Durum = 'OK' | 'SORUN' | 'BILGI'
+type SorunDetayi = { kod: string; mesaj: string; adet?: number }
 type SistemRaporu = {
   ad: string
   durum: Durum
-  mesaj: string
+  /** API'den 'ozet' alanı geliyor; eski ad 'mesaj' geriye dönük olarak desteklensin */
+  ozet?: string
+  mesaj?: string
+  sorunlar?: SorunDetayi[]
   metrikler?: Record<string, any>
 }
 type Rapor = {
@@ -23,6 +27,24 @@ const DURUM_STIL: Record<Durum, { bg: string; color: string; border: string; lab
   OK:    { bg: '#dcfce7', color: '#166534', border: '#86efac', label: 'UYGUN' },
   SORUN: { bg: '#fee2e2', color: '#991b1b', border: '#fca5a5', label: 'SORUN' },
   BILGI: { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', label: 'BİLGİ' },
+}
+
+const DURUM_YORUMU: Record<Durum, { baslik: string; sorunVar: string; eylem: string }> = {
+  OK: {
+    baslik: 'Sorun yok, sistem aktivite üretiyor — sağlıklı çalışıyor.',
+    sorunVar: 'Hayır',
+    eylem: 'Yapılması gereken bir şey yok.',
+  },
+  BILGI: {
+    baslik: 'Sorun yok ama o anda gözlemlenecek aktivite de yok — normal.',
+    sorunVar: 'Hayır',
+    eylem: 'Sistem henüz aktif olarak kullanılmıyor olabilir; yapılması gereken yok.',
+  },
+  SORUN: {
+    baslik: 'Anomali tespit edildi — kontrol gerekiyor.',
+    sorunVar: 'Evet',
+    eylem: 'Aşağıdaki anomali listesini sistem yöneticisine iletin.',
+  },
 }
 
 function tarihFormat(iso: string | null): string {
@@ -43,6 +65,7 @@ export default function SistemSaglikWidget() {
   const [sonKontrol, setSonKontrol] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(false)
+  const [acikKart, setAcikKart] = useState<number | null>(null)
 
   async function yukle() {
     setLoading(true)
@@ -138,7 +161,10 @@ export default function SistemSaglikWidget() {
         <div style={{ padding: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10, background: '#f8fafc' }}>
           {sistemler.map((s, i) => {
             const stil = DURUM_STIL[s.durum]
+            const yorum = DURUM_YORUMU[s.durum]
             const ikon = s.durum === 'OK' ? <CheckCircle2 size={14} /> : s.durum === 'SORUN' ? <AlertTriangle size={14} /> : <Info size={14} />
+            const ozetMetni = s.ozet ?? s.mesaj ?? ''
+            const acik = acikKart === i
             return (
               <div key={i} style={{
                 background: '#fff',
@@ -146,7 +172,15 @@ export default function SistemSaglikWidget() {
                 borderLeft: `4px solid ${stil.color}`,
                 borderRadius: 8,
                 padding: 10,
-              }}>
+                cursor: 'pointer',
+                transition: 'box-shadow 0.15s ease',
+                boxShadow: acik ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+              }}
+              onClick={() => setAcikKart(acik ? null : i)}
+              role="button"
+              aria-expanded={acik}
+              title={acik ? 'Kapat' : 'Detayı görmek için tıkla'}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                   <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>{s.ad}</span>
                   <span style={{
@@ -157,10 +191,58 @@ export default function SistemSaglikWidget() {
                   }}>
                     {ikon} {stil.label}
                   </span>
+                  {acik
+                    ? <ChevronUp size={14} color="#94a3b8" />
+                    : <ChevronDown size={14} color="#94a3b8" />}
                 </div>
-                <div style={{ fontSize: 12.5, color: '#475569', lineHeight: 1.4 }}>
-                  {s.mesaj}
-                </div>
+                {ozetMetni && (
+                  <div style={{ fontSize: 12.5, color: '#475569', lineHeight: 1.4 }}>
+                    {ozetMetni}
+                  </div>
+                )}
+
+                {acik && (
+                  <div style={{
+                    marginTop: 10,
+                    paddingTop: 10,
+                    borderTop: '1px dashed #e2e8f0',
+                    fontSize: 12.3,
+                    color: '#334155',
+                    lineHeight: 1.55,
+                  }}>
+                    <div style={{ marginBottom: 8, fontWeight: 600, color: stil.color }}>
+                      {yorum.baslik}
+                    </div>
+
+                    {ozetMetni && (
+                      <div style={{ marginBottom: 6 }}>
+                        <span style={{ fontWeight: 600, color: '#0f172a' }}>Bu kart neden böyle? </span>
+                        {ozetMetni}
+                      </div>
+                    )}
+
+                    <div style={{ marginBottom: 6 }}>
+                      <span style={{ fontWeight: 600, color: '#0f172a' }}>Sorun var mı? </span>
+                      {yorum.sorunVar}
+                    </div>
+
+                    {s.durum === 'SORUN' && s.sorunlar && s.sorunlar.length > 0 && (
+                      <div style={{ margin: '6px 0', padding: '6px 8px', background: '#fef2f2', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 600, color: '#991b1b', marginBottom: 4 }}>Tespit edilen anomaliler:</div>
+                        <ul style={{ margin: 0, paddingLeft: 18, color: '#7f1d1d' }}>
+                          {s.sorunlar.map((p, j) => (
+                            <li key={j}>{p.mesaj}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div>
+                      <span style={{ fontWeight: 600, color: '#0f172a' }}>Yapılması gereken: </span>
+                      {yorum.eylem}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
