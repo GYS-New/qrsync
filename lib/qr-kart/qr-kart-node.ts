@@ -165,6 +165,10 @@ async function buildMinimalKartPng(lok: QrKartLokasyon, boyut = 320): Promise<Bu
 }
 
 // ── Şablonlu mod: şablon üzerine QR + metin ──────────────────────────────────
+// Standart koordinat grid'i (yeni şablon her boyutta yüklenirse buna ölçeklenir)
+const STD_W = 404
+const STD_H = 593
+
 async function buildSablonluKartPng(
   sablonBuffer: Buffer,
   lok:          QrKartLokasyon,
@@ -172,21 +176,23 @@ async function buildSablonluKartPng(
 ): Promise<Buffer> {
   const sharp = (await import('sharp')).default
 
-  // QR koordinatları — Python'daki mevcut varsayılanlarla aynı
-  const qr_x = ayarlar.qr_x ?? 190
-  const qr_y = ayarlar.qr_y ?? 415
-  const qr_w = ayarlar.qr_w ?? 100
-  const qr_h = ayarlar.qr_h ?? 110
+  // Şablonu standart 404×593 grid'ine ölçekle — koordinatlar bu grid'de tanımlı
+  const sablonStd = await sharp(sablonBuffer)
+    .resize(STD_W, STD_H, { fit: 'fill' })
+    .png()
+    .toBuffer()
 
-  // Balon koordinatları — Atalian MMA şablonu (404x593px)
-  const metin_x  = ayarlar.metin_x         ?? 286   // balon merkez X
-  const metin_y  = ayarlar.metin_y         ?? 261   // balon merkez Y
-  const balonW   = ayarlar.balon_genislik  ?? 196   // iç genişlik
-  const balonH   = ayarlar.balon_yukseklik ?? 78    // iç yükseklik
+  // QR koordinatları — Atalian Geri Bildirim şablonu (404×593 grid)
+  const qr_x = ayarlar.qr_x ?? 122
+  const qr_y = ayarlar.qr_y ?? 280
+  const qr_w = ayarlar.qr_w ?? 160
+  const qr_h = ayarlar.qr_h ?? 165
 
-  const meta = await sharp(sablonBuffer).metadata()
-  const sw   = meta.width  ?? 404
-  const sh   = meta.height ?? 593
+  // Balon koordinatları — alt "Alan Adı / Lokasyon" kutusu
+  const metin_x  = ayarlar.metin_x         ?? 202   // balon merkez X
+  const metin_y  = ayarlar.metin_y         ?? 545   // balon merkez Y
+  const balonW   = ayarlar.balon_genislik  ?? 200   // iç genişlik
+  const balonH   = ayarlar.balon_yukseklik ?? 40    // iç yükseklik
 
   // QR
   const qrRaw     = await QRCode.toBuffer(lok.qr_url, { type: 'png', width: qr_w * 2, margin: 1 })
@@ -195,9 +201,9 @@ async function buildSablonluKartPng(
   // Metin
   const label = lok.tanim.toUpperCase()
   const fs    = ayarlar.font_boyut ?? autoFontSize(label, balonW, balonH)
-  const textPng = await buildTextPng(sw, sh, label, metin_x, metin_y, balonW, balonH, fs)
+  const textPng = await buildTextPng(STD_W, STD_H, label, metin_x, metin_y, balonW, balonH, fs)
 
-  return sharp(sablonBuffer)
+  return sharp(sablonStd)
     .composite([
       { input: qrResized, left: qr_x, top: qr_y },
       { input: textPng,   left: 0,    top: 0    },
