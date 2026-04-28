@@ -14,6 +14,42 @@ const ROL_BADGE: Record<string, { bg: string; color: string; label: string }> = 
   alt_super_admin: { bg: '#e8f4e8', color: '#2e7d32', label: '2.SA — Alt Süper Admin' },
 }
 
+// Web tarafında son 10 dk içinde heartbeat aldıysa online say
+const ONLINE_ESIK_MS = 10 * 60 * 1000
+function isOnline(lastSeen?: string | null): boolean {
+  if (!lastSeen) return false
+  const t = new Date(lastSeen).getTime()
+  if (Number.isNaN(t)) return false
+  return Date.now() - t < ONLINE_ESIK_MS
+}
+
+function SistemdeBadge({ online }: { online: boolean }) {
+  if (online) {
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontSize: 11.5, fontWeight: 800, padding: '3px 10px', borderRadius: 12,
+        background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white',
+        boxShadow: '0 0 10px rgba(16, 185, 129, 0.55), 0 1px 2px rgba(0,0,0,0.08)',
+        textShadow: '0 1px 1px rgba(0,0,0,0.15)',
+      }}>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'white', boxShadow: '0 0 5px rgba(255,255,255,0.95)' }} />
+        Aktif
+      </span>
+    )
+  }
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 12,
+      background: '#f1f5f9', color: '#94a3b8',
+    }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#cbd5e1' }} />
+      Pasif
+    </span>
+  )
+}
+
 export default function SuperAdminlerClient({
   initialUsers,
   currentUserId,
@@ -225,6 +261,7 @@ export default function SuperAdminlerClient({
               <th>Kullanıcı</th>
               <th>Rol</th>
               <th>Telefon</th>
+              <th>Sistemde</th>
               <th>Durum</th>
               <th>İşlem</th>
             </tr>
@@ -261,6 +298,9 @@ export default function SuperAdminlerClient({
                     }
                   </td>
                   <td style={{ color: '#4b5563' }}>{u.telefon ?? '—'}</td>
+                  <td>
+                    <SistemdeBadge online={isOnline((u as any).last_seen_at)} />
+                  </td>
                   <td>
                     <span className={`verde-badge ${u.aktif ? 'status-islemde' : 'status-iptal'}`}>
                       {u.aktif ? 'Aktif' : 'Pasif'}

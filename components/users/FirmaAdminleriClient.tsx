@@ -42,6 +42,7 @@ export default function FirmaAdminleriClient({
       canCreate={true}
       canManage={true}
       enableBulkImport={false}
+      showSistemdeStatus={true}
     />
   )
 }
