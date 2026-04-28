@@ -208,9 +208,9 @@ async function buildSablonluKartPng(
   const qrRaw     = await QRCode.toBuffer(lok.qr_url, { type: 'png', width: qr_w * 2, margin: 1 })
   const qrResized = await sharp(qrRaw).resize(qr_w, qr_h).png().toBuffer()
 
-  // Metin — 16'dan başla, sığmıyorsa tek satır kalacak şekilde küçült
+  // Metin — 16'dan başla, sığmıyorsa tek satır kalacak şekilde küçült (min 11)
   const label = lok.tanim.toUpperCase()
-  const fs    = ayarlar.font_boyut ?? autoFontSizeSingleLine(label, balonW, 16, 9)
+  const fs    = ayarlar.font_boyut ?? autoFontSizeSingleLine(label, balonW, 16, 11)
   const textPng = await buildTextPng(STD_W, STD_H, label, metin_x, metin_y, balonW, balonH, fs)
 
   // Şablondaki "Alan Adı / Lokasyon" placeholder'ını örten beyaz dolgu
