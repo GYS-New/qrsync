@@ -190,7 +190,7 @@ async function buildSablonluKartPng(
 
   // Balon koordinatları — alt "Alan Adı / Lokasyon" kutusu
   const metin_x  = ayarlar.metin_x         ?? 202   // balon merkez X
-  const metin_y  = ayarlar.metin_y         ?? 522   // balon merkez Y
+  const metin_y  = ayarlar.metin_y         ?? 533   // balon merkez Y (dolgu merkezi)
   const balonW   = ayarlar.balon_genislik  ?? 300   // iç genişlik
   const balonH   = ayarlar.balon_yukseklik ?? 30    // iç yükseklik
 
@@ -204,16 +204,17 @@ async function buildSablonluKartPng(
   const textPng = await buildTextPng(STD_W, STD_H, label, metin_x, metin_y, balonW, balonH, fs)
 
   // Şablondaki "Alan Adı / Lokasyon" placeholder'ını örten beyaz dolgu
+  // Boyut: kutu içinde kal, orange border'a değme (kutu ~y=512-553)
   const placeholderCover = await sharp({
     create: {
-      width: 305, height: 45, channels: 3,
+      width: 280, height: 34, channels: 3,
       background: { r: 255, g: 255, b: 255 },
     },
   }).png().toBuffer()
 
   return sharp(sablonStd)
     .composite([
-      { input: placeholderCover, left: 50, top: 510 }, // önce placeholder'ı ört
+      { input: placeholderCover, left: 62, top: 516 }, // dolgu kutu içinde
       { input: qrResized,        left: qr_x, top: qr_y },
       { input: textPng,          left: 0,    top: 0    },
     ])
