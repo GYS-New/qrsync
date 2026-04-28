@@ -183,14 +183,14 @@ async function buildSablonluKartPng(
     .toBuffer()
 
   // QR koordinatları — Atalian Geri Bildirim şablonu (404×593 grid)
-  const qr_x = ayarlar.qr_x ?? 131
-  const qr_y = ayarlar.qr_y ?? 313
-  const qr_w = ayarlar.qr_w ?? 142
-  const qr_h = ayarlar.qr_h ?? 142
+  const qr_x = ayarlar.qr_x ?? 129
+  const qr_y = ayarlar.qr_y ?? 311
+  const qr_w = ayarlar.qr_w ?? 146
+  const qr_h = ayarlar.qr_h ?? 146
 
   // Balon koordinatları — alt "Alan Adı / Lokasyon" kutusu
   const metin_x  = ayarlar.metin_x         ?? 202   // balon merkez X
-  const metin_y  = ayarlar.metin_y         ?? 526   // balon merkez Y
+  const metin_y  = ayarlar.metin_y         ?? 522   // balon merkez Y
   const balonW   = ayarlar.balon_genislik  ?? 300   // iç genişlik
   const balonH   = ayarlar.balon_yukseklik ?? 30    // iç yükseklik
 
