@@ -207,14 +207,14 @@ async function buildSablonluKartPng(
   // Boyut: kutu içinde kal, orange border'a değme (kutu ~y=512-553)
   const placeholderCover = await sharp({
     create: {
-      width: 280, height: 34, channels: 3,
+      width: 280, height: 28, channels: 3,
       background: { r: 255, g: 255, b: 255 },
     },
   }).png().toBuffer()
 
   return sharp(sablonStd)
     .composite([
-      { input: placeholderCover, left: 62, top: 516 }, // dolgu kutu içinde
+      { input: placeholderCover, left: 62, top: 519 }, // dolgu kutu içinde, alt border'a değmesin
       { input: qrResized,        left: qr_x, top: qr_y },
       { input: textPng,          left: 0,    top: 0    },
     ])
