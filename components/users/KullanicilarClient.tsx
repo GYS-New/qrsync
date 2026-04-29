@@ -129,7 +129,7 @@ export default function KullanicilarClient({
       online: (Date.now() - ms) < 10 * 60 * 1000,
     }
   }
-  const apiBase = base === '/sa' ? '/api/sa' : base === '/ta' ? '/api/ta' : '/api'
+  const apiBase = base === '/sa' ? '/api/sa' : base === '/ta' ? '/api/ta' : base === '/u' ? '/api/u' : '/api'
 
   const [q, setQ] = useState('')
   const [filtreLokasyon, setFiltreLokasyon] = useState('')
