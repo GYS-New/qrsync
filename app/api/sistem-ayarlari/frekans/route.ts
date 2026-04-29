@@ -18,7 +18,9 @@ export async function PATCH(req: NextRequest) {
   const tip: 'gunluk' | 'haftalik' = body.tip === 'haftalik' ? 'haftalik' : 'gunluk'
   const kolon = tip === 'haftalik' ? 'haftalik_frekans_sayisi' : 'gunluk_frekans_sayisi'
   const maxVal = tip === 'haftalik' ? 20 : 99
-  const minVal = tip === 'haftalik' ? 0 : 1 // haftalıkta 0 = "henüz atanmadı/iptal" kabulü
+  // Hem günlük hem haftalık 0 olabilir; 0 = "bu lokasyonda bu tip görev üretilmesin"
+  // (örn. günlük 0 + haftalık 2 → sadece haftalık görev üretilir)
+  const minVal = 0
 
   const updates: { id: string; [k: string]: any }[] = body.updates
   if (!Array.isArray(updates) || updates.length === 0)

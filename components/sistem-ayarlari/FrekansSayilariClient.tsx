@@ -94,8 +94,16 @@ export default function FrekansSayilariClient({ lokasyonlar, firmaId, projeId }:
 
   const toplamFrekans = Object.values(values).reduce((s, v) => s + v, 0)
   const maxVal = tip === 'haftalik' ? 20 : 99
-  const minVal = tip === 'haftalik' ? 0 : 1
+  const minVal = 0  // Hem günlük hem haftalık 0 olabilir; 0 = "bu lokasyonda bu tip görev yok"
   const defaultVal = tip === 'haftalik' ? 0 : 1
+
+  // 0 falsy olduğu için "Number(x) || defaultVal" pattern'ı 0 girişi defaultVal'a çeviriyordu;
+  // bu helper Number.isNaN ile ayırt eder
+  function clampInput(raw: string): number {
+    const num = Number(raw)
+    if (Number.isNaN(num)) return defaultVal
+    return Math.max(minVal, Math.min(maxVal, num))
+  }
 
   return (
     <div>
@@ -170,10 +178,7 @@ export default function FrekansSayilariClient({ lokasyonlar, firmaId, projeId }:
                 {/* Üst lokasyon frekans girişi — tüm altlara uygular */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
                   <input type="number" min={minVal} max={maxVal} value={values[ustLok.id] ?? defaultVal}
-                    onChange={e => {
-                      const v = Math.max(minVal, Math.min(maxVal, Number(e.target.value) || defaultVal))
-                      setGrupFrekans([ustLok.id, ...altLokIds], v)
-                    }}
+                    onChange={e => setGrupFrekans([ustLok.id, ...altLokIds], clampInput(e.target.value))}
                     style={{ width: 50, height: 30, textAlign: 'center', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 14, fontWeight: 700, color: '#111827' }} />
                   <button onClick={() => kaydetCoklu([ustLok.id, ...altLokIds])} disabled={savingIds.size > 0}
                     style={{ height: 30, padding: '0 12px', borderRadius: 6, border: 'none', background: '#111827', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
@@ -205,10 +210,7 @@ export default function FrekansSayilariClient({ lokasyonlar, firmaId, projeId }:
                           {/* Grup frekans girişi — değeri tüm lokasyonlara uygula + kaydet */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
                             <input type="number" min={minVal} max={maxVal} value={gLoklar.length > 0 ? (values[gLoklar[0].id] ?? defaultVal) : defaultVal}
-                              onChange={e => {
-                                const v = Math.max(minVal, Math.min(maxVal, Number(e.target.value) || defaultVal))
-                                setGrupFrekans(gLokIds, v)
-                              }}
+                              onChange={e => setGrupFrekans(gLokIds, clampInput(e.target.value))}
                               style={{ width: 50, height: 28, textAlign: 'center', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 13, fontWeight: 700, color: '#374151' }} />
                             <button onClick={() => kaydetCoklu(gLokIds)} disabled={savingIds.size > 0}
                               style={{ height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid #111827', background: '#fff', color: '#111827', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
@@ -222,7 +224,7 @@ export default function FrekansSayilariClient({ lokasyonlar, firmaId, projeId }:
                             <span style={{ color: '#d1d5db', flexShrink: 0, fontSize: 12 }}>└─</span>
                             <span style={{ flex: 1, fontSize: 12.5, color: '#374151' }}>{l.tanim}</span>
                             <input type="number" min={minVal} max={maxVal} value={values[l.id] ?? defaultVal}
-                              onChange={e => setValues(p => ({ ...p, [l.id]: Math.max(minVal, Math.min(maxVal, Number(e.target.value) || defaultVal)) }))}
+                              onChange={e => setValues(p => ({ ...p, [l.id]: clampInput(e.target.value) }))}
                               style={{ width: 46, height: 26, textAlign: 'center', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 700, color: '#374151' }} />
                             <button onClick={() => kaydetCoklu([l.id])} disabled={savingIds.size > 0}
                               style={{ height: 26, padding: '0 8px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#374151', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
@@ -246,7 +248,7 @@ export default function FrekansSayilariClient({ lokasyonlar, firmaId, projeId }:
                             <span style={{ color: '#d1d5db', flexShrink: 0, fontSize: 12 }}>└─</span>
                             <span style={{ flex: 1, fontSize: 12.5, color: '#374151' }}>{l.tanim}</span>
                             <input type="number" min={minVal} max={maxVal} value={values[l.id] ?? defaultVal}
-                              onChange={e => setValues(p => ({ ...p, [l.id]: Math.max(minVal, Math.min(maxVal, Number(e.target.value) || defaultVal)) }))}
+                              onChange={e => setValues(p => ({ ...p, [l.id]: clampInput(e.target.value) }))}
                               style={{ width: 46, height: 26, textAlign: 'center', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 700, color: '#374151' }} />
                             <button onClick={() => kaydetCoklu([l.id])} disabled={savingIds.size > 0}
                               style={{ height: 26, padding: '0 8px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#374151', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
