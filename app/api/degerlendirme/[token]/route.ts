@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getRequestMeta } from '@/lib/device/getRequestMeta'
+import { auditLog } from '@/lib/audit/log'
 
 export const runtime = 'nodejs'
 
-// Eşleşmiş cihaz tespit penceresi: son N saat içinde aynı IP'den device_token aktivitesi
+// Eşleşmiş cihaz tespit penceresi: son N dakika içinde aynı IP'den device_token aktivitesi
 // varsa, gelen değerlendirme aynı çalışan tarafından yapılıyor say.
-const ESLESME_PENCERESI_SAAT = 24
+// 1 saat: CGNAT yanlış-engelleme riskini sınırlar, tipik fraud senaryosunu yakalar.
+const ESLESME_PENCERESI_DK = 60
 
 // Token'dan lokasyonu bul — QR (qr_veri) veya NFC (nfc_token) fark etmez
 async function lokasyonBul(admin: any, token: string) {
@@ -100,14 +102,15 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   const { ip, ua } = getRequestMeta(req)
 
   // ── EŞLEŞMİŞ CİHAZ KONTROLÜ ─────────────────────────────────────────────
-  // Aynı firmaya ait aktif bir device_token (mobile app paired), son 24 saat
+  // Aynı firmaya ait aktif bir device_token (mobile app paired), son 1 saat
   // içinde aynı IP'den heartbeat attıysa → bu cihaz çalışan cihazıdır.
   // Eski tokenlarda son_ip NULL — bu kontrol onları doğal olarak atlar.
+  // CGNAT yanlış-engellemelerini görebilmek için her block audit log'a yazılır.
   if (ip) {
-    const pencereIso = new Date(Date.now() - ESLESME_PENCERESI_SAAT * 60 * 60 * 1000).toISOString()
+    const pencereIso = new Date(Date.now() - ESLESME_PENCERESI_DK * 60 * 1000).toISOString()
     const { data: paired } = await admin
       .from('device_tokens')
-      .select('id')
+      .select('id, user_id, isim_soyisim, son_kullanim, son_user_agent')
       .eq('firma_id', lok.firma_id)
       .eq('aktif', true)
       .eq('son_ip', ip)
@@ -115,6 +118,23 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       .limit(1)
       .maybeSingle()
     if (paired) {
+      await auditLog({
+        tip: 'cihaz_eslesmis_eval_block',
+        tablo: 'musteri_degerlendirmeleri',
+        firma_id: lok.firma_id,
+        proje_id: lok.proje_id ?? null,
+        detay: {
+          lokasyon_id: lok.id,
+          gelen_ip: ip,
+          gelen_ua: ua,
+          eslesen_token_id: (paired as any).id,
+          eslesen_user_id: (paired as any).user_id,
+          eslesen_isim: (paired as any).isim_soyisim,
+          eslesen_son_kullanim: (paired as any).son_kullanim,
+          eslesen_son_ua: (paired as any).son_user_agent,
+          pencere_dk: ESLESME_PENCERESI_DK,
+        },
+      })
       return NextResponse.json({
         ok: false,
         error: 'Bu cihaz sistemde çalışan kullanıcısı olarak kayıtlı. Müşteri değerlendirmesi gönderilemez.',
