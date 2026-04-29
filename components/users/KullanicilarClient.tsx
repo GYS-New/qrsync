@@ -109,14 +109,25 @@ export default function KullanicilarClient({
     return `${gun} gün önce`
   }
 
-  // Kullanıcının son görülme zamanını web önceliğiyle döndürür.
-  // Web (users.last_seen_at) varsa onu, yoksa mobil device_token.son_kullanim'a düş.
-  function getSonGorulme(u: User) {
+  // Kullanıcının son aktivitesini web vs mobil zamanlarını karşılaştırarak döndürür.
+  // Web ve mobil ZAMANLARINDAN HANGİSİ DAHA YENİ ise o gösterilir
+  // (web'e bir kez giren kullanıcının last_seen_at'i takılı kalmasın diye).
+  function getSonGorulme(u: User): {
+    source: 'web' | 'mobil' | null
+    ms: number
+    online: boolean
+  } {
     const webMs = u.last_seen_at ? new Date(u.last_seen_at).getTime() : 0
     const dt = deviceTokenMap[u.id]
     const mobilMs = dt?.son_kullanim ? new Date(dt.son_kullanim).getTime() : 0
-    const webOnline = webMs > 0 && (Date.now() - webMs) < 10 * 60 * 1000
-    return { webMs, mobilMs, webOnline }
+    if (webMs === 0 && mobilMs === 0) return { source: null, ms: 0, online: false }
+    const useMobile = mobilMs > webMs
+    const ms = useMobile ? mobilMs : webMs
+    return {
+      source: useMobile ? 'mobil' : 'web',
+      ms,
+      online: (Date.now() - ms) < 10 * 60 * 1000,
+    }
   }
   const apiBase = base === '/sa' ? '/api/sa' : base === '/ta' ? '/api/ta' : '/api'
 
@@ -229,18 +240,19 @@ export default function KullanicilarClient({
     if (filtreDurum === 'pasif') list = list.filter(u => !u.aktif)
     if (filtreRol) list = list.filter(u => u.rol === filtreRol)
 
-    // İki katmanlı sıralama:
-    //  1) Web last_seen_at olan kullanıcılar üstte (kendi aralarında web zamanı DESC)
-    //  2) Web yoksa: mobil son_kullanim DESC (yoksa kayit_tarihi gibi düş)
+    // En güncel aktiviteye göre sırala (web ile mobil zamanlarından maksimumu al, DESC).
+    // Notlar:
+    //  - Web ve mobil ayrı tier'lara koymak işe yaramıyordu çünkü web'e bir kez giren
+    //    kullanıcının last_seen_at'i kalıcı; herkes "web tier"a düşüyordu.
+    //  - getSonGorulme zaten en yeni aktiviteyi döndürüyor, aynı mantıkla sıralıyoruz.
     return [...list].sort((a, b) => {
       const aWeb = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0
       const bWeb = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0
-      if (aWeb > 0 && bWeb === 0) return -1
-      if (aWeb === 0 && bWeb > 0) return 1
-      if (aWeb > 0 && bWeb > 0) return bWeb - aWeb
       const aMob = deviceTokenMap[a.id]?.son_kullanim ? new Date(deviceTokenMap[a.id].son_kullanim!).getTime() : 0
       const bMob = deviceTokenMap[b.id]?.son_kullanim ? new Date(deviceTokenMap[b.id].son_kullanim!).getTime() : 0
-      return bMob - aMob
+      const aMax = Math.max(aWeb, aMob)
+      const bMax = Math.max(bWeb, bMob)
+      return bMax - aMax
     })
   }, [q, users, filtreLokasyon, filtreDurum, filtreRol, deviceTokenMap])
 
@@ -632,35 +644,30 @@ export default function KullanicilarClient({
                 <td style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>
                   {(() => {
                     const sg = getSonGorulme(u)
-                    if (sg.webMs > 0) {
-                      // Web kayıt varsa öncelik web — online ise yeşil + canlı nokta
-                      return (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 6,
-                          color: sg.webOnline ? '#059669' : '#4b5563',
-                          fontWeight: sg.webOnline ? 700 : 500,
-                        }}>
-                          {sg.webOnline && (
-                            <span style={{
-                              width: 7, height: 7, borderRadius: '50%',
-                              background: '#10b981',
-                              boxShadow: '0 0 5px rgba(16,185,129,0.7)',
-                            }} />
-                          )}
-                          {relativeLabel(sg.webMs)}
-                          <span style={{ fontSize: 10, color: sg.webOnline ? '#10b981' : '#94a3b8', fontWeight: 600 }}>web</span>
-                        </span>
-                      )
+                    if (sg.source === null) {
+                      return <span style={{ color: '#94a3b8' }}>—</span>
                     }
-                    if (sg.mobilMs > 0) {
-                      return (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#6b7280' }}>
-                          {relativeLabel(sg.mobilMs)}
-                          <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>mobil</span>
-                        </span>
-                      )
-                    }
-                    return <span style={{ color: '#94a3b8' }}>—</span>
+                    const isWeb = sg.source === 'web'
+                    const platformColor = isWeb
+                      ? (sg.online ? '#10b981' : '#94a3b8')
+                      : '#a78bfa' // mobil her zaman mor etiket
+                    return (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        color: sg.online ? '#059669' : '#6b7280',
+                        fontWeight: sg.online ? 700 : 500,
+                      }}>
+                        {sg.online && (
+                          <span style={{
+                            width: 7, height: 7, borderRadius: '50%',
+                            background: '#10b981',
+                            boxShadow: '0 0 5px rgba(16,185,129,0.7)',
+                          }} />
+                        )}
+                        {relativeLabel(sg.ms)}
+                        <span style={{ fontSize: 10, color: platformColor, fontWeight: 600 }}>{sg.source}</span>
+                      </span>
+                    )
                   })()}
                 </td>
                 <td>
