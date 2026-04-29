@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getRequestMeta } from '@/lib/device/getRequestMeta'
 
 export const runtime = 'nodejs'
+
+// Eşleşmiş cihaz tespit penceresi: son N saat içinde aynı IP'den device_token aktivitesi
+// varsa, gelen değerlendirme aynı çalışan tarafından yapılıyor say.
+const ESLESME_PENCERESI_SAAT = 24
 
 // Token'dan lokasyonu bul — QR (qr_veri) veya NFC (nfc_token) fark etmez
 async function lokasyonBul(admin: any, token: string) {
@@ -92,9 +97,31 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   const { ok, hata } = await firmaKontrol(admin, lok.firma_id, kanal!)
   if (!ok) return NextResponse.json({ ok: false, error: hata }, { status: 403 })
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-              || req.headers.get('x-real-ip') || null
-  const ua = req.headers.get('user-agent') || null
+  const { ip, ua } = getRequestMeta(req)
+
+  // ── EŞLEŞMİŞ CİHAZ KONTROLÜ ─────────────────────────────────────────────
+  // Aynı firmaya ait aktif bir device_token (mobile app paired), son 24 saat
+  // içinde aynı IP'den heartbeat attıysa → bu cihaz çalışan cihazıdır.
+  // Eski tokenlarda son_ip NULL — bu kontrol onları doğal olarak atlar.
+  if (ip) {
+    const pencereIso = new Date(Date.now() - ESLESME_PENCERESI_SAAT * 60 * 60 * 1000).toISOString()
+    const { data: paired } = await admin
+      .from('device_tokens')
+      .select('id')
+      .eq('firma_id', lok.firma_id)
+      .eq('aktif', true)
+      .eq('son_ip', ip)
+      .gte('son_kullanim', pencereIso)
+      .limit(1)
+      .maybeSingle()
+    if (paired) {
+      return NextResponse.json({
+        ok: false,
+        error: 'Bu cihaz sistemde çalışan kullanıcısı olarak kayıtlı. Müşteri değerlendirmesi gönderilemez.',
+        code: 'CIHAZ_ESLESMIS',
+      }, { status: 403 })
+    }
+  }
 
   const { error } = await admin.from('musteri_degerlendirmeleri').insert({
     lokasyon_id:      lok.id,

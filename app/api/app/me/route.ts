@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getRequestMeta } from '@/lib/device/getRequestMeta'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,9 +36,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: 'Cihaz devre dışı', kod: 'ESLESMEDI' }, { status: 403, headers: CORS_HEADERS })
     }
 
+    const { ip: reqIp, ua: reqUa } = getRequestMeta(req)
     await admin
       .from('device_tokens')
-      .update({ son_kullanim: new Date().toISOString() })
+      .update({ son_kullanim: new Date().toISOString(), son_ip: reqIp, son_user_agent: reqUa })
       .eq('device_token', deviceToken)
 
     // users tablosundan güncel bilgileri al

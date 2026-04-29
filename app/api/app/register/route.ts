@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getRequestMeta } from '@/lib/device/getRequestMeta'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -156,6 +157,8 @@ export async function POST(req: Request) {
 
     let deviceToken: string
 
+    const { ip: reqIp, ua: reqUa } = getRequestMeta(req)
+
     if (mevcutKayit) {
       deviceToken = mevcutKayit.device_token
       await admin
@@ -167,6 +170,8 @@ export async function POST(req: Request) {
           proje_id: proje_id || null,
           aktif: true,
           son_kullanim: new Date().toISOString(),
+          son_ip: reqIp,
+          son_user_agent: reqUa,
           ...(appVersion ? { app_version: appVersion } : {}),
         })
         .eq('id', mevcutKayit.id)
@@ -181,6 +186,9 @@ export async function POST(req: Request) {
           proje_id: proje_id || null,
           aktif: true,
           kayit_tarihi: new Date().toISOString(),
+          son_kullanim: new Date().toISOString(),
+          son_ip: reqIp,
+          son_user_agent: reqUa,
           ...(appVersion ? { app_version: appVersion } : {}),
         })
         .select('device_token')

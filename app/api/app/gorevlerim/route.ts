@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
+import { getRequestMeta } from '@/lib/device/getRequestMeta'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -157,8 +158,9 @@ export async function GET(req: Request) {
     }
 
     // ── Cihaz son kullanım ───────────────────────────────────────────────────
+    const { ip: reqIp, ua: reqUa } = getRequestMeta(req)
     await admin.from('device_tokens')
-      .update({ son_kullanim: new Date().toISOString() })
+      .update({ son_kullanim: new Date().toISOString(), son_ip: reqIp, son_user_agent: reqUa })
       .eq('device_token', deviceToken)
 
     return NextResponse.json({

@@ -45,6 +45,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
 import { auditLog } from '@/lib/audit/log'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
+import { getRequestMeta } from '@/lib/device/getRequestMeta'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -486,8 +487,9 @@ export async function POST(req: Request) {
     }
 
     // Cihaz son kullanım
+    const { ip: reqIp, ua: reqUa } = getRequestMeta(req)
     await admin.from('device_tokens')
-      .update({ son_kullanim: new Date().toISOString() })
+      .update({ son_kullanim: new Date().toISOString(), son_ip: reqIp, son_user_agent: reqUa })
       .eq('device_token', deviceToken)
 
     return NextResponse.json({ ok: true, sonuclar }, { headers: CORS })
