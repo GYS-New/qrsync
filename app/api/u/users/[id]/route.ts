@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { normalizeTelefonForSave } from '@/lib/format/telefon'
 
 // /api/u/users/[id]
 // tenant_user (U) ve musteri (M) rollerinin kullanıcı yönetimi.
@@ -59,7 +60,8 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   const body = await req.json().catch(() => ({} as any))
 
   const isim_soyisim = body.isim_soyisim !== undefined ? String(body.isim_soyisim).trim() : undefined
-  const telefon      = body.telefon !== undefined ? (body.telefon ? String(body.telefon).trim() : null) : undefined
+  // telefon alanı gönderildiyse standart formata çevir; boş gelirse default'a düşer
+  const telefon      = body.telefon !== undefined ? normalizeTelefonForSave(body.telefon) : undefined
   const aktif        = body.aktif !== undefined ? Boolean(body.aktif) : undefined
   const email        = body.email !== undefined ? String(body.email).trim().toLowerCase() : undefined
   const cinsiyet     = body.cinsiyet !== undefined ? (body.cinsiyet === 'E' || body.cinsiyet === 'K' ? body.cinsiyet : null) : undefined

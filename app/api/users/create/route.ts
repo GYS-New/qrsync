@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
+import { normalizeTelefonForSave } from '@/lib/format/telefon'
 
 // Creates a new Supabase Auth user + inserts into public.users
 // Allowed:
@@ -24,7 +25,8 @@ export async function POST(req: Request) {
   const email         = String(body.email ?? '').trim().toLowerCase()
   const password      = String(body.password ?? '')
   const isim_soyisim  = String(body.isim_soyisim ?? '').trim()
-  const telefon       = body.telefon ? String(body.telefon).trim() : null
+  // Boş gelirse default ata, dolu gelirse standart formata çevir
+  const telefon       = normalizeTelefonForSave(body.telefon)
   const rol           = String(body.rol ?? 'tenant_user')
   const firma_id      = body.firma_id ? String(body.firma_id) : null
   const body_proje_id = body.proje_id ? String(body.proje_id) : null

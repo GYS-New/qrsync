@@ -13,6 +13,7 @@ import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
 import PasswordInput from '@/components/ui/PasswordInput'
 import { useYetki } from '@/lib/yetki/useYetki'
 import PushBildirimModal from '@/components/push/PushBildirimModal'
+import { formatTelefon, TELEFON_DEFAULT } from '@/lib/format/telefon'
 
 const ROL_LABEL: Record<UserRole, string> = {
   super_admin: 'Süper Admin',
@@ -852,7 +853,15 @@ export default function KullanicilarClient({
             <div style={{ padding: 18 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div><label className="verde-label">İsim Soyisim *</label><input className="verde-input" value={createForm.isim_soyisim} onChange={e => setCreateForm(f => ({ ...f, isim_soyisim: e.target.value }))} autoComplete="off" /></div>
-                <div><label className="verde-label">Telefon</label><input className="verde-input" value={createForm.telefon} onChange={e => setCreateForm(f => ({ ...f, telefon: e.target.value }))} autoComplete="off" /></div>
+                <div><label className="verde-label">Telefon</label><input
+                  className="verde-input"
+                  value={createForm.telefon}
+                  onChange={e => setCreateForm(f => ({ ...f, telefon: formatTelefon(e.target.value) }))}
+                  autoComplete="off"
+                  inputMode="tel"
+                  placeholder={TELEFON_DEFAULT}
+                  maxLength={15}
+                /></div>
                 <div><label className="verde-label">Email *</label><input className="verde-input" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))} autoComplete="off" /></div>
                 <div><label className="verde-label">Şifre *</label><PasswordInput value={createForm.password} onChange={v => setCreateForm(f => ({ ...f, password: v }))} /></div>
                 <div><label className="verde-label">Cinsiyet</label><select className="verde-input" value={createForm.cinsiyet} onChange={e => setCreateForm(f => ({ ...f, cinsiyet: e.target.value }))}><option value="">Seçiniz</option><option value="E">Erkek</option><option value="K">Kadın</option></select></div>
@@ -1002,7 +1011,15 @@ export default function KullanicilarClient({
               })()}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div><label className="verde-label">İsim Soyisim</label><input className="verde-input" value={editForm.isim_soyisim} onChange={e => setEditForm(f => ({ ...f, isim_soyisim: e.target.value }))} autoComplete="off" /></div>
-                <div><label className="verde-label">Telefon</label><input className="verde-input" value={editForm.telefon} onChange={e => setEditForm(f => ({ ...f, telefon: e.target.value }))} autoComplete="off" /></div>
+                <div><label className="verde-label">Telefon</label><input
+                  className="verde-input"
+                  value={editForm.telefon}
+                  onChange={e => setEditForm(f => ({ ...f, telefon: formatTelefon(e.target.value) }))}
+                  autoComplete="off"
+                  inputMode="tel"
+                  placeholder={TELEFON_DEFAULT}
+                  maxLength={15}
+                /></div>
                 <div><label className="verde-label">Email</label><input className="verde-input" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} autoComplete="off" /></div>
                 <div><label className="verde-label">Cinsiyet</label><select className="verde-input" value={editForm.cinsiyet} onChange={e => setEditForm(f => ({ ...f, cinsiyet: e.target.value }))}><option value="">Seçiniz</option><option value="E">Erkek</option><option value="K">Kadın</option></select></div>
               </div>

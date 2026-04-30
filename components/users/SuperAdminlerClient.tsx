@@ -8,6 +8,7 @@ import RowActionButton from '@/components/ui/RowActionButton'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import PasswordInput from '@/components/ui/PasswordInput'
+import { formatTelefon, TELEFON_DEFAULT } from '@/lib/format/telefon'
 
 const ROL_BADGE: Record<string, { bg: string; color: string; label: string }> = {
   super_admin:     { bg: '#e5e7eb', color: '#1f2937', label: 'SA — Süper Admin' },
@@ -370,7 +371,15 @@ export default function SuperAdminlerClient({
                 </div>
                 <div>
                   <label className="verde-label">Telefon</label>
-                  <input className="verde-input" value={createForm.telefon} onChange={e => setCreateForm(f => ({ ...f, telefon: e.target.value }))} autoComplete="off" />
+                  <input
+                    className="verde-input"
+                    value={createForm.telefon}
+                    onChange={e => setCreateForm(f => ({ ...f, telefon: formatTelefon(e.target.value) }))}
+                    autoComplete="off"
+                    inputMode="tel"
+                    placeholder={TELEFON_DEFAULT}
+                    maxLength={15}
+                  />
                 </div>
                 <div>
                   <label className="verde-label">Email *</label>
@@ -418,7 +427,15 @@ export default function SuperAdminlerClient({
                 </div>
                 <div>
                   <label className="verde-label">Telefon</label>
-                  <input className="verde-input" value={editForm.telefon} onChange={e => setEditForm(f => ({ ...f, telefon: e.target.value }))} autoComplete="off" />
+                  <input
+                    className="verde-input"
+                    value={editForm.telefon}
+                    onChange={e => setEditForm(f => ({ ...f, telefon: formatTelefon(e.target.value) }))}
+                    autoComplete="off"
+                    inputMode="tel"
+                    placeholder={TELEFON_DEFAULT}
+                    maxLength={15}
+                  />
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label className="verde-label">Email</label>
