@@ -22,6 +22,7 @@ export default function LokasyonlarClient({
   projeId,
   qrSablonAktif = true,
   yetkiliLokIds,
+  showReadOnlyActions = false,
 }: {
   base: '/sa' | '/ta' | '/u'
   initialFirmaId?: string | null
@@ -30,6 +31,8 @@ export default function LokasyonlarClient({
   projeId?: string | null
   qrSablonAktif?: boolean
   yetkiliLokIds?: string[] | null
+  /** Readonly kullanıcılar için QR/↓QR/↓Kart butonlarını göster (örn. tenant_user) */
+  showReadOnlyActions?: boolean
 }) {
   const supabase = createClient()
   const { toast } = useToast()
@@ -405,6 +408,7 @@ export default function LokasyonlarClient({
               qrIndiriliyor={qrIndiriliyor}
               qrSablonIndiriliyor={qrSablonIndiriliyor}
               qrSablonAktif={qrSablonAktif}
+              showReadOnlyActions={showReadOnlyActions}
             />
           </div>
         )}

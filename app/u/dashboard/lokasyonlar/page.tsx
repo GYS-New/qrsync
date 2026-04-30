@@ -35,6 +35,8 @@ export default async function ULokasyonlarPage() {
   const { data: lokasyonlar } = await q
 
   const readonly = !yetki.duzenleyebilir && !yetki.ekleyebilir
+  // tenant_user readonly olsa bile QR / ↓QR / ↓Kart butonlarını görsün; musteri'de mevcut hâli korunur
+  const showReadOnlyActions = me.rol === 'tenant_user'
 
   return (
     <div>
@@ -46,6 +48,7 @@ export default async function ULokasyonlarPage() {
         readonly={readonly}
         projeId={projeId ?? undefined}
         yetkiliLokIds={yetkiliLokIds}
+        showReadOnlyActions={showReadOnlyActions}
       />
     </div>
   )

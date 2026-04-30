@@ -17,11 +17,14 @@ interface LokasyonAgacProps {
   qrSablonIndiriliyor?: string | null
   qrSablonAktif?: boolean
   readonly?: boolean
+  /** readonly olsa bile salt-okunur aksiyonları göster (QR/↓QR/↓Kart) */
+  showReadOnlyActions?: boolean
 }
 
 function LokasyonNode({
   lok, depth, onEdit, onDelete, onToggleAktif, onQR, onAddChild,
   onQrIndir, onQrSablonIndir, qrIndiriliyor, qrSablonIndiriliyor, qrSablonAktif, readonly,
+  showReadOnlyActions,
 }: {
   lok: Lokasyon; depth: number
   onEdit?: (l: Lokasyon) => void
@@ -35,6 +38,7 @@ function LokasyonNode({
   qrSablonIndiriliyor?: string | null
   qrSablonAktif?: boolean
   readonly?: boolean
+  showReadOnlyActions?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const hasChildren = (lok.children?.length ?? 0) > 0
@@ -71,15 +75,15 @@ function LokasyonNode({
           {lok.aktif ? 'Aktif' : 'Pasif'}
         </span>
 
-        {!readonly && (
+        {(!readonly || showReadOnlyActions) && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', alignItems: 'center' }}>
 
-            {/* Tekil QR butonu — her lokasyonda */}
+            {/* Tekil QR butonu — her lokasyonda (readonly'de de görünür) */}
             <RowActionButton variant="success" onClick={() => onQR?.(lok)} title="QR Kod">
               QR
             </RowActionButton>
 
-            {/* QR İndir + Şablonlu — sadece üst (root) lokasyonlarda */}
+            {/* QR İndir + Şablonlu — sadece üst (root) lokasyonlarda (readonly'de de görünür) */}
             {isRoot && onQrIndir && (
               <RowActionButton
                 variant="success"
@@ -99,23 +103,28 @@ function LokasyonNode({
               </RowActionButton>
             )}
 
-            {onAddChild && (
-              <RowActionButton variant="success" onClick={() => onAddChild(lok.id)} title="Alt Lokasyon Ekle">
-                +Alt
-              </RowActionButton>
+            {/* Yazma yetkisi gerektiren butonlar — sadece readonly değilken */}
+            {!readonly && (
+              <>
+                {onAddChild && (
+                  <RowActionButton variant="success" onClick={() => onAddChild(lok.id)} title="Alt Lokasyon Ekle">
+                    +Alt
+                  </RowActionButton>
+                )}
+
+                <RowActionButton variant={lok.aktif ? 'warning' : 'success'} onClick={() => onToggleAktif?.(lok)}>
+                  {lok.aktif ? 'Pasif Yap' : 'Aktif Yap'}
+                </RowActionButton>
+
+                <RowActionButton variant="base" onClick={() => onEdit?.(lok)}>
+                  Düzenle
+                </RowActionButton>
+
+                <RowActionButton variant="danger" onClick={() => onDelete?.(lok.id)}>
+                  Sil
+                </RowActionButton>
+              </>
             )}
-
-            <RowActionButton variant={lok.aktif ? 'warning' : 'success'} onClick={() => onToggleAktif?.(lok)}>
-              {lok.aktif ? 'Pasif Yap' : 'Aktif Yap'}
-            </RowActionButton>
-
-            <RowActionButton variant="base" onClick={() => onEdit?.(lok)}>
-              Düzenle
-            </RowActionButton>
-
-            <RowActionButton variant="danger" onClick={() => onDelete?.(lok.id)}>
-              Sil
-            </RowActionButton>
           </div>
         )}
       </div>
@@ -129,6 +138,7 @@ function LokasyonNode({
           qrIndiriliyor={qrIndiriliyor} qrSablonIndiriliyor={qrSablonIndiriliyor}
           qrSablonAktif={qrSablonAktif}
           readonly={readonly}
+          showReadOnlyActions={showReadOnlyActions}
         />
       ))}
     </div>
@@ -138,6 +148,7 @@ function LokasyonNode({
 export default function LokasyonAgac({
   lokasyonlar, onEdit, onDelete, onToggleAktif, onQR, onAddChild,
   onQrIndir, onQrSablonIndir, qrIndiriliyor, qrSablonIndiriliyor, qrSablonAktif, readonly,
+  showReadOnlyActions,
 }: LokasyonAgacProps) {
   const map = new Map<string, Lokasyon>()
   lokasyonlar.forEach(l => map.set(l.id, { ...l, children: [] }))
@@ -170,6 +181,7 @@ export default function LokasyonAgac({
           qrIndiriliyor={qrIndiriliyor} qrSablonIndiriliyor={qrSablonIndiriliyor}
           qrSablonAktif={qrSablonAktif}
           readonly={readonly}
+          showReadOnlyActions={showReadOnlyActions}
         />
       ))}
     </div>
