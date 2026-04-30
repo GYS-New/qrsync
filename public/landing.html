@@ -55,11 +55,8 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-/* Tasarım baseline'ı 1.32x büyük ekrana göre ayarlandı; mobil ve tabletlerde
-   zoom uygulanmıyor (overflow + bozuk ölçek). Sadece geniş desktop'ta uygula. */
-@media (min-width: 1200px) {
-  html { zoom: 1.32; }
-}
+/* zoom hack kaldırıldı (1200px'te tutarsızlık + ölçek atlamasına yol açıyordu).
+   Boyutlar her viewport için doğal CSS ile ayarlandı. */
 body {
   margin: 0;
   background: var(--bg);
@@ -109,7 +106,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .nav {
   display: flex; align-items: center; justify-content: space-between;
-  height: 96px;
+  height: 110px;
   color: #fff;
 }
 .brand {
@@ -117,12 +114,12 @@ ul { margin: 0; padding: 0; list-style: none; }
   color: #fff;
 }
 .brand-img {
-  height: 64px;
+  height: 88px;
   width: auto;
   display: block;
 }
 .brand-svg {
-  height: 64px;
+  height: 88px;
   width: auto;
   display: block;
   flex-shrink: 0;
@@ -164,6 +161,8 @@ ul { margin: 0; padding: 0; list-style: none; }
 .nav-links a { transition: color .2s; }
 .nav-links a:hover { color: #fff; }
 .nav-cta { display: flex; gap: 10px; align-items: center; }
+/* Nav içindeki butonlar daha kompakt — ana CTA hero'da, nav'da küçük tutalım */
+.nav-cta .btn { padding: 8px 14px; font-size: 0.86rem; }
 
 .btn {
   display: inline-flex; align-items: center; gap: 8px;
@@ -735,9 +734,9 @@ footer {
   .menu-btn { display: flex; }
   .nav-cta .btn-ghost { display: none; }
   .brand-text small { display: none; }
-  .nav { height: 76px; }
-  .brand-img { height: 48px; }
-  .brand-svg { height: 48px; }
+  .nav { height: 86px; }
+  .brand-img { height: 64px; }
+  .brand-svg { height: 64px; }
   .strip-inner { grid-template-columns: repeat(2, 1fr); }
   .strip-item:nth-child(2) { border-right: none; }
   .modules { grid-template-columns: 1fr; }
@@ -766,11 +765,13 @@ footer {
   .foot-grid { grid-template-columns: 1fr; }
   .hero { padding: 50px 0 80px; }
   .section { padding: 72px 0; }
-  .nav { height: 64px; }
-  .brand-img { height: 40px; }
-  .brand-svg { height: 40px; }
+  .nav { height: 72px; }
+  .brand-img { height: 52px; }
+  .brand-svg { height: 52px; }
   /* Tap target boyutu — mobil dokunma kolaylığı */
   .btn { min-height: 44px; }
+  /* Mobilde nav butonu çok daha kompakt */
+  .nav-cta .btn { padding: 7px 12px; font-size: 0.82rem; }
 }
 </style>
 </head>
