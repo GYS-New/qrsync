@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { buildQrKartZip } from '@/lib/qr-kart/qr-kart-node'
+import { getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
 
 export const dynamic    = 'force-dynamic'
 export const runtime    = 'nodejs'
@@ -18,7 +19,9 @@ export async function GET(req: NextRequest) {
 
   const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
   const isTA = me.rol === 'tenant_admin'
-  if (!isSA && !isTA) return NextResponse.json({ error: 'Yetki yetersiz' }, { status: 403 })
+  const isU  = me.rol === 'tenant_user'
+  // U salt-okunur QR aksiyonları için izinli; musteri yasak
+  if (!isSA && !isTA && !isU) return NextResponse.json({ error: 'Yetki yetersiz' }, { status: 403 })
 
   const url           = new URL(req.url)
   const firmaId       = url.searchParams.get('firma_id')
@@ -35,7 +38,16 @@ export async function GET(req: NextRequest) {
 
   const effectiveFirmaId = isSA ? firmaId : me.firma_id
   if (!effectiveFirmaId) return NextResponse.json({ error: 'firma_id zorunlu' }, { status: 400 })
-  if (isTA && firmaId && firmaId !== me.firma_id) return NextResponse.json({ error: 'Yetkisiz firma' }, { status: 403 })
+  if ((isTA || isU) && firmaId && firmaId !== me.firma_id) return NextResponse.json({ error: 'Yetkisiz firma' }, { status: 403 })
+
+  // U için: ust_lokasyon_id kullanıcının yetkili olduğu üst lokasyon ağacında olmalı
+  if (isU && ustLokasyonId) {
+    const yetkiliUstLokIds = await getLokasyonYetki(supabase)
+    // null = tüm erişim (kayıt yok), array = kısıtlı
+    if (yetkiliUstLokIds !== null && !yetkiliUstLokIds.includes(ustLokasyonId)) {
+      return NextResponse.json({ error: 'Bu üst lokasyon için yetkiniz yok' }, { status: 403 })
+    }
+  }
 
   let lokQuery = admin
     .from('lokasyonlar')
