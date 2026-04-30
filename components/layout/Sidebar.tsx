@@ -279,7 +279,7 @@ function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' |
   )
 }
 
-export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, sidebarAltyazi, birimFiyatAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; sidebarAltyazi?: string | null; birimFiyatAktifProp?: boolean }) {
+export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, sidebarAltyazi, birimFiyatAktifProp, personelTakibiAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; sidebarAltyazi?: string | null; birimFiyatAktifProp?: boolean; personelTakibiAktifProp?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeLoading = useRouteLoading()
@@ -329,9 +329,11 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
   const birimFiyatAktif = aktifProje
     ? aktifProje.birim_fiyat_aktif === true
     : isSA ? aktifFirma?.birim_fiyat_aktif === true : birimFiyatAktifProp === true
+  // U/M rolleri ProjeProvider sarmalı içinde değil — context'ten aktifProje null gelir.
+  // Bu durumda U layout'tan SSR ile geçirilen prop'u kullan.
   const personelTakibiAktif = aktifProje
     ? aktifProje.personel_takibi_aktif !== false
-    : true
+    : personelTakibiAktifProp !== undefined ? personelTakibiAktifProp : true
   // İO Asistan: aktifProje varsa o projenin ayarı, yoksa varsayılan açık (proje seçilmediyse gösterilmesin sorunu yaşanmasın)
   const ioAsistanAktif = aktifProje ? aktifProje.io_asistan_aktif !== false : true
   // Manuel push: proje varsa proje, yoksa firma ayarından. Rol bazlı alt toggle.
