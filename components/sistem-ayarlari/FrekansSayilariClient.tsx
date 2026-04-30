@@ -175,16 +175,31 @@ export default function FrekansSayilariClient({ lokasyonlar, firmaId, projeId }:
                     {altGruplar.length} grup · {altLokIds.length} lokasyon
                   </span>
                 </span>
-                {/* Üst lokasyon frekans girişi — tüm altlara uygular */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
-                  <input type="number" min={minVal} max={maxVal} value={values[ustLok.id] ?? defaultVal}
-                    onChange={e => setGrupFrekans([ustLok.id, ...altLokIds], clampInput(e.target.value))}
-                    style={{ width: 50, height: 30, textAlign: 'center', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 14, fontWeight: 700, color: '#111827' }} />
-                  <button onClick={() => kaydetCoklu([ustLok.id, ...altLokIds])} disabled={savingIds.size > 0}
-                    style={{ height: 30, padding: '0 12px', borderRadius: 6, border: 'none', background: '#111827', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                    {savingIds.size > 0 ? '...' : 'Tümünü Kaydet'}
-                  </button>
-                </div>
+                {/* Üst lokasyonun toplam frekans göstergesi (read-only) */}
+                {/* Ayar buradan yapılmaz — alttaki gruplar ve lokasyonlardan girilir */}
+                {(() => {
+                  const toplamUstLok = altLokIds.reduce((sum, id) => sum + (values[id] || 0), 0)
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
+                      <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>Toplam</span>
+                      <span
+                        title={`${ustLok.tanim} altındaki ${altLokIds.length} lokasyonun ${tip === 'haftalik' ? 'haftalık' : 'günlük'} frekans toplamı`}
+                        style={{
+                          minWidth: 50, height: 30,
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          padding: '0 14px',
+                          borderRadius: 6,
+                          background: tip === 'haftalik' ? '#faf5ff' : '#eff6ff',
+                          border: `1px solid ${tip === 'haftalik' ? '#e9d5ff' : '#bfdbfe'}`,
+                          color: tip === 'haftalik' ? '#7c3aed' : '#1d4ed8',
+                          fontSize: 14, fontWeight: 800,
+                        }}
+                      >
+                        {toplamUstLok}
+                      </span>
+                    </div>
+                  )
+                })()}
               </div>
 
               {ustAcik && (
