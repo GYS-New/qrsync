@@ -256,6 +256,25 @@ export default function KullanicilarClient({
     })
   }, [q, users, filtreLokasyon, filtreDurum, filtreRol, deviceTokenMap])
 
+  // Üst lokasyon bazında istatistikler — tüm kullanıcı listesi (filtrelerden bağımsız).
+  // U/M rolleri için ustLokasyonlar SSR'da zaten yetkiyle filtrelenmiş halde geliyor,
+  // dolayısıyla "sadece yetkili olduğu üst lokasyonun toplamlarını görür" otomatik sağlanır.
+  const ustLokStats = useMemo(() => {
+    return ustLokasyonlar.map(ustLok => {
+      const ustUsers = users.filter(u => (u as any).ust_lokasyon_id === ustLok.id)
+      let online = 0
+      let paired = 0
+      for (const u of ustUsers) {
+        const sg = getSonGorulme(u)
+        if (sg.online) online++
+        if (deviceTokenMap[u.id]) paired++
+      }
+      return { id: ustLok.id, tanim: ustLok.tanim, total: ustUsers.length, online, paired }
+    })
+  // getSonGorulme deviceTokenMap'i kullanıyor; stable reference değil ama deps'te zaten var
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users, ustLokasyonlar, deviceTokenMap])
+
   function showErr(msg: string) { toast({ type: 'error', title: 'Hata', message: msg }) }
   function showOk(msg: string)  { toast({ type: 'success', title: 'Başarılı', message: msg }) }
 
@@ -466,6 +485,60 @@ export default function KullanicilarClient({
 
   return (
     <div className="users-scale" style={{ padding: '24px 28px' }}>
+      {/* Üst lokasyon bazında özet kartlar */}
+      {ustLokStats.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+          gap: 10,
+          marginBottom: 14,
+        }}>
+          {ustLokStats.map(s => {
+            const orani = s.total > 0 ? Math.round((s.online / s.total) * 100) : 0
+            const tikla = s.id === filtreLokasyon
+            return (
+              <div
+                key={s.id}
+                onClick={() => setFiltreLokasyon(tikla ? '' : s.id)}
+                title={tikla ? 'Filtreyi kaldır' : `${s.tanim} kullanıcılarını filtrele`}
+                style={{
+                  background: '#fff',
+                  border: `1px solid ${tikla ? '#10b981' : '#e5e7eb'}`,
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  cursor: 'pointer',
+                  boxShadow: tikla ? '0 0 0 3px rgba(16,185,129,0.15)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#111827', marginBottom: 8, letterSpacing: 0.2 }}>
+                  📍 {s.tanim}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5 }}>
+                  <div style={{ flex: 1, textAlign: 'center' }}>
+                    <div style={{ fontWeight: 800, fontSize: 18, color: '#111827', lineHeight: 1 }}>{s.total}</div>
+                    <div style={{ color: '#6b7280', marginTop: 3 }}>kullanıcı</div>
+                  </div>
+                  <div style={{ flex: 1, textAlign: 'center', borderLeft: '1px solid #f3f4f6', paddingLeft: 8 }}>
+                    <div style={{ fontWeight: 800, fontSize: 18, color: s.online > 0 ? '#059669' : '#9ca3af', lineHeight: 1, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {s.online > 0 && (
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 5px rgba(16,185,129,0.7)' }} />
+                      )}
+                      {s.online}
+                    </div>
+                    <div style={{ color: '#6b7280', marginTop: 3 }}>online{s.total > 0 ? ` · %${orani}` : ''}</div>
+                  </div>
+                  <div style={{ flex: 1, textAlign: 'center', borderLeft: '1px solid #f3f4f6', paddingLeft: 8 }}>
+                    <div style={{ fontWeight: 800, fontSize: 18, color: s.paired > 0 ? '#7c3aed' : '#9ca3af', lineHeight: 1 }}>{s.paired}</div>
+                    <div style={{ color: '#6b7280', marginTop: 3 }}>cihaz</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       <div className="verde-card">
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
