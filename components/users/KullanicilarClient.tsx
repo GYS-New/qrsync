@@ -489,48 +489,54 @@ export default function KullanicilarClient({
       {ustLokStats.length > 0 && (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: 10,
-          marginBottom: 14,
+          gridTemplateColumns: `repeat(${ustLokStats.length}, minmax(0, 1fr))`,
+          gap: 6,
+          marginBottom: 12,
         }}>
           {ustLokStats.map(s => {
-            const orani = s.total > 0 ? Math.round((s.online / s.total) * 100) : 0
             const tikla = s.id === filtreLokasyon
             return (
               <div
                 key={s.id}
                 onClick={() => setFiltreLokasyon(tikla ? '' : s.id)}
-                title={tikla ? 'Filtreyi kaldır' : `${s.tanim} kullanıcılarını filtrele`}
+                title={tikla ? 'Filtreyi kaldır' : `${s.tanim} — ${s.total} kullanıcı, ${s.online} online, ${s.paired} cihaz`}
                 style={{
                   background: '#fff',
                   border: `1px solid ${tikla ? '#10b981' : '#e5e7eb'}`,
-                  borderRadius: 10,
-                  padding: '12px 14px',
+                  borderRadius: 8,
+                  padding: '7px 9px',
                   cursor: 'pointer',
-                  boxShadow: tikla ? '0 0 0 3px rgba(16,185,129,0.15)' : 'none',
+                  boxShadow: tikla ? '0 0 0 2px rgba(16,185,129,0.15)' : 'none',
                   transition: 'all 0.15s ease',
+                  minWidth: 0,
                 }}
               >
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#111827', marginBottom: 8, letterSpacing: 0.2 }}>
+                <div
+                  style={{
+                    fontSize: 10.5, fontWeight: 800, color: '#111827',
+                    marginBottom: 5, letterSpacing: 0.2,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}
+                >
                   📍 {s.tanim}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5 }}>
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontWeight: 800, fontSize: 18, color: '#111827', lineHeight: 1 }}>{s.total}</div>
-                    <div style={{ color: '#6b7280', marginTop: 3 }}>kullanıcı</div>
+                <div style={{ display: 'flex', gap: 4, fontSize: 9.5 }}>
+                  <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: '#111827', lineHeight: 1 }}>{s.total}</div>
+                    <div style={{ color: '#6b7280', marginTop: 2 }}>kull.</div>
                   </div>
-                  <div style={{ flex: 1, textAlign: 'center', borderLeft: '1px solid #f3f4f6', paddingLeft: 8 }}>
-                    <div style={{ fontWeight: 800, fontSize: 18, color: s.online > 0 ? '#059669' : '#9ca3af', lineHeight: 1, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ flex: 1, textAlign: 'center', borderLeft: '1px solid #f3f4f6', minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: s.online > 0 ? '#059669' : '#9ca3af', lineHeight: 1, display: 'inline-flex', alignItems: 'center', gap: 3, justifyContent: 'center' }}>
                       {s.online > 0 && (
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 5px rgba(16,185,129,0.7)' }} />
+                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 4px rgba(16,185,129,0.7)' }} />
                       )}
                       {s.online}
                     </div>
-                    <div style={{ color: '#6b7280', marginTop: 3 }}>online{s.total > 0 ? ` · %${orani}` : ''}</div>
+                    <div style={{ color: '#6b7280', marginTop: 2 }}>online</div>
                   </div>
-                  <div style={{ flex: 1, textAlign: 'center', borderLeft: '1px solid #f3f4f6', paddingLeft: 8 }}>
-                    <div style={{ fontWeight: 800, fontSize: 18, color: s.paired > 0 ? '#7c3aed' : '#9ca3af', lineHeight: 1 }}>{s.paired}</div>
-                    <div style={{ color: '#6b7280', marginTop: 3 }}>cihaz</div>
+                  <div style={{ flex: 1, textAlign: 'center', borderLeft: '1px solid #f3f4f6', minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: s.paired > 0 ? '#7c3aed' : '#9ca3af', lineHeight: 1 }}>{s.paired}</div>
+                    <div style={{ color: '#6b7280', marginTop: 2 }}>cihaz</div>
                   </div>
                 </div>
               </div>
