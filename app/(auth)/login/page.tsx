@@ -177,6 +177,12 @@ export default function LoginPage() {
       } else {
         setError(authError.message ?? 'Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.')
       }
+      // Saldırı tespiti için başarısız denemeyi audit_log'a yaz (fire-and-forget, login akışını kırmaz)
+      void fetch('/api/auth/login-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, error: authError.message ?? 'unknown' }),
+      }).catch(() => {})
       setLoading(false)
       return
     }

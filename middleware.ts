@@ -1,7 +1,86 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// ── RATE LIMIT (Aşama 3) ──────────────────────────────────────────────────
+// In-memory per-IP bucket. Railway tek process — Map yeterli.
+// Mode: RATE_LIMIT_MODE=off|log|enforce (varsayılan: log — bloklamaz, sadece konsola yazar)
+const ipBucket = new Map<string, { count: number; resetAt: number }>()
+let cleanupCounter = 0
+
+const RATE_LIMITS = {
+  app: { max: 200, windowMs: 60_000 },     // mobile yüksek (heartbeat, gorevlerim)
+  auth: { max: 30, windowMs: 60_000 },     // auth — sıkı (brute-force)
+  default: { max: 90, windowMs: 60_000 },  // genel
+} as const
+
+function rateLimitBucket(path: string): keyof typeof RATE_LIMITS {
+  if (path.startsWith('/api/app/')) return 'app'
+  if (path.startsWith('/api/auth/')) return 'auth'
+  return 'default'
+}
+
+function rateLimitCheck(req: NextRequest, pathname: string): NextResponse | null {
+  const mode = (process.env.RATE_LIMIT_MODE || 'log').toLowerCase()
+  if (mode === 'off') return null
+
+  // Cron endpoint'leri zaten x-cron-token ile korumalı, bypass et
+  if (pathname.startsWith('/api/cron/')) return null
+
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || req.headers.get('x-real-ip')
+    || 'unknown'
+
+  const bucket = rateLimitBucket(pathname)
+  const limits = RATE_LIMITS[bucket]
+  const key = `${ip}:${bucket}`
+  const now = Date.now()
+
+  // Lazy cleanup — her 1000 istekte expired bucket'ları sil (bellek sızıntısı önle)
+  if (++cleanupCounter % 1000 === 0) {
+    for (const [k, v] of ipBucket.entries()) {
+      if (v.resetAt <= now) ipBucket.delete(k)
+    }
+  }
+
+  const entry = ipBucket.get(key)
+  if (!entry || entry.resetAt <= now) {
+    ipBucket.set(key, { count: 1, resetAt: now + limits.windowMs })
+    return null
+  }
+
+  entry.count++
+  if (entry.count > limits.max) {
+    // İlk taşmada bir kez log (spam önleme)
+    if (entry.count === limits.max + 1) {
+      console.warn(`[rate-limit:${mode}] ${ip} ${bucket} ${entry.count}/${limits.max}/dk ${pathname}`)
+    }
+    if (mode === 'enforce') {
+      return new NextResponse(
+        JSON.stringify({ error: 'Çok fazla istek. Birkaç saniye sonra tekrar deneyin.', code: 'RATE_LIMIT_EXCEEDED' }),
+        {
+          status: 429,
+          headers: {
+            'content-type': 'application/json',
+            'retry-after': String(Math.ceil((entry.resetAt - now) / 1000)),
+          },
+        }
+      )
+    }
+    // log mode: bloklamaz, request devam eder
+  }
+
+  return null
+}
+
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  // /api/* için sadece rate limit (her endpoint kendi auth'unu yapar)
+  if (pathname.startsWith('/api/')) {
+    const blocked = rateLimitCheck(request, pathname)
+    if (blocked) return blocked
+    return NextResponse.next()
+  }
 
   let response = NextResponse.next({
     request: {
@@ -28,7 +107,6 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user: authUser } } = await supabase.auth.getUser()
-  const pathname = request.nextUrl.pathname
 
   // Mobil cihaz tespiti — web uygulamasına mobil erişimi engelle, landing'e yönlendir
   const ua = request.headers.get('user-agent') ?? ''
@@ -71,6 +149,7 @@ export async function middleware(request: NextRequest) {
   return response
 }
 
+// Matcher: /api dahil tüm sayfalar (api için sadece rate limit, diğerleri için auth flow)
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|favicon\\.svg|api|screenshots|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp)).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|favicon\\.svg|screenshots|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp)).*)'],
 }
