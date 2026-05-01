@@ -19,8 +19,37 @@ function rateLimitBucket(path: string): keyof typeof RATE_LIMITS {
   return 'default'
 }
 
+// Rate limit aşımını Supabase REST API ile audit_log'a yazar (fire-and-forget).
+// Edge runtime uyumlu — supabase-js client kullanmaz, doğrudan fetch.
+function logRateLimitOverflow(ip: string, bucket: string, count: number, max: number, pathname: string, ua: string | null, mode: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseKey) return // env yoksa sessiz geç
+
+  const payload = {
+    tip: 'rate_limit_asildi',
+    tablo: 'middleware',
+    basarili: false,
+    hata_mesaji: `${count}/${max} istek/dk aşıldı`,
+    detay: { ip, ua, bucket, count, max, path: pathname, mode },
+  }
+
+  // Fire-and-forget — middleware'i bekletme
+  void fetch(`${supabaseUrl}/rest/v1/audit_log`, {
+    method: 'POST',
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(payload),
+  }).catch(() => {})
+}
+
 function rateLimitCheck(req: NextRequest, pathname: string): NextResponse | null {
-  const mode = (process.env.RATE_LIMIT_MODE || 'log').toLowerCase()
+  // Default 'enforce' — saldırı olunca otomatik blokla, manuel "açma" gerek yok
+  const mode = (process.env.RATE_LIMIT_MODE || 'enforce').toLowerCase()
   if (mode === 'off') return null
 
   // Cron endpoint'leri zaten x-cron-token ile korumalı, bypass et
@@ -50,9 +79,10 @@ function rateLimitCheck(req: NextRequest, pathname: string): NextResponse | null
 
   entry.count++
   if (entry.count > limits.max) {
-    // İlk taşmada bir kez log (spam önleme)
+    // İlk taşmada audit_log + email (30 dk içinde guvenlik-mail cron'u tetikler)
     if (entry.count === limits.max + 1) {
       console.warn(`[rate-limit:${mode}] ${ip} ${bucket} ${entry.count}/${limits.max}/dk ${pathname}`)
+      logRateLimitOverflow(ip, bucket, entry.count, limits.max, pathname, req.headers.get('user-agent'), mode)
     }
     if (mode === 'enforce') {
       return new NextResponse(
@@ -66,7 +96,7 @@ function rateLimitCheck(req: NextRequest, pathname: string): NextResponse | null
         }
       )
     }
-    // log mode: bloklamaz, request devam eder
+    // log mode: bloklamaz, request devam eder (audit kaydı yine de düşer)
   }
 
   return null

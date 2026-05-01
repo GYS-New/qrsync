@@ -35,6 +35,7 @@ const GUVENLIK_AUDIT_TIPLERI = [
   'cihaz_eslesmis_eval_block',  // Eşleşmiş cihaz müşteri değerlendirmesi denedi
   'login_basarisiz',             // Başarısız giriş denemesi
   'yetki_reddedildi',            // Yetkisiz erişim denemesi
+  'rate_limit_asildi',           // Rate limit aşımı (DoS / brute-force göstergesi)
 ]
 
 export async function GET(req: Request) { return handle(req) }
@@ -115,6 +116,8 @@ ${(alerts ?? []).map((a: any) => {
       ? 'Başarısız giriş denemesi'
       : tip === 'yetki_reddedildi'
       ? 'Yetkisiz erişim denemesi'
+      : tip === 'rate_limit_asildi'
+      ? 'Rate limit aşımı (DoS/brute-force şüphesi)'
       : tip
     return `  • ${sayi}× ${aciklama} (tip: ${tip})`
   })
