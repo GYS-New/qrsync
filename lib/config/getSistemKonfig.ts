@@ -15,6 +15,7 @@ export async function getSistemKonfig(): Promise<{
   cron_secret: string
   anthropic_api_key: string
   resend_api_key: string
+  guvenlik_email: string
 }> {
   const now = Date.now()
   if (cache && now - cacheTime < CACHE_TTL) return cache as any
@@ -24,7 +25,7 @@ export async function getSistemKonfig(): Promise<{
 
   if (supabaseUrl && supabaseKey) {
     try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/sistem_konfigurasyon?limit=1&select=uygulama_domain,firebase_project_id,firebase_client_email,firebase_private_key,cron_secret,anthropic_api_key,resend_api_key`, {
+      const res = await fetch(`${supabaseUrl}/rest/v1/sistem_konfigurasyon?limit=1&select=uygulama_domain,firebase_project_id,firebase_client_email,firebase_private_key,cron_secret,anthropic_api_key,resend_api_key,guvenlik_email`, {
         headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
       })
       const rows = await res.json()
@@ -37,6 +38,7 @@ export async function getSistemKonfig(): Promise<{
           cron_secret: rows[0].cron_secret || process.env.CRON_SECRET || '',
           anthropic_api_key: rows[0].anthropic_api_key || process.env.ANTHROPIC_API_KEY || '',
           resend_api_key: rows[0].resend_api_key || process.env.RESEND_API_KEY || '',
+          guvenlik_email: rows[0].guvenlik_email || 'ozcana1679@gmail.com',
         }
         cache = sonuc
         cacheTime = now
@@ -54,5 +56,6 @@ export async function getSistemKonfig(): Promise<{
     cron_secret: process.env.CRON_SECRET || '',
     anthropic_api_key: process.env.ANTHROPIC_API_KEY || '',
     resend_api_key: process.env.RESEND_API_KEY || '',
+    guvenlik_email: 'ozcana1679@gmail.com',
   }
 }
