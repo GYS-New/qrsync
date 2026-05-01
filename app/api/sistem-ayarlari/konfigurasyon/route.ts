@@ -34,8 +34,13 @@ export async function PATCH(req: NextRequest) {
   const { data: mevcut } = await admin.from('sistem_konfigurasyon').select('id').limit(1).single()
 
   const update: any = { guncelleme_tarihi: new Date().toISOString() }
-  const fields = ['uygulama_domain', 'uygulama_ismi', 'sidebar_logo_url', 'sidebar_altyazi', 'firebase_project_id', 'firebase_client_email', 'firebase_private_key', 'cron_secret', 'anthropic_api_key', 'resend_api_key']
+  const fields = ['uygulama_domain', 'uygulama_ismi', 'sidebar_logo_url', 'sidebar_altyazi', 'firebase_project_id', 'firebase_client_email', 'firebase_private_key', 'cron_secret', 'anthropic_api_key', 'resend_api_key', 'guvenlik_email', 'guvenlik_mail_aktif', 'rate_limit_mode']
   for (const f of fields) { if (body[f] !== undefined) update[f] = body[f] }
+
+  // rate_limit_mode değerini doğrula
+  if (update.rate_limit_mode !== undefined && !['off', 'log', 'enforce'].includes(update.rate_limit_mode)) {
+    return NextResponse.json({ error: 'rate_limit_mode geçersiz (off|log|enforce)' }, { status: 400 })
+  }
 
   if (mevcut) {
     const { error } = await admin.from('sistem_konfigurasyon').update(update).eq('id', mevcut.id)

@@ -49,9 +49,11 @@ async function handle(req: Request) {
     return NextResponse.json({ ok: false, error: 'cron auth required' }, { status: 401 })
   }
 
-  // Kapama anahtarı: GUVENLIK_MAIL_AKTIF=false ise hemen çık
-  if (process.env.GUVENLIK_MAIL_AKTIF === 'false') {
-    return NextResponse.json({ ok: true, skipped: 'GUVENLIK_MAIL_AKTIF=false' })
+  // Kapama anahtarı — Sistem Ayarları → Sistem Konfigürasyonu → Güvenlik
+  // (guvenlik_mail_aktif=false ise cron mail göndermez, kayıtlar yine tutulur)
+  const konfigErken = await getSistemKonfig()
+  if (!konfigErken.guvenlik_mail_aktif) {
+    return NextResponse.json({ ok: true, skipped: 'guvenlik_mail_aktif=false' })
   }
 
   const admin = createAdminClient()
@@ -86,8 +88,8 @@ async function handle(req: Request) {
     return NextResponse.json({ ok: true, gonderildi: false, sebep: 'icerik_yok' })
   }
 
-  // 3) Email içeriği hazırla
-  const konfig = await getSistemKonfig()
+  // 3) Email içeriği hazırla (konfigErken zaten yukarıda alındı)
+  const konfig = konfigErken
   const aliciEmail = (konfig.guvenlik_email ?? '').trim()
   if (!aliciEmail) {
     return NextResponse.json({ ok: true, gonderildi: false, sebep: 'alici_email_bos' })

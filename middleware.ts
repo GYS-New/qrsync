@@ -3,9 +3,52 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 // ── RATE LIMIT (Aşama 3) ──────────────────────────────────────────────────
 // In-memory per-IP bucket. Railway tek process — Map yeterli.
-// Mode: RATE_LIMIT_MODE=off|log|enforce (varsayılan: log — bloklamaz, sadece konsola yazar)
+// Mode kaynağı (öncelik): DB sistem_konfigurasyon.rate_limit_mode → env RATE_LIMIT_MODE → 'enforce'
 const ipBucket = new Map<string, { count: number; resetAt: number }>()
 let cleanupCounter = 0
+
+// Mode'u DB'den oku, 60 sn modül-içi cache'le.
+// Edge runtime uyumlu: fetch + module-level Map; getSistemKonfig'i import etmiyoruz
+// (cache reuse'a iyi olabilirdi ama bu basit yaklaşım kontrolü ortada tutar).
+let modeCache: { value: 'off' | 'log' | 'enforce'; cacheTime: number } | null = null
+const MODE_CACHE_TTL = 60 * 1000
+
+function getRateLimitMode(): 'off' | 'log' | 'enforce' {
+  const now = Date.now()
+
+  // Cache hit (sync hızlı yol)
+  if (modeCache && now - modeCache.cacheTime < MODE_CACHE_TTL) {
+    return modeCache.value
+  }
+
+  // Cache miss → fire-and-forget refresh; mevcut değer (veya env fallback) ile devam et
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (supabaseUrl && supabaseKey) {
+    void fetch(`${supabaseUrl}/rest/v1/sistem_konfigurasyon?limit=1&select=rate_limit_mode`, {
+      headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
+    })
+      .then(r => r.json())
+      .then(rows => {
+        if (Array.isArray(rows) && rows.length > 0) {
+          const m = rows[0].rate_limit_mode
+          const v: 'off' | 'log' | 'enforce' = (m === 'off' || m === 'log' || m === 'enforce') ? m : 'enforce'
+          modeCache = { value: v, cacheTime: Date.now() }
+        }
+      })
+      .catch(() => {})
+  }
+
+  // Mevcut cache veya env fallback (henüz refresh tamamlanmadı)
+  if (modeCache) {
+    modeCache.cacheTime = now // re-fetch'i 60 sn ertele
+    return modeCache.value
+  }
+  const envMode = (process.env.RATE_LIMIT_MODE || 'enforce').toLowerCase()
+  const v: 'off' | 'log' | 'enforce' = (envMode === 'off' || envMode === 'log' || envMode === 'enforce') ? envMode as any : 'enforce'
+  modeCache = { value: v, cacheTime: now }
+  return v
+}
 
 const RATE_LIMITS = {
   app: { max: 200, windowMs: 60_000 },     // mobile yüksek (heartbeat, gorevlerim)
@@ -48,8 +91,8 @@ function logRateLimitOverflow(ip: string, bucket: string, count: number, max: nu
 }
 
 function rateLimitCheck(req: NextRequest, pathname: string): NextResponse | null {
-  // Default 'enforce' — saldırı olunca otomatik blokla, manuel "açma" gerek yok
-  const mode = (process.env.RATE_LIMIT_MODE || 'enforce').toLowerCase()
+  // Mode kaynak öncelik: DB sistem_konfigurasyon → env → 'enforce'
+  const mode = getRateLimitMode()
   if (mode === 'off') return null
 
   // Cron endpoint'leri zaten x-cron-token ile korumalı, bypass et

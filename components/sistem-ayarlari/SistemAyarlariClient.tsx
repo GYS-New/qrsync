@@ -658,7 +658,18 @@ function SistemKonfigurasyonPanel() {
   const [dogrulaHata, setDogrulaHata] = useState<string | null>(null)
 
   // Form state
-  const [form, setForm] = useState({ uygulama_domain: 'app.iogys.com.tr', firebase_project_id: '', firebase_client_email: '', firebase_private_key: '', cron_secret: '', anthropic_api_key: '', resend_api_key: '' })
+  const [form, setForm] = useState({
+    uygulama_domain: 'app.iogys.com.tr',
+    firebase_project_id: '',
+    firebase_client_email: '',
+    firebase_private_key: '',
+    cron_secret: '',
+    anthropic_api_key: '',
+    resend_api_key: '',
+    guvenlik_email: 'ozcana1679@gmail.com',
+    guvenlik_mail_aktif: true,
+    rate_limit_mode: 'enforce' as 'off' | 'log' | 'enforce',
+  })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -688,6 +699,9 @@ function SistemKonfigurasyonPanel() {
         cron_secret: j2.cron_secret ?? '',
         anthropic_api_key: j2.anthropic_api_key ?? '',
         resend_api_key: j2.resend_api_key ?? '',
+        guvenlik_email: j2.guvenlik_email ?? 'ozcana1679@gmail.com',
+        guvenlik_mail_aktif: j2.guvenlik_mail_aktif !== false,
+        rate_limit_mode: (j2.rate_limit_mode === 'off' || j2.rate_limit_mode === 'log' || j2.rate_limit_mode === 'enforce') ? j2.rate_limit_mode : 'enforce',
       })
       setLoading(false)
     } catch (e: any) {
@@ -795,14 +809,79 @@ function SistemKonfigurasyonPanel() {
         </div>
       </div>
 
-      {/* Cron */}
+      {/* Güvenlik */}
       <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>Güvenlik</div>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 14 }}>Güvenlik</div>
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Cron Secret Token</span>
           <input value={form.cron_secret} onChange={e => setForm(f => ({ ...f, cron_secret: e.target.value }))} style={{ ...sinp, fontFamily: 'monospace' }} placeholder="Otomatik görevler için güvenlik anahtarı" />
           <span style={{ fontSize: 11, color: '#64748b' }}>Zamanlanmış görevlerin (arşivleme, bildirim, rapor) yetkisiz çalıştırılmasını engeller</span>
         </label>
+
+        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 16, marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>📧 Güvenlik Bildirim Maili</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10, lineHeight: 1.5 }}>
+            Saldırı şüphesi (başarısız giriş, rate limit aşımı, eşleşmiş cihaz vs.) tespit edildiğinde 30 dakikada bir özet email gönderilir.
+          </div>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const }}>Alıcı E-posta Adresi</span>
+            <input value={form.guvenlik_email} onChange={e => setForm(f => ({ ...f, guvenlik_email: e.target.value }))} style={sinp} placeholder="ozcana1679@gmail.com" type="email" />
+          </label>
+
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' as const }}>
+            <input type="checkbox" checked={form.guvenlik_mail_aktif} onChange={e => setForm(f => ({ ...f, guvenlik_mail_aktif: e.target.checked }))} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+              Bildirim emaillerini gönder
+            </span>
+            <span style={{ fontSize: 11.5, color: form.guvenlik_mail_aktif ? '#059669' : '#94a3b8', fontWeight: 600 }}>
+              ({form.guvenlik_mail_aktif ? 'AKTİF' : 'KAPALI'})
+            </span>
+          </label>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, marginLeft: 26 }}>
+            Kapalıyken: Saldırılar yine de kayıt altına alınır ama email gönderilmez.
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>🛡️ Rate Limit (DoS / Brute-force koruması)</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10, lineHeight: 1.5 }}>
+            Aşırı sayıda istek gönderen saldırgan IP'leri otomatik bloklar. Limitler: auth 30/dk, mobil 200/dk, genel 90/dk.
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+            {(['enforce', 'log', 'off'] as const).map(modeKey => {
+              const seçili = form.rate_limit_mode === modeKey
+              const renkler = modeKey === 'enforce'
+                ? { bg: '#10b981', label: 'Aktif (Blokla)', desc: 'Saldırgan IP\'leri 429 ile bloklar' }
+                : modeKey === 'log'
+                ? { bg: '#f59e0b', label: 'Sadece Kaydet', desc: 'Bloklamaz, kayıt tutar (test için)' }
+                : { bg: '#94a3b8', label: 'Kapalı', desc: 'Hiçbir koruma yok (acil durumlar)' }
+              return (
+                <button
+                  key={modeKey}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, rate_limit_mode: modeKey }))}
+                  style={{
+                    flex: '1 1 160px',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: seçili ? `2px solid ${renkler.bg}` : '1.5px solid #e5e7eb',
+                    background: seçili ? renkler.bg : '#fff',
+                    color: seçili ? '#fff' : '#374151',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'left' as const,
+                  }}
+                >
+                  <div>{renkler.label}</div>
+                  <div style={{ fontSize: 10.5, fontWeight: 500, marginTop: 4, opacity: 0.85 }}>{renkler.desc}</div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Anthropic (İO Asistan) */}
