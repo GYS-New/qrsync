@@ -1,10 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 import { RefreshCw, Star, Pencil, Trash2, RotateCcw, X, Check, Filter, XCircle, FileSpreadsheet, FileText, Download } from 'lucide-react'
+
+interface Aksiyon {
+  aksiyon_metni: string
+  gorsel_urls: string[]
+  olusturan_id?: string | null
+  olusturma_tarihi?: string
+  guncelleme_tarihi?: string | null
+}
 
 interface Kayit {
   id: string
@@ -16,6 +24,7 @@ interface Kayit {
   ad_soyad: string | null
   gorsel_url: string | null
   olusturma_tarihi: string
+  aksiyon?: Aksiyon | null
 }
 
 interface Props {
@@ -178,6 +187,14 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
   const [arsivleKayit,   setArsivleKayit]   = useState<Kayit | null>(null)
   const [aksiyonLoading, setAksiyonLoading] = useState(false)
 
+  // Müşteri değerlendirmesi aksiyon paneli state'leri
+  const [acikAksiyonId, setAcikAksiyonId] = useState<string | null>(null) // expand edilen kayıt id
+  const [aksiyonMetinDraft, setAksiyonMetinDraft] = useState('')
+  const [aksiyonGorseller, setAksiyonGorseller] = useState<string[]>([])
+  const [aksiyonSaving, setAksiyonSaving] = useState(false)
+  const [aksiyonGorselYukleniyor, setAksiyonGorselYukleniyor] = useState(false)
+  const [aksiyonDuzenleMod, setAksiyonDuzenleMod] = useState(false) // false = read-only görünüm, true = edit
+
   const spinning = { animation: 'spin 0.9s linear infinite' }
 
   // Varsayılan yükleme: sadece aktif tablo
@@ -289,6 +306,89 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     width: 34, height: 34, borderRadius: 8, border: `1.5px solid ${borderColor}`,
     cursor: 'pointer', background: bg, color, transition: 'opacity .15s',
   })
+
+  // ── Aksiyon panel handlerlar ────────────────────────────────────────────────
+  function aksiyonPaneliAc(kayit: Kayit) {
+    if (acikAksiyonId === kayit.id) {
+      // Açıksa kapat
+      setAcikAksiyonId(null)
+      setAksiyonMetinDraft('')
+      setAksiyonGorseller([])
+      setAksiyonDuzenleMod(false)
+      return
+    }
+    setAcikAksiyonId(kayit.id)
+    setAksiyonMetinDraft(kayit.aksiyon?.aksiyon_metni ?? '')
+    setAksiyonGorseller(kayit.aksiyon?.gorsel_urls ?? [])
+    setAksiyonDuzenleMod(!kayit.aksiyon)  // aksiyon yoksa direkt edit modu
+  }
+
+  async function aksiyonGorselYukle(file: File) {
+    setAksiyonGorselYukleniyor(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/raporlar/musteri-degerlendirme/aksiyon/gorsel-yukle', { method: 'POST', body: fd })
+      const j = await res.json()
+      if (!j.ok) { setHata(j.error ?? 'Görsel yüklenemedi'); return }
+      setAksiyonGorseller(prev => [...prev, j.url])
+    } finally { setAksiyonGorselYukleniyor(false) }
+  }
+
+  async function aksiyonKaydet() {
+    if (!acikAksiyonId) return
+    if (!aksiyonMetinDraft.trim() || aksiyonMetinDraft.trim().length < 3) {
+      setHata('Aksiyon metni en az 3 karakter olmalı')
+      return
+    }
+    setAksiyonSaving(true)
+    setHata(null)
+    try {
+      const res = await fetch('/api/raporlar/musteri-degerlendirme/aksiyon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          degerlendirmeId: acikAksiyonId,
+          aksiyon_metni: aksiyonMetinDraft.trim(),
+          gorsel_urls: aksiyonGorseller,
+        }),
+      })
+      const j = await res.json()
+      if (!j.ok) { setHata(j.error ?? 'Kaydedilemedi'); return }
+      // Kayıt başarılı — local state'i güncelle, paneli kapat
+      setKayitlar(prev => prev.map(k => k.id === acikAksiyonId
+        ? { ...k, aksiyon: {
+            aksiyon_metni: aksiyonMetinDraft.trim(),
+            gorsel_urls: aksiyonGorseller,
+            ...(j.aksiyon ?? {}),
+          } as Aksiyon }
+        : k))
+      setAcikAksiyonId(null)
+      setAksiyonMetinDraft('')
+      setAksiyonGorseller([])
+      setAksiyonDuzenleMod(false)
+    } finally { setAksiyonSaving(false) }
+  }
+
+  async function aksiyonSil() {
+    if (!acikAksiyonId) return
+    if (!confirm('Bu aksiyon kaydı silinsin mi?')) return
+    setAksiyonSaving(true)
+    try {
+      const res = await fetch('/api/raporlar/musteri-degerlendirme/aksiyon', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ degerlendirmeId: acikAksiyonId }),
+      })
+      const j = await res.json()
+      if (!j.ok) { setHata(j.error ?? 'Silinemedi'); return }
+      setKayitlar(prev => prev.map(k => k.id === acikAksiyonId ? { ...k, aksiyon: null } : k))
+      setAcikAksiyonId(null)
+      setAksiyonMetinDraft('')
+      setAksiyonGorseller([])
+      setAksiyonDuzenleMod(false)
+    } finally { setAksiyonSaving(false) }
+  }
 
   // ── Excel İndir ─────────────────────────────────────────────────────────
   async function excelIndir() {
@@ -504,13 +604,20 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                     <th>Yorum</th>
                     <th>Ad Soyad</th>
                     <th>Fotoğraf</th>
+                    <th style={{ textAlign: 'center' }}>Aksiyon</th>
                     {filtreMod && <th>Kaynak</th>}
                     {(yetkiler.duzenleyebilir || yetkiler.silebilir) && <th style={{ textAlign: 'center' }}>İşlemler</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {filtreliKayitlar.map((k: any) => (
-                    <tr key={k.id}>
+                  {filtreliKayitlar.map((k: any) => {
+                    const dusukPuan = k.yildiz <= 3
+                    const aksiyonVar = !!k.aksiyon
+                    const acik = acikAksiyonId === k.id
+                    const colSpan = 7 + (filtreMod ? 1 : 0) + ((yetkiler.duzenleyebilir || yetkiler.silebilir) ? 1 : 0)
+                    return (
+                      <React.Fragment key={k.id}>
+                    <tr style={{ background: acik ? '#fafbff' : undefined }}>
                       <td style={{ whiteSpace: 'nowrap', color: '#64748b', fontSize: 12 }}>
                         {new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
@@ -530,6 +637,34 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                             <img src={k.gorsel_url} alt="Görsel" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
                           </button>
                         ) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {/* Aksiyon kolonu: ≤3★ ise buton; aksiyon varsa badge */}
+                        {aksiyonVar ? (
+                          <button onClick={() => aksiyonPaneliAc(k)}
+                            style={{
+                              padding: '4px 10px', fontSize: 11.5, fontWeight: 700,
+                              borderRadius: 6, border: '1.5px solid #10b981',
+                              background: acik ? '#10b981' : '#ecfdf5',
+                              color: acik ? '#fff' : '#047857',
+                              cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4,
+                            }}>
+                            <Check size={12} /> Aksiyon Alındı
+                          </button>
+                        ) : dusukPuan && yetkiler.duzenleyebilir ? (
+                          <button onClick={() => aksiyonPaneliAc(k)}
+                            style={{
+                              padding: '4px 10px', fontSize: 11.5, fontWeight: 700,
+                              borderRadius: 6, border: '1.5px solid #f59e0b',
+                              background: acik ? '#f59e0b' : '#fffbeb',
+                              color: acik ? '#fff' : '#92400e',
+                              cursor: 'pointer', whiteSpace: 'nowrap',
+                            }}>
+                            ⚡ Aksiyon Al
+                          </button>
+                        ) : (
+                          <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>
+                        )}
                       </td>
                       {filtreMod && (
                         <td>
@@ -558,7 +693,112 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                       </td>
                       )}
                     </tr>
-                  ))}
+
+                    {/* Aksiyon paneli — açıkken bu satırın altına gelir */}
+                    {acik && (
+                      <tr>
+                        <td colSpan={colSpan} style={{ padding: 0, background: '#fafbff', borderTop: '2px solid #6366f1' }}>
+                          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>
+                                {aksiyonVar ? (aksiyonDuzenleMod ? '✏️ Aksiyon Düzenle' : '📋 Alınan Aksiyon') : '⚡ Yeni Aksiyon'}
+                              </span>
+                              {aksiyonVar && k.aksiyon?.olusturma_tarihi && (
+                                <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                                  Kaydedildi: {new Date(k.aksiyon.olusturma_tarihi).toLocaleString('tr-TR')}
+                                  {k.aksiyon.guncelleme_tarihi && ` · Güncellendi: ${new Date(k.aksiyon.guncelleme_tarihi).toLocaleString('tr-TR')}`}
+                                </span>
+                              )}
+                              <button onClick={() => aksiyonPaneliAc(k)}
+                                style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                                <X size={14} /> Kapat
+                              </button>
+                            </div>
+
+                            {/* Read-only görünüm (aksiyon var + edit modu kapalı) */}
+                            {aksiyonVar && !aksiyonDuzenleMod ? (
+                              <div>
+                                <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, color: '#334155', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                  {k.aksiyon!.aksiyon_metni}
+                                </div>
+                                {(k.aksiyon?.gorsel_urls?.length ?? 0) > 0 && (
+                                  <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {(k.aksiyon!.gorsel_urls as string[]).map((url: string, i: number) => (
+                                      <button key={i} onClick={() => setGorselModal(url)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                                        <img src={url} alt={`Aksiyon görsel ${i + 1}`} style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                {yetkiler.duzenleyebilir && (
+                                  <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                                    <button onClick={() => setAksiyonDuzenleMod(true)}
+                                      style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6, border: '1px solid #1d4ed8', background: '#eff6ff', color: '#1d4ed8', fontWeight: 600, cursor: 'pointer' }}>
+                                      ✏️ Düzenle
+                                    </button>
+                                    {yetkiler.silebilir && (
+                                      <button onClick={aksiyonSil} disabled={aksiyonSaving}
+                                        style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6, border: '1px solid #dc2626', background: '#fef2f2', color: '#dc2626', fontWeight: 600, cursor: 'pointer' }}>
+                                        🗑 Sil
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              /* Edit görünümü (yeni veya düzenleme) */
+                              <div>
+                                <textarea
+                                  value={aksiyonMetinDraft}
+                                  onChange={e => setAksiyonMetinDraft(e.target.value)}
+                                  placeholder="Hangi aksiyon alındı? Kim/ne zaman/sonuç..."
+                                  style={{ width: '100%', minHeight: 100, padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13.5, fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+                                />
+                                {/* Görsel listesi */}
+                                {aksiyonGorseller.length > 0 && (
+                                  <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {aksiyonGorseller.map((url, i) => (
+                                      <div key={i} style={{ position: 'relative' }}>
+                                        <img src={url} alt={`Görsel ${i + 1}`} style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
+                                        <button onClick={() => setAksiyonGorseller(prev => prev.filter((_, idx) => idx !== i))}
+                                          style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                          ×
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {/* Görsel yükleme butonu */}
+                                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12, borderRadius: 6, border: '1px dashed #94a3b8', background: '#fff', color: '#475569', fontWeight: 600, cursor: aksiyonGorselYukleniyor ? 'wait' : 'pointer', opacity: aksiyonGorselYukleniyor ? 0.6 : 1 }}>
+                                    {aksiyonGorselYukleniyor ? '⏳ Yükleniyor...' : '📎 Görsel Ekle'}
+                                    <input type="file" accept="image/jpeg,image/png,image/webp"
+                                      onChange={e => { const f = e.target.files?.[0]; if (f) aksiyonGorselYukle(f); e.target.value = '' }}
+                                      disabled={aksiyonGorselYukleniyor || aksiyonGorseller.length >= 10}
+                                      style={{ display: 'none' }} />
+                                  </label>
+                                  <span style={{ fontSize: 11, color: '#94a3b8' }}>{aksiyonGorseller.length}/10 · max 5MB · JPG/PNG/WebP</span>
+                                </div>
+                                {/* Kaydet butonları */}
+                                <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                                  <button onClick={aksiyonKaydet} disabled={aksiyonSaving || !aksiyonMetinDraft.trim()}
+                                    style={{ padding: '8px 16px', fontSize: 13, borderRadius: 8, border: 'none', background: aksiyonSaving || !aksiyonMetinDraft.trim() ? '#94a3b8' : '#10b981', color: '#fff', fontWeight: 700, cursor: aksiyonSaving || !aksiyonMetinDraft.trim() ? 'not-allowed' : 'pointer' }}>
+                                    {aksiyonSaving ? 'Kaydediliyor...' : '💾 Kaydet'}
+                                  </button>
+                                  <button onClick={() => aksiyonPaneliAc(k)} disabled={aksiyonSaving}
+                                    style={{ padding: '8px 16px', fontSize: 13, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
+                                    İptal
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                      </React.Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
