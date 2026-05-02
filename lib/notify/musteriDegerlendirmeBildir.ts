@@ -1,11 +1,15 @@
 /**
- * Müşteri değerlendirmesi geldiğinde ilgili yetkililere FCM push bildirim.
+ * Müşteri değerlendirmesi geldiğinde ilgili yetkililere FCM push + web bildirim.
  *
- * Bildirim alıcıları:
- *   - Firmanın TA'ları (tüm tenant_admin'ler)
- *   - Lokasyonun üst lokasyonuna yetkili U'lar (tenant_user)
- *     · kullanici_lokasyon_yetkileri kayıtlı U: ust_lokasyon_id eşleşmeli
- *     · Hiç kayıt yoksa: "tüm erişim" → bildirim alır
+ * Bildirim alıcıları (kuralı):
+ *   - Firmanın TÜM aktif TA'ları (tenant_admin)
+ *   - Lokasyonun üst lokasyonuna açık yetki kaydı olan U'lar (tenant_user)
+ *     · kullanici_lokasyon_yetkileri kayıtlı + ust_lokasyon_id eşleşen
+ *     · NOT: yetki kaydı OLMAYAN U'lar (tüm erişim fallback) bildirim ALMAZ
+ *
+ * İki kanal:
+ *   - Web in-app: bildirimler tablosuna 'musteri_degerlendirme' tipinde kayıt
+ *   - Mobil push: FCM (paired cihaz varsa)
  *
  * Fire-and-forget — değerlendirme insert akışını bekletmez.
  *
@@ -38,35 +42,25 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
       .eq('rol', 'tenant_admin')
       .eq('aktif', true)
 
-    // 3) Yetkili U'ları çek
+    // 3) Sadece bu üst lokasyona AÇIK yetkisi olan U'ları çek
+    // (yetki kaydı olmayan U "tüm erişim" sayılıyor ama bildirim ALMAZ)
     let uList: { id: string }[] = []
     if (ustLokasyonId) {
-      // U'lardan: ya bu üst lokasyona yetkisi var, ya da hiç yetki kaydı yok (tüm erişim)
-      const { data: tumU } = await admin
-        .from('users')
-        .select('id')
-        .eq('firma_id', p.firmaId)
-        .eq('rol', 'tenant_user')
-        .eq('aktif', true)
+      const { data: yetkiKayitlari } = await admin
+        .from('kullanici_lokasyon_yetkileri')
+        .select('user_id')
+        .eq('ust_lokasyon_id', ustLokasyonId)
 
-      if (tumU?.length) {
-        const userIds = tumU.map((u: any) => u.id)
-        const { data: yetkiKayitlari } = await admin
-          .from('kullanici_lokasyon_yetkileri')
-          .select('user_id, ust_lokasyon_id')
-          .in('user_id', userIds)
-
-        const yetkiSahibi = new Map<string, Set<string>>()
-        for (const y of (yetkiKayitlari ?? []) as any[]) {
-          if (!yetkiSahibi.has(y.user_id)) yetkiSahibi.set(y.user_id, new Set())
-          yetkiSahibi.get(y.user_id)!.add(y.ust_lokasyon_id)
-        }
-
-        uList = tumU.filter((u: any) => {
-          const yetkileri = yetkiSahibi.get(u.id)
-          if (!yetkileri || yetkileri.size === 0) return true  // hiç kayıt yok = tüm erişim
-          return yetkileri.has(ustLokasyonId)
-        })
+      const yetkiliUserIds = Array.from(new Set((yetkiKayitlari ?? []).map((y: any) => y.user_id)))
+      if (yetkiliUserIds.length) {
+        const { data: aktifU } = await admin
+          .from('users')
+          .select('id')
+          .in('id', yetkiliUserIds)
+          .eq('firma_id', p.firmaId)
+          .eq('rol', 'tenant_user')
+          .eq('aktif', true)
+        uList = (aktifU ?? []) as any
       }
     }
 
@@ -87,7 +81,19 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
     const body = `${lokTanim} • ${yildizStr}${yorumKisa ? ` — "${yorumKisa}"` : ''}`
     const channel = dusuk ? 'gorev_uyari' : 'default'
 
-    // 5) Paralel gönder
+    // 5a) Web bildirimleri — bildirimler tablosuna toplu insert
+    const bildirimRows = aliciIds.map(uid => ({
+      alici_id: uid,
+      baslik: title,
+      mesaj: body,
+      tip: 'musteri_degerlendirme' as const,
+      okundu: false,
+    }))
+    await admin.from('bildirimler').insert(bildirimRows).then(() => {}, (e: any) => {
+      console.error('[musteriDegerlendirmeBildir:web]', e)
+    })
+
+    // 5b) Mobil FCM push — paralel (cihazı yoksa sessiz geçer)
     await Promise.all(aliciIds.map(uid => sendFCMToUser(uid, title, body, channel).catch(() => {})))
   } catch (e) {
     console.error('[musteriDegerlendirmeBildir]', e)
