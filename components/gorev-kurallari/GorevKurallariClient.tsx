@@ -63,6 +63,8 @@ export default function GorevKurallariClient({
   const [acikGruplar2, setAcikGruplar2] = useState<Set<string>>(new Set())
   const [acikTanimlar, setAcikTanimlar] = useState<Set<string>>(new Set())
   const [duraklatVardiyaModal, setDuraklatVardiyaModal] = useState<{ tanim: string; firmaId: string; projeId: string | null; ustLokasyonId: string; ustLokasyonTanim: string; aktifOlmaSaati: string } | null>(null)
+  const [topluDuraklatModal, setTopluDuraklatModal] = useState<{ ustLokasyonId: string; ustLokasyonTanim: string; firmaId: string; projeId: string | null } | null>(null)
+  const [topluKaldirma, setTopluKaldirma] = useState<string | null>(null)  // ustLokId — kaldırma in-progress
 
   // Sekme içinde (embedded=true) kuralları API'den çek
   useEffect(() => {
@@ -657,6 +659,46 @@ export default function GorevKurallariClient({
                     <span style={{ fontSize: 15, fontWeight: 800, color: '#111827', flex: 1 }}>📍 {h.ustLokTanim}</span>
                     {ustDuraklat > 0 && <span style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>⏸ {ustDuraklat} duraklatma</span>}
                     <span style={{ fontSize: 12, color: '#6b7280' }}>{toplamKural} kural · {h.gruplar.length} grup</span>
+                    {!readonly && yetki.duzenleyebilir && (
+                      <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => setTopluDuraklatModal({ ustLokasyonId: h.ustLok, ustLokasyonTanim: h.ustLokTanim, firmaId: firmaId!, projeId: projeId ?? null })}
+                          style={{ padding: '4px 12px', fontSize: 11.5, borderRadius: 6, border: '1px solid #fbbf24', background: '#fffbeb', cursor: 'pointer', color: '#92400e', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                          ⏸ Tümünü Duraklat
+                        </button>
+                        {ustDuraklat > 0 && (
+                          <button
+                            onClick={async () => {
+                              const ok = await confirm({ title: 'Tümünü Başlat', message: `"${h.ustLokTanim}" üst lokasyonundaki ${ustDuraklat} duraklatma kaldırılacak. Onaylıyor musunuz?`, confirmText: 'Evet, Başlat', variant: 'danger' })
+                              if (!ok) return
+                              setTopluKaldirma(h.ustLok)
+                              try {
+                                const res = await fetch('/api/gorev-kurallari/duraklat-toplu', {
+                                  method: 'DELETE',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ firmaId, projeId, ustLokasyonId: h.ustLok }),
+                                })
+                                const j = await res.json()
+                                if (!res.ok) throw new Error(j.error)
+                                toast({ type: 'success', title: 'Başlatıldı', message: `${j.silinen} duraklatma kaldırıldı.` })
+                                // Duraklatmaları yenile
+                                const dp = new URLSearchParams({ firmaId: firmaId! })
+                                if (projeId) dp.set('projeId', projeId)
+                                const r2 = await fetch(`/api/gorev-kurallari/duraklat-vardiya?${dp}`)
+                                const j2 = await r2.json()
+                                setDuraklatmalar(j2.data ?? [])
+                              } catch (e: any) {
+                                toast({ type: 'error', title: 'Hata', message: e.message })
+                              }
+                              setTopluKaldirma(null)
+                            }}
+                            disabled={topluKaldirma === h.ustLok}
+                            style={{ padding: '4px 12px', fontSize: 11.5, borderRadius: 6, border: '1px solid #10b981', background: '#ecfdf5', cursor: topluKaldirma === h.ustLok ? 'wait' : 'pointer', color: '#047857', fontWeight: 700, whiteSpace: 'nowrap', opacity: topluKaldirma === h.ustLok ? 0.6 : 1 }}>
+                            {topluKaldirma === h.ustLok ? '...' : '▶ Tümünü Başlat'}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {ustAcik && (
@@ -819,6 +861,26 @@ export default function GorevKurallariClient({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Toplu Duraklatma Modal — üst lokasyonun tüm kurallarını birden duraklatır */}
+      {topluDuraklatModal && (
+        <TopluDuraklatModal
+          ustLokasyonId={topluDuraklatModal.ustLokasyonId}
+          ustLokasyonTanim={topluDuraklatModal.ustLokasyonTanim}
+          firmaId={topluDuraklatModal.firmaId}
+          projeId={topluDuraklatModal.projeId}
+          onClose={() => {
+            setTopluDuraklatModal(null)
+            // Duraklatmaları yenile
+            const dp = new URLSearchParams({ firmaId: firmaId! })
+            if (projeId) dp.set('projeId', projeId)
+            fetch(`/api/gorev-kurallari/duraklat-vardiya?${dp}`)
+              .then(r => r.json())
+              .then(j => setDuraklatmalar(j.data ?? []))
+              .catch(() => {})
+          }}
+        />
       )}
 
       {/* Vardiya Bazlı Duraklatma Modal */}
@@ -1326,6 +1388,146 @@ function VardiyaDuraklatModal({ tanim, firmaId, projeId, ustLokasyonId, ustLokas
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+/** Toplu duraklatma popup — bir üst lokasyondaki TÜM kuralları tek seferde duraklat */
+function TopluDuraklatModal({ ustLokasyonId, ustLokasyonTanim, firmaId, projeId, onClose }: {
+  ustLokasyonId: string;
+  ustLokasyonTanim: string;
+  firmaId: string;
+  projeId: string | null;
+  onClose: () => void
+}) {
+  const [vardiyalar, setVardiyalar] = useState<{ no: number; baslangic: string; bitis: string }[]>([])
+  const [seciliTarihler, setSeciliTarihler] = useState<string[]>([])
+  const [seciliVardiyalar, setSeciliVardiyalar] = useState<number[]>([]) // boş = tüm vardiyalar
+  const [tarihInput, setTarihInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
+  const haftaGunleri = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
+
+  useEffect(() => {
+    fetch(`/api/sistem-ayarlari/vardiya?firmaId=${firmaId}`)
+      .then(r => r.json())
+      .then(j => {
+        const sayisi = j.vardiya_sayisi ?? 3
+        const tumAyar = j.tum_vardiya_ayarlari
+        const aktifSet = tumAyar?.[sayisi] ?? j.vardiya_saatleri ?? []
+        setVardiyalar(aktifSet)
+      })
+      .catch(() => {})
+  }, [firmaId])
+
+  function tarihEkle() {
+    if (!tarihInput || seciliTarihler.includes(tarihInput)) return
+    setSeciliTarihler(prev => [...prev, tarihInput].sort())
+    setTarihInput('')
+  }
+
+  async function kaydet() {
+    if (!seciliTarihler.length) {
+      toast({ type: 'error', title: 'Eksik', message: 'En az bir tarih seçin' })
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/gorev-kurallari/duraklat-toplu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firmaId, projeId, ustLokasyonId,
+          tarihler: seciliTarihler,
+          vardiyalar: seciliVardiyalar.length > 0 ? seciliVardiyalar : undefined,
+        }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error)
+      if (j.eklenen === 0) {
+        toast({ type: 'info', title: 'Bilgi', message: `Eklenecek yeni duraklatma yok (${j.sebep ?? '—'}).` })
+      } else {
+        toast({ type: 'success', title: 'Duraklatıldı', message: `${j.eklenen} duraklatma eklendi.` })
+      }
+      onClose()
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setSaving(false)
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 520, maxHeight: '80vh', overflow: 'auto', padding: '24px 28px' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#111827', marginBottom: 4 }}>⏸ Toplu Duraklatma</div>
+        <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', padding: '3px 10px', borderRadius: 4, marginBottom: 6 }}>
+          📍 {ustLokasyonTanim}
+        </div>
+        <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
+          <strong>{ustLokasyonTanim}</strong> üst lokasyonundaki <strong>tüm kurallar</strong> seçili tarih ve vardiyalarda duraklatılacak.
+          <br />
+          <span style={{ fontSize: 12, color: '#9ca3af' }}>Diğer üst lokasyonlar etkilenmez.</span>
+        </div>
+
+        {/* Tarih seçimi */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Tarih Seç</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="date" value={tarihInput} onChange={e => setTarihInput(e.target.value)}
+              min={new Date().toISOString().slice(0, 10)}
+              style={{ height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14 }} />
+            <button onClick={tarihEkle} disabled={!tarihInput}
+              style={{ height: 36, padding: '0 14px', borderRadius: 8, background: '#1d4ed8', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: tarihInput ? 1 : 0.4 }}>
+              Ekle
+            </button>
+          </div>
+          {seciliTarihler.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {seciliTarihler.map(t => {
+                const d = new Date(t + 'T00:00:00')
+                const gun = haftaGunleri[d.getDay()]
+                return (
+                  <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 13, fontWeight: 600, color: '#1d4ed8' }}>
+                    {t} ({gun})
+                    <span onClick={() => setSeciliTarihler(prev => prev.filter(x => x !== t))} style={{ cursor: 'pointer', color: '#dc2626', fontWeight: 800 }}>×</span>
+                  </span>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Vardiya filtresi (opsiyonel) */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Vardiyalar (opsiyonel)</div>
+          <div style={{ fontSize: 11.5, color: '#6b7280', marginBottom: 8 }}>Seçim yapmazsanız tüm vardiyalar duraklatılır.</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {vardiyalar.map(v => {
+              const sec = seciliVardiyalar.includes(v.no)
+              return (
+                <button key={v.no}
+                  onClick={() => setSeciliVardiyalar(prev => prev.includes(v.no) ? prev.filter(x => x !== v.no) : [...prev, v.no])}
+                  style={{ padding: '6px 14px', borderRadius: 6, border: sec ? '2px solid #1d4ed8' : '1.5px solid #e5e7eb', background: sec ? '#eff6ff' : '#fff', color: sec ? '#1d4ed8' : '#6b7280', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  {v.no}. Vardiya
+                  <span style={{ fontSize: 10, marginLeft: 4, fontWeight: 500 }}>({v.baslangic}-{v.bitis})</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} disabled={saving}
+            style={{ padding: '8px 16px', borderRadius: 8, background: '#f9fafb', border: '1px solid #e5e7eb', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+            Vazgeç
+          </button>
+          <button onClick={kaydet} disabled={saving || !seciliTarihler.length}
+            style={{ padding: '8px 18px', borderRadius: 8, background: '#92400e', color: '#fff', border: 'none', cursor: saving || !seciliTarihler.length ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13, opacity: saving || !seciliTarihler.length ? 0.5 : 1 }}>
+            {saving ? 'Kaydediliyor…' : '⏸ Tümünü Duraklat'}
+          </button>
+        </div>
       </div>
     </div>
   )
