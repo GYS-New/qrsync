@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     return parts.reverse().join(' > ') || '—'
   }
 
-  function mapRow(r: any, segment: 'tablo' | 'arsiv') {
+  function mapRow(r: any, segment: 'tablo' | 'arsiv', aksiyon?: any) {
     const yol = getLocPath(r.lokasyon_id)
     return {
       id:                r.id,
@@ -87,7 +87,20 @@ export async function GET(req: NextRequest) {
       arsivlendi:        segment === 'arsiv',
       arsivleme_tarihi:  r.arsivleme_tarihi ?? null,
       segment,
+      aksiyon:           aksiyon ?? null,
     }
+  }
+
+  // Aksiyonları toplu çek — degerlendirme_id'ye göre map'le
+  async function fetchAksiyonMap(degIds: string[]): Promise<Map<string, any>> {
+    if (!degIds.length) return new Map()
+    const { data: aksiyonlar } = await admin
+      .from('musteri_degerlendirme_aksiyonlari')
+      .select('degerlendirme_id, aksiyon_metni, gorsel_urls, olusturan_id, olusturma_tarihi, guncelleme_tarihi')
+      .in('degerlendirme_id', degIds)
+    const map = new Map()
+    for (const a of (aksiyonlar ?? []) as any[]) map.set(a.degerlendirme_id, a)
+    return map
   }
 
   // ── Birleşik mod: hem tablo hem arşiv ──────────────────────────────────
@@ -112,9 +125,15 @@ export async function GET(req: NextRequest) {
     if (resTablo.error) return NextResponse.json({ ok: false, error: resTablo.error.message }, { status: 500 })
     if (resArsiv.error) return NextResponse.json({ ok: false, error: resArsiv.error.message }, { status: 500 })
 
+    const tumIds = [
+      ...(resTablo.data ?? []).map((r: any) => r.id),
+      ...(resArsiv.data ?? []).map((r: any) => r.id),
+    ]
+    const aksiyonMap = await fetchAksiyonMap(tumIds)
+
     const all = [
-      ...(resTablo.data ?? []).map((r: any) => mapRow(r, 'tablo')),
-      ...(resArsiv.data ?? []).map((r: any) => mapRow(r, 'arsiv')),
+      ...(resTablo.data ?? []).map((r: any) => mapRow(r, 'tablo', aksiyonMap.get(r.id))),
+      ...(resArsiv.data ?? []).map((r: any) => mapRow(r, 'arsiv', aksiyonMap.get(r.id))),
     ].sort((a, b) => new Date(b.olusturma_tarihi).getTime() - new Date(a.olusturma_tarihi).getTime())
 
     return NextResponse.json({ ok: true, data: all, yetkiler: { duzenleyebilir: yetkiler.duzenleyebilir, silebilir: yetkiler.silebilir } })
@@ -144,7 +163,8 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
   const segment = arsivlendi ? 'arsiv' : 'tablo'
-  const kayitlar = (data ?? []).map((r: any) => mapRow(r, segment as any))
+  const aksiyonMap = await fetchAksiyonMap((data ?? []).map((r: any) => r.id))
+  const kayitlar = (data ?? []).map((r: any) => mapRow(r, segment as any, aksiyonMap.get(r.id)))
 
   return NextResponse.json({ ok: true, data: kayitlar, yetkiler: { duzenleyebilir: yetkiler.duzenleyebilir, silebilir: yetkiler.silebilir } })
 }
