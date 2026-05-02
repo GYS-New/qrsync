@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getRequestMeta } from '@/lib/device/getRequestMeta'
 import { auditLog } from '@/lib/audit/log'
+import { musteriDegerlendirmeBildir } from '@/lib/notify/musteriDegerlendirmeBildir'
 
 export const runtime = 'nodejs'
 
@@ -158,6 +159,15 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   })
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+
+  // Fire-and-forget bildirim (response'u bekletmez, hata değerlendirme akışını kırmaz)
+  void musteriDegerlendirmeBildir({
+    firmaId: lok.firma_id,
+    lokasyonId: lok.id,
+    lokasyonTanim: (lok as any).tanim,
+    yildiz,
+    yorum: yorum ?? null,
+  })
 
   return NextResponse.json({ ok: true })
 }
