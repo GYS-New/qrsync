@@ -10,6 +10,7 @@ interface Aksiyon {
   aksiyon_metni: string
   gorsel_urls: string[]
   olusturan_id?: string | null
+  olusturan_isim?: string | null
   olusturma_tarihi?: string
   guncelleme_tarihi?: string | null
 }
@@ -651,7 +652,9 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                             }}>
                             <Check size={12} /> Aksiyon Alındı
                           </button>
-                        ) : dusukPuan && yetkiler.duzenleyebilir ? (
+                        ) : dusukPuan ? (
+                          // Sayfaya erişen herkes (TA + yetkili U dahil) aksiyon ekleyebilir
+                          // — backend'de lokasyon scope ile sınırlandırılır
                           <button onClick={() => aksiyonPaneliAc(k)}
                             style={{
                               padding: '4px 10px', fontSize: 11.5, fontWeight: 700,
@@ -721,6 +724,11 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                                 <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, color: '#334155', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                                   {k.aksiyon!.aksiyon_metni}
                                 </div>
+                                {k.aksiyon?.olusturan_isim && (
+                                  <div style={{ marginTop: 6, fontSize: 11.5, color: '#64748b', fontStyle: 'italic' }}>
+                                    Kaydeden: <strong style={{ color: '#475569', fontStyle: 'normal' }}>{k.aksiyon.olusturan_isim}</strong>
+                                  </div>
+                                )}
                                 {(k.aksiyon?.gorsel_urls?.length ?? 0) > 0 && (
                                   <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                     {(k.aksiyon!.gorsel_urls as string[]).map((url: string, i: number) => (
@@ -730,20 +738,18 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                                     ))}
                                   </div>
                                 )}
-                                {yetkiler.duzenleyebilir && (
-                                  <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                                    <button onClick={() => setAksiyonDuzenleMod(true)}
-                                      style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6, border: '1px solid #1d4ed8', background: '#eff6ff', color: '#1d4ed8', fontWeight: 600, cursor: 'pointer' }}>
-                                      ✏️ Düzenle
-                                    </button>
-                                    {yetkiler.silebilir && (
-                                      <button onClick={aksiyonSil} disabled={aksiyonSaving}
-                                        style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6, border: '1px solid #dc2626', background: '#fef2f2', color: '#dc2626', fontWeight: 600, cursor: 'pointer' }}>
-                                        🗑 Sil
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
+                                {/* Düzenle/Sil — sayfaya erişen herkes (aksiyon yetki sisteminden bağımsız);
+                                    backend'de lokasyon scope ile sınırlandırılır */}
+                                <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                                  <button onClick={() => setAksiyonDuzenleMod(true)}
+                                    style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6, border: '1px solid #1d4ed8', background: '#eff6ff', color: '#1d4ed8', fontWeight: 600, cursor: 'pointer' }}>
+                                    ✏️ Düzenle
+                                  </button>
+                                  <button onClick={aksiyonSil} disabled={aksiyonSaving}
+                                    style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6, border: '1px solid #dc2626', background: '#fef2f2', color: '#dc2626', fontWeight: 600, cursor: 'pointer' }}>
+                                    🗑 Sil
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               /* Edit görünümü (yeni veya düzenleme) */

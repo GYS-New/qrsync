@@ -92,14 +92,30 @@ export async function GET(req: NextRequest) {
   }
 
   // Aksiyonları toplu çek — degerlendirme_id'ye göre map'le
+  // olusturan_id → users.isim_soyisim ikinci sorguyla map'lenir (FK yok, embed güvenli değil)
   async function fetchAksiyonMap(degIds: string[]): Promise<Map<string, any>> {
     if (!degIds.length) return new Map()
     const { data: aksiyonlar } = await admin
       .from('musteri_degerlendirme_aksiyonlari')
       .select('degerlendirme_id, aksiyon_metni, gorsel_urls, olusturan_id, olusturma_tarihi, guncelleme_tarihi')
       .in('degerlendirme_id', degIds)
+
+    const list = (aksiyonlar ?? []) as any[]
+    const olusturanIds = Array.from(new Set(list.map(a => a.olusturan_id).filter(Boolean))) as string[]
+    const isimMap = new Map<string, string>()
+    if (olusturanIds.length) {
+      const { data: kullanicilar } = await admin
+        .from('users').select('id, isim_soyisim').in('id', olusturanIds)
+      for (const u of (kullanicilar ?? []) as any[]) isimMap.set(u.id, u.isim_soyisim)
+    }
+
     const map = new Map()
-    for (const a of (aksiyonlar ?? []) as any[]) map.set(a.degerlendirme_id, a)
+    for (const a of list) {
+      map.set(a.degerlendirme_id, {
+        ...a,
+        olusturan_isim: a.olusturan_id ? (isimMap.get(a.olusturan_id) ?? null) : null,
+      })
+    }
     return map
   }
 

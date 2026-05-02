@@ -21,7 +21,7 @@ export const runtime = 'nodejs'
 async function yetkiVeSahiplik(req: NextRequest, supabase: any, admin: any, degerlendirmeId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, status: 401, error: 'Yetkisiz' }
-  const { data: me } = await supabase.from('users').select('rol,firma_id').eq('id', user.id).single()
+  const { data: me } = await supabase.from('users').select('id,rol,firma_id,isim_soyisim').eq('id', user.id).single()
   if (!me) return { ok: false as const, status: 403, error: 'Kullanıcı bulunamadı' }
 
   // Değerlendirmeyi bul (önce aktif tablo, sonra arşiv)
@@ -53,10 +53,13 @@ async function yetkiVeSahiplik(req: NextRequest, supabase: any, admin: any, dege
     }
   }
 
-  // Sayfa yetkisi (düzenleyebilir)
+  // Sayfa yetkisi (görüntülenebilir → aksiyon ekleyebilir)
+  // Aksiyon ekleme değerlendirmenin kendisini değiştirmez (ek not),
+  // bu yüzden gorebilir yetkisi yeterli. Lokasyon scope (yukarıda) zaten
+  // U'yu kendi yetkili olduğu üst lokasyonun değerlendirmeleriyle sınırlar.
   const yetki = await sayfaYetkileri(me.rol, 'musteri-degerlendirme', me.firma_id ?? null)
-  if (!yetki.duzenleyebilir) {
-    return { ok: false as const, status: 403, error: 'Düzenleme yetkiniz yok' }
+  if (!yetki.gorebilir) {
+    return { ok: false as const, status: 403, error: 'Bu sayfaya erişiminiz yok' }
   }
 
   return { ok: true as const, me, target, isSA, isTA }
@@ -116,6 +119,8 @@ export async function POST(req: NextRequest) {
     aksiyon: {
       aksiyon_metni: aksiyonMetni,
       gorsel_urls: gorselUrls,
+      olusturan_id: auth.me.id,
+      olusturan_isim: auth.me.isim_soyisim ?? null,
       olusturma_tarihi: mevcut ? undefined : now,
       guncelleme_tarihi: mevcut ? now : null,
     },
