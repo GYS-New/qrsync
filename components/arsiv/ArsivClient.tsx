@@ -921,7 +921,7 @@ export default function ArsivClient({
               <colgroup>
                 <col style={{ width: 140 }} />
                 <col style={{ width: 220 }} />
-                <col style={{ width: 130 }} />
+                <col style={{ width: 180 }} />
                 <col />
                 <col style={{ width: 160 }} />
                 <col style={{ width: 150 }} />
@@ -929,7 +929,7 @@ export default function ArsivClient({
               </colgroup>
               <thead><tr>
                 <th>Tarih</th><th>Lokasyon</th><th>Puan</th>
-                <th>Yorum</th><th>Ad Soyad</th><th>Arşivlenme</th>
+                <th style={{ paddingLeft: 16 }}>Yorum</th><th>Ad Soyad</th><th>Arşivlenme</th>
                 <th style={{ textAlign:'center' }}>İşlem</th>
               </tr></thead>
               <tbody>
@@ -945,7 +945,7 @@ export default function ArsivClient({
                       <span style={{ fontSize:16, letterSpacing:1, color:'#f59e0b' }}>{'★'.repeat(r.yildiz)}</span>
                       <span style={{ fontSize:13, color:'#64748b', marginLeft:6, fontWeight:600 }}>{YILDIZ_ETIKET[r.yildiz]}</span>
                     </td>
-                    <td style={{ color:'#334155', fontSize:13.5, lineHeight:1.45 }}>
+                    <td style={{ color:'#334155', fontSize:13.5, lineHeight:1.45, paddingLeft: 16 }}>
                       <span title={r.yorum??''} style={{ display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical' as any, overflow:'hidden' }}>
                         {r.yorum || <span style={{ color:'#cbd5e1' }}>—</span>}
                       </span>
