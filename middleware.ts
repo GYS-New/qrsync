@@ -148,6 +148,12 @@ function rateLimitCheck(req: NextRequest, pathname: string): NextResponse | null
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
+  // /.well-known/* — Apple Universal Link, Google verification gibi standart
+  // public dosyalar; auth ve rate limit bypass (Apple/Google bot'ları erişebilmeli)
+  if (pathname.startsWith('/.well-known/')) {
+    return NextResponse.next()
+  }
+
   // /api/* için sadece rate limit (her endpoint kendi auth'unu yapar)
   if (pathname.startsWith('/api/')) {
     const blocked = rateLimitCheck(request, pathname)
