@@ -6,14 +6,29 @@ import { useToast } from '@/components/ui/ToastProvider'
 
 type Kural = {
   id: string
+  lokasyon_id: string
   tanim: string
   aktif_olma_saati: string
   aktif_gunler: number[]
   lokasyon_tanim?: string
   aktif: boolean
 }
-type Duraklat = { id: string; tanim: string; tarih: string; vardiya_no: number }
-type TanimGrup = { tanim: string; kurallar: Kural[]; aktifOlmaSaati: string; aktifGunler: number[] }
+type Duraklat = {
+  id: string
+  ust_lokasyon_id: string | null
+  tanim: string
+  tarih: string
+  vardiya_no: number
+}
+type Lok = { id: string; tanim: string; parent_id: string | null }
+type TanimUstGrup = {
+  tanim: string
+  ustLokasyonId: string
+  ustLokasyonTanim: string
+  kurallar: Kural[]
+  aktifOlmaSaati: string
+  aktifGunler: number[]
+}
 
 const GUN_ISIMLERI = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
 function gunEtiket(gunler: number[]) {
@@ -25,23 +40,28 @@ function gunEtiket(gunler: number[]) {
 export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebilir = true, silebilir = true, yetkiliLokIds }: { firmaId: string; projeId: string | null; ekleyebilir?: boolean; silebilir?: boolean; yetkiliLokIds?: string[] | null }) {
   const [kurallar, setKurallar] = useState<Kural[]>([])
   const [duraklatmalar, setDuraklatmalar] = useState<Duraklat[]>([])
+  const [lokasyonlar, setLokasyonlar] = useState<Lok[]>([])
   const [loading, setLoading] = useState(true)
-  const [modalTanim, setModalTanim] = useState<TanimGrup | null>(null)
+  const [modalGrup, setModalGrup] = useState<TanimUstGrup | null>(null)
   const { toast } = useToast()
 
-  // Kuralları ve duraklatmaları yükle
+  // Kuralları, duraklatmaları ve lokasyon ağacını yükle
   useEffect(() => {
     if (!firmaId) return
     let alive = true
 
     async function yukle() {
       try {
-        const [kuralRes, duraklatRes] = await Promise.all([
+        const lokParams = new URLSearchParams({ firmaId })
+        if (projeId) lokParams.set('projeId', projeId)
+        const [kuralRes, duraklatRes, lokRes] = await Promise.all([
           fetch(`/api/gorev-kurallari?firma_id=${firmaId}${projeId ? `&proje_id=${projeId}` : ''}`),
           fetch(`/api/gorev-kurallari/duraklat-vardiya?firmaId=${firmaId}${projeId ? `&projeId=${projeId}` : ''}`),
+          fetch(`/api/lokasyonlar-list?${lokParams}`, { cache: 'no-store' }),
         ])
         const kuralData = await kuralRes.json()
         const duraklatData = await duraklatRes.json()
+        const lokData = await lokRes.json()
         if (alive) {
           let aktifKurallar = Array.isArray(kuralData) ? kuralData.filter((k: any) => k.aktif) : []
           // Yetkili lokasyon filtresi
@@ -51,6 +71,7 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebili
           }
           setKurallar(aktifKurallar)
           setDuraklatmalar(duraklatData.data ?? [])
+          setLokasyonlar(Array.isArray(lokData) ? lokData : [])
         }
       } catch {}
       if (alive) setLoading(false)
@@ -60,29 +81,51 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebili
     return () => { alive = false }
   }, [firmaId, projeId])
 
-  // Tanım bazlı grupla
-  const tanimGruplari = useMemo(() => {
-    const map = new Map<string, Kural[]>()
-    for (const k of kurallar) {
-      const arr = map.get(k.tanim) ?? []
-      arr.push(k)
-      map.set(k.tanim, arr)
+  // Lokasyon → üst lokasyon resolver (parent_id zincirini takip eder)
+  const lokToUst = useMemo(() => {
+    const lokMap = new Map(lokasyonlar.map(l => [l.id, l]))
+    const cache = new Map<string, Lok | null>()
+    function resolve(lokId: string): Lok | null {
+      if (cache.has(lokId)) return cache.get(lokId) ?? null
+      let cur = lokMap.get(lokId)
+      while (cur && cur.parent_id) cur = lokMap.get(cur.parent_id)
+      const result = cur ?? null
+      cache.set(lokId, result)
+      return result
     }
-    const result: TanimGrup[] = []
-    for (const [tanim, kList] of map) {
-      result.push({
-        tanim,
-        kurallar: kList,
-        aktifOlmaSaati: kList[0]?.aktif_olma_saati?.slice(0, 5) ?? '',
-        aktifGunler: kList[0]?.aktif_gunler ?? [],
-      })
-    }
-    return result.sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr'))
-  }, [kurallar])
+    return resolve
+  }, [lokasyonlar])
 
-  // Tanım bazında duraklatma sayısı
-  function duraklatmaSayisi(tanim: string) {
-    return duraklatmalar.filter(d => d.tanim === tanim).length
+  // (Tanım, üst lokasyon) çifti bazlı grupla — her üst lokasyon kendi grubunu oluşturur
+  const grupListesi = useMemo(() => {
+    const map = new Map<string, TanimUstGrup>()  // key: `${tanim}::${ustLokId}`
+    for (const k of kurallar) {
+      const ust = lokToUst(k.lokasyon_id)
+      if (!ust) continue
+      const key = `${k.tanim}::${ust.id}`
+      const mevcut = map.get(key)
+      if (mevcut) {
+        mevcut.kurallar.push(k)
+      } else {
+        map.set(key, {
+          tanim: k.tanim,
+          ustLokasyonId: ust.id,
+          ustLokasyonTanim: ust.tanim,
+          kurallar: [k],
+          aktifOlmaSaati: k.aktif_olma_saati?.slice(0, 5) ?? '',
+          aktifGunler: k.aktif_gunler ?? [],
+        })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      const ust = a.ustLokasyonTanim.localeCompare(b.ustLokasyonTanim, 'tr')
+      return ust !== 0 ? ust : a.tanim.localeCompare(b.tanim, 'tr')
+    })
+  }, [kurallar, lokToUst])
+
+  // (Tanım, üst lokasyon) çifti bazında duraklatma sayısı
+  function duraklatmaSayisi(tanim: string, ustLokasyonId: string) {
+    return duraklatmalar.filter(d => d.tanim === tanim && d.ust_lokasyon_id === ustLokasyonId).length
   }
 
   async function refreshDuraklatmalar() {
@@ -101,7 +144,7 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebili
     )
   }
 
-  if (tanimGruplari.length === 0) {
+  if (grupListesi.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: 48, color: '#6b7280', fontSize: 14 }}>
         Henüz tanımlı görev kuralı bulunmuyor.
@@ -112,12 +155,17 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebili
   return (
     <div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {tanimGruplari.map(tg => {
-          const dc = duraklatmaSayisi(tg.tanim)
+        {grupListesi.map(tg => {
+          const dc = duraklatmaSayisi(tg.tanim, tg.ustLokasyonId)
           return (
-            <div key={tg.tanim} className="verde-card" style={{ padding: '14px 20px', borderLeft: dc > 0 ? '3px solid #f59e0b' : undefined, background: dc > 0 ? '#fffdf7' : undefined }}>
+            <div key={`${tg.tanim}::${tg.ustLokasyonId}`} className="verde-card" style={{ padding: '14px 20px', borderLeft: dc > 0 ? '3px solid #f59e0b' : undefined, background: dc > 0 ? '#fffdf7' : undefined }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', padding: '2px 8px', borderRadius: 4 }}>
+                      📍 {tg.ustLokasyonTanim}
+                    </span>
+                  </div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>
                     {dc > 0 ? '⏸ ' : '📋 '}{tg.tanim}
                   </div>
@@ -134,7 +182,7 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebili
                 </div>
                 {ekleyebilir && (
                   <button
-                    onClick={() => setModalTanim(tg)}
+                    onClick={() => setModalGrup(tg)}
                     style={{ padding: '6px 16px', fontSize: 13, borderRadius: 8, border: '1px solid #fbbf24', background: '#fffbeb', cursor: 'pointer', color: '#92400e', fontWeight: 700, whiteSpace: 'nowrap' }}>
                     ⏸ Duraklat
                   </button>
@@ -146,13 +194,15 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebili
       </div>
 
       {/* Duraklatma Modal */}
-      {modalTanim && (
+      {modalGrup && (
         <DuraklatModal
-          tanim={modalTanim.tanim}
+          tanim={modalGrup.tanim}
+          ustLokasyonId={modalGrup.ustLokasyonId}
+          ustLokasyonTanim={modalGrup.ustLokasyonTanim}
           firmaId={firmaId}
           projeId={projeId}
-          aktifOlmaSaati={modalTanim.aktifOlmaSaati}
-          onClose={() => { setModalTanim(null); refreshDuraklatmalar() }}
+          aktifOlmaSaati={modalGrup.aktifOlmaSaati}
+          onClose={() => { setModalGrup(null); refreshDuraklatmalar() }}
           toast={toast}
           silebilir={silebilir}
         />
@@ -161,10 +211,17 @@ export default function GorevDuraklatmalariClient({ firmaId, projeId, ekleyebili
   )
 }
 
-/** Duraklatma popup — VardiyaDuraklatModal'ın bağımsız versiyonu */
-function DuraklatModal({ tanim, firmaId, projeId, aktifOlmaSaati, onClose, toast, silebilir = true }: {
-  tanim: string; firmaId: string; projeId: string | null; aktifOlmaSaati: string
-  onClose: () => void; toast: (o: any) => void; silebilir?: boolean
+/** Duraklatma popup — VardiyaDuraklatModal'ın bağımsız versiyonu (üst lokasyon bazlı) */
+function DuraklatModal({ tanim, ustLokasyonId, ustLokasyonTanim, firmaId, projeId, aktifOlmaSaati, onClose, toast, silebilir = true }: {
+  tanim: string;
+  ustLokasyonId: string;
+  ustLokasyonTanim: string;
+  firmaId: string;
+  projeId: string | null;
+  aktifOlmaSaati: string
+  onClose: () => void;
+  toast: (o: any) => void;
+  silebilir?: boolean
 }) {
   const [vardiyalar, setVardiyalar] = useState<{ no: number; baslangic: string; bitis: string }[]>([])
   const [uygunVardiyaNo, setUygunVardiyaNo] = useState<number | null>(null)
@@ -196,13 +253,13 @@ function DuraklatModal({ tanim, firmaId, projeId, aktifOlmaSaati, onClose, toast
       })
       .catch(() => {})
 
-    const p = new URLSearchParams({ firmaId, tanim })
+    const p = new URLSearchParams({ firmaId, tanim, ustLokasyonId })
     if (projeId) p.set('projeId', projeId)
     fetch(`/api/gorev-kurallari/duraklat-vardiya?${p}`)
       .then(r => r.json())
       .then(j => setMevcutlar(j.data ?? []))
       .catch(() => {})
-  }, [firmaId, projeId, tanim])
+  }, [firmaId, projeId, tanim, ustLokasyonId])
 
   function tarihEkle() {
     if (!tarihInput || seciliTarihler.includes(tarihInput)) return
@@ -217,12 +274,12 @@ function DuraklatModal({ tanim, firmaId, projeId, aktifOlmaSaati, onClose, toast
       const res = await fetch('/api/gorev-kurallari/duraklat-vardiya', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firmaId, projeId, tanim, tarihler: seciliTarihler, vardiyalar: seciliVardiyalar }),
+        body: JSON.stringify({ firmaId, projeId, ustLokasyonId, tanim, tarihler: seciliTarihler, vardiyalar: seciliVardiyalar }),
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error)
       toast({ type: 'success', title: 'Duraklatıldı', message: `${j.eklenen} duraklatma eklendi.` })
-      const p = new URLSearchParams({ firmaId, tanim })
+      const p = new URLSearchParams({ firmaId, tanim, ustLokasyonId })
       if (projeId) p.set('projeId', projeId)
       const r2 = await fetch(`/api/gorev-kurallari/duraklat-vardiya?${p}`)
       const j2 = await r2.json()
@@ -238,7 +295,7 @@ function DuraklatModal({ tanim, firmaId, projeId, aktifOlmaSaati, onClose, toast
     await fetch('/api/gorev-kurallari/duraklat-vardiya', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firmaId, projeId, tanim, tarih: t, vardiya_no: v }),
+      body: JSON.stringify({ firmaId, projeId, ustLokasyonId, tanim, tarih: t, vardiya_no: v }),
     })
     setMevcutlar(prev => prev.filter(m => m.id !== id))
   }
@@ -250,8 +307,13 @@ function DuraklatModal({ tanim, firmaId, projeId, aktifOlmaSaati, onClose, toast
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 520, maxHeight: '80vh', overflow: 'auto', padding: '24px 28px' }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: '#111827', marginBottom: 4 }}>⏸ Vardiya Duraklatma</div>
+        <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', padding: '3px 10px', borderRadius: 4, marginBottom: 6 }}>
+          📍 {ustLokasyonTanim}
+        </div>
         <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
           <strong>{tanim}</strong> kuralı için belirli günlerde ve vardiyalarda görev üretimini duraklat.
+          <br />
+          <span style={{ fontSize: 12, color: '#9ca3af' }}>Bu duraklatma sadece <strong>{ustLokasyonTanim}</strong> üst lokasyonundaki kuralları etkiler.</span>
         </div>
 
         {/* Tarih seçimi */}
