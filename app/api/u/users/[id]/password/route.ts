@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { auditLog } from '@/lib/audit/log'
 
 // /api/u/users/[id]/password
 // U/M kullanıcısı kendi yetki kapsamındaki kullanıcıların şifresini değiştirebilir.
@@ -34,7 +35,7 @@ export async function PUT(req: Request, ctx: { params: { id: string } }) {
 
   const admin = createAdminClient()
 
-  const { data: target } = await admin.from('users').select('id,rol,firma_id,ust_lokasyon_id').eq('id', userId).single()
+  const { data: target } = await admin.from('users').select('id,rol,firma_id,ust_lokasyon_id,isim_soyisim,e_posta').eq('id', userId).single()
   if (!target) return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 404 })
   if (ADMIN_ROLLERI.has((target as any).rol)) return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
   if ((target as any).firma_id !== me.firma_id) return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
@@ -50,6 +51,20 @@ export async function PUT(req: Request, ctx: { params: { id: string } }) {
 
   const { error } = await admin.auth.admin.updateUserById(userId, { password })
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  await auditLog({
+    tip: 'kullanici_sifre_degis',
+    tablo: 'users',
+    kullanici_id: me.id,
+    firma_id: me.firma_id,
+    detay: {
+      hedef_user_id: userId,
+      hedef_isim: (target as any).isim_soyisim ?? null,
+      hedef_eposta: (target as any).e_posta ?? null,
+      hedef_rol: (target as any).rol,
+      yapan_rol: me.rol,
+    },
+  })
 
   return NextResponse.json({ ok: true })
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 function isTA(role?: string | null) {
   return role === 'tenant_admin'
@@ -23,13 +24,27 @@ export async function PUT(req: Request, ctx: { params: { id: string } }) {
 
   const admin = createAdminClient()
 
-  const { data: target } = await admin.from('users').select('id,rol,firma_id').eq('id', userId).single()
+  const { data: target } = await admin.from('users').select('id,rol,firma_id,isim_soyisim,e_posta').eq('id', userId).single()
   if (!target) return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 404 })
   if (target.rol === 'super_admin' || target.rol === 'alt_super_admin') return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
   if (target.firma_id !== me.firma_id) return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
 
   const { error } = await admin.auth.admin.updateUserById(userId, { password })
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  await auditLog({
+    tip: 'kullanici_sifre_degis',
+    tablo: 'users',
+    kullanici_id: me.id,
+    firma_id: me.firma_id,
+    detay: {
+      hedef_user_id: userId,
+      hedef_isim: (target as any).isim_soyisim ?? null,
+      hedef_eposta: (target as any).e_posta ?? null,
+      hedef_rol: target.rol,
+      yapan_rol: 'tenant_admin',
+    },
+  })
 
   return NextResponse.json({ ok: true })
 }

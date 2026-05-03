@@ -16,6 +16,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -142,6 +143,23 @@ export async function POST(req: NextRequest) {
   })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Üst lokasyon adını çek (audit detayı için)
+  const { data: ustLok } = await admin.from('lokasyonlar').select('tanim').eq('id', ustLokasyonId).maybeSingle()
+  await auditLog({
+    tip: 'kural_toplu_duraklatma',
+    tablo: 'kural_duraklatmalari',
+    kullanici_id: me.id,
+    firma_id: firmaId,
+    proje_id: projeId,
+    satir_sayisi: rows.length,
+    detay: {
+      ust_lokasyon_id: ustLokasyonId,
+      ust_lokasyon_tanim: (ustLok as any)?.tanim ?? null,
+      tarihler,
+      vardiyalar: vardiyalar ?? null,
+    },
+  })
+
   return NextResponse.json({ ok: true, eklenen: rows.length })
 }
 
@@ -179,5 +197,24 @@ export async function DELETE(req: NextRequest) {
   const { data, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ ok: true, silinen: data?.length ?? 0 })
+  const silinen = data?.length ?? 0
+  if (silinen > 0) {
+    const { data: ustLok } = await admin.from('lokasyonlar').select('tanim').eq('id', ustLokasyonId).maybeSingle()
+    await auditLog({
+      tip: 'kural_toplu_baslatma',
+      tablo: 'kural_duraklatmalari',
+      kullanici_id: me.id,
+      firma_id: firmaId,
+      proje_id: projeId,
+      satir_sayisi: silinen,
+      detay: {
+        ust_lokasyon_id: ustLokasyonId,
+        ust_lokasyon_tanim: (ustLok as any)?.tanim ?? null,
+        tarih: tarih ?? null,
+        kapsam: tarih ? 'tek_tarih' : 'bugun_ve_sonrasi',
+      },
+    })
+  }
+
+  return NextResponse.json({ ok: true, silinen })
 }

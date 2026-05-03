@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 // PUT - Rapor şablonunu güncelle
 export async function PUT(
@@ -137,6 +138,17 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
+
+  await auditLog({
+    tip: 'rapor_sablonu_sil',
+    tablo: 'rapor_sablonlari',
+    kullanici_id: me.id,
+    firma_id: (sablon as any).firma_id ?? null,
+    detay: {
+      sablon_id: params.id,
+      sablon_adi: (sablon as any).ad ?? (sablon as any).baslik ?? null,
+    },
+  })
 
   return NextResponse.json({ ok: true, message: 'Şablon başarıyla silindi' })
 }

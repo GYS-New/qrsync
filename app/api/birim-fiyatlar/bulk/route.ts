@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 // POST /api/birim-fiyatlar/bulk
 // Body: { proje_id, items: [{ grup_id?, lokasyon_id?, fiyat, para_birimi }] }
@@ -67,8 +68,24 @@ export async function POST(req: NextRequest) {
     }
 
     if (error) return { error: error.message }
-    return { ok: true, data }
+    return { ok: true, data, action: existing?.id ? 'update' : 'insert' }
   }))
+
+  // Aksiyon türlerine göre özet
+  const silinen = results.filter((r: any) => r.deleted).length
+  const guncellenen = results.filter((r: any) => r.action === 'update').length
+  const eklenen = results.filter((r: any) => r.action === 'insert').length
+  const hatali = results.filter((r: any) => r.error).length
+
+  await auditLog({
+    tip: 'birim_fiyat_toplu',
+    tablo: 'birim_fiyatlar',
+    kullanici_id: user.id,
+    firma_id: proje.firma_id,
+    proje_id,
+    satir_sayisi: silinen + guncellenen + eklenen,
+    detay: { silinen, guncellenen, eklenen, hatali, toplam_istek: items.length },
+  })
 
   return NextResponse.json({ ok: true, results })
 }
