@@ -226,7 +226,7 @@ function IoAsistanAvatar({ onClick }: { onClick: () => void }) {
 
 
 /** Sidebar logo — boyut logoya göre dinamik */
-function SidebarLogo({ src, alt, bordered = false, imgWidth = '80%' }: { src: string; alt: string; bordered?: boolean; imgWidth?: string }) {
+function SidebarLogo({ src, alt, bordered = false, imgWidth = '80%', maxHeight = 96 }: { src: string; alt: string; bordered?: boolean; imgWidth?: string; maxHeight?: number }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -238,7 +238,7 @@ function SidebarLogo({ src, alt, bordered = false, imgWidth = '80%' }: { src: st
         src={src}
         alt={alt}
         style={{
-          width: imgWidth, maxHeight: 70, objectFit: 'contain',
+          width: imgWidth, maxHeight, objectFit: 'contain',
         }}
       />
     </div>
@@ -279,25 +279,16 @@ function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' |
   )
 }
 
-export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, sidebarAltyazi, birimFiyatAktifProp, personelTakibiAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; sidebarAltyazi?: string | null; birimFiyatAktifProp?: boolean; personelTakibiAktifProp?: boolean }) {
+export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, birimFiyatAktifProp, personelTakibiAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; birimFiyatAktifProp?: boolean; personelTakibiAktifProp?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeLoading = useRouteLoading()
-  
+
   const isSA = user.rol === 'super_admin' || user.rol === 'alt_super_admin'
 
   // SA ve TA her ikisi de ProjeContext + FirmaContext kullanır
   const { aktifProje } = useProje()
   const { firmaId: saFirmaId, firmalar } = useFirma()
-
-  // Sidebar altyazı — prop veya API'den
-  const [altyazi, setAltyazi] = useState(sidebarAltyazi ?? 'GÖREV YÖNETİM SİSTEMİ')
-  useEffect(() => {
-    if (sidebarAltyazi) { setAltyazi(sidebarAltyazi); return }
-    fetch('/api/sistem-konfig?field=sidebar_altyazi').then(r => r.json()).then(j => {
-      if (j?.value) setAltyazi(j.value)
-    }).catch(() => {})
-  }, [sidebarAltyazi])
 
   const [counts, setCounts] = useState<SidebarCounts | null>(null)
   const [countsError, setCountsError] = useState(false)
@@ -451,18 +442,13 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
           onClick={() => go(`${base}/dashboard`)}
           title="Gösterge Paneli"
         >
-          {/* Sidebar Logo (firma veya SA) */}
+          {/* Sidebar Logo (firma veya SA) — alt yazı kaldırıldı, logo alanı tek başına kaplıyor */}
           {isSA && sidebarLogo ? (
-            <SidebarLogo src={sidebarLogo} alt="Logo" imgWidth="100%" />
+            <SidebarLogo src={sidebarLogo} alt="Logo" imgWidth="100%" maxHeight={120} />
           ) : !isSA && firma?.logo_url ? (
-            <SidebarLogo src={firma.logo_url} alt="Firma Logo" />
+            <SidebarLogo src={firma.logo_url} alt="Firma Logo" maxHeight={120} />
           ) : null}
         </div>
-        {altyazi && !isSA && (
-          <div style={{ textAlign: 'center', marginTop: 6, fontSize: 13, fontWeight: 700, color: '#4b5563', fontFamily: 'Inter, sans-serif', letterSpacing: '0.03em' }}>
-            {altyazi}
-          </div>
-        )}
       </div>
 
       {/* Nav */}

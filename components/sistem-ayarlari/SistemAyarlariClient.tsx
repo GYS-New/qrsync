@@ -457,7 +457,6 @@ function UygulamaAyarlariPanel() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [sidebarLogoUrl, setSidebarLogoUrl] = useState<string | null>(null)
   const [appName, setAppName] = useState('İOGYS')
-  const [sidebarAltyazi, setSidebarAltyazi] = useState('GÖREV YÖNETİM SİSTEMİ')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -467,7 +466,7 @@ function UygulamaAyarlariPanel() {
   useEffect(() => {
     fetch('/api/sistem-ayarlari/konfigurasyon')
       .then(r => r.json())
-      .then(j => { setLogoUrl(j.uygulama_logo_url ?? null); setSidebarLogoUrl(j.sidebar_logo_url ?? null); setAppName(j.uygulama_ismi ?? 'İOGYS'); setSidebarAltyazi(j.sidebar_altyazi ?? 'GÖREV YÖNETİM SİSTEMİ'); setLoading(false) })
+      .then(j => { setLogoUrl(j.uygulama_logo_url ?? null); setSidebarLogoUrl(j.sidebar_logo_url ?? null); setAppName(j.uygulama_ismi ?? 'İOGYS'); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
@@ -613,31 +612,6 @@ function UygulamaAyarlariPanel() {
               Sil
             </button>
           )}
-        </div>
-      </div>
-
-      {/* Sidebar Alt Yazı */}
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>Sidebar Alt Yazı</div>
-        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginBottom: 10 }}>
-          Logo altında görünecek metin. Varsayılan: GÖREV YÖNETİM SİSTEMİ
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input value={sidebarAltyazi} onChange={e => setSidebarAltyazi(e.target.value)}
-            style={{ height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: 14, fontWeight: 700, flex: 1 }}
-            placeholder="GÖREV YÖNETİM SİSTEMİ" />
-          <button onClick={async () => {
-            setSaving(true)
-            try {
-              const res = await fetch('/api/sistem-ayarlari/konfigurasyon', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sidebar_altyazi: sidebarAltyazi }) })
-              if (!res.ok) throw new Error('Kaydetme hatası')
-              setMsg('Alt yazı kaydedildi.')
-            } catch (e: any) { setMsg('Hata: ' + e.message) }
-            setSaving(false)
-          }} disabled={saving}
-            style={{ height: 36, padding: '0 16px', borderRadius: 8, background: '#111827', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
-            {saving ? '...' : 'Kaydet'}
-          </button>
         </div>
       </div>
 
