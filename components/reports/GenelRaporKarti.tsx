@@ -215,7 +215,12 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   const [loading,        setLoading]        = useState(false)
   const [dlLoading,      setDlLoading]      = useState(false)
   const [activeTab,      setActiveTab]      = useState<Tab>('Özet & Grafikler')
+  const [gruplandir,     setGruplandir]     = useState(false)
   const debRef = useRef<any>(null)
+
+  // Üst lokasyon filtresi temizlenirse gruplandır modu otomatik kapanır
+  // (gruplandır sadece üst lokasyon filtresi varken anlamlı)
+  useEffect(() => { if (!ustLokasyonId) setGruplandir(false) }, [ustLokasyonId])
 
   const ustLokasyonlar    = useMemo(() => lokasyonlar.filter(l => !l.parent_id), [lokasyonlar])
   const altLokasyonlar    = useMemo(() => lokasyonlar.filter(l => l.parent_id === ustLokasyonId), [lokasyonlar, ustLokasyonId])
@@ -505,9 +510,25 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
               {data.raporuAlan && <span><strong>Raporu Alan:</strong> {data.raporuAlan}</span>}
             </div>
 
-            {/* Sekme navigasyon */}
-            <div style={{ display: 'flex', gap: 4, background: T.grayLight, borderRadius: 8, padding: 4, alignSelf: 'flex-start', flexWrap: 'wrap', border: `1px solid ${T.border}` }}>
-              {TABS.map(t => <button key={t} style={tabStyle(t)} onClick={() => setActiveTab(t)}>{t}</button>)}
+            {/* Sekme navigasyon + Gruplandır (sadece Grup Metrikleri + üst lokasyon filtresi varken) */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 4, background: T.grayLight, borderRadius: 8, padding: 4, flexWrap: 'wrap', border: `1px solid ${T.border}` }}>
+                {TABS.map(t => <button key={t} style={tabStyle(t)} onClick={() => setActiveTab(t)}>{t}</button>)}
+              </div>
+              {ustLokasyonId && activeTab === 'Grup Metrikleri' && (
+                <button
+                  onClick={() => setGruplandir(g => !g)}
+                  title={gruplandir ? 'Lokasyon bazlı görünüme dön' : 'Aynı gruptaki lokasyonları birleştirip grup bazında listele'}
+                  style={{
+                    padding: '7px 14px', borderRadius: 8, fontSize: 13.5, fontWeight: 700,
+                    border: `1px solid ${gruplandir ? T.green : T.border}`, cursor: 'pointer',
+                    background: gruplandir ? T.green : '#fff',
+                    color: gruplandir ? '#fff' : T.greenMid,
+                    transition: 'all .15s',
+                  }}>
+                  {gruplandir ? '✓ Gruplandı' : '⚏ Gruplandır'}
+                </button>
+              )}
             </div>
 
             {/* ── ÖZET & GRAFİKLER ── */}
@@ -699,20 +720,45 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             )}
 
             {/* ── GRUP METRİKLERİ ── */}
-            {activeTab === 'Grup Metrikleri' && (
+            {activeTab === 'Grup Metrikleri' && (() => {
+              // Gruplandır modu: aynı grup adındakileri birleştir, metrikleri topla, oranları yeniden hesapla
+              const grupMetrikleriDisplay = !gruplandir ? data.grupMetrikleri : (() => {
+                const agg = new Map<string, GrupMetrik & { lokasyonSayisi: number }>()
+                for (const g of data.grupMetrikleri) {
+                  const ex = agg.get(g.grup)
+                  if (!ex) { agg.set(g.grup, { ...g, lokasyon: '', lokasyonSayisi: 1 }); continue }
+                  ex.gunlukFrekans += g.gunlukFrekans
+                  ex.kuralSayisi   += g.kuralSayisi
+                  ex.hedef         += g.hedef
+                  ex.tamamlanan    += g.tamamlanan
+                  ex.sapma         += g.sapma
+                  ex.kayip         += g.kayip
+                  ex.ekstra         = (ex.ekstra ?? 0) + (g.ekstra ?? 0)
+                  ex.lokasyonSayisi++
+                }
+                return [...agg.values()].map(g => {
+                  const ger = g.tamamlanan + (g.ekstra ?? 0)
+                  const bas = g.hedef > 0 ? Math.round(ger / g.hedef * 100) : 0
+                  const gen = g.hedef > 0 ? Math.round((ger + g.sapma) / g.hedef * 100) : 0
+                  return { ...g, basariOrani: `%${bas}`, genelOran: `%${gen}` }
+                })
+              })()
+              return (
               <div className="verde-card" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Frekans Metrikleri</div>
-                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{data.grupMetrikleri.length} grup</span>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Grup Frekans Metrikleri{gruplandir ? ' (Grup Bazlı)' : ''}</div>
+                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.blueLight, color: T.blue }}>
+                    {grupMetrikleriDisplay.length} {gruplandir ? 'grup' : 'satır'}
+                  </span>
                 </div>
-                {/* Toplamlar */}
-                {data.grupMetrikleri.length > 0 && (() => {
-                  const tGunluk = data.grupMetrikleri.reduce((s, g) => s + g.gunlukFrekans, 0)
-                  const tHedef  = data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0)
-                  const tTam    = data.grupMetrikleri.reduce((s, g) => s + g.tamamlanan, 0)
-                  const tSap    = data.grupMetrikleri.reduce((s, g) => s + g.sapma, 0)
-                  const tKay    = data.grupMetrikleri.reduce((s, g) => s + g.kayip, 0)
-                  const tEks    = data.grupMetrikleri.reduce((s, g) => s + (g.ekstra ?? 0), 0)
+                {/* Toplamlar — gruplandır modunda da aynı toplamlar (sums değişmez) */}
+                {grupMetrikleriDisplay.length > 0 && (() => {
+                  const tGunluk = grupMetrikleriDisplay.reduce((s, g) => s + g.gunlukFrekans, 0)
+                  const tHedef  = grupMetrikleriDisplay.reduce((s, g) => s + g.hedef, 0)
+                  const tTam    = grupMetrikleriDisplay.reduce((s, g) => s + g.tamamlanan, 0)
+                  const tSap    = grupMetrikleriDisplay.reduce((s, g) => s + g.sapma, 0)
+                  const tKay    = grupMetrikleriDisplay.reduce((s, g) => s + g.kayip, 0)
+                  const tEks    = grupMetrikleriDisplay.reduce((s, g) => s + (g.ekstra ?? 0), 0)
                   const tGer    = tTam + tEks
                   const tBas    = tHedef > 0 ? Math.round(tGer / tHedef * 100) : 0
                   const tGenel  = tHedef > 0 ? Math.round((tGer + tSap) / tHedef * 100) : 0
@@ -736,16 +782,25 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                     </div>
                   )
                 })()}
-                <DataTable
-                  headers={['SN', 'GRUP',
-                    altAltLokasyonId ? 'ALT LOKASYON' : altLokasyonId ? 'ÜST LOKASYON' : 'ÜST LOKASYON',
-                    altAltLokasyonId ? 'ALT-ALT LOKASYON' : altLokasyonId ? 'ALT LOKASYON' : 'LOKASYON',
-                    'VARDİYA FREKANS', !ustLokasyonId ? 'VARDİYA SAYISI' : 'GÜNLÜK VARDİYA', 'HEDEF', 'TAMAMLANAN', 'EKSTRA', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
-                  rows={data.grupMetrikleri.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, !ustLokasyonId ? g.kuralSayisi * (data.gunSayisi || 1) : g.kuralSayisi, g.hedef, g.tamamlanan, g.ekstra ?? 0, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
-                  accentCol={11} accentColor={T.greenMid} leftCols={[1, 2, 3]}
-                />
+                {gruplandir ? (
+                  <DataTable
+                    headers={['SN', 'GRUP', 'LOKASYON SAYISI', 'VARDİYA FREKANS', 'GÜNLÜK VARDİYA', 'HEDEF', 'TAMAMLANAN', 'EKSTRA', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
+                    rows={grupMetrikleriDisplay.map((g, i) => [i + 1, g.grup, (g as any).lokasyonSayisi ?? 1, g.gunlukFrekans, g.kuralSayisi, g.hedef, g.tamamlanan, g.ekstra ?? 0, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
+                    accentCol={10} accentColor={T.greenMid} leftCols={[1]}
+                  />
+                ) : (
+                  <DataTable
+                    headers={['SN', 'GRUP',
+                      altAltLokasyonId ? 'ALT LOKASYON' : altLokasyonId ? 'ÜST LOKASYON' : 'ÜST LOKASYON',
+                      altAltLokasyonId ? 'ALT-ALT LOKASYON' : altLokasyonId ? 'ALT LOKASYON' : 'LOKASYON',
+                      'VARDİYA FREKANS', !ustLokasyonId ? 'VARDİYA SAYISI' : 'GÜNLÜK VARDİYA', 'HEDEF', 'TAMAMLANAN', 'EKSTRA', 'SAPMA', 'KAYIP', 'BAŞARI', 'GENEL ORAN']}
+                    rows={grupMetrikleriDisplay.map((g, i) => [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, !ustLokasyonId ? g.kuralSayisi * (data.gunSayisi || 1) : g.kuralSayisi, g.hedef, g.tamamlanan, g.ekstra ?? 0, g.sapma, g.kayip, g.basariOrani, g.genelOran])}
+                    accentCol={11} accentColor={T.greenMid} leftCols={[1, 2, 3]}
+                  />
+                )}
               </div>
-            )}
+              )
+            })()}
 
             {/* ── TAMAMLANAN ── */}
             {activeTab === 'Tamamlanan' && (
