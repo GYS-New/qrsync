@@ -474,8 +474,51 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                 0% { opacity: 1; transform: scale(1); }
                 100% { opacity: 0; transform: scale(0.5) translateY(4px); }
               }
-              .io-avatar-wrap { position: relative; }
-              .io-avatar { animation: ioFloat 3s ease-in-out infinite; transition: filter 0.3s ease, transform 0.3s ease; }
+              .io-avatar-wrap { position: relative; isolation: isolate; }
+              /* Derinlik aura — yumuşak pastel halka, asistanın arkasında nefes alır */
+              .io-avatar-wrap::before {
+                content: '';
+                position: absolute;
+                top: 55px; left: 55px;
+                width: 180px; height: 180px;
+                transform: translate(-50%, -50%);
+                background: radial-gradient(circle,
+                  rgba(99, 102, 241, 0.20) 0%,
+                  rgba(56, 189, 248, 0.16) 28%,
+                  rgba(52, 211, 153, 0.12) 52%,
+                  transparent 75%);
+                filter: blur(18px);
+                z-index: -1;
+                pointer-events: none;
+                animation: ioAuraBreath 5s ease-in-out infinite;
+              }
+              /* İç katman — yavaş dönen renk huzmeleri (swirl), derinlik hissi için */
+              .io-avatar-wrap::after {
+                content: '';
+                position: absolute;
+                top: 55px; left: 55px;
+                width: 130px; height: 130px;
+                border-radius: 50%;
+                background: conic-gradient(from 0deg,
+                  rgba(167, 139, 250, 0.22) 0%,
+                  rgba(94, 234, 212, 0.18) 33%,
+                  rgba(165, 243, 252, 0.16) 66%,
+                  rgba(167, 139, 250, 0.22) 100%);
+                filter: blur(14px);
+                z-index: -1;
+                pointer-events: none;
+                animation: ioAuraSwirl 22s linear infinite;
+                transform-origin: center;
+              }
+              @keyframes ioAuraBreath {
+                0%, 100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1); }
+                50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.08); }
+              }
+              @keyframes ioAuraSwirl {
+                0%   { transform: translate(-50%, -50%) rotate(0deg); }
+                100% { transform: translate(-50%, -50%) rotate(360deg); }
+              }
+              .io-avatar { animation: ioFloat 3s ease-in-out infinite; transition: filter 0.3s ease, transform 0.3s ease; position: relative; z-index: 1; }
               .io-avatar:hover { filter: drop-shadow(0 0 14px rgba(55,138,221,0.65)); transform: scale(1.35) !important; animation-play-state: paused; }
               .io-ground-shadow {
                 width: 64px; height: 12px; border-radius: 50%;
