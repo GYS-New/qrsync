@@ -3,6 +3,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { resolveScanContext } from '@/lib/scan/core'
 import { completeTask } from '@/lib/tasks/completeTask'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
+import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
 import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
 import { lokasyonEkstraFrekansDropdown } from '@/lib/scan/bugunTamamlananlar'
 
@@ -103,6 +104,18 @@ export async function POST(req: Request, { params }: { params: { token: string }
       const { data: gorev } = await supabase.from(tablo).select('id,baslatilma_tarihi,durum,firma_id,proje_id').eq('id', selectedTaskId).maybeSingle()
       if (gorev?.baslatilma_tarihi) {
         return NextResponse.json({ ok: true, baslatilma_tarihi: gorev.baslatilma_tarihi, mesaj: 'Zaten başlatılmış' }, { headers: CORS_HEADERS })
+      }
+      // Devam eden başka bir görev var mı? (Aynı kullanıcının başka ISLEMDE görevi)
+      if (gorev) {
+        const devam = await devamEdenGorevKontrol(supabase, user.id, gorev.firma_id, { excludeTaskId: selectedTaskId })
+        if (devam) {
+          return NextResponse.json({
+            ok: false,
+            code: 'DEVAM_EDEN_GOREV',
+            error: 'Önce devam eden görevinizi tamamlayın.',
+            aktifGorev: devam,
+          }, { status: 409, headers: CORS_HEADERS })
+        }
       }
       // Ardışık başlatma kontrolü
       if (gorev) {
