@@ -167,7 +167,7 @@ export default function BildirimBar({ rol }: { rol: 'super_admin' | 'alt_super_a
             <span style={{ fontSize: 12.5, fontWeight: 600, color: sol.tip === 'duraklat' ? '#92400e' : '#0369a1', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {sol.mesaj}
             </span>
-            {bildirimler.length > 1 && <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{(solIdx % bildirimler.length) + 1}/{bildirimler.length}</span>}
+            {bildirimler.length > 1 && <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{(solIdx % bildirimler.length) + 1}/{bildirimler.length}</span>}
           </>
         ) : (
           <span style={{ fontSize: 12, color: '#94a3b8' }}>Bildirim yok</span>
@@ -189,8 +189,8 @@ export default function BildirimBar({ rol }: { rol: 'super_admin' | 'alt_super_a
             <span style={{ fontSize: 12.5, fontWeight: 600, color: '#065f46', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {sag.mesaj}
             </span>
-            <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{sag.saat}</span>
-            {aktiviteler.length > 1 && <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{(sagIdx % aktiviteler.length) + 1}/{aktiviteler.length}</span>}
+            <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, flexShrink: 0 }}>{sag.saat}</span>
+            {aktiviteler.length > 1 && <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{(sagIdx % aktiviteler.length) + 1}/{aktiviteler.length}</span>}
           </>
         ) : (
           <span style={{ fontSize: 12, color: '#94a3b8' }}>Aktivite bekleniyor...</span>
