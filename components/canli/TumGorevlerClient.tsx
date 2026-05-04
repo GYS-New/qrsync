@@ -1047,10 +1047,16 @@ async function del() {
                       {v.baslangic}-{v.bitis}
                     </span>
                   </div>
-                  <span style={{
-                    padding: '3px 10px', borderRadius: 999, fontSize: 13, fontWeight: 800, flexShrink: 0,
-                    background: `${renk}1a`, color: renk,
-                  }}>%{v.basari}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+                    <span style={{
+                      padding: '3px 10px', borderRadius: 999, fontSize: 13, fontWeight: 800,
+                      background: `${renk}1a`, color: renk,
+                    }}>%{v.basari}</span>
+                    <span style={{
+                      padding: '1px 8px', borderRadius: 999, fontSize: 10.5, fontWeight: 700,
+                      background: '#f1f5f9', color: '#64748b', letterSpacing: '0.02em',
+                    }}>BUGÜN</span>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 13 }}>
                   <span style={{ color: '#374151' }}><strong>{v.toplam}</strong> Toplam</span>
