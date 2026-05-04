@@ -218,6 +218,15 @@ export async function POST(req: Request) {
       }
     }
 
+    // Tamamlama kanalı: scan_token gönderildiyse gerçek kaynağa göre QR/NFC,
+    // yoksa MOBIL (mobil app'ten direkt "Tamamla" tuşu — qr_zorunlu olmadığı durum).
+    // qr_zorunlu olsa bile mobil app QR okutmadan buraya gelemez (yukarıda 403).
+    let tamamlamaKanali: 'QR' | 'NFC' | 'MOBIL' = 'MOBIL'
+    if (scanToken && lokBilgi) {
+      if (lokBilgi.qr_veri && scanToken === lokBilgi.qr_veri) tamamlamaKanali = 'QR'
+      else if (lokBilgi.nfc_token && scanToken === lokBilgi.nfc_token) tamamlamaKanali = 'NFC'
+    }
+
     if (gorev.firma_id !== firmaId) {
       return NextResponse.json({ ok: false, error: 'Bu göreve erişim yetkiniz yok' }, { status: 403, headers: CORS })
     }
@@ -273,7 +282,7 @@ export async function POST(req: Request) {
         lokasyon_id:      gorev.lokasyon_id,
         sablon_id:        checklistSablonId,
         template_version: templateVersion,
-        kanal:            'MOBİL',
+        kanal:            tamamlamaKanali,
         kullanici_id:     userId,
       }
       if (gorevTipi === 'gorevler') sonucPayload.gorev_id = gorevId
@@ -345,7 +354,7 @@ export async function POST(req: Request) {
 
     const { error: updateErr } = await admin
       .from(gorevTipi)
-      .update(gorevDurumPayload(nextDurum as any, 'MOBIL', {
+      .update(gorevDurumPayload(nextDurum as any, tamamlamaKanali, {
         at: tamamlanmaIso,
         ek: {
           tamamlanma_tarihi:        tamamlanmaIso,
