@@ -1076,20 +1076,11 @@ async function del() {
       {/* ── GÖREV LİSTESİ SEKMESİ ── */}
       {sekme === 'gorevler' && (<>
 
-      {/* ── SATIR 1: Başlık + Araçlar ── */}
+      {/* ── SATIR 1: Aksiyon Butonları (Canlı Akış | Şablon/İçe/Dışa | CRUD) ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: 4 }}>
-        {/* Arama */}
         <input ref={importInputRef} type="file" accept=".xlsx" style={{ display:'none' }} onChange={onImportFile} />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Ara (görev, lokasyon, kişi...)"
-          className="verde-input"
-          style={{ width: 240, flexShrink: 0 }}
-        />
 
-        <div style={{ flex: 1 }} />
-        {/* Canlı Akış linki — her rol için görünür, belirgin */}
+        {/* SOL — Canlı Görev Akışı */}
         <a href={`${base}/dashboard/canli-islemler`} style={{ textDecoration: 'none', flexShrink: 0 }}>
           <button type="button" style={{
             height: 36, padding: '0 16px', borderRadius: 8, border: 'none',
@@ -1098,51 +1089,49 @@ async function del() {
           }}>📡 Canlı Görev Akışı</button>
         </a>
 
-        {/* Toplu Düzenle — readonly olmayanlara göster */}
-        {!readonly && yetki.duzenleyebilir && (
-        <Button
-          className="text-[13.5px]"
-          variant={bulkDuzenleMode ? (bulkDuzenleIds.size > 0 ? 'primary' : 'ghost') : 'ghost'}
-          type="button"
-          style={IMPORT_EXPORT_BUTTON_STYLE}
-          onClick={() => {
-            if (!bulkDuzenleMode) {
-              setBulkDuzenleMode(true)
-              setBulkDuzenleIds(new Set())
-              setBulkDuzenleDurum('')
-              setBulkMode(false)
-            } else if (bulkDuzenleIds.size > 0) {
-              setBulkDuzenlePopup(true)
-            } else {
-              setBulkDuzenleMode(false)
-              setBulkDuzenleIds(new Set())
-            }
-          }}
-        >
-          {bulkDuzenleMode
-            ? bulkDuzenleIds.size > 0
-              ? `Toplu Durum Değiştir (${bulkDuzenleIds.size})`
-              : 'Vazgeç'
-            : '✏️ Toplu Düzenle'}
-        </Button>
-        )}
+        <div style={{ flex: 1 }} />
 
-        {/* Import/Export — U göremez */}
+        {/* ORTA — Şablon / İçe Aktar / Dışa Aktar (U göremez) */}
         {!isU && (<>
-          <div style={{ width: 1, height: 28, background: '#e0ece0', flexShrink: 0 }} />
           <Button className="text-[13.5px]" variant="ghost" onClick={() => downloadExcel('template')} disabled={readonly || saving || (!licenseLoading && licenseExpired)} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}><Download size={14} /> Şablon</Button>
           <Button className="text-[13.5px]" variant="ghost" onClick={() => importInputRef.current?.click()} disabled={readonly || saving || (!licenseLoading && licenseExpired)} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}><Upload size={14} /> İçe Aktar</Button>
           <Button className="text-[13.5px]" variant="ghost" onClick={() => downloadExcel('export')} disabled={readonly || saving} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}><FileSpreadsheet size={14} /> Dışa Aktar</Button>
         </>)}
 
-        {/* CRUD — U sadece Düzenle görebilir, Ekle/Sil/Toplu Sil göremez */}
-        <div style={{ width: 1, height: 28, background: '#e0ece0', flexShrink: 0 }} />
+        <div style={{ flex: 1 }} />
+
+        {/* SAĞ — CRUD: Ekle, Düzenle, Toplu Düzenle, Sil, Toplu Sil */}
         {!isU && yetki.ekleyebilir && (
           <Button className="text-[13.5px]" variant="primary" disabled={readonly || saving || (!licenseLoading && licenseExpired)} onClick={openCreate} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}>+ Ekle</Button>
         )}
-        {!readonly && yetki.duzenleyebilir && (
+        {!readonly && yetki.duzenleyebilir && (<>
           <Button className="text-[13.5px]" variant="primary" disabled={saving || !selected} onClick={openEdit} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}><Pencil size={14} /> Düzenle</Button>
-        )}
+          <Button
+            className="text-[13.5px]"
+            variant={bulkDuzenleMode ? (bulkDuzenleIds.size > 0 ? 'primary' : 'ghost') : 'ghost'}
+            type="button"
+            style={IMPORT_EXPORT_BUTTON_STYLE}
+            onClick={() => {
+              if (!bulkDuzenleMode) {
+                setBulkDuzenleMode(true)
+                setBulkDuzenleIds(new Set())
+                setBulkDuzenleDurum('')
+                setBulkMode(false)
+              } else if (bulkDuzenleIds.size > 0) {
+                setBulkDuzenlePopup(true)
+              } else {
+                setBulkDuzenleMode(false)
+                setBulkDuzenleIds(new Set())
+              }
+            }}
+          >
+            {bulkDuzenleMode
+              ? bulkDuzenleIds.size > 0
+                ? `Toplu Durum Değiştir (${bulkDuzenleIds.size})`
+                : 'Vazgeç'
+              : '✏️ Toplu Düzenle'}
+          </Button>
+        </>)}
         {!isU && yetki.silebilir && (<>
           <Button className="text-[13.5px]" variant="danger" disabled={readonly || saving || bulkMode} onClick={del} type="button" style={IMPORT_EXPORT_BUTTON_STYLE}><Trash2 size={14} /> Sil</Button>
           <Button
@@ -1170,8 +1159,17 @@ async function del() {
         </>)}
       </div>
 
-      {/* ── SATIR 2: Filtreler ── */}
+      {/* ── SATIR 2: Arama + Filtreler ── */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center', padding: '10px 12px', background: '#f8fbf8', borderRadius: 8, border: '1px solid #f3f4f6' }}>
+        {/* Arama — en sol */}
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Ara (görev, lokasyon, kişi...)"
+          className="verde-input"
+          style={{ width: 220, flexShrink: 0 }}
+        />
+
         {/* Lokasyon — 3 seviye */}
         <select className="verde-select" value={filterLoc1} onChange={e => { setFilterLoc1(e.target.value); setFilterLoc2(''); setFilterLoc3('') }} style={{ width: 148 }}>
           <option value="">Lokasyon (Tümü)</option>
