@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
+import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliUserIds'
 
 export interface GenelRaporFilters {
   firmaId: string
@@ -292,6 +293,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     projePersonelIds = new Set((projeUsers ?? []).map((u: any) => u.id))
   }
 
+  // Üst lokasyon yöneticileri — başarı analizinden hariç tutulur
+  const yoneticiIds = await getUstLokasyonYetkiliUserIds(filters.firmaId)
+
   // 5. Lokasyon grupları
   let grupQ = admin
     .from('lokasyon_gruplari')
@@ -551,8 +555,13 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   const genelBasari  = toplamGorev > 0 ? Math.round((toplamTamamlanan / toplamGorev) * 100) : 0
 
   // 9. Tamamlanan görevler (sadece kural-üretimli — ekstra olanlar Frekans Dışı bölümünde)
+  // Üst lokasyon yöneticilerinin yaptığı görevler hariç tutulur (başarı analizine girmez)
   const tamamlananGorevler: TamamlananRow[] = kuralGorevler
-    .filter((g: any) => g.durum === 'TAMAMLANDI')
+    .filter((g: any) => {
+      if (g.durum !== 'TAMAMLANDI') return false
+      const uid = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? g.atanan_kullanici_id ?? ''
+      return !uid || !yoneticiIds.has(uid)
+    })
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
       const kullaniciId = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? g.atanan_kullanici_id ?? ''
@@ -571,9 +580,13 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     })
 
   // 10. Sapma görevleri (sadece kural-üretimli — ekstra'da sapma olmaz)
-  // Sapma: sadece ZAMANINDA_YAPILAMAYAN
+  // Sapma: sadece ZAMANINDA_YAPILAMAYAN — yöneticiler hariç
   const sapmaGorevler: SapmaRow[] = kuralGorevler
-    .filter((g: any) => g.durum === 'ZAMANINDA_YAPILAMAYAN')
+    .filter((g: any) => {
+      if (g.durum !== 'ZAMANINDA_YAPILAMAYAN') return false
+      const uid = g.islemi_yapan_id ?? g.atanan_kullanici_id ?? ''
+      return !uid || !yoneticiIds.has(uid)
+    })
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
       const kullaniciIdS = g.islemi_yapan_id ?? g.atanan_kullanici_id ?? ''

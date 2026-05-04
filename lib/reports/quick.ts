@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
+import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliUserIds'
 
 /**
  * Aktif canli_gorevler + canli_gorevler_arsiv tablosunu paralel çekip
@@ -286,7 +287,7 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
   }
 
   if (type === 'users') {
-    const [liveTasks, { data: manualTasks, error: manualError }] = await Promise.all([
+    const [liveTasks, { data: manualTasks, error: manualError }, yoneticiIds] = await Promise.all([
       fetchCanliGorevlerMerged(admin, 'id,durum,olusturma_tarihi,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,atanan_kullanici_id,firma_id', filters),
       (() => {
         let q = filters.firmaId
@@ -295,22 +296,25 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
         if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
         return q
       })(),
+      filters.firmaId ? getUstLokasyonYetkiliUserIds(filters.firmaId) : Promise.resolve(new Set<string>()),
     ])
     if (manualError) throw new Error(manualError.message)
 
+    // Üst lokasyon yöneticilerini personel başarı/aktivite analizinden hariç tut
+    const isYonetici = (uid: string | null | undefined) => !!uid && yoneticiIds.has(uid)
     const rangedLive   = liveTasks.filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
     const rangedManual = (manualTasks ?? []).filter((x: any) => isWithinRange(x.olusturma_tarihi, filters.dateFrom, filters.dateTo))
 
     const activity: Record<string, number> = {}
     for (const item of rangedLive) {
       for (const uid of [item.atanan_kullanici_id, item.baslatan_kullanici_id, item.tamamlayan_kullanici_id, item.islemi_yapan_id]) {
-        if (!uid) continue
+        if (!uid || isYonetici(uid)) continue
         activity[uid] = (activity[uid] ?? 0) + 1
       }
     }
     for (const item of rangedManual) {
       for (const uid of [item.atanan_kullanici_id, item.olusturan_id, item.islemi_yapan_id]) {
-        if (!uid) continue
+        if (!uid || isYonetici(uid)) continue
         activity[uid] = (activity[uid] ?? 0) + 1
       }
     }
@@ -318,15 +322,19 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
 
     const success: Record<string, number> = {}
     for (const item of rangedLive) {
-      if (item.durum === 'TAMAMLANDI' && item.tamamlayan_kullanici_id) success[item.tamamlayan_kullanici_id] = (success[item.tamamlayan_kullanici_id] ?? 0) + 1
+      if (item.durum === 'TAMAMLANDI' && item.tamamlayan_kullanici_id && !isYonetici(item.tamamlayan_kullanici_id)) {
+        success[item.tamamlayan_kullanici_id] = (success[item.tamamlayan_kullanici_id] ?? 0) + 1
+      }
     }
     for (const item of rangedManual) {
-      if (item.durum === 'TAMAMLANDI' && item.islemi_yapan_id) success[item.islemi_yapan_id] = (success[item.islemi_yapan_id] ?? 0) + 1
+      if (item.durum === 'TAMAMLANDI' && item.islemi_yapan_id && !isYonetici(item.islemi_yapan_id)) {
+        success[item.islemi_yapan_id] = (success[item.islemi_yapan_id] ?? 0) + 1
+      }
     }
     const graph2 = sortEntriesDesc(success, 10).map(([id, toplam]) => ({ personel: userMap.get(id) ?? '-', tamamlanan: toplam }))
 
     const failMeta: Record<string, { total: number; completed: number }> = {}
-    const allUserIds = userList.map((u: any) => u.id)
+    const allUserIds = userList.filter((u: any) => !isYonetici(u.id)).map((u: any) => u.id)
     const resolveTaskUserId = (item: any) =>
       item?.atanan_kullanici_id ||
       item?.islemi_yapan_id ||
@@ -338,7 +346,7 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     for (const uid of allUserIds) failMeta[uid] = { total: 0, completed: success[uid] ?? 0 }
     for (const item of [...rangedLive, ...rangedManual]) {
       const uid = resolveTaskUserId(item)
-      if (!uid) continue
+      if (!uid || isYonetici(uid)) continue
       failMeta[uid] = failMeta[uid] ?? { total: 0, completed: 0 }
       failMeta[uid].total += 1
     }
@@ -352,6 +360,7 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     const statuses = Array.from(new Set([...rangedLive.map((x: any) => x.durum), ...rangedManual.map((x: any) => x.durum)].filter(Boolean))).sort()
     const userTaskRows = [...rangedLive, ...rangedManual].filter((item: any) => {
       const uid = resolveTaskUserId(item)
+      if (uid && isYonetici(uid)) return false
       if (targetUserId && uid !== targetUserId) return false
       if (filters.status && item.durum !== filters.status) return false
       return true
@@ -359,11 +368,12 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     const graph4 = dailyCounts(userTaskRows, (x) => x.olusturma_tarihi)
 
     const personnelWithActivity = new Set(Object.keys(activity)).size
+    const personelToplam = userList.filter((u: any) => !isYonetici(u.id)).length
 
     return {
       type,
       summary: [
-        { title: 'Toplam Personel', value: userList.length },
+        { title: 'Toplam Personel', value: personelToplam },
         { title: 'Hareketli Personel', value: personnelWithActivity, hint: 'Seçili aralıkta görev hareketi olan' },
         { title: 'Seçili Aralık Aktivitesi', value: rangedLive.length + rangedManual.length },
       ],

@@ -21,8 +21,18 @@ export default function PersonelBasariAnaliziBlock({
   const [mode, setMode] = useState<Mode>('gunluk')
   const [rows, setRows] = useState<Array<{ id: string; name: string; value: number }>>([])
   const [loading, setLoading] = useState(false)
+  const [yoneticiIds, setYoneticiIds] = useState<Set<string>>(new Set())
   const lastReq = useRef(0)
   const rangeStart = useMemo(() => rangeStartFor(mode), [mode])
+
+  // Üst lokasyona yetkilendirilmiş yönetici id'lerini çek (başarı analizinden hariç tutulacak)
+  useEffect(() => {
+    if (!firmaId) { setYoneticiIds(new Set()); return }
+    fetch(`/api/yetki/yonetici-userids?firma_id=${firmaId}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(j => { if (j?.ok) setYoneticiIds(new Set(j.ids ?? [])) })
+      .catch(() => setYoneticiIds(new Set()))
+  }, [firmaId])
 
   async function fetchData() {
     const reqId = Date.now()
@@ -56,6 +66,8 @@ export default function PersonelBasariAnaliziBlock({
       ;[...(canli ?? []), ...(arsiv ?? [])].forEach((r: any) => {
         // İşlemi yapan > tamamlayan > atanan sırasıyla personel belirle
         const id = r.islemi_yapan_id ?? r.tamamlayan_kullanici_id ?? r.atanan_kullanici_id ?? 'unknown'
+        // Üst lokasyon yöneticileri başarı analizine dahil edilmez
+        if (yoneticiIds.has(id)) return
         const name = r?.islemi_yapan?.isim_soyisim ?? r?.tamamlayan?.isim_soyisim ?? '—'
         if (!agg[id]) agg[id] = { id, name, value: 0 }
         agg[id].value += 1
@@ -78,7 +90,7 @@ export default function PersonelBasariAnaliziBlock({
       .subscribe()
     return () => { supabase.removeChannel(ch) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, firmaId, projeId])
+  }, [mode, firmaId, projeId, yoneticiIds])
 
   const maxVal = Math.max(1, ...rows.map((r) => r.value))
 

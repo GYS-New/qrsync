@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliUserIds'
 
 function fmt(v: string | null | undefined) {
   if (!v) return '—'
@@ -168,10 +169,12 @@ export async function GET(req: Request) {
       }))
       .sort((a, b) => b.toplam - a.toplam)
 
-    // Personel bazlı dağılım
+    // Personel bazlı dağılım — üst lokasyon yöneticileri başarı analizinden hariç
+    const yoneticiIds = await getUstLokasyonYetkiliUserIds(firmaId)
     const persBazli: Record<string, { toplam: number; tamamlanan: number }> = {}
     for (const g of tumGorevler) {
       const uid = g.atanan_kullanici_id ?? '__yok'
+      if (uid !== '__yok' && yoneticiIds.has(uid)) continue
       if (!persBazli[uid]) persBazli[uid] = { toplam: 0, tamamlanan: 0 }
       persBazli[uid].toplam++
       if (g.durum === 'TAMAMLANDI') persBazli[uid].tamamlanan++
