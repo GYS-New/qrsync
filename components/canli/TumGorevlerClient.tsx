@@ -217,6 +217,7 @@ const getLocUstAlt = (lokasyonId: string | null | undefined, fallbackName?: stri
 
 
   const [gorevler, setGorevler] = useState<any[]>(initialGorevler ?? [])
+  const [vardiyaAyari, setVardiyaAyari] = useState<{ no: number; baslangic: string; bitis: string }[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [checklistGorev, setChecklistGorev] = useState<{ id: string; type: 'canli_gorevler'; duzenleme?: boolean } | null>(null)
   const [bulkMode, setBulkMode] = useState(false)
@@ -302,6 +303,25 @@ const getLocUstAlt = (lokasyonId: string | null | undefined, fallbackName?: stri
   }
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [firmaId, projeId])
+
+// Firma vardiya ayarlarını çek (vardiya bazlı özet için)
+useEffect(() => {
+  if (!firmaId) return
+  let alive = true
+  ;(async () => {
+    const { data: firma } = await supabase
+      .from('firmalar')
+      .select('vardiya_sayisi, tum_vardiya_ayarlari')
+      .eq('id', firmaId)
+      .single()
+    if (!alive || !firma) return
+    const sayisi = (firma as any).vardiya_sayisi ?? 3
+    const set = ((firma as any).tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
+    setVardiyaAyari(Array.isArray(set) ? set : [])
+  })()
+  return () => { alive = false }
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [firmaId])
 
 useEffect(() => {
     // Mount'ta sadece HAZIR→ACIK geçiş check'ini tetikle, listeyi SSR'den gelen
@@ -784,6 +804,50 @@ async function del() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'tr'))
   }, [gorevler])
 
+  // ── Vardiya bazlı bugünkü özet ─────────────────────────────────────────
+  // Vardiyalar gece döngüsünde sıfırlanır (canli_gorevler bugünkü görevleri tutar).
+  // Her görev aktif_olma_tarihi'nin TR saati üzerinden hangi vardiyaya düştüğüyle eşleşir.
+  const vardiyaOzetleri = useMemo(() => {
+    if (!vardiyaAyari.length) return []
+    function saatStrTR(iso: string): string {
+      // ISO timestamp → TR saatine göre HH:MM string
+      const d = new Date(iso)
+      // toLocaleTimeString ile Europe/Istanbul saati al
+      return d.toLocaleTimeString('tr-TR', {
+        hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Istanbul',
+      })
+    }
+    function vardiyaBul(saat: string): number | null {
+      for (const v of vardiyaAyari) {
+        const gece = v.bitis <= v.baslangic
+        const eslesir = gece
+          ? (saat >= v.baslangic || saat < v.bitis)
+          : (saat >= v.baslangic && saat < v.bitis)
+        if (eslesir) return v.no
+      }
+      return null
+    }
+    const sayac: Record<number, { toplam: number; tamamlanan: number; sapma: number; iptal: number }> = {}
+    for (const v of vardiyaAyari) sayac[v.no] = { toplam: 0, tamamlanan: 0, sapma: 0, iptal: 0 }
+    for (const g of gorevler ?? []) {
+      if (!g.aktif_olma_tarihi) continue
+      const vNo = vardiyaBul(saatStrTR(g.aktif_olma_tarihi))
+      if (vNo === null || !sayac[vNo]) continue
+      sayac[vNo].toplam++
+      if (g.durum === 'TAMAMLANDI') sayac[vNo].tamamlanan++
+      else if (g.durum === 'ZAMANINDA_YAPILAMAYAN') sayac[vNo].sapma++
+      else if (g.durum === 'IPTAL') sayac[vNo].iptal++
+    }
+    return vardiyaAyari
+      .slice()
+      .sort((a, b) => a.no - b.no)
+      .map(v => {
+        const s = sayac[v.no] ?? { toplam: 0, tamamlanan: 0, sapma: 0, iptal: 0 }
+        const basari = s.toplam > 0 ? Math.round((s.tamamlanan / s.toplam) * 100) : 0
+        return { no: v.no, baslangic: v.baslangic, bitis: v.bitis, ...s, basari }
+      })
+  }, [vardiyaAyari, gorevler])
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
     const fromD = from ? new Date(from) : null
@@ -953,21 +1017,46 @@ async function del() {
   return (
     <div className="verde-card" style={{ padding: 16, overflowX: 'hidden' }}>
 
-      {/* ── SEKME BAR ── */}
-      <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid #f3f4f6', marginBottom: 16 }}>
-        {[
-          { key: 'gorevler', label: '📋 Görev Listesi' },
-        ].map(({ key, label }) => (
-          <button key={key} onClick={() => setSekme(key as any)} style={{
-            padding: '10px 18px', background: 'none', border: 'none',
-            borderBottom: sekme === key ? '2.5px solid #374151' : '2.5px solid transparent',
-            cursor: 'pointer', fontSize: 13.5,
-            fontWeight: sekme === key ? 800 : 500,
-            color: sekme === key ? '#111827' : '#6b7280',
-            transition: 'all 0.15s', whiteSpace: 'nowrap', marginBottom: -1,
-          }}>{label}</button>
-        ))}
-      </div>
+      {/* ── VARDİYA BAZLI BUGÜNKÜ ÖZET ── */}
+      {vardiyaOzetleri.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${vardiyaOzetleri.length}, minmax(0,1fr))`,
+          gap: 10, marginBottom: 16,
+        }}>
+          {vardiyaOzetleri.map(v => {
+            const renk = v.basari >= 80 ? '#16a34a' : v.basari >= 50 ? '#d97706' : v.basari > 0 ? '#dc2626' : '#6b7280'
+            return (
+              <div key={v.no} style={{
+                background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+                padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#111827' }}>
+                    {v.no}. Vardiya
+                    <span style={{ marginLeft: 6, fontSize: 11, color: '#6b7280', fontWeight: 500 }}>
+                      {v.baslangic}-{v.bitis}
+                    </span>
+                  </div>
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 999, fontSize: 11.5, fontWeight: 800,
+                    background: `${renk}1a`, color: renk,
+                  }}>%{v.basari}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12 }}>
+                  <span style={{ color: '#374151' }}><strong>{v.toplam}</strong> Toplam</span>
+                  <span style={{ color: '#a3a3a3' }}>›</span>
+                  <span style={{ color: '#16a34a' }}><strong>{v.tamamlanan}</strong> Tamamlanan</span>
+                  <span style={{ color: '#a3a3a3' }}>›</span>
+                  <span style={{ color: '#d97706' }}><strong>{v.sapma}</strong> Sapma</span>
+                  <span style={{ color: '#a3a3a3' }}>›</span>
+                  <span style={{ color: '#dc2626' }}><strong>{v.iptal}</strong> İptal</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── GÖREV LİSTESİ SEKMESİ ── */}
       {sekme === 'gorevler' && (<>
