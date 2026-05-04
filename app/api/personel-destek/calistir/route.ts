@@ -1,17 +1,21 @@
 /**
  * POST /api/personel-destek/calistir
- * Personel Görev Desteği motoru — vardiya sonu otomatik tamamlama
+ * Personel Görev Desteği motoru — vardiya bitişinden 15 dk SONRA çalışır
  *
- * Mantık (SİM benzeri doğallık):
+ * Mantık:
  * 1. Aktif personel_gorev_destegi kayıtlarını çek
- * 2. Her üst lokasyonun alt lokasyonlarındaki bugünkü AÇIK görevleri bul
- * 3. hedef_oran'a göre kaç görev tamamlanmalı hesapla
- * 4. Eksik kalan görevleri çeklist ile birlikte tamamla
+ * 2. Her üst lokasyonun alt lokasyonlarındaki BEKLEMEDE durumdaki görevleri bul
+ *    (ACIK görevler 8 saat sonunda otomatik BEKLEMEDE'ye geçer — bitmiş vardiya)
+ * 3. hedef_oran: BEKLEMEDE görev sayısının %X'i tamamlanır
+ * 4. Tamamlanan görevler ZAMANINDA_YAPILAMAYAN durumuna geçer (BEKLEMEDE'den
+ *    geç tamamlama semantiği — liveStatus.ts:78 ile tutarlı)
  * 5. Doğallık: rastgele süre, rastgele personel, %1 iptal
+ *
+ * Aktif vardiyaya dokunmaz: sadece BEKLEMEDE filtresi → ACIK/ISLEMDE görevler
+ * (yeni başlayan vardiya) tamamen güvenli.
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { aktifVardiyaAraligi } from '@/lib/scan/vardiya'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 
 const CORS = {} // Cron endpoint — CORS gereksiz
@@ -114,11 +118,10 @@ async function destekCalistir(admin: any, ayar: any) {
     if (altLokIds.has(l.id)) lokMap.set(l.id, l)
   }
 
-  // Son 24 saatin görevlerini çek — TR gün kayması problemini önler.
-  // Örnek: 00:05 TRT cron çalışırsa dünün V3 (16:00-00:00) kalanları 'bugun' dışında
-  // kalıyordu. Son 24 saat window ile önceki akşam vardiyası da yakalanır.
-  // (Gelecek zamanlı HAZIR görevler filter'a girer ama acikGorevler = ACIK/ISLEMDE/BEKLEMEDE
-  // filter'ında dışarıda kalır, kapatma denemesi olmaz.)
+  // BEKLEMEDE durumdaki görevleri çek — son 24 saat penceresi (eski beklemede
+  // takılı kalan görevler dışarıda kalsın). Cron vardiya bitişinden 15 dk sonra
+  // çalıştığı için ACIK→BEKLEMEDE geçişi (8 saat sonunda) zaten tamamlanmış olur.
+  // Aktif vardiyanın yeni ACIK görevlerine DOKUNULMAZ — sadece BEKLEMEDE filtresi.
   const yirmiDortSaatOnceUTC = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const simdiUTC = new Date().toISOString()
 
@@ -127,61 +130,16 @@ async function destekCalistir(admin: any, ayar: any) {
     .select('id, durum, lokasyon_id, tanim, aktif_olma_tarihi, baslatilma_tarihi, atanan_kullanici_id')
     .eq('firma_id', firma_id)
     .in('lokasyon_id', lokIds)
+    .eq('durum', 'BEKLEMEDE')
     .gte('aktif_olma_tarihi', yirmiDortSaatOnceUTC)
     .lte('aktif_olma_tarihi', simdiUTC)
 
-  const gunlukTumGorevler = gorevler ?? []
-  if (gunlukTumGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bugünkü görev yok' }
+  const bekleyenGorevler = gorevler ?? []
+  if (bekleyenGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bekleyen görev yok' }
 
-  // ── Vardiya filtresi: SAAT ARALIĞI bazlı (firma.tum_vardiya_ayarlari) ────
-  // Eski mantık distinct aktif_olma_tarihi timestamp'lerine bakıyordu; her kural
-  // ayrı saatte tetiklendiği için bir vardiyada onlarca distinct timestamp olabilir,
-  // ve yanlış olarak sadece 'en geç tek timestamp' aktif vardiya sayılırdı.
-  // Doğrusu: firma'nın tanımlı vardiya saatlerinden şu an içinde olunan vardiyayı
-  // bul, aktif_olma_tarihi bu aralıkta olan görevleri 'aktif vardiya' kabul edip
-  // hariç tut — böylece bitmiş vardiyaların tüm görevleri doğru toplanır.
-  const { data: firmaAyar } = await admin
-    .from('firmalar')
-    .select('vardiya_sayisi, tum_vardiya_ayarlari')
-    .eq('id', firma_id)
-    .single()
-  // PD vardiya bitişine 15 dk kala çalışır. Referansı "şu an + 15 dk" yaparak
-  // "bitmek üzere olan vardiya"nın tam sonuna denk gelen ana taşınır → aktifVardiya
-  // olarak YENI başlayacak vardiya tespit edilir, filter bunu hariç tutup BİTMEKTE
-  // OLAN vardiyayı işler. Aksi halde 23:45'te 3. vardiya hâlâ aktif sayılıp filter
-  // dışlardı → 3. vardiya hiç kapanmazdı.
-  const refIso = new Date(Date.now() + 15 * 60 * 1000).toISOString()
-  const aktifVardiya = aktifVardiyaAraligi(
-    (firmaAyar as any)?.vardiya_sayisi,
-    (firmaAyar as any)?.tum_vardiya_ayarlari,
-    refIso,
-  )
-  if (!aktifVardiya) {
-    return { tamamlanan: 0, mesaj: 'Aktif vardiya tespit edilemedi (firma ayarı eksik)' }
-  }
-  // Ms karşılaştırması şart — ISO string formatları farklı gelebiliyor
-  // (Supabase "05:00:00+00:00" vs Date.toISOString() "05:00:00.000Z"). String compare'de
-  // "+" < "." olduğu için sınır görevler yanlış tarafa düşüyordu (228 görev bug'ı).
-  const basMs = new Date(aktifVardiya.baslangicISO).getTime()
-  const bitMs = new Date(aktifVardiya.bitisISO).getTime()
-  const tumGorevler = gunlukTumGorevler.filter((g: any) => {
-    const aktifMs = new Date(g.aktif_olma_tarihi).getTime()
-    return aktifMs < basMs || aktifMs >= bitMs
-  })
-  if (tumGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bitmiş vardiyada görev yok' }
-
-  const tamamlananSayi = tumGorevler.filter((g: any) =>
-    ['TAMAMLANDI', 'ZAMANINDA_TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum)
-  ).length
-  const hedefMax = Math.ceil((hedef_oran / 100) * tumGorevler.length)
-
-  if (tamamlananSayi >= hedefMax) {
-    return { tamamlanan: 0, mesaj: `Hedef zaten sağlandı: ${tamamlananSayi}/${hedefMax}` }
-  }
-
-  // AÇIK, İŞLEMDE ve BEKLEMEDE görevleri tamamla
-  const acikGorevler = tumGorevler.filter((g: any) => g.durum === 'ACIK' || g.durum === 'ISLEMDE' || g.durum === 'BEKLEMEDE')
-  const kalanHedef = hedefMax - tamamlananSayi
+  // hedef_oran: BEKLEMEDE görev sayısının %X'i tamamlanır
+  const kalanHedef = Math.ceil((hedef_oran / 100) * bekleyenGorevler.length)
+  if (kalanHedef === 0) return { tamamlanan: 0, mesaj: 'Hedef 0' }
 
   // ── Personel seçimi: tanımlı personeller + cinsiyet + mesai kontrolü (SİM ile aynı) ──
   // Önce bu destek kaydına atanmış personelleri çek
@@ -230,7 +188,7 @@ async function destekCalistir(admin: any, ayar: any) {
   if (uygunPersonel.length === 0) return { tamamlanan: 0, mesaj: 'Uygun personel yok' }
 
   // Rastgele sırala ve hedef kadar tamamla
-  const shuffled = acikGorevler.sort(() => Math.random() - 0.5).slice(0, kalanHedef)
+  const shuffled = bekleyenGorevler.sort(() => Math.random() - 0.5).slice(0, kalanHedef)
   let tamamlananAdet = 0
   let iptalAdet = 0
   let skipPersonelCount = 0
@@ -274,7 +232,8 @@ async function destekCalistir(admin: any, ayar: any) {
     const tamamlanmaIso = new Date().toISOString()
     const baslatmaIso = new Date(now - sureSaniye * 1000).toISOString()
 
-    const { error: tamamErr } = await admin.from('canli_gorevler').update(gorevDurumPayload('TAMAMLANDI', 'MOBIL', {
+    // BEKLEMEDE'den geç tamamlama → ZAMANINDA_YAPILAMAYAN (liveStatus.ts:78 ile tutarlı)
+    const { error: tamamErr } = await admin.from('canli_gorevler').update(gorevDurumPayload('ZAMANINDA_YAPILAMAYAN', 'MOBIL', {
       at: tamamlanmaIso,
       ek: {
         baslatilma_tarihi: gorev.baslatilma_tarihi || baslatmaIso,
@@ -305,9 +264,8 @@ async function destekCalistir(admin: any, ayar: any) {
   return {
     tamamlanan: tamamlananAdet,
     iptal: iptalAdet,
-    toplam: tumGorevler.length,
-    mevcut_tamamlanan: tamamlananSayi,
-    hedef_max: hedefMax,
+    bekleyen_toplam: bekleyenGorevler.length,
+    hedef_max: kalanHedef,
     debug: { skipPersonel: skipPersonelCount, updateError: updateErrorCount, shuffled: shuffled.length },
   }
 }
