@@ -51,7 +51,7 @@ export default function CanliAkisIzlemeBlock({
   const wrapRef = useRef<HTMLDivElement | null>(null)
 
   const selectCols = useMemo(
-    () => 'id,tanim,durum,durum_degisim_tarihi,olusturma_tarihi,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)',
+    () => 'id,tanim,durum,durum_degisim_tarihi,olusturma_tarihi,lokasyonlar(tanim),users!islemi_yapan_id(isim_soyisim)',
     []
   )
 
@@ -130,7 +130,7 @@ export default function CanliAkisIzlemeBlock({
               <th style={{ width: 36 }}>NO</th>
               <th>Görev</th>
               <th>Lokasyon</th>
-              <th>Atanan</th>
+              <th>İşlemi Yapan</th>
               <th>Durum</th>
               <th>Tarih</th>
             </tr>
