@@ -32,6 +32,8 @@ export interface GrupMetrik {
 export interface TamamlananRow {
   sn: number
   personel: string
+  /** Personel UUID — frontend agg'lerinde yönetici filtresi için kullanılır */
+  personelId: string | null
   ustLokasyon: string
   lokasyon: string
   gorevNo: string
@@ -43,6 +45,8 @@ export interface TamamlananRow {
 export interface SapmaRow {
   sn: number
   personel: string
+  /** Personel UUID — frontend agg'lerinde yönetici filtresi için kullanılır */
+  personelId: string | null
   ustLokasyon: string
   lokasyon: string
   gorevNo: string
@@ -107,6 +111,9 @@ export interface GenelRaporData {
   kayipGorevler: KayipRow[]
   frekansDisiGorevler: FrekansDisiRow[]
   atananFrekanslar: AtananFrekanRow[]
+  /** Üst lokasyon yöneticileri (vardiya şefleri) — frontend personel başarı
+   *  agg'lerinde hariç tutmak için. Listelerde tüm satırlar var, denetim için. */
+  yoneticiIds: string[]
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -555,13 +562,12 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   const genelBasari  = toplamGorev > 0 ? Math.round((toplamTamamlanan / toplamGorev) * 100) : 0
 
   // 9. Tamamlanan görevler (sadece kural-üretimli — ekstra olanlar Frekans Dışı bölümünde)
-  // Üst lokasyon yöneticilerinin yaptığı görevler hariç tutulur (başarı analizine girmez)
+  // NOT: Yönetici filtresi liste seviyesinde YAPILMAZ — denetim listesi tüm satırları
+  // göstermeli. Yönetici filtresi sadece "personel başarı sıralaması" agg'lerinde
+  // (frontend Özet & Grafikler sekmesi) uygulanır — response'taki yoneticiIds set'i
+  // kullanılır.
   const tamamlananGorevler: TamamlananRow[] = kuralGorevler
-    .filter((g: any) => {
-      if (g.durum !== 'TAMAMLANDI') return false
-      const uid = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? g.atanan_kullanici_id ?? ''
-      return !uid || !yoneticiIds.has(uid)
-    })
+    .filter((g: any) => g.durum === 'TAMAMLANDI')
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
       const kullaniciId = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? g.atanan_kullanici_id ?? ''
@@ -570,6 +576,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       return {
         sn: i + 1,
         personel: kullanici,
+        personelId: kullaniciId || null,
         ustLokasyon: getContextUstLokasyon(g.lokasyon_id),
         lokasyon: lok?.tanim ?? '',
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
@@ -580,13 +587,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     })
 
   // 10. Sapma görevleri (sadece kural-üretimli — ekstra'da sapma olmaz)
-  // Sapma: sadece ZAMANINDA_YAPILAMAYAN — yöneticiler hariç
+  // Sapma: sadece ZAMANINDA_YAPILAMAYAN. Yönetici filtresi liste'de YOK (denetim).
   const sapmaGorevler: SapmaRow[] = kuralGorevler
-    .filter((g: any) => {
-      if (g.durum !== 'ZAMANINDA_YAPILAMAYAN') return false
-      const uid = g.islemi_yapan_id ?? g.atanan_kullanici_id ?? ''
-      return !uid || !yoneticiIds.has(uid)
-    })
+    .filter((g: any) => g.durum === 'ZAMANINDA_YAPILAMAYAN')
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
       const kullaniciIdS = g.islemi_yapan_id ?? g.atanan_kullanici_id ?? ''
@@ -596,6 +599,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       return {
         sn: i + 1,
         personel: kullanici,
+        personelId: kullaniciIdS || null,
         ustLokasyon: getContextUstLokasyon(g.lokasyon_id),
         lokasyon: lok?.tanim ?? '',
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
@@ -760,5 +764,6 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     kayipGorevler,
     frekansDisiGorevler,
     atananFrekanslar,
+    yoneticiIds: [...yoneticiIds],
   }
 }

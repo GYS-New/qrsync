@@ -23,8 +23,8 @@ type GrupMetrik = {
   hedef: number; tamamlanan: number; sapma: number; kayip: number; ekstra: number
   basariOrani: string; genelOran: string
 }
-type TamamlananRow  = { sn: number; personel: string; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string }
-type SapmaRow       = { sn: number; personel: string; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; sapmaNedeni: string }
+type TamamlananRow  = { sn: number; personel: string; personelId?: string | null; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string }
+type SapmaRow       = { sn: number; personel: string; personelId?: string | null; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; sapmaNedeni: string }
 type KayipRow       = { sn: number; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string; kayipNedeni: string }
 type FrekansDisiRow  = { sn: number; ustLokasyon: string; grupTanimi: string; lokasyonTanimi: string; personel: string; tarihSaat: string; aciklama: string }
 type AtananFrekanRow = { sn: number; atanan: string; tamamlayan: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gorevDurumu: string; durumKod: string; atamaTarihi: string; tamamlanmaTarihi: string }
@@ -40,6 +40,8 @@ type RaporData = {
   kayipGorevler: KayipRow[]
   frekansDisiGorevler: FrekansDisiRow[]
   atananFrekanslar: AtananFrekanRow[]
+  /** Üst lokasyon yöneticileri — personel başarı agg'lerinde hariç tutulur */
+  yoneticiIds?: string[]
 }
 
 // ── Design tokens (SpesifikRaporKarti ile aynı) ────────────────────
@@ -305,10 +307,15 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
     const toplamGerceklesen = data.toplamTamamlanan + data.toplamSapma
     const genelOran = toplamHedef > 0 ? Math.round(toplamGerceklesen / toplamHedef * 100) : 0
 
+    // Üst lokasyon yöneticileri — personel başarı agg'lerinde hariç tutulur
+    // (vardiya şefleri sahada bireysel görev yapmıyor; kalanları kapatıyorlar)
+    const yoneticiSet = new Set(data.yoneticiIds ?? [])
+
     // Personel bazlı tamamlanan (Üst Lokasyon - Personel formatında, boş personel atlanır)
     const persSayac = new Map<string, number>()
     for (const r of data.tamamlananGorevler) {
       if (!r.personel) continue
+      if (r.personelId && yoneticiSet.has(r.personelId)) continue
       const ust = r.ustLokasyon || '—'
       const key = `${ust} - ${r.personel}`
       persSayac.set(key, (persSayac.get(key) ?? 0) + 1)
