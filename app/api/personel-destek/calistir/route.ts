@@ -145,12 +145,12 @@ async function destekCalistir(admin: any, ayar: any) {
     .select('vardiya_sayisi, tum_vardiya_ayarlari')
     .eq('id', firma_id)
     .single()
-  // PD vardiya bitişine 30 dk kala çalışır. Referansı "şu an + 30 dk" yaparak
+  // PD vardiya bitişine 15 dk kala çalışır. Referansı "şu an + 15 dk" yaparak
   // "bitmek üzere olan vardiya"nın tam sonuna denk gelen ana taşınır → aktifVardiya
   // olarak YENI başlayacak vardiya tespit edilir, filter bunu hariç tutup BİTMEKTE
-  // OLAN vardiyayı işler. Aksi halde 23:30'da 3. vardiya hâlâ aktif sayılıp filter
+  // OLAN vardiyayı işler. Aksi halde 23:45'te 3. vardiya hâlâ aktif sayılıp filter
   // dışlardı → 3. vardiya hiç kapanmazdı.
-  const refIso = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+  const refIso = new Date(Date.now() + 15 * 60 * 1000).toISOString()
   const aktifVardiya = aktifVardiyaAraligi(
     (firmaAyar as any)?.vardiya_sayisi,
     (firmaAyar as any)?.tum_vardiya_ayarlari,
