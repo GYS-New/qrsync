@@ -1176,10 +1176,12 @@ async function del() {
           </select>
         )}
 
-        <select className="verde-select" value={atananId} onChange={e => setAtananId(e.target.value)} style={{ width: 148 }}>
-          <option value="">Atanan (Tümü)</option>
-          {kullanicilar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
-        </select>
+        {personelAtamaAktif && (
+          <select className="verde-select" value={atananId} onChange={e => setAtananId(e.target.value)} style={{ width: 148 }}>
+            <option value="">Atanan (Tümü)</option>
+            {kullanicilar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
+          </select>
+        )}
 
         <select className="verde-select" value={durum} onChange={e => setDurum(e.target.value)} style={{ width: 148 }}>
           <option value="">Durum (Tümü)</option>
@@ -1235,7 +1237,7 @@ async function del() {
               <th>{thBtn('Görev', 'tanim')}</th>
               <th>{thBtn('Üst Lokasyon', 'lokasyon')}</th>
               <th>{thBtn('Lokasyon', 'lokasyon')}</th>
-              <th style={{ paddingRight: 22 }}>{thBtn('Atanan', 'atanan')}</th>
+              {personelAtamaAktif && <th style={{ paddingRight: 22 }}>{thBtn('Atanan', 'atanan')}</th>}
               <th style={{ paddingLeft: 22 }}>{thBtn('Aktif Saat', 'aktif')}</th>
               <th>{thBtn('İŞLEM TARİH-SAAT', 'islem')}</th>
               <th>{thBtn('İşlemi Yapan', 'actor')}</th>
@@ -1302,7 +1304,7 @@ async function del() {
                     </>
                   )
                 })()}
-                <td style={{ color: isArsiv ? '#64748b' : '#4b5563', paddingRight: 22 }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                {personelAtamaAktif && <td style={{ color: isArsiv ? '#64748b' : '#4b5563', paddingRight: 22 }}>{g.atanan?.isim_soyisim ?? '—'}</td>}
                 <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13, paddingLeft: 22 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
                 <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
                   {isArsiv
@@ -1368,20 +1370,20 @@ async function del() {
           <div className="verde-table-wrap" style={{ maxHeight: 400, overflowY: 'auto', borderRadius: 8, border: '1px solid #e5e7eb' }}>
             <table className="verde-table">
               <thead><tr>
-                <th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th>
+                <th>Görev</th><th>Lokasyon</th>{personelAtamaAktif && <th>Atanan</th>}<th>Durum</th>
                 <th>Kanal</th>
                 <th>Arşiv Tarihi</th><th>İşlemi Yapan</th>
               </tr></thead>
               <tbody>
                 {arsivDisplayRows.length === 0 ? (
-                  <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                  <tr><td colSpan={personelAtamaAktif ? 7 : 6} style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
                     {arsivLoading ? 'Yükleniyor...' : 'Arşiv kaydı bulunamadı.'}
                   </td></tr>
                 ) : arsivDisplayRows.map((g: any) => (
                   <tr key={g.id} style={{ background: '#f8fafc' }}>
                     <td style={{ fontWeight: 600, fontSize: 13, color: g.simule_tamamlandi ? '#9ca3af' : '#374151' }}>{g.tanim}</td>
                     <td style={{ color: '#64748b', fontSize: 12.5 }}>{g.lokasyonlar?.tanim ?? '—'}</td>
-                    <td style={{ color: '#64748b', fontSize: 12.5 }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+                    {personelAtamaAktif && <td style={{ color: '#64748b', fontSize: 12.5 }}>{g.atanan?.isim_soyisim ?? '—'}</td>}
                     <td><span className={`verde-badge ${g.durum === 'TAMAMLANDI' ? 'status-tamamlandi' : g.durum === 'IPTAL' ? 'status-iptal' : 'status-islemde'}`} style={{ fontSize: 11 }}>{g.durum}</span></td>
                     <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                     <td style={{ whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 12 }}>{g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—'}</td>
