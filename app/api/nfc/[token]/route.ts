@@ -86,7 +86,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
           return NextResponse.json({ ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' }, { status: 429 })
         }
       }
-      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
+      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, islemi_yapan_id: user.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
       await supabase.from(tablo).update(updatePayload).eq('id', selectedTaskId)
       return NextResponse.json({ ok: true, baslatilma_tarihi: nowIso, mesaj: 'Görev başlatıldı' })
     }
@@ -198,7 +198,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
     if (context.lokasyon.sureli_gorev_aktif && !task.baslatilma_tarihi) {
       const nowIso = new Date().toISOString()
       const tablo = task.taskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'
-      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
+      const updatePayload: any = { baslatilma_tarihi: nowIso, baslatan_kullanici_id: user.id, islemi_yapan_id: user.id, durum_degisim_tarihi: nowIso, durum: 'ISLEMDE' }
       await supabase.from(tablo).update(updatePayload).eq('id', task.id)
       ;(task as any).baslatilma_tarihi = nowIso
     }
