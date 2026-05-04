@@ -805,17 +805,20 @@ async function del() {
   }, [gorevler])
 
   // ── Vardiya bazlı bugünkü özet ─────────────────────────────────────────
-  // Vardiyalar gece döngüsünde sıfırlanır (canli_gorevler bugünkü görevleri tutar).
-  // Her görev aktif_olma_tarihi'nin TR saati üzerinden hangi vardiyaya düştüğüyle eşleşir.
+  // Vardiyalar gece döngüsünde sıfırlanır (canli_gorevler bugünkü görevleri tutar)
+  // ama eski ZAMANI_GECMIS/BEKLEMEDE görevler henüz arşivlenmediyse aktif tabloda
+  // kalabiliyor. Bu yüzden hem TR tarihi hem TR saati ile eşleştirme yapıyoruz —
+  // sadece bugünün TR tarihine ait görevler vardiyalara dağılır.
   const vardiyaOzetleri = useMemo(() => {
     if (!vardiyaAyari.length) return []
-    function saatStrTR(iso: string): string {
-      // ISO timestamp → TR saatine göre HH:MM string
+    function trIsoParts(iso: string): { tarih: string; saat: string } {
+      // ISO timestamp → Europe/Istanbul TZ üzerinden 'YYYY-MM-DD' + 'HH:MM'
       const d = new Date(iso)
-      // toLocaleTimeString ile Europe/Istanbul saati al
-      return d.toLocaleTimeString('tr-TR', {
+      const tarih = d.toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })  // YYYY-MM-DD
+      const saat = d.toLocaleTimeString('tr-TR', {
         hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Istanbul',
       })
+      return { tarih, saat }
     }
     function vardiyaBul(saat: string): number | null {
       for (const v of vardiyaAyari) {
@@ -827,13 +830,16 @@ async function del() {
       }
       return null
     }
+    const bugunTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
     // Kayıp = IPTAL + BEKLEMEDE + ZAMANI_GECMIS (yapılamayan görevler)
     const KAYIP_DURUMLAR = new Set(['IPTAL', 'BEKLEMEDE', 'ZAMANI_GECMIS'])
     const sayac: Record<number, { toplam: number; tamamlanan: number; sapma: number; kayip: number }> = {}
     for (const v of vardiyaAyari) sayac[v.no] = { toplam: 0, tamamlanan: 0, sapma: 0, kayip: 0 }
     for (const g of gorevler ?? []) {
       if (!g.aktif_olma_tarihi) continue
-      const vNo = vardiyaBul(saatStrTR(g.aktif_olma_tarihi))
+      const { tarih, saat } = trIsoParts(g.aktif_olma_tarihi)
+      if (tarih !== bugunTR) continue  // Sadece bugünün görevleri (eski takılı kalanları dışla)
+      const vNo = vardiyaBul(saat)
       if (vNo === null || !sayac[vNo]) continue
       sayac[vNo].toplam++
       if (g.durum === 'TAMAMLANDI') sayac[vNo].tamamlanan++
