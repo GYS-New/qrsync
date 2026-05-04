@@ -1094,6 +1094,7 @@ async function del() {
         <select className="verde-select" value={durum} onChange={e => setDurum(e.target.value)} style={{ width: 148 }}>
           <option value="">Durum (Tümü)</option>
           <option value="ACIK">Açık</option>
+          <option value="ISLEMDE">İşlemde</option>
           <option value="BEKLEMEDE">Beklemede</option>
           <option value="TAMAMLANDI">Tamamlandı</option>
           <option value="ZAMANINDA_YAPILAMAYAN">Zamanında Yapılamayan</option>
