@@ -843,7 +843,8 @@ async function del() {
       .sort((a, b) => a.no - b.no)
       .map(v => {
         const s = sayac[v.no] ?? { toplam: 0, tamamlanan: 0, sapma: 0, iptal: 0 }
-        const basari = s.toplam > 0 ? Math.round((s.tamamlanan / s.toplam) * 100) : 0
+        // Başarı = (tamamlanan + sapma) / toplam — sapma da görev yapılmış sayılır (geç tamamlama)
+        const basari = s.toplam > 0 ? Math.round(((s.tamamlanan + s.sapma) / s.toplam) * 100) : 0
         return { no: v.no, baslangic: v.baslangic, bitis: v.bitis, ...s, basari }
       })
   }, [vardiyaAyari, gorevler])
@@ -1029,21 +1030,21 @@ async function del() {
             return (
               <div key={v.no} style={{
                 background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
-                padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6,
+                padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 7, minWidth: 0,
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#111827' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, color: '#111827', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {v.no}. Vardiya
-                    <span style={{ marginLeft: 6, fontSize: 11, color: '#6b7280', fontWeight: 500 }}>
+                    <span style={{ marginLeft: 6, fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
                       {v.baslangic}-{v.bitis}
                     </span>
                   </div>
                   <span style={{
-                    padding: '2px 8px', borderRadius: 999, fontSize: 11.5, fontWeight: 800,
+                    padding: '3px 10px', borderRadius: 999, fontSize: 13, fontWeight: 800, flexShrink: 0,
                     background: `${renk}1a`, color: renk,
                   }}>%{v.basari}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 13 }}>
                   <span style={{ color: '#374151' }}><strong>{v.toplam}</strong> Toplam</span>
                   <span style={{ color: '#a3a3a3' }}>›</span>
                   <span style={{ color: '#16a34a' }}><strong>{v.tamamlanan}</strong> Tamamlanan</span>
