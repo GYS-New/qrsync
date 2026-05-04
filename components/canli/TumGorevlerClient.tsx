@@ -827,8 +827,10 @@ async function del() {
       }
       return null
     }
-    const sayac: Record<number, { toplam: number; tamamlanan: number; sapma: number; iptal: number }> = {}
-    for (const v of vardiyaAyari) sayac[v.no] = { toplam: 0, tamamlanan: 0, sapma: 0, iptal: 0 }
+    // Kayıp = IPTAL + BEKLEMEDE + ZAMANI_GECMIS (yapılamayan görevler)
+    const KAYIP_DURUMLAR = new Set(['IPTAL', 'BEKLEMEDE', 'ZAMANI_GECMIS'])
+    const sayac: Record<number, { toplam: number; tamamlanan: number; sapma: number; kayip: number }> = {}
+    for (const v of vardiyaAyari) sayac[v.no] = { toplam: 0, tamamlanan: 0, sapma: 0, kayip: 0 }
     for (const g of gorevler ?? []) {
       if (!g.aktif_olma_tarihi) continue
       const vNo = vardiyaBul(saatStrTR(g.aktif_olma_tarihi))
@@ -836,13 +838,13 @@ async function del() {
       sayac[vNo].toplam++
       if (g.durum === 'TAMAMLANDI') sayac[vNo].tamamlanan++
       else if (g.durum === 'ZAMANINDA_YAPILAMAYAN') sayac[vNo].sapma++
-      else if (g.durum === 'IPTAL') sayac[vNo].iptal++
+      else if (KAYIP_DURUMLAR.has(g.durum)) sayac[vNo].kayip++
     }
     return vardiyaAyari
       .slice()
       .sort((a, b) => a.no - b.no)
       .map(v => {
-        const s = sayac[v.no] ?? { toplam: 0, tamamlanan: 0, sapma: 0, iptal: 0 }
+        const s = sayac[v.no] ?? { toplam: 0, tamamlanan: 0, sapma: 0, kayip: 0 }
         // Başarı = (tamamlanan + sapma) / toplam — sapma da görev yapılmış sayılır (geç tamamlama)
         const basari = s.toplam > 0 ? Math.round(((s.tamamlanan + s.sapma) / s.toplam) * 100) : 0
         return { no: v.no, baslangic: v.baslangic, bitis: v.bitis, ...s, basari }
@@ -1051,7 +1053,7 @@ async function del() {
                   <span style={{ color: '#a3a3a3' }}>›</span>
                   <span style={{ color: '#d97706' }}><strong>{v.sapma}</strong> Sapma</span>
                   <span style={{ color: '#a3a3a3' }}>›</span>
-                  <span style={{ color: '#dc2626' }}><strong>{v.iptal}</strong> İptal</span>
+                  <span style={{ color: '#dc2626' }} title="İptal + Beklemede + Zamanı Geçmiş"><strong>{v.kayip}</strong> Kayıp</span>
                 </div>
               </div>
             )
