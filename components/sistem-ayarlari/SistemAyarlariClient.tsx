@@ -1380,38 +1380,38 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
               ) : personeller.length === 0 ? (
                 <div style={{ fontSize: 13, color: '#94a3b8', padding: 8 }}>Bu üst lokasyona atanmış personel yok.</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 480, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, padding: 6, background: '#fff' }}>
+                <div style={{ maxHeight: 480, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, padding: 6, background: '#fff' }}>
                   {kurallar.map((k: any) => {
                     const atananSet = kuralAtamalar[k.id] ?? new Set<string>()
                     const atananSayi = atananSet.size
                     const acik = acikKuralId === k.id
                     const vardiyaRenk = k.vardiya_no === 1 ? '#3b82f6' : k.vardiya_no === 2 ? '#f59e0b' : k.vardiya_no === 3 ? '#a855f7' : '#94a3b8'
                     return (
-                      <div key={k.id} style={{ border: `1.5px solid ${atananSayi > 0 ? '#86efac' : '#e5e7eb'}`, borderRadius: 8, background: atananSayi > 0 ? '#f0fdf4' : '#fafafa', overflow: 'hidden' }}>
+                      <div key={k.id} style={{ border: `1.5px solid ${atananSayi > 0 ? '#86efac' : '#e5e7eb'}`, borderRadius: 8, background: atananSayi > 0 ? '#f0fdf4' : '#fafafa', overflow: 'hidden', marginBottom: 6 }}>
                         <div onClick={() => setAcikKuralId(acik ? null : k.id)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer', userSelect: 'none' as const }}>
-                          <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: vardiyaRenk, padding: '3px 8px', borderRadius: 6, minWidth: 30, textAlign: 'center' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer', userSelect: 'none', minHeight: 44 }}>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: vardiyaRenk, padding: '3px 8px', borderRadius: 6, minWidth: 30, textAlign: 'center', flexShrink: 0 }}>
                             V{k.vardiya_no ?? '?'}
                           </span>
-                          <span style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: '#1f2937', fontWeight: 700, minWidth: 48 }}>
-                            {k.aktif_olma_saati}
+                          <span style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: '#1f2937', fontWeight: 700, minWidth: 48, flexShrink: 0 }}>
+                            {k.aktif_olma_saati || '--:--'}
                           </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{k.tanim}</div>
-                            <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{k.lokasyon_yolu}</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k.tanim || '(isimsiz kural)'}</div>
+                            <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k.lokasyon_yolu || ''}</div>
                           </div>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: atananSayi > 0 ? '#16a34a' : '#94a3b8', background: atananSayi > 0 ? '#dcfce7' : '#f3f4f6', padding: '3px 10px', borderRadius: 6, whiteSpace: 'nowrap' as const }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: atananSayi > 0 ? '#16a34a' : '#94a3b8', background: atananSayi > 0 ? '#dcfce7' : '#f3f4f6', padding: '3px 10px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>
                             {atananSayi > 0 ? `${atananSayi} personel` : 'atanmamış'}
                           </span>
-                          <span style={{ fontSize: 14, color: '#9ca3af', transition: 'transform .2s', transform: acik ? 'rotate(90deg)' : 'rotate(0deg)' }}>›</span>
+                          <span style={{ fontSize: 16, color: '#9ca3af', flexShrink: 0, width: 14, display: 'inline-block' }}>{acik ? '▾' : '▸'}</span>
                         </div>
                         {acik && (
                           <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb', background: '#fff' }}>
                             <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                              <button onClick={() => kuralIcinTumPersonelSec(k.id)} style={{ fontSize: 11, color: '#1f2937', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>
+                              <button type="button" onClick={() => kuralIcinTumPersonelSec(k.id)} style={{ fontSize: 11, color: '#1f2937', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>
                                 Tümü
                               </button>
-                              <button onClick={() => kuralIcinTumPersonelTemizle(k.id)} style={{ fontSize: 11, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>
+                              <button type="button" onClick={() => kuralIcinTumPersonelTemizle(k.id)} style={{ fontSize: 11, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>
                                 Temizle
                               </button>
                             </div>
