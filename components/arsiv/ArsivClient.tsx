@@ -468,19 +468,28 @@ export default function ArsivClient({
       { header: 'Görev', key: 'tanim', width: 32 }, { header: 'Lokasyon', key: 'lokasyon', width: 24 },
       { header: 'Atanan', key: 'atanan', width: 20 }, { header: 'Durum', key: 'durum', width: 18 },
       { header: 'Aktif Saat', key: 'aktif', width: 20 }, { header: 'Arşiv Tarihi', key: 'arsiv_tarihi', width: 20 },
-      { header: 'Arşiv Nedeni', key: 'arsiv_nedeni', width: 18 }, { header: 'Kural', key: 'kural', width: 24 },
+      { header: 'Arşiv Nedeni', key: 'arsiv_nedeni', width: 18 },
+      { header: 'İşlem Tarihi', key: 'islem_tarih', width: 14 }, { header: 'İşlem Saati', key: 'islem_saat', width: 12 },
+      { header: 'İşlemi Yapan', key: 'islemi_yapan', width: 22 },
     ]
     const hr = ws.getRow(1)
     hr.font = { bold: true, color: { argb: 'FF1F6B1F' } }
     hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF0DC' } }
     hr.height = 20
-    filtreFrek.forEach((r: any) => ws.addRow({
-      tanim: r.tanim, lokasyon: r.lokasyonlar?.tanim, atanan: r.atanan?.isim_soyisim,
-      durum: CANLI_DURUM_LABEL[r.durum] ?? r.durum,
-      aktif: r.aktif_olma_tarihi ? formatDateTime(r.aktif_olma_tarihi) : '',
-      arsiv_tarihi: r.arsiv_tarihi ? formatDateTime(r.arsiv_tarihi) : '',
-      arsiv_nedeni: ARSIV_NEDEN_LABEL[r.arsiv_nedeni] ?? r.arsiv_nedeni, kural: r.kural?.tanim,
-    }))
+    filtreFrek.forEach((r: any) => {
+      const islemKaynak = r.tamamlanma_tarihi ?? r.durum_degisim_tarihi ?? r.arsiv_tarihi
+      const islemFmt = islemKaynak ? formatDateTime(islemKaynak) : ''
+      ws.addRow({
+        tanim: r.tanim, lokasyon: r.lokasyonlar?.tanim, atanan: r.atanan?.isim_soyisim,
+        durum: CANLI_DURUM_LABEL[r.durum] ?? r.durum,
+        aktif: r.aktif_olma_tarihi ? formatDateTime(r.aktif_olma_tarihi) : '',
+        arsiv_tarihi: r.arsiv_tarihi ? formatDateTime(r.arsiv_tarihi) : '',
+        arsiv_nedeni: ARSIV_NEDEN_LABEL[r.arsiv_nedeni] ?? r.arsiv_nedeni,
+        islem_tarih: islemFmt.split(' ')[0] ?? '',
+        islem_saat:  islemFmt.split(' ')[1] ?? '',
+        islemi_yapan: r.islemi_yapan?.isim_soyisim ?? r.tamamlayan?.isim_soyisim ?? r.iptalEden?.isim_soyisim ?? '',
+      })
+    })
     const buf = await wb.xlsx.writeBuffer()
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
@@ -489,9 +498,14 @@ export default function ArsivClient({
   }
 
   function frekYazdir() {
-    const rows = filtreFrek.map((r: any) =>
-      `<tr><td>${r.tanim??''}</td><td>${r.lokasyonlar?.tanim??'—'}</td><td>${r.atanan?.isim_soyisim??'—'}</td><td>${CANLI_DURUM_LABEL[r.durum]??r.durum}</td><td>${r.arsiv_tarihi?formatDateTime(r.arsiv_tarihi):'—'}</td><td>${ARSIV_NEDEN_LABEL[r.arsiv_nedeni]??r.arsiv_nedeni??'—'}</td></tr>`
-    ).join('')
+    const rows = filtreFrek.map((r: any) => {
+      const islemKaynak = r.tamamlanma_tarihi ?? r.durum_degisim_tarihi ?? r.arsiv_tarihi
+      const islemFmt = islemKaynak ? formatDateTime(islemKaynak) : ''
+      const tarih = islemFmt.split(' ')[0] ?? '—'
+      const saat = islemFmt.split(' ')[1] ?? '—'
+      const yapan = r.islemi_yapan?.isim_soyisim ?? r.tamamlayan?.isim_soyisim ?? r.iptalEden?.isim_soyisim ?? '—'
+      return `<tr><td>${r.tanim??''}</td><td>${r.lokasyonlar?.tanim??'—'}</td><td>${r.atanan?.isim_soyisim??'—'}</td><td>${CANLI_DURUM_LABEL[r.durum]??r.durum}</td><td>${r.arsiv_tarihi?formatDateTime(r.arsiv_tarihi):'—'}</td><td>${ARSIV_NEDEN_LABEL[r.arsiv_nedeni]??r.arsiv_nedeni??'—'}</td><td>${tarih}</td><td>${saat}</td><td>${yapan}</td></tr>`
+    }).join('')
     const w = window.open('','_blank','width=1000,height=700')
     if (!w) return
     w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>Frekansiyel Arşiv</title>
@@ -499,7 +513,7 @@ export default function ArsivClient({
       th{background:#e5e7eb;color:#1f2937;font-weight:700;padding:6px 8px;border:1px solid #d1d5db;text-align:left}
       td{padding:5px 8px;border:1px solid #e5e7eb}tr:nth-child(even)td{background:#fafafa}</style>
       </head><body><h2 style="color:#1f2937">Frekansiyel Görevler Arşivi</h2>
-      <table><thead><tr><th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th><th>Arşiv Tarihi</th><th>Neden</th></tr></thead>
+      <table><thead><tr><th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th><th>Arşiv Tarihi</th><th>Arşiv Nedeni</th><th>İşlem Tarihi</th><th>İşlem Saati</th><th>İşlemi Yapan</th></tr></thead>
       <tbody>${rows}</tbody></table></body></html>`)
     w.document.close(); setTimeout(() => w.print(), 400)
   }
@@ -645,8 +659,20 @@ export default function ArsivClient({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontSize: 13, color: '#64748b' }}><strong style={{ color: '#1f2937' }}>{frekTotal}</strong> kayıt · Sayfa {frekSayfa}/{frekToplamSayfa}</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => csvIndir('frekansiyel', ['Görev','Lokasyon','Atanan','Durum','Arşiv Tarihi','Neden'],
-                filtreFrek.map((r:any) => [r.tanim,r.lokasyonlar?.tanim??'',r.atanan?.isim_soyisim??'',CANLI_DURUM_LABEL[r.durum]??r.durum,r.arsiv_tarihi?formatDateTime(r.arsiv_tarihi):'',ARSIV_NEDEN_LABEL[r.arsiv_nedeni]??r.arsiv_nedeni??'']))}
+              <button onClick={() => csvIndir('frekansiyel', ['Görev','Lokasyon','Atanan','Durum','Arşiv Tarihi','Neden','İşlem Tarihi','İşlem Saati','İşlemi Yapan'],
+                filtreFrek.map((r:any) => {
+                  const islemKaynak = r.tamamlanma_tarihi ?? r.durum_degisim_tarihi ?? r.arsiv_tarihi
+                  const islemFmt = islemKaynak ? formatDateTime(islemKaynak) : ''
+                  return [
+                    r.tanim, r.lokasyonlar?.tanim ?? '', r.atanan?.isim_soyisim ?? '',
+                    CANLI_DURUM_LABEL[r.durum] ?? r.durum,
+                    r.arsiv_tarihi ? formatDateTime(r.arsiv_tarihi) : '',
+                    ARSIV_NEDEN_LABEL[r.arsiv_nedeni] ?? r.arsiv_nedeni ?? '',
+                    islemFmt.split(' ')[0] ?? '',
+                    islemFmt.split(' ')[1] ?? '',
+                    r.islemi_yapan?.isim_soyisim ?? r.tamamlayan?.isim_soyisim ?? r.iptalEden?.isim_soyisim ?? '',
+                  ]
+                }))}
                 disabled={!filtreFrek.length} className="border border-[#e5e7eb] px-3 py-2 rounded-[10px] text-[13px] hover:bg-[#fafafa] flex items-center gap-2 disabled:opacity-40">
                 <Download size={13} /> CSV
               </button>
@@ -691,20 +717,29 @@ export default function ArsivClient({
             <table className="verde-table">
               <thead><tr>
                 <th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th>
-                <th>Aktif Saat</th><th>Arşiv Tarihi</th><th>Arşiv Nedeni</th><th>Kural</th>
+                <th>Aktif Saat</th><th>Arşiv Tarihi</th><th>Arşiv Nedeni</th>
+                <th>İşlem Tarihi</th><th>İşlem Saati</th><th>İşlemi Yapan</th>
                 <th style={{ textAlign:'center' }}>İşlem</th>
               </tr></thead>
               <tbody>
-                {frekLoading ? <YukleniyorSatir cols={9} /> :
-                 filtreFrek.length === 0 ? <BosKayit cols={9} mesaj="Arşiv kaydı bulunamadı." /> :
-                 filtreFrek.map((r: any) => (
+                {frekLoading ? <YukleniyorSatir cols={11} /> :
+                 filtreFrek.length === 0 ? <BosKayit cols={11} mesaj="Arşiv kaydı bulunamadı." /> :
+                 filtreFrek.map((r: any) => {
+                  // İşlem tarih/saati: TAMAMLANDI ise tamamlanma_tarihi, aksi halde durum_degisim_tarihi → fallback arsiv_tarihi
+                  const islemKaynak = r.tamamlanma_tarihi ?? r.durum_degisim_tarihi ?? r.arsiv_tarihi
+                  const islemFmt = islemKaynak ? formatDateTime(islemKaynak) : ''
+                  const islemTarih = islemFmt.split(' ')[0] ?? '—'
+                  const islemSaat  = islemFmt.split(' ')[1] ?? '—'
+                  const islemiYapan = r.islemi_yapan?.isim_soyisim ?? r.tamamlayan?.isim_soyisim ?? r.iptalEden?.isim_soyisim ?? '—'
+                  const cellColor = '#374151'  // Tek ton — tüm metin hücreleri için
+                  return (
                   <tr key={r.id}>
-                    <td style={{ fontWeight: 600, color: r.simule_tamamlandi ? '#9ca3af' : undefined }}>{r.tanim}</td>
-                    <td style={td({ color:'#64748b' })}>{getLocPath(r.lokasyon_id)}</td>
-                    <td style={td({ color:'#64748b' })}>{r.atanan?.isim_soyisim ?? '—'}</td>
+                    <td style={{ fontWeight: 600, color: cellColor }}>{r.tanim}</td>
+                    <td style={{ color: cellColor }}>{getLocPath(r.lokasyon_id)}</td>
+                    <td style={{ color: cellColor }}>{r.atanan?.isim_soyisim ?? '—'}</td>
                     <td><span className={`verde-badge ${DURUM_RENK[r.durum] ?? 'status-acik'}`}>{CANLI_DURUM_LABEL[r.durum] ?? r.durum}</span></td>
-                    <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.aktif_olma_tarihi ? formatDateTime(r.aktif_olma_tarihi) : '—'}</td>
-                    <td style={{ whiteSpace:'nowrap', color:'#94a3b8', fontSize:12 }}>{r.arsiv_tarihi ? formatDateTime(r.arsiv_tarihi) : '—'}</td>
+                    <td style={{ whiteSpace:'nowrap', color: cellColor, fontSize:12 }}>{r.aktif_olma_tarihi ? formatDateTime(r.aktif_olma_tarihi) : '—'}</td>
+                    <td style={{ whiteSpace:'nowrap', color: cellColor, fontSize:12 }}>{r.arsiv_tarihi ? formatDateTime(r.arsiv_tarihi) : '—'}</td>
                     <td>
                       <span style={{ padding:'2px 8px', borderRadius:6, fontSize:12, fontWeight:600,
                         background: r.arsiv_nedeni==='gun_sonu'?'#e8f4e8':r.arsiv_nedeni==='lokasyon_silindi'?'#fde8e8':'#f0f4ff',
@@ -712,13 +747,16 @@ export default function ArsivClient({
                         {ARSIV_NEDEN_LABEL[r.arsiv_nedeni] ?? r.arsiv_nedeni ?? '—'}
                       </span>
                     </td>
-                    <td style={{ color:'#64748b', fontSize:12 }}>{r.kural?.tanim ?? '—'}</td>
+                    <td style={{ whiteSpace:'nowrap', color: cellColor, fontSize:12 }}>{islemTarih}</td>
+                    <td style={{ whiteSpace:'nowrap', color: cellColor, fontSize:12 }}>{islemSaat}</td>
+                    <td style={{ color: cellColor }}>{islemiYapan}</td>
                     <td><div style={{ display:'flex', gap:6, justifyContent:'center' }}>
                       {yetki.duzenleyebilir && <button onClick={() => frekRestore(r)} title="Geri Yükle" style={aksBtn('#374151','#e8f4e8')}><RotateCcw size={13} /></button>}
                       {yetki.silebilir && <button onClick={() => frekSil(r)}     title="Kalıcı Sil" style={aksBtn('#c0392b','#fde8e8')}><Trash2 size={13} /></button>}
                     </div></td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

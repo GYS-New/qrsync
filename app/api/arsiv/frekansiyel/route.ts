@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
   // Data query
   const offset = (page - 1) * limit
-  const sel = 'id,firma_id,proje_id,tanim,lokasyon_id,durum,arsiv_tarihi,arsiv_nedeni,aktif_olma_tarihi,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,iptal_eden_id,islemi_yapan_id,kural_id,gunluk_frekans_sayisi,son_tamamlama_kanali,simule_tamamlandi'
+  const sel = 'id,firma_id,proje_id,tanim,lokasyon_id,durum,arsiv_tarihi,arsiv_nedeni,aktif_olma_tarihi,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,iptal_eden_id,islemi_yapan_id,kural_id,gunluk_frekans_sayisi,son_tamamlama_kanali,simule_tamamlandi'
 
   let dataQ = admin.from('canli_gorevler_arsiv').select(sel).eq('firma_id', firmaId)
     .order('arsiv_tarihi', { ascending: false })
