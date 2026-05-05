@@ -11,7 +11,7 @@
  *  - Uzantısız URL
  *
  * Kullanıcı /qr/* veya /nfc/* link'ine tıklayınca iOS bu dosyayı çekip
- * 6H649742PC.com.qrsync.qr app'inde açar (Safari'ye düşmez).
+ * 79QYT949XG.com.qrsync.qr app'inde açar (Safari'ye düşmez).
  */
 import { NextResponse } from 'next/server'
 
@@ -23,7 +23,7 @@ export async function GET() {
     applinks: {
       details: [
         {
-          appIDs: ['6H649742PC.com.qrsync.qr'],
+          appIDs: ['79QYT949XG.com.qrsync.qr'],
           components: [
             { '/': '/qr/*' },
             { '/': '/nfc/*' },
