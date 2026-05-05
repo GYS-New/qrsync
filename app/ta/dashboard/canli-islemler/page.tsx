@@ -50,6 +50,7 @@ export default async function CanliIslemlerPage() {
         readonly={me.rol === 'tenant_user'}
         canliAkisSureSaat={efektifAyar.canli_akis_sure_saat}
         ceklistAktif={efektifAyar.frekansiyel_ceklist_aktif}
+        personelAtamaAktif={efektifAyar.frekansiyel_personel_atama_aktif}
       />
     </div>
   )

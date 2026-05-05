@@ -65,6 +65,7 @@ interface Props {
   yetkiliLokIds?: string[] | null
   canliAkisSureSaat?: number  // canlı akış listeleme süresi (varsayılan 8)
   ceklistAktif?: boolean  // proje bazlı: frekansiyel görev çeklist aç/kapat
+  personelAtamaAktif?: boolean  // proje bazlı: kapalıysa Atanan sütunu gizlenir
 }
 
 type BrowseFilter = 'ACIK' | 'IPTAL' | 'KAPALI' | 'TARIHI_GECMIS'
@@ -204,7 +205,7 @@ function LiveHeader({
   )
 }
 
-export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, meName, readonly, projeId, showTumGorevler = true, yetkiliLokIds, canliAkisSureSaat = 8, ceklistAktif = true }: Props) {
+export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, meName, readonly, projeId, showTumGorevler = true, yetkiliLokIds, canliAkisSureSaat = 8, ceklistAktif = true, personelAtamaAktif = true }: Props) {
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -870,7 +871,7 @@ useEffect(() => {
       >
         <td style={{ fontWeight: 500, fontSize: fs, ...tdHL }}>{g.tanim}</td>
         <td style={{ color: '#4b5563', fontSize: fs, ...tdHL }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
-        <td style={{ color: '#4b5563', fontSize: fs, ...tdHL }}>{g.atanan?.isim_soyisim ?? '—'}</td>
+        {personelAtamaAktif && <td style={{ color: '#4b5563', fontSize: fs, ...tdHL }}>{g.atanan?.isim_soyisim ?? '—'}</td>}
         <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatDateTime(g.aktif_olma_tarihi)}</td>
         {/* İşlem Tarihi — son durum değişiminin tarihi */}
         <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatTarihTR(g.durum_degisim_tarihi ?? g.olusturma_tarihi ?? g.aktif_olma_tarihi)}</td>
@@ -977,7 +978,7 @@ useEffect(() => {
           <div className="verde-table-wrap">
             <table className="verde-table">
               <thead><tr>
-                <th>Görev</th><th>Lokasyon</th><th>Atanan</th>
+                <th>Görev</th><th>Lokasyon</th>{personelAtamaAktif && <th>Atanan</th>}
                 <th>Aktif Saat</th><th>İşlem Tarihi</th><th>İşlem Saatleri</th><th>İşlem Süresi</th><th>Durum</th><th>İşlemi Yapan</th>
               </tr></thead>
               <tbody>
@@ -985,7 +986,7 @@ useEffect(() => {
                   <TableRow key={g.id} g={g} showOps={false} showActor={true} highlight={g.id === highlightId} fontSize={14} />
                 ))}
                 {!filteredLive.length && (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', color: '#6b7280', padding: '28px 0', fontSize: 14 }}>
+                  <tr><td colSpan={personelAtamaAktif ? 9 : 8} style={{ textAlign: 'center', color: '#6b7280', padding: '28px 0', fontSize: 14 }}>
                     {durumFilter === 'TÜMÜ' ? 'Aktif frekansiyel görev yok' : 'Bu filtrede görev yok'}
                   </td></tr>
                 )}
@@ -1009,7 +1010,7 @@ useEffect(() => {
         <div style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }} className="verde-table-wrap">
           <table className="verde-table">
             <thead><tr>
-              <th>Görev</th><th>Lokasyon</th><th>Atanan</th>
+              <th>Görev</th><th>Lokasyon</th>{personelAtamaAktif && <th>Atanan</th>}
               <th>Aktif Saat</th><th>İşlem Tarihi</th><th>İşlem Saatleri</th><th>İşlem Süresi</th><th>Durum</th><th>İşlemi Yapan</th>
             </tr></thead>
             <tbody>
@@ -1017,7 +1018,7 @@ useEffect(() => {
                 <TableRow key={g.id} g={g} showOps={false} showActor fontSize={14} />
               ))}
               {!filteredLive.length && (
-                <tr><td colSpan={9} style={{ textAlign: 'center', color: '#6b7280', padding: '22px 0', fontSize: 14 }}>
+                <tr><td colSpan={personelAtamaAktif ? 9 : 8} style={{ textAlign: 'center', color: '#6b7280', padding: '22px 0', fontSize: 14 }}>
                   {durumFilter === 'TÜMÜ' ? 'Liste boş' : 'Bu filtrede görev yok'}
                 </td></tr>
               )}
