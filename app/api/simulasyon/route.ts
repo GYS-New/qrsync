@@ -10,7 +10,7 @@ async function yetkiKontrol(supabase: any) {
   return { ...me, userId: user.id }
 }
 
-// ── GET: firma/proje simülasyon ayarları (grup ayarları + personeller dahil) ──
+// ── GET: simülasyon ayarları (grup ayarları + kural-personel atamaları dahil) ──
 export async function GET(req: NextRequest) {
   const supabase = createClient()
   const me = await yetkiKontrol(supabase)
@@ -29,31 +29,56 @@ export async function GET(req: NextRequest) {
   const { data: ayarlar, error } = await q.order('olusturma_tarihi', { ascending: false })
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
-  // Her ayar için grup ayarları ve personelleri çek
+  // Her ayar için: grup ayarları + kural-personel atamaları
   const enriched = []
   for (const a of (ayarlar ?? [])) {
-    const [grupRes, personelRes] = await Promise.all([
+    const [grupRes, atamaRes] = await Promise.all([
       admin.from('simulasyon_grup_ayarlari').select('*').eq('simulasyon_id', a.id),
-      admin.from('simulasyon_personeller').select('user_id').eq('simulasyon_id', a.id),
+      admin.from('simulasyon_kural_atamalar').select('kural_id,personel_id').eq('simulasyon_id', a.id),
     ])
+    // kural_id → personel_idler[] map'le
+    const kuralMap = new Map<string, string[]>()
+    for (const r of (atamaRes.data ?? [])) {
+      const arr = kuralMap.get(r.kural_id) ?? []
+      arr.push(r.personel_id)
+      kuralMap.set(r.kural_id, arr)
+    }
+    const kural_atamalar = [...kuralMap.entries()].map(([kural_id, personel_idler]) => ({ kural_id, personel_idler }))
     enriched.push({
       ...a,
       grup_ayarlari: grupRes.data ?? [],
-      personel_idler: (personelRes.data ?? []).map((p: any) => p.user_id),
+      kural_atamalar,
     })
   }
 
   return NextResponse.json({ ok: true, data: enriched })
 }
 
-// ── POST: yeni simülasyon oluştur (grup ayarları + personeller ile) ──────────
+// Kural atamalarını yaz/sil — POST ve PATCH ortak
+async function kuralAtamalariYaz(admin: any, simulasyonId: string, kuralAtamalar: any[]) {
+  // Önce eski atamaları temizle
+  await admin.from('simulasyon_kural_atamalar').delete().eq('simulasyon_id', simulasyonId)
+  // Yenileri ekle (kural × personel kartezyen)
+  const rows: any[] = []
+  for (const item of kuralAtamalar) {
+    if (!item?.kural_id || !Array.isArray(item?.personel_idler)) continue
+    for (const pid of item.personel_idler) {
+      if (pid) rows.push({ simulasyon_id: simulasyonId, kural_id: item.kural_id, personel_id: pid })
+    }
+  }
+  if (rows.length > 0) {
+    await admin.from('simulasyon_kural_atamalar').insert(rows)
+  }
+}
+
+// ── POST: yeni simülasyon (grup ayarları + kural atamaları) ──────────────────
 export async function POST(req: NextRequest) {
   const supabase = createClient()
   const me = await yetkiKontrol(supabase)
   if (!me) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 403 })
 
   const body = await req.json()
-  const { firma_id, proje_id, ust_lokasyon_id, grup_ayarlari, personel_idler } = body
+  const { firma_id, proje_id, ust_lokasyon_id, grup_ayarlari, kural_atamalar } = body
 
   const firmaId = ['super_admin', 'alt_super_admin'].includes(me.rol) ? (firma_id ?? me.firma_id) : me.firma_id
   if (!firmaId || !ust_lokasyon_id) {
@@ -88,38 +113,35 @@ export async function POST(req: NextRequest) {
   }))
   await admin.from('simulasyon_grup_ayarlari').insert(grupRows)
 
-  // Personeller
-  if (personel_idler?.length > 0) {
-    const personelRows = personel_idler.map((uid: string) => ({
-      simulasyon_id: sim.id,
-      user_id: uid,
-    }))
-    await admin.from('simulasyon_personeller').insert(personelRows)
+  // Kural-personel atamaları (yeni model — havuz yerine)
+  if (Array.isArray(kural_atamalar)) {
+    await kuralAtamalariYaz(admin, sim.id, kural_atamalar)
   }
 
   return NextResponse.json({ ok: true, data: sim })
 }
 
-// ── PATCH: güncelle (aktif/pasif, grup ayarları, personeller) ────────────────
+// ── PATCH: güncelle (aktif/pasif, grup ayarları, kural atamaları) ───────────
 export async function PATCH(req: NextRequest) {
   const supabase = createClient()
   const me = await yetkiKontrol(supabase)
   if (!me) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 403 })
 
   const body = await req.json()
-  const { id, aktif, grup_ayarlari, personel_idler } = body
+  const { id, aktif, grup_ayarlari, kural_atamalar } = body
   if (!id) return NextResponse.json({ ok: false, error: 'id zorunlu' }, { status: 400 })
 
   const admin = createAdminClient()
 
-  // Ana kayıt güncelle
+  // Ana kayıt güncelle (aktif/pasif)
   if (aktif !== undefined) {
     await admin.from('simulasyon_ayarlari').update({ aktif, guncelleme_tarihi: new Date().toISOString() }).eq('id', id)
-    // SİM durdurulduğunda sanal device_tokens kayıtlarını temizle
+    // SİM durdurulduğunda sanal device_tokens'leri temizle (atanan personellere göre)
     if (aktif === false) {
-      const { data: personeller } = await admin.from('simulasyon_personeller').select('user_id').eq('simulasyon_id', id)
-      if (personeller && personeller.length > 0) {
-        const simDeviceIds = personeller.map((p: any) => `sim-${p.user_id}`)
+      const { data: atamalar } = await admin.from('simulasyon_kural_atamalar').select('personel_id').eq('simulasyon_id', id)
+      const personelIds = Array.from(new Set((atamalar ?? []).map((a: any) => a.personel_id)))
+      if (personelIds.length > 0) {
+        const simDeviceIds = personelIds.map((uid: string) => `sim-${uid}`)
         await admin.from('device_tokens').delete().in('device_id', simDeviceIds)
       }
     }
@@ -134,25 +156,18 @@ export async function PATCH(req: NextRequest) {
         grup_id: g.grup_id,
         hedef_oran: g.hedef_oran ?? 100,
         vardiya_suresi_saat: g.vardiya_suresi_saat ?? 8,
-    iptal_orani: g.iptal_orani ?? 1,
-    gec_50_orani: g.gec_50_orani ?? 3,
-    gec_100_orani: g.gec_100_orani ?? 2,
-    erken_50_orani: g.erken_50_orani ?? 2,
+        iptal_orani: g.iptal_orani ?? 1,
+        gec_50_orani: g.gec_50_orani ?? 3,
+        gec_100_orani: g.gec_100_orani ?? 2,
+        erken_50_orani: g.erken_50_orani ?? 2,
       }))
       await admin.from('simulasyon_grup_ayarlari').insert(rows)
     }
   }
 
-  // Personeller yeniden yaz
-  if (personel_idler && Array.isArray(personel_idler)) {
-    await admin.from('simulasyon_personeller').delete().eq('simulasyon_id', id)
-    if (personel_idler.length > 0) {
-      const rows = personel_idler.map((uid: string) => ({
-        simulasyon_id: id,
-        user_id: uid,
-      }))
-      await admin.from('simulasyon_personeller').insert(rows)
-    }
+  // Kural-personel atamaları yeniden yaz
+  if (Array.isArray(kural_atamalar)) {
+    await kuralAtamalariYaz(admin, id, kural_atamalar)
   }
 
   return NextResponse.json({ ok: true })
@@ -169,7 +184,7 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ ok: false, error: 'id zorunlu' }, { status: 400 })
 
   const admin = createAdminClient()
-  // CASCADE silecek: grup_ayarlari + personeller otomatik silinir
+  // CASCADE: grup_ayarlari + kural_atamalar + (varsa) eski personeller otomatik silinir
   const { error } = await admin.from('simulasyon_ayarlari').delete().eq('id', id)
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 

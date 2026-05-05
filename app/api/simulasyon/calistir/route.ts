@@ -63,22 +63,38 @@ export async function POST(req: Request) {
     console.log(`[SIMULASYON] ${ayarlar.length} aktif ayar bulundu`)
 
     for (const ayar of ayarlar) {
-      const [grupRes, personelRes] = await Promise.all([
+      // Yeni model: havuz yerine kural-bazlı atama. Her kurala 1+ personel atanmış,
+      // cron görevin kural_id'sine bakıp atanan personellerden random seçiyor.
+      const [grupRes, atamaRes] = await Promise.all([
         admin.from('simulasyon_grup_ayarlari').select('*').eq('simulasyon_id', ayar.id),
-        admin.from('simulasyon_personeller').select('user_id').eq('simulasyon_id', ayar.id),
+        admin.from('simulasyon_kural_atamalar').select('kural_id, personel_id').eq('simulasyon_id', ayar.id),
       ])
 
       const grupAyarlari = grupRes.data ?? []
-      const personelIdler = (personelRes.data ?? []).map((p: any) => p.user_id)
-      console.log(`[SIMULASYON] Ayar ${ayar.id}: grup=${grupAyarlari.length}, personel=${personelIdler.length}, firma=${ayar.firma_id}, proje=${ayar.proje_id}`)
-      if (grupAyarlari.length === 0 || personelIdler.length === 0) { console.log('[SIMULASYON] SKIP: grup veya personel yok'); continue }
+      const atamalar: { kural_id: string; personel_id: string }[] = (atamaRes.data ?? []) as any
+      const tumPersonelIds = Array.from(new Set(atamalar.map(a => a.personel_id)))
+      console.log(`[SIMULASYON] Ayar ${ayar.id}: grup=${grupAyarlari.length}, kural_atama=${atamalar.length}, uniq_personel=${tumPersonelIds.length}, firma=${ayar.firma_id}, proje=${ayar.proje_id}`)
+      if (grupAyarlari.length === 0 || atamalar.length === 0) { console.log('[SIMULASYON] SKIP: grup veya kural ataması yok'); continue }
 
-      const uygunPersonel = await filtreliPersonelGetir(admin, ayar.firma_id, ayar.proje_id, personelIdler)
+      // Mesai + aktif filtresi (atanmış personellerin alt kümesi)
+      const uygunPersonel = await filtreliPersonelGetir(admin, ayar.firma_id, ayar.proje_id, tumPersonelIds)
       console.log(`[SIMULASYON] Uygun personel: ${uygunPersonel.length}`)
       if (uygunPersonel.length === 0) { console.log('[SIMULASYON] SKIP: uygun personel yok (mesai kontrolü?)'); continue }
 
+      // Kural → uygun personel listesi (cinsiyet bilgisiyle)
+      const uygunMap = new Map(uygunPersonel.map(p => [p.id, p]))
+      const kuralAtamalar = new Map<string, PersonelBilgi[]>()
+      for (const a of atamalar) {
+        const pBilgi = uygunMap.get(a.personel_id)
+        if (!pBilgi) continue  // mesaide değil veya pasif
+        const arr = kuralAtamalar.get(a.kural_id) ?? []
+        arr.push(pBilgi)
+        kuralAtamalar.set(a.kural_id, arr)
+      }
+      console.log(`[SIMULASYON] Atanmış kural sayısı: ${kuralAtamalar.size}`)
+
       for (const ga of grupAyarlari) {
-        const result = await grupSimulasyonCalistir(admin, ayar, ga, uygunPersonel)
+        const result = await grupSimulasyonCalistir(admin, ayar, ga, kuralAtamalar)
         sonuclar.push({ ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id, grup_id: ga.grup_id, ...result })
       }
     }
@@ -153,18 +169,26 @@ function lokasyonCinsiyetBelirle(lokTanim: string): 'E' | 'K' | null {
   return null // cinsiyet belirtilmemiş lokasyon
 }
 
-// Cinsiyet eşleştirmesiyle personel seç
-function cinsiyetliPersonelSec(personeller: PersonelBilgi[], lokTanim: string): string {
+// Cinsiyet eşleştirmesiyle personel seç (havuz versiyonu — eski/iç kullanım)
+function cinsiyetliPersonelSec(personeller: PersonelBilgi[], lokTanim: string): string | null {
+  if (!personeller.length) return null
   const gerekliCinsiyet = lokasyonCinsiyetBelirle(lokTanim)
   if (gerekliCinsiyet) {
     const uygunlar = personeller.filter(p => p.cinsiyet === gerekliCinsiyet)
     if (uygunlar.length > 0) return uygunlar[Math.floor(Math.random() * uygunlar.length)].id
   }
-  // Cinsiyet eşleşmesi yoksa veya uygun personel yoksa rastgele seç
   return personeller[Math.floor(Math.random() * personeller.length)].id
 }
 
-async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygunPersonel: PersonelBilgi[]) {
+// Kurala atanmış personellerden cinsiyet+random seç. Atama yoksa null.
+function kuralPersonelSec(kuralAtamalar: Map<string, PersonelBilgi[]>, kuralId: string | null | undefined, lokTanim: string): string | null {
+  if (!kuralId) return null
+  const havuz = kuralAtamalar.get(kuralId)
+  if (!havuz || havuz.length === 0) return null
+  return cinsiyetliPersonelSec(havuz, lokTanim)
+}
+
+async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kuralAtamalar: Map<string, PersonelBilgi[]>) {
   const { firma_id } = ayar
   const { grup_id, hedef_oran, vardiya_suresi_saat } = grupAyar
   const bugun = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
@@ -194,7 +218,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
 
   const { data: gorevler } = await admin
     .from('canli_gorevler')
-    .select('id, durum, lokasyon_id, tanim, aktif_olma_tarihi, baslatilma_tarihi, simule_tamamlandi')
+    .select('id, durum, lokasyon_id, tanim, aktif_olma_tarihi, baslatilma_tarihi, baslatan_kullanici_id, simule_tamamlandi, kural_id')
     .eq('firma_id', firma_id)
     .in('lokasyon_id', lokIds)
     .gte('aktif_olma_tarihi', gunBaslangicUTC)
@@ -330,7 +354,9 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
 
     const sureSaniye = Math.round(gecenDk * 60)
     const tamamlanmaIso = new Date().toISOString()
-    const personelId = gorev.baslatan_kullanici_id ?? cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
+    // Görevi başlatan personel varsa o tamamlasın; yoksa kuralın atanmış havuzundan seç
+    const personelId = gorev.baslatan_kullanici_id ?? kuralPersonelSec(kuralAtamalar, gorev.kural_id, lok?.tanim ?? '')
+    if (!personelId) continue  // Kural atanmamış → atla
 
     // %1 iptal olasılığı
     if (Math.random() < (grupAyar.iptal_orani ?? 1) / 100) {
@@ -390,7 +416,9 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, uygu
       if ((tamamlananSayi + tamamlananAdet + baslatmaAdet) >= hedefMax) break
 
       const lok = lokMap.get(gorev.lokasyon_id)
-      const personelId = cinsiyetliPersonelSec(uygunPersonel, lok?.tanim ?? '')
+      // ACIK görevi başlatacak personel: kurala atanmışlardan random seç. Atanmamışsa atla.
+      const personelId = kuralPersonelSec(kuralAtamalar, gorev.kural_id, lok?.tanim ?? '')
+      if (!personelId) continue
 
       // %1 iptal olasılığı
       if (Math.random() < (grupAyar.iptal_orani ?? 1) / 100) {

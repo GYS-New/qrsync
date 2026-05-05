@@ -1084,11 +1084,14 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
   // Gruplar ve personeller (üst lokasyon seçince yüklenir)
   const [gruplar, setGruplar] = useState<any[]>([])
   const [personeller, setPersoneller] = useState<any[]>([])
+  const [kurallar, setKurallar] = useState<any[]>([])  // Yeni: üst lokasyonun aktif kuralları
 
   // Yeni ayar formu
   const [yeniUstLok, setYeniUstLok] = useState('')
   const [seciliGruplar, setSeciliGruplar] = useState<Record<string, any>>({})
-  const [seciliPersonel, setSeciliPersonel] = useState<Set<string>>(new Set())
+  // Yeni: kural-personel eşleştirme — kural_id → Set<personel_id>
+  const [kuralAtamalar, setKuralAtamalar] = useState<Record<string, Set<string>>>({})
+  const [acikKuralId, setAcikKuralId] = useState<string | null>(null)
 
   // Düzenleme
   const [duzenleId, setDuzenleId] = useState<string | null>(null)
@@ -1111,13 +1114,15 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
 
   useEffect(() => { yukle() }, [firmaId, projeId])
 
-  // Üst lokasyon seçilince grupları ve personelleri yükle
+  // Üst lokasyon seçilince grupları, kuralları ve personelleri yükle
   async function ustLokasyonSecildi(ustLokId: string) {
     setYeniUstLok(ustLokId)
     setSeciliGruplar({})
-    setSeciliPersonel(new Set())
+    setKuralAtamalar({})
+    setAcikKuralId(null)
     setGruplar([])
     setPersoneller([])
+    setKurallar([])
     if (!ustLokId) return
 
     // Grupları çek
@@ -1130,6 +1135,13 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
     const pRes = await fetch(`/api/simulasyon/personeller?firma_id=${firmaId}&ust_lokasyon_id=${ustLokId}`)
     const pJson = await pRes.json()
     setPersoneller(pJson.data ?? [])
+
+    // Aktif kuralları çek (yeni endpoint — vardiya bilgisiyle)
+    const kQp = new URLSearchParams({ firma_id: firmaId, ust_lokasyon_id: ustLokId })
+    if (projeId) kQp.set('proje_id', projeId)
+    const kRes = await fetch(`/api/simulasyon/kurallar?${kQp}`)
+    const kJson = await kRes.json()
+    if (kJson.ok) setKurallar(kJson.data ?? [])
   }
 
   // Düzenleme moduna geç
@@ -1143,7 +1155,12 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
       ga[g.grup_id] = { hedef_oran: g.hedef_oran, vardiya_suresi_saat: g.vardiya_suresi_saat, iptal_orani: g.iptal_orani ?? 1, gec_50_orani: g.gec_50_orani ?? 3, gec_100_orani: g.gec_100_orani ?? 2, erken_50_orani: g.erken_50_orani ?? 2 }
     }
     setSeciliGruplar(ga)
-    setSeciliPersonel(new Set(a.personel_idler ?? []))
+    // Mevcut kural-personel atamalarını yükle
+    const ka: Record<string, Set<string>> = {}
+    for (const item of (a.kural_atamalar ?? [])) {
+      ka[item.kural_id] = new Set(item.personel_idler ?? [])
+    }
+    setKuralAtamalar(ka)
   }
 
   function grupToggle(grupId: string) {
@@ -1159,35 +1176,54 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
     setSeciliGruplar(prev => ({ ...prev, [grupId]: { ...prev[grupId], [field]: value } }))
   }
 
-  function personelToggle(uid: string) {
-    setSeciliPersonel(prev => { const n = new Set(prev); n.has(uid) ? n.delete(uid) : n.add(uid); return n })
+  // Kural-personel atamasında toggle
+  function kuralPersonelToggle(kuralId: string, personelId: string) {
+    setKuralAtamalar(prev => {
+      const n = { ...prev }
+      const set = new Set(n[kuralId] ?? [])
+      set.has(personelId) ? set.delete(personelId) : set.add(personelId)
+      n[kuralId] = set
+      return n
+    })
   }
 
-  function tumPersonelSec() {
-    setSeciliPersonel(new Set(personeller.map((p: any) => p.id)))
+  function kuralIcinTumPersonelSec(kuralId: string) {
+    setKuralAtamalar(prev => ({ ...prev, [kuralId]: new Set(personeller.map((p: any) => p.id)) }))
   }
+
+  function kuralIcinTumPersonelTemizle(kuralId: string) {
+    setKuralAtamalar(prev => {
+      const n = { ...prev }
+      n[kuralId] = new Set()
+      return n
+    })
+  }
+
+  // Toplam atanan kural sayısı (en az 1 personel atanmış)
+  const atanmisKuralSayisi = Object.values(kuralAtamalar).filter(s => s.size > 0).length
 
   async function kaydet() {
     const grupIds = Object.keys(seciliGruplar)
-    if (!yeniUstLok || grupIds.length === 0 || seciliPersonel.size === 0) return
+    if (!yeniUstLok || grupIds.length === 0) return
+    if (atanmisKuralSayisi === 0) return  // En az 1 kural-personel ataması zorunlu
     setSaving(true)
     try {
       const grupAyar = grupIds.map(gid => ({ grup_id: gid, ...seciliGruplar[gid] }))
-      const personelIdler = Array.from(seciliPersonel)
+      const kural_atamalar = Object.entries(kuralAtamalar)
+        .filter(([_, set]) => set.size > 0)
+        .map(([kural_id, set]) => ({ kural_id, personel_idler: [...set] }))
 
       if (duzenleId) {
-        // Güncelle
         await fetch('/api/simulasyon', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: duzenleId, grup_ayarlari: grupAyar, personel_idler: personelIdler }),
+          body: JSON.stringify({ id: duzenleId, grup_ayarlari: grupAyar, kural_atamalar }),
         })
       } else {
-        // Yeni oluştur
         await fetch('/api/simulasyon', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ firma_id: firmaId, proje_id: projeId, ust_lokasyon_id: yeniUstLok, grup_ayarlari: grupAyar, personel_idler: personelIdler }),
+          body: JSON.stringify({ firma_id: firmaId, proje_id: projeId, ust_lokasyon_id: yeniUstLok, grup_ayarlari: grupAyar, kural_atamalar }),
         })
       }
       iptal()
@@ -1197,7 +1233,9 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
   }
 
   function iptal() {
-    setDuzenleId(null); setYeniUstLok(''); setSeciliGruplar({}); setSeciliPersonel(new Set()); setGruplar([]); setPersoneller([])
+    setDuzenleId(null); setYeniUstLok(''); setSeciliGruplar({})
+    setKuralAtamalar({}); setAcikKuralId(null)
+    setGruplar([]); setPersoneller([]); setKurallar([])
   }
 
   async function toggle(id: string, aktif: boolean) {
@@ -1330,29 +1368,67 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
               )}
             </div>
 
-            {/* Personeller */}
+            {/* Kural-Personel Eşleştirme */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
-                  Personeller ({seciliPersonel.size}/{personeller.length})
+                  Kural-Personel Eşleştirme ({atanmisKuralSayisi}/{kurallar.length} kural atandı)
                 </span>
-                {personeller.length > 0 && (
-                  <button onClick={tumPersonelSec} style={{ fontSize: 11, color: '#1f2937', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>
-                    Tümünü Seç
-                  </button>
-                )}
               </div>
-              {personeller.length === 0 ? (
+              {kurallar.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#94a3b8', padding: 8 }}>Bu üst lokasyon altında aktif kural bulunamadı.</div>
+              ) : personeller.length === 0 ? (
                 <div style={{ fontSize: 13, color: '#94a3b8', padding: 8 }}>Bu üst lokasyona atanmış personel yok.</div>
               ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {personeller.map((p: any) => {
-                    const secili = seciliPersonel.has(p.id)
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 480, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, padding: 6, background: '#fff' }}>
+                  {kurallar.map((k: any) => {
+                    const atananSet = kuralAtamalar[k.id] ?? new Set<string>()
+                    const atananSayi = atananSet.size
+                    const acik = acikKuralId === k.id
+                    const vardiyaRenk = k.vardiya_no === 1 ? '#3b82f6' : k.vardiya_no === 2 ? '#f59e0b' : k.vardiya_no === 3 ? '#a855f7' : '#94a3b8'
                     return (
-                      <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', background: secili ? '#fef2f2' : '#fff', border: `1.5px solid ${secili ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                        <input type="checkbox" checked={secili} onChange={() => personelToggle(p.id)} style={{ width: 15, height: 15 }} />
-                        <span style={{ fontWeight: secili ? 600 : 400, color: secili ? '#dc2626' : '#374151' }}>{p.isim_soyisim}</span>
-                      </label>
+                      <div key={k.id} style={{ border: `1.5px solid ${atananSayi > 0 ? '#86efac' : '#e5e7eb'}`, borderRadius: 8, background: atananSayi > 0 ? '#f0fdf4' : '#fafafa', overflow: 'hidden' }}>
+                        <div onClick={() => setAcikKuralId(acik ? null : k.id)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer', userSelect: 'none' as const }}>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: vardiyaRenk, padding: '3px 8px', borderRadius: 6, minWidth: 30, textAlign: 'center' }}>
+                            V{k.vardiya_no ?? '?'}
+                          </span>
+                          <span style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: '#1f2937', fontWeight: 700, minWidth: 48 }}>
+                            {k.aktif_olma_saati}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{k.tanim}</div>
+                            <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{k.lokasyon_yolu}</div>
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: atananSayi > 0 ? '#16a34a' : '#94a3b8', background: atananSayi > 0 ? '#dcfce7' : '#f3f4f6', padding: '3px 10px', borderRadius: 6, whiteSpace: 'nowrap' as const }}>
+                            {atananSayi > 0 ? `${atananSayi} personel` : 'atanmamış'}
+                          </span>
+                          <span style={{ fontSize: 14, color: '#9ca3af', transition: 'transform .2s', transform: acik ? 'rotate(90deg)' : 'rotate(0deg)' }}>›</span>
+                        </div>
+                        {acik && (
+                          <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb', background: '#fff' }}>
+                            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                              <button onClick={() => kuralIcinTumPersonelSec(k.id)} style={{ fontSize: 11, color: '#1f2937', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>
+                                Tümü
+                              </button>
+                              <button onClick={() => kuralIcinTumPersonelTemizle(k.id)} style={{ fontSize: 11, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>
+                                Temizle
+                              </button>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                              {personeller.map((p: any) => {
+                                const secili = atananSet.has(p.id)
+                                return (
+                                  <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: secili ? '#fef2f2' : '#fff', border: `1.5px solid ${secili ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                                    <input type="checkbox" checked={secili} onChange={() => kuralPersonelToggle(k.id, p.id)} style={{ width: 14, height: 14 }} />
+                                    <span style={{ fontWeight: secili ? 600 : 400, color: secili ? '#dc2626' : '#374151' }}>{p.isim_soyisim}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
                 </div>
@@ -1362,7 +1438,7 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
             {/* Kaydet / İptal */}
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={kaydet}
-                disabled={saving || Object.keys(seciliGruplar).length === 0 || seciliPersonel.size === 0}
+                disabled={saving || Object.keys(seciliGruplar).length === 0 || atanmisKuralSayisi === 0}
                 style={{ height: 38, padding: '0 24px', borderRadius: 10, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
                 {saving ? 'Kaydediliyor…' : duzenleId ? 'Güncelle' : 'Oluştur'}
               </button>
@@ -1409,7 +1485,7 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
                   <span style={{ fontSize: 13, color: a.aktif ? '#dc2626' : '#94a3b8', fontWeight: 700 }}>
                     {a.aktif ? 'ÇALIŞIYOR' : 'DURDURULDU'}
                   </span>
-                  <span style={{ fontSize: 12.5, color: '#94a3b8' }}>· {(a.grup_ayarlari?.length ?? 0)} grup · {(a.personel_idler?.length ?? 0)} personel</span>
+                  <span style={{ fontSize: 12.5, color: '#94a3b8' }}>· {(a.grup_ayarlari?.length ?? 0)} grup · {(a.kural_atamalar?.length ?? 0)} kural</span>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => duzenleBasla(a)} style={{ flex: 1, height: 34, borderRadius: 8, border: '1px solid #e5e7eb', background: '#f9fafb', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Düzenle</button>
