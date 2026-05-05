@@ -1,9 +1,11 @@
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import DashboardRenderer from '@/components/dashboard/DashboardRenderer'
 import DashboardRefresher from '@/components/dashboard/DashboardRefresher'
 import { ensureDashboardDefaults } from '@/lib/dashboard/ensureDefaults'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { getDescendantIds } from '@/lib/lokasyon/getDescendantIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,9 +18,13 @@ export default async function Dashboard() {
   const { data: me } = await supabase.from('users').select('firma_id').eq('id', user.id).single()
   const firmaId = me?.firma_id ?? null
 
-  const [bloklar, aktifProje] = await Promise.all([
+  // Aktif üst lokasyon (TA dashboard scope filtresi) — cookie'den oku
+  const aktifUstLokasyonId = cookies().get('qrsync_aktif_ust_lokasyon_id')?.value ?? null
+
+  const [bloklar, aktifProje, yetkiliLokIds] = await Promise.all([
     ensureDashboardDefaults(user.id),
     getAktifProje(firmaId),
+    getDescendantIds(aktifUstLokasyonId, firmaId),
   ])
 
   return (
@@ -29,7 +35,14 @@ export default async function Dashboard() {
         breadcrumbs={[{ label: 'Gosterge Paneli' }]}
       />
       <div style={{ padding: 'clamp(12px, 2vw, 28px)' }}>
-        <DashboardRenderer bloklar={bloklar} firmaId={firmaId} isSuperAdmin={false} basePath="/ta" projeId={aktifProje?.id ?? null} />
+        <DashboardRenderer
+          bloklar={bloklar}
+          firmaId={firmaId}
+          isSuperAdmin={false}
+          basePath="/ta"
+          projeId={aktifProje?.id ?? null}
+          yetkiliLokIds={yetkiliLokIds}
+        />
       </div>
       <DashboardRefresher />
     </div>
