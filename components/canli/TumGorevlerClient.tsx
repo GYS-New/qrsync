@@ -260,6 +260,8 @@ const getLocUstAlt = (lokasyonId: string | null | undefined, fallbackName?: stri
   const [bulkDuzenleDurum, setBulkDuzenleDurum] = useState('')
   const [bulkDuzenleIds, setBulkDuzenleIds] = useState<Set<string>>(new Set())
   const [bulkDuzenleUyari, setBulkDuzenleUyari] = useState<string[]>([])
+  const [bulkIptalSebep, setBulkIptalSebep] = useState('')  // Web bulk IPTAL'de zorunlu sebep
+  const [editIptalSebep, setEditIptalSebep] = useState('')  // Edit modal IPTAL'de zorunlu sebep
   const selected = useMemo(() => gorevler.find((g: any) => g.id === selectedId) ?? null, [gorevler, selectedId])
 
   const [modal, setModal] = useState<null | 'create' | 'edit'>(null)
@@ -376,6 +378,7 @@ useEffect(() => {
 function openCreate() {
     setForm({ ...emptyForm, durum: 'HAZIR' })
     setLoc1(''); setLoc2(''); setLoc3('')
+    setEditIptalSebep('')
     setModal('create')
   }
 
@@ -385,6 +388,7 @@ function openCreate() {
       toast({ type: 'error', title: 'İşlem Yapılamaz', message: 'Zamanı geçmiş görevler düzenlenemez.' })
       return
     }
+    setEditIptalSebep(selected.iptal_sebep ?? '')
     const c = deriveChain(selected.lokasyon_id ?? '')
     setForm({
       tanim: selected.tanim ?? '',
@@ -495,6 +499,16 @@ function openCreate() {
         } else if (['IPTAL', 'KAPATILDI', 'SILINDI'].includes(form.durum)) {
           payload.iptal_eden_id = meId
           payload.iptal_tarihi = nowIso
+          // IPTAL'de sebep zorunlu (web tarafı)
+          if (form.durum === 'IPTAL') {
+            const sebep = editIptalSebep.trim()
+            if (sebep.length < 3) {
+              toast({ type: 'error', title: 'İptal Sebebi Eksik', message: 'Lütfen en az 3 karakter iptal sebebi girin.' })
+              setSaving(false)
+              return
+            }
+            payload.iptal_sebep = sebep
+          }
         } else {
           // Diğer durumlar (BEKLEMEDE, ZAMANINDA_YAPILAMAYAN, KAPATILDI, SILINDI, ZAMANI_GECMIS vs.)
           // Şimdilik iptal_eden_id alanını "işlemi yapan" olarak kullanıyoruz (mobil taraf ayrı ele alınacak)
@@ -557,6 +571,14 @@ function openCreate() {
 
   async function applyBulkDuzenle() {
     if (!bulkDuzenleDurum || !bulkDuzenleIds.size) return
+    // IPTAL hedefinde sebep zorunlu (min 3 karakter)
+    if (bulkDuzenleDurum === 'IPTAL') {
+      const sebep = bulkIptalSebep.trim()
+      if (sebep.length < 3) {
+        toast({ type: 'error', title: 'İptal Sebebi Eksik', message: 'Lütfen en az 3 karakter iptal sebebi girin.' })
+        return
+      }
+    }
     const nowIso = new Date().toISOString()
     const allIds = Array.from(bulkDuzenleIds)
 
@@ -619,6 +641,9 @@ function openCreate() {
           patch.iptal_eden_id = meId
           patch.iptal_tarihi = nowIso
         }
+        if (bulkDuzenleDurum === 'IPTAL') {
+          patch.iptal_sebep = bulkIptalSebep.trim()
+        }
         const { error } = await supabase
           .from('canli_gorevler')
           .update(patch)
@@ -631,6 +656,7 @@ function openCreate() {
       setBulkDuzenleMode(false)
       setBulkDuzenleIds(new Set())
       setBulkDuzenleDurum('')
+      setBulkIptalSebep('')
       await refresh()
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
@@ -1532,9 +1558,23 @@ async function del() {
                 </label>
               ))}
             </div>
+            {bulkDuzenleDurum === 'IPTAL' && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 6 }}>İptal Sebebi <span style={{ color: '#dc2626' }}>*</span></div>
+                <textarea
+                  value={bulkIptalSebep}
+                  onChange={(e) => setBulkIptalSebep(e.target.value)}
+                  placeholder="Görevlerin neden iptal edildiğini açıklayın (en az 3 karakter)"
+                  maxLength={500}
+                  rows={3}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' as const, boxSizing: 'border-box' }}
+                />
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, textAlign: 'right' as const }}>{bulkIptalSebep.length}/500</div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <Button variant="ghost" type="button" onClick={() => setBulkDuzenlePopup(false)}>Vazgeç</Button>
-              <Button variant="primary" type="button" disabled={!bulkDuzenleDurum} onClick={applyBulkDuzenle}>Tamam</Button>
+              <Button variant="ghost" type="button" onClick={() => { setBulkDuzenlePopup(false); setBulkIptalSebep('') }}>Vazgeç</Button>
+              <Button variant="primary" type="button" disabled={!bulkDuzenleDurum || (bulkDuzenleDurum === 'IPTAL' && bulkIptalSebep.trim().length < 3)} onClick={applyBulkDuzenle}>Tamam</Button>
             </div>
           </div>
         </div>
@@ -1729,6 +1769,23 @@ async function del() {
                   </select>
                 )}
               </div>
+
+              {modal === 'edit' && form.durum === 'IPTAL' && (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ fontSize: 13, color: '#4b5563', marginBottom: 6 }}>
+                    İptal Sebebi <span style={{ color: '#dc2626' }}>*</span>
+                  </div>
+                  <textarea
+                    value={editIptalSebep}
+                    onChange={(e) => setEditIptalSebep(e.target.value)}
+                    placeholder="Görevin neden iptal edildiğini açıklayın (en az 3 karakter)"
+                    maxLength={500}
+                    rows={3}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' as const, boxSizing: 'border-box' }}
+                  />
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, textAlign: 'right' as const }}>{editIptalSebep.length}/500</div>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 14 }}>

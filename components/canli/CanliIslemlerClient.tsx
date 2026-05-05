@@ -764,17 +764,21 @@ useEffect(() => {
   }
 
   async function handleIptal(id: string) {
-    const ok = await confirm({
-      title: 'İptal Onayı',
-      message: 'Bu görevi iptal etmek istediğinizden emin misiniz?',
-      confirmText: 'İptal Et',
-      cancelText: 'Vazgeç',
-      variant: 'danger',
-    })
-    if (!ok) return
+    // İptal sebebi zorunlu (min 3 char) — web tarafından da takip edebilmek için
+    const sebepRaw = window.prompt('Görevin neden iptal edildiğini açıklayın (en az 3 karakter):', '')
+    if (sebepRaw === null) return  // Vazgeç
+    const sebep = sebepRaw.trim()
+    if (sebep.length < 3) {
+      toast({ type: 'error', title: 'İptal Sebebi Eksik', message: 'En az 3 karakter sebep girmelisiniz.' })
+      return
+    }
+    if (sebep.length > 500) {
+      toast({ type: 'error', title: 'Sebep Çok Uzun', message: 'En fazla 500 karakter girebilirsiniz.' })
+      return
+    }
     await supabase
       .from('canli_gorevler')
-      .update({ durum: 'IPTAL', iptal_eden_id: meId, iptal_tarihi: new Date().toISOString(), islemi_yapan_id: meId })
+      .update({ durum: 'IPTAL', iptal_eden_id: meId, iptal_tarihi: new Date().toISOString(), islemi_yapan_id: meId, iptal_sebep: sebep })
       .eq('id', id)
     refreshLiveFlow()
   }
