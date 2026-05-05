@@ -12,6 +12,35 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Pause, Play, Square } from 'lucide-react'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 
+// ── Tarih/saat formatlama yardımcıları (TR — Europe/Istanbul) ────────────
+function formatTarihTR(value?: string | null): string {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Istanbul' })
+}
+function formatSaatTR(value?: string | null): string {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Istanbul' })
+}
+function formatIslemSaatleri(baslatma?: string | null, bitis?: string | null): string {
+  const b = formatSaatTR(baslatma)
+  const t = formatSaatTR(bitis)
+  if (!b && !t) return '—'
+  return `${b || '—'} - ${t || '—'}`
+}
+function formatIslemSuresi(saniye?: number | null): string {
+  if (saniye == null || saniye <= 0) return '—'
+  if (saniye < 60) return `${saniye} sn`
+  const dk = saniye / 60
+  if (dk < 60) return `${dk.toFixed(1)} dk`
+  const saat = Math.floor(dk / 60)
+  const kalanDk = Math.round(dk % 60)
+  return kalanDk > 0 ? `${saat} sa ${kalanDk} dk` : `${saat} sa`
+}
+
 // datetime-local input Türkiye saatini bekler — UTC Date'i Istanbul local string'e çevir
 function toIstanbulLocalInput(d: Date): string {
   const parts = new Intl.DateTimeFormat('sv-SE', {
@@ -843,7 +872,12 @@ useEffect(() => {
         <td style={{ color: '#4b5563', fontSize: fs, ...tdHL }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
         <td style={{ color: '#4b5563', fontSize: fs, ...tdHL }}>{g.atanan?.isim_soyisim ?? '—'}</td>
         <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatDateTime(g.aktif_olma_tarihi)}</td>
-        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatDateTime(g.durum_degisim_tarihi ?? g.olusturma_tarihi ?? g.aktif_olma_tarihi)}</td>
+        {/* İşlem Tarihi — son durum değişiminin tarihi */}
+        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatTarihTR(g.durum_degisim_tarihi ?? g.olusturma_tarihi ?? g.aktif_olma_tarihi)}</td>
+        {/* İşlem Saatleri — başlatma → tamamlanma (yoksa son durum değişimi) */}
+        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatIslemSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi ?? g.durum_degisim_tarihi)}</td>
+        {/* İşlem Süresi */}
+        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatIslemSuresi(g.tamamlanma_suresi_saniye)}</td>
         <td style={{ fontSize: fs, ...tdHL }}>
           <span style={{ fontSize: fs }} className={`verde-badge ${durumRenk[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
         </td>
@@ -944,14 +978,14 @@ useEffect(() => {
             <table className="verde-table">
               <thead><tr>
                 <th>Görev</th><th>Lokasyon</th><th>Atanan</th>
-                <th>Aktif Saat</th><th>İŞLEM TARİH-SAAT</th><th>Durum</th><th>İşlemi Yapan</th>
+                <th>Aktif Saat</th><th>İşlem Tarihi</th><th>İşlem Saatleri</th><th>İşlem Süresi</th><th>Durum</th><th>İşlemi Yapan</th>
               </tr></thead>
               <tbody>
                 {filtreLiveSayfa.map((g: any) => (
                   <TableRow key={g.id} g={g} showOps={false} showActor={true} highlight={g.id === highlightId} fontSize={14} />
                 ))}
                 {!filteredLive.length && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', color: '#6b7280', padding: '28px 0', fontSize: 14 }}>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', color: '#6b7280', padding: '28px 0', fontSize: 14 }}>
                     {durumFilter === 'TÜMÜ' ? 'Aktif frekansiyel görev yok' : 'Bu filtrede görev yok'}
                   </td></tr>
                 )}
@@ -976,14 +1010,14 @@ useEffect(() => {
           <table className="verde-table">
             <thead><tr>
               <th>Görev</th><th>Lokasyon</th><th>Atanan</th>
-              <th>Aktif Saat</th><th>İŞLEM TARİH-SAAT</th><th>Durum</th><th>İşlemi Yapan</th>
+              <th>Aktif Saat</th><th>İşlem Tarihi</th><th>İşlem Saatleri</th><th>İşlem Süresi</th><th>Durum</th><th>İşlemi Yapan</th>
             </tr></thead>
             <tbody>
               {filtreLiveSayfa.map((g: any) => (
                 <TableRow key={g.id} g={g} showOps={false} showActor fontSize={14} />
               ))}
               {!filteredLive.length && (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: '#6b7280', padding: '22px 0', fontSize: 14 }}>
+                <tr><td colSpan={9} style={{ textAlign: 'center', color: '#6b7280', padding: '22px 0', fontSize: 14 }}>
                   {durumFilter === 'TÜMÜ' ? 'Liste boş' : 'Bu filtrede görev yok'}
                 </td></tr>
               )}

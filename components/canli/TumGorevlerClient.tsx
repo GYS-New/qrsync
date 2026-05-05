@@ -40,6 +40,35 @@ const DURUM_RENK: Record<string, string> = {
   SILINDI: 'status-silindi',
 }
 
+// ── Tarih/saat formatlama yardımcıları (TR — Europe/Istanbul) ────────────
+function formatTarihTR(value?: string | null): string {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Istanbul' })
+}
+function formatSaatTR(value?: string | null): string {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Istanbul' })
+}
+function formatIslemSaatleri(baslatma?: string | null, bitis?: string | null): string {
+  const b = formatSaatTR(baslatma)
+  const t = formatSaatTR(bitis)
+  if (!b && !t) return '—'
+  return `${b || '—'} - ${t || '—'}`
+}
+function formatIslemSuresi(saniye?: number | null): string {
+  if (saniye == null || saniye <= 0) return '—'
+  if (saniye < 60) return `${saniye} sn`
+  const dk = saniye / 60
+  if (dk < 60) return `${dk.toFixed(1)} dk`
+  const saat = Math.floor(dk / 60)
+  const kalanDk = Math.round(dk % 60)
+  return kalanDk > 0 ? `${saat} sa ${kalanDk} dk` : `${saat} sa`
+}
+
 function getIslemiYapan(g: any, ctx?: { meId?: string; meName?: string; kullanicilar?: { id: string; isim_soyisim: string }[] }) {
   if (g.islemi_yapan?.isim_soyisim) return g.islemi_yapan.isim_soyisim
   // SA gibi farklı firma_id'li kullanıcılar join ile gelmez; id + isim eşleştirmesi ile fallback
@@ -1246,7 +1275,9 @@ async function del() {
               <th>{thBtn('Lokasyon', 'lokasyon')}</th>
               {personelAtamaAktif && <th style={{ paddingRight: 22 }}>{thBtn('Atanan', 'atanan')}</th>}
               <th style={{ paddingLeft: 22 }}>{thBtn('Aktif Saat', 'aktif')}</th>
-              <th>{thBtn('İŞLEM TARİH-SAAT', 'islem')}</th>
+              <th>{thBtn('İşlem Tarihi', 'islem')}</th>
+              <th>İşlem Saatleri</th>
+              <th>İşlem Süresi</th>
               <th>{thBtn('İşlemi Yapan', 'actor')}</th>
               <th>Kanal</th>
               <th>{thBtn('Durum', 'durum')}</th>
@@ -1313,10 +1344,17 @@ async function del() {
                 })()}
                 {personelAtamaAktif && <td style={{ color: isArsiv ? '#64748b' : '#4b5563', paddingRight: 22 }}>{g.atanan?.isim_soyisim ?? '—'}</td>}
                 <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13, paddingLeft: 22 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
+                {/* İşlem Tarihi — sadece tarih kısmı (DD.MM.YYYY) */}
                 <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
-                  {isArsiv
-                    ? (g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—')
-                    : (g.durum_degisim_tarihi ? formatDateTime(g.durum_degisim_tarihi) : '—')}
+                  {formatTarihTR(isArsiv ? (g.arsiv_tarihi ?? g.durum_degisim_tarihi) : g.durum_degisim_tarihi)}
+                </td>
+                {/* İşlem Saatleri — başlatma → tamamlanma (yoksa son durum değişimi) */}
+                <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
+                  {formatIslemSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi ?? g.durum_degisim_tarihi)}
+                </td>
+                {/* İşlem Süresi — DB'deki süre yoksa "—" */}
+                <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
+                  {formatIslemSuresi(g.tamamlanma_suresi_saniye)}
                 </td>
                 <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g, { meId, meName, kullanicilar })}</td>
                 <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
