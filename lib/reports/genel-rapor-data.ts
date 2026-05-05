@@ -694,7 +694,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   }
   const kayipNedeniLabel: Record<string, string> = {
     ZAMANI_GECMIS: 'Süre aşıldı, gerçekleşmedi',
-    IPTAL: 'Manuel iptal edildi',
+    IPTAL: 'Sebep belirtilmedi',  // sadece iptal_sebep null ise fallback olarak görünür
     SILINDI: 'Kayıt silindi',
     BEKLEMEDE: 'Beklemede kaldı',
     KAPATILDI: 'Kapatıldı',

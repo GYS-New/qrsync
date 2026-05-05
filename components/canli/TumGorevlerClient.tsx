@@ -251,6 +251,8 @@ const getLocUstAlt = (lokasyonId: string | null | undefined, fallbackName?: stri
   const [vardiyaAyari, setVardiyaAyari] = useState<{ no: number; baslangic: string; bitis: string }[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [checklistGorev, setChecklistGorev] = useState<{ id: string; type: 'canli_gorevler'; duzenleme?: boolean } | null>(null)
+  // İptal nedeni popup'ı için state
+  const [iptalDetay, setIptalDetay] = useState<{ sebep?: string | null; eden?: string | null; tarih?: string | null } | null>(null)
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDuzenleMode, setBulkDuzenleMode] = useState(false)
@@ -1368,7 +1370,20 @@ async function del() {
                 <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g, { meId, meName, kullanicilar })}</td>
                 <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                 <td>
-                  <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
+                  {g.durum === 'IPTAL' ? (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setIptalDetay({ sebep: g.iptal_sebep, eden: g.iptalEden?.isim_soyisim ?? null, tarih: g.iptal_tarihi }) }}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                      title="İptal nedenini görüntüle"
+                    >
+                      <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`} style={{ cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 2 }}>
+                        {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
+                      </span>
+                    </button>
+                  ) : (
+                    <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
+                  )}
                 </td>
                 <td style={{ textAlign: 'center' }}>
                   {ceklistAktif && !isArsiv && lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) ? (
@@ -1741,6 +1756,45 @@ async function del() {
         </div>
       ) : null}
       </>)}
+
+      {iptalDetay && (() => {
+        const sebep = (iptalDetay.sebep ?? '').trim()
+        const otomatik = sebep.startsWith('Otomatik iptal')
+        const tip = otomatik ? '🤖 Otomatik İptal' : '👤 Manuel İptal'
+        const tipRenk = otomatik ? '#0369a1' : '#92400e'
+        const tipBg = otomatik ? '#e0f2fe' : '#fef3c7'
+        return (
+          <div onClick={() => setIptalDetay(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background: '#fff', borderRadius: 12, padding: '20px 22px', maxWidth: 440, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                <span style={{ padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, background: tipBg, color: tipRenk }}>{tip}</span>
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 4 }}>İptal Sebebi</div>
+              <div style={{ padding: '12px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13.5, color: '#334155', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: 14 }}>
+                {sebep || 'Sebep belirtilmemiş'}
+              </div>
+              {iptalDetay.eden && (
+                <div style={{ fontSize: 12.5, color: '#475569', marginBottom: 4 }}>
+                  <strong style={{ color: '#1f2937' }}>İptal Eden:</strong> {iptalDetay.eden}
+                </div>
+              )}
+              {iptalDetay.tarih && (
+                <div style={{ fontSize: 12.5, color: '#475569', marginBottom: 14 }}>
+                  <strong style={{ color: '#1f2937' }}>Tarih:</strong> {formatDateTime(iptalDetay.tarih)}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setIptalDetay(null)}
+                  style={{ height: 34, padding: '0 16px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                  Kapat
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {checklistGorev && (
         <ChecklistModal
