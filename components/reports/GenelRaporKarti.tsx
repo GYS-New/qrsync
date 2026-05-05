@@ -23,10 +23,10 @@ type GrupMetrik = {
   hedef: number; tamamlanan: number; sapma: number; kayip: number; ekstra: number
   basariOrani: string; genelOran: string
 }
-type TamamlananRow  = { sn: number; personel: string; personelId?: string | null; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string }
-type SapmaRow       = { sn: number; personel: string; personelId?: string | null; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; sapmaNedeni: string }
-type KayipRow       = { sn: number; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; durum: string; kayipNedeni: string }
-type FrekansDisiRow  = { sn: number; ustLokasyon: string; grupTanimi: string; lokasyonTanimi: string; personel: string; tarihSaat: string; aciklama: string }
+type TamamlananRow  = { sn: number; personel: string; personelId?: string | null; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; tarih: string; gorevSaatleri: string; gorevSuresi: string; durum: string }
+type SapmaRow       = { sn: number; personel: string; personelId?: string | null; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; tarih: string; gorevSaatleri: string; gorevSuresi: string; sapmaNedeni: string }
+type KayipRow       = { sn: number; ustLokasyon: string; lokasyon: string; gorevNo: string; gorevTanimi: string; tarihSaat: string; tarih: string; gorevSaatleri: string; gorevSuresi: string; durum: string; kayipNedeni: string }
+type FrekansDisiRow  = { sn: number; ustLokasyon: string; grupTanimi: string; lokasyonTanimi: string; personel: string; tarihSaat: string; tarih: string; gorevSaatleri: string; gorevSuresi: string; aciklama: string }
 type AtananFrekanRow = { sn: number; atanan: string; tamamlayan: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gorevDurumu: string; durumKod: string; atamaTarihi: string; tamamlanmaTarihi: string }
 
 type RaporData = {
@@ -163,10 +163,29 @@ function KpiCard({ label, value, sub, pct, color, Icon }: { label: string; value
 }
 
 // ── DataTable ──────────────────────────────────────────────────────
-function DataTable({ headers, rows, accentCol, accentColor, leftCols }: {
-  headers: string[]; rows: (string | number)[][]; accentCol?: number; accentColor?: string; leftCols?: number[]
+function DataTable({ headers, rows, accentCol, accentColor, leftCols, filterable, noFilterCols }: {
+  headers: string[]; rows: (string | number)[][]; accentCol?: number; accentColor?: string; leftCols?: number[];
+  filterable?: boolean; noFilterCols?: number[]
 }) {
   const isLeft = (i: number) => i === 0 || (leftCols?.includes(i) ?? false)
+  const skipFilter = (i: number) => noFilterCols?.includes(i) ?? false
+  const [filters, setFilters] = useState<string[]>(() => headers.map(() => ''))
+
+  // headers değişirse filtreleri sıfırla (sekme değişiminde)
+  React.useEffect(() => { setFilters(headers.map(() => '')) }, [headers.length, headers.join('|')])
+
+  const filteredRows = useMemo(() => {
+    if (!filterable) return rows
+    const aktif = filters.some(f => f && f.trim())
+    if (!aktif) return rows
+    return rows.filter(row =>
+      filters.every((f, i) => {
+        if (!f || !f.trim()) return true
+        return String(row[i] ?? '').toLowerCase().includes(f.trim().toLowerCase())
+      })
+    )
+  }, [rows, filters, filterable])
+
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
@@ -174,11 +193,28 @@ function DataTable({ headers, rows, accentCol, accentColor, leftCols }: {
           <tr>{headers.map((h, i) => (
             <th key={i} style={{ padding: '8px 12px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 12.5, textAlign: isLeft(i) ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
           ))}</tr>
+          {filterable && (
+            <tr style={{ background: '#eaf0fa' }}>{headers.map((_, i) => (
+              <th key={i} style={{ padding: '4px 6px', background: '#eaf0fa', borderBottom: `1px solid ${T.border}` }}>
+                {skipFilter(i) ? null : (
+                  <input
+                    value={filters[i] ?? ''}
+                    onChange={e => setFilters(prev => { const n = [...prev]; n[i] = e.target.value; return n })}
+                    placeholder="Ara…"
+                    style={{
+                      width: '100%', minWidth: 60, padding: '4px 6px', borderRadius: 5,
+                      border: `1px solid ${T.border}`, fontSize: 11.5, background: '#fff',
+                    }}
+                  />
+                )}
+              </th>
+            ))}</tr>
+          )}
         </thead>
         <tbody>
-          {rows.length === 0
+          {filteredRows.length === 0
             ? <tr><td colSpan={headers.length} style={{ padding: '20px', textAlign: 'center', color: T.textSoft }}>Veri bulunamadı.</td></tr>
-            : rows.map((row, ri) => (
+            : filteredRows.map((row, ri) => (
               <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : '#fff' }}>
                 {row.map((cell, ci) => (
                   <td key={ci} style={{
@@ -817,8 +853,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{data.tamamlananGorevler.length} kayıt</span>
                 </div>
                 <DataTable
-                  headers={['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM']}
-                  rows={data.tamamlananGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum])}
+                  headers={['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', 'GÖREV SAATLERİ', 'GÖREV SÜRESİ', 'DURUM']}
+                  rows={data.tamamlananGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, r.gorevSaatleri, r.gorevSuresi, r.durum])}
+                  filterable noFilterCols={[0]}
                 />
               </div>
             )}
@@ -831,8 +868,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.sapmaGorevler.length} kayıt</span>
                 </div>
                 <DataTable
-                  headers={['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'SAPMA NEDENİ']}
-                  rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.sapmaNedeni])}
+                  headers={['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', 'GÖREV SAATLERİ', 'GÖREV SÜRESİ', 'SAPMA NEDENİ']}
+                  rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, r.gorevSaatleri, r.gorevSuresi, r.sapmaNedeni])}
+                  filterable noFilterCols={[0]}
                 />
               </div>
             )}
@@ -845,8 +883,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.redLight, color: T.red }}>{data.kayipGorevler.length} kayıt</span>
                 </div>
                 <DataTable
-                  headers={['SN', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH-SAAT', 'DURUM', 'KAYIP NEDENİ']}
-                  rows={data.kayipGorevler.map(r => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarihSaat, r.durum, r.kayipNedeni])}
+                  headers={['SN', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', 'GÖREV SAATLERİ', 'GÖREV SÜRESİ', 'DURUM', 'KAYIP NEDENİ']}
+                  rows={data.kayipGorevler.map(r => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, r.gorevSaatleri, r.gorevSuresi, r.durum, r.kayipNedeni])}
+                  filterable noFilterCols={[0]}
                 />
               </div>
             )}
@@ -859,8 +898,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{data.frekansDisiGorevler.length} kayıt</span>
                 </div>
                 <DataTable
-                  headers={['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH-SAAT', 'AÇIKLAMA']}
-                  rows={data.frekansDisiGorevler.map(r => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarihSaat, r.aciklama])}
+                  headers={['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH', 'GÖREV SAATLERİ', 'GÖREV SÜRESİ', 'AÇIKLAMA']}
+                  rows={data.frekansDisiGorevler.map(r => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarih, r.gorevSaatleri, r.gorevSuresi, r.aciklama])}
+                  filterable noFilterCols={[0]}
                 />
               </div>
             )}

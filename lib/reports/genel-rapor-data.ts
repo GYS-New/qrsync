@@ -38,20 +38,29 @@ export interface TamamlananRow {
   lokasyon: string
   gorevNo: string
   gorevTanimi: string
+  /** ESKİ — geriye uyum için tutuluyor (Excel export vs. eski tüketicileri kırmasın) */
   tarihSaat: string
+  /** YENİ — DD.MM.YYYY formatında sadece tarih */
+  tarih: string
+  /** YENİ — "HH:MM - HH:MM" başlatma-tamamlama */
+  gorevSaatleri: string
+  /** YENİ — "X dk" / "Y sn" / "H sa M dk" */
+  gorevSuresi: string
   durum: string
 }
 
 export interface SapmaRow {
   sn: number
   personel: string
-  /** Personel UUID — frontend agg'lerinde yönetici filtresi için kullanılır */
   personelId: string | null
   ustLokasyon: string
   lokasyon: string
   gorevNo: string
   gorevTanimi: string
   tarihSaat: string
+  tarih: string
+  gorevSaatleri: string
+  gorevSuresi: string
   sapmaNedeni: string
 }
 
@@ -62,6 +71,9 @@ export interface KayipRow {
   gorevNo: string
   gorevTanimi: string
   tarihSaat: string
+  tarih: string
+  gorevSaatleri: string
+  gorevSuresi: string
   durum: string
   kayipNedeni: string
 }
@@ -73,6 +85,9 @@ export interface FrekansDisiRow {
   lokasyonTanimi: string
   personel: string
   tarihSaat: string
+  tarih: string
+  gorevSaatleri: string
+  gorevSuresi: string
   aciklama: string
 }
 
@@ -124,6 +139,52 @@ function formatDate(value: string | null | undefined): string {
   const trt = new Date(d.getTime() + 3 * 60 * 60 * 1000)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${pad(trt.getUTCDate())}.${pad(trt.getUTCMonth() + 1)}.${trt.getUTCFullYear()} ${pad(trt.getUTCHours())}:${pad(trt.getUTCMinutes())}`
+}
+
+// Sadece tarih (DD.MM.YYYY) — TR saat
+function formatTarihTR(value?: string | null): string {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  const trt = new Date(d.getTime() + 3 * 60 * 60 * 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(trt.getUTCDate())}.${pad(trt.getUTCMonth() + 1)}.${trt.getUTCFullYear()}`
+}
+
+// Sadece saat (HH:MM) — TR saat
+function formatSaatTR(value?: string | null): string {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const trt = new Date(d.getTime() + 3 * 60 * 60 * 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(trt.getUTCHours())}:${pad(trt.getUTCMinutes())}`
+}
+
+// "HH:MM - HH:MM" (başlatma - tamamlanma) — bir taraf eksikse "—"
+function formatGorevSaatleri(baslatilma?: string | null, tamamlanma?: string | null): string {
+  const b = formatSaatTR(baslatilma)
+  const t = formatSaatTR(tamamlanma)
+  if (!b && !t) return '—'
+  return `${b || '—'} - ${t || '—'}`
+}
+
+// Süre: "X dk", "Y sn", veya "H sa M dk"
+function formatGorevSuresi(saniye?: number | null): string {
+  if (saniye == null || saniye <= 0) return '—'
+  if (saniye < 60) return `${saniye} sn`
+  const dk = saniye / 60
+  if (dk < 60) return `${dk.toFixed(1)} dk`
+  const saat = Math.floor(dk / 60)
+  const kalanDk = Math.round(dk % 60)
+  return kalanDk > 0 ? `${saat} sa ${kalanDk} dk` : `${saat} sa`
+}
+
+// Sıralama için ms timestamp döndür (en yeni üstte için DESC)
+function tsMs(value?: string | null): number {
+  if (!value) return 0
+  const t = new Date(value).getTime()
+  return Number.isNaN(t) ? 0 : t
 }
 
 function withinRange(value: string | null | undefined, from?: string | null, to?: string | null): boolean {
@@ -248,7 +309,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
 
   // 3. Görevleri çek: aktif tablo + arşiv tablosu birleşik
   // Arşiv tablosu terminal durumları (TAMAMLANDI, ZAMANI_GECMIS vb.) tutar
-  const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,tamamlanma_tarihi,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
+  const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
 
   const baslangicUTC = filters.raporBaslangic ? new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString() : null
   const bitisUTC = filters.raporBitis ? new Date(filters.raporBitis + 'T23:59:59+03:00').toISOString() : null
@@ -568,6 +629,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   // kullanılır.
   const tamamlananGorevler: TamamlananRow[] = kuralGorevler
     .filter((g: any) => g.durum === 'TAMAMLANDI')
+    // En son tamamlanan üstte
+    .sort((a: any, b: any) => tsMs(b.tamamlanma_tarihi ?? b.durum_degisim_tarihi) - tsMs(a.tamamlanma_tarihi ?? a.durum_degisim_tarihi))
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
       const kullaniciId = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? g.atanan_kullanici_id ?? ''
@@ -582,6 +645,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
         tarihSaat: formatDate(g.tamamlanma_tarihi ?? g.durum_degisim_tarihi),
+        tarih: formatTarihTR(g.tamamlanma_tarihi ?? g.durum_degisim_tarihi),
+        gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
+        gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
         durum: 'TAMAMLANDI',
       }
     })
@@ -590,6 +656,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   // Sapma: sadece ZAMANINDA_YAPILAMAYAN. Yönetici filtresi liste'de YOK (denetim).
   const sapmaGorevler: SapmaRow[] = kuralGorevler
     .filter((g: any) => g.durum === 'ZAMANINDA_YAPILAMAYAN')
+    .sort((a: any, b: any) => tsMs(b.tamamlanma_tarihi ?? b.durum_degisim_tarihi) - tsMs(a.tamamlanma_tarihi ?? a.durum_degisim_tarihi))
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
       const kullaniciIdS = g.islemi_yapan_id ?? g.atanan_kullanici_id ?? ''
@@ -605,6 +672,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
         tarihSaat: formatDate(g.durum_degisim_tarihi ?? g.aktif_olma_tarihi),
+        tarih: formatTarihTR(g.tamamlanma_tarihi ?? g.durum_degisim_tarihi),
+        gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
+        gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
         sapmaNedeni,
       }
     })
@@ -625,9 +695,10 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   // Kayıp görevler: sadece kural-üretimli (ekstra'da kayıp olmaz, TAMAMLANDI olarak açılır)
   const kayipGorevler: KayipRow[] = kuralGorevler
     .filter((g: any) => !KAYIP_HARIC_DURUMLAR.has(g.durum))
+    // En son durumu değişen üstte (kayıp = yapılamamış, son aksiyon zamanı önemli)
+    .sort((a: any, b: any) => tsMs(b.durum_degisim_tarihi ?? b.aktif_olma_tarihi) - tsMs(a.durum_degisim_tarihi ?? a.aktif_olma_tarihi))
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
-      // IPTAL durumunda kullanıcı tarafından girilen iptal_sebep varsa onu kullan
       const iptalSebep = typeof g.iptal_sebep === 'string' ? g.iptal_sebep.trim() : ''
       const kayipNedeni = (g.durum === 'IPTAL' && iptalSebep)
         ? iptalSebep
@@ -639,6 +710,10 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
         tarihSaat: formatDate(g.aktif_olma_tarihi),
+        // Kayıp görevlerin çoğu tamamlanmamış — tarih = aktif olma günü, görev saatleri/süresi varsa göster
+        tarih: formatTarihTR(g.durum_degisim_tarihi ?? g.aktif_olma_tarihi),
+        gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
+        gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
         durum: durumLabel[g.durum] ?? g.durum,
         kayipNedeni,
       }
@@ -676,6 +751,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       for (const u of eu ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
     }
 
+    // En son tamamlanan üstte
+    ekstraTamamlanan.sort((a: any, b: any) => tsMs(b.tamamlanma_tarihi ?? b.durum_degisim_tarihi) - tsMs(a.tamamlanma_tarihi ?? a.durum_degisim_tarihi))
     ekstraTamamlanan.forEach((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
       const personelId = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? ''
@@ -686,6 +763,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         lokasyonTanimi: lok?.tanim ?? '',
         personel: userMap.get(personelId) ?? '',
         tarihSaat: formatDate(g.tamamlanma_tarihi ?? g.durum_degisim_tarihi),
+        tarih: formatTarihTR(g.tamamlanma_tarihi ?? g.durum_degisim_tarihi),
+        gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
+        gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
         aciklama: g.tanim ?? '',
       })
     })
