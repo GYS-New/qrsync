@@ -20,7 +20,7 @@ function progressForStatus(durum?: string | null) {
 
 const GRID = '44px minmax(220px, 2fr) 110px 170px 150px 120px'
 
-export default async function AktifGorevlerBlock({ firmaId, projeId,
+export default async function AktifGorevlerBlock({ firmaId, projeId, yetkiliLokIds,
   basePath,
   limit = 8,
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null; limit?: number }) {
@@ -33,7 +33,8 @@ export default async function AktifGorevlerBlock({ firmaId, projeId,
     .limit(limit)
 
   if (firmaId) q = q.eq('firma_id', firmaId)
-    if (projeId) q = (q as any).eq('proje_id', projeId)
+  if (projeId) q = (q as any).eq('proje_id', projeId)
+  if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)
 
   // SA: firma seçilmemişse tüm firmaların son görevlerini listeler.
   const sonGorevler = (await q).data

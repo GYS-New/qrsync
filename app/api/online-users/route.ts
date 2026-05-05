@@ -15,6 +15,10 @@ export async function GET(req: NextRequest) {
   const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit') ?? '6') || 6))
   const firmaParam = url.searchParams.get('firma')
   const projeId = url.searchParams.get('projeId') || null
+  // Üst lokasyon filtresi: virgülle ayrılmış lokasyon UUID listesi (genelde alt lokasyonlar)
+  // users.ust_lokasyon_id bu listede olan kullanıcılar gösterilir
+  const lokIdsRaw = url.searchParams.get('lokIds') || ''
+  const lokIds = lokIdsRaw ? lokIdsRaw.split(',').filter(Boolean) : []
 
   const since = new Date(Date.now() - ONLINE_WINDOW_SECONDS * 1000).toISOString()
   const admin = createAdminClient()
@@ -51,12 +55,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, users: [], since })
   }
 
-  // Kullanıcı detaylarını çek (proje filtresi dahil)
+  // Kullanıcı detaylarını çek (proje + üst lokasyon filtresi dahil)
   let uQ = admin.from('users')
-    .select('id,isim_soyisim,rol,profil_foto,firma_id')
+    .select('id,isim_soyisim,rol,profil_foto,firma_id,ust_lokasyon_id')
     .in('id', uniqueUserIds.slice(0, limit))
     .eq('aktif', true)
   if (projeId) uQ = (uQ as any).eq('proje_id', projeId)
+  if (lokIds.length) uQ = (uQ as any).in('ust_lokasyon_id', lokIds)
   const { data: users, error: uErr } = await uQ
   if (uErr) {
     return NextResponse.json({ ok: true, users: [], since, _error: uErr.message })

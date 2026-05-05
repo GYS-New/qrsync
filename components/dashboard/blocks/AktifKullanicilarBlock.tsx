@@ -18,6 +18,7 @@ export default function AktifKullanicilarBlock({
   basePath,
   limit = 6,
   projeId,
+  yetkiliLokIds,
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null; limit?: number }) {
   const [rows, setRows] = useState<Row[]>([])
 
@@ -25,6 +26,12 @@ export default function AktifKullanicilarBlock({
     const arr = Array.from({ length: limit }).map((_, i) => rows[i] ?? null)
     return arr
   }, [rows, limit])
+
+  // yetkiliLokIds bir Array, useEffect dependency için stable string'e çevir
+  const yetkiliLokIdsKey = useMemo(
+    () => (yetkiliLokIds && yetkiliLokIds.length ? yetkiliLokIds.slice().sort().join(',') : ''),
+    [yetkiliLokIds]
+  )
 
   useEffect(() => {
     let alive = true
@@ -35,6 +42,7 @@ export default function AktifKullanicilarBlock({
         const qp = new URLSearchParams({ limit: String(limit) })
         if (firmaId) qp.set('firma', firmaId)
         if (projeId) qp.set('projeId', projeId)
+        if (yetkiliLokIdsKey) qp.set('lokIds', yetkiliLokIdsKey)
         const res = await fetch(`/api/online-users?${qp.toString()}`, { method: 'GET' })
         const json = await res.json()
         if (!alive) return
@@ -50,7 +58,7 @@ export default function AktifKullanicilarBlock({
       alive = false
       clearInterval(t)
     }
-  }, [limit, firmaId, projeId])
+  }, [limit, firmaId, projeId, yetkiliLokIdsKey])
 
   return (
     <div className="verde-card dashboard-border-intro h-[420px] flex flex-col">
