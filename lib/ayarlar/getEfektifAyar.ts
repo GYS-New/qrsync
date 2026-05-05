@@ -10,6 +10,7 @@ const DEFAULTS = {
   spesifik_personel_atama_aktif: true,
   frekansiyel_personel_atama_aktif: true,
   frekansiyel_ceklist_aktif: true,
+  islem_sureleri_aktif: true,
   ardisik_baslatma_suresi_dk: 0,
   personel_takip_bildirim_dk: 0,
   canli_akis_sure_saat: 8,

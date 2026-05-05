@@ -102,6 +102,7 @@ export default function TumGorevlerClient({
   projeId,
   personelAtamaAktif = true,
   ceklistAktif = true,
+  islemSureleriAktif = true,
   yetkiliLokIds,
 }: {
   base: '/sa' | '/ta' | '/u'
@@ -115,6 +116,7 @@ export default function TumGorevlerClient({
   projeId?: string | null
   personelAtamaAktif?: boolean
   ceklistAktif?: boolean
+  islemSureleriAktif?: boolean
   yetkiliLokIds?: string[] | null
 }) {
   const yetki = useYetki('tum-gorevler')
@@ -1276,8 +1278,8 @@ async function del() {
               {personelAtamaAktif && <th style={{ paddingRight: 22 }}>{thBtn('Atanan', 'atanan')}</th>}
               <th style={{ paddingLeft: 22 }}>{thBtn('Aktif Saat', 'aktif')}</th>
               <th>{thBtn('İşlem Tarihi', 'islem')}</th>
-              <th>İşlem Saatleri</th>
-              <th>İşlem Süresi</th>
+              {islemSureleriAktif && <th>İşlem Saatleri</th>}
+              {islemSureleriAktif && <th>İşlem Süresi</th>}
               <th>{thBtn('İşlemi Yapan', 'actor')}</th>
               <th>Kanal</th>
               <th>{thBtn('Durum', 'durum')}</th>
@@ -1348,14 +1350,18 @@ async function del() {
                 <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
                   {formatTarihTR(isArsiv ? (g.arsiv_tarihi ?? g.durum_degisim_tarihi) : g.durum_degisim_tarihi)}
                 </td>
-                {/* İşlem Saatleri — başlatma → tamamlanma (yoksa son durum değişimi) */}
-                <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
-                  {formatIslemSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi ?? g.durum_degisim_tarihi)}
-                </td>
-                {/* İşlem Süresi — DB'deki süre yoksa "—" */}
-                <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
-                  {formatIslemSuresi(g.tamamlanma_suresi_saniye)}
-                </td>
+                {/* İşlem Saatleri (proje ayarına bağlı) */}
+                {islemSureleriAktif && (
+                  <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
+                    {formatIslemSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi ?? g.durum_degisim_tarihi)}
+                  </td>
+                )}
+                {/* İşlem Süresi (proje ayarına bağlı) */}
+                {islemSureleriAktif && (
+                  <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
+                    {formatIslemSuresi(g.tamamlanma_suresi_saniye)}
+                  </td>
+                )}
                 <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g, { meId, meName, kullanicilar })}</td>
                 <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                 <td>

@@ -4,12 +4,13 @@ import { auditLog } from '@/lib/audit/log'
 
 export const dynamic = 'force-dynamic'
 
-const SEL = 'gorev_suresi_hedef_orani,arsiv_mesai_saat,arsiv_musteri_saat,arsiv_spesifik_saat,arsiv_frekansiyel_saat,spesifik_ceklist_aktif,spesifik_personel_atama_aktif,frekansiyel_personel_atama_aktif,ardisik_baslatma_suresi_dk,personel_takip_bildirim_dk,personel_takip_bildirim_alicilar,acik_bekleme_saat,bekleme_gecmis_saat,canli_akis_sure_saat,haftalik_acik_bekleme_saat,haftalik_bekleme_gecmis_saat,manuel_push_aktif,manuel_push_u_rolu,manuel_push_m_rolu'
+const SEL = 'gorev_suresi_hedef_orani,arsiv_mesai_saat,arsiv_musteri_saat,arsiv_spesifik_saat,arsiv_frekansiyel_saat,spesifik_ceklist_aktif,spesifik_personel_atama_aktif,frekansiyel_personel_atama_aktif,islem_sureleri_aktif,ardisik_baslatma_suresi_dk,personel_takip_bildirim_dk,personel_takip_bildirim_alicilar,acik_bekleme_saat,bekleme_gecmis_saat,canli_akis_sure_saat,haftalik_acik_bekleme_saat,haftalik_bekleme_gecmis_saat,manuel_push_aktif,manuel_push_u_rolu,manuel_push_m_rolu'
 
 const DEFAULTS: Record<string, number | boolean | null> = {
   gorev_suresi_hedef_orani: 10,
   arsiv_mesai_saat: 24, arsiv_musteri_saat: 24, arsiv_spesifik_saat: 48, arsiv_frekansiyel_saat: 24,
   spesifik_ceklist_aktif: true, spesifik_personel_atama_aktif: true, frekansiyel_personel_atama_aktif: true,
+  islem_sureleri_aktif: true,
   ardisik_baslatma_suresi_dk: 0,
   personel_takip_bildirim_dk: 0,
   acik_bekleme_saat: 8, bekleme_gecmis_saat: 12,
@@ -28,7 +29,7 @@ const NUM_FIELDS: [string, number, number][] = [
   ['canli_akis_sure_saat', 1, 24],
   ['haftalik_acik_bekleme_saat', 1, 240], ['haftalik_bekleme_gecmis_saat', 1, 240],
 ]
-const BOOL_FIELDS = ['spesifik_ceklist_aktif', 'spesifik_personel_atama_aktif', 'frekansiyel_personel_atama_aktif']
+const BOOL_FIELDS = ['spesifik_ceklist_aktif', 'spesifik_personel_atama_aktif', 'frekansiyel_personel_atama_aktif', 'islem_sureleri_aktif']
 
 function buildAyar(row: any): Record<string, number | boolean | null> {
   const r: Record<string, number | boolean | null> = {}

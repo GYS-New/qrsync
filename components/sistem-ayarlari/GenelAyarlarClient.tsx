@@ -49,6 +49,7 @@ const NULLABLE_DEFAULTS: Record<string, null> = {
 }
 const BOOL_DEFAULTS: Record<string, boolean> = {
   spesifik_ceklist_aktif: true, spesifik_personel_atama_aktif: true, frekansiyel_personel_atama_aktif: true,
+  islem_sureleri_aktif: true,
 }
 const ALL_DEFAULTS: AllValues = { ...NUM_DEFAULTS, ...BOOL_DEFAULTS, ...NULLABLE_DEFAULTS }
 

@@ -190,6 +190,7 @@ function ProjeAyarlariPanel({ projeId }: { projeId: string }) {
     { key: 'spesifik_ceklist_aktif', label: 'Spesifik Görev · Çeklist', desc: 'Proje bazlı. Pasif yapılırsa spesifik görevlerde lokasyonda tanımlı çeklist olsa dahi gösterilmez.', icon: '📋', defaultTrue: true },
     { key: 'spesifik_personel_atama_aktif', label: 'Spesifik Görev · Personel Atama', desc: 'Proje bazlı. Pasif yapılırsa spesifik görev oluştururken personel atama alanı ve zorunluluğu kaldırılır.', icon: '👤', defaultTrue: true },
     { key: 'frekansiyel_personel_atama_aktif', label: 'Frekansiyel Görev · Personel Atama', desc: 'Proje bazlı. Pasif yapılırsa frekansiyel görev kuralı oluştururken personel atama alanı ve zorunluluğu kaldırılır.', icon: '👥', defaultTrue: true },
+    { key: 'islem_sureleri_aktif', label: 'İşlem Süreleri Başlıkları', desc: 'Proje bazlı. Pasif yapılırsa frekansiyel rapor, Tüm Görevler ve Canlı Akış tablolarında "Görev/İşlem Saatleri" ve "Görev/İşlem Süresi" sütunları gizlenir. Sadece Tarih sütunu görünür.', icon: '⏱️', defaultTrue: true },
     { key: 'frekansiyel_ceklist_aktif', label: 'Frekansiyel Görev · Çeklist', desc: 'Proje bazlı. Pasif yapılırsa frekansiyel görevlerde lokasyonda tanımlı çeklist olsa dahi gösterilmez.', icon: '📋', defaultTrue: true },
     { key: 'io_asistan_aktif', label: 'İO Asistan', desc: 'Sidebar üzerindeki İO avatarı ve asistan modalı. Kapalıyken bu proje içinde kullanıcılar İO\'yu göremez.', icon: '🤖', defaultTrue: true },
   ]

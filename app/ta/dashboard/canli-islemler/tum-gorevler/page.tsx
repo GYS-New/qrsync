@@ -66,6 +66,7 @@ export default async function TATumGorevlerPage() {
         projeId={aktifProje.id}
         personelAtamaAktif={ayarlar.frekansiyel_personel_atama_aktif}
         ceklistAktif={ayarlar.frekansiyel_ceklist_aktif}
+        islemSureleriAktif={ayarlar.islem_sureleri_aktif}
       />
     </div>
   )

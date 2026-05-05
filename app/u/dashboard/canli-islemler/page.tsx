@@ -71,6 +71,7 @@ export default async function UserCanliIslemler() {
         canliAkisSureSaat={efektifAyar.canli_akis_sure_saat}
         ceklistAktif={efektifAyar.frekansiyel_ceklist_aktif}
         personelAtamaAktif={efektifAyar.frekansiyel_personel_atama_aktif}
+        islemSureleriAktif={efektifAyar.islem_sureleri_aktif}
       />
     </div>
   )

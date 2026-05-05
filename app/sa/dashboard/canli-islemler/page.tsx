@@ -70,6 +70,7 @@ export default async function SACanliIslemlerPage() {
         canliAkisSureSaat={efektifAyar?.canli_akis_sure_saat ?? 8}
         ceklistAktif={efektifAyar?.frekansiyel_ceklist_aktif ?? true}
         personelAtamaAktif={efektifAyar?.frekansiyel_personel_atama_aktif ?? true}
+        islemSureleriAktif={efektifAyar?.islem_sureleri_aktif ?? true}
       />
     </div>
   )

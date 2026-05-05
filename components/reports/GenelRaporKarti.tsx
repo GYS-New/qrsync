@@ -42,6 +42,8 @@ type RaporData = {
   atananFrekanslar: AtananFrekanRow[]
   /** Üst lokasyon yöneticileri — personel başarı agg'lerinde hariç tutulur */
   yoneticiIds?: string[]
+  /** Proje ayarı: false ise Görev Saatleri + Görev Süresi sütunları gizlenir */
+  islemSureleriAktif?: boolean
 }
 
 // ── Design tokens (SpesifikRaporKarti ile aynı) ────────────────────
@@ -845,65 +847,79 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
               )
             })()}
 
-            {/* ── TAMAMLANAN ── */}
-            {activeTab === 'Tamamlanan' && (
-              <div className="verde-card" style={{ padding: '16px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Tamamlanan Frekanslar</div>
-                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{data.tamamlananGorevler.length} kayıt</span>
+            {/* islemSureleriAktif=false ise GÖREV SAATLERİ ve GÖREV SÜRESİ sütunları gizlenir */}
+            {(() => null)()}
+            {activeTab === 'Tamamlanan' && (() => {
+              const sureli = data.islemSureleriAktif !== false
+              const headers = ['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'GÖREV SÜRESİ'] : []), 'DURUM']
+              return (
+                <div className="verde-card" style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Tamamlanan Frekanslar</div>
+                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{data.tamamlananGorevler.length} kayıt</span>
+                  </div>
+                  <DataTable
+                    headers={headers}
+                    rows={data.tamamlananGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.durum])}
+                    filterable noFilterCols={[0]}
+                  />
                 </div>
-                <DataTable
-                  headers={['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', 'GÖREV SAATLERİ', 'GÖREV SÜRESİ', 'DURUM']}
-                  rows={data.tamamlananGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, r.gorevSaatleri, r.gorevSuresi, r.durum])}
-                  filterable noFilterCols={[0]}
-                />
-              </div>
-            )}
+              )
+            })()}
 
-            {/* ── SAPMALAR ── */}
-            {activeTab === 'Sapmalar' && (
-              <div className="verde-card" style={{ padding: '16px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
-                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.sapmaGorevler.length} kayıt</span>
+            {activeTab === 'Sapmalar' && (() => {
+              const sureli = data.islemSureleriAktif !== false
+              const headers = ['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'GÖREV SÜRESİ'] : []), 'SAPMA NEDENİ']
+              return (
+                <div className="verde-card" style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
+                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.sapmaGorevler.length} kayıt</span>
+                  </div>
+                  <DataTable
+                    headers={headers}
+                    rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.sapmaNedeni])}
+                    filterable noFilterCols={[0]}
+                  />
                 </div>
-                <DataTable
-                  headers={['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', 'GÖREV SAATLERİ', 'GÖREV SÜRESİ', 'SAPMA NEDENİ']}
-                  rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, r.gorevSaatleri, r.gorevSuresi, r.sapmaNedeni])}
-                  filterable noFilterCols={[0]}
-                />
-              </div>
-            )}
+              )
+            })()}
 
-            {/* ── KAYIP FREKANSLAR ── */}
-            {activeTab === 'Kayıp Frekanslar' && (
-              <div className="verde-card" style={{ padding: '16px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar</div>
-                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.redLight, color: T.red }}>{data.kayipGorevler.length} kayıt</span>
+            {activeTab === 'Kayıp Frekanslar' && (() => {
+              const sureli = data.islemSureleriAktif !== false
+              const headers = ['SN', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'GÖREV SÜRESİ'] : []), 'DURUM', 'KAYIP NEDENİ']
+              return (
+                <div className="verde-card" style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar</div>
+                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.redLight, color: T.red }}>{data.kayipGorevler.length} kayıt</span>
+                  </div>
+                  <DataTable
+                    headers={headers}
+                    rows={data.kayipGorevler.map(r => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.durum, r.kayipNedeni])}
+                    filterable noFilterCols={[0]}
+                  />
                 </div>
-                <DataTable
-                  headers={['SN', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', 'GÖREV SAATLERİ', 'GÖREV SÜRESİ', 'DURUM', 'KAYIP NEDENİ']}
-                  rows={data.kayipGorevler.map(r => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, r.gorevSaatleri, r.gorevSuresi, r.durum, r.kayipNedeni])}
-                  filterable noFilterCols={[0]}
-                />
-              </div>
-            )}
+              )
+            })()}
 
-            {/* ── FREKANS DIŞI ── */}
-            {activeTab === 'Frekans Dışı' && (
-              <div className="verde-card" style={{ padding: '16px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Ekstra Frekansiyel)</div>
-                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{data.frekansDisiGorevler.length} kayıt</span>
+            {activeTab === 'Frekans Dışı' && (() => {
+              const sureli = data.islemSureleriAktif !== false
+              const headers = ['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'GÖREV SÜRESİ'] : []), 'AÇIKLAMA']
+              return (
+                <div className="verde-card" style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Ekstra Frekansiyel)</div>
+                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{data.frekansDisiGorevler.length} kayıt</span>
+                  </div>
+                  <DataTable
+                    headers={headers}
+                    rows={data.frekansDisiGorevler.map(r => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.aciklama])}
+                    filterable noFilterCols={[0]}
+                  />
                 </div>
-                <DataTable
-                  headers={['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH', 'GÖREV SAATLERİ', 'GÖREV SÜRESİ', 'AÇIKLAMA']}
-                  rows={data.frekansDisiGorevler.map(r => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarih, r.gorevSaatleri, r.gorevSuresi, r.aciklama])}
-                  filterable noFilterCols={[0]}
-                />
-              </div>
-            )}
+              )
+            })()}
 
             {/* ── ATANAN FREKANSLAR ── */}
             {activeTab === 'Atanan Frekanslar' && (

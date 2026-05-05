@@ -66,6 +66,7 @@ interface Props {
   canliAkisSureSaat?: number  // canlı akış listeleme süresi (varsayılan 8)
   ceklistAktif?: boolean  // proje bazlı: frekansiyel görev çeklist aç/kapat
   personelAtamaAktif?: boolean  // proje bazlı: kapalıysa Atanan sütunu gizlenir
+  islemSureleriAktif?: boolean  // proje bazlı: kapalıysa İşlem Saatleri+Süresi sütunları gizlenir
 }
 
 type BrowseFilter = 'ACIK' | 'IPTAL' | 'KAPALI' | 'TARIHI_GECMIS'
@@ -205,7 +206,7 @@ function LiveHeader({
   )
 }
 
-export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, meName, readonly, projeId, showTumGorevler = true, yetkiliLokIds, canliAkisSureSaat = 8, ceklistAktif = true, personelAtamaAktif = true }: Props) {
+export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, meName, readonly, projeId, showTumGorevler = true, yetkiliLokIds, canliAkisSureSaat = 8, ceklistAktif = true, personelAtamaAktif = true, islemSureleriAktif = true }: Props) {
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -875,10 +876,14 @@ useEffect(() => {
         <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatDateTime(g.aktif_olma_tarihi)}</td>
         {/* İşlem Tarihi — son durum değişiminin tarihi */}
         <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatTarihTR(g.durum_degisim_tarihi ?? g.olusturma_tarihi ?? g.aktif_olma_tarihi)}</td>
-        {/* İşlem Saatleri — başlatma → tamamlanma (yoksa son durum değişimi) */}
-        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatIslemSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi ?? g.durum_degisim_tarihi)}</td>
-        {/* İşlem Süresi */}
-        <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatIslemSuresi(g.tamamlanma_suresi_saniye)}</td>
+        {/* İşlem Saatleri (proje ayarına bağlı) */}
+        {islemSureleriAktif && (
+          <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatIslemSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi ?? g.durum_degisim_tarihi)}</td>
+        )}
+        {/* İşlem Süresi (proje ayarına bağlı) */}
+        {islemSureleriAktif && (
+          <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatIslemSuresi(g.tamamlanma_suresi_saniye)}</td>
+        )}
         <td style={{ fontSize: fs, ...tdHL }}>
           <span style={{ fontSize: fs }} className={`verde-badge ${durumRenk[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
         </td>
@@ -979,14 +984,14 @@ useEffect(() => {
             <table className="verde-table">
               <thead><tr>
                 <th>Görev</th><th>Lokasyon</th>{personelAtamaAktif && <th>Atanan</th>}
-                <th>Aktif Saat</th><th>İşlem Tarihi</th><th>İşlem Saatleri</th><th>İşlem Süresi</th><th>Durum</th><th>İşlemi Yapan</th>
+                <th>Aktif Saat</th><th>İşlem Tarihi</th>{islemSureleriAktif && <th>İşlem Saatleri</th>}{islemSureleriAktif && <th>İşlem Süresi</th>}<th>Durum</th><th>İşlemi Yapan</th>
               </tr></thead>
               <tbody>
                 {filtreLiveSayfa.map((g: any) => (
                   <TableRow key={g.id} g={g} showOps={false} showActor={true} highlight={g.id === highlightId} fontSize={14} />
                 ))}
                 {!filteredLive.length && (
-                  <tr><td colSpan={personelAtamaAktif ? 9 : 8} style={{ textAlign: 'center', color: '#6b7280', padding: '28px 0', fontSize: 14 }}>
+                  <tr><td colSpan={(personelAtamaAktif ? 9 : 8) - (islemSureleriAktif ? 0 : 2)} style={{ textAlign: 'center', color: '#6b7280', padding: '28px 0', fontSize: 14 }}>
                     {durumFilter === 'TÜMÜ' ? 'Aktif frekansiyel görev yok' : 'Bu filtrede görev yok'}
                   </td></tr>
                 )}
@@ -1011,14 +1016,14 @@ useEffect(() => {
           <table className="verde-table">
             <thead><tr>
               <th>Görev</th><th>Lokasyon</th>{personelAtamaAktif && <th>Atanan</th>}
-              <th>Aktif Saat</th><th>İşlem Tarihi</th><th>İşlem Saatleri</th><th>İşlem Süresi</th><th>Durum</th><th>İşlemi Yapan</th>
+              <th>Aktif Saat</th><th>İşlem Tarihi</th>{islemSureleriAktif && <th>İşlem Saatleri</th>}{islemSureleriAktif && <th>İşlem Süresi</th>}<th>Durum</th><th>İşlemi Yapan</th>
             </tr></thead>
             <tbody>
               {filtreLiveSayfa.map((g: any) => (
                 <TableRow key={g.id} g={g} showOps={false} showActor fontSize={14} />
               ))}
               {!filteredLive.length && (
-                <tr><td colSpan={personelAtamaAktif ? 9 : 8} style={{ textAlign: 'center', color: '#6b7280', padding: '22px 0', fontSize: 14 }}>
+                <tr><td colSpan={(personelAtamaAktif ? 9 : 8) - (islemSureleriAktif ? 0 : 2)} style={{ textAlign: 'center', color: '#6b7280', padding: '22px 0', fontSize: 14 }}>
                   {durumFilter === 'TÜMÜ' ? 'Liste boş' : 'Bu filtrede görev yok'}
                 </td></tr>
               )}

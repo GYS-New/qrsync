@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
 import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliUserIds'
+import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export interface GenelRaporFilters {
   firmaId: string
@@ -129,6 +130,8 @@ export interface GenelRaporData {
   /** Üst lokasyon yöneticileri (vardiya şefleri) — frontend personel başarı
    *  agg'lerinde hariç tutmak için. Listelerde tüm satırlar var, denetim için. */
   yoneticiIds: string[]
+  /** Proje ayarı: false ise UI'de Görev/İşlem Saatleri ve Süresi sütunları gizlenir */
+  islemSureleriAktif: boolean
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -363,6 +366,10 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
 
   // Üst lokasyon yöneticileri — başarı analizinden hariç tutulur
   const yoneticiIds = await getUstLokasyonYetkiliUserIds(filters.firmaId)
+
+  // Proje ayarı: islem_sureleri_aktif (false ise UI Görev/İşlem Saatleri ve Süresi sütunlarını gizler)
+  const efektifAyar = await getEfektifAyar(filters.firmaId, filters.projeId)
+  const islemSureleriAktif = efektifAyar.islem_sureleri_aktif !== false
 
   // 5. Lokasyon grupları
   let grupQ = admin
@@ -845,5 +852,6 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     frekansDisiGorevler,
     atananFrekanslar,
     yoneticiIds: [...yoneticiIds],
+    islemSureleriAktif: islemSureleriAktif,
   }
 }
