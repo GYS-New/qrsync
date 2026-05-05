@@ -880,9 +880,14 @@ useEffect(() => {
         {islemSureleriAktif && (
           <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatIslemSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi ?? g.durum_degisim_tarihi)}</td>
         )}
-        {/* İşlem Süresi (proje ayarına bağlı) */}
+        {/* İşlem Süresi (proje ayarına bağlı) — ekstra görevde "Ekstra" badge */}
         {islemSureleriAktif && (
-          <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>{formatIslemSuresi(g.tamamlanma_suresi_saniye)}</td>
+          <td style={{ color: '#6b7280', whiteSpace: 'nowrap', fontSize: fs ?? '11.5px', ...tdHL }}>
+            {g.kural_id == null
+              ? <span style={{ display: 'inline-block', padding: '1px 8px', borderRadius: 6, background: '#ede9fe', color: '#7c3aed', fontWeight: 700, fontSize: 11 }}>Ekstra</span>
+              : formatIslemSuresi(g.tamamlanma_suresi_saniye)
+            }
+          </td>
         )}
         <td style={{ fontSize: fs, ...tdHL }}>
           <span style={{ fontSize: fs }} className={`verde-badge ${durumRenk[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>

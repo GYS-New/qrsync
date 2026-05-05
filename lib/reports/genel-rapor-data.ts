@@ -763,6 +763,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     ekstraTamamlanan.forEach((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
       const personelId = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? ''
+      // Ekstra görevler anlık (başlatma=tamamlama=aktif, süre 0). Saatler/Süre alanlarına
+      // standart format yerine "Ekstra" gösteriyoruz — frontend bunu badge olarak render edebilir
+      // veya plain text olarak gösterir (string olduğu için tüketici esnek davranır).
       frekansDisiGorevler.push({
         sn: i + 1,
         ustLokasyon: lokUstMap.get(g.lokasyon_id) ?? '',
@@ -772,7 +775,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         tarihSaat: formatDate(g.tamamlanma_tarihi ?? g.durum_degisim_tarihi),
         tarih: formatTarihTR(g.tamamlanma_tarihi ?? g.durum_degisim_tarihi),
         gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
-        gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
+        gorevSuresi: 'Ekstra',
         aciklama: g.tanim ?? '',
       })
     })
