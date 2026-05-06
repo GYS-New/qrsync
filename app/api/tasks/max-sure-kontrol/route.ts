@@ -2,8 +2,10 @@
  * POST /api/tasks/max-sure-kontrol
  *
  * Cron job: Her 5 dakikada bir çalışır.
- * ISLEMDE durumundaki görevleri kontrol eder.
- * Lokasyonun max_sure_dakika süresi dolmuş ve görev hâlâ ISLEMDE ise durum IPTAL yapılır.
+ * ISLEMDE durumundaki görevleri iki açıdan kontrol eder:
+ *  1) İptal eşiğine 10 dk kala uyarı FCM bildirimi gönderir (5 dk genişliğinde pencere
+ *     — cron 5 dk interval olduğu için tam 1 tick yakalar, çakışma yok).
+ *  2) Lokasyonun max_sure_dakika süresi dolmuş görevleri IPTAL yapar.
  *
  * Kontrol edilen tablolar:
  *  - gorevler       (SG - Spesifik Görevler)
@@ -12,6 +14,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
+import { sendFCMToUser } from '@/lib/fcm-sender'
+
+// Uyarı penceresi: cron 5 dk'da çalışır, pencere genişliği 5 dk.
+// Tek bir cron tick'i yakalar → çift bildirim olmaz, atlama olmaz.
+const UYARI_PENCERE_BASLANGIC = 10  // dk: maxSure - 10'dan başlar
+const UYARI_PENCERE_BITIS     = 5   // dk: maxSure - 5'te biter
+
+const UYARI_TITLE = '⏰ Görev Süresi Bitiyor'
+function uyariBody(lokasyonAdi: string): string {
+  return `${lokasyonAdi || 'Lokasyon'} görevinizin tamamlanma süresi dolmak üzere. 10 dakika içinde tamamlamazsanız otomatik olarak iptal edilecektir.`
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,16 +36,21 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient()
     const now = new Date()
-    const results: { gorevler_iptal: number; canli_gorevler_iptal: number } = {
+    const results: { gorevler_iptal: number; canli_gorevler_iptal: number; uyari_gonderildi: number } = {
       gorevler_iptal: 0,
       canli_gorevler_iptal: 0,
+      uyari_gonderildi: 0,
     }
+
+    // FCM gönderimleri en sonda paralel toplanacak — cron'un ana işini bloklamasın
+    type UyariCagri = { user_id: string; lokasyon_adi: string }
+    const uyarilar: UyariCagri[] = []
 
     // ── 1. gorevler (Spesifik Görevler) ─────────────────────────────────────
     // ISLEMDE olan ve lokasyonun max_sure_dakika'sı dolu olan görevleri çek
     const { data: sgRows, error: sgErr } = await admin
       .from('gorevler')
-      .select('id, baslatilma_tarihi, lokasyon_id, lokasyonlar(max_sure_dakika)')
+      .select('id, baslatilma_tarihi, baslatan_kullanici_id, lokasyon_id, lokasyonlar(tanim, max_sure_dakika)')
       .eq('durum', 'ISLEMDE')
       .not('baslatilma_tarihi', 'is', null)
 
@@ -46,6 +64,15 @@ export async function POST(req: NextRequest) {
       const gecenDakika = (now.getTime() - baslatilma.getTime()) / 60000
       if (gecenDakika >= maxSure) {
         sgIptalIds.push(row.id)
+      } else if (
+        gecenDakika >= (maxSure - UYARI_PENCERE_BASLANGIC) &&
+        gecenDakika <  (maxSure - UYARI_PENCERE_BITIS) &&
+        row.baslatan_kullanici_id
+      ) {
+        uyarilar.push({
+          user_id: row.baslatan_kullanici_id,
+          lokasyon_adi: row.lokasyonlar?.tanim ?? '',
+        })
       }
     }
 
@@ -65,7 +92,7 @@ export async function POST(req: NextRequest) {
     // Sadece sureli_gorev_aktif=true lokasyonlarda ISLEMDE olanları kontrol et
     const { data: fgRows, error: fgErr } = await admin
       .from('canli_gorevler')
-      .select('id, baslatilma_tarihi, lokasyon_id, lokasyonlar(max_sure_dakika, sureli_gorev_aktif)')
+      .select('id, baslatilma_tarihi, baslatan_kullanici_id, lokasyon_id, lokasyonlar(tanim, max_sure_dakika, sureli_gorev_aktif)')
       .eq('durum', 'ISLEMDE')
       .not('baslatilma_tarihi', 'is', null)
 
@@ -81,6 +108,15 @@ export async function POST(req: NextRequest) {
       const gecenDakika = (now.getTime() - baslatilma.getTime()) / 60000
       if (gecenDakika >= maxSure) {
         fgIptalIds.push(row.id)
+      } else if (
+        gecenDakika >= (maxSure - UYARI_PENCERE_BASLANGIC) &&
+        gecenDakika <  (maxSure - UYARI_PENCERE_BITIS) &&
+        row.baslatan_kullanici_id
+      ) {
+        uyarilar.push({
+          user_id: row.baslatan_kullanici_id,
+          lokasyon_adi: lok.tanim ?? '',
+        })
       }
     }
 
@@ -96,10 +132,27 @@ export async function POST(req: NextRequest) {
       results.canli_gorevler_iptal = fgIptalIds.length
     }
 
+    // ── 3. 10 dk uyarı bildirimleri ─────────────────────────────────────────
+    // Aynı kullanıcıya birden fazla görev için tek FCM göndermeye gerek yok —
+    // ama mesajda lokasyon adı var, ayrı ayrı göndermek daha bilgilendirici.
+    // Yine de aynı user+lokasyon kombinasyonu için tekrarı engelle.
+    const gonderilenler = new Set<string>()
+    for (const u of uyarilar) {
+      const key = `${u.user_id}|${u.lokasyon_adi}`
+      if (gonderilenler.has(key)) continue
+      gonderilenler.add(key)
+      try {
+        await sendFCMToUser(u.user_id, UYARI_TITLE, uyariBody(u.lokasyon_adi), 'gorev_uyari')
+        results.uyari_gonderildi++
+      } catch (e) {
+        console.error('[max-sure-kontrol] uyarı FCM hatası', e)
+      }
+    }
+
     console.log('[MAX-SURE-KONTROL]', now.toISOString(), results)
 
-    // Cron audit — sadece bir şey değiştiyse
-    const toplam = (results.gorevler_iptal ?? 0) + (results.canli_gorevler_iptal ?? 0)
+    // Cron audit — sadece bir şey olduysa
+    const toplam = (results.gorevler_iptal ?? 0) + (results.canli_gorevler_iptal ?? 0) + (results.uyari_gonderildi ?? 0)
     if (toplam > 0) {
       const { auditLog } = await import('@/lib/audit/log')
       await auditLog({
