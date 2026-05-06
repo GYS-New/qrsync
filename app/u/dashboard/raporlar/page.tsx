@@ -70,11 +70,12 @@ export default async function URaporlarPage() {
   )
   initialRaporTurleri = raporYetkiSonuclari.filter(r => r.gorebilir)
 
-  // frekansiyel/spesifik/hakedis rapor yetki kontrolü (firma_rapor_turleri dışında)
-  const [frekanYetki, spesifYetki, hakedisYetki] = await Promise.all([
+  // frekansiyel/spesifik/hakedis/personel-degerlendirme rapor yetki kontrolü (firma_rapor_turleri dışında)
+  const [frekanYetki, spesifYetki, hakedisYetki, personelDegerlendirmeYetki] = await Promise.all([
     sayfaGorebilirMi(me.rol, 'frekansiyel-rapor', (me as any).firma_id ?? null),
     sayfaGorebilirMi(me.rol, 'spesifik-rapor', (me as any).firma_id ?? null),
     sayfaGorebilirMi(me.rol, 'hakedis-raporu', (me as any).firma_id ?? null),
+    sayfaGorebilirMi(me.rol, 'personel-degerlendirme-raporlari', (me as any).firma_id ?? null),
   ])
 
   // Süre analiz kartı için süreli görev durumu
@@ -103,6 +104,7 @@ export default async function URaporlarPage() {
       frekanRaporYetki={frekanYetki}
       spesifRaporYetki={spesifYetki}
       hakedisYetki={hakedisYetki}
+      personelDegerlendirmeYetki={personelDegerlendirmeYetki}
     />
   )
 }

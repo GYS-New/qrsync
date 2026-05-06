@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Topbar from '@/components/layout/Topbar'
 import { useRouteLoading } from '@/components/ui/RouteLoadingProvider'
 import { useToast } from '@/components/ui/ToastProvider'
-import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2, MessageSquare, CheckSquare, Receipt, BarChart2, ClipboardList } from 'lucide-react'
+import { Database, BarChart3, Sparkles, Clock3, ArrowRight, FileBarChart2, MessageSquare, CheckSquare, Receipt, BarChart2, ClipboardList, UserCheck } from 'lucide-react'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 
@@ -74,6 +74,13 @@ const RAPOR_KARTLARI = [
     eyebrow: 'SPESİFİK', badge: 'Excel + PDF', tone: 'violet' as const,
     icon: 'clipboard', path: '/raporlar/ozellestir/spesifik', disabled: false,
   },
+  {
+    id: 'personel_degerlendirme',
+    title: 'Personel Değerlendirme Raporu',
+    description: 'Personel bazlı tamamlama, iptal sayıları, ortalama işlem süresi, cihaz eşleşme ve aktiflik durumu.',
+    eyebrow: 'PERSONEL', badge: 'Excel + PDF', tone: 'green' as const,
+    icon: 'userCheck', path: '/raporlar/personel-degerlendirme', disabled: false,
+  },
 ]
 
 const IKON_MAP: Record<string, ReactNode> = {
@@ -86,6 +93,7 @@ const IKON_MAP: Record<string, ReactNode> = {
   receipt:   <Receipt size={22} />,
   bar2:      <BarChart2 size={22} />,
   clipboard: <ClipboardList size={22} />,
+  userCheck: <UserCheck size={22} />,
 }
 
 // ─── HubCard ─────────────────────────────────────────────────────────────────
@@ -163,6 +171,7 @@ export default function ReportsHubClient({
   frekanRaporYetki,
   spesifRaporYetki,
   hakedisYetki,
+  personelDegerlendirmeYetki,
 }: {
   base: string
   firmaAdi?: string | null
@@ -175,6 +184,7 @@ export default function ReportsHubClient({
   frekanRaporYetki?: boolean     // Frekansiyel rapor yetki (TA/U SSR'dan gelir)
   spesifRaporYetki?: boolean     // Spesifik rapor yetki (TA/U SSR'dan gelir)
   hakedisYetki?: boolean         // Hakediş raporu sayfa yetkisi (TA/U SSR'dan gelir)
+  personelDegerlendirmeYetki?: boolean // Personel Değerlendirme rapor sayfa yetkisi (TA/U SSR'dan gelir)
 }) {
   const router     = useRouter()
   const { start }  = useRouteLoading()
@@ -274,7 +284,7 @@ export default function ReportsHubClient({
   //        herhangi bir client state değişimi bu değeri ETKILEYEMEZ
   const gorunurKartlar = useMemo(() => {
     // hakedis ve yeni rapor kartları firma_rapor_turleri dışında yönetilir
-    const FIRMA_RAPOR_DISI = new Set(['hakedis', 'frekansiyel_rapor', 'spesifik_rapor'])
+    const FIRMA_RAPOR_DISI = new Set(['hakedis', 'frekansiyel_rapor', 'spesifik_rapor', 'personel_degerlendirme'])
 
     const kartlar = RAPOR_KARTLARI
       // Hakediş: hem firma birim_fiyat_aktif hem de TA/U için sayfa yetkisi (SSR prop)
@@ -291,6 +301,8 @@ export default function ReportsHubClient({
         if (!isSA) {
           if (k.id === 'frekansiyel_rapor') return frekanRaporYetki !== false
           if (k.id === 'spesifik_rapor')    return spesifRaporYetki !== false
+          // Personel Değerlendirme: SA hariç default kapalı, yetki açıkça true ise görünür
+          if (k.id === 'personel_degerlendirme') return personelDegerlendirmeYetki === true
         }
         return true
       })
@@ -314,7 +326,7 @@ export default function ReportsHubClient({
     if (aktifIdler.size === 0) return kartlar
     // hakedis + frekansiyel/spesifik rapor firma_rapor_turleri'nde kayıtlı değil
     return kartlar.filter(k => FIRMA_RAPOR_DISI.has(k.id) || aktifIdler.has(k.id))
-  }, [isSA, saAktifTurler, base, initialRaporTurleri, hakedisGoster, ozellestirGoster, frekanRaporYetki, spesifRaporYetki, hakedisYetki])
+  }, [isSA, saAktifTurler, base, initialRaporTurleri, hakedisGoster, ozellestirGoster, frekanRaporYetki, spesifRaporYetki, hakedisYetki, personelDegerlendirmeYetki])
   // ↑ TA için: sadece `base` veya `initialRaporTurleri` prop'u değişirse yeniden hesaplanır
   //   ProjeContext, FirmaContext, Sidebar, Topbar yeniden render'ı bu hesaplamayı ETKİLEMEZ
 
