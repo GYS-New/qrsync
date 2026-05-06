@@ -87,7 +87,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
   const [colFiltreIsim, setColFiltreIsim] = useState('')
   const [colFiltreCihaz, setColFiltreCihaz] = useState<'' | 'eslesmis' | 'eslesmemis'>('')
   const [colFiltreDurum, setColFiltreDurum] = useState<'' | 'aktif' | 'pasif'>('')
-  const [colFiltreBasari, setColFiltreBasari] = useState<'' | 'BAŞARILI' | 'NORMAL' | 'YETERSİZ' | 'BAŞARISIZ'>('')
+  const [colFiltreBasari, setColFiltreBasari] = useState<'' | 'BAŞARILI' | 'NORMAL' | 'YETERSİZ' | 'BAŞARISIZ' | 'YOK'>('')
 
   // Sıralama
   const [sortKey, setSortKey] = useState<SortKey>('isim_soyisim')
@@ -145,7 +145,8 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
     if (colFiltreCihaz === 'eslesmemis')  r = r.filter(x => !x.cihaz_eslesti)
     if (colFiltreDurum === 'aktif') r = r.filter(x => x.aktif)
     if (colFiltreDurum === 'pasif') r = r.filter(x => !x.aktif)
-    if (colFiltreBasari) r = r.filter(x => x.basari_kategori === colFiltreBasari)
+    if (colFiltreBasari === 'YOK') r = r.filter(x => x.basari_kategori === null)
+    else if (colFiltreBasari) r = r.filter(x => x.basari_kategori === colFiltreBasari)
 
     r.sort((a, b) => {
       const av = (a as any)[sortKey]
@@ -368,6 +369,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
                         <option value="NORMAL">NORMAL</option>
                         <option value="YETERSİZ">YETERSİZ</option>
                         <option value="BAŞARISIZ">BAŞARISIZ</option>
+                        <option value="YOK">Görev Yapmamış</option>
                       </select>
                     </th>
                   </tr>
