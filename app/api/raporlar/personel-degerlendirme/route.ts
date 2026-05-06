@@ -63,6 +63,25 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
+  // ── 0. U/M için lokasyon scope kontrolü ────────────────────────────────────
+  // SA/TA = sınırsız. U/M = kullanici_lokasyon_yetkileri'deki ust_lokasyon_id'lere bağlı.
+  // Yetki kaydı yoksa = sınırsız (geriye dönük uyumluluk — diğer raporlarla aynı pattern).
+  let yetkiliUstLokIds: string[] | null = null  // null = sınırsız
+  if (me.rol === 'tenant_user' || me.rol === 'musteri') {
+    const { data: ylk } = await admin
+      .from('kullanici_lokasyon_yetkileri')
+      .select('ust_lokasyon_id')
+      .eq('user_id', me.id)
+    const ids = (ylk ?? []).map((r: any) => r.ust_lokasyon_id).filter(Boolean) as string[]
+    if (ids.length > 0) yetkiliUstLokIds = ids
+  }
+
+  // Eğer URL'de gelen ust_lokasyon_id, kullanıcının yetkili listesinde değilse bypass et —
+  // sessizce reddedip boş dönmek yerine, scope filtresi zaten istenmeyeni süzer.
+  if (yetkiliUstLokIds && ustLokFilter && !yetkiliUstLokIds.includes(ustLokFilter)) {
+    return NextResponse.json({ ok: true, data: [], meta: { tarih_baslangic: tarihBaslangic, tarih_bitis: tarihBitis, ust_lokasyonlar: [], personeller: [] } })
+  }
+
   // ── 1. Personeller ─────────────────────────────────────────────────────────
   // ust_lokasyon_id doğrudan users tablosunda — kullanıcı oluşturulurken atanır
   let userQ = admin
@@ -71,6 +90,7 @@ export async function GET(req: NextRequest) {
     .eq('firma_id', firmaId)
     .in('rol', ['tenant_user', 'musteri'])
   if (projeId) userQ = (userQ as any).eq('proje_id', projeId)
+  if (yetkiliUstLokIds) userQ = (userQ as any).in('ust_lokasyon_id', yetkiliUstLokIds)
   const { data: personeller } = await userQ.order('isim_soyisim', { ascending: true })
 
   const personelIds = (personeller ?? []).map((u: any) => u.id)
@@ -88,12 +108,13 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 2. Üst lokasyonlar (root: parent_id IS NULL) ───────────────────────────
-  const { data: ustLokRows } = await admin
+  let ustLokQ = admin
     .from('lokasyonlar')
     .select('id, tanim')
     .eq('firma_id', firmaId)
     .is('parent_id', null)
-    .order('tanim', { ascending: true })
+  if (yetkiliUstLokIds) ustLokQ = (ustLokQ as any).in('id', yetkiliUstLokIds)
+  const { data: ustLokRows } = await ustLokQ.order('tanim', { ascending: true })
 
   const lokAdMap = new Map<string, string>()
   for (const l of ustLokRows ?? []) lokAdMap.set((l as any).id, (l as any).tanim)
