@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
   const ustLokasyonlar = (ustLokRows ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim }))
 
   // ── 3. Görevler — canli_gorevler + canli_gorevler_arsiv ────────────────────
-  const SELECT_COLS = 'tamamlayan_kullanici_id, iptal_eden_id, durum, tamamlanma_suresi_saniye'
+  const SELECT_COLS = 'tamamlayan_kullanici_id, iptal_eden_id, durum, tamamlanma_suresi_saniye, tamamlanma_tarihi'
 
   let liveQ = admin
     .from('canli_gorevler')
@@ -140,10 +140,19 @@ export async function GET(req: NextRequest) {
     iptal: number
     sureToplam: number
     sureSayi: number
+    aktifGunler: Set<string>  // YYYY-MM-DD (TR timezone) — distinct çalışma günleri
   }
   const aggMap = new Map<string, Agg>()
   for (const pid of personelIds) {
-    aggMap.set(pid, { tamamlandi: 0, iptal: 0, sureToplam: 0, sureSayi: 0 })
+    aggMap.set(pid, { tamamlandi: 0, iptal: 0, sureToplam: 0, sureSayi: 0, aktifGunler: new Set() })
+  }
+
+  function trDateStr(iso: string | null | undefined): string | null {
+    if (!iso) return null
+    try {
+      // 'en-CA' locale → YYYY-MM-DD; timeZone Europe/Istanbul ile gün sınırı TR'ye göre
+      return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+    } catch { return null }
   }
 
   for (const t of allTasks as any[]) {
@@ -158,6 +167,8 @@ export async function GET(req: NextRequest) {
         a.sureToplam += t.tamamlanma_suresi_saniye
         a.sureSayi++
       }
+      const gun = trDateStr(t.tamamlanma_tarihi)
+      if (gun) a.aktifGunler.add(gun)
     }
 
     if (iptalEden && aggMap.has(iptalEden) && durum === 'IPTAL') {
@@ -166,10 +177,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Başarı kategori — günlük ortalama tamamlama süresine göre
+  // ≥6sa BAŞARILI, 3-6sa NORMAL, 1-3sa YETERSİZ, 0-1sa BAŞARISIZ, hiç çalışmamışsa null
+  function basariKategoriBul(gunlukOrtSn: number | null): string | null {
+    if (gunlukOrtSn == null) return null
+    if (gunlukOrtSn >= 21600) return 'BAŞARILI'
+    if (gunlukOrtSn >= 10800) return 'NORMAL'
+    if (gunlukOrtSn >= 3600)  return 'YETERSİZ'
+    return 'BAŞARISIZ'
+  }
+
   // ── 6. Sonuç satırları ─────────────────────────────────────────────────────
   let rows = (personeller ?? []).map((u: any) => {
     const a = aggMap.get(u.id)!
     const ustLokId = u.ust_lokasyon_id ?? null
+    const aktifGunSayisi = a.aktifGunler.size
+    const gunlukOrtSn = aktifGunSayisi > 0 ? Math.round(a.sureToplam / aktifGunSayisi) : null
     return {
       personel_id: u.id,
       isim_soyisim: u.isim_soyisim,
@@ -180,6 +203,9 @@ export async function GET(req: NextRequest) {
       tamamlandi_sayi: a.tamamlandi,
       iptal_sayi: a.iptal,
       ortalama_sure_saniye: a.sureSayi > 0 ? Math.round(a.sureToplam / a.sureSayi) : null,
+      aktif_gun_sayisi: aktifGunSayisi,
+      gunluk_ortalama_saniye: gunlukOrtSn,
+      basari_kategori: basariKategoriBul(gunlukOrtSn),
     }
   })
 
@@ -194,7 +220,7 @@ export async function GET(req: NextRequest) {
       tarih_baslangic: tarihBaslangic,
       tarih_bitis: tarihBitis,
       ust_lokasyonlar: ustLokasyonlar,
-      personeller: (personeller ?? []).map((u: any) => ({ id: u.id, isim_soyisim: u.isim_soyisim })),
+      personeller: (personeller ?? []).map((u: any) => ({ id: u.id, isim_soyisim: u.isim_soyisim, ust_lokasyon_id: u.ust_lokasyon_id ?? null })),
     },
   })
 }
