@@ -64,9 +64,10 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
 
   // ── 1. Personeller ─────────────────────────────────────────────────────────
+  // ust_lokasyon_id doğrudan users tablosunda — kullanıcı oluşturulurken atanır
   let userQ = admin
     .from('users')
-    .select('id, isim_soyisim, aktif, rol')
+    .select('id, isim_soyisim, aktif, rol, ust_lokasyon_id')
     .eq('firma_id', firmaId)
     .in('rol', ['tenant_user', 'musteri'])
   if (projeId) userQ = (userQ as any).eq('proje_id', projeId)
@@ -86,47 +87,20 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // ── 2. Lokasyonlar — üst lokasyon mapping ──────────────────────────────────
-  const { data: lokasyonlar } = await admin
+  // ── 2. Üst lokasyonlar (root: parent_id IS NULL) ───────────────────────────
+  const { data: ustLokRows } = await admin
     .from('lokasyonlar')
-    .select('id, tanim, parent_id')
+    .select('id, tanim')
     .eq('firma_id', firmaId)
+    .is('parent_id', null)
+    .order('tanim', { ascending: true })
 
   const lokAdMap = new Map<string, string>()
-  const lokParentMap = new Map<string, string | null>()
-  for (const l of lokasyonlar ?? []) {
-    lokAdMap.set((l as any).id, (l as any).tanim)
-    lokParentMap.set((l as any).id, (l as any).parent_id ?? null)
-  }
-  // lokasyon_id → ust_lokasyon_id (en üst parent)
-  const lokToUstMap = new Map<string, string>()
-  function ustLokBul(lokId: string): string {
-    const cached = lokToUstMap.get(lokId)
-    if (cached) return cached
-    let cur: string | null = lokId
-    let guard = 0
-    while (cur && guard < 8) {
-      const parent = lokParentMap.get(cur)
-      if (parent == null) {
-        lokToUstMap.set(lokId, cur)
-        return cur
-      }
-      cur = parent
-      guard++
-    }
-    lokToUstMap.set(lokId, lokId)
-    return lokId
-  }
-  for (const id of lokParentMap.keys()) ustLokBul(id)
-
-  // Üst lokasyon listesi (dropdown filter için)
-  const ustLokasyonlar = (lokasyonlar ?? [])
-    .filter((l: any) => l.parent_id == null)
-    .map((l: any) => ({ id: l.id, tanim: l.tanim }))
-    .sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr'))
+  for (const l of ustLokRows ?? []) lokAdMap.set((l as any).id, (l as any).tanim)
+  const ustLokasyonlar = (ustLokRows ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim }))
 
   // ── 3. Görevler — canli_gorevler + canli_gorevler_arsiv ────────────────────
-  const SELECT_COLS = 'atanan_kullanici_id, durum, tamamlanma_suresi_saniye, iptal_eden_id, lokasyon_id'
+  const SELECT_COLS = 'tamamlayan_kullanici_id, iptal_eden_id, durum, tamamlanma_suresi_saniye'
 
   let liveQ = admin
     .from('canli_gorevler')
@@ -158,26 +132,27 @@ export async function GET(req: NextRequest) {
   const eslesenSet = new Set((deviceRows ?? []).map((r: any) => r.user_id))
 
   // ── 5. Personel başına agregasyon ──────────────────────────────────────────
+  // NOT: Tamamlanma — frekansiyel görevlerde atanan_kullanici_id NULL,
+  //      iş mobilde tamamlanınca tamamlayan_kullanici_id dolar. O yüzden
+  //      "tamamladığı görev" = tamamlayan_kullanici_id eşleşmesi.
   type Agg = {
     tamamlandi: number
     iptal: number
     sureToplam: number
     sureSayi: number
-    ustLokSayac: Map<string, number>
   }
   const aggMap = new Map<string, Agg>()
   for (const pid of personelIds) {
-    aggMap.set(pid, { tamamlandi: 0, iptal: 0, sureToplam: 0, sureSayi: 0, ustLokSayac: new Map() })
+    aggMap.set(pid, { tamamlandi: 0, iptal: 0, sureToplam: 0, sureSayi: 0 })
   }
 
   for (const t of allTasks as any[]) {
-    const aid = t.atanan_kullanici_id as string | null
+    const tamamlayan = t.tamamlayan_kullanici_id as string | null
     const iptalEden = t.iptal_eden_id as string | null
     const durum = t.durum as string
 
-    // Tamamlanma — atanan kullanıcıya yazılır
-    if (aid && aggMap.has(aid) && durum === 'TAMAMLANDI') {
-      const a = aggMap.get(aid)!
+    if (tamamlayan && aggMap.has(tamamlayan) && durum === 'TAMAMLANDI') {
+      const a = aggMap.get(tamamlayan)!
       a.tamamlandi++
       if (typeof t.tamamlanma_suresi_saniye === 'number' && t.tamamlanma_suresi_saniye > 0) {
         a.sureToplam += t.tamamlanma_suresi_saniye
@@ -185,31 +160,16 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // İptal — iptal eden kullanıcıya yazılır
     if (iptalEden && aggMap.has(iptalEden) && durum === 'IPTAL') {
       const a = aggMap.get(iptalEden)!
       a.iptal++
-    }
-
-    // Üst lokasyon sayacı — sadece atanan kullanıcı için
-    if (aid && aggMap.has(aid) && t.lokasyon_id) {
-      const ust = lokToUstMap.get(t.lokasyon_id)
-      if (ust) {
-        const a = aggMap.get(aid)!
-        a.ustLokSayac.set(ust, (a.ustLokSayac.get(ust) ?? 0) + 1)
-      }
     }
   }
 
   // ── 6. Sonuç satırları ─────────────────────────────────────────────────────
   let rows = (personeller ?? []).map((u: any) => {
     const a = aggMap.get(u.id)!
-    // En sık karşılaşılan üst lokasyon
-    let ustLokId: string | null = null
-    let maxCount = 0
-    for (const [lid, c] of a.ustLokSayac) {
-      if (c > maxCount) { maxCount = c; ustLokId = lid }
-    }
+    const ustLokId = u.ust_lokasyon_id ?? null
     return {
       personel_id: u.id,
       isim_soyisim: u.isim_soyisim,
