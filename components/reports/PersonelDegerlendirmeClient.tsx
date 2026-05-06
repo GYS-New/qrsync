@@ -312,6 +312,17 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
           <KpiKart Icon={Filter} label="İptal" value={String(ozet.toplamIptal)} color={T.red} />
         </div>
 
+        {/* ─── Başarı kriteri notu ─────────────────────────────────────────── */}
+        <div style={{ padding: '12px 16px', background: T.grayLight, border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 12.5, color: T.text, lineHeight: 1.6 }}>
+          <strong style={{ color: T.gray }}>Başarı analizi</strong> günlük çalışma saati üzerinden aşağıdaki şekilde değerlendirilir:{' '}
+          <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 6, marginLeft: 4, verticalAlign: 'middle' }}>
+            <Badge text="0 – 1 saat: BAŞARISIZ" bg={T.redLight}    fg={T.red} />
+            <Badge text="1 – 3 saat: YETERSİZ"  bg={T.amberLight}  fg={T.amber} />
+            <Badge text="3 – 6 saat: NORMAL"    bg={T.blueLight}   fg={T.blue} />
+            <Badge text="6+ saat: BAŞARILI"     bg={T.greenLight}  fg={T.green} />
+          </span>
+        </div>
+
         {/* ─── Tablo ───────────────────────────────────────────────────────── */}
         <div className="verde-card" style={{ padding: 0, overflow: 'hidden' }}>
           {loading ? (
