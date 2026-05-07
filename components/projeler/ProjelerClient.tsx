@@ -184,6 +184,17 @@ export default function ProjelerClient({
   }
 
   async function toggleAktif(p: Proje) {
+    // Pasif yapma kritik bir işlem — onay al. Aktif yapma zararsız, direkt geç.
+    if (p.aktif) {
+      const ok = await confirm({
+        title: '⚠️ PROJEYİ PASİF YAP',
+        message: `"${p.ad}" projesi PASİF yapılacak.\n\nPasif edilen proje:\n• Yeni görev üretilemez (cron'lar atlar)\n• Mobil uygulamada görevler görünmez\n• Simülasyon motoru durur\n• Tüm operasyonlar askıya alınır\n\nBu işlem geri alınabilir, ancak diğer firma yöneticilerine kritik bildirim gönderilecektir.\n\nDevam etmek istiyor musunuz?`,
+        confirmText: 'Pasife Al',
+        cancelText: 'Vazgeç',
+        variant: 'danger',
+      })
+      if (!ok) return
+    }
     try {
       await fetch(`/api/projeler/${p.id}`, {
         method: 'PATCH',
