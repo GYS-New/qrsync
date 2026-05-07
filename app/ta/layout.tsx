@@ -6,6 +6,7 @@ import { UstLokasyonProvider } from '@/components/lokasyon/UstLokasyonContext'
 import FirmaDurumBanner from '@/components/firmalar/FirmaDurumBanner'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { TesterProvider } from '@/components/layout/TesterContext'
+import KritikUyariModal from '@/components/bildirim/KritikUyariModal'
 
 function getFirmaDurum(firma: any): { durum: 'pasif' | 'lisans_doldu' | null; lisansTarihi: string | null } {
   if (!firma) return { durum: null, lisansTarihi: null }
@@ -65,6 +66,7 @@ export default async function TALayout({ children }: { children: React.ReactNode
               {children}
             </div>
           </div>
+          <KritikUyariModal />
         </TesterProvider>
       </UstLokasyonProvider>
     </ProjeProvider>

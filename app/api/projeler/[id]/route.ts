@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
+import { projePasiflendiBildir } from '@/lib/notify/projePasiflendiBildir'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -35,6 +36,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json()
   const admin = createAdminClient()
+
+  // aktif=true→false geçişi tespiti için ÖNCEKİ durumu çek
+  let oncekiAktif: boolean | null = null
+  if (body.aktif !== undefined) {
+    const { data: oncekiProje } = await admin.from('projeler').select('aktif').eq('id', params.id).single()
+    oncekiAktif = (oncekiProje as any)?.aktif ?? null
+  }
 
   const { data, error } = await admin
     .from('projeler')
@@ -74,6 +82,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     kullanici_id: user.id,
     detay: { proje_adi: data?.ad, degisen_alanlar: Object.keys(body), yeni_degerler: body },
   })
+
+  // Aktif → pasif geçişi: TA'lara kritik uyarı bildirimi (fire-and-forget)
+  if (body.aktif === false && oncekiAktif === true && data?.firma_id) {
+    const { data: yapanUser } = await admin.from('users').select('isim_soyisim').eq('id', user.id).single()
+    void projePasiflendiBildir({
+      firmaId: data.firma_id,
+      projeAdi: data?.ad ?? 'Proje',
+      yapanKullaniciId: user.id,
+      yapanIsim: (yapanUser as any)?.isim_soyisim ?? 'Bir yönetici',
+    })
+  }
+
   return NextResponse.json(data)
 }
 
