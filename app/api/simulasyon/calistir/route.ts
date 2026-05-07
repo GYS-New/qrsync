@@ -62,7 +62,20 @@ export async function POST(req: Request) {
 
     console.log(`[SIMULASYON] ${ayarlar.length} aktif ayar bulundu`)
 
+    // Pasif projelerin sim'lerini atla (B yumuşak yaklaşım)
+    const projeIds = Array.from(new Set((ayarlar as any[]).map(a => a.proje_id).filter(Boolean) as string[]))
+    const aktifProjeIds = new Set<string>()
+    if (projeIds.length > 0) {
+      const { data: aktifProjeler } = await admin.from('projeler').select('id').in('id', projeIds).eq('aktif', true)
+      for (const p of (aktifProjeler ?? []) as any[]) aktifProjeIds.add(p.id)
+    }
+
     for (const ayar of ayarlar) {
+      // Projesi varsa ve pasifse atla — projesiz sim'ler etkilenmez
+      if (ayar.proje_id && !aktifProjeIds.has(ayar.proje_id)) {
+        console.log(`[SIMULASYON] SKIP: proje pasif (ayar=${ayar.id}, proje=${ayar.proje_id})`)
+        continue
+      }
       // Yeni model: havuz yerine kural-bazlı atama. Her kurala 1+ personel atanmış,
       // cron görevin kural_id'sine bakıp atanan personellerden random seçiyor.
       const [grupRes, atamaRes] = await Promise.all([

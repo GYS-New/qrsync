@@ -1,0 +1,13 @@
+-- ─────────────────────────────────────────────────────────────────────────
+-- gece_gorev_uret: pasif projelerin görev kurallarını atla
+-- ─────────────────────────────────────────────────────────────────────────
+-- B yumuşak yaklaşım: yeni görev üretimi durur, mevcut görevler etkilenmez.
+-- Projesiz görev kuralları (l.proje_id IS NULL) etkilenmez — geriye dönük uyumluluk.
+--
+-- Eklenen:
+--   - LEFT JOIN projeler p ON p.id = l.proje_id
+--   - p.aktif kontrolü (varsa) — pasifse CONTINUE + v_proje_pasif sayacı
+--   - Result JSON'a 'proje_pasif' alanı eklendi
+--
+-- Tüm fonksiyon yeniden yaratılıyor (CREATE OR REPLACE).
+-- Gerçek SQL Supabase MCP üzerinden uygulandı; kanonik referans dosyası burada.
