@@ -664,6 +664,26 @@ useEffect(() => {
       throw new Error('Beklemede olan görevlerde manuel işlem yapılamaz.')
     }
 
+    // Terminal → non-terminal geri-açma: önceki tamamlanma/iptal/başlatma izlerini sıfırla
+    // (yoksa eski tamamlanma_tarihi, tamamlayan_kullanici_id, son_tamamlama_kanali, vs.
+    // canli_gorevler kaydında kalır ve sanki görev yarım tamamlanmış gibi görünür)
+    const TERMINAL_DURUMLAR = ['TAMAMLANDI', 'IPTAL', 'KAPATILDI', 'SILINDI', 'ZAMANI_GECMIS', 'ZAMANINDA_YAPILAMAYAN']
+    const NON_TERMINAL_DURUMLAR = ['HAZIR', 'ACIK', 'BEKLEMEDE', 'ISLEMDE']
+    if (TERMINAL_DURUMLAR.includes(mevcutDurum) && NON_TERMINAL_DURUMLAR.includes(nd)) {
+      patch.tamamlanma_tarihi        = null
+      patch.tamamlayan_kullanici_id  = null
+      patch.tamamlanma_suresi_saniye = null
+      patch.iptal_tarihi             = null
+      patch.iptal_eden_id            = null
+      patch.iptal_sebep              = null
+      patch.son_tamamlama_kanali     = null
+      // ISLEMDE'ye değilse başlatma izini de temizle (görev hiç başlatılmamış sayılır)
+      if (nd !== 'ISLEMDE') {
+        patch.baslatilma_tarihi    = null
+        patch.baslatan_kullanici_id = null
+      }
+    }
+
     // Duruma göre ek alanları doldur
     if (nd === 'TAMAMLANDI') {
       patch.durum = resolveLiveCompletionStatusByTask(liveTask as any, nowIso)
