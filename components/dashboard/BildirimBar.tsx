@@ -80,7 +80,7 @@ export default function BildirimBar({ rol }: { rol: 'super_admin' | 'alt_super_a
             gece_dongu: s => `🌙 ${s?.uretim?.uretilen ?? 0} görev üretildi${s?.uretim?.duraklatilan ? `, ${s.uretim.duraklatilan} duraklatıldı` : ''}`,
             arsivleme: s => { const t = Object.values(s?.results ?? {}).reduce((acc: number, r: any) => acc + (r?.frekansiyel ?? 0) + (r?.spesifik ?? 0) + (r?.personel ?? 0) + (r?.musteri ?? 0), 0) as number; return `📦 ${t} kayıt arşivlendi` },
             simulasyon: s => `⚡ SİM: ${s?.tamamlanan ?? 0} görev`,
-            max_sure: s => `⏰ ${(s?.gorevler_iptal ?? 0) + (s?.canli_gorevler_iptal ?? 0)} görev süre aşımı`,
+            max_sure: s => `⏰ ${(s?.gorevler_otomatik_tamamla ?? s?.gorevler_iptal ?? 0) + (s?.canli_gorevler_otomatik_tamamla ?? s?.canli_gorevler_iptal ?? 0)} görev otomatik tamamlandı`,
             personel_takip: s => `👷 ${s?.gonderilen ?? 0} takip bildirimi`,
             rapor_gonder: s => `📊 ${s?.processed ?? 0} rapor gönderildi`,
             personel_destek: s => { const t = (s?.sonuclar ?? []).reduce((acc: number, r: any) => acc + (r?.tamamlanan ?? 0), 0); return `🤝 ${t} görev destek tamamlandı` },
