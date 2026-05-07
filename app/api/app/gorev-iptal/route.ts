@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
+import { iptalSebepKontrol } from '@/lib/validation/iptalSebep'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -49,8 +50,6 @@ export async function POST(req: Request) {
 
     const gorevId      = body?.gorev_id as string | undefined
     const gorevTipi    = (body?.gorev_tipi as string | undefined) ?? 'gorevler'
-    const iptalSebepRaw = body?.iptal_sebep
-    const iptalSebep   = typeof iptalSebepRaw === 'string' ? iptalSebepRaw.trim() : ''
 
     if (!gorevId) {
       return NextResponse.json({ ok: false, error: 'gorev_id gerekli' }, { status: 400, headers: CORS })
@@ -58,18 +57,15 @@ export async function POST(req: Request) {
     if (!['gorevler', 'canli_gorevler'].includes(gorevTipi)) {
       return NextResponse.json({ ok: false, error: 'Geçersiz gorev_tipi' }, { status: 400, headers: CORS })
     }
-    if (!iptalSebep || iptalSebep.length < 3) {
+
+    const sebepCheck = iptalSebepKontrol(body?.iptal_sebep)
+    if (!sebepCheck.ok) {
       return NextResponse.json(
-        { ok: false, error: 'İptal sebebi zorunlu (en az 3 karakter)', code: 'IPTAL_SEBEP_GEREKLI' },
+        { ok: false, error: sebepCheck.mesaj, code: sebepCheck.kod },
         { status: 400, headers: CORS }
       )
     }
-    if (iptalSebep.length > 500) {
-      return NextResponse.json(
-        { ok: false, error: 'İptal sebebi en fazla 500 karakter olabilir', code: 'IPTAL_SEBEP_UZUN' },
-        { status: 400, headers: CORS }
-      )
-    }
+    const iptalSebep = sebepCheck.sebep
 
     const { data: gorev, error: gorevErr } = await admin
       .from(gorevTipi)

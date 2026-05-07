@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Pause, Play, Square } from 'lucide-react'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
+import { iptalSebepKontrol } from '@/lib/validation/iptalSebep'
 
 // ── Tarih/saat formatlama yardımcıları (TR — Europe/Istanbul) ────────────
 function formatTarihTR(value?: string | null): string {
@@ -784,17 +785,16 @@ useEffect(() => {
   }
 
   async function handleIptal(id: string) {
-    // İptal sebebi zorunlu (min 3 char) — web tarafından da takip edebilmek için
-    const sebepRaw = window.prompt('Görevin neden iptal edildiğini açıklayın (en az 3 karakter):', '')
-    if (sebepRaw === null) return  // Vazgeç
-    const sebep = sebepRaw.trim()
-    if (sebep.length < 3) {
-      toast({ type: 'error', title: 'İptal Sebebi Eksik', message: 'En az 3 karakter sebep girmelisiniz.' })
-      return
-    }
-    if (sebep.length > 500) {
-      toast({ type: 'error', title: 'Sebep Çok Uzun', message: 'En fazla 500 karakter girebilirsiniz.' })
-      return
+    // İptal sebebi zorunlu — junk girişlere karşı ortak validator (lib/validation/iptalSebep)
+    // En az 5 char, 3 farklı karakter, harf/rakam içermeli ("....", "aaaaa" reddedilir).
+    let sebep = ''
+    while (true) {
+      const sebepRaw = window.prompt('Görev iptal sebebi (örn. "ekipman arızası", "personel yetişemedi"):', sebep)
+      if (sebepRaw === null) return  // Vazgeç
+      const check = iptalSebepKontrol(sebepRaw)
+      if (check.ok) { sebep = check.sebep; break }
+      sebep = sebepRaw  // tekrar göster, kullanıcı düzeltsin
+      toast({ type: 'error', title: 'Geçersiz İptal Sebebi', message: check.mesaj })
     }
     await supabase
       .from('canli_gorevler')
