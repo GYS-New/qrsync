@@ -1,0 +1,13 @@
+-- ─────────────────────────────────────────────────────────────────────────
+-- gece_gorev_uret: haftalık branch NOT NULL fix
+-- ─────────────────────────────────────────────────────────────────────────
+-- 2026-05-08 sabahı tüm vardiya görevleri üretilemedi. Cron 00:01 TRT'de
+-- çalıştı ama haftalık branch'i ilk haftalık kuralı işlerken patladı:
+--   ERROR: null value in column "gunluk_frekans_sayisi" violates not-null
+-- Sebep: haftalık INSERT'te NULL geçiriliyordu, kolon NOT NULL DEFAULT 0.
+-- Plpgsql EXCEPTION bloğu hatayı yutup ROLLBACK yaptı → 0 görev oluştu.
+--
+-- Fix: haftalık branch'te gunluk_frekans_sayisi=0 (haftalık görev için
+-- günlük frekansın anlamı yok, default 0 ile yazıyoruz).
+--
+-- Gerçek SQL Supabase MCP üzerinden uygulandı; kanonik referans dosyası burada.
