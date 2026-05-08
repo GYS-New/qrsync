@@ -13,8 +13,9 @@ const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/
 const LokasyonYetkileriPanel = dynamic(() => import('@/components/ayarlar/LokasyonYetkileriPanel'), { ssr: false })
 const GrupYetkileriClient = dynamic(() => import('@/components/ayarlar/GrupYetkileriClient'), { ssr: false })
 const PersonelDestekPanel = dynamic(() => import('./PersonelDestekPanel'), { ssr: false })
+const CronYonetimiPanel = dynamic(() => import('./CronYonetimiPanel'), { ssr: false })
 
-type Tab = 'genel' | 'proje-ayarlari' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'simulasyon' | 'personel-destek' | 'uygulama' | 'mobil' | 'smtp' | 'konfigurasyon' | 'dashboard'
+type Tab = 'genel' | 'proje-ayarlari' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'simulasyon' | 'personel-destek' | 'uygulama' | 'mobil' | 'smtp' | 'konfigurasyon' | 'cron' | 'dashboard'
 
 const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'genel',          label: 'Genel Ayarlar'   },
@@ -29,6 +30,7 @@ const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'mobil',          label: 'Mobil Ayarlar', saOnly: true },
   { key: 'smtp',           label: 'Mail Sunucusu', saOnly: true },
   { key: 'konfigurasyon',  label: 'Sistem Konfigürasyonu', saOnly: true },
+  { key: 'cron',           label: 'Cron Yönetimi', saOnly: true },
   { key: 'dashboard',      label: 'Dashboard'        },
 ]
 
@@ -145,6 +147,7 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
       {aktifTab === 'mobil' && isSA && <MobilAyarlariPanel />}
       {aktifTab === 'smtp' && isSA && <SmtpAyarlariPanel />}
       {aktifTab === 'konfigurasyon' && isSA && <SistemKonfigurasyonPanel />}
+      {aktifTab === 'cron' && isSA && <CronYonetimiPanel />}
       {aktifTab === 'dashboard' && (
         <DashboardSettingsClient meId={meId} initialBloklar={initialBloklar} />
       )}
