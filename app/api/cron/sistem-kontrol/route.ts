@@ -53,6 +53,7 @@ async function handle(req: Request) {
   sistemler.push(await kontrolPersonelDestek(admin, nowMs))
   sistemler.push(await kontrolOfflineMod(admin, nowMs))
   sistemler.push(await kontrolVeriButunlugu(admin, nowMs))
+  sistemler.push(await kontrolGorevUretimi(admin, nowMs))
 
   const toplamSorun = sistemler.filter(s => s.durum === 'SORUN').length
   const toplamOk = sistemler.filter(s => s.durum === 'OK').length
@@ -452,6 +453,108 @@ async function kontrolVeriButunlugu(admin: any, nowMs: number): Promise<SistemRa
 
   if (sorunlar.length > 0) return raporla('Veri Bütünlüğü', sorunlar, '', metrikler)
   return raporla('Veri Bütünlüğü', [], 'Son 1 saatte kapalı kayıtlar tutarlı (kanal dolu)', metrikler)
+}
+
+/* ────────────────────────── GÖREV ÜRETİMİ ────────────────────────── */
+
+/**
+ * Sabah 04:00 TRT sonrası gece üretiminin başarılı olup olmadığını kontrol eder.
+ * Her aktif firma için bugünkü görev sayısı eşik altındaysa SORUN raporlar VE
+ * o firmanın TA'larına KritikUyariModal tetikleyen bildirim gönderir.
+ *
+ * Eşik: bir firmanın aktif görev kuralı varsa ama bugünkü görev sayısı 50'nin
+ * altındaysa (gece üretimi büyük ihtimalle başarısız).
+ *
+ * Saat 04:00 TRT öncesi → BILGI (üretim henüz tamamlanmamış olabilir).
+ */
+async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRaporu> {
+  const sorunlar: SorunDetayi[] = []
+
+  // TR saat hesabı
+  const trNow = new Date(new Date(nowMs).toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
+  const trSaat = trNow.getHours()
+  const trDate = trNow.toISOString().slice(0, 10)
+
+  const metrikler: any = { tr_saat: trSaat, tr_tarih: trDate, firmalar: [] }
+
+  // 04:00 TRT öncesi henüz erken — kontrol etme
+  if (trSaat < 4) {
+    return raporla('Görev Üretimi', [], '', metrikler, `Saat ${trSaat}:00 TRT — gece üretimi henüz tamamlanmamış olabilir, kontrol atlandı`)
+  }
+
+  // Aktif firmalar
+  const { data: firmalar } = await admin
+    .from('firmalar')
+    .select('id, ticari_unvan, firma_adi')
+    .eq('aktif', true)
+
+  if (!firmalar || firmalar.length === 0) {
+    return raporla('Görev Üretimi', [], 'Aktif firma yok', metrikler)
+  }
+
+  for (const f of firmalar as any[]) {
+    // Firmanın aktif görev kuralı sayısı
+    const { count: aktifKural } = await admin
+      .from('gorev_kurallari')
+      .select('id', { count: 'exact', head: true })
+      .eq('firma_id', f.id)
+      .eq('aktif', true)
+
+    if ((aktifKural ?? 0) === 0) {
+      metrikler.firmalar.push({ firma_id: f.id, ad: f.firma_adi ?? f.ticari_unvan, durum: 'kural_yok' })
+      continue
+    }
+
+    // Bugün için üretilen + arşive kaymış (yine sayılır) görev sayısı
+    const trGunBaslangic = `${trDate}T00:00:00+03:00`
+    const trGunBitis = `${trDate}T23:59:59.999+03:00`
+
+    const [{ count: canliCount }, { count: arsivCount }] = await Promise.all([
+      admin.from('canli_gorevler').select('id', { count: 'exact', head: true })
+        .eq('firma_id', f.id)
+        .gte('aktif_olma_tarihi', trGunBaslangic)
+        .lte('aktif_olma_tarihi', trGunBitis),
+      admin.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true })
+        .eq('firma_id', f.id)
+        .gte('aktif_olma_tarihi', trGunBaslangic)
+        .lte('aktif_olma_tarihi', trGunBitis),
+    ])
+
+    const toplam = (canliCount ?? 0) + (arsivCount ?? 0)
+    const firmaAdi = f.firma_adi ?? f.ticari_unvan ?? 'Firma'
+
+    metrikler.firmalar.push({
+      firma_id: f.id,
+      ad: firmaAdi,
+      aktif_kural: aktifKural,
+      bugun_uretilen: toplam,
+    })
+
+    // Eşik: 50'den az ise sorun (büyük ihtimalle gece cron'u patladı)
+    if (toplam < 50) {
+      sorunlar.push({
+        kod: 'GOREV_URETIM_BASARISIZ',
+        mesaj: `${firmaAdi}: bugün için sadece ${toplam} görev (${aktifKural} aktif kural var, beklenen 50+)`,
+        adet: toplam,
+      })
+
+      // TA'lara kritik uyarı + FCM (idempotent — son 4 saat içinde aynı kod yoksa)
+      try {
+        const { sistemUyariBildir } = await import('@/lib/notify/sistemUyariBildir')
+        await sistemUyariBildir({
+          firmaId: f.id,
+          kod: 'GOREV_URETIM_BASARISIZ',
+          baslik: '🚨 Görev Üretimi Başarısız',
+          mesaj: `Bugün için sadece ${toplam} görev üretilmiş (beklenen ${aktifKural}+). Gece otomatik üretimi başarısız olmuş olabilir. Sistem yöneticisi ile iletişime geçin.`,
+        })
+      } catch (e) {
+        console.error('[kontrolGorevUretimi] uyarı gönderme hatası:', e)
+      }
+    }
+  }
+
+  if (sorunlar.length > 0) return raporla('Görev Üretimi', sorunlar, '', metrikler)
+  return raporla('Görev Üretimi', [], `Tüm aktif firmalar bugün için yeterli görev üretmiş`, metrikler)
 }
 
 /* ────────────────────────── OFFLINE MOD ────────────────────────── */

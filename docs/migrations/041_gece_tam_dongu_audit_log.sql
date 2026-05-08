@@ -1,0 +1,17 @@
+-- ─────────────────────────────────────────────────────────────────────────
+-- gece_tam_dongu: audit_log'a iz bırakma
+-- ─────────────────────────────────────────────────────────────────────────
+-- 2026-05-08 sabahı görev üretimi sessizce başarısız oldu (haftalık
+-- branch NOT NULL violation, bkz migration 040). cron.job_run_details
+-- "succeeded" gösterdi (fonksiyon return etti) ama içeriden ROLLBACK
+-- olmuştu. Hiçbir uyarı sistemine yansımadı.
+--
+-- Artık fonksiyon her çalışmasında audit_log'a INSERT eder:
+--   - Başarılı üretim: basarili=true, satir_sayisi=uretilen
+--   - Üretim hatası: basarili=false, hata_mesaji=hata detayı
+--   - Üst seviye exception: EXCEPTION bloğunda yakalanıp yine basarili=false
+--
+-- Sistem-kontrol cron'u (her saat) bu kayıtları okuyup TA'lara
+-- KritikUyariModal ile bildirim verecek (migration 042).
+--
+-- Gerçek SQL Supabase MCP üzerinden uygulandı; kanonik referans dosyası burada.
