@@ -466,13 +466,13 @@ export default function LokasyonlarClient({
                     <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Aktif ise personel görevi önce başlatır, sonra tamamlar. Pasif ise görev doğrudan tamamlanır.</div>
                   )}
                 </div>
-                <div style={{ gridColumn:'1 / -1', opacity: projeSureliAktif && form.sureli_gorev_aktif ? 1 : 0.5 }}>
-                  <label className="verde-label" style={{ display:'flex', alignItems:'center', gap:10, cursor: projeSureliAktif && form.sureli_gorev_aktif ? 'pointer' : 'not-allowed' }}>
-                    <input type="checkbox" checked={form.tamamlama_qr_zorunlu} disabled={!projeSureliAktif || !form.sureli_gorev_aktif}
+                <div style={{ gridColumn:'1 / -1' }}>
+                  <label className="verde-label" style={{ display:'flex', alignItems:'center', gap:10, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={form.tamamlama_qr_zorunlu}
                       onChange={e => setForm(f => ({ ...f, tamamlama_qr_zorunlu: e.target.checked }))} />
                     <span>Tamamlama için QR/NFC okutma zorunlu</span>
                   </label>
-                  <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Aktif ise personel görevi tamamlarken lokasyondaki QR veya NFC kodunu okutmalıdır. Süreli görev kapalıysa bu ayar devre dışıdır.</div>
+                  <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Aktif ise personel görevi tamamlarken lokasyondaki QR veya NFC kodunu okutmalıdır. Süreli görev ayarından bağımsız çalışır.</div>
                 </div>
                 <div style={{ gridColumn:'1 / -1' }}>
                   <label className="verde-label">Checklist</label>

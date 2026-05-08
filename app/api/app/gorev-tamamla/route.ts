@@ -100,11 +100,11 @@ export async function POST(req: Request) {
       if (gorevLokBilgi?.lokasyon_id) {
         const { data: lokQr } = await admin
           .from('lokasyonlar')
-          .select('tamamlama_qr_zorunlu, sureli_gorev_aktif, qr_veri, nfc_token')
+          .select('tamamlama_qr_zorunlu, qr_veri, nfc_token')
           .eq('id', gorevLokBilgi.lokasyon_id)
           .single()
-        console.log('[gorev-tamamla] lokQr:', { tamamlama_qr_zorunlu: lokQr?.tamamlama_qr_zorunlu, sureli_gorev_aktif: lokQr?.sureli_gorev_aktif })
-        if (lokQr?.tamamlama_qr_zorunlu && lokQr?.sureli_gorev_aktif) {
+        console.log('[gorev-tamamla] lokQr:', { tamamlama_qr_zorunlu: lokQr?.tamamlama_qr_zorunlu })
+        if (lokQr?.tamamlama_qr_zorunlu) {
           console.log('[gorev-tamamla] QR/NFC ZORUNLU — scanToken:', scanToken ?? 'YOK')
           if (!scanToken) {
             return NextResponse.json(
@@ -192,15 +192,15 @@ export async function POST(req: Request) {
     if (gorev.lokasyon_id) {
       const { data: lok } = await admin
         .from('lokasyonlar')
-        .select('checklist_sablon_id, tamamlama_qr_zorunlu, sureli_gorev_aktif, qr_veri, nfc_token')
+        .select('checklist_sablon_id, tamamlama_qr_zorunlu, qr_veri, nfc_token')
         .eq('id', gorev.lokasyon_id)
         .single()
       lokBilgi = lok
       if (maddeler?.length > 0) checklistSablonId = lok?.checklist_sablon_id ?? null
     }
 
-    // QR/NFC tamamlama zorunluluğu: lokasyonda aktifse VE süreli görev aktifse kontrol et
-    if (lokBilgi?.tamamlama_qr_zorunlu && lokBilgi?.sureli_gorev_aktif) {
+    // QR/NFC tamamlama zorunluluğu: lokasyonda aktifse kontrol et (süreli görev ayarından bağımsız)
+    if (lokBilgi?.tamamlama_qr_zorunlu) {
       if (!scanToken) {
         return NextResponse.json(
           { ok: false, error: 'Bu lokasyonda tamamlama için QR veya NFC okutmanız gerekiyor.', code: 'QR_NFC_ZORUNLU' },
