@@ -91,16 +91,20 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Aksiyonları toplu çek — degerlendirme_id'ye göre map'le
+  // Aksiyonları toplu çek — hem aktif hem arşiv tablosundan
   // olusturan_id → users.isim_soyisim ikinci sorguyla map'lenir (FK yok, embed güvenli değil)
   async function fetchAksiyonMap(degIds: string[]): Promise<Map<string, any>> {
     if (!degIds.length) return new Map()
-    const { data: aksiyonlar } = await admin
-      .from('musteri_degerlendirme_aksiyonlari')
-      .select('degerlendirme_id, aksiyon_metni, gorsel_urls, olusturan_id, olusturma_tarihi, guncelleme_tarihi')
-      .in('degerlendirme_id', degIds)
+    const [aktifRes, arsivRes] = await Promise.all([
+      admin.from('musteri_degerlendirme_aksiyonlari')
+        .select('degerlendirme_id, aksiyon_metni, gorsel_urls, olusturan_id, olusturma_tarihi, guncelleme_tarihi')
+        .in('degerlendirme_id', degIds),
+      admin.from('musteri_degerlendirme_aksiyonlari_arsiv')
+        .select('degerlendirme_id, aksiyon_metni, gorsel_urls, olusturan_id, olusturma_tarihi, guncelleme_tarihi')
+        .in('degerlendirme_id', degIds),
+    ])
 
-    const list = (aksiyonlar ?? []) as any[]
+    const list = [...(aktifRes.data ?? []), ...(arsivRes.data ?? [])] as any[]
     const olusturanIds = Array.from(new Set(list.map(a => a.olusturan_id).filter(Boolean))) as string[]
     const isimMap = new Map<string, string>()
     if (olusturanIds.length) {
@@ -111,10 +115,14 @@ export async function GET(req: NextRequest) {
 
     const map = new Map()
     for (const a of list) {
-      map.set(a.degerlendirme_id, {
-        ...a,
-        olusturan_isim: a.olusturan_id ? (isimMap.get(a.olusturan_id) ?? null) : null,
-      })
+      // Aynı degerlendirme_id için hem aktif hem arşivde varsa aktifin önceliği var
+      // (geri yükleme akışında çift bulunabilir — kayıp riski sıfır)
+      if (!map.has(a.degerlendirme_id)) {
+        map.set(a.degerlendirme_id, {
+          ...a,
+          olusturan_isim: a.olusturan_id ? (isimMap.get(a.olusturan_id) ?? null) : null,
+        })
+      }
     }
     return map
   }
@@ -239,6 +247,32 @@ export async function PATCH(req: NextRequest) {
         .insert(arsivRecordData)
       if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 })
 
+      // ÖNCE aksiyonları arşive kopyala (sonra CASCADE DELETE silmeden önce)
+      const { data: aksiyonlar } = await admin
+        .from('musteri_degerlendirme_aksiyonlari')
+        .select('*')
+        .eq('degerlendirme_id', id)
+      if (aksiyonlar && aksiyonlar.length > 0) {
+        const arsivAksiyonRows = aksiyonlar.map((a: any) => ({
+          id: a.id,
+          degerlendirme_id: a.degerlendirme_id,
+          aksiyon_metni: a.aksiyon_metni,
+          gorsel_urls: a.gorsel_urls ?? [],
+          olusturan_id: a.olusturan_id,
+          olusturma_tarihi: a.olusturma_tarihi,
+          guncelleme_tarihi: a.guncelleme_tarihi,
+          arsivleme_tarihi: new Date().toISOString(),
+        }))
+        const { error: aksErr } = await admin
+          .from('musteri_degerlendirme_aksiyonlari_arsiv')
+          .insert(arsivAksiyonRows)
+        if (aksErr) {
+          // Aksiyon arşivleme başarısız → ana arşivi rollback et (insert'i geri al)
+          await admin.from('musteri_degerlendirmeleri_arsiv').delete().eq('id', id)
+          return NextResponse.json({ ok: false, error: `Aksiyon arşivlenemedi: ${aksErr.message}` }, { status: 500 })
+        }
+      }
+
       const { error: deleteErr } = await admin
         .from('musteri_degerlendirmeleri')
         .delete()
@@ -277,6 +311,33 @@ export async function PATCH(req: NextRequest) {
         .from('musteri_degerlendirmeleri')
         .insert(mainRecordData)
       if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 })
+
+      // Aksiyonları geri taşı: arsiv → aktif tablo
+      const { data: arsivAksiyonlar } = await admin
+        .from('musteri_degerlendirme_aksiyonlari_arsiv')
+        .select('*')
+        .eq('degerlendirme_id', id)
+      if (arsivAksiyonlar && arsivAksiyonlar.length > 0) {
+        const aktifAksiyonRows = arsivAksiyonlar.map((a: any) => ({
+          id: a.id,
+          degerlendirme_id: a.degerlendirme_id,
+          aksiyon_metni: a.aksiyon_metni,
+          gorsel_urls: a.gorsel_urls ?? [],
+          olusturan_id: a.olusturan_id,
+          olusturma_tarihi: a.olusturma_tarihi,
+          guncelleme_tarihi: a.guncelleme_tarihi,
+        }))
+        const { error: aksInsertErr } = await admin
+          .from('musteri_degerlendirme_aksiyonlari')
+          .insert(aktifAksiyonRows)
+        if (aksInsertErr) {
+          // Aksiyon geri yükleme başarısız → mainRecord'u rollback et
+          await admin.from('musteri_degerlendirmeleri').delete().eq('id', id)
+          return NextResponse.json({ ok: false, error: `Aksiyonlar geri yüklenemedi: ${aksInsertErr.message}` }, { status: 500 })
+        }
+        // Arşivden aksiyonları sil
+        await admin.from('musteri_degerlendirme_aksiyonlari_arsiv').delete().eq('degerlendirme_id', id)
+      }
 
       const { error: deleteErr } = await admin
         .from('musteri_degerlendirmeleri_arsiv')
@@ -359,6 +420,10 @@ export async function DELETE(req: NextRequest) {
     .eq('id', id)
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+
+  // Aksiyon arşivini de temizle (CASCADE aktif tablodaki aksiyonları silmiş olur,
+  // arşiv tablosunda FK olmadığı için manuel temizlik gerekir)
+  await admin.from('musteri_degerlendirme_aksiyonlari_arsiv').delete().eq('degerlendirme_id', id)
 
   return NextResponse.json({ ok: true })
 }

@@ -100,16 +100,51 @@ export async function POST(req: NextRequest) {
         const { data: yeni } = await q
         let moved = 0
         if (yeni?.length) {
+          const yeniIds = yeni.map(x => x.id)
+          // Önce aksiyonları arşive kopyala — CASCADE DELETE silmeden ÖNCE.
+          // (musteri_degerlendirme_aksiyonlari.degerlendirme_id → ...mleri.id ON DELETE CASCADE)
+          const { data: aksiyonlar } = await admin
+            .from('musteri_degerlendirme_aksiyonlari').select('*').in('degerlendirme_id', yeniIds)
+          if (aksiyonlar?.length) {
+            const arsivAksiyonRows = aksiyonlar.map((a: any) => ({
+              id: a.id,
+              degerlendirme_id: a.degerlendirme_id,
+              aksiyon_metni: a.aksiyon_metni,
+              gorsel_urls: a.gorsel_urls ?? [],
+              olusturan_id: a.olusturan_id,
+              olusturma_tarihi: a.olusturma_tarihi,
+              guncelleme_tarihi: a.guncelleme_tarihi,
+              arsivleme_tarihi: new Date().toISOString(),
+            }))
+            await admin.from('musteri_degerlendirme_aksiyonlari_arsiv').insert(arsivAksiyonRows)
+          }
           await admin.from('musteri_degerlendirmeleri_arsiv').insert(yeni.map(x => ({ ...x, arsivleme_tarihi: new Date().toISOString() })))
-          await admin.from('musteri_degerlendirmeleri').delete().in('id', yeni.map(x => x.id))
+          await admin.from('musteri_degerlendirmeleri').delete().in('id', yeniIds)
           moved += yeni.length
         }
-        // Soft arşivler temizle
+        // Soft arşivler temizle (zaten arsivlendi=true olan kayıtlar — duplicate temizleme)
         let sq = admin.from('musteri_degerlendirmeleri').select('id').eq('firma_id', s.firmaId).eq('arsivlendi', true).limit(5000)
         if (s.projeId) sq = (sq as any).eq('proje_id', s.projeId)
         const { data: soft } = await sq
         if (soft?.length) {
-          await admin.from('musteri_degerlendirmeleri').delete().in('id', soft.map(x => x.id))
+          const softIds = soft.map(x => x.id)
+          // Aksiyonlar burada da kaybolmasın
+          const { data: softAks } = await admin
+            .from('musteri_degerlendirme_aksiyonlari').select('*').in('degerlendirme_id', softIds)
+          if (softAks?.length) {
+            const arsivRows = softAks.map((a: any) => ({
+              id: a.id,
+              degerlendirme_id: a.degerlendirme_id,
+              aksiyon_metni: a.aksiyon_metni,
+              gorsel_urls: a.gorsel_urls ?? [],
+              olusturan_id: a.olusturan_id,
+              olusturma_tarihi: a.olusturma_tarihi,
+              guncelleme_tarihi: a.guncelleme_tarihi,
+              arsivleme_tarihi: new Date().toISOString(),
+            }))
+            await admin.from('musteri_degerlendirme_aksiyonlari_arsiv').insert(arsivRows)
+          }
+          await admin.from('musteri_degerlendirmeleri').delete().in('id', softIds)
           moved += soft.length
         }
         if (moved > 0) r.musteri = moved
