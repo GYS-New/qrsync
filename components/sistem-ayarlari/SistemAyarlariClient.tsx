@@ -102,7 +102,13 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
 
       {/* Tab içerikleri */}
       {aktifTab === 'genel' && <GenelAyarlarClient isSA={isSA} firmaId={firmaId} projeId={projeId} kullanicilar={kullanicilar} />}
-      {aktifTab === 'proje-ayarlari' && projeId && <ProjeAyarlariPanel projeId={projeId} />}
+      {aktifTab === 'proje-ayarlari' && (
+        projeId
+          ? <ProjeAyarlariPanel projeId={projeId} />
+          : <div style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 14, background: '#fafafa', border: '1px dashed #e5e7eb', borderRadius: 12 }}>
+              Bu sekme için bir proje seçilmesi gerekir. Sol üst köşedeki proje seçiciden bir proje seçin.
+            </div>
+      )}
       {aktifTab === 'frekans' && <FrekansSayilariClient lokasyonlar={lokasyonlar as any} firmaId={firmaId ?? ''} projeId={projeId ?? null} />}
       {aktifTab === 'gorev-kurallari' && firmaId && (
         <GorevKurallariClient
