@@ -30,9 +30,15 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
   try {
     const admin = createAdminClient()
 
-    // 1) Üst lokasyonu bul
+    // 1) Üst lokasyonu bul (id + tanım)
     const { data: ustLokId } = await admin.rpc('get_ust_lokasyon_id', { p_lok_id: p.lokasyonId })
     const ustLokasyonId = ustLokId as string | null
+    let ustLokasyonTanim: string | null = null
+    if (ustLokasyonId) {
+      const { data: ustLok } = await admin
+        .from('lokasyonlar').select('tanim').eq('id', ustLokasyonId).maybeSingle()
+      ustLokasyonTanim = (ustLok as any)?.tanim ?? null
+    }
 
     // 2) TA'ları çek
     const { data: taList } = await admin
@@ -74,11 +80,16 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
     const dusuk = p.yildiz <= 3
     const yildizStr = '★'.repeat(p.yildiz) + '☆'.repeat(5 - p.yildiz)
     const lokTanim = p.lokasyonTanim ?? 'Bir lokasyon'
+    // Üst lokasyon ile alt lokasyon farklı ise yol göster: "ÜST > ALT"
+    // Aynı ise tek kez yaz (değerlendirme üst lokasyonda alınmış olabilir)
+    const lokYol = ustLokasyonTanim && ustLokasyonTanim !== lokTanim
+      ? `${ustLokasyonTanim} › ${lokTanim}`
+      : lokTanim
     const title = dusuk
       ? `⚠️ Düşük Puan (${p.yildiz}/5)`
       : `Yeni Değerlendirme (${p.yildiz}/5)`
     const yorumKisa = p.yorum ? (p.yorum.length > 80 ? p.yorum.slice(0, 77) + '...' : p.yorum) : ''
-    const body = `${lokTanim} • ${yildizStr}${yorumKisa ? ` — "${yorumKisa}"` : ''}`
+    const body = `${lokYol} • ${yildizStr}${yorumKisa ? ` — "${yorumKisa}"` : ''}`
     const channel = dusuk ? 'gorev_uyari' : 'default'
 
     // 5a) Web bildirimleri — bildirimler tablosuna toplu insert
