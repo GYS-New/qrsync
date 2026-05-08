@@ -250,13 +250,28 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Sadece arşivlenmiş kayıtlar geri yüklenebilir' }, { status: 400 })
       }
 
-      const mainRecordData = {
-        ...archiveRecord,
+      // SCHEMA NOTU: musteri_degerlendirmeleri_arsiv tablosunda eski legacy
+      // kolonlar var (gorev_id, kullanici_id, yildiz_sayisi, degerlendirme_tarihi,
+      // arsiv_tarihi) — asıl musteri_degerlendirmeleri tablosunda bunlar YOK.
+      // Bu yüzden ...archiveRecord ile spread edersek INSERT patlar. Explicit
+      // alan kopyalaması yapıyoruz.
+      const mainRecordData: Record<string, any> = {
+        id: archiveRecord.id,
+        firma_id: archiveRecord.firma_id,
+        proje_id: archiveRecord.proje_id,
+        lokasyon_id: archiveRecord.lokasyon_id,
+        kanal: archiveRecord.kanal,
+        qr_token: archiveRecord.qr_token,
+        yildiz: archiveRecord.yildiz,
+        yorum: archiveRecord.yorum,
+        ad_soyad: archiveRecord.ad_soyad,
+        gorsel_url: archiveRecord.gorsel_url,
+        ip_adresi: archiveRecord.ip_adresi,
+        user_agent: archiveRecord.user_agent,
+        olusturma_tarihi: archiveRecord.olusturma_tarihi,
         arsivlendi: false,
         arsivleme_tarihi: null,
       }
-      // arsivleme_tarihi alanını kaldır
-      delete (mainRecordData as any).arsivleme_tarihi
 
       const { error: insertErr } = await admin
         .from('musteri_degerlendirmeleri')
