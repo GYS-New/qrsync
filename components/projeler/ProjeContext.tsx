@@ -71,13 +71,24 @@ export function ProjeProvider({
       const aktifler = data.filter(p => p.aktif)
       setProjeler(aktifler)
 
+      // Önce cookie'deki seçimi dene
       const saved = getCookie(COOKIE_KEY)
+      let secili: Proje | null = null
       if (saved) {
-        const found = aktifler.find(p => p.id === saved)
-        setAktifProjeState(found ?? null)
-      } else {
-        setAktifProjeState(null)
+        secili = aktifler.find(p => p.id === saved) ?? null
       }
+
+      // Cookie yoksa veya geçersizse (örn. pasif/silinmiş projeye işaret
+      // ediyorsa) firmanın ilk aktif projesini otomatik seç + cookie'ye
+      // yaz. Bu, "Tüm Projeler"in kaldırıldığı yeni akışta default seçim
+      // mantığıdır. Reload tetiklemiyoruz çünkü server zaten getAktifProje
+      // fallback'i ile aynı sonucu render etmiş durumda.
+      if (!secili && aktifler.length > 0) {
+        secili = aktifler[0]
+        setCookie(COOKIE_KEY, secili.id)
+      }
+
+      setAktifProjeState(secili)
     } catch {
       // sessizce geç
     } finally {
