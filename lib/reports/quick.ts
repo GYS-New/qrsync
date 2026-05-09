@@ -288,8 +288,10 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
 
   if (type === 'users') {
     const [liveTasks, { data: manualTasks, error: manualError }, yoneticiIds] = await Promise.all([
-      fetchCanliGorevlerMerged(admin, 'id,durum,olusturma_tarihi,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,atanan_kullanici_id,firma_id', filters),
+      fetchCanliGorevlerMerged(admin, 'id,durum,olusturma_tarihi,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,atanan_kullanici_id,iptal_eden_id,firma_id', filters),
       (() => {
+        // NOT: gorevler tablosunda iptal_eden_id yok — spesifik görevlerde iptal yapanı
+        // islemi_yapan_id temsil eder (durum=IPTAL kayıtlarında).
         let q = filters.firmaId
           ? admin.from('gorevler').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id').eq('firma_id', filters.firmaId)
           : admin.from('gorevler').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id')
@@ -333,8 +335,27 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     }
     const graph2 = sortEntriesDesc(success, 10).map(([id, toplam]) => ({ personel: userMap.get(id) ?? '-', tamamlanan: toplam }))
 
-    const failMeta: Record<string, { total: number; completed: number }> = {}
-    const allUserIds = userList.filter((u: any) => !isYonetici(u.id)).map((u: any) => u.id)
+    // G3: En çok manuel görev iptal eden personeller
+    // (durum=IPTAL — sistem geçişleri ZAMANI_GECMIS / ZAMANINDA_YAPILAMAYAN dahil değil)
+    // Frekansiyel: iptal_eden_id, Spesifik: islemi_yapan_id (gorevler tablosunda iptal_eden_id yok)
+    const iptal: Record<string, number> = {}
+    for (const item of rangedLive) {
+      if (item.durum !== 'IPTAL') continue
+      const uid = item.iptal_eden_id
+      if (!uid || isYonetici(uid)) continue
+      iptal[uid] = (iptal[uid] ?? 0) + 1
+    }
+    for (const item of rangedManual) {
+      if (item.durum !== 'IPTAL') continue
+      const uid = item.islemi_yapan_id
+      if (!uid || isYonetici(uid)) continue
+      iptal[uid] = (iptal[uid] ?? 0) + 1
+    }
+    const graph3 = sortEntriesDesc(iptal, 10).map(([id, toplam]) => ({
+      personel: userMap.get(id) ?? '-',
+      iptal: toplam,
+    }))
+
     const resolveTaskUserId = (item: any) =>
       item?.atanan_kullanici_id ||
       item?.islemi_yapan_id ||
@@ -342,19 +363,6 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
       item?.baslatan_kullanici_id ||
       item?.olusturan_id ||
       null
-
-    for (const uid of allUserIds) failMeta[uid] = { total: 0, completed: success[uid] ?? 0 }
-    for (const item of [...rangedLive, ...rangedManual]) {
-      const uid = resolveTaskUserId(item)
-      if (!uid || isYonetici(uid)) continue
-      failMeta[uid] = failMeta[uid] ?? { total: 0, completed: 0 }
-      failMeta[uid].total += 1
-    }
-    const graph3 = Object.entries(failMeta)
-      .map(([id, meta]) => ({ personel: userMap.get(id) ?? '-', tamamlanan: meta.completed, toplam: meta.total, basarisizlik: Math.max(0, meta.total - meta.completed) }))
-      .filter((x) => x.toplam > 0)
-      .sort((a, b) => b.basarisizlik - a.basarisizlik || a.tamamlanan - b.tamamlanan)
-      .slice(0, 10)
 
     const targetUserId = filters.userId || null
     const statuses = Array.from(new Set([...rangedLive.map((x: any) => x.durum), ...rangedManual.map((x: any) => x.durum)].filter(Boolean))).sort()
@@ -381,7 +389,7 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
       charts: [
         chartOrEmpty({ key: 'g1', title: 'En aktif personeller', subtitle: 'Görev hareketliliğine göre', chart: 'bar', data: graph1, xKey: 'personel', dataKey: 'aktivite' }),
         chartOrEmpty({ key: 'g2', title: 'En başarılı personeller', subtitle: 'En fazla tamamlanan yapanlar', chart: 'bar', data: graph2, xKey: 'personel', dataKey: 'tamamlanan' }),
-        chartOrEmpty({ key: 'g3', title: 'En başarısız personeller', subtitle: 'Tamamlanan dışındaki görev yüküne göre', chart: 'bar', data: graph3, xKey: 'personel', dataKey: 'basarisizlik' }),
+        chartOrEmpty({ key: 'g3', title: 'En çok görev iptal eden personeller', subtitle: 'Manuel iptal sayısına göre (sistem geçişleri hariç)', chart: 'bar', data: graph3, xKey: 'personel', dataKey: 'iptal' }),
         chartOrEmpty({ key: 'g4', title: 'Personel görev sayıları', subtitle: targetUserId ? `Seçili personel: ${userMap.get(targetUserId) ?? '-'}` : 'Tüm personeller', chart: 'line', data: graph4, xKey: 'tarih', dataKey: 'toplam' }),
       ],
     }
