@@ -287,20 +287,40 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
   }
 
   if (type === 'users') {
-    const [liveTasks, { data: manualTasks, error: manualError }, yoneticiIds] = await Promise.all([
+    const [liveTasks, gorevlerAktif, gorevlerArsiv, yoneticiIds] = await Promise.all([
+      // Frekansiyel: helper canli + arsiv'i merge ediyor
       fetchCanliGorevlerMerged(admin, 'id,durum,olusturma_tarihi,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,atanan_kullanici_id,iptal_eden_id,firma_id', filters),
+      // Spesifik aktif: gorevler tablosu (iptal_eden_id yok, islemi_yapan_id manuel iptal yapanı temsil eder)
       (() => {
-        // NOT: gorevler tablosunda iptal_eden_id yok — spesifik görevlerde iptal yapanı
-        // islemi_yapan_id temsil eder (durum=IPTAL kayıtlarında).
         let q = filters.firmaId
           ? admin.from('gorevler').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id').eq('firma_id', filters.firmaId)
           : admin.from('gorevler').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id')
         if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
         return q
       })(),
+      // Spesifik arşiv: gorevler_arsiv (islemi_yapan_id YOK ama tamamlayan_kullanici_id var)
+      (() => {
+        let q = filters.firmaId
+          ? admin.from('gorevler_arsiv').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,firma_id').eq('firma_id', filters.firmaId)
+          : admin.from('gorevler_arsiv').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,firma_id')
+        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+        return q
+      })(),
       filters.firmaId ? getUstLokasyonYetkiliUserIds(filters.firmaId) : Promise.resolve(new Set<string>()),
     ])
-    if (manualError) throw new Error(manualError.message)
+    if (gorevlerAktif.error) throw new Error(gorevlerAktif.error.message)
+    if (gorevlerArsiv.error) throw new Error(gorevlerArsiv.error.message)
+
+    // Arşivdeki spesifik kayıtları aktif şemasına uydur (islemi_yapan_id <- tamamlayan_kullanici_id)
+    // gorevler_arsiv'de islemi_yapan_id yok; G2 tamamlama hesabı için tamamlayan_kullanici_id'yi
+    // alias'la. G3 iptal hesabı arşivde tespit edilemez (kim iptal etti bilgisi kaybolmuş).
+    const manualTasks = [
+      ...(gorevlerAktif.data ?? []),
+      ...((gorevlerArsiv.data ?? []) as any[]).map((x: any) => ({
+        ...x,
+        islemi_yapan_id: x.tamamlayan_kullanici_id ?? null,
+      })),
+    ]
 
     // Üst lokasyon yöneticilerini personel başarı/aktivite analizinden hariç tut
     const isYonetici = (uid: string | null | undefined) => !!uid && yoneticiIds.has(uid)
