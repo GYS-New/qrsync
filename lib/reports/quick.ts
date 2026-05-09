@@ -171,17 +171,17 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
   const admin = createAdminClient()
 
   let locQuery = admin.from('lokasyonlar').select('id,firma_id,tanim,parent_id,aktif')
-  let userQuery = admin.from('users').select('id,firma_id,isim_soyisim,rol,aktif').in('rol', ['tenant_admin', 'tenant_user'])
+  // Yöneticiler (SA, alt_super_admin, tenant_admin) raporda yer almaz — sadece saha personeli (U/M).
+  // Üst lokasyon yetkilileri (örn. MUSTAFA YILDIZ, SİNAN KORKMAZ) ayrıca isYonetici() helper'ı ile
+  // hesaplamalardan çıkarılır (bkz: getUstLokasyonYetkiliUserIds).
+  let userQuery = admin.from('users').select('id,firma_id,isim_soyisim,rol,aktif').in('rol', ['tenant_user', 'musteri'])
   if (filters.firmaId) {
     locQuery = locQuery.eq('firma_id', filters.firmaId)
     userQuery = userQuery.eq('firma_id', filters.firmaId)
   }
   if (filters.projeId) {
     locQuery = (locQuery as any).eq('proje_id', filters.projeId)
-    // U kullanıcıları projeye göre filtrele, TA her zaman
-    // Pratik çözüm: proje_id filtresi sadece tenant_user için - ama sorgu karmaşıklaşır
-    // En temiz: proje lokasyonlarına atanmış kullanıcıları döndür
-    userQuery = (userQuery as any).or(`rol.eq.tenant_admin,proje_id.eq.${filters.projeId}`)
+    userQuery = (userQuery as any).eq('proje_id', filters.projeId)
   }
 
   const [{ data: locations, error: locError }, { data: users, error: userError }] = await Promise.all([locQuery, userQuery])
