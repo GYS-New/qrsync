@@ -46,6 +46,16 @@ type RaporData = {
   islemSureleriAktif?: boolean
 }
 
+// Bugünün yerel tarihini YYYY-MM-DD formatında döner (timezone-safe; UTC'den
+// kayma yapmaz). Default rapor aralığını kullanıcının yerel gününe sabitler.
+function todayLocal(): string {
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
 // ── Design tokens (SpesifikRaporKarti ile aynı) ────────────────────
 const T = {
   blue:      '#1d4ed8', blueLight: '#eff6ff', blueMid: '#3b82f6',
@@ -248,8 +258,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   const [ustLokasyonId,     setUstLokasyonId]     = useState('')
   const [altLokasyonId,     setAltLokasyonId]     = useState('')
   const [altAltLokasyonId,  setAltAltLokasyonId]  = useState('')
-  const [raporBaslangic, setRaporBaslangic] = useState('')
-  const [raporBitis,     setRaporBitis]     = useState('')
+  // Default: bugün → bugün (büyüyen veri yoğunluğunda hızlı yükleme).
+  // Boşaltırsa "tüm dönem" davranışı korunur.
+  const [raporBaslangic, setRaporBaslangic] = useState(todayLocal)
+  const [raporBitis,     setRaporBitis]     = useState(todayLocal)
   const [raporuAlan,     setRaporuAlan]     = useState('')
   const [data,           setData]           = useState<RaporData | null>(null)
   const [loading,        setLoading]        = useState(false)
