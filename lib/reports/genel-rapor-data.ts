@@ -319,8 +319,17 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   }
 
   // 3. Görevleri çek: aktif tablo + arşiv tablosu birleşik
-  // Arşiv tablosu terminal durumları (TAMAMLANDI, ZAMANI_GECMIS vb.) tutar
-  const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
+  // Arşiv tablosu terminal durumları (TAMAMLANDI, ZAMANI_GECMIS vb.) tutar.
+  //
+  // Sütun seti includeDetails'a göre değişir:
+  //   - false (yeni rapor sayfası): sadece aggregation için gerekli 7 sütun.
+  //     21K satırda payload ~4MB → ~1.5MB (büyük kazanç). Detay liste üretimi
+  //     yapılmadığı için tanim/baslatilma_tarihi/iptal_sebep/personel id'ler vs.
+  //     hiç çekilmez.
+  //   - true (Excel/Export/Mail): tüm sütunlar, mevcut davranış korunur.
+  const SELECT_COLS_MIN = 'id,firma_id,lokasyon_id,durum,aktif_olma_tarihi,gunluk_frekans_sayisi,kural_id'
+  const SELECT_COLS_FULL = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
+  const SELECT_COLS = includeDetails ? SELECT_COLS_FULL : SELECT_COLS_MIN
 
   const baslangicUTC = filters.raporBaslangic ? new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString() : null
   const bitisUTC = filters.raporBitis ? new Date(filters.raporBitis + 'T23:59:59+03:00').toISOString() : null
@@ -353,23 +362,25 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   const ekstraGorevler = tumGorevler.filter((g: any) => g.kural_id == null)
 
   // 4. Kullanıcı isimleri + proje personel ID seti
-  const userIds = Array.from(new Set(tumGorevler.flatMap((g: any) =>
-    [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id].filter(Boolean)
-  )))
+  //    Bu lookup'lar SADECE detay liste row'larında personel adı/filtresi için kullanılır.
+  //    includeDetails=false durumunda atlanır (network/DB roundtrip tasarrufu).
   const userMap = new Map<string, string>()
-  if (userIds.length > 0) {
-    const { data: users } = await admin
-      .from('users')
-      .select('id,isim_soyisim')
-      .in('id', userIds)
-    for (const u of users ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
-  }
-
-  // Proje personel ID seti — sadece bu projeye atanmış kullanıcılar (grafiklerde yabancı proje personeli çıkmasın)
   let projePersonelIds: Set<string> | null = null
-  if (filters.projeId) {
-    const { data: projeUsers } = await admin.from('users').select('id').eq('proje_id', filters.projeId).eq('aktif', true)
-    projePersonelIds = new Set((projeUsers ?? []).map((u: any) => u.id))
+  if (includeDetails) {
+    const userIds = Array.from(new Set(tumGorevler.flatMap((g: any) =>
+      [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id].filter(Boolean)
+    )))
+    if (userIds.length > 0) {
+      const { data: users } = await admin
+        .from('users')
+        .select('id,isim_soyisim')
+        .in('id', userIds)
+      for (const u of users ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
+    }
+    if (filters.projeId) {
+      const { data: projeUsers } = await admin.from('users').select('id').eq('proje_id', filters.projeId).eq('aktif', true)
+      projePersonelIds = new Set((projeUsers ?? []).map((u: any) => u.id))
+    }
   }
 
   // Üst lokasyon yöneticileri — başarı analizinden hariç tutulur
