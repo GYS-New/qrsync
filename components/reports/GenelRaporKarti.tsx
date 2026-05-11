@@ -269,6 +269,11 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   const [activeTab,      setActiveTab]      = useState<Tab>('Özet & Grafikler')
   const [gruplandir,     setGruplandir]     = useState(false)
   const debRef = useRef<any>(null)
+  // Race condition koruması: hızlı tarih/filtre değişimlerinde yavaş request'lerin
+  // hızlı request'leri override etmesini önler. AbortController eski isteği iptal
+  // eder, requestIdRef de en son başlatılan request'in id'sini takip eder.
+  const abortRef = useRef<AbortController | null>(null)
+  const requestIdRef = useRef(0)
 
   // Üst lokasyon filtresi temizlenirse gruplandır modu otomatik kapanır
   // (gruplandır sadece üst lokasyon filtresi varken anlamlı)
@@ -303,16 +308,29 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
 
   const fetchData = useCallback(async () => {
     if (!currentFirmaId) return
+    // Önceki devam eden request'i iptal et
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    const myId = ++requestIdRef.current
     setLoading(true)
     try {
-      const res  = await fetch(`/api/reports/genel-rapor?${buildParams()}`, { cache: 'no-store' })
+      const res  = await fetch(`/api/reports/genel-rapor?${buildParams()}`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error ?? 'Veri alınamadı.')
+      // Bu request en son başlatılan değilse sonucu yoksay (race koruma)
+      if (myId !== requestIdRef.current) return
       setData(json)
     } catch (e: any) {
+      if (e?.name === 'AbortError') return  // iptal edilen request — sessizce yut
+      if (myId !== requestIdRef.current) return  // eski request hatası — yoksay
       toast({ type: 'error', title: 'Hata', message: e.message })
+    } finally {
+      if (myId === requestIdRef.current) setLoading(false)
     }
-    setLoading(false)
   }, [buildParams, currentFirmaId, toast])
 
   useEffect(() => {
