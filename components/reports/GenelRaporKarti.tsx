@@ -820,17 +820,53 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 {(() => {
                   const departmanlar = data.ozetAgg?.departmanMetrikleri ?? []
                   if (departmanlar.length === 0) return null
-                  // Üst lokasyon filtresi aktifse sadece seçili olanı tam genişlikte göster
                   const filtreli = ustLokasyonId
                     ? departmanlar.filter(d => d.ustLokasyonId === ustLokasyonId)
                     : departmanlar
                   if (filtreli.length === 0) return null
+
+                  // Tek bir departman görünümünde küçük yardımcı row bileşeni
+                  const pctOf = (v: number, t: number) => t > 0 ? Math.round(v / t * 100) : 0
+                  const OzetRow = ({ label, value, sub, color, bold }: { label: string; value: string | number; sub?: string; color?: string; bold?: boolean }) => (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '7px 0', borderBottom: `1px dashed ${T.border}`, fontSize: 13 }}>
+                      <span style={{ color: T.textSoft, fontWeight: 600 }}>{label}</span>
+                      <span style={{ fontWeight: bold ? 900 : 800, color: color ?? T.text, fontSize: bold ? 14.5 : 13 }}>
+                        {value}{sub && <span style={{ color: T.textSoft, fontWeight: 600, fontSize: 11.5, marginLeft: 4 }}>{sub}</span>}
+                      </span>
+                    </div>
+                  )
+
                   return (
                     <div className="verde-card" style={{ padding: '20px 24px' }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 14 }}>Departman Analizi</div>
-                      {ustLokasyonId ? (
-                        <DepartmanGraph d={filtreli[0]} expanded />
-                      ) : (
+                      {ustLokasyonId ? (() => {
+                        const d = filtreli[0]
+                        const basari = pctOf(d.tamamlanan, d.hedef)
+                        return (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 280px 260px', gap: 20, alignItems: 'stretch' }}>
+                            <DepartmanGraph d={d} expanded />
+                            <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em', alignSelf: 'flex-start' }}>Genel Dağılım</div>
+                              <PieChart size={200} slices={[
+                                { label: 'Tamamlandı', value: d.tamamlanan, color: T.greenMid },
+                                { label: 'Sapma',      value: d.sapma,      color: T.amber },
+                                { label: 'Kayıp',      value: d.kayip,      color: T.red },
+                              ]} />
+                            </div>
+                            <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 18px', minWidth: 0 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Özet</div>
+                              <OzetRow label="Hedef Frekans" value={d.hedef} color={T.blue} bold />
+                              <OzetRow label="Tamamlanan" value={d.tamamlanan} sub={`%${pctOf(d.tamamlanan, d.hedef)}`} color={T.green} />
+                              <OzetRow label="Sapma"      value={d.sapma}      sub={`%${pctOf(d.sapma, d.hedef)}`}      color={T.amber} />
+                              <OzetRow label="Kayıp"      value={d.kayip}      sub={`%${pctOf(d.kayip, d.hedef)}`}      color={T.red} />
+                              <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: basari >= 80 ? '#dcfce7' : basari >= 50 ? T.amberLight : T.redLight, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: basari >= 80 ? T.green : basari >= 50 ? T.amber : T.red, textTransform: 'uppercase' as const }}>Başarı</span>
+                                <span style={{ fontSize: 20, fontWeight: 900, color: basari >= 80 ? T.green : basari >= 50 ? T.amber : T.red }}>%{basari}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })() : (
                         // Tek satır: tüm departmanlar eşit pay, sayfa darsa yatay scroll
                         <div style={{
                           display: 'grid',
