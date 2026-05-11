@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { RefreshCw, CheckCircle2, AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react'
+import { RefreshCw, CheckCircle2, AlertTriangle, Info, ChevronDown, ChevronUp, Wrench } from 'lucide-react'
 
 type Durum = 'OK' | 'SORUN' | 'BILGI'
 type SorunDetayi = { kod: string; mesaj: string; adet?: number }
@@ -21,6 +21,32 @@ type Rapor = {
   toplam_sorun: number
   toplam_bilgi: number
   sistemler: SistemRaporu[]
+}
+
+// Otomatik düzeltilebilir sistemler ve karşılık gelen cron tipleri.
+// Sistemde tespit edilen anomali kodlarına bakarak hangi cron'ları tetikleyeceğimizi
+// belirler. Liste boşsa "Sorunları Düzelt" butonu gösterilmez.
+type CronTipi = 'arsivleme' | 'simulasyon' | 'personel_destek' | 'gece_dongu'
+function otomatikCronlar(s: SistemRaporu): CronTipi[] {
+  if (s.durum !== 'SORUN') return []
+  const out = new Set<CronTipi>()
+  if (s.ad === 'Arşivleme') out.add('arsivleme')
+  else if (s.ad === 'Personel Destek') out.add('personel_destek')
+  else if (s.ad === 'Görev Üretimi') out.add('gece_dongu')
+  else if (s.ad === 'Cron Motoru') {
+    for (const sr of s.sorunlar ?? []) {
+      if (sr.kod === 'ARSIV_CRON_DURAKSADI') out.add('arsivleme')
+      if (sr.kod === 'SIM_CRON_DURAKSADI') out.add('simulasyon')
+      if (sr.kod === 'PD_CRON_LOG_YOK') out.add('personel_destek')
+    }
+  }
+  return [...out]
+}
+const CRON_LABEL: Record<CronTipi, string> = {
+  arsivleme: 'Arşivleme',
+  simulasyon: 'Simülasyon',
+  personel_destek: 'Personel Destek',
+  gece_dongu: 'Gece Tam Döngü',
 }
 
 const DURUM_STIL: Record<Durum, { bg: string; color: string; border: string; label: string }> = {
@@ -66,6 +92,55 @@ export default function SistemSaglikWidget() {
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(false)
   const [acikKart, setAcikKart] = useState<number | null>(null)
+  // Aktif düzeltme işlemi yapılan kart indexi (buton spinner için)
+  const [duzeltiyor, setDuzeltiyor] = useState<number | null>(null)
+  // Düzeltme sonucu mini bildirim (kart başına 5sn görünür)
+  const [duzeltMesaj, setDuzeltMesaj] = useState<{ kartIndex: number; tip: 'ok' | 'hata'; metin: string } | null>(null)
+
+  async function duzeltSistem(i: number, s: SistemRaporu) {
+    const cronlar = otomatikCronlar(s)
+    if (cronlar.length === 0) return
+    const onay = window.confirm(
+      `"${s.ad}" sistemindeki anomalileri çözmek için şu cron'lar manuel tetiklenecek:\n\n` +
+      cronlar.map(c => `• ${CRON_LABEL[c]}`).join('\n') +
+      `\n\nDevam etmek istiyor musunuz?`
+    )
+    if (!onay) return
+    setDuzeltiyor(i)
+    setDuzeltMesaj(null)
+    try {
+      const sonuclar = await Promise.all(cronlar.map(async tip => {
+        const r = await fetch('/api/admin/cron-tetikle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tip }),
+        })
+        return { tip, ok: r.ok, json: await r.json().catch(() => ({})) }
+      }))
+      const basariliCron = sonuclar.filter(x => x.ok && x.json?.ok !== false)
+      const hataliCron = sonuclar.filter(x => !x.ok || x.json?.ok === false)
+      if (hataliCron.length === 0) {
+        setDuzeltMesaj({ kartIndex: i, tip: 'ok', metin: `${basariliCron.length} cron tetiklendi. Sistem yeniden kontrol ediliyor…` })
+        // Sistem kontrolünü tetikle ki yeni durum hemen yansısın
+        try {
+          await fetch('/api/admin/cron-tetikle', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tip: 'sistem_kontrol' }),
+          })
+        } catch {}
+        setTimeout(() => { yukle(); setDuzeltMesaj(null) }, 3000)
+      } else {
+        const ilkHata = hataliCron[0]
+        setDuzeltMesaj({ kartIndex: i, tip: 'hata', metin: ilkHata.json?.error ?? `${CRON_LABEL[ilkHata.tip]} tetiklenemedi.` })
+        setTimeout(() => setDuzeltMesaj(null), 5000)
+      }
+    } catch (e: any) {
+      setDuzeltMesaj({ kartIndex: i, tip: 'hata', metin: e?.message ?? 'Bağlantı hatası' })
+      setTimeout(() => setDuzeltMesaj(null), 5000)
+    } finally {
+      setDuzeltiyor(null)
+    }
+  }
 
   async function yukle() {
     setLoading(true)
@@ -241,6 +316,41 @@ export default function SistemSaglikWidget() {
                       <span style={{ fontWeight: 600, color: '#0f172a' }}>Yapılması gereken: </span>
                       {yorum.eylem}
                     </div>
+
+                    {/* Otomatik düzelt butonu — sadece desteklenen sistemlerde görünür */}
+                    {(() => {
+                      const cronlar = otomatikCronlar(s)
+                      if (cronlar.length === 0) return null
+                      const aktif = duzeltiyor === i
+                      const msg = duzeltMesaj?.kartIndex === i ? duzeltMesaj : null
+                      return (
+                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #e2e8f0' }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); duzeltSistem(i, s) }}
+                            disabled={aktif || duzeltiyor !== null}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              padding: '7px 14px', borderRadius: 6, border: 'none',
+                              background: aktif ? '#94a3b8' : '#1f2937', color: '#fff',
+                              fontSize: 12.5, fontWeight: 700, cursor: aktif ? 'wait' : 'pointer',
+                              opacity: duzeltiyor !== null && !aktif ? 0.5 : 1,
+                            }}
+                            title={`Tetiklenecek cron'lar: ${cronlar.map(c => CRON_LABEL[c]).join(', ')}`}
+                          >
+                            {aktif ? <RefreshCw size={13} style={{ animation: 'spin 0.9s linear infinite' }} /> : <Wrench size={13} />}
+                            {aktif ? 'Düzeltiliyor…' : 'Sorunları Düzelt'}
+                          </button>
+                          {msg && (
+                            <span style={{
+                              marginLeft: 10, fontSize: 12, fontWeight: 600,
+                              color: msg.tip === 'ok' ? '#166534' : '#991b1b',
+                            }}>
+                              {msg.tip === 'ok' ? '✓ ' : '⚠ '}{msg.metin}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>
