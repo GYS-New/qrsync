@@ -777,20 +777,6 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   </div>
                 </div>
 
-                {/* ── 6. Frekans Dışı Çalışmalar ── */}
-                {data.frekansDisiGorevler.length > 0 && (
-                  <div className="verde-card" style={{ padding: '16px 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Ekstra Frekansiyel)</div>
-                      <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{data.frekansDisiGorevler.length} kayıt</span>
-                    </div>
-                    <DataTable
-                      headers={['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH-SAAT', 'GÖREV TANIMI']}
-                      rows={data.frekansDisiGorevler.map(r => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarihSaat, r.aciklama])}
-                    />
-                  </div>
-                )}
-
               </div>
             )}
 
