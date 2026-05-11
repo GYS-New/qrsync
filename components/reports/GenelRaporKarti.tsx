@@ -29,6 +29,16 @@ type KayipRow       = { sn: number; ustLokasyon: string; lokasyon: string; gorev
 type FrekansDisiRow  = { sn: number; ustLokasyon: string; grupTanimi: string; lokasyonTanimi: string; personel: string; tarihSaat: string; tarih: string; gorevSaatleri: string; gorevSuresi: string; aciklama: string }
 type AtananFrekanRow = { sn: number; atanan: string; tamamlayan: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gorevDurumu: string; durumKod: string; atamaTarihi: string; tamamlanmaTarihi: string }
 
+type OzetAgg = {
+  personelTamamlananTop: { key: string; sayi: number }[]
+  lokasyonTamamlananTop: { key: string; sayi: number }[]
+  kayipNedeniDagilim: { neden: string; sayi: number }[]
+  sapmaNedeniDagilim: { neden: string; sayi: number }[]
+  kayipLokasyonTop: { key: string; sayi: number }[]
+  sapmaLokasyonTop: { key: string; sayi: number }[]
+  atananPersonelBasari: { personel: string; atanan: number; tamamlanan: number; sapma: number; kayip: number; aktif: number }[]
+}
+
 type RaporData = {
   firmaAdi: string; projeAdi: string; ustLokTanim: string; altLokTanim: string
   raporTarihLabel: string; gunSayisi: number; raporuAlan: string
@@ -40,6 +50,8 @@ type RaporData = {
   kayipGorevler: KayipRow[]
   frekansDisiGorevler: FrekansDisiRow[]
   atananFrekanslar: AtananFrekanRow[]
+  /** Özet & Grafikler için önceden hesaplanmış agg'ler (backend ozetAgg). */
+  ozetAgg?: OzetAgg
   /** Üst lokasyon yöneticileri — personel başarı agg'lerinde hariç tutulur */
   yoneticiIds?: string[]
   /** Proje ayarı: false ise Görev Saatleri + Görev Süresi sütunları gizlenir */
@@ -478,54 +490,13 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
     const toplamGerceklesen = data.toplamTamamlanan + data.toplamSapma
     const genelOran = toplamHedef > 0 ? Math.round(toplamGerceklesen / toplamHedef * 100) : 0
 
-    // Üst lokasyon yöneticileri — personel başarı agg'lerinde hariç tutulur
-    // (vardiya şefleri sahada bireysel görev yapmıyor; kalanları kapatıyorlar)
-    const yoneticiSet = new Set(data.yoneticiIds ?? [])
-
-    // Personel bazlı tamamlanan (Üst Lokasyon - Personel formatında, boş personel atlanır)
-    const persSayac = new Map<string, number>()
-    for (const r of data.tamamlananGorevler) {
-      if (!r.personel) continue
-      if (r.personelId && yoneticiSet.has(r.personelId)) continue
-      const ust = r.ustLokasyon || '—'
-      const key = `${ust} - ${r.personel}`
-      persSayac.set(key, (persSayac.get(key) ?? 0) + 1)
-    }
-    const persBazli = [...persSayac.entries()]
-      .map(([personel, sayi]) => ({ personel, sayi }))
-      .sort((a, b) => b.sayi - a.sayi).slice(0, 10)
-
-    // Lokasyon bazlı tamamlanan (Üst Lokasyon - Lokasyon formatında)
-    const lokSayac = new Map<string, number>()
-    for (const r of data.tamamlananGorevler) {
-      const lok = r.lokasyon || 'Bilinmiyor'
-      const ust = r.ustLokasyon || '—'
-      const key = `${ust} - ${lok}`
-      lokSayac.set(key, (lokSayac.get(key) ?? 0) + 1)
-    }
-    const lokBazli = [...lokSayac.entries()]
-      .map(([lokasyon, sayi]) => ({ lokasyon, sayi }))
-      .sort((a, b) => b.sayi - a.sayi).slice(0, 10)
-
-    // Kayıp neden dağılımı
-    const kayipSayac = new Map<string, number>()
-    for (const r of data.kayipGorevler) {
-      const k = r.kayipNedeni || 'Diğer'
-      kayipSayac.set(k, (kayipSayac.get(k) ?? 0) + 1)
-    }
-    const kayipNedeni = [...kayipSayac.entries()]
-      .map(([neden, sayi]) => ({ neden, sayi }))
-      .sort((a, b) => b.sayi - a.sayi)
-
-    // Sapma neden dağılımı
-    const sapmaSayac = new Map<string, number>()
-    for (const r of data.sapmaGorevler) {
-      const k = r.sapmaNedeni || 'Diğer'
-      sapmaSayac.set(k, (sapmaSayac.get(k) ?? 0) + 1)
-    }
-    const sapmaNedeni = [...sapmaSayac.entries()]
-      .map(([neden, sayi]) => ({ neden, sayi }))
-      .sort((a, b) => b.sayi - a.sayi)
+    // Özet sayfasının grafik verileri artık backend'de hesaplanıyor (ozetAgg).
+    // Detay listeler lazy load olduğu için frontend bunlardan agg yapamaz.
+    const agg = data.ozetAgg
+    const persBazli = (agg?.personelTamamlananTop ?? []).map(x => ({ personel: x.key, sayi: x.sayi }))
+    const lokBazli = (agg?.lokasyonTamamlananTop ?? []).map(x => ({ lokasyon: x.key, sayi: x.sayi }))
+    const kayipNedeni = (agg?.kayipNedeniDagilim ?? []).map(x => ({ neden: x.neden, sayi: x.sayi }))
+    const sapmaNedeni = (agg?.sapmaNedeniDagilim ?? []).map(x => ({ neden: x.neden, sayi: x.sayi }))
 
     // Grup bazlı tamamlanan (aynı isimli grupları birleştir, tüm gruplar)
     const grupAgg = new Map<string, { tamamlanan: number; hedef: number; sapma: number; kayip: number }>()
@@ -537,53 +508,20 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       .map(([grup, v]) => ({ grup, ...v }))
       .sort((a, b) => b.tamamlanan - a.tamamlanan)
 
-    // Kayıp frekanslar – lokasyon bazlı (Üst Lokasyon - Lokasyon, ilk 10)
-    const kayipLokSayac = new Map<string, number>()
-    for (const r of data.kayipGorevler) {
-      const lok = r.lokasyon || 'Bilinmiyor'
-      const ust = r.ustLokasyon || '—'
-      const key = `${ust} - ${lok}`
-      kayipLokSayac.set(key, (kayipLokSayac.get(key) ?? 0) + 1)
-    }
-    const kayipLokBazli = [...kayipLokSayac.entries()]
-      .map(([lokasyon, sayi]) => ({ lokasyon, sayi }))
-      .sort((a, b) => b.sayi - a.sayi).slice(0, 10)
+    // Kayıp / Sapma — lokasyon bazlı (backend agg)
+    const kayipLokBazli = (agg?.kayipLokasyonTop ?? []).map(x => ({ lokasyon: x.key, sayi: x.sayi }))
+    const sapmaLokBazli = (agg?.sapmaLokasyonTop ?? []).map(x => ({ lokasyon: x.key, sayi: x.sayi }))
 
-    // Sapma frekanslar – lokasyon bazlı (Üst Lokasyon - Lokasyon, ilk 10)
-    const sapmaLokSayac = new Map<string, number>()
-    for (const r of data.sapmaGorevler) {
-      const lok = r.lokasyon || 'Bilinmiyor'
-      const ust = r.ustLokasyon || '—'
-      const key = `${ust} - ${lok}`
-      sapmaLokSayac.set(key, (sapmaLokSayac.get(key) ?? 0) + 1)
-    }
-    const sapmaLokBazli = [...sapmaLokSayac.entries()]
-      .map(([lokasyon, sayi]) => ({ lokasyon, sayi }))
-      .sort((a, b) => b.sayi - a.sayi).slice(0, 10)
-
-    // Atanan frekanslar — personel bazlı başarı
-    const persBazliBasariMap = new Map<string, { atanan: number; tamamlanan: number; sapma: number; kayip: number; aktif: number }>()
-    for (const r of data.atananFrekanslar) {
-      const key = r.atanan === '—' ? 'Atanmamış' : r.atanan
-      if (!persBazliBasariMap.has(key)) persBazliBasariMap.set(key, { atanan: 0, tamamlanan: 0, sapma: 0, kayip: 0, aktif: 0 })
-      const e = persBazliBasariMap.get(key)!
-      e.atanan++
-      if (r.durumKod === 'TAMAMLANDI') e.tamamlanan++
-      else if (r.durumKod === 'ZAMANINDA_YAPILAMAYAN') e.sapma++
-      else if (['ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI', 'SILINDI', 'BEKLEMEDE'].includes(r.durumKod)) e.kayip++
-      else e.aktif++
-    }
-    const persBazliBasari = [...persBazliBasariMap.entries()]
-      .map(([personel, v]) => ({
-        personel,
-        atanan: v.atanan,
-        tamamlanan: v.tamamlanan,
-        sapma: v.sapma,
-        kayip: v.kayip,
-        aktif: v.aktif,
-        basariOrani: v.atanan > 0 ? Math.round(v.tamamlanan / v.atanan * 100) : 0,
-      }))
-      .sort((a, b) => b.atanan - a.atanan)
+    // Atanan frekanslar — personel bazlı başarı (backend agg)
+    const persBazliBasari = (agg?.atananPersonelBasari ?? []).map(v => ({
+      personel: v.personel,
+      atanan: v.atanan,
+      tamamlanan: v.tamamlanan,
+      sapma: v.sapma,
+      kayip: v.kayip,
+      aktif: v.aktif,
+      basariOrani: v.atanan > 0 ? Math.round(v.tamamlanan / v.atanan * 100) : 0,
+    }))
 
     return { toplamGerceklesen, genelOran, persBazli, lokBazli, kayipNedeni, sapmaNedeni, grupBazli, kayipLokBazli, sapmaLokBazli, persBazliBasari }
   }, [data, toplamHedef])

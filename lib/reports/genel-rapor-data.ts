@@ -110,6 +110,21 @@ export interface AtananFrekanRow {
   tamamlanmaTarihi: string
 }
 
+/** Özet & Grafikler sekmesinde tüketilen önceden agg-edilmiş veriler.
+ *  Frontend artık detay listelerden hesaplamaz (lazy load sonrası boş gelirler);
+ *  doğrudan bu alanlardan okur. Tüm key formatları "Üst Lokasyon - X". */
+export interface OzetAgg {
+  personelTamamlananTop: { key: string; sayi: number }[]   // Üst Lok - Personel, top 10, yönetici hariç
+  lokasyonTamamlananTop: { key: string; sayi: number }[]   // Üst Lok - Lokasyon, top 10
+  kayipNedeniDagilim: { neden: string; sayi: number }[]    // desc, tüm nedenler
+  sapmaNedeniDagilim: { neden: string; sayi: number }[]
+  kayipLokasyonTop: { key: string; sayi: number }[]        // top 10
+  sapmaLokasyonTop: { key: string; sayi: number }[]
+  atananPersonelBasari: {                                  // tüm atanan personel
+    personel: string; atanan: number; tamamlanan: number; sapma: number; kayip: number; aktif: number
+  }[]
+}
+
 export interface GenelRaporData {
   firmaAdi: string
   projeAdi: string
@@ -132,6 +147,9 @@ export interface GenelRaporData {
   kayipGorevler: KayipRow[]
   frekansDisiGorevler: FrekansDisiRow[]
   atananFrekanslar: AtananFrekanRow[]
+  /** Özet sayfası grafikleri için önceden hesaplanmış agg'ler.
+   *  includeDetails=false durumunda detay listeler boş gelir; özet bu alanlardan okur. */
+  ozetAgg: OzetAgg
   /** Üst lokasyon yöneticileri (vardiya şefleri) — frontend personel başarı
    *  agg'lerinde hariç tutmak için. Listelerde tüm satırlar var, denetim için. */
   yoneticiIds: string[]
@@ -322,14 +340,13 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   // Arşiv tablosu terminal durumları (TAMAMLANDI, ZAMANI_GECMIS vb.) tutar.
   //
   // Sütun seti includeDetails'a göre değişir:
-  //   - false (yeni rapor sayfası): sadece aggregation için gerekli 7 sütun.
-  //     21K satırda payload ~4MB → ~1.5MB (büyük kazanç). Detay liste üretimi
-  //     yapılmadığı için tanim/baslatilma_tarihi/iptal_sebep/personel id'ler vs.
-  //     hiç çekilmez.
+  //   - false (yeni rapor sayfası): özet & grafikler agg'leri için gerekli 11 sütun.
+  //     Personel/lokasyon/kayıp-neden top-N grafikleri response.ozetAgg üzerinden
+  //     hesaplanır (frontend artık detay listelerden değil bu agg'lerden okur).
   //   - true (Excel/Export/Mail): tüm sütunlar, mevcut davranış korunur.
-  const SELECT_COLS_MIN = 'id,firma_id,lokasyon_id,durum,aktif_olma_tarihi,gunluk_frekans_sayisi,kural_id'
+  const SELECT_COLS_MID = 'id,firma_id,lokasyon_id,durum,aktif_olma_tarihi,gunluk_frekans_sayisi,kural_id,islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id,iptal_sebep'
   const SELECT_COLS_FULL = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
-  const SELECT_COLS = includeDetails ? SELECT_COLS_FULL : SELECT_COLS_MIN
+  const SELECT_COLS = includeDetails ? SELECT_COLS_FULL : SELECT_COLS_MID
 
   const baslangicUTC = filters.raporBaslangic ? new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString() : null
   const bitisUTC = filters.raporBitis ? new Date(filters.raporBitis + 'T23:59:59+03:00').toISOString() : null
@@ -362,25 +379,23 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   const ekstraGorevler = tumGorevler.filter((g: any) => g.kural_id == null)
 
   // 4. Kullanıcı isimleri + proje personel ID seti
-  //    Bu lookup'lar SADECE detay liste row'larında personel adı/filtresi için kullanılır.
-  //    includeDetails=false durumunda atlanır (network/DB roundtrip tasarrufu).
+  //    Hem detay liste row'larında personel adı/filtresi için, hem de özet
+  //    sayfası agg'lerinde (en aktif personel grafiği vb.) gerekli.
   const userMap = new Map<string, string>()
   let projePersonelIds: Set<string> | null = null
-  if (includeDetails) {
-    const userIds = Array.from(new Set(tumGorevler.flatMap((g: any) =>
-      [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id].filter(Boolean)
-    )))
-    if (userIds.length > 0) {
-      const { data: users } = await admin
-        .from('users')
-        .select('id,isim_soyisim')
-        .in('id', userIds)
-      for (const u of users ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
-    }
-    if (filters.projeId) {
-      const { data: projeUsers } = await admin.from('users').select('id').eq('proje_id', filters.projeId).eq('aktif', true)
-      projePersonelIds = new Set((projeUsers ?? []).map((u: any) => u.id))
-    }
+  const userIds = Array.from(new Set(tumGorevler.flatMap((g: any) =>
+    [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id].filter(Boolean)
+  )))
+  if (userIds.length > 0) {
+    const { data: users } = await admin
+      .from('users')
+      .select('id,isim_soyisim')
+      .in('id', userIds)
+    for (const u of users ?? []) userMap.set((u as any).id, (u as any).isim_soyisim ?? '')
+  }
+  if (filters.projeId) {
+    const { data: projeUsers } = await admin.from('users').select('id').eq('proje_id', filters.projeId).eq('aktif', true)
+    projePersonelIds = new Set((projeUsers ?? []).map((u: any) => u.id))
   }
 
   // Üst lokasyon yöneticileri — başarı analizinden hariç tutulur
@@ -841,6 +856,111 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       })
   }
 
+  // 13. Özet & Grafikler sekmesi için agg'ler — frontend artık detay listelerden değil
+  //     burayı kullanır. Detay listeler lazy load olduğu için boş gelir, özet bozulurdu.
+  const yoneticiSet = yoneticiIds
+  const kayipNedeniLabelInline: Record<string, string> = {
+    ZAMANI_GECMIS: 'Süre aşıldı, gerçekleşmedi', IPTAL: 'Sebep belirtilmedi',
+    SILINDI: 'Kayıt silindi', BEKLEMEDE: 'Beklemede kaldı', KAPATILDI: 'Kapatıldı',
+  }
+  function ustLokAd(lokId: string | null | undefined): string {
+    if (!lokId) return '—'
+    let cur = lokMap.get(lokId) as any
+    let safety = 0
+    while (cur?.parent_id && safety < 20) { cur = lokMap.get(cur.parent_id) as any; safety++ }
+    return cur?.tanim ?? '—'
+  }
+  const ozetAgg: OzetAgg = {
+    personelTamamlananTop: [],
+    lokasyonTamamlananTop: [],
+    kayipNedeniDagilim: [],
+    sapmaNedeniDagilim: [],
+    kayipLokasyonTop: [],
+    sapmaLokasyonTop: [],
+    atananPersonelBasari: [],
+  }
+  {
+    const persSayac = new Map<string, number>()
+    const lokSayac = new Map<string, number>()
+    for (const g of kuralGorevler) {
+      if ((g as any).durum !== 'TAMAMLANDI') continue
+      const lokId = (g as any).lokasyon_id
+      const lok = lokMap.get(lokId) as any
+      const ust = ustLokAd(lokId)
+      const personelId = (g as any).islemi_yapan_id ?? (g as any).tamamlayan_kullanici_id
+      // Personel agg: boş personel atlanır, yönetici filtrelenir, proje dışı kişiler dahil edilmez
+      if (personelId && !yoneticiSet.has(personelId)) {
+        const isProje = !projePersonelIds || projePersonelIds.has(personelId)
+        if (isProje) {
+          const isim = userMap.get(personelId)
+          if (isim) {
+            const key = `${ust} - ${isim}`
+            persSayac.set(key, (persSayac.get(key) ?? 0) + 1)
+          }
+        }
+      }
+      // Lokasyon agg
+      const lokKey = `${ust} - ${lok?.tanim ?? 'Bilinmiyor'}`
+      lokSayac.set(lokKey, (lokSayac.get(lokKey) ?? 0) + 1)
+    }
+    ozetAgg.personelTamamlananTop = [...persSayac.entries()].map(([key, sayi]) => ({ key, sayi })).sort((a, b) => b.sayi - a.sayi).slice(0, 10)
+    ozetAgg.lokasyonTamamlananTop = [...lokSayac.entries()].map(([key, sayi]) => ({ key, sayi })).sort((a, b) => b.sayi - a.sayi).slice(0, 10)
+  }
+  {
+    const kayipNedenSayac = new Map<string, number>()
+    const kayipLokSayac = new Map<string, number>()
+    for (const g of kuralGorevler) {
+      const d = (g as any).durum
+      if (d === 'TAMAMLANDI' || d === 'ZAMANINDA_YAPILAMAYAN' || d === 'HAZIR' || d === 'ACIK' || d === 'ISLEMDE') continue
+      // Kayıp neden
+      const iptalSebep = typeof (g as any).iptal_sebep === 'string' ? (g as any).iptal_sebep.trim() : ''
+      const neden = (d === 'IPTAL' && iptalSebep) ? iptalSebep : (kayipNedeniLabelInline[d] ?? d)
+      kayipNedenSayac.set(neden, (kayipNedenSayac.get(neden) ?? 0) + 1)
+      // Kayıp lokasyon
+      const lokId = (g as any).lokasyon_id
+      const lok = lokMap.get(lokId) as any
+      const ust = ustLokAd(lokId)
+      const key = `${ust} - ${lok?.tanim ?? 'Bilinmiyor'}`
+      kayipLokSayac.set(key, (kayipLokSayac.get(key) ?? 0) + 1)
+    }
+    ozetAgg.kayipNedeniDagilim = [...kayipNedenSayac.entries()].map(([neden, sayi]) => ({ neden, sayi })).sort((a, b) => b.sayi - a.sayi)
+    ozetAgg.kayipLokasyonTop = [...kayipLokSayac.entries()].map(([key, sayi]) => ({ key, sayi })).sort((a, b) => b.sayi - a.sayi).slice(0, 10)
+  }
+  {
+    const sapmaNedenSayac = new Map<string, number>()
+    const sapmaLokSayac = new Map<string, number>()
+    for (const g of kuralGorevler) {
+      if ((g as any).durum !== 'ZAMANINDA_YAPILAMAYAN') continue
+      const neden = 'Gecikme ile tamamlandı'  // tek sebep (mevcut FE mantığı ile aynı)
+      sapmaNedenSayac.set(neden, (sapmaNedenSayac.get(neden) ?? 0) + 1)
+      const lokId = (g as any).lokasyon_id
+      const lok = lokMap.get(lokId) as any
+      const ust = ustLokAd(lokId)
+      const key = `${ust} - ${lok?.tanim ?? 'Bilinmiyor'}`
+      sapmaLokSayac.set(key, (sapmaLokSayac.get(key) ?? 0) + 1)
+    }
+    ozetAgg.sapmaNedeniDagilim = [...sapmaNedenSayac.entries()].map(([neden, sayi]) => ({ neden, sayi })).sort((a, b) => b.sayi - a.sayi)
+    ozetAgg.sapmaLokasyonTop = [...sapmaLokSayac.entries()].map(([key, sayi]) => ({ key, sayi })).sort((a, b) => b.sayi - a.sayi).slice(0, 10)
+  }
+  {
+    // Atanan personel başarı: atanan_kullanici_id NOT NULL olan kural görevleri
+    const persMap = new Map<string, { atanan: number; tamamlanan: number; sapma: number; kayip: number; aktif: number }>()
+    for (const g of kuralGorevler) {
+      const atananId = (g as any).atanan_kullanici_id
+      if (!atananId) continue
+      const isim = userMap.get(atananId) ?? 'Atanmamış'
+      if (!persMap.has(isim)) persMap.set(isim, { atanan: 0, tamamlanan: 0, sapma: 0, kayip: 0, aktif: 0 })
+      const e = persMap.get(isim)!
+      e.atanan++
+      const d = (g as any).durum
+      if (d === 'TAMAMLANDI') e.tamamlanan++
+      else if (d === 'ZAMANINDA_YAPILAMAYAN') e.sapma++
+      else if (d === 'ZAMANI_GECMIS' || d === 'IPTAL' || d === 'KAPATILDI' || d === 'SILINDI' || d === 'BEKLEMEDE') e.kayip++
+      else e.aktif++
+    }
+    ozetAgg.atananPersonelBasari = [...persMap.entries()].map(([personel, v]) => ({ personel, ...v })).sort((a, b) => b.atanan - a.atanan)
+  }
+
   // Rapor tarihi etiketi
   let raporTarihLabel = ''
   if (filters.raporBaslangic && filters.raporBitis) {
@@ -870,6 +990,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     toplamKayip,
     toplamEkstra,
     genelBasari,
+    ozetAgg,
     grupMetrikleri,
     tamamlananGorevler,
     sapmaGorevler,
