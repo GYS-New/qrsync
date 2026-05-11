@@ -29,7 +29,14 @@ type KayipRow       = { sn: number; ustLokasyon: string; lokasyon: string; gorev
 type FrekansDisiRow  = { sn: number; ustLokasyon: string; grupTanimi: string; lokasyonTanimi: string; personel: string; tarihSaat: string; tarih: string; gorevSaatleri: string; gorevSuresi: string; aciklama: string }
 type AtananFrekanRow = { sn: number; atanan: string; tamamlayan: string; ustLokasyon: string; lokasyon: string; gorevTanimi: string; gorevDurumu: string; durumKod: string; atamaTarihi: string; tamamlanmaTarihi: string }
 
+type DepartmanMetrik = {
+  ustLokasyonId: string
+  ustLokasyonAd: string
+  hedef: number; tamamlanan: number; sapma: number; kayip: number
+}
+
 type OzetAgg = {
+  departmanMetrikleri?: DepartmanMetrik[]
   personelTamamlananTop: { key: string; sayi: number }[]
   lokasyonTamamlananTop: { key: string; sayi: number }[]
   kayipNedeniDagilim: { neden: string; sayi: number }[]
@@ -301,6 +308,54 @@ function DetayLoader({ label }: { label: string }) {
     <div className="verde-card" style={{ padding: '64px 20px', textAlign: 'center' }}>
       <RefreshCw size={36} style={{ animation: 'spin 0.9s linear infinite', color: T.blue, margin: '0 auto 14px', display: 'block' }} />
       <div style={{ fontSize: 14, fontWeight: 600, color: T.textSoft }}>{label} yükleniyor…</div>
+    </div>
+  )
+}
+
+// Departman Analizi kartı içindeki tek bir üst lokasyon grafiği — 3 dikey bar
+// (Tamamlandı / Sapma / Kayıp), hedefe referans yükseklik. expanded=true ise
+// daha uzun çubuklar (tek üst lokasyon filtresi seçildiğinde).
+function DepartmanGraph({ d, expanded = false }: { d: DepartmanMetrik; expanded?: boolean }) {
+  const max = d.hedef || 1
+  const bars = [
+    { label: 'Tamamlandı', value: d.tamamlanan, color: T.greenMid },
+    { label: 'Sapma',      value: d.sapma,      color: T.amber },
+    { label: 'Kayıp',      value: d.kayip,      color: T.red },
+  ]
+  const H = expanded ? 280 : 180
+  return (
+    <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 16px', minWidth: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.ustLokasyonAd}>
+          {d.ustLokasyonAd}
+        </div>
+        <div style={{ fontSize: 11, color: T.textSoft, fontWeight: 600, flexShrink: 0 }}>
+          Hedef: <strong style={{ color: T.text, fontWeight: 800 }}>{d.hedef}</strong>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, height: H, paddingBottom: 26, position: 'relative' }}>
+        {bars.map(b => {
+          const pct = (b.value / max) * 100
+          const oran = max > 0 ? Math.round((b.value / max) * 100) : 0
+          return (
+            <div key={b.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', position: 'relative', minWidth: 0 }}
+              title={`${b.label}: ${b.value} (%${oran} / hedef ${d.hedef})`}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 4, whiteSpace: 'nowrap' }}>
+                {b.value} <span style={{ color: T.textSoft, fontWeight: 600, fontSize: 11 }}>%{oran}</span>
+              </div>
+              <div style={{
+                width: '78%', height: `${Math.max(pct, 1.5)}%`, minHeight: 2,
+                background: `linear-gradient(180deg, ${b.color}, ${b.color}aa)`,
+                borderRadius: '6px 6px 2px 2px', transition: 'height 0.5s ease',
+              }} />
+              <div style={{
+                position: 'absolute', bottom: -20, left: '50%', transform: 'translateX(-50%)',
+                fontSize: 11, fontWeight: 700, color: T.textSoft, whiteSpace: 'nowrap',
+              }}>{b.label}</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -707,6 +762,29 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {/* ── ÖZET & GRAFİKLER ── */}
             {activeTab === 'Özet & Grafikler' && ozetData && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                {/* ── 0. Departman Analizi ── */}
+                {(() => {
+                  const departmanlar = data.ozetAgg?.departmanMetrikleri ?? []
+                  if (departmanlar.length === 0) return null
+                  // Üst lokasyon filtresi aktifse sadece seçili olanı tam genişlikte göster
+                  const filtreli = ustLokasyonId
+                    ? departmanlar.filter(d => d.ustLokasyonId === ustLokasyonId)
+                    : departmanlar
+                  if (filtreli.length === 0) return null
+                  return (
+                    <div className="verde-card" style={{ padding: '20px 24px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 14 }}>Departman Analizi</div>
+                      {ustLokasyonId ? (
+                        <DepartmanGraph d={filtreli[0]} expanded />
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+                          {filtreli.map(d => <DepartmanGraph key={d.ustLokasyonId} d={d} />)}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {/* ── 1. Genel Performans Paneli ── */}
                 <div className="verde-card" style={{ padding: '20px 24px' }}>

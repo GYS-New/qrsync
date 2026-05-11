@@ -110,10 +110,21 @@ export interface AtananFrekanRow {
   tamamlanmaTarihi: string
 }
 
+/** Üst lokasyon (departman) bazında özet. Departman Analizi kartı için. */
+export interface DepartmanMetrik {
+  ustLokasyonId: string
+  ustLokasyonAd: string
+  hedef: number       // toplam kural-üretimli görev
+  tamamlanan: number  // durum=TAMAMLANDI
+  sapma: number       // durum=ZAMANINDA_YAPILAMAYAN
+  kayip: number       // durum IN (ZAMANI_GECMIS, IPTAL, SILINDI, BEKLEMEDE, KAPATILDI)
+}
+
 /** Özet & Grafikler sekmesinde tüketilen önceden agg-edilmiş veriler.
  *  Frontend artık detay listelerden hesaplamaz (lazy load sonrası boş gelirler);
  *  doğrudan bu alanlardan okur. Tüm key formatları "Üst Lokasyon - X". */
 export interface OzetAgg {
+  departmanMetrikleri: DepartmanMetrik[]                   // üst lokasyon bazlı, hedef desc
   personelTamamlananTop: { key: string; sayi: number }[]   // Üst Lok - Personel, top 10, yönetici hariç
   lokasyonTamamlananTop: { key: string; sayi: number }[]   // Üst Lok - Lokasyon, top 10
   kayipNedeniDagilim: { neden: string; sayi: number }[]    // desc, tüm nedenler
@@ -871,6 +882,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     return cur?.tanim ?? '—'
   }
   const ozetAgg: OzetAgg = {
+    departmanMetrikleri: [],
     personelTamamlananTop: [],
     lokasyonTamamlananTop: [],
     kayipNedeniDagilim: [],
@@ -878,6 +890,32 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     kayipLokasyonTop: [],
     sapmaLokasyonTop: [],
     atananPersonelBasari: [],
+  }
+  {
+    // Departman Analizi — üst lokasyon (parent_id IS NULL) bazlı
+    const departmanAgg = new Map<string, DepartmanMetrik>()
+    for (const g of kuralGorevler) {
+      const lokId = (g as any).lokasyon_id
+      if (!lokId) continue
+      let cur = lokMap.get(lokId) as any
+      let safety = 0
+      while (cur?.parent_id && safety < 20) { cur = lokMap.get(cur.parent_id) as any; safety++ }
+      const ustId = cur?.id
+      if (!ustId) continue
+      if (!departmanAgg.has(ustId)) {
+        departmanAgg.set(ustId, {
+          ustLokasyonId: ustId, ustLokasyonAd: cur?.tanim ?? '—',
+          hedef: 0, tamamlanan: 0, sapma: 0, kayip: 0,
+        })
+      }
+      const m = departmanAgg.get(ustId)!
+      m.hedef++
+      const d = (g as any).durum
+      if (d === 'TAMAMLANDI') m.tamamlanan++
+      else if (d === 'ZAMANINDA_YAPILAMAYAN') m.sapma++
+      else if (d === 'ZAMANI_GECMIS' || d === 'IPTAL' || d === 'SILINDI' || d === 'BEKLEMEDE' || d === 'KAPATILDI') m.kayip++
+    }
+    ozetAgg.departmanMetrikleri = [...departmanAgg.values()].sort((a, b) => b.hedef - a.hedef)
   }
   {
     const persSayac = new Map<string, number>()
