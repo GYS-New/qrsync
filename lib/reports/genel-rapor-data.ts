@@ -892,8 +892,18 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     atananPersonelBasari: [],
   }
   {
-    // Departman Analizi — üst lokasyon (parent_id IS NULL) bazlı
+    // Departman Analizi — üst lokasyon (parent_id IS NULL) bazlı.
+    // Görev olmayan üst lokasyonlar da 0 değerleriyle dahil edilir (kullanıcı her
+    // departmanı görmek istiyor; boş çubuklar departmanın atıl olduğunu gösterir).
     const departmanAgg = new Map<string, DepartmanMetrik>()
+    for (const l of (lokasyonlar ?? []) as any[]) {
+      if (l.parent_id) continue
+      if (l.aktif === false) continue
+      departmanAgg.set(l.id, {
+        ustLokasyonId: l.id, ustLokasyonAd: l.tanim ?? '—',
+        hedef: 0, tamamlanan: 0, sapma: 0, kayip: 0,
+      })
+    }
     for (const g of kuralGorevler) {
       const lokId = (g as any).lokasyon_id
       if (!lokId) continue
@@ -903,6 +913,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       const ustId = cur?.id
       if (!ustId) continue
       if (!departmanAgg.has(ustId)) {
+        // Pasif veya beklenmeyen bir üst lokasyon — yine de görünsün
         departmanAgg.set(ustId, {
           ustLokasyonId: ustId, ustLokasyonAd: cur?.tanim ?? '—',
           hedef: 0, tamamlanan: 0, sapma: 0, kayip: 0,
@@ -915,7 +926,11 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       else if (d === 'ZAMANINDA_YAPILAMAYAN') m.sapma++
       else if (d === 'ZAMANI_GECMIS' || d === 'IPTAL' || d === 'SILINDI' || d === 'BEKLEMEDE' || d === 'KAPATILDI') m.kayip++
     }
-    ozetAgg.departmanMetrikleri = [...departmanAgg.values()].sort((a, b) => b.hedef - a.hedef)
+    // Görev olanlar önce (hedef desc), sonra boşlar (alfabetik)
+    ozetAgg.departmanMetrikleri = [...departmanAgg.values()].sort((a, b) => {
+      if (a.hedef !== b.hedef) return b.hedef - a.hedef
+      return a.ustLokasyonAd.localeCompare(b.ustLokasyonAd, 'tr')
+    })
   }
   {
     const persSayac = new Map<string, number>()

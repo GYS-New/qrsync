@@ -763,29 +763,6 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {activeTab === 'Özet & Grafikler' && ozetData && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                {/* ── 0. Departman Analizi ── */}
-                {(() => {
-                  const departmanlar = data.ozetAgg?.departmanMetrikleri ?? []
-                  if (departmanlar.length === 0) return null
-                  // Üst lokasyon filtresi aktifse sadece seçili olanı tam genişlikte göster
-                  const filtreli = ustLokasyonId
-                    ? departmanlar.filter(d => d.ustLokasyonId === ustLokasyonId)
-                    : departmanlar
-                  if (filtreli.length === 0) return null
-                  return (
-                    <div className="verde-card" style={{ padding: '20px 24px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 14 }}>Departman Analizi</div>
-                      {ustLokasyonId ? (
-                        <DepartmanGraph d={filtreli[0]} expanded />
-                      ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
-                          {filtreli.map(d => <DepartmanGraph key={d.ustLokasyonId} d={d} />)}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })()}
-
                 {/* ── 1. Genel Performans Paneli ── */}
                 <div className="verde-card" style={{ padding: '20px 24px' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 14 }}>Genel Performans Özeti</div>
@@ -838,6 +815,35 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                     ))}
                   </div>
                 </div>
+
+                {/* ── 1b. Departman Analizi (Genel Performans'ın hemen altında) ── */}
+                {(() => {
+                  const departmanlar = data.ozetAgg?.departmanMetrikleri ?? []
+                  if (departmanlar.length === 0) return null
+                  // Üst lokasyon filtresi aktifse sadece seçili olanı tam genişlikte göster
+                  const filtreli = ustLokasyonId
+                    ? departmanlar.filter(d => d.ustLokasyonId === ustLokasyonId)
+                    : departmanlar
+                  if (filtreli.length === 0) return null
+                  return (
+                    <div className="verde-card" style={{ padding: '20px 24px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 14 }}>Departman Analizi</div>
+                      {ustLokasyonId ? (
+                        <DepartmanGraph d={filtreli[0]} expanded />
+                      ) : (
+                        // Tek satır: tüm departmanlar eşit pay, sayfa darsa yatay scroll
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: `repeat(${filtreli.length}, minmax(220px, 1fr))`,
+                          gap: 12,
+                          overflowX: 'auto',
+                        }}>
+                          {filtreli.map(d => <DepartmanGraph key={d.ustLokasyonId} d={d} />)}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {/* ── 2. Frekans Dağılımı | Grup Bazlı Tamamlanan ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
