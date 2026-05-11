@@ -305,6 +305,28 @@ function DetayLoader({ label }: { label: string }) {
   )
 }
 
+// Top-N grafiklerinde grafiğin sağına yerleşen sıralı liste — "1- Etiket    24"
+// formatında, son satır hariç ince ayraç çizgisiyle.
+function SiraliListe({ items }: { items: { label: string; value: number }[] }) {
+  if (!items.length) return null
+  return (
+    <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+      {items.map((it, i) => (
+        <li key={i} style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '6px 8px',
+          borderBottom: i < items.length - 1 ? `1px solid ${T.border}` : 'none',
+          fontSize: 12.5,
+        }} title={`${it.label}: ${it.value}`}>
+          <span style={{ fontWeight: 800, color: T.textSoft, minWidth: 22, textAlign: 'right' }}>{i + 1}-</span>
+          <span style={{ flex: 1, color: T.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.label}</span>
+          <span style={{ fontWeight: 800, color: T.text, minWidth: 32, textAlign: 'right' }}>{it.value}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 // Bir sonraki sayfa butonu (pagination). Daha fazla satır varsa görünür.
 function DahaFazlaButon({ loading, onClick }: { loading: boolean; onClick: () => void }) {
   return (
@@ -835,22 +857,34 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   </div>
                 </div>
 
-                {/* ── 4. Lokasyon Bazlı Tamamlanan (dikey) ── */}
+                {/* ── 4. Lokasyon Bazlı Tamamlanan (sol: yatay bar | sağ: sıralı liste) ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Lokasyon Bazlı Tamamlanan Görevler</div>
-                  {ozetData.lokBazli.length > 0
-                    ? <BarChart data={ozetData.lokBazli} valueKey="sayi" labelKey="lokasyon" color={T.blueMid} orientation="vertical" />
-                    : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
-                  }
+                  {ozetData.lokBazli.length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'flex-start' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <BarChart data={ozetData.lokBazli} valueKey="sayi" labelKey="lokasyon" color={T.blueMid} />
+                      </div>
+                      <SiraliListe items={ozetData.lokBazli.map(x => ({ label: x.lokasyon, value: x.sayi }))} />
+                    </div>
+                  ) : (
+                    <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+                  )}
                 </div>
 
-                {/* ── 5. Personel Bazlı Tamamlanan (dikey) ── */}
+                {/* ── 5. Personel Bazlı Tamamlanan (sol: yatay bar | sağ: sıralı liste) ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Bazlı Tamamlanan Göreveler</div>
-                  {ozetData.persBazli.length > 0
-                    ? <BarChart data={ozetData.persBazli} valueKey="sayi" labelKey="personel" color={T.blue} orientation="vertical" />
-                    : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
-                  }
+                  {ozetData.persBazli.length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'flex-start' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <BarChart data={ozetData.persBazli} valueKey="sayi" labelKey="personel" color={T.blue} />
+                      </div>
+                      <SiraliListe items={ozetData.persBazli.map(x => ({ label: x.personel, value: x.sayi }))} />
+                    </div>
+                  ) : (
+                    <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+                  )}
                 </div>
 
               </div>
