@@ -843,7 +843,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                         const d = filtreli[0]
                         const basari = pctOf(d.tamamlanan, d.hedef)
                         return (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 280px 260px', gap: 20, alignItems: 'stretch' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, alignItems: 'stretch' }}>
                             <DepartmanGraph d={d} expanded />
                             <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                               <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em', alignSelf: 'flex-start' }}>Genel Dağılım</div>
