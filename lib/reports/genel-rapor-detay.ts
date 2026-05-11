@@ -26,6 +26,9 @@ export interface GenelRaporDetayFilters {
   altAltLokasyonId?: string | null
   raporBaslangic?: string | null
   raporBitis?: string | null
+  /** U/M rolü için yetkili üst lokasyon ID listesi. null = tüm erişim.
+   *  Verildiğinde target lokasyon listesi bu kapsamla sınırlanır. */
+  yetkiliUstLokIds?: string[] | null
 }
 
 export interface DetayResponse {
@@ -98,6 +101,11 @@ export async function buildGenelRaporDetay(
   if (filters.altAltLokasyonId)    targetLokIds = getAllDescendants(filters.altAltLokasyonId, lokMap)
   else if (filters.altLokasyonId)  targetLokIds = getAllDescendants(filters.altLokasyonId, lokMap)
   else if (filters.ustLokasyonId)  targetLokIds = getAllDescendants(filters.ustLokasyonId, lokMap)
+
+  // U/M yetki scope: manuel filter yoksa yetkili üst lokasyonların torunları
+  if (!targetLokIds && filters.yetkiliUstLokIds && filters.yetkiliUstLokIds.length > 0) {
+    targetLokIds = filters.yetkiliUstLokIds.flatMap(id => getAllDescendants(id, lokMap))
+  }
 
   // 3. Tarih sınırları
   const baslangicUTC = filters.raporBaslangic ? new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString() : null

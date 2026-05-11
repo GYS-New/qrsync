@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { buildGenelRaporDetay, type DetayTip } from '@/lib/reports/genel-rapor-detay'
+import { getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
 
 const VALID_TIPLER: DetayTip[] = ['tamamlanan', 'sapma', 'kayip', 'frekans_disi', 'atanan']
 
@@ -31,15 +32,23 @@ export async function GET(request: Request) {
     const limitRaw = parseInt(searchParams.get('limit') ?? '200', 10) || 200
     const limit = Math.min(Math.max(1, limitRaw), 1000)  // 1..1000
 
+    // U/M: yetkili üst lokasyon scope filtresi. SA/TA için null (tüm erişim).
+    const yetkiliUstLokIds = isTenantViewer ? await getLokasyonYetki(supabase) : null
+    const seciliUstLok = searchParams.get('ustLokasyonId')
+    if (yetkiliUstLokIds && seciliUstLok && !yetkiliUstLokIds.includes(seciliUstLok)) {
+      return NextResponse.json({ error: 'Bu lokasyona erişim yetkiniz yok.' }, { status: 403 })
+    }
+
     const data = await buildGenelRaporDetay(
       {
         firmaId,
         projeId: searchParams.get('projeId') || null,
-        ustLokasyonId:    searchParams.get('ustLokasyonId'),
+        ustLokasyonId:    seciliUstLok,
         altLokasyonId:    searchParams.get('altLokasyonId'),
         altAltLokasyonId: searchParams.get('altAltLokasyonId'),
         raporBaslangic:   searchParams.get('raporBaslangic'),
         raporBitis:       searchParams.get('raporBitis'),
+        yetkiliUstLokIds,
       },
       tip,
       offset,

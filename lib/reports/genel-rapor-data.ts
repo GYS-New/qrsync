@@ -12,6 +12,10 @@ export interface GenelRaporFilters {
   raporBaslangic?: string | null   // 'YYYY-MM-DD'
   raporBitis?: string | null       // 'YYYY-MM-DD'
   raporuAlan?: string | null
+  /** U/M rolü için yetkili üst lokasyon ID listesi. null = tüm erişim (SA/TA).
+   *  Verildiğinde tüm sorgular ve Departman Analizi sadece bu üst lokasyonlar +
+   *  alt lokasyonlarıyla sınırlanır. lib/yetki/getLokasyonYetki.ts ile uyumlu. */
+  yetkiliUstLokIds?: string[] | null
   /** false ise detay listelerini (tamamlananGorevler, sapmaGorevler, kayipGorevler,
    *  frekansDisiGorevler, atananFrekanslar) üretmez — özet + grup metrikleri + count'lar
    *  döner. Detay tablolar `/api/reports/genel-rapor-detay` üzerinden paginated alınır.
@@ -345,6 +349,13 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       // Sadece Üst seçili: üst + tüm torunları
       targetLokasyonIds = getAllDescendants(filters.ustLokasyonId)
     }
+  }
+
+  // U/M yetki scope: kullanıcı manuel filter seçmemişse, yetkili üst lokasyonların
+  // tümünün altındaki lokasyonlar kapsama alınır. Filter seçtiyse o zaten yetkili
+  // listesinde olduğu route.ts'te doğrulandı; mevcut targetLokasyonIds geçerli.
+  if (!targetLokasyonIds && filters.yetkiliUstLokIds && filters.yetkiliUstLokIds.length > 0) {
+    targetLokasyonIds = filters.yetkiliUstLokIds.flatMap(id => getAllDescendants(id))
   }
 
   // 3. Görevleri çek: aktif tablo + arşiv tablosu birleşik
@@ -895,10 +906,15 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     // Departman Analizi — üst lokasyon (parent_id IS NULL) bazlı.
     // Görev olmayan üst lokasyonlar da 0 değerleriyle dahil edilir (kullanıcı her
     // departmanı görmek istiyor; boş çubuklar departmanın atıl olduğunu gösterir).
+    // U/M yetki scope: yetkiliUstLokIds verilmişse sadece o departmanlar listelenir.
+    const yetkiliSet = filters.yetkiliUstLokIds && filters.yetkiliUstLokIds.length > 0
+      ? new Set(filters.yetkiliUstLokIds)
+      : null
     const departmanAgg = new Map<string, DepartmanMetrik>()
     for (const l of (lokasyonlar ?? []) as any[]) {
       if (l.parent_id) continue
       if (l.aktif === false) continue
+      if (yetkiliSet && !yetkiliSet.has(l.id)) continue
       departmanAgg.set(l.id, {
         ustLokasyonId: l.id, ustLokasyonAd: l.tanim ?? '—',
         hedef: 0, tamamlanan: 0, sapma: 0, kayip: 0,
