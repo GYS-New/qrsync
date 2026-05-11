@@ -2,23 +2,26 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-const RETRY_KEY = 'canli-islemler-error-last-retry'
-const RETRY_COOLDOWN_MS = 10000
+const RETRY_KEY = 'canli-islemler-error-retry'
+// 15 sn'lik pencere içinde max 2 otomatik retry (1.5 sn, sonra 3 sn delay).
+// Pencere dışında counter sıfırlanır → tek seferlik transient hatadan sonra
+// uzun ara verilirse yeniden 2 hak tanınır.
+const RETRY_WINDOW_MS = 15000
+const MAX_AUTO_RETRIES = 2
+const RETRY_DELAYS_MS = [1500, 3000]
 
 /**
- * Canlı İşlemler sayfası için error boundary.
+ * Canlı İşlemler sayfası için error boundary (dashboard error.tsx'ler de aynısını
+ * kullanıyor — re-export ile).
  *
  * Tipik tetikleyici: Railway proxy'sinden HTTP/2 stream drop / 503 / RSC fetch fail.
  * Bu durumda Next.js iç state'i corrupt olur (örn. useMemo içinde null .get()).
  *
  * Strateji:
- * 1) Sayfa ilk hata aldığında 1.5 sn sonra otomatik bir kez `reset()` denenir
- *    (transient network hiccup'larda kullanıcı hatayı görmez).
- * 2) Otomatik retry yapıldıysa veya 10 sn içinde tekrar hata alındıysa manuel
- *    "Tekrar Dene" butonu gösterilir (sonsuz döngüden kaçınmak için).
- *
- * Retry zamanı sessionStorage'da tutulur, böylece reset → fail → remount
- * döngüsünde otomatik retry tek seferlik olur.
+ * - 15 sn'lik pencere içinde max 2 otomatik retry. Delay: 1.5 sn → 3 sn.
+ * - Pencere dolduktan sonra (veya 2 retry tükenince) manuel "Tekrar Dene" butonu.
+ * - Retry sayacı sessionStorage'da tutulur (reset → fail → remount döngüsünde
+ *   sonsuz retry'ı engellemek için).
  */
 export default function CanliIslemlerError({
   error,
@@ -38,21 +41,40 @@ export default function CanliIslemlerError({
     if (didScheduleRef.current) return
     didScheduleRef.current = true
 
-    let lastRetry = 0
+    // Pencere kontrol: ilk hata zamanını ve retry sayısını oku
+    let firstTryTs = 0
+    let retryCount = 0
     try {
-      lastRetry = Number(sessionStorage.getItem(RETRY_KEY) || '0')
+      const raw = sessionStorage.getItem(RETRY_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as { firstTryTs?: number; count?: number }
+        firstTryTs = Number(parsed.firstTryTs ?? 0)
+        retryCount = Number(parsed.count ?? 0)
+      }
     } catch {}
-    const now = Date.now()
 
-    if (now - lastRetry < RETRY_COOLDOWN_MS) {
+    const now = Date.now()
+    const windowExpired = !firstTryTs || (now - firstTryTs) > RETRY_WINDOW_MS
+    if (windowExpired) {
+      firstTryTs = now
+      retryCount = 0
+    }
+
+    if (retryCount >= MAX_AUTO_RETRIES) {
+      // Pencere içinde retry hakkı tükendi — manuel buton göster
       setAutoRetryDone(true)
       return
     }
 
+    const delay = RETRY_DELAYS_MS[retryCount] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]
     const timer = setTimeout(() => {
-      try { sessionStorage.setItem(RETRY_KEY, String(Date.now())) } catch {}
+      try {
+        sessionStorage.setItem(RETRY_KEY, JSON.stringify({
+          firstTryTs, count: retryCount + 1,
+        }))
+      } catch {}
       reset()
-    }, 1500)
+    }, delay)
 
     return () => clearTimeout(timer)
   }, [reset])
