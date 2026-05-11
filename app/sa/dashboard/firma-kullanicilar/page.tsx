@@ -13,8 +13,10 @@ export default async function SAFirmaKullanicilarPage() {
   const aktifProje = firmaId ? await getAktifProje(firmaId) : null
   const projeId = aktifProje?.id ?? null
 
+  // Firma kullanıcıları listesi: hem 'tenant_user' (personel) hem 'musteri'
+  // (QR/NFC ile müşteri değerlendirmesi gönderen müşteri hesapları) dahil.
   let q = firmaId
-    ? supabase.from('users').select('*').eq('firma_id', firmaId).eq('rol', 'tenant_user').order('kayit_tarihi', { ascending: false })
+    ? supabase.from('users').select('*').eq('firma_id', firmaId).in('rol', ['tenant_user', 'musteri']).order('kayit_tarihi', { ascending: false })
     : null
   if (q && projeId) q = (q as any).eq('proje_id', projeId)
 
