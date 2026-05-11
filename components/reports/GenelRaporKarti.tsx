@@ -809,49 +809,63 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   )
                 })()}
 
-                {/* ── 2. Sapma Frekanslar: pasta (hedef vs sapma) | lokasyon bar ── */}
+                {/* ── 2. Sapma Frekanslar: 1/3 pasta | 1/3 bar | 1/3 sıralı liste ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                     <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
                     <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.amberLight, color: T.amber, flexShrink: 0 }}>{data.toplamSapma} kayıt</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
-                    <div style={{ flexShrink: 0 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Hedef / Sapma Oranı</div>
                       <PieChart size={200} slices={[
                         { label: 'Sapma',       value: data.toplamSapma,                                       color: T.amber },
                         { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamSapma),            color: '#e2e8f0' },
                       ]} />
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Sapma (İlk 10)</div>
                       {ozetData.sapmaLokBazli.length > 0
                         ? <BarChart data={ozetData.sapmaLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.amber} />
                         : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Sapma kayıt yok</div>
                       }
                     </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Sıralı Liste</div>
+                      {ozetData.sapmaLokBazli.length > 0
+                        ? <SiraliListe items={ozetData.sapmaLokBazli.map(x => ({ label: x.lokasyon, value: x.sayi }))} />
+                        : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+                      }
+                    </div>
                   </div>
                 </div>
 
-                {/* ── 3. Kayıp Frekanslar: pasta (hedef vs kayıp) | lokasyon bar ── */}
+                {/* ── 3. Kayıp Frekanslar: 1/3 pasta | 1/3 bar | 1/3 sıralı liste ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                     <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar</div>
                     <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.redLight, color: T.red, flexShrink: 0 }}>{data.toplamKayip} kayıt</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
-                    <div style={{ flexShrink: 0 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Hedef / Kayıp Oranı</div>
                       <PieChart size={200} slices={[
                         { label: 'Kayıp',       value: data.toplamKayip,                                       color: T.red },
                         { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamKayip),            color: '#e2e8f0' },
                       ]} />
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Kayıp (İlk 10)</div>
                       {ozetData.kayipLokBazli.length > 0
                         ? <BarChart data={ozetData.kayipLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.red} />
                         : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Kayıp kayıt yok</div>
+                      }
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Sıralı Liste</div>
+                      {ozetData.kayipLokBazli.length > 0
+                        ? <SiraliListe items={ozetData.kayipLokBazli.map(x => ({ label: x.lokasyon, value: x.sayi }))} />
+                        : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
                       }
                     </div>
                   </div>
