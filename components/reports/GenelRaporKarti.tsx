@@ -764,10 +764,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 {/* ── 2. Frekans Dağılımı | Grup Bazlı Tamamlanan ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dağılımı &amp; Grup Bazlı Tamamlanan</div>
-                  <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: 56, alignItems: 'flex-start', minWidth: 0 }}>
                     <div style={{ flexShrink: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Genel Dağılım</div>
-                      <PieChart size={200} slices={[
+                      <PieChart size={280} slices={[
                         { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
                         { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
                         { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
@@ -818,7 +818,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Hedef / Sapma Oranı</div>
-                      <PieChart size={200} slices={[
+                      <PieChart size={240} slices={[
                         { label: 'Sapma',       value: data.toplamSapma,                                       color: T.amber },
                         { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamSapma),            color: '#e2e8f0' },
                       ]} />
@@ -849,7 +849,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Hedef / Kayıp Oranı</div>
-                      <PieChart size={200} slices={[
+                      <PieChart size={240} slices={[
                         { label: 'Kayıp',       value: data.toplamKayip,                                       color: T.red },
                         { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamKayip),            color: '#e2e8f0' },
                       ]} />
