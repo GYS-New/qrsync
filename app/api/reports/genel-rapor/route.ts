@@ -30,6 +30,10 @@ export async function GET(request: Request) {
       raporBaslangic: searchParams.get('raporBaslangic'),
       raporBitis: searchParams.get('raporBitis'),
       raporuAlan: searchParams.get('raporuAlan'),
+      // Detay tablolar (Tamamlanan / Sapma / Kayıp / Frekans Dışı / Atanan)
+      // /api/reports/genel-rapor-detay üzerinden lazy + paginated alınır.
+      // Burada sadece özet sayılar + grup metrikleri + grafik verisi döner.
+      includeDetails: false,
     })
 
     return NextResponse.json(data)

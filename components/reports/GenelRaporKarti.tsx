@@ -248,6 +248,29 @@ function DataTable({ headers, rows, accentCol, accentColor, leftCols, filterable
 const TABS = ['Özet & Grafikler', 'Grup Metrikleri', 'Tamamlanan', 'Sapmalar', 'Kayıp Frekanslar', 'Frekans Dışı', 'Atanan Frekanslar'] as const
 type Tab = typeof TABS[number]
 
+// Detay tablo yüklenirken gösterilen iskelet/spinner blok.
+function DetayLoader({ label }: { label: string }) {
+  return (
+    <div className="verde-card" style={{ padding: '64px 20px', textAlign: 'center' }}>
+      <RefreshCw size={36} style={{ animation: 'spin 0.9s linear infinite', color: T.blue, margin: '0 auto 14px', display: 'block' }} />
+      <div style={{ fontSize: 14, fontWeight: 600, color: T.textSoft }}>{label} yükleniyor…</div>
+    </div>
+  )
+}
+
+// Bir sonraki sayfa butonu (pagination). Daha fazla satır varsa görünür.
+function DahaFazlaButon({ loading, onClick }: { loading: boolean; onClick: () => void }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '14px 0 4px' }}>
+      <button onClick={onClick} disabled={loading}
+        style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.text, fontSize: 13, fontWeight: 600, cursor: loading ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        {loading && <RefreshCw size={13} style={{ animation: 'spin 0.9s linear infinite' }} />}
+        {loading ? 'Yükleniyor…' : 'Daha Fazla Yükle'}
+      </button>
+    </div>
+  )
+}
+
 // ── Ana bileşen ────────────────────────────────────────────────────
 export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: Props) {
   const { toast } = useToast()
@@ -274,6 +297,27 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   // eder, requestIdRef de en son başlatılan request'in id'sini takip eder.
   const abortRef = useRef<AbortController | null>(null)
   const requestIdRef = useRef(0)
+
+  // Detay tab'ları (Tamamlanan/Sapma/Kayıp/Frekans Dışı/Atanan) artık ana endpoint
+  // yerine /api/reports/genel-rapor-detay'dan lazy + paginated alınır. Sekme
+  // tıklanana kadar veri çekilmez; veri yoğunluğu büyüdükçe (3-12 aylık aralık)
+  // memory ve network yükü kontrollü kalır.
+  type DetayTip = 'tamamlanan' | 'sapma' | 'kayip' | 'frekans_disi' | 'atanan'
+  type DetayState = {
+    rows: any[]
+    total: number
+    hasMore: boolean
+    loading: boolean
+    loadedFor: string | null   // filterKey snapshot; eşleşirse cache geçerli
+    islemSureleriAktif: boolean | null
+  }
+  const EMPTY_DETAY: DetayState = { rows: [], total: 0, hasMore: false, loading: false, loadedFor: null, islemSureleriAktif: null }
+  const [detayState, setDetayState] = useState<Record<DetayTip, DetayState>>({
+    tamamlanan: EMPTY_DETAY, sapma: EMPTY_DETAY, kayip: EMPTY_DETAY,
+    frekans_disi: EMPTY_DETAY, atanan: EMPTY_DETAY,
+  })
+  const detayStateRef = useRef(detayState)
+  useEffect(() => { detayStateRef.current = detayState }, [detayState])
 
   // Üst lokasyon filtresi temizlenirse gruplandır modu otomatik kapanır
   // (gruplandır sadece üst lokasyon filtresi varken anlamlı)
@@ -332,6 +376,65 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       if (myId === requestIdRef.current) setLoading(false)
     }
   }, [buildParams, currentFirmaId, toast])
+
+  // Detay tabloların cache key'i — filtreler değişince cache invalidate olur.
+  const filterKey = useMemo(() => JSON.stringify({
+    f: currentFirmaId, p: projeId ?? '', u: ustLokasyonId, a: altLokasyonId, aa: altAltLokasyonId,
+    b: raporBaslangic, t: raporBitis,
+  }), [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, altAltLokasyonId, raporBaslangic, raporBitis])
+
+  function tabToTip(tab: Tab): DetayTip | null {
+    switch (tab) {
+      case 'Tamamlanan':       return 'tamamlanan'
+      case 'Sapmalar':         return 'sapma'
+      case 'Kayıp Frekanslar': return 'kayip'
+      case 'Frekans Dışı':     return 'frekans_disi'
+      case 'Atanan Frekanslar':return 'atanan'
+      default: return null
+    }
+  }
+
+  const fetchDetay = useCallback(async (tip: DetayTip, offset: number = 0, append: boolean = false) => {
+    if (!currentFirmaId) return
+    setDetayState(prev => ({ ...prev, [tip]: { ...prev[tip], loading: true } }))
+    try {
+      const params = new URLSearchParams({ firmaId: currentFirmaId, tip, offset: String(offset), limit: '200' })
+      if (projeId) params.set('projeId', projeId)
+      if (ustLokasyonId) params.set('ustLokasyonId', ustLokasyonId)
+      if (altLokasyonId) params.set('altLokasyonId', altLokasyonId)
+      if (altAltLokasyonId) params.set('altAltLokasyonId', altAltLokasyonId)
+      if (raporBaslangic) params.set('raporBaslangic', raporBaslangic)
+      if (raporBitis) params.set('raporBitis', raporBitis)
+      const res = await fetch(`/api/reports/genel-rapor-detay?${params}`, { cache: 'no-store' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error ?? 'Detay verisi alınamadı.')
+      setDetayState(prev => ({
+        ...prev,
+        [tip]: {
+          rows: append ? [...prev[tip].rows, ...(json.rows ?? [])] : (json.rows ?? []),
+          total: json.total ?? 0,
+          hasMore: !!json.hasMore,
+          loading: false,
+          loadedFor: filterKey,
+          islemSureleriAktif: json.islemSureleriAktif ?? null,
+        },
+      }))
+    } catch (e: any) {
+      setDetayState(prev => ({ ...prev, [tip]: { ...prev[tip], loading: false } }))
+      toast({ type: 'error', title: 'Hata', message: e.message ?? 'Detay yüklenemedi' })
+    }
+  }, [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, altAltLokasyonId, raporBaslangic, raporBitis, filterKey, toast])
+
+  // Tab değişince veya filtre değişince ilgili detay tipini yükle (yoksa).
+  useEffect(() => {
+    if (!currentFirmaId) return
+    const tip = tabToTip(activeTab)
+    if (!tip) return
+    const s = detayStateRef.current[tip]
+    if (s.loading) return
+    if (s.loadedFor === filterKey) return
+    fetchDetay(tip, 0, false)
+  }, [activeTab, filterKey, currentFirmaId, fetchDetay])
 
   useEffect(() => {
     if (!currentFirmaId) return
@@ -562,14 +665,14 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
               const sapmaPct  = toplamHedef > 0 ? Math.round(data.toplamSapma  / toplamHedef * 100) : 0
               const kayipPct  = toplamHedef > 0 ? Math.round(data.toplamKayip  / toplamHedef * 100) : 0
               const tamPct    = toplamHedef > 0 ? Math.round(data.toplamTamamlanan / toplamHedef * 100) : 0
-              const frekansPct = toplamHedef > 0 ? Math.round(data.frekansDisiGorevler.length / toplamHedef * 100) : 0
+              const frekansPct = toplamHedef > 0 ? Math.round(data.toplamEkstra / toplamHedef * 100) : 0
               return (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))', gap: 10 }}>
                   <KpiCard label="Hedef"        value={toplamHedef}                        color={T.blue}    Icon={Target} />
                   <KpiCard label="Tamamlanan"   value={data.toplamTamamlanan}              color={T.green}   Icon={CheckCircle}   pct={`%${tamPct}`} />
                   <KpiCard label="Sapma"        value={data.toplamSapma}                   color={T.amber}   Icon={AlertTriangle} pct={`%${sapmaPct}`} />
                   <KpiCard label="Kayıp"        value={data.toplamKayip}                   color={T.red}     Icon={XCircle}       pct={`%${kayipPct}`} />
-                  <KpiCard label="Frekans Dışı" value={data.frekansDisiGorevler.length}    color={T.gray}    Icon={Activity}      pct={`%${frekansPct}`} />
+                  <KpiCard label="Frekans Dışı" value={data.toplamEkstra}    color={T.gray}    Icon={Activity}      pct={`%${frekansPct}`} />
                   <KpiCard label="Rapor Dönemi" value={`${data.gunSayisi} gün`}            color={T.blueMid} Icon={Clock}         sub={raporBaslangic && raporBitis ? `${raporBaslangic} – ${raporBitis}` : 'Tüm dönem'} />
                 </div>
               )
@@ -652,7 +755,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                       { label: 'Gerçekleşen',     value: ozetData.toplamGerceklesen,    color: T.greenMid,bg: '#f9fafb' },
                       { label: 'Sapma',           value: data.toplamSapma,              color: T.amber,   bg: T.amberLight },
                       { label: 'Kayıp',           value: data.toplamKayip,              color: T.red,     bg: T.redLight },
-                      { label: 'Frekans Dışı',    value: data.frekansDisiGorevler.length, color: T.gray,  bg: T.grayLight },
+                      { label: 'Frekans Dışı',    value: data.toplamEkstra, color: T.gray,  bg: T.grayLight },
                       { label: 'Rapor Dönemi',    value: `${data.gunSayisi} gün`,       color: T.gray,    bg: T.grayLight },
                     ].map(s => (
                       <div key={s.label} style={{ padding: '10px 12px', background: s.bg, borderRadius: 8, textAlign: 'center', border: `1px solid ${T.border}` }}>
@@ -866,91 +969,108 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {/* islemSureleriAktif=false ise GÖREV SAATLERİ ve GÖREV SÜRESİ sütunları gizlenir */}
             {(() => null)()}
             {activeTab === 'Tamamlanan' && (() => {
-              const sureli = data.islemSureleriAktif !== false
+              const ds = detayState.tamamlanan
+              if (ds.loading && ds.rows.length === 0) return <DetayLoader label="Tamamlanan görevler" />
+              const sureli = (ds.islemSureleriAktif ?? data.islemSureleriAktif) !== false
               const headers = ['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'GÖREV SÜRESİ'] : []), 'DURUM']
               return (
                 <div className="verde-card" style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Tamamlanan Frekanslar</div>
-                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{data.tamamlananGorevler.length} kayıt</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: '#dcfce7', color: T.green }}>{ds.rows.length} / {ds.total} kayıt</span>
                   </div>
                   <DataTable
                     headers={headers}
-                    rows={data.tamamlananGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.durum])}
+                    rows={ds.rows.map((r: any) => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.durum])}
                     filterable noFilterCols={[0]}
                   />
+                  {ds.hasMore && <DahaFazlaButon loading={ds.loading} onClick={() => fetchDetay('tamamlanan', ds.rows.length, true)} />}
                 </div>
               )
             })()}
 
             {activeTab === 'Sapmalar' && (() => {
-              const sureli = data.islemSureleriAktif !== false
+              const ds = detayState.sapma
+              if (ds.loading && ds.rows.length === 0) return <DetayLoader label="Sapma görevler" />
+              const sureli = (ds.islemSureleriAktif ?? data.islemSureleriAktif) !== false
               const headers = ['SN', 'PERSONEL', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'GÖREV SÜRESİ'] : []), 'SAPMA NEDENİ']
               return (
                 <div className="verde-card" style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
-                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{data.sapmaGorevler.length} kayıt</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.amberLight, color: T.amber }}>{ds.rows.length} / {ds.total} kayıt</span>
                   </div>
                   <DataTable
                     headers={headers}
-                    rows={data.sapmaGorevler.map(r => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.sapmaNedeni])}
+                    rows={ds.rows.map((r: any) => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.sapmaNedeni])}
                     filterable noFilterCols={[0]}
                   />
+                  {ds.hasMore && <DahaFazlaButon loading={ds.loading} onClick={() => fetchDetay('sapma', ds.rows.length, true)} />}
                 </div>
               )
             })()}
 
             {activeTab === 'Kayıp Frekanslar' && (() => {
-              const sureli = data.islemSureleriAktif !== false
+              const ds = detayState.kayip
+              if (ds.loading && ds.rows.length === 0) return <DetayLoader label="Kayıp görevler" />
+              const sureli = (ds.islemSureleriAktif ?? data.islemSureleriAktif) !== false
               const headers = ['SN', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'GÖREV SÜRESİ'] : []), 'DURUM', 'KAYIP NEDENİ']
               return (
                 <div className="verde-card" style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar</div>
-                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.redLight, color: T.red }}>{data.kayipGorevler.length} kayıt</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.redLight, color: T.red }}>{ds.rows.length} / {ds.total} kayıt</span>
                   </div>
                   <DataTable
                     headers={headers}
-                    rows={data.kayipGorevler.map(r => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.durum, r.kayipNedeni])}
+                    rows={ds.rows.map((r: any) => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.durum, r.kayipNedeni])}
                     filterable noFilterCols={[0]}
                   />
+                  {ds.hasMore && <DahaFazlaButon loading={ds.loading} onClick={() => fetchDetay('kayip', ds.rows.length, true)} />}
                 </div>
               )
             })()}
 
             {activeTab === 'Frekans Dışı' && (() => {
-              const sureli = data.islemSureleriAktif !== false
+              const ds = detayState.frekans_disi
+              if (ds.loading && ds.rows.length === 0) return <DetayLoader label="Frekans dışı çalışmalar" />
+              const sureli = (ds.islemSureleriAktif ?? data.islemSureleriAktif) !== false
               const headers = ['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'GÖREV SÜRESİ'] : []), 'AÇIKLAMA']
               return (
                 <div className="verde-card" style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dışı Çalışmalar (Ekstra Frekansiyel)</div>
-                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{data.frekansDisiGorevler.length} kayıt</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.grayLight, color: T.gray }}>{ds.rows.length} / {ds.total} kayıt</span>
                   </div>
                   <DataTable
                     headers={headers}
-                    rows={data.frekansDisiGorevler.map(r => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.aciklama])}
+                    rows={ds.rows.map((r: any) => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.aciklama])}
                     filterable noFilterCols={[0]}
                   />
+                  {ds.hasMore && <DahaFazlaButon loading={ds.loading} onClick={() => fetchDetay('frekans_disi', ds.rows.length, true)} />}
                 </div>
               )
             })()}
 
             {/* ── ATANAN FREKANSLAR ── */}
-            {activeTab === 'Atanan Frekanslar' && (
-              <div className="verde-card" style={{ padding: '16px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Atanan Frekanslar</div>
-                  <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{data.atananFrekanslar.length} kayıt</span>
+            {activeTab === 'Atanan Frekanslar' && (() => {
+              const ds = detayState.atanan
+              if (ds.loading && ds.rows.length === 0) return <DetayLoader label="Atanan frekanslar" />
+              return (
+                <div className="verde-card" style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Atanan Frekanslar</div>
+                    <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 12px', borderRadius: 999, background: T.blueLight, color: T.blue }}>{ds.rows.length} / {ds.total} kayıt</span>
+                  </div>
+                  <DataTable
+                    headers={['SN', 'ATANAN', 'TAMAMLAYAN', 'ÜST LOKASYON', 'LOKASYON', 'GÖREV TANIMI', 'GÖREV DURUMU', 'ATAMA TARİHİ', 'TAMAMLANMA TARİH+SAAT']}
+                    rows={ds.rows.map((r: any) => [r.sn, r.atanan, r.tamamlayan, r.ustLokasyon, r.lokasyon, r.gorevTanimi, r.gorevDurumu, r.atamaTarihi, r.tamamlanmaTarihi])}
+                    leftCols={[1, 2, 3, 4, 5]}
+                  />
+                  {ds.hasMore && <DahaFazlaButon loading={ds.loading} onClick={() => fetchDetay('atanan', ds.rows.length, true)} />}
                 </div>
-                <DataTable
-                  headers={['SN', 'ATANAN', 'TAMAMLAYAN', 'ÜST LOKASYON', 'LOKASYON', 'GÖREV TANIMI', 'GÖREV DURUMU', 'ATAMA TARİHİ', 'TAMAMLANMA TARİH+SAAT']}
-                  rows={data.atananFrekanslar.map(r => [r.sn, r.atanan, r.tamamlayan, r.ustLokasyon, r.lokasyon, r.gorevTanimi, r.gorevDurumu, r.atamaTarihi, r.tamamlanmaTarihi])}
-                  leftCols={[1, 2, 3, 4, 5]}
-                />
-              </div>
-            )}
+              )
+            })()}
           </>
         )}
       </div>
