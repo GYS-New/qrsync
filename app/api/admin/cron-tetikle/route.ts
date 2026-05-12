@@ -25,6 +25,7 @@ const CRON_TIPLERI: Record<string, { yol: string; method: 'POST' | 'GET' }> = {
   simulasyon:      { yol: '/api/simulasyon/calistir',       method: 'POST' },
   sistem_kontrol:  { yol: '/api/cron/sistem-kontrol',       method: 'POST' },
   rapor_gonder:    { yol: '/api/reports/rapor-gonder',      method: 'POST' },
+  yedekleme:       { yol: '/api/cron/yedekleme',            method: 'POST' },
 }
 
 export async function POST(req: NextRequest) {

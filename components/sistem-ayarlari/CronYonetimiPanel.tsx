@@ -6,10 +6,11 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Play, RefreshCw, Clock } from 'lucide-react'
 
-type CronTipi = 'personel_destek' | 'max_sure' | 'arsivleme' | 'simulasyon' | 'sistem_kontrol' | 'rapor_gonder' | 'gece_dongu'
+type CronTipi = 'personel_destek' | 'max_sure' | 'arsivleme' | 'simulasyon' | 'sistem_kontrol' | 'rapor_gonder' | 'gece_dongu' | 'yedekleme'
 
 const CRONLAR: { tip: CronTipi; ad: string; aciklama: string; periyot: string; tehlike?: boolean }[] = [
   { tip: 'gece_dongu',      ad: 'Gece Tam Döngü',         aciklama: 'Durum geçişleri (HAZIR→ACIK→BEKLEMEDE→ZAMANI_GECMIS) + arşivleme + ertesi gün görev üretimi.', periyot: 'Her gece 00:01 TRT', tehlike: true },
+  { tip: 'yedekleme',       ad: 'Veri Yedekleme',          aciklama: 'Kritik tabloları JSON+gzip olarak Supabase Storage\'a yedekler (26 tablo). 90 günden eski yedekler otomatik silinir.', periyot: 'Her gece 00:30 TRT' },
   { tip: 'personel_destek', ad: 'Personel Görev Desteği', aciklama: 'Vardiya bitiminde BEKLEMEDE görevleri ZAMANINDA_YAPILAMAYAN olarak destek personeline yazar (hedef oran %).', periyot: '00:30, 08:30, 16:30 TRT' },
   { tip: 'max_sure',        ad: 'Max Süre Kontrol',        aciklama: 'ISLEMDE durumdaki görevleri max_sure_dakika dolduğunda otomatik tamamlar; ek olarak 10 dk kala uyarı bildirimi gönderir.', periyot: 'Her 5 dakika' },
   { tip: 'arsivleme',       ad: 'Arşivleme',               aciklama: 'Eski görev/değerlendirme/mesai kayıtlarını arşiv tablolarına taşır (firma/proje arsiv_*_saat ayarlarına göre).', periyot: 'Her 6 saat' },
@@ -189,6 +190,9 @@ function ozetMetni(tip: string, sonuc: any): string {
       return `${s.toplam_sorun ?? 0} sorun / ${s.toplam_sistem ?? 0} sistem`
     case 'rapor_gonder':
       return `${s.processed ?? 0} rapor`
+    case 'yedekleme':
+      const kb = Math.round((s.boyut_gzip_byte ?? 0) / 1024)
+      return `${s.basarili_tablo ?? 0}/${s.toplam_tablo ?? 0} tablo, ${s.toplam_satir ?? 0} satır, ${kb} KB`
     case 'gece_dongu':
       return `üretildi: ${s.uretim?.uretilen ?? 0}, durum geçişi: ${(s.durum_gecis?.aktive ?? 0) + (s.durum_gecis?.beklemeye ?? 0) + (s.durum_gecis?.zamani_gecmis ?? 0)}`
     default:
