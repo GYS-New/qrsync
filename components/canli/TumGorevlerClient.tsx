@@ -842,6 +842,7 @@ async function del() {
       if (q.trim()) qp.set('q', q.trim())
       if (from) qp.set('from', from)
       if (to) qp.set('to', to)
+      if (vardiyaFilter !== 'all') qp.set('vardiya', vardiyaFilter)
       const res = await fetch(`/api/arsiv/frekansiyel?${qp}`)
       const j = await res.json()
       setArsivRows(j.data ?? [])
