@@ -20,7 +20,9 @@ export async function GET(req: NextRequest) {
   const firmaId = p.get('firma_id')
   const projeId = p.get('proje_id')
   const page = Math.max(1, parseInt(p.get('page') ?? '1'))
-  const limit = Math.min(100, Math.max(10, parseInt(p.get('limit') ?? '50')))
+  // Tüm Görevler sayfası tek tabloda merge edebilmek için yüksek limit ihtiyacı
+  // duyabilir (varsayılan 50, max 5000)
+  const limit = Math.min(5000, Math.max(10, parseInt(p.get('limit') ?? '50')))
   const q = p.get('q')?.trim().toLowerCase() ?? ''
   const durum = p.get('durum') ?? ''
   const neden = p.get('neden') ?? ''
