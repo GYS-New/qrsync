@@ -18,6 +18,9 @@ type Arac = {
   son_yikama_tarihi: string | null
   aktif: boolean
   notlar: string | null
+  kullanici_adi_soyadi: string | null
+  kullanici_telefon: string | null
+  kullanici_email: string | null
   olusturma_tarihi: string
   guncelleme_tarihi: string
 }
@@ -31,7 +34,10 @@ const T = {
   grayLight: '#f8fafc',
 }
 
-const BOS_FORM = { plaka: '', marka: '', model: '', renk: '', departman: '', periyot_gun: 7, notlar: '' }
+const BOS_FORM = {
+  plaka: '', marka: '', model: '', renk: '', departman: '', periyot_gun: 7, notlar: '',
+  kullanici_adi_soyadi: '', kullanici_telefon: '', kullanici_email: '',
+}
 
 export default function AraclarClient({ firmaId, projeId }: { firmaId: string; projeId: string | null }) {
   const { toast } = useToast()
@@ -80,7 +86,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
     return araclar.filter(a => {
       if (filterDepartman && a.departman !== filterDepartman) return false
       if (s) {
-        const hay = `${a.plaka} ${a.marka ?? ''} ${a.model ?? ''} ${a.departman ?? ''}`.toLowerCase()
+        const hay = `${a.plaka} ${a.marka ?? ''} ${a.model ?? ''} ${a.departman ?? ''} ${a.kullanici_adi_soyadi ?? ''}`.toLowerCase()
         if (!hay.includes(s)) return false
       }
       return true
@@ -99,12 +105,17 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       plaka: a.plaka, marka: a.marka ?? '', model: a.model ?? '', renk: a.renk ?? '',
       departman: a.departman ?? '', periyot_gun: a.periyot_gun,
       notlar: a.notlar ?? '',
+      kullanici_adi_soyadi: a.kullanici_adi_soyadi ?? '',
+      kullanici_telefon: a.kullanici_telefon ?? '',
+      kullanici_email: a.kullanici_email ?? '',
     })
     setModalOpen(true)
   }
 
   async function kaydet() {
     if (!form.plaka.trim()) { toast({ type: 'error', title: 'Hata', message: 'Plaka gerekli' }); return }
+    if (!form.kullanici_adi_soyadi.trim()) { toast({ type: 'error', title: 'Hata', message: 'Kullanıcı adı soyadı gerekli' }); return }
+    if (!form.departman.trim()) { toast({ type: 'error', title: 'Hata', message: 'Departman gerekli' }); return }
     setKaydetLoading(true)
     try {
       const url = editing ? `/api/oto-yikama/araclar/${editing.id}` : `/api/oto-yikama/araclar`
@@ -148,17 +159,33 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('Araç Listesi')
+    // Zorunlu sütunlar: plaka, kullanici_adi_soyadi, departman
     ws.columns = [
-      { header: 'plaka',       key: 'plaka',       width: 14 },
-      { header: 'marka',       key: 'marka',       width: 16 },
-      { header: 'model',       key: 'model',       width: 16 },
-      { header: 'renk',        key: 'renk',        width: 12 },
-      { header: 'departman',   key: 'departman',   width: 22 },
-      { header: 'periyot_gun', key: 'periyot_gun', width: 12 },
+      { header: 'plaka',                key: 'plaka',                width: 14 },
+      { header: 'kullanici_adi_soyadi', key: 'kullanici_adi_soyadi', width: 24 },
+      { header: 'departman',            key: 'departman',            width: 22 },
+      { header: 'marka',                key: 'marka',                width: 14 },
+      { header: 'model',                key: 'model',                width: 14 },
+      { header: 'renk',                 key: 'renk',                 width: 12 },
+      { header: 'periyot_gun',          key: 'periyot_gun',          width: 12 },
+      { header: 'kullanici_telefon',    key: 'kullanici_telefon',    width: 18 },
+      { header: 'kullanici_email',      key: 'kullanici_email',      width: 24 },
     ]
-    ws.addRow({ plaka: '06ABC123', marka: 'TOYOTA', model: 'Corolla', renk: 'Beyaz', departman: 'Üretim Hattı 3', periyot_gun: 7 })
-    ws.addRow({ plaka: '34XYZ789', marka: 'FORD', model: 'Focus', renk: 'Gri', departman: 'Yönetim', periyot_gun: 14 })
-    ws.getRow(1).font = { bold: true }
+    ws.addRow({ plaka: '06ABC123', kullanici_adi_soyadi: 'Ahmet Yılmaz', departman: 'Üretim Hattı 3', marka: 'TOYOTA', model: 'Corolla', renk: 'Beyaz', periyot_gun: 7,  kullanici_telefon: '5551234567', kullanici_email: 'ahmet@firma.com' })
+    ws.addRow({ plaka: '34XYZ789', kullanici_adi_soyadi: 'Mehmet Demir',  departman: 'Yönetim',         marka: 'FORD',   model: 'Focus',   renk: 'Gri',   periyot_gun: 14, kullanici_telefon: '',           kullanici_email: '' })
+    // Başlık satırı: bold + zorunlu sütunlar kırmızı vurgulu
+    const header = ws.getRow(1)
+    header.font = { bold: true }
+    // Zorunlu sütunlar: plaka (A), kullanici_adi_soyadi (B), departman (C)
+    ;['A1', 'B1', 'C1'].forEach(addr => {
+      const c = ws.getCell(addr)
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }  // kırmızımsı
+      c.font = { bold: true, color: { argb: 'FF991B1B' } }
+    })
+    // Not satırı ekle (3. satır)
+    ws.insertRow(4, { plaka: '* Zorunlu alanlar: plaka, kullanici_adi_soyadi, departman' })
+    ws.getRow(4).font = { italic: true, color: { argb: 'FF991B1B' } }
+    ws.mergeCells('A4:I4')
     const buf = await wb.xlsx.writeBuffer()
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const a = document.createElement('a')
@@ -183,24 +210,48 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       ws.getRow(1).eachCell((c) => headers.push(String(c.value ?? '').toLowerCase().trim()))
       const idxPlaka = headers.indexOf('plaka')
       if (idxPlaka < 0) throw new Error('Excel\'de "plaka" sütunu bulunamadı.')
+      const idxKulAd = headers.indexOf('kullanici_adi_soyadi')
+      if (idxKulAd < 0) throw new Error('Excel\'de "kullanici_adi_soyadi" sütunu bulunamadı.')
+      const idxDep = headers.indexOf('departman')
+      if (idxDep < 0) throw new Error('Excel\'de "departman" sütunu bulunamadı.')
       const idxMarka = headers.indexOf('marka')
       const idxModel = headers.indexOf('model')
       const idxRenk = headers.indexOf('renk')
-      const idxDep = headers.indexOf('departman')
       const idxPer = headers.indexOf('periyot_gun')
+      const idxKulTel = headers.indexOf('kullanici_telefon')
+      const idxKulMail = headers.indexOf('kullanici_email')
+
+      // Excel hücre değerini düz string'e çevir (email obj { text, hyperlink } da olabilir)
+      const cellStr = (val: any): string => {
+        if (val == null) return ''
+        if (typeof val === 'string') return val.trim()
+        if (typeof val === 'number') return String(val)
+        if (typeof val === 'object') {
+          if ('text' in val) return String(val.text ?? '').trim()
+          if ('result' in val) return String(val.result ?? '').trim()
+          if ('richText' in val && Array.isArray(val.richText)) return val.richText.map((r: any) => r.text ?? '').join('').trim()
+        }
+        return String(val).trim()
+      }
 
       const satirlar: any[] = []
       ws.eachRow((row, rowNum) => {
         if (rowNum === 1) return
-        const plaka = String(row.getCell(idxPlaka + 1).value ?? '').trim().toUpperCase().replace(/\s+/g, '')
-        if (!plaka) return
+        const plaka = cellStr(row.getCell(idxPlaka + 1).value).toUpperCase().replace(/\s+/g, '')
+        const kulAd = cellStr(row.getCell(idxKulAd + 1).value)
+        const dep = cellStr(row.getCell(idxDep + 1).value)
+        // Tamamen boş satırları (yorum/not satırı dahil) atla
+        if (!plaka && !kulAd && !dep) return
         satirlar.push({
           plaka,
-          marka: idxMarka >= 0 ? String(row.getCell(idxMarka + 1).value ?? '').trim() || null : null,
-          model: idxModel >= 0 ? String(row.getCell(idxModel + 1).value ?? '').trim() || null : null,
-          renk:  idxRenk >= 0 ? String(row.getCell(idxRenk + 1).value ?? '').trim() || null : null,
-          departman: idxDep >= 0 ? String(row.getCell(idxDep + 1).value ?? '').trim() || null : null,
+          kullanici_adi_soyadi: kulAd || null,
+          departman: dep || null,
+          marka: idxMarka >= 0 ? cellStr(row.getCell(idxMarka + 1).value) || null : null,
+          model: idxModel >= 0 ? cellStr(row.getCell(idxModel + 1).value) || null : null,
+          renk:  idxRenk >= 0 ? cellStr(row.getCell(idxRenk + 1).value) || null : null,
           periyot_gun: idxPer >= 0 ? Number(row.getCell(idxPer + 1).value) || 7 : 7,
+          kullanici_telefon: idxKulTel >= 0 ? cellStr(row.getCell(idxKulTel + 1).value) || null : null,
+          kullanici_email: idxKulMail >= 0 ? cellStr(row.getCell(idxKulMail + 1).value) || null : null,
         })
       })
       if (satirlar.length === 0) throw new Error('Excel\'de geçerli satır bulunamadı.')
@@ -211,7 +262,13 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
         body: JSON.stringify({ firma_id: firmaId, proje_id: projeId, araclar: satirlar, dry_run: true }),
       })
       const j = await res.json()
-      if (!j.ok) throw new Error(j.error)
+      if (!j.ok) {
+        if (j.hatali_satirlar?.length) {
+          const ornek = j.hatali_satirlar.slice(0, 5).map((h: any) => `Satır ${h.satir} (${h.plaka}): ${h.eksik.join(', ')}`).join('\n')
+          throw new Error(`${j.error}\n\nİlk hatalı satırlar:\n${ornek}${j.toplam_hatali > 5 ? `\n…ve ${j.toplam_hatali - 5} satır daha` : ''}`)
+        }
+        throw new Error(j.error)
+      }
       setImportPreview({ ...j, satirlar })
     } catch (err: any) {
       toast({ type: 'error', title: 'Excel hatası', message: err.message })
@@ -258,8 +315,8 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       {/* Üst bar — filter + actions */}
       <div className="verde-card" style={{ padding: '12px 16px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
         <input
-          className="verde-input" placeholder="Plaka, marka, departman..." value={q}
-          onChange={e => setQ(e.target.value)} style={{ maxWidth: 220 }}
+          className="verde-input" placeholder="Plaka, marka, departman, kullanıcı..." value={q}
+          onChange={e => setQ(e.target.value)} style={{ maxWidth: 240 }}
         />
         <select className="verde-select" value={filterDepartman} onChange={e => setFilterDepartman(e.target.value)} style={{ width: 180 }}>
           <option value="">Departman (Tümü)</option>
@@ -342,9 +399,10 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
             <thead>
               <tr>
                 <th>Plaka</th>
+                <th>Kullanıcı</th>
+                <th>Departman</th>
                 <th>Marka / Model</th>
                 <th>Renk</th>
-                <th>Departman</th>
                 <th>Periyot</th>
                 <th>Son Yıkama</th>
                 <th>Durum</th>
@@ -353,9 +411,9 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
             </thead>
             <tbody>
               {yukleniyor ? (
-                <tr><td colSpan={8} style={{ padding: 30, textAlign: 'center', color: T.textSoft }}>Yükleniyor…</td></tr>
+                <tr><td colSpan={9} style={{ padding: 30, textAlign: 'center', color: T.textSoft }}>Yükleniyor…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: 30, textAlign: 'center', color: T.textSoft }}>Kayıt bulunamadı.</td></tr>
+                <tr><td colSpan={9} style={{ padding: 30, textAlign: 'center', color: T.textSoft }}>Kayıt bulunamadı.</td></tr>
               ) : filtered.map(a => {
                 const gecikme = a.son_yikama_tarihi ? (
                   Math.floor((Date.now() - new Date(a.son_yikama_tarihi).getTime()) / 86400000) - a.periyot_gun
@@ -363,9 +421,17 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
                 return (
                   <tr key={a.id} style={{ opacity: a.aktif ? 1 : 0.55 }}>
                     <td style={{ fontFamily: 'monospace', fontWeight: 700, color: T.text }}>{a.plaka}</td>
+                    <td style={{ color: T.text }}>
+                      <div>{a.kullanici_adi_soyadi ?? <span style={{ color: T.textSoft }}>—</span>}</div>
+                      {(a.kullanici_telefon || a.kullanici_email) && (
+                        <div style={{ fontSize: 11, color: T.textSoft, marginTop: 2 }}>
+                          {a.kullanici_telefon}{a.kullanici_telefon && a.kullanici_email ? ' · ' : ''}{a.kullanici_email}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ color: T.textSoft }}>{a.departman ?? '—'}</td>
                     <td style={{ color: T.text }}>{[a.marka, a.model].filter(Boolean).join(' ') || '—'}</td>
                     <td style={{ color: T.textSoft }}>{a.renk ?? '—'}</td>
-                    <td style={{ color: T.textSoft }}>{a.departman ?? '—'}</td>
                     <td style={{ color: T.textSoft }}>{a.periyot_gun} gün</td>
                     <td style={{ color: T.textSoft, fontSize: 12 }}>
                       {a.son_yikama_tarihi
@@ -410,8 +476,24 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Plaka *</label>
+                <label style={{ fontSize: 12, color: T.red, fontWeight: 600 }}>Plaka *</label>
                 <input className="verde-input" value={form.plaka} onChange={e => setForm({ ...form, plaka: e.target.value.toUpperCase() })} style={{ width: '100%', marginTop: 4, fontFamily: 'monospace', fontWeight: 700 }} />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ fontSize: 12, color: T.red, fontWeight: 600 }}>Kullanıcı Adı Soyadı *</label>
+                <input className="verde-input" value={form.kullanici_adi_soyadi} onChange={e => setForm({ ...form, kullanici_adi_soyadi: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ fontSize: 12, color: T.red, fontWeight: 600 }}>Departman *</label>
+                <input className="verde-input" value={form.departman} onChange={e => setForm({ ...form, departman: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Telefon</label>
+                <input className="verde-input" value={form.kullanici_telefon} onChange={e => setForm({ ...form, kullanici_telefon: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>E-posta</label>
+                <input className="verde-input" type="email" value={form.kullanici_email} onChange={e => setForm({ ...form, kullanici_email: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
               </div>
               <div>
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Marka</label>
@@ -428,10 +510,6 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
               <div>
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Periyot (gün)</label>
                 <input className="verde-input" type="number" min={1} value={form.periyot_gun} onChange={e => setForm({ ...form, periyot_gun: Number(e.target.value) || 7 })} style={{ width: '100%', marginTop: 4 }} />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Departman</label>
-                <input className="verde-input" value={form.departman} onChange={e => setForm({ ...form, departman: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Notlar</label>

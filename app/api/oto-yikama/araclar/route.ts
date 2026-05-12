@@ -46,7 +46,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
 
   const plaka = String(body.plaka ?? '').trim().toUpperCase()
+  const kullaniciAd = String(body.kullanici_adi_soyadi ?? '').trim()
+  const departman = String(body.departman ?? '').trim()
   if (!plaka) return NextResponse.json({ ok: false, error: 'Plaka gerekli' }, { status: 400 })
+  if (!kullaniciAd) return NextResponse.json({ ok: false, error: 'Kullanıcı adı soyadı gerekli' }, { status: 400 })
+  if (!departman) return NextResponse.json({ ok: false, error: 'Departman gerekli' }, { status: 400 })
   if (!body.firma_id) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
 
   const payload = {
@@ -56,8 +60,11 @@ export async function POST(req: NextRequest) {
     marka: body.marka ?? null,
     model: body.model ?? null,
     renk: body.renk ?? null,
-    departman: body.departman ?? null,
+    departman,
     periyot_gun: body.periyot_gun ?? 7,
+    kullanici_adi_soyadi: kullaniciAd,
+    kullanici_telefon: body.kullanici_telefon?.toString().trim() || null,
+    kullanici_email: body.kullanici_email?.toString().trim() || null,
     notlar: body.notlar ?? null,
     aktif: body.aktif !== false,
     olusturan_id: auth.me!.id,

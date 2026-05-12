@@ -26,6 +26,9 @@ type ImportRow = {
   renk?: string | null
   departman?: string | null
   periyot_gun?: number | null
+  kullanici_adi_soyadi?: string | null
+  kullanici_telefon?: string | null
+  kullanici_email?: string | null
 }
 
 export async function POST(req: NextRequest) {
@@ -49,19 +52,43 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Excel satırlarını temizle ve plaka bazlı haritala
+  // Excel satırlarını temizle ve plaka bazlı haritala.
+  // Zorunlu alanlar: plaka, kullanici_adi_soyadi, departman. Eksik satırlar
+  // hatalı liste döndürülür ve sync iptal edilir (kullanıcı önce excel'i düzeltsin).
   const excelMap = new Map<string, ImportRow>()
-  for (const r of araclar) {
+  const hataliSatirlar: { satir: number; plaka: string; eksik: string[] }[] = []
+  araclar.forEach((r, idx) => {
     const plaka = String(r.plaka ?? '').trim().toUpperCase().replace(/\s+/g, '')
-    if (!plaka) continue
+    const kullaniciAd = String(r.kullanici_adi_soyadi ?? '').trim()
+    const departman = String(r.departman ?? '').trim()
+    const eksik: string[] = []
+    if (!plaka) eksik.push('plaka')
+    if (!kullaniciAd) eksik.push('kullanici_adi_soyadi')
+    if (!departman) eksik.push('departman')
+    if (eksik.length > 0) {
+      hataliSatirlar.push({ satir: idx + 2, plaka: plaka || '(boş)', eksik })  // +2: header satırı + 1-based
+      return
+    }
     excelMap.set(plaka, {
       plaka,
       marka: r.marka?.toString().trim() || null,
       model: r.model?.toString().trim() || null,
       renk: r.renk?.toString().trim() || null,
-      departman: r.departman?.toString().trim() || null,
+      departman,
       periyot_gun: r.periyot_gun != null ? Number(r.periyot_gun) || 7 : 7,
+      kullanici_adi_soyadi: kullaniciAd,
+      kullanici_telefon: r.kullanici_telefon?.toString().trim() || null,
+      kullanici_email: r.kullanici_email?.toString().trim() || null,
     })
+  })
+
+  if (hataliSatirlar.length > 0) {
+    return NextResponse.json({
+      ok: false,
+      error: `${hataliSatirlar.length} satırda zorunlu alan eksik (plaka, kullanici_adi_soyadi, departman).`,
+      hatali_satirlar: hataliSatirlar.slice(0, 20),
+      toplam_hatali: hataliSatirlar.length,
+    }, { status: 400 })
   }
 
   // DB'deki AKTİF araçları çek (sync sadece aktifler arasında çalışır)
@@ -111,6 +138,9 @@ export async function POST(req: NextRequest) {
         firma_id: firmaId, proje_id: projeId,
         plaka: r.plaka, marka: r.marka, model: r.model, renk: r.renk,
         departman: r.departman, periyot_gun: r.periyot_gun ?? 7,
+        kullanici_adi_soyadi: r.kullanici_adi_soyadi,
+        kullanici_telefon: r.kullanici_telefon,
+        kullanici_email: r.kullanici_email,
         olusturan_id: me.id, aktif: true,
       }))
       const { error } = await admin.from('araclar').insert(batch)

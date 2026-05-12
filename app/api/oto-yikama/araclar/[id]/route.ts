@@ -30,11 +30,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!mevcut) return NextResponse.json({ ok: false, error: 'Araç bulunamadı' }, { status: 404 })
 
   const update: any = {}
-  if ('plaka' in body) update.plaka = String(body.plaka).trim().toUpperCase()
+  if ('plaka' in body) {
+    const p = String(body.plaka).trim().toUpperCase()
+    if (!p) return NextResponse.json({ ok: false, error: 'Plaka boş olamaz' }, { status: 400 })
+    update.plaka = p
+  }
   if ('marka' in body) update.marka = body.marka
   if ('model' in body) update.model = body.model
   if ('renk' in body) update.renk = body.renk
-  if ('departman' in body) update.departman = body.departman
+  if ('departman' in body) {
+    const d = String(body.departman ?? '').trim()
+    if (!d) return NextResponse.json({ ok: false, error: 'Departman boş olamaz' }, { status: 400 })
+    update.departman = d
+  }
+  if ('kullanici_adi_soyadi' in body) {
+    const k = String(body.kullanici_adi_soyadi ?? '').trim()
+    if (!k) return NextResponse.json({ ok: false, error: 'Kullanıcı adı soyadı boş olamaz' }, { status: 400 })
+    update.kullanici_adi_soyadi = k
+  }
+  if ('kullanici_telefon' in body) update.kullanici_telefon = body.kullanici_telefon?.toString().trim() || null
+  if ('kullanici_email' in body) update.kullanici_email = body.kullanici_email?.toString().trim() || null
   if ('periyot_gun' in body) update.periyot_gun = body.periyot_gun
   if ('notlar' in body) update.notlar = body.notlar
   if ('aktif' in body) update.aktif = !!body.aktif
