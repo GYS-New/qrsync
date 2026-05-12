@@ -227,34 +227,81 @@ export default function YedeklerPanel() {
                   })}
                 </div>
 
-                {/* Önizleme paneli */}
-                {(previewLoading || previewVeri) && (
-                  <div style={{ marginTop: 16, padding: 12, background: '#0f172a', color: '#e2e8f0', borderRadius: 10, fontFamily: 'monospace', fontSize: 11, maxHeight: 400, overflow: 'auto' }}>
-                    {previewLoading ? (
-                      <div style={{ color: '#94a3b8' }}>Yükleniyor…</div>
-                    ) : previewVeri ? (
-                      <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #334155' }}>
-                          <FileArchive size={14} color="#60a5fa" />
-                          <strong style={{ color: '#f1f5f9' }}>{previewVeri.tablo}</strong>
-                          <span style={{ color: '#94a3b8' }}>·</span>
-                          <span style={{ color: '#94a3b8' }}>{previewVeri.toplam} satır toplam</span>
-                          <span style={{ color: '#94a3b8' }}>·</span>
-                          <span style={{ color: '#94a3b8' }}>İlk {Math.min(50, previewVeri.toplam)} satır gösteriliyor</span>
-                          <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>
-                            {formatBoyut(previewVeri.boyut_ham)} → {formatBoyut(previewVeri.boyut_gzip)}
-                          </span>
-                          <button onClick={() => setPreviewVeri(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>×</button>
-                        </div>
-                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(previewVeri.ornek, null, 2)}</pre>
-                      </>
-                    ) : null}
-                  </div>
-                )}
               </>
             ) : (
               <div style={{ padding: 40, textAlign: 'center', color: T.textSoft, fontSize: 14 }}>
                 Soldan bir tarih seçin.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Önizleme popup'ı — overlay modal */}
+      {(previewLoading || previewVeri) && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => { setPreviewVeri(null); setPreviewLoading(false) }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(900px, 96vw)', maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+              background: '#0f172a', color: '#e2e8f0', borderRadius: 12,
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+              border: '1px solid #1e293b',
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', borderBottom: '1px solid #1e293b' }}>
+              <FileArchive size={16} color="#60a5fa" />
+              {previewVeri ? (
+                <>
+                  <strong style={{ color: '#f1f5f9', fontSize: 14, fontFamily: 'monospace' }}>{previewVeri.tablo}</strong>
+                  <span style={{ color: '#475569' }}>·</span>
+                  <span style={{ color: '#94a3b8', fontSize: 12 }}>{previewVeri.tarih}</span>
+                  <span style={{ color: '#475569' }}>·</span>
+                  <span style={{ color: '#94a3b8', fontSize: 12 }}><strong style={{ color: '#cbd5e1' }}>{previewVeri.toplam}</strong> satır toplam, ilk {Math.min(50, previewVeri.toplam)} gösteriliyor</span>
+                  <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: 12 }}>
+                    {formatBoyut(previewVeri.boyut_ham)} → {formatBoyut(previewVeri.boyut_gzip)}
+                  </span>
+                </>
+              ) : (
+                <span style={{ color: '#94a3b8', fontSize: 13 }}>Yükleniyor…</span>
+              )}
+              <button
+                onClick={() => { setPreviewVeri(null); setPreviewLoading(false) }}
+                style={{ marginLeft: previewVeri ? 12 : 'auto', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 0 }}
+                aria-label="Kapat"
+              >×</button>
+            </div>
+
+            {/* İçerik */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.55 }}>
+              {previewLoading ? (
+                <div style={{ color: '#94a3b8', textAlign: 'center', padding: 40 }}>
+                  <RefreshCw size={20} style={{ animation: 'yp-spin 0.9s linear infinite', marginBottom: 8 }} />
+                  <div>Önizleme yükleniyor…</div>
+                </div>
+              ) : previewVeri ? (
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {JSON.stringify(previewVeri.ornek, null, 2)}
+                </pre>
+              ) : null}
+            </div>
+
+            {/* Footer */}
+            {previewVeri && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderTop: '1px solid #1e293b', fontSize: 11.5, color: '#94a3b8' }}>
+                <span>ESC veya dışına tıklayarak kapat</span>
+                <button
+                  onClick={() => indirYedek(previewVeri.tarih, previewVeri.tablo)}
+                  style={{ marginLeft: 'auto', padding: '6px 12px', borderRadius: 6, border: '1px solid #334155', background: '#1e293b', color: '#e2e8f0', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600 }}
+                >
+                  <Download size={12} /> Tam JSON İndir
+                </button>
               </div>
             )}
           </div>
