@@ -27,7 +27,21 @@ export default async function OtoYikamaGenel() {
               <div style={{ padding: 18, border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc', cursor: 'pointer' }}>
                 <div style={{ fontSize: 22, marginBottom: 6 }}>🚗</div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>Araç Kayıtları</div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 3 }}>Plaka listesi, Excel import, periyot ayarları</div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 3 }}>Plaka listesi, Excel sync, kullanıcı bilgileri</div>
+              </div>
+            </a>
+            <a href="/sa/dashboard/oto-yikama/istasyonlar" style={{ textDecoration: 'none' }}>
+              <div style={{ padding: 18, border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc', cursor: 'pointer' }}>
+                <div style={{ fontSize: 22, marginBottom: 6 }}>📍</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>İstasyonlar</div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 3 }}>Yıkama istasyonu lokasyonlarını yönet</div>
+              </div>
+            </a>
+            <a href="/sa/dashboard/oto-yikama/gorev-olustur" style={{ textDecoration: 'none' }}>
+              <div style={{ padding: 18, border: '1px solid #1d4ed8', borderRadius: 10, background: '#eff6ff', cursor: 'pointer' }}>
+                <div style={{ fontSize: 22, marginBottom: 6 }}>➕</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#1d4ed8' }}>Görev Oluştur</div>
+                <div style={{ fontSize: 12, color: '#1e3a8a', marginTop: 3 }}>Plaka × istasyon × tarih bazlı toplu görev oluştur</div>
               </div>
             </a>
             <a href="/sa/dashboard/oto-yikama/gunluk" style={{ textDecoration: 'none' }}>
