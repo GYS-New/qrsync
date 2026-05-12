@@ -91,9 +91,23 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Push Bildirim Geçmişi', href: `${base}/dashboard/push-log`, icon: '🔔' },
         ]
 
+  // Oto Yıkama modülü — yalnızca SA görür. Araç kayıtları, günlük yıkama tablosu
+  // ve raporlar tek başlık altında toplanır. Mobil app değişmez; yıkama görevleri
+  // mevcut spesifik görev sistemi üzerinden akar.
+  const otoYikamaGroup = isSA ? [{
+    label: 'Oto Yıkama',
+    items: [
+      { label: 'Genel Bakış',   href: `${base}/dashboard/oto-yikama`,          icon: '🚿' },
+      { label: 'Araç Kayıtları', href: `${base}/dashboard/oto-yikama/araclar`, icon: '🚗' },
+      { label: 'Günlük Tablo',  href: `${base}/dashboard/oto-yikama/gunluk`,  icon: '📋' },
+      { label: 'Raporlar',      href: `${base}/dashboard/oto-yikama/raporlar`, icon: '📊' },
+    ],
+  }] : []
+
   return [
     { label: 'Ana Menü', items: [{ label: 'Gösterge Paneli', href: `${base}/dashboard`, icon: '⊞' }] },
     { label: 'Yönetim', items: mgmt },
+    ...otoYikamaGroup,
     {
       label: 'Sistem',
       items: [
