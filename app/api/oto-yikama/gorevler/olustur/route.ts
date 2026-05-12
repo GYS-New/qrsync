@@ -1,10 +1,11 @@
 /**
  * POST /api/oto-yikama/gorevler/olustur
  *
- * Toplu yıkama görevi oluşturma:
- *   - Yönetici plaka(lar) ve her plaka için lokasyon (yıkama alt lokasyonu) seçer
- *   - Çoklu tarih seçer
- *   - Her (plaka × tarih) için açık görev oluşturulur (atama yok)
+ * Toplu yıkama görevi oluşturma. Mevcut "gorevler" tablosuna spesifik görev
+ * olarak yazılır + yana 1:1 oto_yikama_gorev_metadata kaydı atılır.
+ *
+ * Bu sayede mobil app değişmez (mevcut spesifik görev akışıyla yıkama
+ * görevleri de gelir/yapılır). Plaka geçmişi raporu metadata tablosundan.
  *
  * Body:
  *   {
@@ -14,8 +15,13 @@
  *   }
  *
  * Davranış:
- *   - Aynı (arac, lokasyon, tarih) için zaten görev varsa atlanır (UNIQUE constraint).
- *   - Plaka snapshot — araç sonradan silinse bile görev geçmişi okunur kalır.
+ *   - Görev tanımı: "Oto Yıkama - PLAKA"
+ *   - atanan_kullanici_id = NULL (açık görev — atama yok)
+ *   - durum = 'ACIK'
+ *   - Aynı (arac, lokasyon, hedef_tarih) için duplicate engelleme:
+ *     metadata UNIQUE constraint + ön sorgu ile API'de elenir.
+ *   - Hata olursa best-effort cleanup: metadata INSERT fail ederse oluşan
+ *     gorev satırı silinir.
  *
  * SA-only + firma için oto_yikama_aktif=true zorunlu.
  */
@@ -27,7 +33,6 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 type Atama = { arac_id: string; lokasyon_id: string }
-
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 export async function POST(req: NextRequest) {
@@ -54,7 +59,7 @@ export async function POST(req: NextRequest) {
   }
   const gecersizTarih = tarihler.find(t => !DATE_RE.test(t))
   if (gecersizTarih) {
-    return NextResponse.json({ ok: false, error: `Geçersiz tarih formatı: ${gecersizTarih} (beklenen YYYY-MM-DD)` }, { status: 400 })
+    return NextResponse.json({ ok: false, error: `Geçersiz tarih formatı: ${gecersizTarih}` }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -64,7 +69,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Bu firma için Oto Yıkama modülü aktif değil.' }, { status: 403 })
   }
 
-  // Araç + lokasyon doğrulama
+  // Aracı + lokasyonu doğrula
   const aracIds = [...new Set(atamalar.map(a => a.arac_id).filter(Boolean))]
   const lokasyonIds = [...new Set(atamalar.map(a => a.lokasyon_id).filter(Boolean))]
   if (aracIds.length === 0 || lokasyonIds.length === 0) {
@@ -97,52 +102,87 @@ export async function POST(req: NextRequest) {
   }
   if (dogrulamaHatalari.length > 0) {
     return NextResponse.json({
-      ok: false,
-      error: 'Doğrulama hatası',
+      ok: false, error: 'Doğrulama hatası',
       hatalar: dogrulamaHatalari.slice(0, 20),
       toplam_hata: dogrulamaHatalari.length,
     }, { status: 400 })
   }
 
-  const rows = atamalar.flatMap(a =>
-    tarihler.map(t => ({
-      firma_id: firmaId,
-      arac_id: a.arac_id,
-      lokasyon_id: a.lokasyon_id,
-      plaka_snapshot: aracMap.get(a.arac_id)!.plaka,
-      hedef_tarih: t,
-      durum: 'ACIK' as const,
-      olusturan_id: me.id,
-    })),
+  // Duplicate önle: hangi (arac_id, hedef_tarih) kombinasyonu zaten yazılmış?
+  const { data: mevcutMeta } = await admin
+    .from('oto_yikama_gorev_metadata')
+    .select('arac_id, hedef_tarih')
+    .in('arac_id', aracIds)
+    .in('hedef_tarih', tarihler)
+  const mevcutSet = new Set<string>(
+    (mevcutMeta ?? []).map(m => `${m.arac_id}__${m.hedef_tarih}`),
   )
 
-  const BATCH = 500
-  let eklenen = 0
-  let duplicate = 0
-  const hatalar: string[] = []
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH)
-    const { data, error } = await admin
-      .from('yikama_gorevleri')
-      .insert(batch)
-      .select('id')
-    if (error) {
-      // Toplu hata → satır satır retry (duplicate'ları ayıkla)
-      for (const row of batch) {
-        const { error: rowErr } = await admin.from('yikama_gorevleri').insert(row)
-        if (!rowErr) eklenen++
-        else if (rowErr.code === '23505') duplicate++
-        else hatalar.push(`(${row.plaka_snapshot}, ${row.hedef_tarih}): ${rowErr.message}`)
-      }
-    } else {
-      eklenen += data?.length ?? 0
+  // Görev satırlarını hazırla
+  type GorevSatir = { arac_id: string; lokasyon_id: string; hedef_tarih: string; plaka: string }
+  const planlanan: GorevSatir[] = []
+  for (const a of atamalar) {
+    const plaka = aracMap.get(a.arac_id)!.plaka
+    for (const t of tarihler) {
+      const k = `${a.arac_id}__${t}`
+      if (mevcutSet.has(k)) continue  // duplicate, atla
+      planlanan.push({ arac_id: a.arac_id, lokasyon_id: a.lokasyon_id, hedef_tarih: t, plaka })
     }
+  }
+
+  let eklenen = 0
+  const hatalar: string[] = []
+  const duplicate = (atamalar.length * tarihler.length) - planlanan.length
+
+  // Batch — her satır için gorevler INSERT + metadata INSERT
+  // (Supabase JS'te transaction yok; metadata fail olursa gorev rollback.)
+  const BATCH = 100
+  for (let i = 0; i < planlanan.length; i += BATCH) {
+    const chunk = planlanan.slice(i, i + BATCH)
+
+    // 1) gorevler INSERT
+    const gorevRows = chunk.map(c => ({
+      firma_id: firmaId,
+      tanim: `Oto Yıkama - ${c.plaka}`,
+      lokasyon_id: c.lokasyon_id,
+      atanan_kullanici_id: null,
+      durum: 'ACIK',
+      olusturan_id: me.id,
+    }))
+    const { data: insertedGorevler, error: gorevErr } = await admin
+      .from('gorevler')
+      .insert(gorevRows)
+      .select('id')
+
+    if (gorevErr || !insertedGorevler || insertedGorevler.length !== chunk.length) {
+      hatalar.push(`gorevler batch ${i}: ${gorevErr?.message ?? 'beklenen satır sayısı eşleşmedi'}`)
+      continue
+    }
+
+    // 2) metadata INSERT — gorev_id'lerle eşle
+    const metaRows = insertedGorevler.map((g, idx) => ({
+      gorev_id: g.id,
+      arac_id: chunk[idx].arac_id,
+      plaka_snapshot: chunk[idx].plaka,
+      hedef_tarih: chunk[idx].hedef_tarih,
+    }))
+    const { error: metaErr } = await admin.from('oto_yikama_gorev_metadata').insert(metaRows)
+
+    if (metaErr) {
+      // Rollback: oluşan görevleri sil — yetim kalmasın
+      const idsToDelete = insertedGorevler.map(g => g.id)
+      await admin.from('gorevler').delete().in('id', idsToDelete)
+      hatalar.push(`metadata batch ${i}: ${metaErr.message} (görevler geri alındı)`)
+      continue
+    }
+
+    eklenen += chunk.length
   }
 
   try {
     await admin.from('audit_log').insert({
       tip: 'oto_yikama_gorev_olustur',
-      tablo: 'yikama_gorevleri',
+      tablo: 'gorevler',
       kullanici_id: me.id,
       basarili: hatalar.length === 0,
       satir_sayisi: eklenen,
@@ -151,7 +191,7 @@ export async function POST(req: NextRequest) {
         firma_id: firmaId,
         toplam_atama: atamalar.length,
         toplam_tarih: tarihler.length,
-        beklenen: rows.length,
+        beklenen: planlanan.length,
         eklenen,
         duplicate,
         hata_sayisi: hatalar.length,
@@ -161,7 +201,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: hatalar.length === 0,
-    beklenen: rows.length,
+    beklenen: planlanan.length,
     eklenen,
     duplicate,
     hatalar: hatalar.slice(0, 10),
