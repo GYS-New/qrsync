@@ -136,6 +136,8 @@ export default function KullanicilarClient({
   const [filtreLokasyon, setFiltreLokasyon] = useState('')
   const [filtreDurum, setFiltreDurum] = useState<'' | 'aktif' | 'pasif'>('')
   const [filtreRol, setFiltreRol] = useState('')
+  // Cihaz eşleşme filtresi — mobil device_token kaydı olan/olmayan kullanıcılar
+  const [filtreCihaz, setFiltreCihaz] = useState<'all' | 'eslesmis' | 'eslesmemis'>('all')
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [seciliIds, setSeciliIds] = useState<Set<string>>(new Set())
   const [topluSilModu, setTopluSilModu] = useState(false)
@@ -240,6 +242,9 @@ export default function KullanicilarClient({
     if (filtreDurum === 'aktif') list = list.filter(u => u.aktif)
     if (filtreDurum === 'pasif') list = list.filter(u => !u.aktif)
     if (filtreRol) list = list.filter(u => u.rol === filtreRol)
+    // Cihaz eşleşme filtresi: deviceTokenMap'te kayıtlı device_token varsa "eşleşmiş"
+    if (filtreCihaz === 'eslesmis')   list = list.filter(u => !!deviceTokenMap[u.id]?.device_token)
+    if (filtreCihaz === 'eslesmemis') list = list.filter(u => !deviceTokenMap[u.id]?.device_token)
 
     // En güncel aktiviteye göre sırala (web ile mobil zamanlarından maksimumu al, DESC).
     // Notlar:
@@ -255,7 +260,7 @@ export default function KullanicilarClient({
       const bMax = Math.max(bWeb, bMob)
       return bMax - aMax
     })
-  }, [q, users, filtreLokasyon, filtreDurum, filtreRol, deviceTokenMap])
+  }, [q, users, filtreLokasyon, filtreDurum, filtreRol, filtreCihaz, deviceTokenMap])
 
   // Üst lokasyon bazında istatistikler — tüm kullanıcı listesi (filtrelerden bağımsız).
   // U/M rolleri için ustLokasyonlar SSR'da zaten yetkiyle filtrelenmiş halde geliyor,
@@ -569,6 +574,12 @@ export default function KullanicilarClient({
             <option value="tenant_admin">TA</option>
             <option value="tenant_user">Kullanıcı</option>
             <option value="musteri">Müşteri</option>
+          </select>
+          <select className="verde-select" value={filtreCihaz} onChange={e => setFiltreCihaz(e.target.value as any)} style={{ width: 140 }}
+            title="Mobil cihaz eşleşme durumu">
+            <option value="all">Cihaz (Tümü)</option>
+            <option value="eslesmis">Eşleşmiş Cihaz</option>
+            <option value="eslesmemis">Eşleşmemiş Cihaz</option>
           </select>
           <span style={{ fontSize: 12, color: '#6b7280' }}>{filtered.length}/{users.length}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
