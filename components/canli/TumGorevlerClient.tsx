@@ -836,7 +836,10 @@ async function del() {
     try {
       const qp = new URLSearchParams({ firma_id: firmaId, page: String(pg), limit: String(ARSIV_PER_PAGE) })
       if (projeId) qp.set('proje_id', projeId)
-      if (lokasyonId) qp.set('lokasyon_id', lokasyonId)
+      // Üst lokasyon seçildiğinde tüm torunları kapsayan ID listesi gönder
+      // (backend tek lokasyon_id ile eq kontrolü yapıyor; descendant'ları yakalamak için 'in')
+      if (lokasyonSet && lokasyonSet.size > 0) qp.set('lokasyon_ids', [...lokasyonSet].join(','))
+      else if (lokasyonId) qp.set('lokasyon_id', lokasyonId)
       if (atananId) qp.set('atanan_id', atananId)
       if (durum) qp.set('durum', durum)
       if (q.trim()) qp.set('q', q.trim())

@@ -28,6 +28,10 @@ export async function GET(req: NextRequest) {
   const toD = p.get('to') ?? ''       // 'YYYY-MM-DD' (TR günü)
   const vardiya = p.get('vardiya') ?? 'all'  // all | v1 | v2 | v3
   const lokasyonId = p.get('lokasyon_id') ?? ''
+  // Virgülle ayrılmış lokasyon ID listesi (üst lokasyon + tüm torunları için).
+  // Frontend "MONTAJ" gibi üst seviye seçildiğinde descendant set'ini iletir.
+  const lokasyonIdsRaw = p.get('lokasyon_ids') ?? ''
+  const lokasyonIds = lokasyonIdsRaw ? lokasyonIdsRaw.split(',').map(s => s.trim()).filter(Boolean) : []
   const atananId = p.get('atanan_id') ?? ''
 
   if (!firmaId) return NextResponse.json({ data: [], total: 0 })
@@ -49,7 +53,8 @@ export async function GET(req: NextRequest) {
   if (fromUTC) countQ = countQ.gte('aktif_olma_tarihi', fromUTC)
   if (toUTC) countQ = countQ.lte('aktif_olma_tarihi', toUTC)
   if (q) countQ = countQ.ilike('tanim', `%${q}%`)
-  if (lokasyonId) countQ = countQ.eq('lokasyon_id', lokasyonId)
+  if (lokasyonIds.length > 0) countQ = countQ.in('lokasyon_id', lokasyonIds)
+  else if (lokasyonId) countQ = countQ.eq('lokasyon_id', lokasyonId)
   if (atananId) countQ = countQ.eq('atanan_kullanici_id', atananId)
 
   let totalRaw: number | null = null
@@ -71,7 +76,8 @@ export async function GET(req: NextRequest) {
   if (fromUTC) dataQ = dataQ.gte('aktif_olma_tarihi', fromUTC)
   if (toUTC) dataQ = dataQ.lte('aktif_olma_tarihi', toUTC)
   if (q) dataQ = dataQ.ilike('tanim', `%${q}%`)
-  if (lokasyonId) dataQ = dataQ.eq('lokasyon_id', lokasyonId)
+  if (lokasyonIds.length > 0) dataQ = dataQ.in('lokasyon_id', lokasyonIds)
+  else if (lokasyonId) dataQ = dataQ.eq('lokasyon_id', lokasyonId)
   if (atananId) dataQ = dataQ.eq('atanan_kullanici_id', atananId)
 
   // Vardiya yokken normal pagination; varken filter sonrası slice yapacağız
