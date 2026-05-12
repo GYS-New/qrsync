@@ -554,12 +554,12 @@ export default function KullanicilarClient({
       <div className="verde-card">
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
-            className="verde-input" placeholder="Ara (isim, email, telefon)"
-            value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 220 }} autoComplete="off"
+            className="verde-input" placeholder="Ara…"
+            value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 160 }} autoComplete="off"
           />
           {ustLokasyonlar.length > 0 && (
-            <select className="verde-select" value={filtreLokasyon} onChange={e => setFiltreLokasyon(e.target.value)} style={{ width: 148 }}>
-              <option value="">Lokasyon (Tümü)</option>
+            <select className="verde-select" value={filtreLokasyon} onChange={e => setFiltreLokasyon(e.target.value)} style={{ width: 124 }}>
+              <option value="">Lokasyon</option>
               <option value="__bos">— Atanmamış —</option>
               {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
             </select>
