@@ -32,8 +32,9 @@ export default async function UGorevlerPage() {
   // Yetkili lokasyon kısıtlaması
   const yetkiliLokIds = firmaId ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
 
+  // gorevler_normal view: yıkama görevleri hariç (Oto Yıkama için ayrı sayfa)
   let gorevQ = supabase
-    .from('gorevler')
+    .from('gorevler_normal')
     .select('*,lokasyonlar(id,tanim,parent_id),atanan:users!atanan_kullanici_id(isim_soyisim)')
     .eq('firma_id', firmaId)
     .order('olusturma_tarihi', { ascending: false })

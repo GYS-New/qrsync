@@ -119,8 +119,8 @@ export async function GET(req: Request) {
     const { data: kullanicilar } = await kulQ
     const userMap = new Map<string, string>((kullanicilar ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
 
-    // Görevler (aktif tablo)
-    let qAktif = admin.from('gorevler')
+    // Görevler (aktif tablo) — gorevler_normal view: yıkama görevleri hariç
+    let qAktif = admin.from('gorevler_normal')
       .select('id,tanim,durum,lokasyon_id,atanan_kullanici_id,olusturan_id,islemi_yapan_id,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi')
       .eq('firma_id', firmaId)
     if (projeId)     qAktif = (qAktif as any).eq('proje_id', projeId)

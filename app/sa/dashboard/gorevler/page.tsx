@@ -19,8 +19,9 @@ export default async function SAGorevlerPage() {
   const projeId = aktifProje?.id ?? null
 
   const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  // gorevler_normal view: yıkama görevleri hariç (Oto Yıkama için ayrı sayfa)
   let gorevQ = firmaId
-    ? supabase.from('gorevler').select('*,lokasyonlar(id,tanim,parent_id),users!atanan_kullanici_id(isim_soyisim)')
+    ? supabase.from('gorevler_normal').select('*,lokasyonlar(id,tanim,parent_id),users!atanan_kullanici_id(isim_soyisim)')
         .eq('firma_id', firmaId).or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`).order('olusturma_tarihi', { ascending: false }).limit(200)
     : null
   if (gorevQ && projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)

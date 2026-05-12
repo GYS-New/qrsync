@@ -75,8 +75,9 @@ export default function GorevlerUserClient({
   async function refresh() {
     if (!firmaId) return
     setLoading(true)
+    // gorevler_normal view: yıkama görevleri hariç (Oto Yıkama için ayrı sayfa)
     const { data } = await supabase
-      .from('gorevler')
+      .from('gorevler_normal')
       .select('*,lokasyonlar(id,tanim,parent_id),atanan:users!atanan_kullanici_id(isim_soyisim)')
       .eq('firma_id', firmaId)
       .order('olusturma_tarihi', { ascending: false })

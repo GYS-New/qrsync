@@ -26,8 +26,9 @@ export default async function TAGorevlerPage() {
 
   const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
+    // gorevler_normal view: yıkama görevleri hariç (Oto Yıkama için ayrı sayfa)
     supabase
-      .from('gorevler')
+      .from('gorevler_normal')
       .select('*,lokasyonlar(id,tanim,parent_id),users!atanan_kullanici_id(isim_soyisim)')
       .eq('firma_id', firmaId)
       .eq('proje_id', aktifProje.id)

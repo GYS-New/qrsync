@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     const [firmaCfg, projeCfg] = await Promise.all([
       admin.from('firmalar').select('frekansiyel_ceklist_aktif, spesifik_ceklist_aktif').eq('id', firmaId).single(),
       personelProjeId
-        ? admin.from('projeler').select('personel_takibi_aktif, frekansiyel_ceklist_aktif, spesifik_ceklist_aktif').eq('id', personelProjeId).single()
+        ? admin.from('projeler').select('personel_takibi_aktif, frekansiyel_ceklist_aktif, spesifik_ceklist_aktif, spesifik_personel_atama_aktif').eq('id', personelProjeId).single()
         : Promise.resolve({ data: null }),
     ])
     const efAyar = (k: string, defaultV = true): boolean => {
@@ -64,6 +64,10 @@ export async function GET(req: Request) {
     }
     const canliCeklistAktif    = efAyar('frekansiyel_ceklist_aktif')
     const spesifikCeklistAktif = efAyar('spesifik_ceklist_aktif')
+    // Spesifik görevlerde personel atama aktifse → sadece kişiye atanmış görevler
+    // Pasifse → kişiye atanmış + atanan_kullanici_id IS NULL olan açık görevler
+    // (NULL atanan görevler "açık görev" semantiği — Oto Yıkama görevleri de bu yolla görünür)
+    const personelAtamaAktif = efAyar('spesifik_personel_atama_aktif')
 
     // ── Mesai kontrolü (sadece proje bazlı) ─────────────────────────────────
     {
@@ -91,14 +95,23 @@ export async function GET(req: Request) {
 
     // Spesifik + canlı görevleri paralel çek
     const [gorevler, canliGorevler] = await Promise.all([
-      fetchAll(() =>
-        admin.from('gorevler').select(`
-          id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
+      fetchAll(() => {
+        let q = admin.from('gorevler').select(`
+          id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi, atanan_kullanici_id,
           lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
-        `).eq('firma_id', firmaId).eq('atanan_kullanici_id', userId)
+        `).eq('firma_id', firmaId)
+        // Atama mantığı:
+        //   AKTİF  → sadece kişiye atanmış görevler
+        //   PASİF → kişiye atanmış + atanan IS NULL (Oto Yıkama gibi açık görevler dahil)
+        if (personelAtamaAktif) {
+          q = q.eq('atanan_kullanici_id', userId)
+        } else {
+          q = q.or(`atanan_kullanici_id.eq.${userId},atanan_kullanici_id.is.null`)
+        }
+        return q
           .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
           .order('olusturma_tarihi', { ascending: false })
-      ),
+      }),
       fetchAll(() =>
         admin.from('canli_gorevler').select(`
           id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,

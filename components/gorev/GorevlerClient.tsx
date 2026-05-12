@@ -192,7 +192,8 @@ export default function GorevlerClient({
   async function refreshAll(fid: string) {
     setLoading(true); setError('')
     const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    let gorevQuery = supabase.from('gorevler').select(SEL)
+    // gorevler_normal view: yıkama görevleri hariç (Oto Yıkama için ayrı sayfa)
+    let gorevQuery = supabase.from('gorevler_normal').select(SEL)
       .eq('firma_id', fid)
       .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
       .order('olusturma_tarihi', { ascending: false }).limit(200)
@@ -219,8 +220,8 @@ export default function GorevlerClient({
     if (!firmaId) return
     setLoading(true); setError('')
 
-    // ── Ana tablo: gorevler ───────────────────────────────────────────────────
-    let query = supabase.from('gorevler').select(SEL).eq('firma_id', firmaId)
+    // ── Ana tablo: gorevler_normal view (yıkama hariç) ─────────────────────────
+    let query = supabase.from('gorevler_normal').select(SEL).eq('firma_id', firmaId)
     if (projeId) query = (query as any).eq('proje_id', projeId)
     if (yetkiliLokIds) query = query.in('lokasyon_id', yetkiliLokIds)
 
