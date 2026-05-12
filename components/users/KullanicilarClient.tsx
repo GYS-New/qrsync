@@ -581,8 +581,8 @@ export default function KullanicilarClient({
             <option value="eslesmis">Eşleşmiş</option>
             <option value="eslesmemis">Eşleşmemiş</option>
           </select>
-          <span style={{ fontSize: 12, color: '#6b7280' }}>{filtered.length}/{users.length}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, color: '#6b7280', marginRight: 4 }}>{filtered.length}/{users.length}</span>
             <input ref={importInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={onImportFile} />
             <Button variant="ghost" size="sm" onClick={refresh} disabled={loading} className="text-[15px]" style={IMPORT_EXPORT_BUTTON_STYLE}>
               {loading ? 'Yükleniyor…' : '↻ Yenile'}
