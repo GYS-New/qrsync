@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { RefreshCw, Eye, Download, Database, Calendar, FileArchive, RotateCcw } from 'lucide-react'
+import { RefreshCw, Eye, Download, Database, Calendar, FileArchive, RotateCcw, HelpCircle, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 type YedekDosya = { tablo: string; boyut: number; olusturma: string | null }
 type YedekListesi = { tarihler: string[]; detay: Record<string, YedekDosya[]> }
@@ -37,6 +37,8 @@ export default function YedeklerPanel() {
   const [previewVeri, setPreviewVeri] = useState<{ tarih: string; tablo: string; toplam: number; ornek: any[]; boyut_gzip: number; boyut_ham: number } | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [restoreLoading, setRestoreLoading] = useState<string | null>(null)
+  const [rehberAcik, setRehberAcik] = useState(false)
+  const [acikSenaryo, setAcikSenaryo] = useState<number | null>(0)
 
   async function yukle() {
     setYukleniyor(true)
@@ -133,8 +135,13 @@ export default function YedeklerPanel() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <div style={{ width: 4, height: 20, borderRadius: 2, background: T.blue }} />
         <h3 style={{ fontSize: 16, fontWeight: 800, color: T.text, margin: 0 }}>Veri Yedekleri</h3>
+        <button onClick={() => setRehberAcik(true)}
+          style={{ marginLeft: 'auto', padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.blue}40`, background: T.blueLight, color: T.blue, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <HelpCircle size={13} />
+          Nasıl Yapılır?
+        </button>
         <button onClick={yukle} disabled={yukleniyor}
-          style={{ marginLeft: 'auto', padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.text, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.text, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <RefreshCw size={12} style={yukleniyor ? { animation: 'yp-spin 0.9s linear infinite' } : undefined} />
           Yenile
         </button>
@@ -308,7 +315,213 @@ export default function YedeklerPanel() {
         </div>
       )}
 
+      {/* "Nasıl Yapılır?" rehber popup'ı */}
+      {rehberAcik && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setRehberAcik(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 95, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(820px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+              background: '#fff', borderRadius: 14,
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)',
+              border: `1px solid ${T.border}`,
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 22px', borderBottom: `1px solid ${T.border}`, background: T.blueLight }}>
+              <HelpCircle size={20} color={T.blue} />
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: T.text }}>Yedekleme ve Geri Yükleme Rehberi</h3>
+                <div style={{ fontSize: 12, color: T.textSoft, marginTop: 2 }}>Veri kaybı senaryolarında ne yapacağınız adım adım anlatılmıştır.</div>
+              </div>
+              <button
+                onClick={() => setRehberAcik(false)}
+                style={{ background: 'transparent', border: 'none', color: T.textSoft, cursor: 'pointer', fontSize: 24, lineHeight: 1, padding: 0 }}
+                aria-label="Kapat"
+              >×</button>
+            </div>
+
+            {/* İçerik — accordion */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '14px 18px' }}>
+              {/* Bilgi şeridi */}
+              <div style={{ padding: '10px 14px', background: T.amberLight, border: `1px solid ${T.amber}40`, borderRadius: 10, marginBottom: 14, fontSize: 12.5, color: T.text, lineHeight: 1.55 }}>
+                <strong style={{ color: T.amber }}>⚠️ Önemli:</strong> Bu sistem Supabase'in yerleşik (built-in) backup'larından <strong>bağımsız bir katman</strong>dır. Tablo bazlı seçici restore için tasarlanmıştır. Veritabanı tamamen çökerse Supabase Dashboard'tan yerleşik backup kullanılır.
+              </div>
+
+              {SENARYOLAR.map((s, i) => {
+                const acik = acikSenaryo === i
+                return (
+                  <div key={i} style={{
+                    marginBottom: 10, border: `1px solid ${acik ? s.renk : T.border}`,
+                    borderRadius: 10, overflow: 'hidden',
+                    background: acik ? `${s.renk}08` : '#fff',
+                  }}>
+                    <button onClick={() => setAcikSenaryo(acik ? null : i)}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '12px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
+                        textAlign: 'left',
+                      }}>
+                      <span style={{
+                        width: 26, height: 26, borderRadius: 999, background: s.renk, color: '#fff',
+                        fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>{i + 1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: T.text }}>{s.baslik}</div>
+                        <div style={{ fontSize: 12, color: T.textSoft, marginTop: 1 }}>{s.ozet}</div>
+                      </div>
+                      <span style={{
+                        padding: '2px 10px', borderRadius: 999, fontSize: 10.5, fontWeight: 700,
+                        background: `${s.renk}1a`, color: s.renk,
+                      }}>{s.etiket}</span>
+                      {acik ? <ChevronDown size={16} color={T.textSoft} /> : <ChevronRight size={16} color={T.textSoft} />}
+                    </button>
+
+                    {acik && (
+                      <div style={{ padding: '0 16px 14px', borderTop: `1px dashed ${T.border}`, marginTop: -1 }}>
+                        <div style={{ paddingTop: 12, fontSize: 13, color: T.text, lineHeight: 1.65 }}>
+                          {s.durum && (
+                            <div style={{ marginBottom: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 8, fontSize: 12.5 }}>
+                              <strong style={{ color: T.textSoft }}>Durum: </strong>{s.durum}
+                            </div>
+                          )}
+                          <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                            Yapılacak Adımlar
+                          </div>
+                          <ol style={{ paddingLeft: 22, margin: 0 }}>
+                            {s.adimlar.map((a, j) => (
+                              <li key={j} style={{ marginBottom: 8 }}>
+                                {typeof a === 'string' ? a : (
+                                  <>
+                                    {a.metin}
+                                    {a.kod && (
+                                      <div style={{ marginTop: 4, padding: '6px 10px', background: '#0f172a', color: '#e2e8f0', borderRadius: 6, fontFamily: 'monospace', fontSize: 12 }}>
+                                        {a.kod}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </li>
+                            ))}
+                          </ol>
+                          {s.uyari && (
+                            <div style={{ marginTop: 12, padding: '10px 12px', background: T.amberLight, borderRadius: 8, fontSize: 12.5, color: T.text, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                              <AlertTriangle size={14} color={T.amber} style={{ flexShrink: 0, marginTop: 2 }} />
+                              <div><strong style={{ color: T.amber }}>Uyarı: </strong>{s.uyari}</div>
+                            </div>
+                          )}
+                          {s.guvenli && (
+                            <div style={{ marginTop: 8, padding: '10px 12px', background: T.greenLight, borderRadius: 8, fontSize: 12.5, color: T.text, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                              <CheckCircle2 size={14} color={T.green} style={{ flexShrink: 0, marginTop: 2 }} />
+                              <div><strong style={{ color: T.green }}>Güvenlik: </strong>{s.guvenli}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '10px 18px', borderTop: `1px solid ${T.border}`, background: T.grayLight, fontSize: 12, color: T.textSoft, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>Bu rehberi her zaman üst sağdaki <strong style={{ color: T.text }}>Nasıl Yapılır?</strong> butonundan açabilirsiniz.</span>
+              <button onClick={() => setRehberAcik(false)}
+                style={{ marginLeft: 'auto', padding: '6px 14px', borderRadius: 6, border: 'none', background: T.text, color: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }}>
+                Anladım
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`@keyframes yp-spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }
+
+// ── Senaryo içerikleri ────────────────────────────────────────────────
+type Adim = string | { metin: string; kod?: string }
+type Senaryo = {
+  baslik: string
+  ozet: string
+  etiket: string
+  renk: string
+  durum?: string
+  adimlar: Adim[]
+  uyari?: string
+  guvenli?: string
+}
+
+const SENARYOLAR: Senaryo[] = [
+  {
+    baslik: 'Belirli görevler / kayıtlar kaybolmuş',
+    ozet: 'Bug, yanlış toplu silme veya beklenmedik DELETE sonucu birkaç tablo etkilenmiş.',
+    etiket: 'TABLO-BAZLI',
+    renk: '#1d4ed8',
+    durum: 'Örnek: "2 gün önceki görevler listede yok ama o gün yapılmıştı." Sistem genel çalışıyor, sadece veri eksik.',
+    adimlar: [
+      'Hangi tablonun etkilendiğini tespit edin (genelde canli_gorevler_arsiv, gorevler_arsiv, musteri_degerlendirmeleri).',
+      'Sol kolondaki tarih listesinden BUG ÖNCESİ en yakın yedek tarihini seçin (yedekler her gece 00:30 TR alınır — örn. 12 May için 12 May 00:30 yedeği, 11 May verisini içerir).',
+      'Sağdaki tablo listesinden etkilenen tabloyu bulun.',
+      '"Önizle" butonu ile içeriği kontrol edin — kayıp verinin orada olduğunu doğrulayın.',
+      { metin: '"Geri Yükle" butonuna basın. Onay diyaloğunu okuyun, sonra prompt\'a tam onay kodunu yazın:', kod: 'RESTORE-canli_gorevler_arsiv' },
+      'Toast "✓ Geri yüklendi — N satır upsert edildi" gözükmeli. İşlem audit_log\'a yazılır.',
+      'İlgili sayfayı yenileyerek kaybın düzeldiğini doğrulayın.',
+    ],
+    guvenli: 'Restore upsert mantığı ile çalışır — id bazlı eşleşme. Yedekte olmayıp DB\'de olan kayıtlar (10 May sonrası eklenen yeni işler vb.) silinmez. Eksik olanlar tamamlanır, var olanlar güncellenir.',
+    uyari: 'Görev verisi kayıpsa ve checklist sonuçları da eksikse checklist_sonuc_basliklari_arsiv + checklist_sonuc_maddeleri_arsiv tablolarını da aynı tarihten restore edin (parent → child sırasıyla).',
+  },
+  {
+    baslik: 'Yanlışlıkla yapılmış toplu güncelleme / migration',
+    ozet: 'Bir SQL/migration toplu olarak yanlış değer yazdı ve geri alınamıyor.',
+    etiket: 'CERRAHI',
+    renk: '#d97706',
+    durum: 'Örnek: "Migration 045 tüm görevlerin durumunu yanlış değiştirdi" veya "UPDATE statement WHERE clause yanlıştı".',
+    adimlar: [
+      'Sorunu durdurun — eğer cron veya tetik halen çalışıp daha fazla satırı bozuyorsa Sistem Ayarları > Cron Yönetimi\'nden ilgili cron\'u manuel devre dışı bırakın.',
+      'Bug öncesi en yakın yedeği belirleyin (saat farkına bakın — yedek 00:30\'da alınır, bug 10:00\'da olduysa 10:00 yedeği YOK demektir, bir gün öncesini seçin).',
+      'Etkilenen tabloyu restore edin (Senaryo 1\'deki adımlar).',
+      'Bug öncesinden sonra (yedek anı ile bug anı arasında) yapılmış meşru değişiklikler varsa onları manuel olarak yeniden uygulayın.',
+    ],
+    uyari: 'Bu sistem 24 saatten daha eski olmayan veri kaybı için optimaldir. Bug uzun süre fark edilmediyse (örn. 10 gün sonra) o aralıktaki tüm meşru değişiklikler de yedeklenmiş olur — geri yükleme onları da değiştirir. Bu durumda daha çok manuel inceleme gerekir.',
+  },
+  {
+    baslik: 'Veritabanı tamamen çöktü / büyük veri kaybı',
+    ozet: 'Tüm tablolar boş, DB corruption, hardware sorunu — bizim sistem yetersiz.',
+    etiket: 'FULL-DB',
+    renk: '#dc2626',
+    durum: 'Örnek: Supabase\'de bir extension bug\'ı, accidental drop database, infra arıza. Bizim yedekleme sistemi DEVREYE GİRMEZ — Supabase\'in yerleşik backup\'ı kullanılır.',
+    adimlar: [
+      'Panik yapmayın — Supabase Pro tier (aktif) günlük yerleşik backup alır (14-30 gün retention).',
+      'Supabase Dashboard\'a giriş yapın → seçili proje → Database → Backups menüsü.',
+      'Bug öncesi son sağlam backup\'ı seçin → "Restore" butonuna basın.',
+      'Tüm veritabanı o ana geri yüklenir (tablolar + RLS + function\'lar + Storage\'daki yedek dosyaları). 30 dakika ila 2 saat sürebilir.',
+      'Restore tamamlanınca uygulamayı test edin. Bizim Storage yedekleri de geri gelmiş olur (90 günlük arşiv).',
+      'Restore noktasından sonra yapılmış işler kaybolur — kullanıcılarla iletişime geçilmesi gerekebilir.',
+    ],
+    uyari: 'Built-in backup günlük alındığı için en son backup\'tan itibaren yapılmış tüm işler kaybolur. Saniyelik granularity için PITR (Point-in-Time Recovery) opsiyonu Supabase Pro+\'da ekstra ücretle aktif edilir.',
+    guvenli: 'Bu işlem sırasında bizim Storage backup\'ları da etkilenmez (Supabase Storage farklı bir altyapı). Restore sonrası Storage dosyaları doğrudan erişilebilir kalır.',
+  },
+  {
+    baslik: 'Sistem kodu / Next.js uygulaması çöktü',
+    ozet: 'Hatalı deploy, runtime error, build fail — kod hasarı, DB sağlam.',
+    etiket: 'KOD',
+    renk: '#7c3aed',
+    durum: 'Örnek: Bir commit production\'a gitti, sayfa açılmıyor veya hata veriyor. Veritabanı sağlam, sadece app katmanı bozuk. Bizim yedekleme sistemi bu durumda yardımcı OLMAZ — Git/Railway kullanılır.',
+    adimlar: [
+      'Railway Dashboard → Deployments → son sağlam deploy\'u bulun → "Rollback" butonu.',
+      { metin: 'Alternatif: Git ile son sağlam commit\'e dönün:', kod: 'git log --oneline\ngit revert <hatali_commit>\ngit push' },
+      'Railway otomatik olarak yeni deploy yapar (~2-3 dakika).',
+      'Uygulamanın geri geldiğini doğrulayın.',
+      'Bu işlem veritabanına dokunmaz — tüm veriler korunur.',
+    ],
+    guvenli: 'Kod rollback DB\'yi etkilemez. Bizim yedekleme sistemi sadece DB içeriği için — kod yedeği GitHub\'tır.',
+  },
+]
