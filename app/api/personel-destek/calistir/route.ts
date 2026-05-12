@@ -210,7 +210,7 @@ async function destekCalistir(admin: any, ayar: any) {
     // %1 iptal olasılığı (doğallık)
     if (Math.random() < 0.01) {
       const iptalIso = new Date().toISOString()
-      const { error: iptalErr } = await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'MOBIL', {
+      const { error: iptalErr } = await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'WEB', {
         at: iptalIso,
         iptal_sebep: 'Otomatik iptal — personel destek (vardiya bitti)',
         ek: {
@@ -233,7 +233,9 @@ async function destekCalistir(admin: any, ayar: any) {
     const baslatmaIso = new Date(now - sureSaniye * 1000).toISOString()
 
     // BEKLEMEDE'den geç tamamlama → ZAMANINDA_YAPILAMAYAN (liveStatus.ts:78 ile tutarlı)
-    const { error: tamamErr } = await admin.from('canli_gorevler').update(gorevDurumPayload('ZAMANINDA_YAPILAMAYAN', 'MOBIL', {
+    // Kanal: WEB — PD destek personelleri (üst lokasyon yetkilileri) web kullanıcısı,
+    // mobil app kullanmıyor. Doğal görünüm için WEB olarak işaretlenir.
+    const { error: tamamErr } = await admin.from('canli_gorevler').update(gorevDurumPayload('ZAMANINDA_YAPILAMAYAN', 'WEB', {
       at: tamamlanmaIso,
       ek: {
         baslatilma_tarihi: gorev.baslatilma_tarihi || baslatmaIso,
