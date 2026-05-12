@@ -124,7 +124,7 @@ function LiveHeader({
             Frekansiyel Görev Akışı
           </span>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', padding: '2px 8px', borderRadius: 4 }}>
-            Son {canliAkisSureSaat} saat
+            {canliAkisSureSaat === -1 ? 'Bugün' : `Son ${canliAkisSureSaat} saat`}
           </span>
           {/* Canlı badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 9px', borderRadius: 20, background: streamState === 'running' ? '#f9fafb' : '#f5f5f5', border: `1px solid ${streamState === 'running' ? '#d1d5db' : '#e0e0e0'}` }}>
@@ -257,6 +257,11 @@ const getLocPath = useMemo(() => {
   const [liveKpiRows, setLiveKpiRows] = useState<{ durum: string }[]>([])
   const [highlightId, setHighlightId] = useState<string | null>(null)
   const lastTopIdRef = useRef<string | null>(null)
+  // Bugünün tüm canlı görevleri (vardiya özet kartları için).
+  // browseGorevler son N saat ile sınırlı; vardiya özetinin doğruluğu için
+  // bugünün TR gün başlangıcından itibaren ayrı fetch ediyoruz.
+  const [bugunGorevler, setBugunGorevler] = useState<any[]>([])
+  const [vardiyaAyari, setVardiyaAyari] = useState<{ no: number; baslangic: string; bitis: string }[]>([])
 
   // NÜKLEER FIX: React render zinciri bir sebepten parlamayı DOM'a yansıtamıyor
   // (muhtemelen #422 hydration sorunu). highlightId değişince DOM'u direkt boyayalım.
@@ -438,10 +443,112 @@ useEffect(() => {
     return () => clearInterval(interval)
   }, [streamState])
 
+  // Listeleme süresinin başlangıcını hesapla.
+  //   canliAkisSureSaat = -1 → "Bugün" → TR günü 00:00:00
+  //   canliAkisSureSaat > 0 → Son N saat → şimdi - N saat
+  function computeSinceISO(): string {
+    if (canliAkisSureSaat === -1) {
+      const trDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })  // 'YYYY-MM-DD'
+      return new Date(`${trDate}T00:00:00+03:00`).toISOString()
+    }
+    return new Date(Date.now() - canliAkisSureSaat * 60 * 60 * 1000).toISOString()
+  }
+
+  // Vardiya ayarlarını çek (firma + vardiya_sayisi)
+  useEffect(() => {
+    if (!firmaId) return
+    let alive = true
+    ;(async () => {
+      const { data: firma } = await supabase
+        .from('firmalar')
+        .select('vardiya_sayisi, tum_vardiya_ayarlari')
+        .eq('id', firmaId)
+        .single()
+      if (!alive || !firma) return
+      const sayisi = (firma as any).vardiya_sayisi ?? 3
+      const set = ((firma as any).tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
+      setVardiyaAyari(Array.isArray(set) ? set : [])
+    })()
+    return () => { alive = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaId])
+
+  // Bugünün TR günü için tüm canlı görevleri çek (vardiya özet kartları)
+  async function refreshBugun() {
+    if (!firmaId) return
+    const trDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+    const trStartISO = new Date(`${trDate}T00:00:00+03:00`).toISOString()
+    let q = supabase
+      .from('canli_gorevler')
+      .select('id,durum,aktif_olma_tarihi')
+      .eq('firma_id', firmaId)
+      .gte('aktif_olma_tarihi', trStartISO)
+      .limit(2000)
+    if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+    if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
+    const { data } = await q
+    if (data) setBugunGorevler(data)
+  }
+
+  // Vardiya özet kartlarını her dakika tazele (canlı veriden ayrı, hafif sorgu)
+  useEffect(() => {
+    if (!firmaId) return
+    refreshBugun()
+    const id = setInterval(refreshBugun, 60 * 1000)
+    return () => clearInterval(id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaId, projeId, yetkiliLokIds])
+
+  // Vardiya özetleri — TumGorevlerClient ile aynı mantık
+  const vardiyaOzetleri = useMemo(() => {
+    if (!vardiyaAyari.length) return []
+    function trIsoParts(iso: string): { tarih: string; saat: string } {
+      const d = new Date(iso)
+      const tarih = d.toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+      const saat = d.toLocaleTimeString('tr-TR', {
+        hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Istanbul',
+      })
+      return { tarih, saat }
+    }
+    function vardiyaBul(saat: string): number | null {
+      for (const v of vardiyaAyari) {
+        const gece = v.bitis <= v.baslangic
+        const eslesir = gece
+          ? (saat >= v.baslangic || saat < v.bitis)
+          : (saat >= v.baslangic && saat < v.bitis)
+        if (eslesir) return v.no
+      }
+      return null
+    }
+    const bugunTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+    const KAYIP_DURUMLAR = new Set(['IPTAL', 'BEKLEMEDE', 'ZAMANI_GECMIS'])
+    const sayac: Record<number, { toplam: number; tamamlanan: number; sapma: number; kayip: number }> = {}
+    for (const v of vardiyaAyari) sayac[v.no] = { toplam: 0, tamamlanan: 0, sapma: 0, kayip: 0 }
+    for (const g of bugunGorevler) {
+      if (!g.aktif_olma_tarihi) continue
+      const { tarih, saat } = trIsoParts(g.aktif_olma_tarihi)
+      if (tarih !== bugunTR) continue
+      const vNo = vardiyaBul(saat)
+      if (vNo === null || !sayac[vNo]) continue
+      sayac[vNo].toplam++
+      if (g.durum === 'TAMAMLANDI') sayac[vNo].tamamlanan++
+      else if (g.durum === 'ZAMANINDA_YAPILAMAYAN') sayac[vNo].sapma++
+      else if (KAYIP_DURUMLAR.has(g.durum)) sayac[vNo].kayip++
+    }
+    return vardiyaAyari
+      .slice()
+      .sort((a, b) => a.no - b.no)
+      .map(v => {
+        const s = sayac[v.no] ?? { toplam: 0, tamamlanan: 0, sapma: 0, kayip: 0 }
+        const basari = s.toplam > 0 ? Math.round(((s.tamamlanan + s.sapma) / s.toplam) * 100) : 0
+        return { no: v.no, baslangic: v.baslangic, bitis: v.bitis, ...s, basari }
+      })
+  }, [vardiyaAyari, bugunGorevler])
+
   async function refreshBrowse() {
     if (!firmaId) return
 
-    const sinceISO = new Date(Date.now() - canliAkisSureSaat * 60 * 60 * 1000).toISOString()
+    const sinceISO = computeSinceISO()
     let q = supabase
       .from('canli_gorevler')
       .select('*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)')
@@ -484,7 +591,7 @@ useEffect(() => {
     const liveSelect =
       '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-    const liveSinceISO = new Date(Date.now() - canliAkisSureSaat * 60 * 60 * 1000).toISOString()
+    const liveSinceISO = computeSinceISO()
     let liveQ = supabase
       .from('canli_gorevler')
       .select(liveSelect)
@@ -1018,10 +1125,54 @@ useEffect(() => {
     )
   }
 
+  // Vardiya özet kartları — readonly + interaktif iki render dalında da gösterilir.
+  // Bugünün TR günü için aktif olmuş görevleri vardiyalara dağıtır.
+  const vardiyaKartlari = vardiyaOzetleri.length > 0 ? (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: `repeat(${vardiyaOzetleri.length}, minmax(0,1fr))`,
+      gap: 10, marginBottom: 12,
+    }}>
+      {vardiyaOzetleri.map(v => {
+        const renk = v.basari >= 80 ? '#16a34a' : v.basari >= 50 ? '#d97706' : v.basari > 0 ? '#dc2626' : '#6b7280'
+        return (
+          <div key={v.no} style={{
+            background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+            padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 7, minWidth: 0,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: '#111827', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {v.no}. Vardiya
+                <span style={{ marginLeft: 6, fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+                  {v.baslangic}-{v.bitis}
+                </span>
+              </div>
+              <span style={{
+                padding: '3px 10px', borderRadius: 999, fontSize: 13, fontWeight: 800, flexShrink: 0,
+                background: `${renk}1a`, color: renk,
+              }}>%{v.basari}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 13 }}>
+              <span style={{ color: '#374151' }}><strong>{v.toplam}</strong> Toplam</span>
+              <span style={{ color: '#a3a3a3' }}>›</span>
+              <span style={{ color: '#16a34a' }}><strong>{v.tamamlanan}</strong> Tamamlanan</span>
+              <span style={{ color: '#a3a3a3' }}>›</span>
+              <span style={{ color: '#d97706' }}><strong>{v.sapma}</strong> Sapma</span>
+              <span style={{ color: '#a3a3a3' }}>›</span>
+              <span style={{ color: '#dc2626' }} title="İptal + Beklemede + Zamanı Geçmiş"><strong>{v.kayip}</strong> Kayıp</span>
+              <span style={{ marginLeft: 'auto', padding: '1px 8px', borderRadius: 999, fontSize: 10.5, fontWeight: 700, background: '#f1f5f9', color: '#64748b', letterSpacing: '0.02em', flexShrink: 0 }}>BUGÜN</span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  ) : null
+
   // U / readonly için: canlı akış izleme (yeni tasarım)
   if (readonly) {
     return (
       <div style={{ padding: '24px 28px' }}>
+        {vardiyaKartlari}
         {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: true, showTumGorevler, canliAkisSureSaat })}
         <div className="verde-card" style={{ overflow: 'hidden', marginTop: 12 }}>
           <div className="verde-table-wrap">
@@ -1050,6 +1201,9 @@ useEffect(() => {
 
   return (
     <div style={{ padding: '24px 28px' }}>
+
+      {/* ── VARDİYA BAZLI BUGÜNKÜ ÖZET ── */}
+      {vardiyaKartlari}
 
       {/* ── YENİ HEADER + KPI ── */}
       {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: false, showTumGorevler, canliAkisSureSaat })}

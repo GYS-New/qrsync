@@ -376,6 +376,7 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
             <option value={4}>Son 4 saat</option>
             <option value={8}>Son 8 saat</option>
             <option value={24}>Son 24 saat</option>
+            <option value={-1}>Bugün (TR günü 00:00→şimdi)</option>
           </select>
           <SaveBtn id="canli_akis_sure_saat" onClick={() => handleSave('canli_akis_sure_saat', efektif.canli_akis_sure_saat)} />
         </div>
