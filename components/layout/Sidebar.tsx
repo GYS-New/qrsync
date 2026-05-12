@@ -100,7 +100,6 @@ function getNav(base: string, rol: UserRole, otoYikamaAktif: boolean): NavGroup[
     items: [
       { label: 'Genel Bakış',    href: `${base}/dashboard/oto-yikama`,                icon: '🚿' },
       { label: 'Araç Kayıtları',  href: `${base}/dashboard/oto-yikama/araclar`,        icon: '🚗' },
-      { label: 'İstasyonlar',    href: `${base}/dashboard/oto-yikama/istasyonlar`,    icon: '📍' },
       { label: 'Görev Oluştur',  href: `${base}/dashboard/oto-yikama/gorev-olustur`,  icon: '➕' },
       { label: 'Günlük Tablo',   href: `${base}/dashboard/oto-yikama/gunluk`,         icon: '📋' },
       { label: 'Raporlar',       href: `${base}/dashboard/oto-yikama/raporlar`,        icon: '📊' },

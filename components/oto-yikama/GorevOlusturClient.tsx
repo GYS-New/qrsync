@@ -15,10 +15,12 @@ type Arac = {
   aktif: boolean
 }
 
-type Istasyon = {
+type Lokasyon = {
   id: string
-  ad: string
+  tanim: string
+  parent_id: string | null
   aktif: boolean
+  ust?: { id: string; tanim: string } | null
 }
 
 const T = {
@@ -30,7 +32,6 @@ const T = {
   grayLight: '#f8fafc',
 }
 
-// 'YYYY-MM-DD' formatında (yerel saat, UTC kayması yok)
 function fmtDate(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -49,17 +50,23 @@ function startOfWeek(d: Date) {
 const AY_ADLARI = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 const GUN_ADLARI = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
 
+// Lokasyon display: "OTO YIKAMA > İSTASYON-1" gibi
+function lokasyonDisplay(l: Lokasyon): string {
+  if (l.ust?.tanim) return `${l.ust.tanim} > ${l.tanim}`
+  return l.tanim
+}
+
 export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
   const { toast } = useToast()
   const { confirm } = useConfirm()
   const [araclar, setAraclar] = useState<Arac[]>([])
-  const [istasyonlar, setIstasyonlar] = useState<Istasyon[]>([])
+  const [lokasyonlar, setLokasyonlar] = useState<Lokasyon[]>([])
   const [yukleniyor, setYukleniyor] = useState(true)
 
   const [q, setQ] = useState('')
   const [filterDepartman, setFilterDepartman] = useState('')
 
-  // Seçim state: arac_id -> istasyon_id
+  // arac_id → lokasyon_id
   const [secimMap, setSecimMap] = useState<Map<string, string>>(new Map())
   const [tarihler, setTarihler] = useState<Set<string>>(new Set())
   const [ayBaslangic, setAyBaslangic] = useState(() => startOfMonth(new Date()))
@@ -68,16 +75,16 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
   async function yukle() {
     setYukleniyor(true)
     try {
-      const [aracRes, istRes] = await Promise.all([
+      const [aracRes, lokRes] = await Promise.all([
         fetch(`/api/oto-yikama/araclar?firma_id=${firmaId}&aktif=true`, { cache: 'no-store' }),
-        fetch(`/api/oto-yikama/istasyonlar?firma_id=${firmaId}&aktif=true`, { cache: 'no-store' }),
+        fetch(`/api/oto-yikama/lokasyonlar?firma_id=${firmaId}`, { cache: 'no-store' }),
       ])
       const aracJ = await aracRes.json()
-      const istJ = await istRes.json()
+      const lokJ = await lokRes.json()
       if (!aracJ.ok) throw new Error(aracJ.error)
-      if (!istJ.ok) throw new Error(istJ.error)
+      if (!lokJ.ok) throw new Error(lokJ.error)
       setAraclar(aracJ.data)
-      setIstasyonlar(istJ.data)
+      setLokasyonlar(lokJ.data)
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
     } finally {
@@ -105,21 +112,23 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
     })
   }, [araclar, q, filterDepartman])
 
-  const varsayilanIstasyon = istasyonlar[0]?.id ?? ''
+  // Varsayılan lokasyon — sadece alt lokasyonlar (parent_id NOT NULL) tercih edilir
+  const altLokasyonlar = useMemo(() => lokasyonlar.filter(l => l.parent_id != null), [lokasyonlar])
+  const varsayilanLokasyon = altLokasyonlar[0]?.id ?? lokasyonlar[0]?.id ?? ''
 
   function toggleArac(a: Arac) {
     setSecimMap(prev => {
       const m = new Map(prev)
       if (m.has(a.id)) m.delete(a.id)
-      else m.set(a.id, varsayilanIstasyon)
+      else m.set(a.id, varsayilanLokasyon)
       return m
     })
   }
 
-  function setIstasyon(aracId: string, istId: string) {
+  function setLokasyon(aracId: string, lokId: string) {
     setSecimMap(prev => {
       const m = new Map(prev)
-      m.set(aracId, istId)
+      m.set(aracId, lokId)
       return m
     })
   }
@@ -127,21 +136,20 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
   function tumunuSec() {
     setSecimMap(prev => {
       const m = new Map(prev)
-      for (const a of filtered) if (!m.has(a.id)) m.set(a.id, varsayilanIstasyon)
+      for (const a of filtered) if (!m.has(a.id)) m.set(a.id, varsayilanLokasyon)
       return m
     })
   }
   function temizleSecim() { setSecimMap(new Map()) }
 
-  function tumIstasyon(istId: string) {
+  function tumLokasyon(lokId: string) {
     setSecimMap(prev => {
       const m = new Map<string, string>()
-      for (const [k] of prev) m.set(k, istId)
+      for (const [k] of prev) m.set(k, lokId)
       return m
     })
   }
 
-  // Takvim
   function toggleTarih(d: Date) {
     const k = fmtDate(d)
     setTarihler(prev => {
@@ -174,7 +182,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
     setTarihler(yeni)
   }
 
-  // Takvim grid (mevcut ay)
   const takvimHucreler = useMemo(() => {
     const ayBas = startOfMonth(ayBaslangic)
     const gridBas = startOfWeek(ayBas)
@@ -187,7 +194,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
     return hucreler
   }, [ayBaslangic])
 
-  // Atama listesi (sadece seçili araçlar)
   const atamaListesi = useMemo(() => {
     const ids = [...secimMap.keys()]
     return araclar.filter(a => ids.includes(a.id))
@@ -198,8 +204,8 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
   async function olustur() {
     if (atamaListesi.length === 0) { toast({ type: 'error', title: 'Hata', message: 'En az bir plaka seçin' }); return }
     if (tarihler.size === 0) { toast({ type: 'error', title: 'Hata', message: 'En az bir tarih seçin' }); return }
-    const eksikIstasyon = atamaListesi.find(a => !secimMap.get(a.id))
-    if (eksikIstasyon) { toast({ type: 'error', title: 'Hata', message: `${eksikIstasyon.plaka} için istasyon seçilmedi` }); return }
+    const eksikLok = atamaListesi.find(a => !secimMap.get(a.id))
+    if (eksikLok) { toast({ type: 'error', title: 'Hata', message: `${eksikLok.plaka} için lokasyon seçilmedi` }); return }
 
     const sortedTarihler = [...tarihler].sort()
     const ok = await confirm({
@@ -217,7 +223,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           firma_id: firmaId,
-          atamalar: atamaListesi.map(a => ({ arac_id: a.id, istasyon_id: secimMap.get(a.id) })),
+          atamalar: atamaListesi.map(a => ({ arac_id: a.id, lokasyon_id: secimMap.get(a.id) })),
           tarihler: sortedTarihler,
         }),
       })
@@ -228,7 +234,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
         title: 'Sonuç',
         message: `+${j.eklenen} görev eklendi${j.duplicate ? `, ${j.duplicate} duplicate atlandı` : ''}${j.hatalar?.length ? `, ${j.hatalar.length} hata` : ''}`,
       })
-      // Başarılıysa seçimleri temizle
       if (j.eklenen > 0) {
         setSecimMap(new Map())
         setTarihler(new Set())
@@ -250,18 +255,19 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
     )
   }
 
-  if (istasyonlar.length === 0) {
+  if (altLokasyonlar.length === 0) {
     return (
       <div style={{ padding: '24px 28px' }}>
         <div className="verde-card" style={{ padding: 32, textAlign: 'center' }}>
           <MapPin size={32} color={T.amber} style={{ marginBottom: 8 }} />
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Önce İstasyon Tanımlayın</h3>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Önce Yıkama Lokasyonları Oluşturun</h3>
           <p style={{ marginTop: 8, color: T.textSoft, fontSize: 13 }}>
-            Görev oluşturmak için en az bir aktif yıkama istasyonu gerekli.
+            Görev oluşturmak için Lokasyonlar sayfasından bir üst lokasyon (örn. "OTO YIKAMA")
+            ve altına en az bir alt lokasyon (örn. "İSTASYON-1") tanımlamış olmalısınız.
           </p>
-          <a href="/sa/dashboard/oto-yikama/istasyonlar"
+          <a href="/sa/dashboard/lokasyonlar"
             style={{ display: 'inline-block', marginTop: 14, padding: '8px 18px', borderRadius: 8, background: T.text, color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 700 }}>
-            İstasyonlara Git
+            Lokasyonlara Git
           </a>
         </div>
       </div>
@@ -270,9 +276,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
 
   return (
     <div style={{ padding: '24px 28px', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, alignItems: 'start' }}>
-      {/* SOL: Plaka seçim + atama */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* Plaka filtre + tümünü seç */}
         <div className="verde-card" style={{ padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Search size={14} color={T.textSoft} />
           <input className="verde-input" placeholder="Plaka, kullanıcı, departman ara…"
@@ -291,7 +295,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
           </button>
         </div>
 
-        {/* Plaka tablosu */}
         <div className="verde-card" style={{ overflow: 'hidden' }}>
           <div style={{ maxHeight: 320, overflowY: 'auto' }}>
             <table className="verde-table">
@@ -324,19 +327,18 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
           </div>
         </div>
 
-        {/* Atama tablosu (sadece seçili) */}
         {atamaListesi.length > 0 && (
           <div className="verde-card" style={{ padding: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: T.text }}>
                 <Car size={14} /> Atamalar ({atamaListesi.length})
               </div>
-              {istasyonlar.length > 1 && (
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {istasyonlar.map(i => (
-                    <button key={i.id} onClick={() => tumIstasyon(i.id)}
+              {altLokasyonlar.length > 1 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {altLokasyonlar.slice(0, 4).map(l => (
+                    <button key={l.id} onClick={() => tumLokasyon(l.id)}
                       style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 11 }}>
-                      Tümünü → {i.ad}
+                      Tümünü → {l.tanim}
                     </button>
                   ))}
                 </div>
@@ -348,7 +350,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                   <tr>
                     <th>Plaka</th>
                     <th>Kullanıcı</th>
-                    <th style={{ width: 180 }}>İstasyon</th>
+                    <th style={{ width: 220 }}>Lokasyon</th>
                     <th style={{ width: 32 }}></th>
                   </tr>
                 </thead>
@@ -359,9 +361,11 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                       <td style={{ color: T.textSoft, fontSize: 12 }}>{a.kullanici_adi_soyadi ?? '—'}</td>
                       <td>
                         <select className="verde-select" value={secimMap.get(a.id) ?? ''}
-                          onChange={e => setIstasyon(a.id, e.target.value)}
+                          onChange={e => setLokasyon(a.id, e.target.value)}
                           style={{ width: '100%', padding: '3px 6px', fontSize: 12 }}>
-                          {istasyonlar.map(i => <option key={i.id} value={i.id}>{i.ad}</option>)}
+                          {altLokasyonlar.map(l => (
+                            <option key={l.id} value={l.id}>{lokasyonDisplay(l)}</option>
+                          ))}
                         </select>
                       </td>
                       <td>
@@ -379,7 +383,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
         )}
       </div>
 
-      {/* SAĞ: Takvim + özet + buton */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, position: 'sticky', top: 16 }}>
         <div className="verde-card" style={{ padding: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 13, fontWeight: 700 }}>
@@ -387,7 +390,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
             <span style={{ marginLeft: 'auto', color: T.textSoft, fontWeight: 500 }}>{tarihler.size} gün seçili</span>
           </div>
 
-          {/* Hızlı seçim */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
             <button onClick={() => hizliSec(1, 'bugun')} style={hizliBtn}>Bugün</button>
             <button onClick={() => hizliSec(1, 'yarin')} style={hizliBtn}>Yarın</button>
@@ -397,7 +399,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
             <button onClick={() => setTarihler(new Set())} style={{ ...hizliBtn, color: T.red }}>Temizle</button>
           </div>
 
-          {/* Ay nav */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <button onClick={() => setAyBaslangic(new Date(ayBaslangic.getFullYear(), ayBaslangic.getMonth() - 1, 1))}
               style={{ padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: T.text }}>
@@ -412,7 +413,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
             </button>
           </div>
 
-          {/* Takvim grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
             {GUN_ADLARI.map(g => (
               <div key={g} style={{ padding: 4, textAlign: 'center', fontSize: 11, fontWeight: 700, color: T.textSoft }}>{g}</div>
@@ -440,7 +440,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
             })}
           </div>
 
-          {/* Seçili tarihler badge'leri */}
           {tarihler.size > 0 && (
             <div style={{ marginTop: 10, display: 'flex', gap: 4, flexWrap: 'wrap', maxHeight: 80, overflowY: 'auto' }}>
               {[...tarihler].sort().map(t => (
@@ -453,7 +452,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
           )}
         </div>
 
-        {/* Özet + Oluştur */}
         <div className="verde-card" style={{ padding: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
             <div style={{ padding: 10, background: T.grayLight, borderRadius: 8, textAlign: 'center' }}>

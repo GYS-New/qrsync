@@ -1,9 +1,8 @@
 /**
  * GET /api/oto-yikama/lokasyonlar?firma_id=...
- *   → Firmaya ait aktif lokasyonları döner; istasyon olarak işaretlenecek
- *     lokasyon dropdown'u için kullanılır. Hâlihazırda yıkama istasyonu olan
- *     lokasyonlar `is_istasyon: true` flag'iyle işaretlenir (UI'da disabled veya
- *     vurgulu gösterilebilir).
+ *   → Firmaya ait aktif lokasyonları döner; görev oluşturma ekranında lokasyon
+ *     dropdown'u için kullanılır. Parent (üst lokasyon) tanımı da gelir ki
+ *     UI "OTO YIKAMA > İSTASYON-1" formatında gösterebilsin.
  *
  * SA-only + oto_yikama_aktif=true.
  */
@@ -33,25 +32,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Bu firma için Oto Yıkama modülü aktif değil.' }, { status: 403 })
   }
 
-  const [lokQ, istQ] = await Promise.all([
-    admin
-      .from('lokasyonlar')
-      .select('id, tanim, parent_id, aktif')
-      .eq('firma_id', firmaId)
-      .eq('aktif', true)
-      .order('tanim'),
-    admin
-      .from('yikama_istasyonlari')
-      .select('lokasyon_id')
-      .eq('firma_id', firmaId),
-  ])
+  const { data, error } = await admin
+    .from('lokasyonlar')
+    .select('id, tanim, parent_id, aktif, ust:parent_id(id, tanim)')
+    .eq('firma_id', firmaId)
+    .eq('aktif', true)
+    .order('tanim')
 
-  if (lokQ.error) return NextResponse.json({ ok: false, error: lokQ.error.message }, { status: 500 })
-
-  const istasyonLokIds = new Set((istQ.data ?? []).map((r: any) => r.lokasyon_id))
-  const data = (lokQ.data ?? []).map((l: any) => ({
-    ...l,
-    is_istasyon: istasyonLokIds.has(l.id),
-  }))
-  return NextResponse.json({ ok: true, data })
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true, data: data ?? [] })
 }
