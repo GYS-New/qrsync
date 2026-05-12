@@ -553,7 +553,7 @@ useEffect(() => {
       .from('canli_gorevler')
       .select('*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)')
       .eq('firma_id', firmaId)
-      .gte('durum_degisim_tarihi', sinceISO)
+      .gte('aktif_olma_tarihi', sinceISO)
       .order('durum_degisim_tarihi', { ascending: false })
       .limit(500)
 
@@ -592,12 +592,16 @@ useEffect(() => {
       '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
     const liveSinceISO = computeSinceISO()
+    // Kapsam: "Son N saatte AKTİF OLMUŞ görevler" (vardiya kartlarıyla uyumlu).
+    // Önceden durum_degisim_tarihi'ne göre filtreliyordu — bu yüzden dün aktif
+    // olup bugün PD cron'la ZYS'ye düşen görevler "bugünün" gecikmelisine
+    // sayılıyordu. Artık görev hangi vardiyada aktif olduysa o günün özetinde.
     let liveQ = supabase
       .from('canli_gorevler')
       .select(liveSelect)
       .eq('firma_id', firmaId)
       .not('durum', 'in', '(HAZIR,ACIK)')
-      .gte('durum_degisim_tarihi', liveSinceISO)
+      .gte('aktif_olma_tarihi', liveSinceISO)
       .order('durum_degisim_tarihi', { ascending: false })
       .limit(500)
 
@@ -610,7 +614,7 @@ useEffect(() => {
       .select('durum')
       .eq('firma_id', firmaId)
       .not('durum', 'in', '(HAZIR,ACIK)')
-      .gte('durum_degisim_tarihi', liveSinceISO)
+      .gte('aktif_olma_tarihi', liveSinceISO)
       .limit(10000)
     if (projeId) kpiQ = kpiQ.eq('proje_id', projeId)
     if (yetkiliLokIds) kpiQ = kpiQ.in('lokasyon_id', yetkiliLokIds)
@@ -632,7 +636,7 @@ useEffect(() => {
         .select('*')
         .eq('firma_id', firmaId)
         .not('durum', 'in', '(HAZIR,ACIK)')
-        .gte('durum_degisim_tarihi', liveSinceISO)
+        .gte('aktif_olma_tarihi', liveSinceISO)
         .order('durum_degisim_tarihi', { ascending: false })
         .limit(500)
       if (projeId) fallbackQ = fallbackQ.eq('proje_id', projeId)
