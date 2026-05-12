@@ -409,6 +409,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   // Boşaltırsa "tüm dönem" davranışı korunur.
   const [raporBaslangic, setRaporBaslangic] = useState(todayLocal)
   const [raporBitis,     setRaporBitis]     = useState(todayLocal)
+  // Vardiya filtresi: aktif_olma_tarihi'nin TR saatine göre dilim
+  const [vardiyaFilter,  setVardiyaFilter]  = useState<'all' | 'v1' | 'v2' | 'v3'>('all')
   const [raporuAlan,     setRaporuAlan]     = useState('')
   const [data,           setData]           = useState<RaporData | null>(null)
   const [loading,        setLoading]        = useState(false)
@@ -471,8 +473,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
     if (raporBaslangic)    p.set('raporBaslangic', raporBaslangic)
     if (raporBitis)        p.set('raporBitis', raporBitis)
     if (raporuAlan)        p.set('raporuAlan', raporuAlan)
+    if (vardiyaFilter !== 'all') p.set('vardiya', vardiyaFilter)
     return p
-  }, [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, altAltLokasyonId, raporBaslangic, raporBitis, raporuAlan])
+  }, [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, altAltLokasyonId, raporBaslangic, raporBitis, raporuAlan, vardiyaFilter])
 
   const fetchData = useCallback(async () => {
     if (!currentFirmaId) return
@@ -504,8 +507,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   // Detay tabloların cache key'i — filtreler değişince cache invalidate olur.
   const filterKey = useMemo(() => JSON.stringify({
     f: currentFirmaId, p: projeId ?? '', u: ustLokasyonId, a: altLokasyonId, aa: altAltLokasyonId,
-    b: raporBaslangic, t: raporBitis,
-  }), [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, altAltLokasyonId, raporBaslangic, raporBitis])
+    b: raporBaslangic, t: raporBitis, v: vardiyaFilter,
+  }), [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, altAltLokasyonId, raporBaslangic, raporBitis, vardiyaFilter])
 
   function tabToTip(tab: Tab): DetayTip | null {
     switch (tab) {
@@ -529,6 +532,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       if (altAltLokasyonId) params.set('altAltLokasyonId', altAltLokasyonId)
       if (raporBaslangic) params.set('raporBaslangic', raporBaslangic)
       if (raporBitis) params.set('raporBitis', raporBitis)
+      if (vardiyaFilter !== 'all') params.set('vardiya', vardiyaFilter)
       const res = await fetch(`/api/reports/genel-rapor-detay?${params}`, { cache: 'no-store' })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error ?? 'Detay verisi alınamadı.')
@@ -547,7 +551,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       setDetayState(prev => ({ ...prev, [tip]: { ...prev[tip], loading: false } }))
       toast({ type: 'error', title: 'Hata', message: e.message ?? 'Detay yüklenemedi' })
     }
-  }, [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, altAltLokasyonId, raporBaslangic, raporBitis, filterKey, toast])
+  }, [currentFirmaId, projeId, ustLokasyonId, altLokasyonId, altAltLokasyonId, raporBaslangic, raporBitis, vardiyaFilter, filterKey, toast])
 
   // Tab değişince veya filtre değişince ilgili detay tipini yükle (yoksa).
   useEffect(() => {
@@ -671,6 +675,15 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {([
               { label: 'Başlangıç',    node: <input type="date" value={raporBaslangic} onChange={e => setRaporBaslangic(e.target.value)} style={inp} /> },
               { label: 'Bitiş',        node: <input type="date" value={raporBitis}     onChange={e => setRaporBitis(e.target.value)}     style={inp} /> },
+              { label: 'Vardiya',      node: (
+                <select value={vardiyaFilter} onChange={e => setVardiyaFilter(e.target.value as any)} style={inp}
+                  title="Aktif olma saatine göre vardiya filtresi (TRT)">
+                  <option value="all">Tümü</option>
+                  <option value="v1">1. Vardiya (00-08)</option>
+                  <option value="v2">2. Vardiya (08-16)</option>
+                  <option value="v3">3. Vardiya (16-24)</option>
+                </select>
+              )},
               { label: 'Üst Lokasyon', node: (
                 <select value={ustLokasyonId} onChange={e => { setUstLokasyonId(e.target.value); setAltLokasyonId(''); setAltAltLokasyonId('') }} style={inp}>
                   <option value="">Tümü</option>

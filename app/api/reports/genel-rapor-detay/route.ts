@@ -48,6 +48,7 @@ export async function GET(request: Request) {
         altAltLokasyonId: searchParams.get('altAltLokasyonId'),
         raporBaslangic:   searchParams.get('raporBaslangic'),
         raporBitis:       searchParams.get('raporBitis'),
+        vardiya:          (searchParams.get('vardiya') as any) || 'all',
         yetkiliUstLokIds,
       },
       tip,

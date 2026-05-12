@@ -3,6 +3,8 @@ import { fetchAll } from '@/lib/supabase/fetchAll'
 import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliUserIds'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
+export type VardiyaFilter = 'all' | 'v1' | 'v2' | 'v3'
+
 export interface GenelRaporFilters {
   firmaId: string
   projeId?: string | null
@@ -12,6 +14,9 @@ export interface GenelRaporFilters {
   raporBaslangic?: string | null   // 'YYYY-MM-DD'
   raporBitis?: string | null       // 'YYYY-MM-DD'
   raporuAlan?: string | null
+  /** Vardiya filtresi — aktif_olma_tarihi'nin TR saatine göre.
+   *  v1: 00-08, v2: 08-16, v3: 16-24. 'all' veya undefined → filtre yok. */
+  vardiya?: VardiyaFilter
   /** U/M rolü için yetkili üst lokasyon ID listesi. null = tüm erişim (SA/TA).
    *  Verildiğinde tüm sorgular ve Departman Analizi sadece bu üst lokasyonlar +
    *  alt lokasyonlarıyla sınırlanır. lib/yetki/getLokasyonYetki.ts ile uyumlu. */
@@ -390,8 +395,23 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   // Birleştir, çakışan id varsa aktif tablosu öncelikli
   const arsivMap = new Map((arsivGorevler ?? []).map((g: any) => [g.id, g]))
   for (const g of (aktifGorevler ?? [])) arsivMap.set((g as any).id, g)
+  // Vardiya filtresi — aktif_olma_tarihi'nin TR saatine göre filtreler.
+  const vardiya = filters.vardiya ?? 'all'
+  const vardiyaRange: { from: number; to: number } | null =
+    vardiya === 'v1' ? { from: 0, to: 8 } :
+    vardiya === 'v2' ? { from: 8, to: 16 } :
+    vardiya === 'v3' ? { from: 16, to: 24 } : null
+  function isInShift(iso: string | null | undefined): boolean {
+    if (!vardiyaRange) return true
+    if (!iso) return false
+    const h = Number(new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false,
+    }).format(new Date(iso)))
+    return h >= vardiyaRange.from && h < vardiyaRange.to
+  }
   const tumGorevler = Array.from(arsivMap.values()).filter((g: any) =>
     withinRange(g.aktif_olma_tarihi, filters.raporBaslangic, filters.raporBitis)
+    && isInShift(g.aktif_olma_tarihi)
   )
 
   // KURAL ÜRETİMLİ vs EKSTRA FREKANSİYEL AYRIMI

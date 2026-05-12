@@ -40,6 +40,7 @@ export async function GET(request: Request) {
       raporBaslangic: searchParams.get('raporBaslangic'),
       raporBitis: searchParams.get('raporBitis'),
       raporuAlan: searchParams.get('raporuAlan'),
+      vardiya: (searchParams.get('vardiya') as any) || 'all',
       yetkiliUstLokIds,
       // Detay tablolar (Tamamlanan / Sapma / Kayıp / Frekans Dışı / Atanan)
       // /api/reports/genel-rapor-detay üzerinden lazy + paginated alınır.

@@ -29,6 +29,9 @@ export interface GenelRaporDetayFilters {
   /** U/M rolü için yetkili üst lokasyon ID listesi. null = tüm erişim.
    *  Verildiğinde target lokasyon listesi bu kapsamla sınırlanır. */
   yetkiliUstLokIds?: string[] | null
+  /** Vardiya filtresi — aktif_olma_tarihi'nin TR saatine göre.
+   *  v1: 00-08, v2: 08-16, v3: 16-24. 'all' veya undefined → filtre yok. */
+  vardiya?: 'all' | 'v1' | 'v2' | 'v3'
 }
 
 export interface DetayResponse {
@@ -147,17 +150,32 @@ export async function buildGenelRaporDetay(
 
   const aktifCount = aktifRes.count ?? 0
   const arsivCount = arsivRes.count ?? 0
-  const total = aktifCount + arsivCount
+  // Vardiya filtresi yokken DB count'larını kullan; varken filter sonrası gerçek sayım
+  // (vardiya filtresi DB'de uygulanamadığı için aşağıda merged üzerinden hesaplanır)
+  let total = aktifCount + arsivCount
 
-  // 6. Merge + sort + slice (id-bazlı deduplicate; aktif önceliklidir)
+  // 6. Merge + sort + (vardiya filtresi) + slice (id-bazlı deduplicate; aktif önceliklidir)
   const map = new Map<string, any>()
   for (const g of (arsivRes.data ?? []) as any[]) map.set(g.id, g)
   for (const g of (aktifRes.data ?? []) as any[]) map.set(g.id, g)
-  const merged = Array.from(map.values()).sort((a: any, b: any) => {
+  let merged = Array.from(map.values()).sort((a: any, b: any) => {
     const av = a[sortCol] ? new Date(a[sortCol]).getTime() : 0
     const bv = b[sortCol] ? new Date(b[sortCol]).getTime() : 0
     return bv - av
   })
+  // Vardiya filtresi (TR saati)
+  const vardiya = filters.vardiya ?? 'all'
+  if (vardiya !== 'all') {
+    const range = vardiya === 'v1' ? { from: 0, to: 8 } : vardiya === 'v2' ? { from: 8, to: 16 } : { from: 16, to: 24 }
+    merged = merged.filter((g: any) => {
+      if (!g.aktif_olma_tarihi) return false
+      const h = Number(new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false,
+      }).format(new Date(g.aktif_olma_tarihi)))
+      return h >= range.from && h < range.to
+    })
+    total = merged.length
+  }
   const slice = merged.slice(offset, offset + limit)
 
   // 7. User isim lookup (sadece bu sayfa için)
