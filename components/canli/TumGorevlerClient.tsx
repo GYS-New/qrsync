@@ -787,10 +787,13 @@ async function del() {
   const [atananId, setAtananId] = useState('')
   const [durum, setDurum] = useState('')
   const [actor, setActor] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [islemFrom, setIslemFrom] = useState('')
-  const [islemTo, setIslemTo] = useState('')
+  // Tarih filtresi yalnızca aktif_olma_tarihi üzerinden, date input (saat yok).
+  // İşlem tarihi (durum_degisim_tarihi) filtresi kaldırıldı.
+  const [from, setFrom] = useState('')        // 'YYYY-MM-DD'
+  const [to, setTo] = useState('')            // 'YYYY-MM-DD'
+  // Vardiya filtresi — aktif_olma_tarihi'nin TR saatine göre.
+  // V1: 00:00-08:00, V2: 08:00-16:00, V3: 16:00-24:00
+  const [vardiyaFilter, setVardiyaFilter] = useState<'all' | 'v1' | 'v2' | 'v3'>('all')
 
   // Seçili lokasyon filtresi (3 seviyeden en derini)
   const lokasyonId = filterLoc3 || filterLoc2 || filterLoc1
@@ -918,10 +921,9 @@ async function del() {
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
-    const fromD = from ? new Date(from) : null
-    const toD = to ? new Date(to) : null
-    const isFromD = islemFrom ? new Date(islemFrom) : null
-    const isToD = islemTo ? new Date(islemTo) : null
+    // Date input string'leri → TRT gün sınırlı ms (00:00 ve 23:59:59 +03:00)
+    const fromTs = from ? new Date(`${from}T00:00:00+03:00`).getTime() : null
+    const toTs   = to   ? new Date(`${to}T23:59:59.999+03:00`).getTime() : null
 
     return (gorevler ?? []).filter((g: any) => {
       if (s) {
@@ -941,23 +943,26 @@ async function del() {
       if (durum && g.durum !== durum) return false
       if (actor && getIslemiYapan(g, { meId, meName, kullanicilar }) !== actor) return false
 
-      if (fromD || toD) {
-        const d = g.aktif_olma_tarihi ? new Date(g.aktif_olma_tarihi) : null
-        if (!d) return false
-        if (fromD && d < fromD) return false
-        if (toD && d > toD) return false
-      }
-
-      if (isFromD || isToD) {
-        const d2 = g.durum_degisim_tarihi ? new Date(g.durum_degisim_tarihi) : null
-        if (!d2) return false
-        if (isFromD && d2 < isFromD) return false
-        if (isToD && d2 > isToD) return false
+      if (fromTs !== null || toTs !== null || vardiyaFilter !== 'all') {
+        if (!g.aktif_olma_tarihi) return false
+        const ts = new Date(g.aktif_olma_tarihi).getTime()
+        if (fromTs !== null && ts < fromTs) return false
+        if (toTs !== null && ts > toTs) return false
+        if (vardiyaFilter !== 'all') {
+          // TR saatini Intl ile çıkar (timezone-safe)
+          const trHourStr = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false,
+          }).format(new Date(g.aktif_olma_tarihi))
+          const trHour = Number(trHourStr)
+          if (vardiyaFilter === 'v1' && !(trHour >= 0 && trHour < 8)) return false
+          if (vardiyaFilter === 'v2' && !(trHour >= 8 && trHour < 16)) return false
+          if (vardiyaFilter === 'v3' && !(trHour >= 16 && trHour < 24)) return false
+        }
       }
 
       return true
     })
-  }, [q, lokasyonSet, atananId, durum, actor, from, to, islemFrom, islemTo, gorevler])
+  }, [q, lokasyonSet, atananId, durum, actor, from, to, vardiyaFilter, gorevler])
 
   const sorted = useMemo(() => {
     // Varsayılan 3-seviyeli grup sıralaması:
@@ -1047,8 +1052,7 @@ async function del() {
     setActor('')
     setFrom('')
     setTo('')
-    setIslemFrom('')
-    setIslemTo('')
+    setVardiyaFilter('all')
     setArsivRows([])
     setArsivAktif(false)
     setSortKey('grup')
@@ -1270,18 +1274,19 @@ async function del() {
         <div style={{ width: 1, height: 24, background: '#e5e7eb', flexShrink: 0 }} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>Aktif:</span>
-          <input type="datetime-local" className="verde-input" style={{ width: 155 }} value={from} onChange={e => setFrom(e.target.value)} />
+          <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>Aktif Olma Tarihi:</span>
+          <input type="date" className="verde-input" style={{ width: 140 }} value={from} onChange={e => setFrom(e.target.value)} />
           <span style={{ fontSize: 12, color: '#9a9a9a' }}>—</span>
-          <input type="datetime-local" className="verde-input" style={{ width: 155 }} value={to} onChange={e => setTo(e.target.value)} />
+          <input type="date" className="verde-input" style={{ width: 140 }} value={to} onChange={e => setTo(e.target.value)} />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>İşlem:</span>
-          <input type="datetime-local" className="verde-input" style={{ width: 155 }} value={islemFrom} onChange={e => setIslemFrom(e.target.value)} />
-          <span style={{ fontSize: 12, color: '#9a9a9a' }}>—</span>
-          <input type="datetime-local" className="verde-input" style={{ width: 155 }} value={islemTo} onChange={e => setIslemTo(e.target.value)} />
-        </div>
+        <select className="verde-select" value={vardiyaFilter} onChange={e => setVardiyaFilter(e.target.value as any)} style={{ width: 138 }}
+          title="Aktif olma saatine göre vardiya filtresi">
+          <option value="all">Vardiya (Tümü)</option>
+          <option value="v1">1. Vardiya (00-08)</option>
+          <option value="v2">2. Vardiya (08-16)</option>
+          <option value="v3">3. Vardiya (16-24)</option>
+        </select>
 
         <button type="button" onClick={uygula} disabled={arsivLoading}
           style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: '#1f2937', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: arsivLoading ? 0.7 : 1 }}>
