@@ -101,12 +101,21 @@ export async function PATCH(req: NextRequest) {
   // Haftalık alanlar firma seviyesinde de null olabilir (null = günlük değere fallback)
   const NULLABLE_ON_FIRMA = new Set(['haftalik_acik_bekleme_saat', 'haftalik_bekleme_gecmis_saat'])
 
+  // Sentinel değer izinleri: bazı alanlar standart range dışında özel anlam taşır.
+  //   canli_akis_sure_saat = -1 → "Bugün" (TR günü 00:00 → şimdi)
+  const ALLOWED_SENTINELS: Record<string, number[]> = {
+    canli_akis_sure_saat: [-1],
+  }
+
   // Sayısal alanlar
   for (const [key, min, max] of NUM_FIELDS) {
     if (body[key] !== undefined) {
       if (body[key] === null && (hedef === 'proje' || NULLABLE_ON_FIRMA.has(key))) { update[key] = null; continue }
       const v = Number(body[key])
-      if (isNaN(v) || v < min || v > max) return NextResponse.json({ error: `${key}: ${min}-${max} arasında olmalıdır` }, { status: 400 })
+      const sentinelOk = ALLOWED_SENTINELS[key]?.includes(v)
+      if (isNaN(v) || (!sentinelOk && (v < min || v > max))) {
+        return NextResponse.json({ error: `${key}: ${min}-${max} arasında olmalıdır` }, { status: 400 })
+      }
       update[key] = v
     }
   }
