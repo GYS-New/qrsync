@@ -31,6 +31,7 @@ export default function FirmaDetayClient({ firma }: { firma: Firma }) {
     rapor_ozellestir_aktif: (firma as any).rapor_ozellestir_aktif !== false,
     personel_takibi_aktif: (firma as any).personel_takibi_aktif === true,
     birim_fiyat_aktif: (firma as any).birim_fiyat_aktif === true,
+    oto_yikama_aktif: (firma as any).oto_yikama_aktif === true,
     logo_url: (firma as any).logo_url ?? null,
     lisans_gecerlilik_tarihi: (firma as any).lisans_gecerlilik_tarihi
       ? new Date((firma as any).lisans_gecerlilik_tarihi).toISOString().slice(0, 10)
@@ -149,6 +150,7 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
         rapor_ozellestir_aktif: form.rapor_ozellestir_aktif,
         personel_takibi_aktif: form.personel_takibi_aktif,
         birim_fiyat_aktif: form.birim_fiyat_aktif,
+        oto_yikama_aktif: form.oto_yikama_aktif,
         lisans_gecerlilik_tarihi: form.lisans_gecerlilik_tarihi
           ? new Date(form.lisans_gecerlilik_tarihi + 'T23:59:59').toISOString()
           : null,
@@ -192,6 +194,7 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
       rapor_ozellestir_aktif: form.rapor_ozellestir_aktif,
       personel_takibi_aktif: form.personel_takibi_aktif,
       birim_fiyat_aktif: form.birim_fiyat_aktif,
+      oto_yikama_aktif: form.oto_yikama_aktif,
       kaydedilme_tarihi: new Date().toISOString(),
     }
     const { error } = await supabase.from('firmalar').update({ varsayilan_ayarlar: snapshot }).eq('id', firma.id)
@@ -386,6 +389,20 @@ toast({ type: 'success', title: 'Başarılı', message: 'Logo güncellendi.' })
           ) : (
             <span className={`verde-badge ${(firma as any).birim_fiyat_aktif === true ? 'status-tamamlandi' : 'status-iptal'}`}>
               {(firma as any).birim_fiyat_aktif === true ? 'Aktif' : 'Pasif'}
+            </span>
+          )}
+        </Row>
+
+        <Row label="Oto Yıkama Modülü">
+          {edit ? (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={form.oto_yikama_aktif} onChange={(e) => setForm({ ...form, oto_yikama_aktif: e.target.checked })} />
+              {form.oto_yikama_aktif ? 'Aktif' : 'Pasif'}
+              <span style={{ color: '#64748b', fontSize: 12 }}>— araç kayıtları, QR akışı, periyodik yıkama görevleri</span>
+            </label>
+          ) : (
+            <span className={`verde-badge ${(firma as any).oto_yikama_aktif === true ? 'status-tamamlandi' : 'status-iptal'}`}>
+              {(firma as any).oto_yikama_aktif === true ? 'Aktif' : 'Pasif'}
             </span>
           )}
         </Row>

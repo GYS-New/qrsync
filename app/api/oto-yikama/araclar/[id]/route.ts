@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getFirmaModulDurumu } from '@/lib/firmalar/modulDurumu'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,15 +20,29 @@ async function sa(supabase: any) {
   return { me }
 }
 
+async function assertOtoYikamaAktifById(admin: any, aracId: string) {
+  const { data: arac } = await admin.from('araclar').select('firma_id').eq('id', aracId).single()
+  if (!arac) return { err: NextResponse.json({ ok: false, error: 'Araç bulunamadı' }, { status: 404 }) }
+  const aktif = await getFirmaModulDurumu(admin, arac.firma_id, 'oto_yikama_aktif')
+  if (!aktif) {
+    return { err: NextResponse.json({ ok: false, error: 'Bu firma için Oto Yıkama modülü aktif değil.' }, { status: 403 }) }
+  }
+  return { arac }
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createClient()
   const auth = await sa(supabase); if ('err' in auth) return auth.err
   const admin = createAdminClient()
   const body = await req.json().catch(() => ({}))
 
-  // Mevcut kaydı al — plaka değişikliği audit için
+  // Mevcut kaydı al — plaka değişikliği audit için + firma modül flag kontrolü
   const { data: mevcut } = await admin.from('araclar').select('*').eq('id', params.id).single()
   if (!mevcut) return NextResponse.json({ ok: false, error: 'Araç bulunamadı' }, { status: 404 })
+  const modulAktif = await getFirmaModulDurumu(admin, mevcut.firma_id, 'oto_yikama_aktif')
+  if (!modulAktif) {
+    return NextResponse.json({ ok: false, error: 'Bu firma için Oto Yıkama modülü aktif değil.' }, { status: 403 })
+  }
 
   const update: any = {}
   if ('plaka' in body) {
@@ -79,6 +94,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const auth = await sa(supabase); if ('err' in auth) return auth.err
   const admin = createAdminClient()
   const hard = req.nextUrl.searchParams.get('hard') === '1'
+
+  const modul = await assertOtoYikamaAktifById(admin, params.id)
+  if ('err' in modul) return modul.err
 
   if (hard) {
     const { error } = await admin.from('araclar').delete().eq('id', params.id)

@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getFirmaModulDurumu } from '@/lib/firmalar/modulDurumu'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,17 @@ async function sa(supabase: any) {
   return { me }
 }
 
+async function assertOtoYikamaAktif(admin: any, firmaId: string) {
+  const aktif = await getFirmaModulDurumu(admin, firmaId, 'oto_yikama_aktif')
+  if (!aktif) {
+    return NextResponse.json(
+      { ok: false, error: 'Bu firma için Oto Yıkama modülü aktif değil. Firma detay sayfasından açın.' },
+      { status: 403 },
+    )
+  }
+  return null
+}
+
 export async function GET(req: NextRequest) {
   const supabase = createClient()
   const auth = await sa(supabase); if ('err' in auth) return auth.err
@@ -26,6 +38,7 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
   const firmaId = sp.get('firma_id')
   if (!firmaId) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
+  const modulErr = await assertOtoYikamaAktif(admin, firmaId); if (modulErr) return modulErr
   const projeId = sp.get('proje_id')
   const aktif = sp.get('aktif')
 
@@ -52,6 +65,7 @@ export async function POST(req: NextRequest) {
   if (!kullaniciAd) return NextResponse.json({ ok: false, error: 'Kullanıcı adı soyadı gerekli' }, { status: 400 })
   if (!departman) return NextResponse.json({ ok: false, error: 'Departman gerekli' }, { status: 400 })
   if (!body.firma_id) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
+  const modulErr = await assertOtoYikamaAktif(admin, body.firma_id); if (modulErr) return modulErr
 
   const payload = {
     firma_id: body.firma_id,

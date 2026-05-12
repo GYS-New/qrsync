@@ -20,7 +20,7 @@ interface NavGroup {
   items: NavItem[]
 }
 
-function getNav(base: string, rol: UserRole): NavGroup[] {
+function getNav(base: string, rol: UserRole, otoYikamaAktif: boolean): NavGroup[] {
   const isSA = rol === 'super_admin' || rol === 'alt_super_admin'
   const isTA = rol === 'tenant_admin'
   const isMusteri = rol === 'musteri'
@@ -91,10 +91,11 @@ function getNav(base: string, rol: UserRole): NavGroup[] {
           { label: 'Push Bildirim Geçmişi', href: `${base}/dashboard/push-log`, icon: '🔔' },
         ]
 
-  // Oto Yıkama modülü — yalnızca SA görür. Araç kayıtları, günlük yıkama tablosu
-  // ve raporlar tek başlık altında toplanır. Mobil app değişmez; yıkama görevleri
-  // mevcut spesifik görev sistemi üzerinden akar.
-  const otoYikamaGroup = isSA ? [{
+  // Oto Yıkama modülü — opt-in. SA dahil herkes seçili firmanın
+  // `oto_yikama_aktif` flag'i true ise görür. Modül firma detay sayfasından
+  // açılır/kapatılır. Mobil app değişmez; yıkama görevleri mevcut spesifik
+  // görev sistemi üzerinden akar.
+  const otoYikamaGroup = (isSA && otoYikamaAktif) ? [{
     label: 'Oto Yıkama',
     items: [
       { label: 'Genel Bakış',   href: `${base}/dashboard/oto-yikama`,          icon: '🚿' },
@@ -293,7 +294,7 @@ function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' |
   )
 }
 
-export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, birimFiyatAktifProp, personelTakibiAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; birimFiyatAktifProp?: boolean; personelTakibiAktifProp?: boolean }) {
+export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, birimFiyatAktifProp, personelTakibiAktifProp, otoYikamaAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; birimFiyatAktifProp?: boolean; personelTakibiAktifProp?: boolean; otoYikamaAktifProp?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeLoading = useRouteLoading()
@@ -318,7 +319,14 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
         ? '/ta'
         : '/u'  // musteri ve tenant_user her ikisi de /u kullanır
 
-  const groups = getNav(base, user.rol)
+  // Oto Yıkama modülü flag'i — SA için seçili firmadan, diğer roller için
+  // server-side layout'tan gelen prop'tan okunur. Modül kapalıysa Sidebar
+  // grubu render edilmez (getNav içinde).
+  const otoYikamaAktif = isSA
+    ? firmalar.find(f => f.id === saFirmaId)?.oto_yikama_aktif === true
+    : otoYikamaAktifProp === true
+
+  const groups = getNav(base, user.rol, otoYikamaAktif)
 
   // U ve M için sayfa yetkileri çek
   useEffect(() => {

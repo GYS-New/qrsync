@@ -15,6 +15,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getFirmaModulDurumu } from '@/lib/firmalar/modulDurumu'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120  // Büyük import için
@@ -51,6 +52,15 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(araclar)) return NextResponse.json({ ok: false, error: 'araclar dizisi gerekli' }, { status: 400 })
 
   const admin = createAdminClient()
+
+  // Firma modül flag kontrolü — modül kapalıysa import bile başlatma
+  const modulAktif = await getFirmaModulDurumu(admin, firmaId, 'oto_yikama_aktif')
+  if (!modulAktif) {
+    return NextResponse.json(
+      { ok: false, error: 'Bu firma için Oto Yıkama modülü aktif değil. Firma detay sayfasından açın.' },
+      { status: 403 },
+    )
+  }
 
   // Excel satırlarını temizle ve plaka bazlı haritala.
   // Zorunlu alanlar: plaka, kullanici_adi_soyadi, departman. Eksik satırlar
