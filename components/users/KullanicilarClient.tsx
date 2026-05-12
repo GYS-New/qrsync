@@ -564,22 +564,22 @@ export default function KullanicilarClient({
               {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
             </select>
           )}
-          <select className="verde-select" value={filtreDurum} onChange={e => setFiltreDurum(e.target.value as any)} style={{ width: 110 }}>
-            <option value="">Durum (Tümü)</option>
+          <select className="verde-select" value={filtreDurum} onChange={e => setFiltreDurum(e.target.value as any)} style={{ width: 92 }}>
+            <option value="">Durum</option>
             <option value="aktif">Aktif</option>
             <option value="pasif">Pasif</option>
           </select>
-          <select className="verde-select" value={filtreRol} onChange={e => setFiltreRol(e.target.value)} style={{ width: 120 }}>
-            <option value="">Rol (Tümü)</option>
+          <select className="verde-select" value={filtreRol} onChange={e => setFiltreRol(e.target.value)} style={{ width: 100 }}>
+            <option value="">Rol</option>
             <option value="tenant_admin">TA</option>
             <option value="tenant_user">Kullanıcı</option>
             <option value="musteri">Müşteri</option>
           </select>
-          <select className="verde-select" value={filtreCihaz} onChange={e => setFiltreCihaz(e.target.value as any)} style={{ width: 140 }}
+          <select className="verde-select" value={filtreCihaz} onChange={e => setFiltreCihaz(e.target.value as any)} style={{ width: 112 }}
             title="Mobil cihaz eşleşme durumu">
-            <option value="all">Cihaz (Tümü)</option>
-            <option value="eslesmis">Eşleşmiş Cihaz</option>
-            <option value="eslesmemis">Eşleşmemiş Cihaz</option>
+            <option value="all">Cihaz</option>
+            <option value="eslesmis">Eşleşmiş</option>
+            <option value="eslesmemis">Eşleşmemiş</option>
           </select>
           <span style={{ fontSize: 12, color: '#6b7280' }}>{filtered.length}/{users.length}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
