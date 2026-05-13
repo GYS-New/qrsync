@@ -262,7 +262,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
         breadcrumbs={[{ label: 'Yönetim' }, { label: 'Rapor Merkezi', href: `${base}/dashboard/raporlar` }, { label: 'Personel Değerlendirme' }]}
       />
 
-      <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14, height: 'calc(100vh - 60px)', minHeight: 0 }}>
 
         {/* ─── Üst filtre bandı ─────────────────────────────────────────────── */}
         <div className="verde-card" style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto auto auto', gap: 10, alignItems: 'end' }}>
@@ -323,8 +323,8 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
           </span>
         </div>
 
-        {/* ─── Tablo ───────────────────────────────────────────────────────── */}
-        <div className="verde-card" style={{ padding: 0, overflow: 'hidden' }}>
+        {/* ─── Tablo (sayfa iç scroll: üst KPI + filtre sabit kalır) ──────── */}
+        <div className="verde-card" style={{ padding: 0, overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {loading ? (
             <div style={{ padding: 60, textAlign: 'center', color: T.textSoft, fontSize: 14 }}>Yükleniyor…</div>
           ) : rows.length === 0 ? (
@@ -332,48 +332,48 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
               {firmaId ? 'Bu kriterlerle eşleşen personel yok.' : 'Lütfen bir firma seçin.'}
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  {/* Sıralanabilir başlıklar */}
-                  <tr style={{ background: T.grayLight, borderBottom: `1px solid ${T.border}` }}>
-                    <th style={thS}>#</th>
-                    <ThS k="isim_soyisim"           sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('isim_soyisim')}>Personel</ThS>
-                    <ThS k="cihaz_eslesti"          sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('cihaz_eslesti')}>Cihaz</ThS>
-                    <ThS k="ust_lokasyon_adi"       sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('ust_lokasyon_adi')}>Üst Lokasyon</ThS>
-                    <ThS k="aktif"                  sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('aktif')}>Durum</ThS>
-                    <ThS k="tamamlandi_sayi"        sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('tamamlandi_sayi')}        align="right">Tamamlanan</ThS>
-                    <ThS k="iptal_sayi"             sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('iptal_sayi')}             align="right">İptal</ThS>
-                    <ThS k="ortalama_sure_saniye"   sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('ortalama_sure_saniye')}   align="right">Ort. Süre</ThS>
-                    <ThS k="aktif_gun_sayisi"       sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('aktif_gun_sayisi')}       align="right">Aktif Gün</ThS>
-                    <ThS k="basari_kategori"        sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('basari_kategori')}>Başarı</ThS>
+                  {/* Sıralanabilir başlıklar (sticky — scroll'da görünür kalır) */}
+                  <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+                    <th style={thSticky}>#</th>
+                    <ThS k="isim_soyisim"           sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('isim_soyisim')} sticky>Personel</ThS>
+                    <ThS k="cihaz_eslesti"          sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('cihaz_eslesti')} sticky>Cihaz</ThS>
+                    <ThS k="ust_lokasyon_adi"       sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('ust_lokasyon_adi')} sticky>Üst Lokasyon</ThS>
+                    <ThS k="aktif"                  sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('aktif')} sticky>Durum</ThS>
+                    <ThS k="tamamlandi_sayi"        sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('tamamlandi_sayi')}        align="right" sticky>Tamamlanan</ThS>
+                    <ThS k="iptal_sayi"             sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('iptal_sayi')}             align="right" sticky>İptal</ThS>
+                    <ThS k="ortalama_sure_saniye"   sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('ortalama_sure_saniye')}   align="right" sticky>Ort. Süre</ThS>
+                    <ThS k="aktif_gun_sayisi"       sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('aktif_gun_sayisi')}       align="right" sticky>Aktif Gün</ThS>
+                    <ThS k="basari_kategori"        sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('basari_kategori')} sticky>Başarı</ThS>
                   </tr>
-                  {/* Kolon filtre satırı */}
-                  <tr style={{ background: '#fff', borderBottom: `2px solid ${T.border}` }}>
-                    <th style={{ padding: 6 }}></th>
-                    <th style={{ padding: 6 }}>
+                  {/* Kolon filtre satırı (sticky — scroll'da görünür kalır) */}
+                  <tr style={{ borderBottom: `2px solid ${T.border}` }}>
+                    <th style={thFilterSticky}></th>
+                    <th style={thFilterSticky}>
                       <input value={colFiltreIsim} onChange={e => setColFiltreIsim(e.target.value)} placeholder="Ara…" style={inpSm} />
                     </th>
-                    <th style={{ padding: 6 }}>
+                    <th style={thFilterSticky}>
                       <select value={colFiltreCihaz} onChange={e => setColFiltreCihaz(e.target.value as any)} style={inpSm}>
                         <option value="">Tümü</option>
                         <option value="eslesmis">Eşleşmiş</option>
                         <option value="eslesmemis">Eşleşmemiş</option>
                       </select>
                     </th>
-                    <th style={{ padding: 6 }}></th>
-                    <th style={{ padding: 6 }}>
+                    <th style={thFilterSticky}></th>
+                    <th style={thFilterSticky}>
                       <select value={colFiltreDurum} onChange={e => setColFiltreDurum(e.target.value as any)} style={inpSm}>
                         <option value="">Tümü</option>
                         <option value="aktif">Aktif</option>
                         <option value="pasif">Pasif</option>
                       </select>
                     </th>
-                    <th style={{ padding: 6 }}></th>
-                    <th style={{ padding: 6 }}></th>
-                    <th style={{ padding: 6 }}></th>
-                    <th style={{ padding: 6 }}></th>
-                    <th style={{ padding: 6 }}>
+                    <th style={thFilterSticky}></th>
+                    <th style={thFilterSticky}></th>
+                    <th style={thFilterSticky}></th>
+                    <th style={thFilterSticky}></th>
+                    <th style={thFilterSticky}>
                       <select value={colFiltreBasari} onChange={e => setColFiltreBasari(e.target.value as any)} style={inpSm}>
                         <option value="">Tümü</option>
                         <option value="BAŞARILI">BAŞARILI</option>
@@ -386,30 +386,47 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
                   </tr>
                 </thead>
                 <tbody>
-                  {displayRows.map((r, i) => (
-                    <tr key={r.personel_id} style={{ borderBottom: `1px solid ${T.border}`, background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                      <td style={tdS}>{i + 1}</td>
-                      <td style={{ ...tdS, fontWeight: 700, color: T.text }}>{r.isim_soyisim}</td>
-                      <td style={tdS}>
-                        <Badge text={r.cihaz_eslesti ? 'Eşleşmiş' : 'Eşleşmemiş'} bg={r.cihaz_eslesti ? T.greenLight : T.amberLight} fg={r.cihaz_eslesti ? T.green : T.amber} />
-                      </td>
-                      <td style={tdS}>{r.ust_lokasyon_adi || <span style={{ color: T.textSoft, fontStyle: 'italic' }}>—</span>}</td>
-                      <td style={tdS}>
-                        <Badge text={r.aktif ? 'Aktif' : 'Pasif'} bg={r.aktif ? T.greenLight : T.redLight} fg={r.aktif ? T.green : T.red} />
-                      </td>
-                      <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: T.green }}>{r.tamamlandi_sayi}</td>
-                      <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: r.iptal_sayi > 0 ? T.red : T.textSoft }}>{r.iptal_sayi}</td>
-                      <td style={{ ...tdS, textAlign: 'right', fontWeight: 600 }}>{fmtSure(r.ortalama_sure_saniye)}</td>
-                      <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: r.aktif_gun_sayisi > 0 ? T.text : T.textSoft }}>{r.aktif_gun_sayisi}</td>
-                      <td style={tdS}>
-                        {r.basari_kategori ? (
-                          <Badge text={r.basari_kategori} bg={BASARI_RENK[r.basari_kategori].bg} fg={BASARI_RENK[r.basari_kategori].fg} />
-                        ) : (
-                          <span style={{ color: T.textSoft, fontStyle: 'italic' }}>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {displayRows.map((r, i) => {
+                    // Pasif personel → kırmızımsı ton + soldan kırmızı kalın çubuk + isim üstü çizgili.
+                    const pasif = !r.aktif
+                    const rowBg = pasif ? '#fef2f2' : (i % 2 === 0 ? '#fff' : '#fafafa')
+                    const isimStil: React.CSSProperties = pasif
+                      ? { fontWeight: 700, color: T.textSoft, textDecoration: 'line-through' }
+                      : { fontWeight: 700, color: T.text }
+                    return (
+                      <tr
+                        key={r.personel_id}
+                        style={{
+                          borderBottom: `1px solid ${T.border}`,
+                          background: rowBg,
+                          opacity: pasif ? 0.85 : 1,
+                          boxShadow: pasif ? `inset 4px 0 0 ${T.red}` : undefined,
+                        }}
+                        title={pasif ? 'Bu personel pasif durumda — geçmiş görevleri raporda görünür.' : undefined}
+                      >
+                        <td style={tdS}>{i + 1}</td>
+                        <td style={{ ...tdS, ...isimStil }}>{r.isim_soyisim}</td>
+                        <td style={tdS}>
+                          <Badge text={r.cihaz_eslesti ? 'Eşleşmiş' : 'Eşleşmemiş'} bg={r.cihaz_eslesti ? T.greenLight : T.amberLight} fg={r.cihaz_eslesti ? T.green : T.amber} />
+                        </td>
+                        <td style={tdS}>{r.ust_lokasyon_adi || <span style={{ color: T.textSoft, fontStyle: 'italic' }}>—</span>}</td>
+                        <td style={tdS}>
+                          <Badge text={r.aktif ? 'Aktif' : 'Pasif'} bg={r.aktif ? T.greenLight : T.redLight} fg={r.aktif ? T.green : T.red} />
+                        </td>
+                        <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: T.green }}>{r.tamamlandi_sayi}</td>
+                        <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: r.iptal_sayi > 0 ? T.red : T.textSoft }}>{r.iptal_sayi}</td>
+                        <td style={{ ...tdS, textAlign: 'right', fontWeight: 600 }}>{fmtSure(r.ortalama_sure_saniye)}</td>
+                        <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: r.aktif_gun_sayisi > 0 ? T.text : T.textSoft }}>{r.aktif_gun_sayisi}</td>
+                        <td style={tdS}>
+                          {r.basari_kategori ? (
+                            <Badge text={r.basari_kategori} bg={BASARI_RENK[r.basari_kategori].bg} fg={BASARI_RENK[r.basari_kategori].fg} />
+                          ) : (
+                            <span style={{ color: T.textSoft, fontStyle: 'italic' }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -428,15 +445,34 @@ const thS: React.CSSProperties = {
   padding: '10px 14px', textAlign: 'left', fontSize: 11.5, fontWeight: 800,
   color: T.gray, textTransform: 'uppercase', letterSpacing: '0.04em',
 }
+// Sticky header — tablo scroll'da en üstte sabit kalır.
+const thSticky: React.CSSProperties = {
+  ...thS,
+  position: 'sticky',
+  top: 0,
+  background: T.grayLight,
+  zIndex: 3,
+  boxShadow: `inset 0 -1px 0 ${T.border}`,
+}
+// Sticky kolon-filtre satırı (ana başlığın hemen altında).
+const thFilterSticky: React.CSSProperties = {
+  padding: 6,
+  position: 'sticky',
+  top: 38,  // thSticky satır yüksekliği (~38px: padding 10*2 + ~18 line)
+  background: '#fff',
+  zIndex: 2,
+  boxShadow: `inset 0 -2px 0 ${T.border}`,
+}
 const tdS: React.CSSProperties = { padding: '10px 14px', color: T.text, verticalAlign: 'middle' }
 
-function ThS({ children, k, sortKey, sortDir, onClick, align }: {
-  children: React.ReactNode; k: SortKey; sortKey: SortKey; sortDir: SortDir; onClick: () => void; align?: 'left' | 'right'
+function ThS({ children, k, sortKey, sortDir, onClick, align, sticky }: {
+  children: React.ReactNode; k: SortKey; sortKey: SortKey; sortDir: SortDir; onClick: () => void; align?: 'left' | 'right'; sticky?: boolean
 }) {
   const aktif = sortKey === k
+  const baseStyle = sticky ? thSticky : thS
   return (
     <th onClick={onClick}
-      style={{ ...thS, textAlign: align ?? 'left', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+      style={{ ...baseStyle, textAlign: align ?? 'left', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         {children}
         {aktif && (sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
