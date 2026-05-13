@@ -124,55 +124,16 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── SİMÜLASYON BYPASS: SİM aktifse ve görev kapsamındaysa VT'ye yazma ──
-    if (gorevTipi === 'canli_gorevler') {
-      const { data: gorevLok } = await admin
-        .from('canli_gorevler')
-        .select('lokasyon_id')
-        .eq('id', gorevId)
-        .single()
-      if (gorevLok?.lokasyon_id) {
-        // Görevin lokasyonunun üst lokasyonunu bul
-        const { data: lokasyon } = await admin
-          .from('lokasyonlar')
-          .select('id, parent_id')
-          .eq('id', gorevLok.lokasyon_id)
-          .single()
-        // Üst lokasyonu bul (root'a kadar çık)
-        let ustLokId = lokasyon?.id ?? null
-        if (lokasyon?.parent_id) {
-          let curId: string | null = lokasyon.parent_id
-          let guard = 0
-          while (curId && guard < 10) {
-            const { data: parent } = await admin.from('lokasyonlar').select('id, parent_id').eq('id', curId).single()
-            if (!parent) break
-            ustLokId = parent.id
-            curId = parent.parent_id
-            guard++
-          }
-        }
-        // Bu üst lokasyon için aktif simülasyon var mı?
-        if (ustLokId) {
-          const { data: simAyar } = await admin
-            .from('simulasyon_ayarlari')
-            .select('id')
-            .eq('firma_id', firmaId)
-            .eq('ust_lokasyon_id', ustLokId)
-            .eq('aktif', true)
-            .maybeSingle()
-          if (simAyar) {
-            // SİM aktif — personele başarılı response dön ama VT'ye yazma
-            return NextResponse.json({
-              ok: true,
-              mesaj: 'Görev başarıyla tamamlandı.',
-              gorev_id: gorevId,
-              gorev_tipi: gorevTipi,
-              tamamlanma_tarihi: new Date().toISOString(),
-            }, { headers: CORS })
-          }
-        }
-      }
-    }
+    // SİMÜLASYON HİBRİT MODU: bypass kaldırıldı.
+    //   Eskiden sim aktif üst lokasyondaki gerçek tamamlamalar sahte success
+    //   alır, DB'ye yazılmazdı. Artık sim + gerçek paralel çalışır:
+    //     • Gerçek personel görev tamamlar → normal akış DB'ye yazar.
+    //     • Sim cron sadece halen 'ACIK'/'ISLEMDE' duranları tamamlar (durum
+    //       guard'ı simulasyon/calistir'da var) — race olduğunda kim önce
+    //       yaparsa o yazılır, diğeri no-op.
+    //   3 frekanslı görev senaryosu: bir frekansı canlı tamamlanırsa sim
+    //   diğer frekansları yapar; sim biri yaparsa kalanı canlı yapabilir.
+
 
     const nowIso = new Date().toISOString()
 

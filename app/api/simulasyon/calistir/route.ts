@@ -373,6 +373,8 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
 
     // %1 iptal olasılığı
     if (Math.random() < (grupAyar.iptal_orani ?? 1) / 100) {
+      // Race-safe: yalnızca hâlâ ISLEMDE ise yaz (gerçek personel araya
+      // tamamlama yaptıysa veya başka biri iptal etmişse no-op).
       await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'MOBIL', {
         at: tamamlanmaIso,
         iptal_sebep: 'Otomatik iptal — simülasyon',
@@ -380,12 +382,13 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
           iptal_eden_id: personelId, iptal_tarihi: tamamlanmaIso,
           islemi_yapan_id: personelId, simule_tamamlandi: true,
         },
-      }) as any).eq('id', gorev.id)
+      }) as any).eq('id', gorev.id).eq('durum', 'ISLEMDE')
       await personelAktiviteGuncelle(admin, personelId)
       iptalAdet++; tamamlamaSayaci++
       continue
     }
 
+    // Race-safe: yalnızca hâlâ ISLEMDE ise yaz (gerçek tamamlama araya girdiyse no-op).
     await admin.from('canli_gorevler').update(gorevDurumPayload('TAMAMLANDI', 'MOBIL', {
       at: tamamlanmaIso,
       ek: {
@@ -394,7 +397,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
         islemi_yapan_id: personelId,
         tamamlanma_suresi_saniye: sureSaniye,
       },
-    }) as any).eq('id', gorev.id)
+    }) as any).eq('id', gorev.id).eq('durum', 'ISLEMDE')
 
     if (lok?.checklist_sablon_id) {
       await simuleCeklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)
@@ -436,6 +439,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
       // %1 iptal olasılığı
       if (Math.random() < (grupAyar.iptal_orani ?? 1) / 100) {
         const iptalIso = new Date().toISOString()
+        // Race-safe: yalnızca hâlâ ACIK ise yaz.
         await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'MOBIL', {
           at: iptalIso,
           iptal_sebep: 'Otomatik iptal — simülasyon',
@@ -445,7 +449,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
             islemi_yapan_id: personelId,
             simule_tamamlandi: true,
           },
-        }) as any).eq('id', gorev.id)
+        }) as any).eq('id', gorev.id).eq('durum', 'ACIK')
         await personelAktiviteGuncelle(admin, personelId)
         iptalAdet++
         continue
@@ -453,6 +457,8 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
 
       if (lok?.sureli_gorev_aktif) {
         // SG aktif → ISLEMDE yap, sonraki cron'larda süresi dolunca tamamlanacak
+        // Race-safe: yalnızca hâlâ ACIK ise yaz (gerçek personel araya başlatma/
+        // tamamlama yaptıysa no-op).
         await admin.from('canli_gorevler').update({
           durum: 'ISLEMDE',
           durum_degisim_tarihi: new Date().toISOString(),
@@ -460,7 +466,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
           baslatan_kullanici_id: personelId,
           islemi_yapan_id: personelId,
           simule_tamamlandi: true,
-        } as any).eq('id', gorev.id)
+        } as any).eq('id', gorev.id).eq('durum', 'ACIK')
         await personelAktiviteGuncelle(admin, personelId)
         baslatmaAdet++
       } else {
@@ -470,6 +476,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
         const tamamlanmaIso = new Date().toISOString()
         const baslatmaIso = new Date(Date.now() - sureSaniye * 1000).toISOString()
 
+        // Race-safe: yalnızca hâlâ ACIK ise yaz.
         await admin.from('canli_gorevler').update(gorevDurumPayload('TAMAMLANDI', 'MOBIL', {
           at: tamamlanmaIso,
           ek: {
@@ -481,7 +488,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
             tamamlanma_suresi_saniye: sureSaniye,
             simule_tamamlandi: true,
           },
-        }) as any).eq('id', gorev.id)
+        }) as any).eq('id', gorev.id).eq('durum', 'ACIK')
 
         if (lok?.checklist_sablon_id) {
           await simuleCeklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)
