@@ -1204,7 +1204,7 @@ Aşağıdaki tablolar sorgulanabilir. Kolon adlarını AYNEN kullan:
 
 ### Görevler
 - **gorevler** (spesifik): id, firma_id, proje_id, tanim, lokasyon_id, atanan_kullanici_id, durum (AÇIK/İŞLEMDE/TAMAMLANDI/İPTAL), olusturma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye
-- **canli_gorevler** (frekansiyel): id, firma_id, proje_id, tanim, lokasyon_id, atanan_kullanici_id, durum, aktif_olma_tarihi, olusturma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, kural_id, simule_tamamlandi
+- **canli_gorevler** (frekansiyel): id, firma_id, proje_id, tanim, lokasyon_id, atanan_kullanici_id, durum, aktif_olma_tarihi, olusturma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, kural_id
 - **gorev_kurallari**: id, firma_id, proje_id, lokasyon_id, tanim, aktif_gunler, gunluk_frekans_sayisi, aktif_olma_saati, aktif, baslangic_tarihi, bitis_tarihi, atanan_kullanici_id
 
 ### Lokasyonlar
