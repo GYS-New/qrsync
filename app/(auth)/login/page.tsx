@@ -440,7 +440,16 @@ export default function LoginPage() {
                 </p>
 
                 <p className="mt-64 text-center text-[13px]" style={{ color: 'var(--text-400)' }}>
-                  2026@United Software Teknologies · Tüm hakları saklıdır
+                  2026@United Software Teknologies · Tüm hakları saklıdır · {' '}
+                  <a
+                    href="/privacy-policy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold hover:underline"
+                    style={{ color: '#4F6AFF' }}
+                  >
+                    Gizlilik Politikası
+                  </a>
                 </p>
               </form>
             </div>
