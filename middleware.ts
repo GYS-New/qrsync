@@ -154,6 +154,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // /privacy-policy — Apple App Store gereği herkese (web + mobil) açık olmalı,
+  // auth ve mobil-redirect bypass.
+  if (pathname === '/privacy-policy' || pathname.startsWith('/privacy-policy/')) {
+    return NextResponse.next()
+  }
+
   // /api/* için sadece rate limit (her endpoint kendi auth'unu yapar)
   if (pathname.startsWith('/api/')) {
     const blocked = rateLimitCheck(request, pathname)
