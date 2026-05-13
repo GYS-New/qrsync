@@ -669,8 +669,21 @@ export default function KullanicilarClient({
             </tr>
           </thead>
           <tbody>
-            {filtered.map(u => (
-              <tr key={u.id} style={{ background: (topluSilModu && seciliIds.has(u.id)) ? '#fef2f2' : (pushToplu && pushSeciliIds.has(u.id)) ? '#f5f3ff' : undefined }}>
+            {filtered.map(u => {
+              // Pasif kullanıcı vurgusu (Personel Değerlendirme Raporu ile aynı pattern):
+              // kırmızımsı arka plan, soldan kırmızı 4px çubuk, isim üstü çizgili, opacity 0.85.
+              const pasif = !u.aktif
+              const bgToplu = (topluSilModu && seciliIds.has(u.id)) ? '#fef2f2' : (pushToplu && pushSeciliIds.has(u.id)) ? '#f5f3ff' : undefined
+              return (
+              <tr
+                key={u.id}
+                title={pasif ? 'Bu kullanıcı pasif durumda.' : undefined}
+                style={{
+                  background: bgToplu ?? (pasif ? '#fef2f2' : undefined),
+                  opacity: pasif ? 0.85 : 1,
+                  boxShadow: pasif ? 'inset 4px 0 0 #dc2626' : undefined,
+                }}
+              >
                 {topluSilModu && (
                   <td>
                     <input type="checkbox" checked={seciliIds.has(u.id)} onChange={() => toggleSecim(u.id)}
@@ -688,7 +701,7 @@ export default function KullanicilarClient({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <UserAvatar name={u.isim_soyisim} photoUrl={u.profil_foto} size={28} />
                     <div>
-                      <div style={{ fontWeight: 600, color: '#111827' }}>{u.isim_soyisim}</div>
+                      <div style={{ fontWeight: 600, color: pasif ? '#6b7280' : '#111827', textDecoration: pasif ? 'line-through' : undefined }}>{u.isim_soyisim}</div>
                       <div style={{ fontSize: 13, color: '#6b7280' }}>{u.email}</div>
                     </div>
                   </div>
@@ -844,7 +857,7 @@ export default function KullanicilarClient({
                   </td>
                 )}
               </tr>
-            ))}
+            )})}
             {!filtered.length && (
               <tr><td colSpan={(canManage ? 8 : 7) + ((topluSilModu || pushToplu) ? 1 : 0)} style={{ textAlign: 'center', color: '#6b7280', padding: '36px 0' }}>Kayıt bulunamadı</td></tr>
             )}
