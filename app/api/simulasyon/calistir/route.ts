@@ -182,23 +182,31 @@ function lokasyonCinsiyetBelirle(lokTanim: string): 'E' | 'K' | null {
   return null // cinsiyet belirtilmemiş lokasyon
 }
 
-// Cinsiyet eşleştirmesiyle personel seç (havuz versiyonu — eski/iç kullanım)
-function cinsiyetliPersonelSec(personeller: PersonelBilgi[], lokTanim: string): string | null {
+// Cinsiyet eşleştirmesiyle personel seç. `exclude` Set'i = "şu anda başka
+// görevde meşgul olan" personeller — doğal akış: bir kişi aynı anda iki
+// görev yapmaz. Eğer cinsiyet filtreli aday kalmazsa cinsiyet kısıtı
+// gevşetilir; o da boşsa null döner (görev atlanır, sıradaki tura sarkar).
+function cinsiyetliPersonelSec(personeller: PersonelBilgi[], lokTanim: string, exclude?: Set<string>): string | null {
   if (!personeller.length) return null
+  const musait = exclude && exclude.size > 0
+    ? personeller.filter(p => !exclude.has(p.id))
+    : personeller
+  if (musait.length === 0) return null
   const gerekliCinsiyet = lokasyonCinsiyetBelirle(lokTanim)
   if (gerekliCinsiyet) {
-    const uygunlar = personeller.filter(p => p.cinsiyet === gerekliCinsiyet)
+    const uygunlar = musait.filter(p => p.cinsiyet === gerekliCinsiyet)
     if (uygunlar.length > 0) return uygunlar[Math.floor(Math.random() * uygunlar.length)].id
   }
-  return personeller[Math.floor(Math.random() * personeller.length)].id
+  return musait[Math.floor(Math.random() * musait.length)].id
 }
 
 // Kurala atanmış personellerden cinsiyet+random seç. Atama yoksa null.
-function kuralPersonelSec(kuralAtamalar: Map<string, PersonelBilgi[]>, kuralId: string | null | undefined, lokTanim: string): string | null {
+// `exclude`: meşgul personelleri (zaten ISLEMDE başka görevde) eler.
+function kuralPersonelSec(kuralAtamalar: Map<string, PersonelBilgi[]>, kuralId: string | null | undefined, lokTanim: string, exclude?: Set<string>): string | null {
   if (!kuralId) return null
   const havuz = kuralAtamalar.get(kuralId)
   if (!havuz || havuz.length === 0) return null
-  return cinsiyetliPersonelSec(havuz, lokTanim)
+  return cinsiyetliPersonelSec(havuz, lokTanim, exclude)
 }
 
 async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kuralAtamalar: Map<string, PersonelBilgi[]>) {
@@ -330,6 +338,17 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
 
   let tamamlananAdet = 0
   let baslatmaAdet = 0
+
+  // Meşgul personel kilidi — bir kişi aynı anda iki görevde olamaz.
+  // Şu anda halen ISLEMDE bir göreve atanmış personeller başlangıç set'i;
+  // bu tur içinde yeni başlatma yapılınca da set'e eklenir (in-memory guard).
+  // ADIM 1 ISLEMDE'leri tamamladıkça serbest bırakıyoruz.
+  const mesgulPersoneller = new Set<string>()
+  for (const g of tumGorevler) {
+    if (g.durum === 'ISLEMDE' && g.baslatan_kullanici_id) {
+      mesgulPersoneller.add(g.baslatan_kullanici_id)
+    }
+  }
   let iptalAdet = 0
   let tamamlamaSayaci = 0 // ADIM 1 sayacı
 
@@ -384,6 +403,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
         },
       }) as any).eq('id', gorev.id).eq('durum', 'ISLEMDE')
       await personelAktiviteGuncelle(admin, personelId)
+      mesgulPersoneller.delete(personelId)  // Görev kapandı → personel serbest
       iptalAdet++; tamamlamaSayaci++
       continue
     }
@@ -398,6 +418,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
         tamamlanma_suresi_saniye: sureSaniye,
       },
     }) as any).eq('id', gorev.id).eq('durum', 'ISLEMDE')
+    mesgulPersoneller.delete(personelId)  // Görev TAMAMLANDI → personel serbest
 
     if (lok?.checklist_sablon_id) {
       await simuleCeklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)
@@ -432,8 +453,10 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
       if ((tamamlananSayi + tamamlananAdet + baslatmaAdet) >= hedefMax) break
 
       const lok = lokMap.get(gorev.lokasyon_id)
-      // ACIK görevi başlatacak personel: kurala atanmışlardan random seç. Atanmamışsa atla.
-      const personelId = kuralPersonelSec(kuralAtamalar, gorev.kural_id, lok?.tanim ?? '')
+      // ACIK görevi başlatacak personel: kurala atanmışlardan, ŞU AN MEŞGUL OLMAYAN
+      // birini cinsiyet+random ile seç. Atama yoksa veya tüm aday meşgulse atla.
+      // (Doğal akış: bir personel aynı anda iki görev yürütemez.)
+      const personelId = kuralPersonelSec(kuralAtamalar, gorev.kural_id, lok?.tanim ?? '', mesgulPersoneller)
       if (!personelId) continue
 
       // %1 iptal olasılığı
@@ -451,6 +474,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
           },
         }) as any).eq('id', gorev.id).eq('durum', 'ACIK')
         await personelAktiviteGuncelle(admin, personelId)
+        // İptal anında zaten bir göreve başlatılmadı; meşgul listesini değiştirmeye gerek yok.
         iptalAdet++
         continue
       }
@@ -468,6 +492,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
           simule_tamamlandi: true,
         } as any).eq('id', gorev.id).eq('durum', 'ACIK')
         await personelAktiviteGuncelle(admin, personelId)
+        mesgulPersoneller.add(personelId)  // Personel artık ISLEMDE — sonraki seçimlerden ele
         baslatmaAdet++
       } else {
         // SG pasif → direkt TAMAMLANDI
@@ -495,6 +520,9 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
         }
 
         await personelAktiviteGuncelle(admin, personelId)
+        // SG pasif: anlık başlatıp tamamladı. Aynı cron turunda bu personeli
+        // başka göreve atamamak için set'e ekle (sonraki turda yine müsait).
+        mesgulPersoneller.add(personelId)
         tamamlananAdet++
       }
     }
