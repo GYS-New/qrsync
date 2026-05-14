@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
+import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -187,6 +188,18 @@ export async function POST(req: Request) {
         { ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' },
         { status: 429, headers: CORS },
       )
+    }
+
+    // Aktif görev kontrolü — kullanıcının halen ISLEMDE bir görevi varsa
+    // ekstra görev oluşturamaz (doğal akış: aynı anda iki görev yürütülmez).
+    const devamEden = await devamEdenGorevKontrol(admin, userId, firmaId)
+    if (devamEden) {
+      return NextResponse.json({
+        ok: false,
+        error: `Aktif başka bir göreviniz var: "${devamEden.tanim ?? '—'}"${devamEden.lokasyon_tanim ? ` (${devamEden.lokasyon_tanim})` : ''}. Önce onu tamamlayın.`,
+        code: 'DEVAM_EDEN_GOREV',
+        aktifGorev: devamEden,
+      }, { status: 409, headers: CORS })
     }
 
     // Kayıt oluştur

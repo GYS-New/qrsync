@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
+import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
 import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 
@@ -210,6 +211,20 @@ export async function POST(req: Request) {
       if (ardisikHata) {
         return NextResponse.json({ ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' }, { status: 429, headers: CORS })
       }
+    }
+
+    // Aktif görev kontrolü — kullanıcının başka bir ISLEMDE görevi varsa
+    // yeni görev tamamlayamaz (doğal akış: bir personel aynı anda iki görev
+    // yürütemez). exceptId ile şu anki görev hariç tutulur — eğer bu görev
+    // zaten ISLEMDE ise kendi sahibi olduğu için engellenmez.
+    const devamEden = await devamEdenGorevKontrol(admin, userId, firmaId, { excludeTaskId: gorevId })
+    if (devamEden) {
+      return NextResponse.json({
+        ok: false,
+        error: `Aktif başka bir göreviniz var: "${devamEden.tanim ?? '—'}"${devamEden.lokasyon_tanim ? ` (${devamEden.lokasyon_tanim})` : ''}. Önce onu tamamlayın.`,
+        code: 'DEVAM_EDEN_GOREV',
+        aktifGorev: devamEden,
+      }, { status: 409, headers: CORS })
     }
 
     // Proje ayarı kapalıysa çeklist maddelerini sessizce ihmal et
