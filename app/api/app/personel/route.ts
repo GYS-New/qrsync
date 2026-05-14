@@ -93,12 +93,14 @@ export async function GET(req: Request) {
     const kayitliUserIdler = (kayitliCihazlar ?? []).map((d: any) => d.user_id)
 
     // Personel listesi - proje seçildiyse o projenin personelleri
+    // Mobil eşleşme akışına dahil roller: tenant_user (personel),
+    // tenant_admin (firma yönetici), musteri (QR/değerlendirme kullanıcısı).
     let personelQuery = admin
       .from('users')
       .select('id, isim_soyisim, rol')
       .eq('firma_id', firmaId)
       .eq('aktif', true)
-      .in('rol', ['tenant_user', 'tenant_admin'])
+      .in('rol', ['tenant_user', 'tenant_admin', 'musteri'])
       .order('isim_soyisim', { ascending: true })
 
     if (projeId) {
