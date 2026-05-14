@@ -1,6 +1,6 @@
 # Çevrimdışı (Offline) Çalışma Sistemi — Mimari & Referans
 
-**Son güncelleme:** 2026-04-24  
+**Son güncelleme:** 2026-05-14  
 **Statü:** Canlı (OYAK RENAULT projesinde saha testinde)
 
 Bu doküman mobil uygulamanın çevrimdışı çalışma akışını, backend'in bunu nasıl desteklediğini ve olası sorunların nerede aranacağını tek yerde toplar. İleride bir arızada buraya bak.
@@ -20,7 +20,7 @@ Bu doküman mobil uygulamanın çevrimdışı çalışma akışını, backend'in
   ② Uçak modu: lokal snapshot ile QR okut, görev tamamla ─────┘
 ```
 
-1. **Snapshot (`POST /api/app/offline-snapshot`)** — mobil, şebeke varken "sıradaki 1 saat içinde ihtiyaç duyacağı" verileri tek istekte indirir.
+1. **Snapshot (`POST /api/app/offline-snapshot`)** — mobil, şebeke varken vardiyası boyunca ihtiyaç duyacağı verileri tek istekte indirir.
 2. **Offline çalışma** — cihazda ağ yokken, snapshot'taki lokasyon/görev/checklist şablonlarıyla normal iş akışı.
 3. **Sync (`POST /api/app/offline-sync`)** — ağa dönünce biriken kayıtlar toplu gönderilir. Her kayıt bağımsız işlenir, idempotent.
 
@@ -56,20 +56,26 @@ yetki kaydı var  →  sadece yetkili üst lokasyonlar + BFS alt ağaç
 - Yetki var → `.in(lokasyon_id, yetkiliLokIds)` (küçük liste — sorun yok)
 - Yetki yok → `.eq(proje_id, personelProjeId)` (tek eq, URL güvenli)
 
-### Görev Kapsam Politikası — **Sıradaki 1 Saat Penceresi**
+### Görev Kapsam Politikası — **Vardiya Bitişine Kadar Pencere**
 ```ts
-const siradakiSinir = şimdi + 1 saat
+const siradakiSinir = vardiyaBilgi?.bitisISO ?? (şimdi + 12 saat)
 filter: durum IN (HAZIR, ACIK) AND aktif_olma_tarihi <= siradakiSinir
 ```
 - **ACIK** görevler: vardiya penceresi içindeyse dahil
-- **HAZIR** görevler: sadece önümüzdeki 1 saatte aktifleşecek olanlar dahil
-- Daha ileri tarihli HAZIR görevler (sistem 24 saat ilerisi için üretir) **dışlanır**
+- **HAZIR** görevler: vardiya bitişine kadar aktifleşecek olanlar dahil
+- Vardiya tespit edilemediyse fallback **+12 saat** (vardiyasız firma/proje için)
+- Bir sonraki vardiyaya / güne ait HAZIR görevler **dışlanır**
 
-**Rasyonel:**
-- Operatörün önündeki iş yükü 1 saatlik pencereye sığar
-- Snapshot boyutu makul kalır (50-150 görev)
-- Vardiya tespit edilemeyen senaryolarda bile kontrollü kapsam (gün boyu HAZIR yığılması gelmez)
-- Operatör 1 saatten uzun offline kalırsa snapshot'ı yeniden indirir — doğal beklenti
+**Rasyonel (2026-05-14 güncellemesi — commit `d800b99`):**
+- Eski `şimdi + 1 saat` penceresi, offline kalan personeli mağdur ediyordu:
+  - Sabah 07:30 senkron → 08:30'a kadar olan görevler indi
+  - 09:00'da internet kesildi → 09:00 sonrası aktive olan frekansiyel görevler snapshot'ta **YOK**
+  - Mobil app "ekstra görev yap" gösterdi (frekansiyel görev yok zannıyla)
+  - Personel 3 ekstra görev yaptı; gerçek frekansiyel görevler vardiya sonu hâlâ ACIK
+  - Gece dongusu → `ZAMANINDA_YAPILAMAYAN` → personel raporda haksız yere başarısız görüntü
+- Yeni pencere vardiya boyunca tüm görevleri snapshot'a koyar — offline operatör vardiya boyu güvende
+- Snapshot boyutu büyür ama tipik vardiyada problemli değil (100 lokasyon × 3 frekans ≈ 300 satır)
+- Vardiya bilgisi yoksa +12 saat — gün boyu çalışan vardiyasız personele güvenli kapsam
 
 ### Ekstra Frekans Kuralları — Kapsam İstisnası
 Her lokasyon için `ekstra_frekans_kurallari: [{tanim}]` listesi döner (mevcut `gorev_kurallari` kayıtlarından). **Önemli:**
@@ -212,8 +218,8 @@ Terminal durum geçişlerinde `son_tamamlama_kanali` **zorunlu** — `lib/gorev/
 
 - `mesai-okut` saat kontrolü yapmaz — mesai açılır
 - `aktifVardiyaAraligi` tolerans dışı + devam eden vardiya yok → **null** döner
-- Snapshot vardiya filter uygulamaz → **yalnızca "sıradaki 1 saat" penceresi** çalışır
-- Operatör yine yakın görevleri görür, ama vardiya belli olmadığı için kapsam sıkı kalır
+- Snapshot vardiya filter uygulamaz → pencere **fallback +12 saat** olur (eski "+1 saat" değildir; 2026-05-14 güncellemesi)
+- Operatör yine yakın görevleri görür, kapsam vardiyasız 12 saatlik dilime düşer
 
 **Uyarı:** Snapshot response'unda `vardiya: null` geliyor ama kullanıcıya açık hata verilmiyor. Mobil UI bu alanı kontrol edip uyarı gösterebilir ("İş başı saatiniz vardiya dışı").
 
@@ -256,16 +262,22 @@ Online kazanır kuralı — görev zaten bir terminal durumda. Mobil bu offline 
 
 ---
 
-## 9. İlgili Commit Zinciri (24.04.2026 Düzeltme Paketi)
+## 9. İlgili Commit Zinciri
 
+### 24.04.2026 Düzeltme Paketi
 | Commit | İş |
 |---|---|
 | `4d30484` | Yetki kaydı yoksa proje kapsamı fallback |
 | `6d025c1` | mesai-okut response'una mesai objesi ekle |
 | `414f3d9` | `.in()` URL limit fix — fallback'te proje_id EQ |
 | `96f23b6` | Ekstra görev spec validasyonu + `gorev_kurallari` NULL proje fix |
-| `6fd4e84` | Sıradaki 1 saat penceresi + HAZIR kapsam kısıtı |
+| `6fd4e84` | Sıradaki 1 saat penceresi + HAZIR kapsam kısıtı (sonradan revize edildi) |
 | `717a5e0` | Kanal-zorunlu helper (terminal durum geçişleri) |
+
+### 14.05.2026 Offline Pencere Genişletme
+| Commit | İş |
+|---|---|
+| `d800b99` | siradakiSinirIso → vardiya bitişi (fallback +12 saat). Eski +1 saat penceresi offline operatörü mağdur ediyordu (frekansiyel görevler vardiya sonu ACIK kalıyordu); gerçek saha vakası sonrası genişletildi. |
 
 ---
 
@@ -276,7 +288,9 @@ Yeni deploy veya şüpheli durumda:
 - [ ] Fatih token ile snapshot curl — `sayi.lokasyon > 0`, `sayi.gorev > 0`
 - [ ] ARITMA WC gibi 3+ ACIK görevli lokasyon → snapshot'ta 3/3 gorev_id
 - [ ] BAY WC SASI KAYNAK gibi kural tanımlı lokasyon → `ekstra_frekans_kurallari` 3 tanım
-- [ ] DB'ye test HAZIR kayıt (aktif_olma = şu an + 3 saat) → snapshot'a **girmemeli**
+- [ ] DB'ye test HAZIR kayıt (aktif_olma = **vardiya bitişinden sonra**) → snapshot'a **girmemeli**
+- [ ] DB'ye test HAZIR kayıt (aktif_olma = şu an + 3 saat, vardiya içinde) → snapshot'a **girmeli** (eski +1s pencere kaldırıldı)
 - [ ] DB'ye test HAZIR kayıt (aktif_olma = şu an + 30 dk) → snapshot'a **girmeli**
+- [ ] Vardiya bilgisi olmayan kullanıcı (PT pasif) → fallback +12 saat penceresi devrede mi?
 - [ ] Test kayıtlarını sil
 - [ ] `/api/cron/sistem-kontrol` yanıtında `Offline Mod` durumu `OK`
