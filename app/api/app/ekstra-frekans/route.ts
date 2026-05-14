@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
+import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -168,6 +169,23 @@ export async function POST(req: Request) {
           izinli_tanimlar: [...izinliTanimlar],
         },
         { status: 400, headers: CORS }
+      )
+    }
+
+    // Ardışık başlatma süre kontrolü — kullanıcının son tamamlanan görevinden
+    // bu yana yeterli süre geçti mi (firma/proje ayarı). Ekstra görev de
+    // normal görev gibi bu kuralı uygular; yoksa kullanıcı kural görevini
+    // ekstra olarak tekrarlayıp süreyi bypass edebilirdi.
+    const ardisikHata = await ardisikBaslatmaKontrol(
+      admin,
+      userId,
+      firmaId,
+      lok.proje_id ?? personelProjeId ?? null,
+    )
+    if (ardisikHata) {
+      return NextResponse.json(
+        { ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' },
+        { status: 429, headers: CORS },
       )
     }
 
