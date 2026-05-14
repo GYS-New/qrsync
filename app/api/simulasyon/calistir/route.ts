@@ -375,7 +375,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
     if (Math.random() < (grupAyar.iptal_orani ?? 1) / 100) {
       // Race-safe: yalnızca hâlâ ISLEMDE ise yaz (gerçek personel araya
       // tamamlama yaptıysa veya başka biri iptal etmişse no-op).
-      await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'MOBIL', {
+      await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'QR', {
         at: tamamlanmaIso,
         iptal_sebep: 'Otomatik iptal — simülasyon',
         ek: {
@@ -389,7 +389,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
     }
 
     // Race-safe: yalnızca hâlâ ISLEMDE ise yaz (gerçek tamamlama araya girdiyse no-op).
-    await admin.from('canli_gorevler').update(gorevDurumPayload('TAMAMLANDI', 'MOBIL', {
+    await admin.from('canli_gorevler').update(gorevDurumPayload('TAMAMLANDI', 'QR', {
       at: tamamlanmaIso,
       ek: {
         tamamlanma_tarihi: tamamlanmaIso,
@@ -440,7 +440,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
       if (Math.random() < (grupAyar.iptal_orani ?? 1) / 100) {
         const iptalIso = new Date().toISOString()
         // Race-safe: yalnızca hâlâ ACIK ise yaz.
-        await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'MOBIL', {
+        await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'QR', {
           at: iptalIso,
           iptal_sebep: 'Otomatik iptal — simülasyon',
           ek: {
@@ -477,7 +477,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
         const baslatmaIso = new Date(Date.now() - sureSaniye * 1000).toISOString()
 
         // Race-safe: yalnızca hâlâ ACIK ise yaz.
-        await admin.from('canli_gorevler').update(gorevDurumPayload('TAMAMLANDI', 'MOBIL', {
+        await admin.from('canli_gorevler').update(gorevDurumPayload('TAMAMLANDI', 'QR', {
           at: tamamlanmaIso,
           ek: {
             baslatilma_tarihi: baslatmaIso,
@@ -545,7 +545,7 @@ async function simuleCeklistTamamla(admin: any, gorevId: string, sablonId: strin
       lokasyon_id: lokasyonId,
       sablon_id: sablonId,
       template_version: sablon.versiyon ?? 1,
-      kanal: 'MOBİL',
+      kanal: 'QR',
       kullanici_id: userId,
     }).select('id').single()
 
