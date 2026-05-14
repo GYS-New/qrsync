@@ -23,9 +23,11 @@ export default async function TAKullanicilarPage() {
     </div>
   )
 
-  // Sadece aktif projeye bağlı tenant_user'ları göster
+  // Aktif projeye bağlı tenant_user (personel) + musteri rollerini göster
+  // (Müşteri rolü değerlendirme/QR ile uygulamayı kullanır; mobil eşleşme
+  //  listesinde görünmesi için SA sayfasıyla aynı .in() filtresi.)
   const [{ data: users }, { data: lokasyonlar }] = await Promise.all([
-    supabase.from('users').select('*').eq('firma_id', firmaId).eq('rol', 'tenant_user').eq('proje_id', aktifProje.id).order('kayit_tarihi', { ascending: false }),
+    supabase.from('users').select('*').eq('firma_id', firmaId).in('rol', ['tenant_user', 'musteri']).eq('proje_id', aktifProje.id).order('kayit_tarihi', { ascending: false }),
     supabase.from('lokasyonlar').select('id,tanim').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).is('parent_id', null).eq('aktif', true).order('tanim'),
   ])
 
