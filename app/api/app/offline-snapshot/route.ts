@@ -183,8 +183,12 @@ export async function POST(req: Request) {
     let bekleyenGorevler: any[] = []
     let bekleyenCanli: any[] = []
 
-    // Sıradaki 1 saat penceresi sınırı — operatörün önündeki iş yükü
-    const siradakiSinirIso = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    // Pencere sınırı: offline kalan personel vardiya boyu görev listesini
+    // görebilsin diye vardiya bitişine kadar uzatıldı. Eski "+1 saat"
+    // offline'da stale snapshot'a yol açıyordu (personel görev göremiyor,
+    // ekstra görev üretip yapıyor, frekansiyel görevler açık kalıyordu).
+    // Fallback: vardiya bilgisi yoksa +12 saat (vardiyasız firma/proje için).
+    const siradakiSinirIso = vardiyaBilgi?.bitisISO ?? new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
 
     if (yetkiliLokIds.length > 0) {
       const [spesifikRes, canliRes] = await Promise.all([
