@@ -16,8 +16,6 @@ type Row = {
   kullanici: string | null
   lokasyon: string
   durum: Durum
-  baslatan: string | null
-  baslatilma_tarihi: string | null
   tamamlayan: string | null
   tamamlanma_tarihi: string | null
   durum_degisim_tarihi: string | null
@@ -34,7 +32,6 @@ const T = {
   grayLight: '#f8fafc',
 }
 
-const DURUM_ORDER: Record<Durum, number> = { ISLEMDE: 0, ACIK: 1, TAMAMLANDI: 2, IPTAL: 3 }
 const DURUM_LABEL: Record<Durum, string> = { ISLEMDE: 'İşlemde', ACIK: 'Açık', TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal' }
 const DURUM_BG: Record<Durum, string> = { ISLEMDE: T.blueLight, ACIK: T.amberLight, TAMAMLANDI: T.greenLight, IPTAL: T.redLight }
 const DURUM_FG: Record<Durum, string> = { ISLEMDE: T.blue, ACIK: T.amber, TAMAMLANDI: T.green, IPTAL: T.red }
@@ -86,11 +83,14 @@ export default function GunlukClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firmaId])
 
-  // Sıralama: ISLEMDE > ACIK > TAMAMLANDI > IPTAL — aynı grupta durum_degisim DESC
+  // Sıralama: hareket eden (ACIK olmayan) üstte, durum_degisim_tarihi DESC.
+  // ACIK satırlar altta (henüz işlem görmedi). Son tamamlanan/iptal/işleme alınan
+  // her zaman tepeye taşınır — canlı akış mantığı.
   const sorted = useMemo(() => {
     return [...rows].sort((a, b) => {
-      const od = DURUM_ORDER[a.durum] - DURUM_ORDER[b.durum]
-      if (od !== 0) return od
+      const aHar = a.durum === 'ACIK' ? 1 : 0
+      const bHar = b.durum === 'ACIK' ? 1 : 0
+      if (aHar !== bHar) return aHar - bHar
       const ta = a.durum_degisim_tarihi ? new Date(a.durum_degisim_tarihi).getTime() : 0
       const tb = b.durum_degisim_tarihi ? new Date(b.durum_degisim_tarihi).getTime() : 0
       return tb - ta
@@ -154,7 +154,7 @@ export default function GunlukClient() {
       ) : (
         <div className="verde-card" style={{ overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table className="verde-table" style={{ minWidth: 980 }}>
+            <table className="verde-table" style={{ minWidth: 820 }}>
               <thead>
                 <tr>
                   <th style={{ width: 110 }}>Plaka</th>
@@ -162,8 +162,6 @@ export default function GunlukClient() {
                   <th>Departman</th>
                   <th>Lokasyon</th>
                   <th style={{ width: 110 }}>Durum</th>
-                  <th>Başlatan</th>
-                  <th style={{ width: 90 }}>Başlatma</th>
                   <th>Tamamlayan</th>
                   <th style={{ width: 90 }}>Tamamlama</th>
                 </tr>
@@ -181,8 +179,6 @@ export default function GunlukClient() {
                         {DURUM_LABEL[r.durum]}
                       </span>
                     </td>
-                    <td style={{ color: T.textSoft, fontSize: 12 }}>{r.baslatan ?? '—'}</td>
-                    <td style={{ color: T.textSoft, fontSize: 12, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.tamamlayan ?? '—'}</td>
                     <td style={{ color: T.textSoft, fontSize: 12, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
                   </tr>

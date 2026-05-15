@@ -52,9 +52,8 @@ export async function GET(req: NextRequest) {
   const { data: gorevler, error: gorevErr } = await admin
     .from('gorevler')
     .select(`
-      id, durum, baslatilma_tarihi, tamamlanma_tarihi, durum_degisim_tarihi, olusturma_tarihi, iptal_sebep,
+      id, durum, tamamlanma_tarihi, durum_degisim_tarihi, olusturma_tarihi, iptal_sebep,
       lokasyon:lokasyon_id (tanim, parent_id, ust:parent_id (tanim)),
-      baslatan:baslatan_kullanici_id (isim_soyisim),
       tamamlayan:islemi_yapan_id (isim_soyisim)
     `)
     .in('id', gorevIds)
@@ -89,8 +88,6 @@ export async function GET(req: NextRequest) {
         kullanici: a?.kullanici_adi_soyadi ?? null,
         lokasyon,
         durum: g.durum as 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL',
-        baslatan: g.baslatan?.isim_soyisim ?? null,
-        baslatilma_tarihi: g.baslatilma_tarihi,
         tamamlayan: g.tamamlayan?.isim_soyisim ?? null,
         tamamlanma_tarihi: g.tamamlanma_tarihi,
         durum_degisim_tarihi: g.durum_degisim_tarihi,
