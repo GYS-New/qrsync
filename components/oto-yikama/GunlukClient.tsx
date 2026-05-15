@@ -191,11 +191,11 @@ export default function GunlukClient() {
                   <th style={{ minWidth: 140 }}>Kullanıcı</th>
                   <th style={{ minWidth: 130 }}>Departman</th>
                   <th style={{ minWidth: 180 }}>Lokasyon</th>
-                  <th style={{ width: 120 }}>Durum</th>
+                  <th style={{ width: 120, paddingLeft: 2 }}>Durum</th>
                   <th style={{ width: 110, whiteSpace: 'nowrap' }}>Başlatma</th>
                   <th style={{ width: 110, whiteSpace: 'nowrap' }}>Bitirme</th>
                   <th style={{ width: 90 }}>Süre</th>
-                  <th style={{ minWidth: 160 }}>Tamamlayan</th>
+                  <th style={{ minWidth: 160, paddingRight: 24, textAlign: 'right' }}>Tamamlayan</th>
                 </tr>
               </thead>
               <tbody>
@@ -206,7 +206,7 @@ export default function GunlukClient() {
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.kullanici ?? '—'}</td>
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.departman ?? '—'}</td>
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.lokasyon}</td>
-                    <td>
+                    <td style={{ paddingLeft: 2 }}>
                       <span className={r.durum === 'ISLEMDE' ? 'islemde-flash' : undefined}
                         style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 999, background: DURUM_BG[r.durum], color: DURUM_FG[r.durum], fontSize: 11, fontWeight: 700 }}>
                         {DURUM_LABEL[r.durum]}
@@ -217,7 +217,7 @@ export default function GunlukClient() {
                     <td style={{ color: r.durum === 'TAMAMLANDI' ? T.green : T.textSoft, fontSize: 12, fontFamily: 'monospace', fontWeight: 700 }}>
                       {r.durum === 'TAMAMLANDI' ? fmtSure(gorevSuresiSaniye(r)) : '—'}
                     </td>
-                    <td style={{ color: T.textSoft, fontSize: 12 }}>{r.tamamlayan ?? '—'}</td>
+                    <td style={{ color: T.textSoft, fontSize: 12, paddingRight: 24, textAlign: 'right' }}>{r.tamamlayan ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
