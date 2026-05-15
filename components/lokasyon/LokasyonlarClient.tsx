@@ -165,6 +165,14 @@ export default function LokasyonlarClient({
   const [editing, setEditing] = useState<Lokasyon | null>(null)
   const [parentId, setParentId] = useState<string | null>(null)
   const [form, setForm] = useState({ tanim:'', aciklama:'', nfc_token:'', checklist_sablon_id:'', sureli_gorev_aktif:false, tamamlama_qr_zorunlu:false, oto_yikama_lokasyon:false })
+  const [firmaOtoYikamaAktif, setFirmaOtoYikamaAktif] = useState(false)
+
+  // Firma'nın Oto Yıkama modülü aktif mi? Checkbox sadece aktifse görünür.
+  useEffect(() => {
+    if (!firmaId) { setFirmaOtoYikamaAktif(false); return }
+    supabase.from('firmalar').select('oto_yikama_aktif').eq('id', firmaId).single()
+      .then(({ data }) => setFirmaOtoYikamaAktif(!!(data as any)?.oto_yikama_aktif))
+  }, [firmaId])
 
   useEffect(() => {
     // when firm changes, refresh
@@ -475,7 +483,7 @@ export default function LokasyonlarClient({
                   </label>
                   <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Aktif ise personel görevi tamamlarken lokasyondaki QR veya NFC kodunu okutmalıdır. Süreli görev ayarından bağımsız çalışır.</div>
                 </div>
-                {parentId == null && (
+                {parentId == null && firmaOtoYikamaAktif && (
                   <div style={{ gridColumn:'1 / -1' }}>
                     <label className="verde-label" style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
                       <input type="checkbox" checked={form.oto_yikama_lokasyon}
