@@ -112,20 +112,36 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
 
   // ── EŞLEŞMİŞ CİHAZ KONTROLÜ ─────────────────────────────────────────────
   // Aynı firmaya ait aktif bir device_token (mobile app paired), son 30 gün
-  // içinde aynı IP'den heartbeat attıysa → bu cihaz çalışan cihazıdır.
-  // Eski tokenlarda son_ip NULL — bu kontrol onları doğal olarak atlar.
-  // CGNAT yanlış-engellemelerini görebilmek için her block audit log'a yazılır.
-  if (ip) {
+  // içinde IP VEYA User-Agent eşleşmesi varsa → bu cihaz çalışan cihazıdır.
+  //
+  // Çift kontrol: kullanıcı WiFi/mobil veri geçişi yaparak IP'yi
+  // değiştirse bile UA tipik olarak sabit (cihaz modeli + OS sürümü).
+  // Tek koşullu IP eşleşmesi bypass edilebiliyordu, UA fallback'i bunu
+  // kapatır. Eski tokenlarda son_ip/son_user_agent NULL — doğal olarak
+  // atlar. CGNAT/aynı cihaz modeli ortak ortamlarda yanlış-engellemeyi
+  // görebilmek için her block audit log'a yazılır.
+  if (ip || ua) {
     const pencereIso = new Date(Date.now() - ESLESME_PENCERESI_DK * 60 * 1000).toISOString()
-    const { data: paired } = await admin
+    const baseQ = admin
       .from('device_tokens')
-      .select('id, user_id, isim_soyisim, son_kullanim, son_user_agent')
+      .select('id, user_id, isim_soyisim, son_kullanim, son_ip, son_user_agent')
       .eq('firma_id', lok.firma_id)
       .eq('aktif', true)
-      .eq('son_ip', ip)
       .gte('son_kullanim', pencereIso)
-      .limit(1)
-      .maybeSingle()
+
+    // Önce IP eşleşmesini dene (daha hızlı, daha specific)
+    let paired: any = null
+    let eslesmeYontemi: 'IP' | 'UA' | null = null
+    if (ip) {
+      const { data } = await baseQ.eq('son_ip', ip).limit(1).maybeSingle()
+      if (data) { paired = data; eslesmeYontemi = 'IP' }
+    }
+    // IP eşleşmediyse UA fallback'ini dene
+    if (!paired && ua) {
+      const { data } = await baseQ.eq('son_user_agent', ua).limit(1).maybeSingle()
+      if (data) { paired = data; eslesmeYontemi = 'UA' }
+    }
+
     if (paired) {
       await auditLog({
         tip: 'cihaz_eslesmis_eval_block',
@@ -136,11 +152,13 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
           lokasyon_id: lok.id,
           gelen_ip: ip,
           gelen_ua: ua,
-          eslesen_token_id: (paired as any).id,
-          eslesen_user_id: (paired as any).user_id,
-          eslesen_isim: (paired as any).isim_soyisim,
-          eslesen_son_kullanim: (paired as any).son_kullanim,
-          eslesen_son_ua: (paired as any).son_user_agent,
+          eslesme_yontemi: eslesmeYontemi,
+          eslesen_token_id: paired.id,
+          eslesen_user_id: paired.user_id,
+          eslesen_isim: paired.isim_soyisim,
+          eslesen_son_kullanim: paired.son_kullanim,
+          eslesen_son_ip: paired.son_ip,
+          eslesen_son_ua: paired.son_user_agent,
           pencere_dk: ESLESME_PENCERESI_DK,
         },
       })
