@@ -310,10 +310,13 @@ export default function GorevlerClient({
 
   async function save() {
     if (!firmaId) { setError('Firma seçilmedi'); return }
-    // Lokasyon ARTIK OPSİYONEL (migration 056). Tanım + (atama aktifse atanan) yeterli.
-    // Lokasyon NULL → "kişisel görev" (mobilde Benim Görevlerim'den direkt tamamla, QR yok).
-    if (!form.tanim.trim() || (personelAtamaAktif && !form.atanan_kullanici_id)) {
-      showError(personelAtamaAktif ? 'Tanım ve atanan kullanıcı zorunludur.' : 'Tanım zorunludur.'); return
+    // NOT: gorevler.lokasyon_id DB'de NULLABLE (migration 056) ama mobil app
+    // şu an sadece QR/NFC scan ile görev başlatabiliyor. Lokasyonsuz görev
+    // mobil tarafta başlatılamadığı için web'de yine zorunlu tutuyoruz.
+    // Mobil app "Atanan Görevlerim listesinden QR'sız Başla/Tamamla"
+    // özelliğini eklediğinde bu validation tekrar gevşetilebilir.
+    if (!form.tanim.trim() || !loc1 || (personelAtamaAktif && !form.atanan_kullanici_id)) {
+      showError(personelAtamaAktif ? 'Tanım, lokasyon ve kullanıcı zorunludur.' : 'Tanım ve lokasyon zorunludur.'); return
     }
     setLoading(true); setError('')
     if (editing) {
@@ -619,10 +622,10 @@ export default function GorevlerClient({
                   <input className="verde-input" value={form.tanim} onChange={e => setForm(f => ({ ...f, tanim: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="verde-label">Lokasyon <span style={{ color: '#9ca3af', fontWeight: 400, fontSize: 12 }}>(opsiyonel — boş bırakılırsa kişisel görev)</span></label>
+                  <label className="verde-label">Lokasyon *</label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr)', gap: 8 }}>
                     <select className="verde-input" value={loc1} onChange={e => { setLoc1(e.target.value); setLoc2(''); setLoc3('') }}>
-                      <option value="">Lokasyon yok</option>
+                      <option value="">Lokasyon Seçiniz</option>
                       {roots.map((l: any) => <option key={l.id} value={l.id}>{l.tanim}</option>)}
                     </select>
                     <select className="verde-input" value={loc2} onChange={e => { setLoc2(e.target.value); setLoc3('') }} disabled={!loc1 || loc2Options.length === 0}>
