@@ -464,6 +464,13 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       .catch(() => setLokasyonlar([]))
   }, [currentFirmaId, projeId])
 
+  // Tek üst lokasyona yetkisi olan U/M rollerinde otomatik seç — alt lokasyon filtresi açılsın
+  useEffect(() => {
+    if (!ustLokasyonId && ustLokasyonlar.length === 1) {
+      setUstLokasyonId(ustLokasyonlar[0].id)
+    }
+  }, [ustLokasyonlar, ustLokasyonId])
+
   const buildParams = useCallback(() => {
     const p = new URLSearchParams({ firmaId: currentFirmaId })
     if (projeId)           p.set('projeId', projeId)
