@@ -145,7 +145,7 @@ export default function GunlukClient() {
       <div className="verde-card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <Pil label="Toplam" sayi={sayilar.toplam} bg={T.grayLight} fg={T.text} />
-          <Pil label="İşlemde" sayi={sayilar.ISLEMDE} bg={DURUM_BG.ISLEMDE} fg={DURUM_FG.ISLEMDE} />
+          <Pil label="İşlemde" sayi={sayilar.ISLEMDE} bg={DURUM_BG.ISLEMDE} fg={DURUM_FG.ISLEMDE} blink={sayilar.ISLEMDE > 0} />
           <Pil label="Açık" sayi={sayilar.ACIK} bg={DURUM_BG.ACIK} fg={DURUM_FG.ACIK} />
           <Pil label="Tamamlandı" sayi={sayilar.TAMAMLANDI} bg={DURUM_BG.TAMAMLANDI} fg={DURUM_FG.TAMAMLANDI} />
           <Pil label="İptal" sayi={sayilar.IPTAL} bg={DURUM_BG.IPTAL} fg={DURUM_FG.IPTAL} />
@@ -207,7 +207,8 @@ export default function GunlukClient() {
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.departman ?? '—'}</td>
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.lokasyon}</td>
                     <td>
-                      <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 999, background: DURUM_BG[r.durum], color: DURUM_FG[r.durum], fontSize: 11, fontWeight: 700 }}>
+                      <span className={r.durum === 'ISLEMDE' ? 'islemde-blink' : undefined}
+                        style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 999, background: DURUM_BG[r.durum], color: DURUM_FG[r.durum], fontSize: 11, fontWeight: 700 }}>
                         {DURUM_LABEL[r.durum]}
                       </span>
                     </td>
@@ -225,14 +226,22 @@ export default function GunlukClient() {
         </div>
       )}
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes islemde-pulse {
+          0%, 100% { opacity: 1; transform: scale(1) }
+          50%      { opacity: 0.55; transform: scale(0.96) }
+        }
+        .islemde-blink { animation: islemde-pulse 1.1s ease-in-out infinite; }
+      `}</style>
     </div>
   )
 }
 
-function Pil({ label, sayi, bg, fg }: { label: string; sayi: number; bg: string; fg: string }) {
+function Pil({ label, sayi, bg, fg, blink }: { label: string; sayi: number; bg: string; fg: string; blink?: boolean }) {
   return (
-    <div style={{ padding: '6px 12px', borderRadius: 8, background: bg, color: fg, display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+    <div className={blink ? 'islemde-blink' : undefined}
+      style={{ padding: '6px 12px', borderRadius: 8, background: bg, color: fg, display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
       <span style={{ fontSize: 18, fontWeight: 900 }}>{sayi}</span>
       <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
     </div>
