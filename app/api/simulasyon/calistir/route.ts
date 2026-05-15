@@ -106,8 +106,27 @@ export async function POST(req: Request) {
       }
       console.log(`[SIMULASYON] Atanmış kural sayısı: ${kuralAtamalar.size}`)
 
+      // Grup-üstü (firma çapında) meşgul personel kilidi.
+      // Eskiden her grup kendi mesgulPersoneller'ini kuruyordu →
+      // gruplar arası sızıntı: bir personele Grup A'da görev verildikten
+      // sonra Grup B aynı personeli serbest sandığı için ona da görev
+      // verebiliyordu (REMZİYE örneği: ÇAY+SİGARA grupları çakışması).
+      //
+      // Çözüm: Set parent'ta tek kez kurulur, tüm gruplara paylaştırılır.
+      // Başlangıç verisi DB'den firma çapında ISLEMDE görevlerin
+      // baslatan_kullanici_id'leri.
+      const { data: tumIslemde } = await admin
+        .from('canli_gorevler')
+        .select('baslatan_kullanici_id')
+        .eq('firma_id', ayar.firma_id)
+        .eq('durum', 'ISLEMDE')
+        .not('baslatan_kullanici_id', 'is', null)
+      const mesgulPersonellerFirma = new Set<string>(
+        ((tumIslemde ?? []) as any[]).map(r => r.baslatan_kullanici_id),
+      )
+
       for (const ga of grupAyarlari) {
-        const result = await grupSimulasyonCalistir(admin, ayar, ga, kuralAtamalar)
+        const result = await grupSimulasyonCalistir(admin, ayar, ga, kuralAtamalar, mesgulPersonellerFirma)
         sonuclar.push({ ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id, grup_id: ga.grup_id, ...result })
       }
     }
@@ -209,7 +228,7 @@ function kuralPersonelSec(kuralAtamalar: Map<string, PersonelBilgi[]>, kuralId: 
   return cinsiyetliPersonelSec(havuz, lokTanim, exclude)
 }
 
-async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kuralAtamalar: Map<string, PersonelBilgi[]>) {
+async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kuralAtamalar: Map<string, PersonelBilgi[]>, mesgulPersonellerFirma?: Set<string>) {
   const { firma_id } = ayar
   const { grup_id, hedef_oran, vardiya_suresi_saat } = grupAyar
   const bugun = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
@@ -340,13 +359,15 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
   let baslatmaAdet = 0
 
   // Meşgul personel kilidi — bir kişi aynı anda iki görevde olamaz.
-  // Şu anda halen ISLEMDE bir göreve atanmış personeller başlangıç set'i;
-  // bu tur içinde yeni başlatma yapılınca da set'e eklenir (in-memory guard).
-  // ADIM 1 ISLEMDE'leri tamamladıkça serbest bırakıyoruz.
-  const mesgulPersoneller = new Set<string>()
-  for (const g of tumGorevler) {
-    if (g.durum === 'ISLEMDE' && g.baslatan_kullanici_id) {
-      mesgulPersoneller.add(g.baslatan_kullanici_id)
+  // Parent'tan firma çapında set geldiyse onu kullan (gruplar arası kilit
+  // aktif). Aksi halde sadece bu grubun ISLEMDE'lerinden lokal set kur
+  // (geriye uyumlu). Tur içinde yeni başlatmalar set'e eklenir.
+  const mesgulPersoneller = mesgulPersonellerFirma ?? new Set<string>()
+  if (!mesgulPersonellerFirma) {
+    for (const g of tumGorevler) {
+      if (g.durum === 'ISLEMDE' && g.baslatan_kullanici_id) {
+        mesgulPersoneller.add(g.baslatan_kullanici_id)
+      }
     }
   }
   let iptalAdet = 0
