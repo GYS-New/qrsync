@@ -9,6 +9,7 @@ type Durum = 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL'
 
 type Row = {
   gorev_id: string
+  ekstra: boolean
   plaka: string
   marka: string | null
   model: string | null
@@ -202,7 +203,16 @@ export default function GunlukClient() {
                 {sorted.map(r => (
                   <tr key={r.gorev_id}
                     style={{ background: r.durum === 'ISLEMDE' ? DURUM_BG.ISLEMDE : undefined }}>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 800, color: T.text }}>{r.plaka}</td>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 800, color: T.text }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        {r.plaka}
+                        {r.ekstra && (
+                          <span style={{ padding: '1px 6px', borderRadius: 999, background: '#fde68a', color: '#92400e', fontSize: 10, fontWeight: 800, letterSpacing: '0.04em' }}>
+                            EKSTRA
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.kullanici ?? '—'}</td>
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.departman ?? '—'}</td>
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.lokasyon}</td>

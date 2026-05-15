@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   // 1) Bugünün metadata kayıtlarını çek
   const { data: metaRows, error: metaErr } = await admin
     .from('oto_yikama_gorev_metadata')
-    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih')
+    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra')
     .eq('hedef_tarih', today)
 
   if (metaErr) return NextResponse.json({ ok: false, error: metaErr.message }, { status: 500 })
@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
       const lokasyon = ustTanim && lokTanim ? `${ustTanim} > ${lokTanim}` : (lokTanim ?? '—')
       return {
         gorev_id: m.gorev_id,
+        ekstra: !!(m as any).ekstra,
         plaka: m.plaka_snapshot,
         marka: a?.marka ?? null,
         model: a?.model ?? null,
