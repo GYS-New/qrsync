@@ -16,6 +16,8 @@ type Row = {
   kullanici: string | null
   lokasyon: string
   durum: Durum
+  baslatilma_tarihi: string | null
+  tamamlanma_suresi_saniye: number | null
   tamamlayan: string | null
   tamamlanma_tarihi: string | null
   durum_degisim_tarihi: string | null
@@ -40,6 +42,26 @@ function fmtTime(iso: string | null): string {
   if (!iso) return '—'
   const d = new Date(iso)
   return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+function fmtSure(saniye: number | null | undefined): string {
+  if (saniye == null || saniye <= 0) return '—'
+  const h = Math.floor(saniye / 3600)
+  const m = Math.floor((saniye % 3600) / 60)
+  const s = saniye % 60
+  if (h > 0) return `${h}sa ${m}dk`
+  if (m > 0) return `${m}dk ${s}sn`
+  return `${s}sn`
+}
+
+// Süre hesaplama: tamamlanma_suresi_saniye (snapshot) varsa onu kullan,
+// yoksa baslatilma-tamamlanma farkından türet.
+function gorevSuresiSaniye(r: Row): number {
+  if (r.tamamlanma_suresi_saniye && r.tamamlanma_suresi_saniye > 0) return r.tamamlanma_suresi_saniye
+  if (r.baslatilma_tarihi && r.tamamlanma_tarihi) {
+    return Math.max(0, Math.floor((new Date(r.tamamlanma_tarihi).getTime() - new Date(r.baslatilma_tarihi).getTime()) / 1000))
+  }
+  return 0
 }
 
 export default function GunlukClient() {
@@ -103,6 +125,10 @@ export default function GunlukClient() {
     return c
   }, [rows])
 
+  const toplamSureSaniye = useMemo(() => {
+    return rows.reduce((acc, r) => acc + (r.durum === 'TAMAMLANDI' ? gorevSuresiSaniye(r) : 0), 0)
+  }, [rows])
+
   if (!firmaId) {
     return (
       <div style={{ padding: '24px 28px' }}>
@@ -123,6 +149,10 @@ export default function GunlukClient() {
           <Pil label="Açık" sayi={sayilar.ACIK} bg={DURUM_BG.ACIK} fg={DURUM_FG.ACIK} />
           <Pil label="Tamamlandı" sayi={sayilar.TAMAMLANDI} bg={DURUM_BG.TAMAMLANDI} fg={DURUM_FG.TAMAMLANDI} />
           <Pil label="İptal" sayi={sayilar.IPTAL} bg={DURUM_BG.IPTAL} fg={DURUM_FG.IPTAL} />
+          <div style={{ padding: '6px 12px', borderRadius: 8, background: T.greenLight, color: T.green, display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontSize: 16, fontWeight: 900 }}>{fmtSure(toplamSureSaniye)}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Toplam Süre</span>
+          </div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: T.textSoft }}>
           <span>Tarih: <strong style={{ color: T.text }}>{today || '—'}</strong></span>
@@ -154,7 +184,7 @@ export default function GunlukClient() {
       ) : (
         <div className="verde-card" style={{ overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table className="verde-table" style={{ minWidth: 820 }}>
+            <table className="verde-table" style={{ minWidth: 980 }}>
               <thead>
                 <tr>
                   <th style={{ width: 110 }}>Plaka</th>
@@ -162,8 +192,10 @@ export default function GunlukClient() {
                   <th>Departman</th>
                   <th>Lokasyon</th>
                   <th style={{ width: 110 }}>Durum</th>
+                  <th style={{ width: 80 }}>Başlatma</th>
+                  <th style={{ width: 80 }}>Bitirme</th>
+                  <th style={{ width: 80 }}>Süre</th>
                   <th>Tamamlayan</th>
-                  <th style={{ width: 90 }}>Tamamlama</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,8 +211,12 @@ export default function GunlukClient() {
                         {DURUM_LABEL[r.durum]}
                       </span>
                     </td>
-                    <td style={{ color: T.textSoft, fontSize: 12 }}>{r.tamamlayan ?? '—'}</td>
+                    <td style={{ color: T.textSoft, fontSize: 12, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
                     <td style={{ color: T.textSoft, fontSize: 12, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
+                    <td style={{ color: r.durum === 'TAMAMLANDI' ? T.green : T.textSoft, fontSize: 12, fontFamily: 'monospace', fontWeight: 700 }}>
+                      {r.durum === 'TAMAMLANDI' ? fmtSure(gorevSuresiSaniye(r)) : '—'}
+                    </td>
+                    <td style={{ color: T.textSoft, fontSize: 12 }}>{r.tamamlayan ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
