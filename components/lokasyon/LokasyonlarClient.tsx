@@ -217,7 +217,11 @@ export default function LokasyonlarClient({
   function openCreate(pid?: string | null) {
     setEditing(null)
     setParentId(pid ?? null)
-    setForm({ tanim:'', aciklama:'', nfc_token: crypto.randomUUID(), checklist_sablon_id: '', sureli_gorev_aktif:false, tamamlama_qr_zorunlu:false, oto_yikama_lokasyon:false })
+    // Üst lokasyon Oto Yıkama işaretli ise alt için sureli_gorev_aktif default=true
+    // (Oto Yıkama akışı her zaman Başlat → Tamamla iki adımlı süreli görev gerektirir.)
+    const ust = pid ? lokasyonlar.find(l => l.id === pid) : null
+    const ustOtoYikama = !!(ust as any)?.oto_yikama_lokasyon
+    setForm({ tanim:'', aciklama:'', nfc_token: crypto.randomUUID(), checklist_sablon_id: '', sureli_gorev_aktif: ustOtoYikama, tamamlama_qr_zorunlu:false, oto_yikama_lokasyon:false })
     setOpenForm(true)
   }
 
