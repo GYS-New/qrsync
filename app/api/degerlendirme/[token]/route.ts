@@ -8,8 +8,16 @@ export const runtime = 'nodejs'
 
 // Eşleşmiş cihaz tespit penceresi: son N dakika içinde aynı IP'den device_token aktivitesi
 // varsa, gelen değerlendirme aynı çalışan tarafından yapılıyor say.
-// 1 saat: CGNAT yanlış-engelleme riskini sınırlar, tipik fraud senaryosunu yakalar.
-const ESLESME_PENCERESI_DK = 60
+//
+// 30 gün penceresi: app yüklü ve son 30 gün içinde mobil aktivite olan
+// cihazların değerlendirme göndermesi engellenir. Pasifleşmiş cihazlar
+// (aktif=true filtresiyle) zaten dışlanır — kullanıcı app'i silip token
+// pasifleştirildiyse blok olmaz.
+//
+// Tarihsel: 60dk idi → bazı personeller offline çalışıp 4-16 saat app'e
+// girmediği için kaçıyordu. 30 gün'e çıkarıldı; CGNAT yanlış pozitif
+// riskinin az artması kabul edilen trade-off (her blok audit_log'a yazılır).
+const ESLESME_PENCERESI_DK = 60 * 24 * 30  // 30 gün = 43.200 dk
 
 // Token'dan lokasyonu bul — QR (qr_veri) veya NFC (nfc_token) fark etmez
 async function lokasyonBul(admin: any, token: string) {
@@ -103,7 +111,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   const { ip, ua } = getRequestMeta(req)
 
   // ── EŞLEŞMİŞ CİHAZ KONTROLÜ ─────────────────────────────────────────────
-  // Aynı firmaya ait aktif bir device_token (mobile app paired), son 1 saat
+  // Aynı firmaya ait aktif bir device_token (mobile app paired), son 30 gün
   // içinde aynı IP'den heartbeat attıysa → bu cihaz çalışan cihazıdır.
   // Eski tokenlarda son_ip NULL — bu kontrol onları doğal olarak atlar.
   // CGNAT yanlış-engellemelerini görebilmek için her block audit log'a yazılır.
