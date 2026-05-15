@@ -44,7 +44,8 @@ export async function lokasyonEkstraFrekansDropdown(
         .eq('id', lok.parent_id)
         .maybeSingle()
       if ((ust as any)?.oto_yikama_lokasyon) {
-        const today = new Date().toISOString().slice(0, 10)
+        // TR saatine göre bugünün tarihi (server UTC olsa bile)
+        const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
         const [aracRes, metaRes] = await Promise.all([
           supabase.from('araclar').select('plaka')
             .eq('firma_id', (lok as any).firma_id)

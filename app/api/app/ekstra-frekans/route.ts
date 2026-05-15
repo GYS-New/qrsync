@@ -169,7 +169,8 @@ export async function POST(req: Request) {
       }
 
       const nowIso = new Date().toISOString()
-      const today = nowIso.slice(0, 10)
+      // TR saatine göre tarih — server UTC olsa bile Europe/Istanbul takvim günü
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
 
       // gorevler INSERT: direkt TAMAMLANDI (ekstra = tek tıkla kayıt akışı)
       const { data: insertedGorev, error: gorevErr } = await admin

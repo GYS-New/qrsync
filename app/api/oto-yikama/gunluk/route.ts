@@ -11,10 +11,10 @@ import { getFirmaModulDurumu } from '@/lib/firmalar/modulDurumu'
 
 export const dynamic = 'force-dynamic'
 
-function todayLocalDate(): string {
-  const now = new Date()
-  const tz = now.getTimezoneOffset() * 60000
-  return new Date(now.getTime() - tz).toISOString().slice(0, 10)
+// Türkiye saatine göre bugünün tarihi (YYYY-MM-DD). Server UTC olsa bile
+// Europe/Istanbul takvim günü döner — TR'de 00:00-03:00 arası bile doğru sonuç.
+function bugunTRDate(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
 }
 
 export async function GET(req: NextRequest) {
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Bu firma için Oto Yıkama modülü aktif değil.' }, { status: 403 })
   }
 
-  const today = todayLocalDate()
+  const today = bugunTRDate()
 
   // 1) Bugünün metadata kayıtlarını çek
   const { data: metaRows, error: metaErr } = await admin
