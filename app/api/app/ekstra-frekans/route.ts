@@ -87,7 +87,7 @@ export async function POST(req: Request) {
     // Lokasyon kontrol + QR/NFC doğrulama hazırlığı
     const { data: lok } = await admin
       .from('lokasyonlar')
-      .select('id, firma_id, proje_id, tanim, tamamlama_qr_zorunlu, sureli_gorev_aktif, qr_veri, nfc_token, aktif')
+      .select('id, firma_id, proje_id, tanim, parent_id, tamamlama_qr_zorunlu, sureli_gorev_aktif, qr_veri, nfc_token, aktif')
       .eq('id', lokasyonId)
       .single()
 
@@ -119,6 +119,125 @@ export async function POST(req: Request) {
       }
     }
 
+    // ── Oto Yıkama dal: lokasyonun üst lokasyonu oto_yikama_lokasyon=true ise
+    //   "ekstra görev" plaka bazlı çalışır. Kural kontrolü atlanır, canli_gorevler
+    //   yerine gorevler + oto_yikama_gorev_metadata yazılır.
+    let ustOtoYikama = false
+    if (lok.parent_id) {
+      const { data: ustLok } = await admin
+        .from('lokasyonlar')
+        .select('oto_yikama_lokasyon')
+        .eq('id', lok.parent_id)
+        .single()
+      ustOtoYikama = !!(ustLok as any)?.oto_yikama_lokasyon
+    }
+
+    if (ustOtoYikama) {
+      // gorev_tanim = plaka. Araç firmaya ait + aktif olmalı.
+      const { data: arac } = await admin
+        .from('araclar')
+        .select('id, plaka, aktif')
+        .eq('firma_id', firmaId)
+        .eq('plaka', gorevTanim)
+        .maybeSingle()
+
+      if (!arac || arac.aktif === false) {
+        return NextResponse.json(
+          { ok: false, error: 'Bu plaka sistemde kayıtlı/aktif değil.', code: 'PLAKA_GECERSIZ' },
+          { status: 400, headers: CORS }
+        )
+      }
+
+      // Ardışık başlatma + devam eden görev
+      const ardisikHata = await ardisikBaslatmaKontrol(
+        admin, userId, firmaId, lok.proje_id ?? personelProjeId ?? null,
+      )
+      if (ardisikHata) {
+        return NextResponse.json(
+          { ok: false, error: ardisikHata, code: 'ARDISIK_BEKLEME' },
+          { status: 429, headers: CORS },
+        )
+      }
+      const devamEden = await devamEdenGorevKontrol(admin, userId, firmaId)
+      if (devamEden) {
+        return NextResponse.json({
+          ok: false,
+          error: `Aktif başka bir göreviniz var: "${devamEden.tanim ?? '—'}"${devamEden.lokasyon_tanim ? ` (${devamEden.lokasyon_tanim})` : ''}. Önce onu tamamlayın.`,
+          code: 'DEVAM_EDEN_GOREV',
+          aktifGorev: devamEden,
+        }, { status: 409, headers: CORS })
+      }
+
+      const nowIso = new Date().toISOString()
+      const today = nowIso.slice(0, 10)
+
+      // gorevler INSERT: direkt TAMAMLANDI (ekstra = tek tıkla kayıt akışı)
+      const { data: insertedGorev, error: gorevErr } = await admin
+        .from('gorevler')
+        .insert({
+          firma_id: firmaId,
+          proje_id: lok.proje_id ?? personelProjeId ?? null,
+          tanim: `Oto Yıkama - ${arac.plaka} (Ekstra)`,
+          lokasyon_id: lokasyonId,
+          atanan_kullanici_id: null,
+          durum: 'TAMAMLANDI',
+          olusturan_id: userId,
+          islemi_yapan_id: userId,
+          tamamlanma_tarihi: nowIso,
+          durum_degisim_tarihi: nowIso,
+        })
+        .select('id')
+        .single()
+
+      if (gorevErr || !insertedGorev) {
+        return NextResponse.json(
+          { ok: false, error: gorevErr?.message ?? 'Görev oluşturulamadı' },
+          { status: 500, headers: CORS }
+        )
+      }
+      const yeniGorevId = insertedGorev.id
+
+      const { error: metaErr } = await admin
+        .from('oto_yikama_gorev_metadata')
+        .insert({
+          gorev_id: yeniGorevId,
+          arac_id: arac.id,
+          plaka_snapshot: arac.plaka,
+          hedef_tarih: today,
+          ekstra: true,
+        })
+      if (metaErr) {
+        await admin.from('gorevler').delete().eq('id', yeniGorevId)
+        return NextResponse.json(
+          { ok: false, error: 'metadata yazılamadı: ' + metaErr.message },
+          { status: 500, headers: CORS }
+        )
+      }
+
+      await admin.from('device_tokens').update({ son_kullanim: nowIso }).eq('device_token', deviceToken)
+
+      void auditLog({
+        tip: 'oto_yikama_ekstra',
+        tablo: 'gorevler',
+        firma_id: firmaId,
+        kullanici_id: userId,
+        detay: {
+          gorev_id: yeniGorevId, lokasyon_id: lokasyonId, lokasyon_tanim: lok.tanim,
+          arac_id: arac.id, plaka: arac.plaka, hedef_tarih: today, kanal: 'MOBIL',
+        },
+      })
+
+      return NextResponse.json({
+        ok: true,
+        mesaj: 'Ekstra yıkama kaydedildi',
+        gorev_id: yeniGorevId,
+        plaka: arac.plaka,
+        lokasyon_id: lokasyonId,
+        tamamlanma_tarihi: nowIso,
+      }, { headers: CORS })
+    }
+
+    // ── Frekansiyel dal (klasik akış) ────────────────────────────────────────
     // Aktif kural görevi kontrolü — bu lokasyonda ACIK/ISLEMDE/BEKLEMEDE bir kural görevi varsa önce onu yap
     const { data: aktifKural } = await admin
       .from('canli_gorevler')

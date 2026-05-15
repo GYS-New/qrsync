@@ -296,6 +296,41 @@ export async function POST(req: Request) {
       }
     }
 
+    // ── Oto Yıkama alt lokasyonları: "kural tanımı" yerine PLAKA listesi ──────
+    // Mobil app'in "Ekstra Görev Yap" dropdown'u gorev_kurallari.tanim listesini
+    // kullanıyor. Oto Yıkama lokasyonlarında kural kaydı olmadığı için listesini
+    // o lokasyonun yıkayabileceği plakalarla doldururuz. Personel plaka seçip
+    // ekstra-frekans endpoint'ine post atınca Oto Yıkama dalı tetiklenir.
+    const yikamaAltLokIds = new Set<string>()
+    {
+      const { data: ustOtoYikama } = await admin
+        .from('lokasyonlar')
+        .select('id')
+        .eq('firma_id', firmaId)
+        .eq('oto_yikama_lokasyon', true)
+        .eq('aktif', true)
+      const ustIds = new Set((ustOtoYikama ?? []).map((u: any) => u.id))
+      for (const l of lokasyonlar as any[]) {
+        if (l.parent_id && ustIds.has(l.parent_id)) yikamaAltLokIds.add(l.id)
+      }
+    }
+    if (yikamaAltLokIds.size > 0) {
+      const { data: araclar } = await admin
+        .from('araclar')
+        .select('plaka')
+        .eq('firma_id', firmaId)
+        .eq('aktif', true)
+      const plakaSet = new Set<string>(
+        ((araclar ?? []) as any[])
+          .map(a => (typeof a.plaka === 'string' ? a.plaka.trim() : ''))
+          .filter(Boolean),
+      )
+      for (const lid of yikamaAltLokIds) {
+        // Override: kural tanımı varsa bile Oto Yıkama alt lokasyonunda plaka listesi geçerli
+        kuralMap.set(lid, plakaSet)
+      }
+    }
+
     // ── Çeklist şablonları ──────────────────────────────────────────────────
     // Proje ayarı kapalıysa o tipe ait şablonlar snapshot'a alınmaz
     // (lokasyon meta'sı: ekstra görev frekansiyel sayıldığı için canli ayarına bakılır)
