@@ -129,6 +129,47 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ── Lokasyon için "ekstra görev tanım listesi" hazırla ─────────────────
+    // Klasik akış: gorev_kurallari.tanim listesi
+    // Oto Yıkama altı (üst lokasyon.oto_yikama_lokasyon=true): firmanın aktif
+    //   plakaları — mobile dropdown bunlardan plaka seçer.
+    let ekstraTanimlar: { tanim: string }[] = []
+    let ustOtoYikama = false
+    if (lokasyon.parent_id) {
+      const { data: ustLok } = await admin
+        .from('lokasyonlar')
+        .select('oto_yikama_lokasyon')
+        .eq('id', lokasyon.parent_id)
+        .maybeSingle()
+      ustOtoYikama = !!(ustLok as any)?.oto_yikama_lokasyon
+    }
+    if (ustOtoYikama) {
+      const { data: araclar } = await admin
+        .from('araclar')
+        .select('plaka')
+        .eq('firma_id', lokasyon.firma_id)
+        .eq('aktif', true)
+      ekstraTanimlar = ((araclar ?? []) as any[])
+        .map(a => (typeof a.plaka === 'string' ? a.plaka.trim() : ''))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'tr'))
+        .map(tanim => ({ tanim }))
+    } else {
+      const { data: kurallar } = await admin
+        .from('gorev_kurallari')
+        .select('tanim')
+        .eq('lokasyon_id', lokasyon.id)
+        .eq('aktif', true)
+      const set = new Set<string>(
+        ((kurallar ?? []) as any[])
+          .map(k => (typeof k.tanim === 'string' ? k.tanim.trim() : ''))
+          .filter(Boolean),
+      )
+      ekstraTanimlar = [...set]
+        .sort((a, b) => a.localeCompare(b, 'tr'))
+        .map(tanim => ({ tanim }))
+    }
+
     return NextResponse.json({
       ok: true,
       lokasyon: {
@@ -137,6 +178,7 @@ export async function GET(req: NextRequest) {
         aciklama: lokasyon.aciklama,
         firma_id: lokasyon.firma_id,
         sureli_gorev_aktif: !!lokasyon.sureli_gorev_aktif,
+        ekstra_frekans_kurallari: ekstraTanimlar,
       },
       kullanici: { id: me.id, isim_soyisim: me.isim_soyisim, firma_id: me.firma_id },
       gorevler,
