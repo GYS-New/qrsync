@@ -310,13 +310,15 @@ export default function GorevlerClient({
 
   async function save() {
     if (!firmaId) { setError('Firma seçilmedi'); return }
-    if (!form.tanim.trim() || !loc1 || (personelAtamaAktif && !form.atanan_kullanici_id)) {
-      showError(personelAtamaAktif ? 'Tanım, lokasyon ve kullanıcı zorunludur.' : 'Tanım ve lokasyon zorunludur.'); return
+    // Lokasyon ARTIK OPSİYONEL (migration 056). Tanım + (atama aktifse atanan) yeterli.
+    // Lokasyon NULL → "kişisel görev" (mobilde Benim Görevlerim'den direkt tamamla, QR yok).
+    if (!form.tanim.trim() || (personelAtamaAktif && !form.atanan_kullanici_id)) {
+      showError(personelAtamaAktif ? 'Tanım ve atanan kullanıcı zorunludur.' : 'Tanım zorunludur.'); return
     }
     setLoading(true); setError('')
     if (editing) {
       const reAssigned = editing.atanan_kullanici_id !== form.atanan_kullanici_id
-      const patch: any = { tanim: form.tanim.trim(), lokasyon_id: selectedLokasyonId, atanan_kullanici_id: form.atanan_kullanici_id }
+      const patch: any = { tanim: form.tanim.trim(), lokasyon_id: selectedLokasyonId || null, atanan_kullanici_id: form.atanan_kullanici_id }
       if (reAssigned) patch.durum = 'ACIK'
       const { data: updated, error: err } = await supabase.from('gorevler').update(patch).eq('id', editing.id)
         .select(SEL).single()
@@ -330,7 +332,7 @@ export default function GorevlerClient({
       }
     } else {
       const { data: inserted, error: err } = await supabase.from('gorevler').insert({
-        firma_id: firmaId, tanim: form.tanim.trim(), lokasyon_id: selectedLokasyonId,
+        firma_id: firmaId, tanim: form.tanim.trim(), lokasyon_id: selectedLokasyonId || null,
         atanan_kullanici_id: form.atanan_kullanici_id, durum: 'ACIK', olusturan_id: meId,
         islemi_yapan_id: meId, durum_degisim_tarihi: new Date().toISOString(),
         ...(projeId ? { proje_id: projeId } : {}),
@@ -617,10 +619,10 @@ export default function GorevlerClient({
                   <input className="verde-input" value={form.tanim} onChange={e => setForm(f => ({ ...f, tanim: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="verde-label">Lokasyon *</label>
+                  <label className="verde-label">Lokasyon <span style={{ color: '#9ca3af', fontWeight: 400, fontSize: 12 }}>(opsiyonel — boş bırakılırsa kişisel görev)</span></label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr)', gap: 8 }}>
                     <select className="verde-input" value={loc1} onChange={e => { setLoc1(e.target.value); setLoc2(''); setLoc3('') }}>
-                      <option value="">Lokasyon Seçiniz</option>
+                      <option value="">Lokasyon yok</option>
                       {roots.map((l: any) => <option key={l.id} value={l.id}>{l.tanim}</option>)}
                     </select>
                     <select className="verde-input" value={loc2} onChange={e => { setLoc2(e.target.value); setLoc3('') }} disabled={!loc1 || loc2Options.length === 0}>
