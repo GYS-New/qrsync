@@ -34,6 +34,9 @@ const BOSH_FORM = {
   aktif_olma_saati: '08:00',
   baslangic_tarihi: new Date().toISOString().slice(0, 10),
   bitis_tarihi: '',
+  // Kural seviyesi ömür override (boş = proje/firma'ya düş = varsayılan davranış)
+  acik_bekleme_saat: '' as number | string,
+  bekleme_gecmis_saat: '' as number | string,
 }
 
 const lbl: React.CSSProperties = { display: 'block', fontSize: 12.5, fontWeight: 700, color: '#4b5563', marginBottom: 5 }
@@ -234,6 +237,8 @@ export default function GorevKurallariClient({
       aktif_olma_saati: k.aktif_olma_saati?.slice(0, 5) ?? '08:00',
       baslangic_tarihi: k.baslangic_tarihi ?? new Date().toISOString().slice(0, 10),
       bitis_tarihi: k.bitis_tarihi ?? '',
+      acik_bekleme_saat: k.acik_bekleme_saat ?? '',
+      bekleme_gecmis_saat: k.bekleme_gecmis_saat ?? '',
     })
     initLokSec(k.lokasyon_id ?? '')
     setEditId(k.id); setModal('edit')
@@ -293,6 +298,9 @@ export default function GorevKurallariClient({
             haftalik_frekans_sayisi: isHaftalik ? lokHaftalik : null,
             aktif_gunler: form.aktif_gunler, aktif_olma_saati: form.aktif_olma_saati,
             baslangic_tarihi: form.baslangic_tarihi, bitis_tarihi: form.bitis_tarihi || null,
+            // Kural seviyesi ömür override (boş string → API NULL'a normalize eder)
+            acik_bekleme_saat: form.acik_bekleme_saat === '' ? null : Number(form.acik_bekleme_saat),
+            bekleme_gecmis_saat: form.bekleme_gecmis_saat === '' ? null : Number(form.bekleme_gecmis_saat),
             ...(projeId ? { proje_id: projeId } : {}),
           }
           const res = await fetch('/api/gorev-kurallari', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -315,6 +323,9 @@ export default function GorevKurallariClient({
           haftalik_frekans_sayisi: isHaftalik ? lokHaftalik : null,
           aktif_gunler: form.aktif_gunler, aktif_olma_saati: form.aktif_olma_saati,
           baslangic_tarihi: form.baslangic_tarihi, bitis_tarihi: form.bitis_tarihi || null,
+          // Kural seviyesi ömür override
+          acik_bekleme_saat: form.acik_bekleme_saat === '' ? null : Number(form.acik_bekleme_saat),
+          bekleme_gecmis_saat: form.bekleme_gecmis_saat === '' ? null : Number(form.bekleme_gecmis_saat),
           ...(projeId ? { proje_id: projeId } : {}),
         }
         const res = await fetch(`/api/gorev-kurallari/${editId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -1130,6 +1141,34 @@ export default function GorevKurallariClient({
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>Bitiş Tarihi <span style={{ fontSize: 11, color: '#6b7280' }}>(boş = süresiz)</span></label>
                   <input type="date" className="verde-input" style={{ width: '100%' }} value={form.bitis_tarihi} onChange={e => setForm(p => ({ ...p, bitis_tarihi: e.target.value }))} />
+                </div>
+              </div>
+
+              {/* Kural seviyesi ömür override (opsiyonel) */}
+              <div style={{ padding: 12, background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 4 }}>
+                  Bu kurala özel ömür süreleri <span style={{ color: '#9ca3af', fontWeight: 400 }}>(opsiyonel)</span>
+                </div>
+                <div style={{ fontSize: 11.5, color: '#6b7280', marginBottom: 10, lineHeight: 1.5 }}>
+                  Boş bırakılırsa proje/firma genel ayarları kullanılır (varsayılan davranış). Sadece bu kuralın özel
+                  süre kullanmasını istediğin senaryolar için doldur (örn. acil temizlik kuralı: 1 saat içinde yapılmazsa
+                  zamanı geçmiş).
+                </div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={lbl}>ACIK → BEKLEMEDE (saat)</label>
+                    <input type="number" min={1} max={240} className="verde-input" style={{ width: '100%' }}
+                      placeholder="Varsayılan"
+                      value={form.acik_bekleme_saat as any}
+                      onChange={e => setForm(p => ({ ...p, acik_bekleme_saat: e.target.value === '' ? '' : Number(e.target.value) }))} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={lbl}>BEKLEMEDE → ZAMANI_GECMIS (saat)</label>
+                    <input type="number" min={1} max={240} className="verde-input" style={{ width: '100%' }}
+                      placeholder="Varsayılan"
+                      value={form.bekleme_gecmis_saat as any}
+                      onChange={e => setForm(p => ({ ...p, bekleme_gecmis_saat: e.target.value === '' ? '' : Number(e.target.value) }))} />
+                  </div>
                 </div>
               </div>
               {personelAtamaAktif && (

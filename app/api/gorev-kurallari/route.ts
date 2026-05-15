@@ -55,7 +55,19 @@ export async function POST(req: NextRequest) {
     frekans_tipi: frekansTipiRaw,
     aktif_olma_saati, baslangic_tarihi, bitis_tarihi, atanan_kullanici_id,
     proje_id,
+    acik_bekleme_saat, bekleme_gecmis_saat,  // Kural seviyesi ömür override (NULL = proje/firma'ya düş)
   } = body
+
+  // Override saat değerleri: int veya NULL
+  function normSaat(v: any): number | null {
+    if (v === undefined || v === null || v === '') return null
+    const n = Number(v)
+    if (!Number.isFinite(n)) return null
+    if (n < 1 || n > 240) return null
+    return Math.floor(n)
+  }
+  const acikBeklemeSaat = normSaat(acik_bekleme_saat)
+  const beklemeGecmisSaat = normSaat(bekleme_gecmis_saat)
 
   const frekans_tipi: 'gunluk' | 'haftalik' = frekansTipiRaw === 'haftalik' ? 'haftalik' : 'gunluk'
 
@@ -108,6 +120,8 @@ export async function POST(req: NextRequest) {
       olusturan_id: user.id,
       kaynak: 'manuel',
       proje_id: proje_id ?? lok.proje_id,
+      acik_bekleme_saat: acikBeklemeSaat,
+      bekleme_gecmis_saat: beklemeGecmisSaat,
     })
     .select()
     .single()

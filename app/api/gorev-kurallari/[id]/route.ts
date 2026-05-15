@@ -39,10 +39,22 @@ export async function PATCH(
     'tanim', 'aktif_gunler', 'gunluk_frekans_sayisi', 'haftalik_frekans_sayisi',
     'frekans_tipi', 'aktif_olma_saati',
     'baslangic_tarihi', 'bitis_tarihi', 'atanan_kullanici_id', 'aktif',
+    'acik_bekleme_saat', 'bekleme_gecmis_saat',  // Kural seviyesi ömür override
   ]
   const update: Record<string, any> = { guncelleme_tarihi: new Date().toISOString() }
   for (const k of allowed) {
     if (k in body) update[k] = body[k]
+  }
+  // Override saat: int(1-240) veya null normalize
+  for (const k of ['acik_bekleme_saat', 'bekleme_gecmis_saat']) {
+    if (k in body) {
+      const v = body[k]
+      if (v === null || v === '' || v === undefined) update[k] = null
+      else {
+        const n = Number(v)
+        update[k] = (Number.isFinite(n) && n >= 1 && n <= 240) ? Math.floor(n) : null
+      }
+    }
   }
 
   // frekans_tipi geçişinde diğer frekans kolonunu null yap (CHECK constraint)
