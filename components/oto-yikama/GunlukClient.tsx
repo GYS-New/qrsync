@@ -207,7 +207,7 @@ export default function GunlukClient() {
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.departman ?? '—'}</td>
                     <td style={{ color: T.textSoft, fontSize: 12 }}>{r.lokasyon}</td>
                     <td>
-                      <span className={r.durum === 'ISLEMDE' ? 'islemde-blink' : undefined}
+                      <span className={r.durum === 'ISLEMDE' ? 'islemde-flash' : undefined}
                         style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 999, background: DURUM_BG[r.durum], color: DURUM_FG[r.durum], fontSize: 11, fontWeight: 700 }}>
                         {DURUM_LABEL[r.durum]}
                       </span>
@@ -232,7 +232,13 @@ export default function GunlukClient() {
           0%, 100% { opacity: 1; transform: scale(1) }
           50%      { opacity: 0.55; transform: scale(0.96) }
         }
+        @keyframes islemde-flash {
+          0%, 49% { opacity: 1 }
+          50%, 99% { opacity: 0 }
+          100%   { opacity: 1 }
+        }
         .islemde-blink { animation: islemde-pulse 1.1s ease-in-out infinite; }
+        .islemde-flash { animation: islemde-flash 1s steps(1, end) infinite; }
       `}</style>
     </div>
   )
