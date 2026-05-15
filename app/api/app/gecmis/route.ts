@@ -31,11 +31,13 @@ export async function GET(req: Request) {
   const admin = createAdminClient()
   const sonYirmiDortSaat = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  // 1. Spesifik görevler — kullanıcıya atanmış, son 24 saat
+  // 1. Spesifik görevler — kullanıcıya atanmış VEYA bu kullanıcı tarafından
+  //    tamamlanmış (Oto Yıkama gibi açık spesifik görevler atanan_kullanici_id
+  //    NULL ile açılır, QR okutan personel tamamlar — onlar da geçmişte görünmeli)
   const { data: gorevler } = await admin
     .from('gorevler')
     .select('id, tanim, durum, tamamlanma_tarihi, durum_degisim_tarihi, olusturma_tarihi, lokasyon_id, lokasyonlar(tanim)')
-    .eq('atanan_kullanici_id', user.id)
+    .or(`atanan_kullanici_id.eq.${user.id},islemi_yapan_id.eq.${user.id}`)
     .gte('olusturma_tarihi', sonYirmiDortSaat)
     .order('olusturma_tarihi', { ascending: false })
     .limit(50)
