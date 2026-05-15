@@ -164,7 +164,7 @@ export default function LokasyonlarClient({
   const [openForm, setOpenForm] = useState(false)
   const [editing, setEditing] = useState<Lokasyon | null>(null)
   const [parentId, setParentId] = useState<string | null>(null)
-  const [form, setForm] = useState({ tanim:'', aciklama:'', nfc_token:'', checklist_sablon_id:'', sureli_gorev_aktif:false, tamamlama_qr_zorunlu:false })
+  const [form, setForm] = useState({ tanim:'', aciklama:'', nfc_token:'', checklist_sablon_id:'', sureli_gorev_aktif:false, tamamlama_qr_zorunlu:false, oto_yikama_lokasyon:false })
 
   useEffect(() => {
     // when firm changes, refresh
@@ -209,14 +209,14 @@ export default function LokasyonlarClient({
   function openCreate(pid?: string | null) {
     setEditing(null)
     setParentId(pid ?? null)
-    setForm({ tanim:'', aciklama:'', nfc_token: crypto.randomUUID(), checklist_sablon_id: '', sureli_gorev_aktif:false, tamamlama_qr_zorunlu:false })
+    setForm({ tanim:'', aciklama:'', nfc_token: crypto.randomUUID(), checklist_sablon_id: '', sureli_gorev_aktif:false, tamamlama_qr_zorunlu:false, oto_yikama_lokasyon:false })
     setOpenForm(true)
   }
 
   function openEdit(l: Lokasyon) {
     setEditing(l)
     setParentId(l.parent_id ?? null)
-    setForm({ tanim:l.tanim ?? '', aciklama:l.aciklama ?? '', nfc_token:(l as any).nfc_token ?? '', checklist_sablon_id:(l as any).checklist_sablon_id ?? '', sureli_gorev_aktif: !!(l as any).sureli_gorev_aktif, tamamlama_qr_zorunlu: !!(l as any).tamamlama_qr_zorunlu })
+    setForm({ tanim:l.tanim ?? '', aciklama:l.aciklama ?? '', nfc_token:(l as any).nfc_token ?? '', checklist_sablon_id:(l as any).checklist_sablon_id ?? '', sureli_gorev_aktif: !!(l as any).sureli_gorev_aktif, tamamlama_qr_zorunlu: !!(l as any).tamamlama_qr_zorunlu, oto_yikama_lokasyon: !!(l as any).oto_yikama_lokasyon })
     setOpenForm(true)
   }
 
@@ -245,7 +245,7 @@ export default function LokasyonlarClient({
     if (editing) {
       const { error: err } = await supabase
         .from('lokasyonlar')
-        .update({ tanim: form.tanim.trim(), aciklama: form.aciklama.trim() || null, parent_id: parentId, nfc_token: form.nfc_token.trim() || null, checklist_sablon_id: form.checklist_sablon_id.trim() || null, sureli_gorev_aktif: form.sureli_gorev_aktif, tamamlama_qr_zorunlu: form.tamamlama_qr_zorunlu })
+        .update({ tanim: form.tanim.trim(), aciklama: form.aciklama.trim() || null, parent_id: parentId, nfc_token: form.nfc_token.trim() || null, checklist_sablon_id: form.checklist_sablon_id.trim() || null, sureli_gorev_aktif: form.sureli_gorev_aktif, tamamlama_qr_zorunlu: form.tamamlama_qr_zorunlu, oto_yikama_lokasyon: parentId == null ? form.oto_yikama_lokasyon : false })
         .eq('id', editing.id)
       if (err) showError(err.message)
       else {
@@ -266,6 +266,7 @@ export default function LokasyonlarClient({
           checklist_sablon_id: form.checklist_sablon_id.trim() || null,
           sureli_gorev_aktif: form.sureli_gorev_aktif,
           tamamlama_qr_zorunlu: form.tamamlama_qr_zorunlu,
+          oto_yikama_lokasyon: parentId == null ? form.oto_yikama_lokasyon : false,
           ...(projeId ? { proje_id: projeId } : {}),
         })
       if (err) showError(err.message)
@@ -474,6 +475,16 @@ export default function LokasyonlarClient({
                   </label>
                   <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>Aktif ise personel görevi tamamlarken lokasyondaki QR veya NFC kodunu okutmalıdır. Süreli görev ayarından bağımsız çalışır.</div>
                 </div>
+                {parentId == null && (
+                  <div style={{ gridColumn:'1 / -1' }}>
+                    <label className="verde-label" style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+                      <input type="checkbox" checked={form.oto_yikama_lokasyon}
+                        onChange={e => setForm(f => ({ ...f, oto_yikama_lokasyon: e.target.checked }))} />
+                      <span>Bu üst lokasyon Oto Yıkama için kullanılıyor</span>
+                    </label>
+                    <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>İşaretlenirse, bu üst lokasyon ve tüm alt lokasyonları Oto Yıkama → Görev Oluştur ekranında listelenir.</div>
+                  </div>
+                )}
                 <div style={{ gridColumn:'1 / -1' }}>
                   <label className="verde-label">Checklist</label>
                   <select className="verde-input" value={form.checklist_sablon_id} onChange={e => setForm(f => ({...f, checklist_sablon_id:e.target.value}))}>

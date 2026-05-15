@@ -34,11 +34,29 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await admin
     .from('lokasyonlar')
-    .select('id, tanim, parent_id, aktif, ust:parent_id(id, tanim)')
+    .select('id, tanim, parent_id, aktif, oto_yikama_lokasyon, ust:parent_id(id, tanim)')
     .eq('firma_id', firmaId)
     .eq('aktif', true)
     .order('tanim')
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, data: data ?? [] })
+
+  // Sadece "oto_yikama_lokasyon=true" işaretli üst lokasyonlar + tüm alt soyları
+  const tum = data ?? []
+  const yetkili = new Set<string>(
+    tum.filter(l => l.parent_id == null && l.oto_yikama_lokasyon).map(l => l.id)
+  )
+  const queue = [...yetkili]
+  while (queue.length) {
+    const cur = queue.shift()!
+    for (const l of tum) {
+      if (l.parent_id === cur && !yetkili.has(l.id)) {
+        yetkili.add(l.id)
+        queue.push(l.id)
+      }
+    }
+  }
+
+  const filtered = tum.filter(l => yetkili.has(l.id))
+  return NextResponse.json({ ok: true, data: filtered })
 }
