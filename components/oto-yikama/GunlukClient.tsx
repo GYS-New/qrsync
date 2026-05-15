@@ -184,18 +184,18 @@ export default function GunlukClient() {
       ) : (
         <div className="verde-card" style={{ overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table className="verde-table" style={{ minWidth: 980 }}>
+            <table className="verde-table" style={{ minWidth: 1180, width: '100%' }}>
               <thead>
                 <tr>
                   <th style={{ width: 110 }}>Plaka</th>
-                  <th>Kullanıcı</th>
-                  <th>Departman</th>
-                  <th>Lokasyon</th>
-                  <th style={{ width: 110 }}>Durum</th>
-                  <th style={{ width: 80 }}>Başlatma</th>
-                  <th style={{ width: 80 }}>Bitirme</th>
-                  <th style={{ width: 80 }}>Süre</th>
-                  <th>Tamamlayan</th>
+                  <th style={{ minWidth: 140 }}>Kullanıcı</th>
+                  <th style={{ minWidth: 130 }}>Departman</th>
+                  <th style={{ minWidth: 180 }}>Lokasyon</th>
+                  <th style={{ width: 120 }}>Durum</th>
+                  <th style={{ width: 110, whiteSpace: 'nowrap' }}>Başlatma</th>
+                  <th style={{ width: 110, whiteSpace: 'nowrap' }}>Bitirme</th>
+                  <th style={{ width: 90 }}>Süre</th>
+                  <th style={{ minWidth: 160 }}>Tamamlayan</th>
                 </tr>
               </thead>
               <tbody>
