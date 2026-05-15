@@ -27,6 +27,53 @@ export async function lokasyonEkstraFrekansDropdown(
   bugun_tamamlananlar: { tanim: string; adet: number }[]
   lokasyon_kurallari:  { tanim: string; adet: number }[]
 }> {
+  // ── Oto Yıkama dalı: lokasyonun üst lokasyonu oto_yikama_lokasyon=true ise
+  //   "kural tanımları" yerine firmanın aktif PLAKA listesi döner. Bugün
+  //   tamamlananlar metadata'dan plaka bazında sayılır. Mobil dropdown bu
+  //   plakalardan seçim yapar, ekstra-frekans endpoint'inde plaka eşleşir.
+  {
+    const { data: lok } = await supabase
+      .from('lokasyonlar')
+      .select('id, firma_id, parent_id')
+      .eq('id', lokasyonId)
+      .maybeSingle()
+    if (lok?.parent_id) {
+      const { data: ust } = await supabase
+        .from('lokasyonlar')
+        .select('oto_yikama_lokasyon')
+        .eq('id', lok.parent_id)
+        .maybeSingle()
+      if ((ust as any)?.oto_yikama_lokasyon) {
+        const today = new Date().toISOString().slice(0, 10)
+        const [aracRes, metaRes] = await Promise.all([
+          supabase.from('araclar').select('plaka')
+            .eq('firma_id', (lok as any).firma_id)
+            .eq('aktif', true),
+          supabase.from('oto_yikama_gorev_metadata')
+            .select('plaka_snapshot, gorevler!inner(durum, lokasyon_id)')
+            .eq('hedef_tarih', today)
+            .eq('gorevler.lokasyon_id', lokasyonId)
+            .eq('gorevler.durum', 'TAMAMLANDI'),
+        ])
+        const plakaList = ((aracRes.data ?? []) as any[])
+          .map(a => (typeof a.plaka === 'string' ? a.plaka.trim() : ''))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b, 'tr'))
+        const bugunSayac = new Map<string, number>()
+        for (const m of ((metaRes.data ?? []) as any[])) {
+          const p = m?.plaka_snapshot
+          if (typeof p === 'string' && p.trim()) bugunSayac.set(p, (bugunSayac.get(p) ?? 0) + 1)
+        }
+        return {
+          bugun_tamamlananlar: Array.from(bugunSayac.entries())
+            .map(([tanim, adet]) => ({ tanim, adet }))
+            .sort((a, b) => b.adet - a.adet),
+          lokasyon_kurallari: plakaList.map(tanim => ({ tanim, adet: 0 })),
+        }
+      }
+    }
+  }
+
   const baslangic = bugunTRISO()
   const [aktifRes, arsivRes, kuralRes] = await Promise.all([
     supabase.from('canli_gorevler').select('tanim')
