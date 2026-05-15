@@ -93,6 +93,12 @@ export default function FrekansiyelGorevAnaliziBlock({
   const success = pct(counts.completed, counts.total)
   const remain  = Math.max(0, counts.total - counts.completed)
 
+  // Bar başına özel renkler — Cell ile uygulanır
+  // Graf-1: Mavi (Toplam), Yeşil (Tamamlanan), Sarı (Diğer)
+  // Graf-2: Mavi (Toplam), Sarı (Zamanında Yapılamayan), Kırmızı (Beklemede)
+  const G1_COLORS = ['#3b82f6', '#16a34a', '#eab308']
+  const G2_COLORS = ['#3b82f6', '#eab308', '#dc2626']
+
   const g1 = useMemo(() => [
     { name: 'Toplam', value: counts.total },
     { name: 'Tamamlanan', value: counts.completed },
@@ -143,7 +149,9 @@ export default function FrekansiyelGorevAnaliziBlock({
                     tickFormatter={(v) => typeof v === 'string' && v.length > 12 ? `${v.slice(0, 12)}…` : v} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 13 }} />
                   <Tooltip />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#3b82f6" />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {g1.map((_, idx) => <Cell key={idx} fill={G1_COLORS[idx % G1_COLORS.length]} />)}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>}
             </div>
@@ -160,7 +168,9 @@ export default function FrekansiyelGorevAnaliziBlock({
                     tickFormatter={(v) => typeof v === 'string' && v.length > 12 ? `${v.slice(0, 12)}…` : v} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#10b981" />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {g2.map((_, idx) => <Cell key={idx} fill={G2_COLORS[idx % G2_COLORS.length]} />)}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>}
             </div>
