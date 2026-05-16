@@ -183,13 +183,27 @@ function PieChart({ slices, size = 120 }: { slices: { label: string; value: numb
     <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
       <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
         <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
-          {arcs.map((p, i) => (
-            <path key={i} d={p.d} fill={p.color} stroke="#fff" strokeWidth={1.2} style={{ cursor: 'pointer', opacity: 0.9, transition: 'opacity 0.15s' }}
-              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-              onMouseLeave={e => (e.currentTarget.style.opacity = '0.9')}>
-              <title>{`${p.label}: ${p.value} (%${p.pct})`}</title>
-            </path>
-          ))}
+          {/* Tek slice (%100) durumunda SVG arc başlangıç=bitiş olduğu için path
+              çizilmez — iki concentric circle ile tam donut çiz. */}
+          {arcs.length === 1 ? (
+            <>
+              <circle cx={cx} cy={cy} r={R} fill={arcs[0].color} stroke="#fff" strokeWidth={1.2}
+                style={{ cursor: 'pointer', opacity: 0.9, transition: 'opacity 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '0.9')}>
+                <title>{`${arcs[0].label}: ${arcs[0].value} (%${arcs[0].pct})`}</title>
+              </circle>
+              <circle cx={cx} cy={cy} r={r} fill="#fff" pointerEvents="none" />
+            </>
+          ) : (
+            arcs.map((p, i) => (
+              <path key={i} d={p.d} fill={p.color} stroke="#fff" strokeWidth={1.2} style={{ cursor: 'pointer', opacity: 0.9, transition: 'opacity 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '0.9')}>
+                <title>{`${p.label}: ${p.value} (%${p.pct})`}</title>
+              </path>
+            ))
+          )}
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
           <span style={{ fontSize: size * 0.14, fontWeight: 900, color: T.text, lineHeight: 1 }}>%{mainPct}</span>
@@ -1015,11 +1029,14 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Lokasyon Bazlı Tamamlanan Görevler</div>
                   {ozetData.lokBazli.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'flex-start' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', gap: 32, alignItems: 'stretch' }}>
                       <div style={{ minWidth: 0 }}>
                         <BarChart data={ozetData.lokBazli} valueKey="sayi" labelKey="lokasyon" color={T.blueMid} />
                       </div>
-                      <SiraliListe items={ozetData.lokBazli.map(x => ({ label: x.lokasyon, value: x.sayi }))} />
+                      <div style={{ background: T.border }} />
+                      <div style={{ minWidth: 0 }}>
+                        <SiraliListe items={ozetData.lokBazli.map(x => ({ label: x.lokasyon, value: x.sayi }))} />
+                      </div>
                     </div>
                   ) : (
                     <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
@@ -1030,11 +1047,14 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Personel Bazlı Tamamlanan Göreveler</div>
                   {ozetData.persBazli.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'flex-start' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', gap: 32, alignItems: 'stretch' }}>
                       <div style={{ minWidth: 0 }}>
                         <BarChart data={ozetData.persBazli} valueKey="sayi" labelKey="personel" color={T.blue} />
                       </div>
-                      <SiraliListe items={ozetData.persBazli.map(x => ({ label: x.personel, value: x.sayi }))} />
+                      <div style={{ background: T.border }} />
+                      <div style={{ minWidth: 0 }}>
+                        <SiraliListe items={ozetData.persBazli.map(x => ({ label: x.personel, value: x.sayi }))} />
+                      </div>
                     </div>
                   ) : (
                     <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
