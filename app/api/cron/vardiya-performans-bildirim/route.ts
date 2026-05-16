@@ -132,8 +132,11 @@ export async function POST(req: NextRequest) {
           const bitisMs = new Date(bitisIso).getTime()
           const gecenDk = (nowMs - bitisMs) / 60000
 
-          // Bitiş+10dk geçti mi (10-3000dk pencere — geç tetiklemelerde de tutar; ama duplicate log korur)
-          if (gecenDk < 10 || gecenDk > 24 * 60) continue
+          // Sıkı pencere: bitiş+10dk ile bitiş+20dk arası. Cron 5dk'da 1 çalışır,
+          // 5dk gecikme toleransı eklenir. Bu sayede her vardiya sadece kendi
+          // bitiminden hemen sonraki tek bir cron tetiklemesinde gönderilir;
+          // sonraki tetiklemeler UNIQUE log + pencere dışı kaldığı için atlar.
+          if (gecenDk < 10 || gecenDk > 20) continue
 
           // Vardiya tarihi: bitişin gerçekleştiği TR günü
           const vardiyaTarihi = trDateStr(new Date(bitisMs))
