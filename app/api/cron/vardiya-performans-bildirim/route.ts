@@ -159,11 +159,12 @@ export async function POST(req: NextRequest) {
           const ustLoklar = (loks ?? []).filter((l: any) => l.parent_id == null)
           if (ustLoklar.length === 0) continue
 
-          // 6) Üst lokasyon → yöneticiler haritası
+          // 6) Üst lokasyon → yöneticiler haritası (sadece U rolü; M rolü muaf)
           const { data: yetkiler } = await admin
             .from('kullanici_lokasyon_yetkileri')
-            .select('user_id, ust_lokasyon_id')
+            .select('user_id, ust_lokasyon_id, users!inner(rol)')
             .eq('firma_id', f.id)
+            .eq('users.rol', 'tenant_user')
           const ustToUsers = new Map<string, string[]>()
           for (const y of yetkiler ?? []) {
             const arr = ustToUsers.get((y as any).ust_lokasyon_id) ?? []
