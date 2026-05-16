@@ -118,7 +118,6 @@ function getNav(base: string, rol: UserRole, otoYikamaAktif: boolean): NavGroup[
           ? [
               { label: 'Sistem Ayarları', href: `${base}/dashboard/sistem-ayarlari`, icon: '🛠️' },
               { label: 'Sistem Logları', href: `${base}/dashboard/sistem-loglari`, icon: '📜' },
-              { label: 'Mobil Hata Log', href: `${base}/dashboard/sistem-loglari/mobil-hata-log`, icon: '📱' },
             ]
           : [{ label: 'Dashboard Ayarları', href: `${base}/dashboard/ayarlar/dashboard`, icon: '🧩' }]
         ),

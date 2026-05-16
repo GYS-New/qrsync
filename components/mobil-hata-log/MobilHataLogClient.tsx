@@ -35,7 +35,6 @@ const SEVIYE_RENK: Record<Seviye, { bg: string; fg: string; label: string }> = {
 }
 
 export default function MobilHataLogClient({ isSA, firmalarListesi = [] }: Props) {
-  const [tab, setTab] = useState<'loglar' | 'uyarilar'>('loglar')
   const [data, setData] = useState<LogRow[]>([])
   const [cihazModelleri, setCihazModelleri] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,9 +48,7 @@ export default function MobilHataLogClient({ isSA, firmalarListesi = [] }: Props
   function yukle() {
     setLoading(true)
     const p = new URLSearchParams({ gun: String(gun) })
-    // 'Uyarılar' sekmesi → hata + kritik
-    const seviyeEff = tab === 'uyarilar' ? 'hata,kritik' : seviye
-    if (seviyeEff) p.set('seviye', seviyeEff)
+    if (seviye) p.set('seviye', seviye)
     if (cihazModeli) p.set('cihazModeli', cihazModeli)
     if (q.trim()) p.set('q', q.trim())
     if (isSA && saFirma) p.set('firmaId', saFirma)
@@ -66,7 +63,7 @@ export default function MobilHataLogClient({ isSA, firmalarListesi = [] }: Props
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { yukle() }, [tab, gun, seviye, cihazModeli, saFirma])
+  useEffect(() => { yukle() }, [gun, seviye, cihazModeli, saFirma])
 
   function tarihFormat(iso: string) {
     try { return new Date(iso).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }
@@ -95,31 +92,6 @@ export default function MobilHataLogClient({ isSA, firmalarListesi = [] }: Props
 
   return (
     <div>
-      <div style={{ padding: '12px 24px 0', display: 'flex', gap: 6, borderBottom: '1px solid #e5e7eb', background: '#fff' }}>
-        <button onClick={() => setTab('loglar')}
-          style={{
-            padding: '10px 18px', border: 'none', cursor: 'pointer',
-            fontSize: 13.5, fontWeight: 700,
-            color: tab === 'loglar' ? '#0f172a' : '#64748b',
-            background: 'transparent',
-            borderBottom: tab === 'loglar' ? '2px solid #7c3aed' : '2px solid transparent',
-            marginBottom: -1,
-          }}>
-          📦 Loglar
-        </button>
-        <button onClick={() => setTab('uyarilar')}
-          style={{
-            padding: '10px 18px', border: 'none', cursor: 'pointer',
-            fontSize: 13.5, fontWeight: 700,
-            color: tab === 'uyarilar' ? '#0f172a' : '#64748b',
-            background: 'transparent',
-            borderBottom: tab === 'uyarilar' ? '2px solid #dc2626' : '2px solid transparent',
-            marginBottom: -1,
-          }}>
-          ⚠️ Uyarılar
-        </button>
-      </div>
-
       <div style={{ padding: '20px 24px' }}>
         <div className="verde-card">
           <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -133,15 +105,13 @@ export default function MobilHataLogClient({ isSA, firmalarListesi = [] }: Props
                 {firmalarListesi.map(f => <option key={f.id} value={f.id}>{f.firma_adi ?? f.ticari_unvan}</option>)}
               </select>
             )}
-            {tab === 'loglar' && (
-              <select className="verde-select" value={seviye} onChange={e => setSeviye(e.target.value)} style={{ width: 140 }}>
-                <option value="">Seviye (Tümü)</option>
-                <option value="bilgi">Bilgi</option>
-                <option value="uyari">Uyarı</option>
-                <option value="hata">Hata</option>
-                <option value="kritik">Kritik</option>
-              </select>
-            )}
+            <select className="verde-select" value={seviye} onChange={e => setSeviye(e.target.value)} style={{ width: 140 }}>
+              <option value="">Seviye (Tümü)</option>
+              <option value="bilgi">Bilgi</option>
+              <option value="uyari">Uyarı</option>
+              <option value="hata">Hata</option>
+              <option value="kritik">Kritik</option>
+            </select>
             <select className="verde-select" value={gun} onChange={e => setGun(Number(e.target.value))} style={{ width: 130 }}>
               <option value={1}>Son 1 gün</option>
               <option value={7}>Son 7 gün</option>
