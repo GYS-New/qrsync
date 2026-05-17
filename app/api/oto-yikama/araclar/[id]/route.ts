@@ -66,6 +66,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ('kullanici_telefon' in body) update.kullanici_telefon = body.kullanici_telefon?.toString().trim() || null
   if ('kullanici_email' in body) update.kullanici_email = body.kullanici_email?.toString().trim() || null
   if ('periyot_gun' in body) update.periyot_gun = body.periyot_gun
+  if ('yikama_gunleri' in body) {
+    update.yikama_gunleri = Array.isArray(body.yikama_gunleri)
+      ? [...new Set(body.yikama_gunleri.filter((g: any) => Number.isInteger(g) && g >= 1 && g <= 7))]
+      : []
+  }
   if ('notlar' in body) update.notlar = body.notlar
   if ('aktif' in body) update.aktif = !!body.aktif
 

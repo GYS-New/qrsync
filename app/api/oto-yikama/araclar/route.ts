@@ -76,6 +76,9 @@ export async function POST(req: NextRequest) {
     renk: body.renk ?? null,
     departman,
     periyot_gun: body.periyot_gun ?? 7,
+    yikama_gunleri: Array.isArray(body.yikama_gunleri)
+      ? [...new Set(body.yikama_gunleri.filter((g: any) => Number.isInteger(g) && g >= 1 && g <= 7))]
+      : [],
     kullanici_adi_soyadi: kullaniciAd,
     kullanici_telefon: body.kullanici_telefon?.toString().trim() || null,
     kullanici_email: body.kullanici_email?.toString().trim() || null,

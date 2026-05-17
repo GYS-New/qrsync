@@ -15,6 +15,7 @@ type Arac = {
   renk: string | null
   departman: string | null
   periyot_gun: number
+  yikama_gunleri: number[]
   son_yikama_tarihi: string | null
   aktif: boolean
   notlar: string | null
@@ -35,9 +36,13 @@ const T = {
 }
 
 const BOS_FORM = {
-  plaka: '', marka: '', model: '', renk: '', departman: '', periyot_gun: 7, notlar: '',
+  plaka: '', marka: '', model: '', renk: '', departman: '', periyot_gun: 7,
+  yikama_gunleri: [] as number[], notlar: '',
   kullanici_adi_soyadi: '', kullanici_telefon: '', kullanici_email: '',
 }
+
+const GUN_KISA = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
+const GUN_UZUN = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar']
 
 export default function AraclarClient({ firmaId, projeId }: { firmaId: string; projeId: string | null }) {
   const { toast } = useToast()
@@ -104,6 +109,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
     setForm({
       plaka: a.plaka, marka: a.marka ?? '', model: a.model ?? '', renk: a.renk ?? '',
       departman: a.departman ?? '', periyot_gun: a.periyot_gun,
+      yikama_gunleri: Array.isArray(a.yikama_gunleri) ? [...a.yikama_gunleri].sort((x, y) => x - y) : [],
       notlar: a.notlar ?? '',
       kullanici_adi_soyadi: a.kullanici_adi_soyadi ?? '',
       kullanici_telefon: a.kullanici_telefon ?? '',
@@ -402,7 +408,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
               <th>Departman</th>
               <th>Marka / Model</th>
               <th>Renk</th>
-              <th>Periyot</th>
+              <th>Yıkama Günü</th>
               <th>Son Yıkama</th>
               <th>Durum</th>
               <th style={{ width: 110, textAlign: 'right' }}>İşlem</th>
@@ -431,7 +437,11 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
                     <td style={{ color: T.textSoft }}>{a.departman ?? '—'}</td>
                     <td style={{ color: T.text }}>{[a.marka, a.model].filter(Boolean).join(' ') || '—'}</td>
                     <td style={{ color: T.textSoft }}>{a.renk ?? '—'}</td>
-                    <td style={{ color: T.textSoft }}>{a.periyot_gun} gün</td>
+                    <td style={{ color: T.textSoft }}>
+                      {Array.isArray(a.yikama_gunleri) && a.yikama_gunleri.length > 0
+                        ? [...a.yikama_gunleri].sort((x, y) => x - y).map(g => GUN_KISA[g] ?? g).join(', ')
+                        : <span style={{ color: '#cbd5e1' }}>—</span>}
+                    </td>
                     <td style={{ color: T.textSoft, fontSize: 12 }}>
                       {a.son_yikama_tarihi
                         ? <>
@@ -505,9 +515,39 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Renk</label>
                 <input className="verde-input" value={form.renk} onChange={e => setForm({ ...form, renk: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
               </div>
-              <div>
-                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Periyot (gün)</label>
-                <input className="verde-input" type="number" min={1} value={form.periyot_gun} onChange={e => setForm({ ...form, periyot_gun: Number(e.target.value) || 7 })} style={{ width: '100%', marginTop: 4 }} />
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>
+                  Yıkama Günleri <span style={{ color: T.textSoft, fontWeight: 400 }}>(haftada 1-3 gün önerilir)</span>
+                </label>
+                <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                  {[1, 2, 3, 4, 5, 6, 7].map(g => {
+                    const aktif = form.yikama_gunleri.includes(g)
+                    return (
+                      <button key={g} type="button"
+                        onClick={() => setForm(f => ({
+                          ...f,
+                          yikama_gunleri: aktif
+                            ? f.yikama_gunleri.filter(x => x !== g)
+                            : [...f.yikama_gunleri, g].sort((a, b) => a - b),
+                        }))}
+                        style={{
+                          flex: 1, minWidth: 50, padding: '8px 4px', borderRadius: 6,
+                          border: `1px solid ${aktif ? T.blue : T.border}`,
+                          background: aktif ? T.blue : '#fff',
+                          color: aktif ? '#fff' : T.text,
+                          cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                          transition: 'all 0.15s',
+                        }}>
+                        {GUN_KISA[g]}
+                      </button>
+                    )
+                  })}
+                </div>
+                {form.yikama_gunleri.length === 0 && (
+                  <div style={{ fontSize: 11, color: T.textSoft, marginTop: 4, fontStyle: 'italic' }}>
+                    Gün seçilmezse araç için periyodik görev oluşturulmaz, sadece manuel oluşturulabilir.
+                  </div>
+                )}
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Notlar</label>
