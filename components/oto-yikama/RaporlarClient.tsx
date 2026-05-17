@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
-import { Loader2, RefreshCw, Calendar, Filter, X } from 'lucide-react'
+import { Loader2, RefreshCw, Calendar, Filter, X, FileSpreadsheet, FileText } from 'lucide-react'
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis, LineChart, Line,
@@ -97,6 +97,8 @@ export default function RaporlarClient() {
   const [plaka, setPlaka] = useState<string>('')
   const [tip, setTip] = useState<'' | 'planli' | 'ekstra'>('')
   const [arama, setArama] = useState('')
+  const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
+  const printRef = useRef<HTMLDivElement | null>(null)
 
   async function yukle() {
     if (!firmaId) return
@@ -143,6 +145,57 @@ export default function RaporlarClient() {
     setPlaka('')
     setTip('')
     setArama('')
+  }
+
+  function buildQuery(): string {
+    const p = new URLSearchParams({ firma_id: firmaId ?? '', baslangic, bitis })
+    if (personelId) p.set('personel_id', personelId)
+    if (plaka) p.set('plaka', plaka)
+    if (tip) p.set('tip', tip)
+    return p.toString()
+  }
+
+  async function excelIndir() {
+    if (!firmaId) return
+    setExporting('excel')
+    try {
+      const res = await fetch(`/api/oto-yikama/raporlar/excel?${buildQuery()}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error('Excel oluşturulamadı')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `oto-yikama-raporu-${baslangic}_${bitis}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  async function pdfIndir() {
+    if (!printRef.current) return
+    setExporting('pdf')
+    const header = printRef.current.querySelector<HTMLElement>('.pdf-only')
+    if (header) header.style.display = 'block'
+    try {
+      const mod: any = await import('html2pdf.js')
+      const html2pdf = mod.default || mod
+      await html2pdf().set({
+        margin: [10, 8, 12, 8],
+        filename: `oto-yikama-raporu-${baslangic}_${bitis}.pdf`,
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#f8fafc' },
+        jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4' },
+        pagebreak: { mode: ['css', 'legacy'] },
+      }).from(printRef.current).save()
+    } catch (e: any) {
+      toast({ type: 'error', title: 'PDF hatası', message: e?.message ?? 'Bilinmeyen hata' })
+    } finally {
+      if (header) header.style.display = 'none'
+      setExporting(null)
+    }
   }
 
   if (!firmaId) {
@@ -203,11 +256,38 @@ export default function RaporlarClient() {
             <X size={11} style={{ marginRight: 4 }} /> Temizle
           </button>
 
-          <button onClick={yukle} disabled={loading}
-            style={{ ...chip, marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <RefreshCw size={11} style={{ animation: loading ? 'spin 0.9s linear infinite' : undefined }} />
-            Yenile
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button onClick={excelIndir} disabled={exporting !== null || loading || (agg?.toplam ?? 0) === 0}
+              style={{ ...chip, display: 'inline-flex', alignItems: 'center', gap: 4, background: '#dcfce7', borderColor: '#bbf7d0', color: '#166534' }}>
+              <FileSpreadsheet size={12} />
+              {exporting === 'excel' ? 'Hazırlanıyor…' : 'Excel'}
+            </button>
+            <button onClick={pdfIndir} disabled={exporting !== null || loading || (agg?.toplam ?? 0) === 0}
+              style={{ ...chip, display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fee2e2', borderColor: '#fecaca', color: '#991b1b' }}>
+              <FileText size={12} />
+              {exporting === 'pdf' ? 'Hazırlanıyor…' : 'PDF'}
+            </button>
+            <button onClick={yukle} disabled={loading}
+              style={{ ...chip, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <RefreshCw size={11} style={{ animation: loading ? 'spin 0.9s linear infinite' : undefined }} />
+              Yenile
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div ref={printRef} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* PDF başlığı — yalnız print için */}
+      <div className="pdf-only" style={{ display: 'none', padding: '0 4px' }}>
+        <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a' }}>🚗 Oto Yıkama Raporu</div>
+        <div style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
+          Dönem: <strong>{baslangic}</strong> → <strong>{bitis}</strong>
+          {personelId && (() => {
+            const p = filterMeta.personeller.find(x => x.id === personelId)
+            return p ? <> · Personel: <strong>{p.ad}</strong></> : null
+          })()}
+          {plaka && <> · Plaka: <strong>{plaka}</strong></>}
+          {tip && <> · Tip: <strong>{tip === 'ekstra' ? 'Ekstra' : 'Planlı'}</strong></>}
         </div>
       </div>
 
@@ -389,7 +469,13 @@ export default function RaporlarClient() {
         </>
       )}
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>{/* printRef close */}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg) } }
+        /* html2pdf çalışırken pdf-only blok görünür olsun (capture sırasında) */
+        .pdf-only { display: none; }
+      `}</style>
     </div>
   )
 }
