@@ -275,7 +275,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
   }
 
   return (
-    <div style={{ padding: '24px 28px', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, alignItems: 'start' }}>
+    <div style={{ padding: '24px 28px', display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, alignItems: 'start' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="verde-card" style={{ padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Search size={14} color={T.textSoft} />
@@ -296,7 +296,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
         </div>
 
         <div className="verde-card" style={{ overflow: 'hidden' }}>
-          <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+          <div style={{ maxHeight: 460, overflowY: 'auto' }}>
             <table className="verde-table">
               <thead>
                 <tr>
@@ -344,7 +344,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                 </div>
               )}
             </div>
-            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+            <div style={{ maxHeight: 400, overflowY: 'auto' }}>
               <table className="verde-table">
                 <thead>
                   <tr>

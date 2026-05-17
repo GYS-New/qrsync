@@ -1,5 +1,5 @@
 import Topbar from '@/components/layout/Topbar'
-import GorevOlusturClient from '@/components/oto-yikama/GorevOlusturClient'
+import GorevOlusturPageClient from '@/components/oto-yikama/GorevOlusturPageClient'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +18,7 @@ export default async function OtoYikamaGorevOlusturPage() {
           { label: 'Görev Oluştur' },
         ]}
       />
-      <GorevOlusturClient firmaId={firmaId} />
+      <GorevOlusturPageClient firmaId={firmaId} />
     </div>
   )
 }
