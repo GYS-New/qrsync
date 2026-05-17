@@ -198,6 +198,29 @@ export async function POST(req: Request) {
       }
       const yeniGorevId = insertedGorev.id
 
+      // Opsiyonel km/foto/notlar — mobil yıkama akışı için
+      const km = Number.isFinite(Number(body?.km)) ? Math.floor(Number(body.km)) : null
+      const fotoOnce = typeof body?.foto_oncesi_url === 'string' ? body.foto_oncesi_url.trim() : null
+      const fotoSonra = typeof body?.foto_sonrasi_url === 'string' ? body.foto_sonrasi_url.trim() : null
+      const notlar = typeof body?.notlar === 'string' ? body.notlar.trim() : null
+
+      // KM gerileme uyarısı
+      let kmUyarisi: string | null = null
+      if (km != null) {
+        const { data: maxRow } = await admin
+          .from('oto_yikama_gorev_metadata')
+          .select('km')
+          .eq('arac_id', arac.id)
+          .not('km', 'is', null)
+          .order('km', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const oncekiMax = (maxRow as any)?.km ?? null
+        if (oncekiMax != null && km < oncekiMax) {
+          kmUyarisi = `KM girilen (${km}) önceki yıkamadaki KM'den (${oncekiMax}) düşük — kayıt yine de yapıldı.`
+        }
+      }
+
       const { error: metaErr } = await admin
         .from('oto_yikama_gorev_metadata')
         .insert({
@@ -206,6 +229,10 @@ export async function POST(req: Request) {
           plaka_snapshot: arac.plaka,
           hedef_tarih: today,
           ekstra: true,
+          km,
+          foto_oncesi_url: fotoOnce,
+          foto_sonrasi_url: fotoSonra,
+          notlar,
         })
       if (metaErr) {
         await admin.from('gorevler').delete().eq('id', yeniGorevId)
@@ -235,6 +262,7 @@ export async function POST(req: Request) {
         plaka: arac.plaka,
         lokasyon_id: lokasyonId,
         tamamlanma_tarihi: nowIso,
+        uyari: kmUyarisi,
       }, { headers: CORS })
     }
 

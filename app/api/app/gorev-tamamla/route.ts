@@ -345,6 +345,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500, headers: CORS })
     }
 
+    // Oto Yıkama görevi için opsiyonel km/foto/notlar metadata'ya yazılır.
+    // (Görev gorevler tablosundaysa + body'de bu alanlar varsa)
+    let kmUyarisi: string | null = null
+    if (gorevTipi === 'gorevler') {
+      const km = Number.isFinite(Number(body?.km)) ? Math.floor(Number(body.km)) : null
+      const fotoOnce = typeof body?.foto_oncesi_url === 'string' ? body.foto_oncesi_url.trim() : null
+      const fotoSonra = typeof body?.foto_sonrasi_url === 'string' ? body.foto_sonrasi_url.trim() : null
+      const notlar = typeof body?.notlar === 'string' ? body.notlar.trim() : null
+      if (km != null || fotoOnce || fotoSonra || notlar) {
+        // Metadata var mı kontrolü (Oto Yıkama görevi mi)
+        const { data: meta } = await admin
+          .from('oto_yikama_gorev_metadata')
+          .select('gorev_id, arac_id')
+          .eq('gorev_id', gorevId)
+          .maybeSingle()
+        if (meta) {
+          // KM gerileme kontrolü
+          if (km != null) {
+            const { data: maxRow } = await admin
+              .from('oto_yikama_gorev_metadata')
+              .select('km')
+              .eq('arac_id', (meta as any).arac_id)
+              .not('km', 'is', null)
+              .order('km', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            const oncekiMax = (maxRow as any)?.km ?? null
+            if (oncekiMax != null && km < oncekiMax) {
+              kmUyarisi = `KM girilen (${km}) önceki yıkamadaki KM'den (${oncekiMax}) düşük — kayıt yine de yapıldı.`
+            }
+          }
+          const update: any = {}
+          if (km != null) update.km = km
+          if (fotoOnce) update.foto_oncesi_url = fotoOnce
+          if (fotoSonra) update.foto_sonrasi_url = fotoSonra
+          if (notlar) update.notlar = notlar
+          await admin.from('oto_yikama_gorev_metadata').update(update).eq('gorev_id', gorevId)
+        }
+      }
+    }
+
     await admin
       .from('device_tokens')
       .update({ son_kullanim: nowIso })
@@ -356,6 +397,7 @@ export async function POST(req: Request) {
       gorev_id: gorevId,
       gorev_tipi: gorevTipi,
       tamamlanma_tarihi: nowIso,
+      uyari: kmUyarisi,
     }, { headers: CORS })
 
   } catch (error: any) {

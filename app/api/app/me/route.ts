@@ -49,6 +49,26 @@ export async function GET(req: Request) {
       .eq('id', tokenData.user_id)
       .single()
 
+    // Oto Yıkama personeli mi? — kullanici_lokasyon_yetkileri üzerinden
+    // oto_yikama_lokasyon=true olan üst lokasyonlara bağlı mı kontrolü.
+    let otoYikamaPersoneli = false
+    {
+      const { data: yetkiler } = await admin
+        .from('kullanici_lokasyon_yetkileri')
+        .select('ust_lokasyon_id')
+        .eq('user_id', tokenData.user_id)
+      const ustIds = (yetkiler ?? []).map((y: any) => y.ust_lokasyon_id).filter(Boolean)
+      if (ustIds.length > 0) {
+        const { data: loks } = await admin
+          .from('lokasyonlar')
+          .select('id')
+          .in('id', ustIds)
+          .eq('oto_yikama_lokasyon', true)
+          .eq('aktif', true)
+        otoYikamaPersoneli = (loks ?? []).length > 0
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       user: {
@@ -58,6 +78,7 @@ export async function GET(req: Request) {
         proje_id: userData?.proje_id ?? null,
         rol: userData?.rol ?? 'tenant_user',
         email: userData?.email ?? null,
+        oto_yikama_personeli: otoYikamaPersoneli,
       },
     }, { headers: CORS_HEADERS })
 
