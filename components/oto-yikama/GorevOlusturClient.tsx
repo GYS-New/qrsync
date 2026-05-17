@@ -348,9 +348,9 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
               <table className="verde-table">
                 <thead>
                   <tr>
-                    <th>Plaka</th>
-                    <th>Kullanıcı</th>
-                    <th style={{ minWidth: 280 }}>Lokasyon</th>
+                    <th style={{ width: 110 }}>Plaka</th>
+                    <th style={{ width: 160 }}>Kullanıcı</th>
+                    <th style={{ minWidth: 340, width: '60%' }}>Lokasyon</th>
                     <th style={{ width: 32 }}></th>
                   </tr>
                 </thead>
@@ -362,7 +362,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                       <td>
                         <select className="verde-select" value={secimMap.get(a.id) ?? ''}
                           onChange={e => setLokasyon(a.id, e.target.value)}
-                          style={{ width: '100%', padding: '3px 6px', fontSize: 12 }}>
+                          style={{ width: '100%', minWidth: 320, padding: '4px 8px', fontSize: 12 }}>
                           {altLokasyonlar.map(l => (
                             <option key={l.id} value={l.id}>{lokasyonDisplay(l)}</option>
                           ))}
