@@ -392,23 +392,22 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
         </div>
       )}
 
-      {/* Tablo */}
-      <div className="verde-card" style={{ overflow: 'hidden' }}>
-        <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
-          <table className="verde-table">
-            <thead>
-              <tr>
-                <th>Plaka</th>
-                <th>Kullanıcı</th>
-                <th>Departman</th>
-                <th>Marka / Model</th>
-                <th>Renk</th>
-                <th>Periyot</th>
-                <th>Son Yıkama</th>
-                <th>Durum</th>
-                <th style={{ width: 110, textAlign: 'right' }}>İşlem</th>
-              </tr>
-            </thead>
+      {/* Tablo — tam genişlik, sticky başlık, sayfa scroll */}
+      <div className="verde-card" style={{ overflow: 'visible' }}>
+        <table className="verde-table" style={{ width: '100%' }}>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: T.grayLight, boxShadow: `0 1px 0 ${T.border}` }}>
+            <tr>
+              <th>Plaka</th>
+              <th>Kullanıcı</th>
+              <th>Departman</th>
+              <th>Marka / Model</th>
+              <th>Renk</th>
+              <th>Periyot</th>
+              <th>Son Yıkama</th>
+              <th>Durum</th>
+              <th style={{ width: 110, textAlign: 'right' }}>İşlem</th>
+            </tr>
+          </thead>
             <tbody>
               {yukleniyor ? (
                 <tr><td colSpan={9} style={{ padding: 30, textAlign: 'center', color: T.textSoft }}>Yükleniyor…</td></tr>
@@ -463,7 +462,6 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
               })}
             </tbody>
           </table>
-        </div>
       </div>
 
       {/* Ekle/Düzenle modal */}
