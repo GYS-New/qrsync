@@ -350,7 +350,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                   <tr>
                     <th>Plaka</th>
                     <th>Kullanıcı</th>
-                    <th style={{ width: 220 }}>Lokasyon</th>
+                    <th style={{ minWidth: 280 }}>Lokasyon</th>
                     <th style={{ width: 32 }}></th>
                   </tr>
                 </thead>
