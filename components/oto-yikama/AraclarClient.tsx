@@ -173,12 +173,12 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       { header: 'marka',                key: 'marka',                width: 14 },
       { header: 'model',                key: 'model',                width: 14 },
       { header: 'renk',                 key: 'renk',                 width: 12 },
-      { header: 'periyot_gun',          key: 'periyot_gun',          width: 12 },
+      { header: 'yikama_gunleri',       key: 'yikama_gunleri',       width: 16 },
       { header: 'kullanici_telefon',    key: 'kullanici_telefon',    width: 18 },
       { header: 'kullanici_email',      key: 'kullanici_email',      width: 24 },
     ]
-    ws.addRow({ plaka: '06ABC123', kullanici_adi_soyadi: 'Ahmet Yılmaz', departman: 'Üretim Hattı 3', marka: 'TOYOTA', model: 'Corolla', renk: 'Beyaz', periyot_gun: 7,  kullanici_telefon: '5551234567', kullanici_email: 'ahmet@firma.com' })
-    ws.addRow({ plaka: '34XYZ789', kullanici_adi_soyadi: 'Mehmet Demir',  departman: 'Yönetim',         marka: 'FORD',   model: 'Focus',   renk: 'Gri',   periyot_gun: 14, kullanici_telefon: '',           kullanici_email: '' })
+    ws.addRow({ plaka: '06ABC123', kullanici_adi_soyadi: 'Ahmet Yılmaz', departman: 'Üretim Hattı 3', marka: 'TOYOTA', model: 'Corolla', renk: 'Beyaz', yikama_gunleri: '1,3',  kullanici_telefon: '5551234567', kullanici_email: 'ahmet@firma.com' })
+    ws.addRow({ plaka: '34XYZ789', kullanici_adi_soyadi: 'Mehmet Demir',  departman: 'Yönetim',         marka: 'FORD',   model: 'Focus',   renk: 'Gri',   yikama_gunleri: '2,4,6', kullanici_telefon: '',          kullanici_email: '' })
     // Başlık satırı: bold + zorunlu sütunlar kırmızı vurgulu
     const header = ws.getRow(1)
     header.font = { bold: true }
@@ -189,7 +189,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       c.font = { bold: true, color: { argb: 'FF991B1B' } }
     })
     // Not satırı ekle (3. satır)
-    ws.insertRow(4, { plaka: '* Zorunlu alanlar: plaka, kullanici_adi_soyadi, departman' })
+    ws.insertRow(4, { plaka: '* Zorunlu: plaka, kullanici_adi_soyadi, departman   |   yikama_gunleri: 1=Pzt..7=Paz, virgülle ayır (örn "1,3")' })
     ws.getRow(4).font = { italic: true, color: { argb: 'FF991B1B' } }
     ws.mergeCells('A4:I4')
     const buf = await wb.xlsx.writeBuffer()
@@ -224,6 +224,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       const idxModel = headers.indexOf('model')
       const idxRenk = headers.indexOf('renk')
       const idxPer = headers.indexOf('periyot_gun')
+      const idxGun = headers.indexOf('yikama_gunleri')
       const idxKulTel = headers.indexOf('kullanici_telefon')
       const idxKulMail = headers.indexOf('kullanici_email')
 
@@ -248,6 +249,11 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
         const dep = cellStr(row.getCell(idxDep + 1).value)
         // Tamamen boş satırları (yorum/not satırı dahil) atla
         if (!plaka && !kulAd && !dep) return
+        // yikama_gunleri: "1,3" veya "1, 3" veya "1;3" gibi → [1,3], sınır 1-7, distinct
+        const gunStr = idxGun >= 0 ? cellStr(row.getCell(idxGun + 1).value) : ''
+        const yikamaGunleri = gunStr
+          ? [...new Set(gunStr.split(/[,;\s]+/).map(s => Number(s)).filter(n => Number.isInteger(n) && n >= 1 && n <= 7))].sort((a, b) => a - b)
+          : []
         satirlar.push({
           plaka,
           kullanici_adi_soyadi: kulAd || null,
@@ -256,6 +262,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
           model: idxModel >= 0 ? cellStr(row.getCell(idxModel + 1).value) || null : null,
           renk:  idxRenk >= 0 ? cellStr(row.getCell(idxRenk + 1).value) || null : null,
           periyot_gun: idxPer >= 0 ? Number(row.getCell(idxPer + 1).value) || 7 : 7,
+          yikama_gunleri: yikamaGunleri,
           kullanici_telefon: idxKulTel >= 0 ? cellStr(row.getCell(idxKulTel + 1).value) || null : null,
           kullanici_email: idxKulMail >= 0 ? cellStr(row.getCell(idxKulMail + 1).value) || null : null,
         })

@@ -27,6 +27,7 @@ type ImportRow = {
   renk?: string | null
   departman?: string | null
   periyot_gun?: number | null
+  yikama_gunleri?: number[] | null
   kullanici_adi_soyadi?: string | null
   kullanici_telefon?: string | null
   kullanici_email?: string | null
@@ -79,6 +80,9 @@ export async function POST(req: NextRequest) {
       hataliSatirlar.push({ satir: idx + 2, plaka: plaka || '(boş)', eksik })  // +2: header satırı + 1-based
       return
     }
+    const gunler = Array.isArray(r.yikama_gunleri)
+      ? [...new Set(r.yikama_gunleri.map(g => Number(g)).filter(n => Number.isInteger(n) && n >= 1 && n <= 7))].sort((a, b) => a - b)
+      : []
     excelMap.set(plaka, {
       plaka,
       marka: r.marka?.toString().trim() || null,
@@ -86,6 +90,7 @@ export async function POST(req: NextRequest) {
       renk: r.renk?.toString().trim() || null,
       departman,
       periyot_gun: r.periyot_gun != null ? Number(r.periyot_gun) || 7 : 7,
+      yikama_gunleri: gunler,
       kullanici_adi_soyadi: kullaniciAd,
       kullanici_telefon: r.kullanici_telefon?.toString().trim() || null,
       kullanici_email: r.kullanici_email?.toString().trim() || null,
@@ -148,6 +153,7 @@ export async function POST(req: NextRequest) {
         firma_id: firmaId, proje_id: projeId,
         plaka: r.plaka, marka: r.marka, model: r.model, renk: r.renk,
         departman: r.departman, periyot_gun: r.periyot_gun ?? 7,
+        yikama_gunleri: r.yikama_gunleri ?? [],
         kullanici_adi_soyadi: r.kullanici_adi_soyadi,
         kullanici_telefon: r.kullanici_telefon,
         kullanici_email: r.kullanici_email,
