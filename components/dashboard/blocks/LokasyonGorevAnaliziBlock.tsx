@@ -25,6 +25,7 @@ export default function LokasyonGorevAnaliziBlock({
   const [loading, setLoading] = useState(false)
   const lastReq = useRef(0)
   const rangeStart = useMemo(() => rangeStartFor(mode), [mode])
+  const yetkiliLokIdsKey = useMemo(() => (yetkiliLokIds ?? []).slice().sort().join(','), [yetkiliLokIds])
 
   async function fetchData() {
     const reqId = Date.now()
@@ -79,7 +80,7 @@ export default function LokasyonGorevAnaliziBlock({
       .subscribe()
     return () => { supabase.removeChannel(ch) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, firmaId, projeId])
+  }, [mode, firmaId, projeId, yetkiliLokIdsKey])
 
   const maxVal = Math.max(1, ...rows.map((r) => r.value))
 

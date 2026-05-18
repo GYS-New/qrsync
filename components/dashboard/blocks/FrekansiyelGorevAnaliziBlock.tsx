@@ -79,6 +79,9 @@ export default function FrekansiyelGorevAnaliziBlock({
     setLoading(false)
   }
 
+  // yetkiliLokIds array referansı her render değişir; stable key yarat
+  const yetkiliLokIdsKey = useMemo(() => (yetkiliLokIds ?? []).slice().sort().join(','), [yetkiliLokIds])
+
   useEffect(() => {
     fetchCounts()
     const ch = supabase.channel('dashboard-frekansiyel')
@@ -87,7 +90,7 @@ export default function FrekansiyelGorevAnaliziBlock({
       .subscribe()
     return () => { supabase.removeChannel(ch) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, firmaId, projeId])
+  }, [mode, firmaId, projeId, yetkiliLokIdsKey])
 
   const other   = Math.max(0, counts.total - counts.completed)
   const success = pct(counts.completed, counts.total)

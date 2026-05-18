@@ -40,6 +40,7 @@ export default function AktiviteGrafigiBlock({
   const supabase = createClient()
   const [mode, setMode] = useState<Mode>("gunluk")
   const [data, setData] = useState<Array<{ label: string; value: number }>>([])
+  const yetkiliLokIdsKey = useMemo(() => (yetkiliLokIds ?? []).slice().sort().join(','), [yetkiliLokIds])
 
   const chartWrapRef = useRef<HTMLDivElement | null>(null)
   const [chartSize, setChartSize] = useState({ w: 0, h: 0 })
@@ -156,7 +157,7 @@ export default function AktiviteGrafigiBlock({
       .subscribe()
     return () => { supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, firmaId, projeId])
+  }, [mode, firmaId, projeId, yetkiliLokIdsKey])
 
   return (
     <BlockWrapper title="AKTİVİTE GRAFİĞİ" size="big" href={`${basePath}/dashboard/canli-islemler`}>

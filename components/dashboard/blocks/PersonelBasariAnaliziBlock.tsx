@@ -24,6 +24,7 @@ export default function PersonelBasariAnaliziBlock({
   const [yoneticiIds, setYoneticiIds] = useState<Set<string>>(new Set())
   const lastReq = useRef(0)
   const rangeStart = useMemo(() => rangeStartFor(mode), [mode])
+  const yetkiliLokIdsKey = useMemo(() => (yetkiliLokIds ?? []).slice().sort().join(','), [yetkiliLokIds])
 
   // Üst lokasyona yetkilendirilmiş yönetici id'lerini çek (başarı analizinden hariç tutulacak)
   useEffect(() => {
@@ -90,7 +91,7 @@ export default function PersonelBasariAnaliziBlock({
       .subscribe()
     return () => { supabase.removeChannel(ch) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, firmaId, projeId, yoneticiIds])
+  }, [mode, firmaId, projeId, yoneticiIds, yetkiliLokIdsKey])
 
   const maxVal = Math.max(1, ...rows.map((r) => r.value))
 

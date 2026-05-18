@@ -48,6 +48,7 @@ export default function CanliAkisIzlemeBlock({
   const [rows, setRows] = useState<CanliGorevRow[]>([])
   const MAX_ROWS = 7
   const [limit, setLimit] = useState(MAX_ROWS)
+  const yetkiliLokIdsKey = useMemo(() => (yetkiliLokIds ?? []).slice().sort().join(','), [yetkiliLokIds])
   const wrapRef = useRef<HTMLDivElement | null>(null)
 
   const selectCols = useMemo(
@@ -106,7 +107,7 @@ export default function CanliAkisIzlemeBlock({
     const t = setInterval(fetchLive, 5000)   // 5 saniyede bir — 1s çok agresif
     return () => clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmaId, projeId, limit])
+  }, [firmaId, projeId, limit, yetkiliLokIdsKey])
 
   return (
     <div className="verde-card dashboard-border-intro h-[420px] flex flex-col">
