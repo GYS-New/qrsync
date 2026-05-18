@@ -229,7 +229,31 @@ export default function LokasyonlarClient({
     ])
     if (locRes.error) showError(locRes.error.message)
     if (tplRes.error) showError(tplRes.error.message)
-    if (locRes.data) setLokasyonlar(locRes.data as any)
+    if (locRes.data) {
+      let data = locRes.data as any[]
+      // Oto Yıkama modülü şu an SA-only — TA/U/M için bu lokasyonları gizle
+      // (BFS: işaretli üst lokasyon + tüm alt soyları)
+      if (base !== '/sa') {
+        const otoUstIds = new Set<string>(
+          data.filter(l => !l.parent_id && (l as any).oto_yikama_lokasyon === true).map(l => l.id)
+        )
+        if (otoUstIds.size > 0) {
+          const gizli = new Set<string>(otoUstIds)
+          const queue = [...otoUstIds]
+          while (queue.length) {
+            const cur = queue.shift()!
+            for (const l of data) {
+              if (l.parent_id === cur && !gizli.has(l.id)) {
+                gizli.add(l.id)
+                queue.push(l.id)
+              }
+            }
+          }
+          data = data.filter(l => !gizli.has(l.id))
+        }
+      }
+      setLokasyonlar(data as any)
+    }
     if (tplRes.data) setTemplates(tplRes.data as any)
     setLoading(false)
   }

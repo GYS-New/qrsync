@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,7 +99,12 @@ export async function GET(req: NextRequest) {
   const { data: rows, error } = await q
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
-  const kurallar = (rows ?? []).map((r: any) => {
+  // Oto Yıkama modülü şu an SA-only — TA/U/M için bu lokasyonların kurallarını gizle
+  const otoIds = !isSA ? await getOtoYikamaLokasyonIds(admin, firmaId) : new Set<string>()
+
+  const kurallar = (rows ?? [])
+    .filter((r: any) => !otoIds.has(r.lokasyon_id))
+    .map((r: any) => {
     const saat = r.aktif_olma_saati ? String(r.aktif_olma_saati).slice(0, 5) : ''
     const vno = saat ? vardiyaNoBul(saat, ayarlar) : null
     const sayi = r.frekans_tipi === 'haftalik'

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export async function GET(request: Request) {
   try {
@@ -41,7 +42,14 @@ export async function GET(request: Request) {
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    return NextResponse.json(data ?? [])
+    // Oto Yıkama modülü şu an SA-only — TA/U/M için bu lokasyonları JS'de filtrele
+    let result = data ?? []
+    if (!isSA && firmaId) {
+      const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
+      if (otoIds.size > 0) result = result.filter((l: any) => !otoIds.has(l.id))
+    }
+
+    return NextResponse.json(result)
   } catch (error: any) {
     return NextResponse.json({ error: error?.message ?? 'Lokasyonlar alınamadı.' }, { status: 500 })
   }

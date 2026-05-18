@@ -1,11 +1,12 @@
 import { cookies } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import DashboardRenderer from '@/components/dashboard/DashboardRenderer'
 import DashboardRefresher from '@/components/dashboard/DashboardRefresher'
 import { ensureDashboardDefaults } from '@/lib/dashboard/ensureDefaults'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getDescendantIds } from '@/lib/lokasyon/getDescendantIds'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,11 +22,27 @@ export default async function Dashboard() {
   // Aktif üst lokasyon (TA dashboard scope filtresi) — cookie'den oku
   const aktifUstLokasyonId = cookies().get('qrsync_aktif_ust_lokasyon_id')?.value ?? null
 
-  const [bloklar, aktifProje, yetkiliLokIds] = await Promise.all([
+  const [bloklar, aktifProje, descendantIds] = await Promise.all([
     ensureDashboardDefaults(user.id),
     getAktifProje(firmaId),
     getDescendantIds(aktifUstLokasyonId, firmaId),
   ])
+
+  // Oto Yıkama modülü şu an SA-only — TA için bu lokasyonları yetkiliLokIds'ten hariç tut
+  let yetkiliLokIds = descendantIds
+  if (firmaId) {
+    const admin = createAdminClient()
+    const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
+    if (otoIds.size > 0) {
+      if (yetkiliLokIds === null) {
+        // Tüm firma lokasyonları minus Oto Yıkama
+        const { data: tum } = await admin.from('lokasyonlar').select('id').eq('firma_id', firmaId)
+        yetkiliLokIds = (tum ?? []).map((l: any) => l.id).filter((id: string) => !otoIds.has(id))
+      } else {
+        yetkiliLokIds = yetkiliLokIds.filter(id => !otoIds.has(id))
+      }
+    }
+  }
 
   return (
     <div>

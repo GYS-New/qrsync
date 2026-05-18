@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { buildQrKartZip } from '@/lib/qr-kart/qr-kart-node'
 import { getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic    = 'force-dynamic'
 export const runtime    = 'nodejs'
@@ -49,6 +50,12 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Oto Yıkama modülü şu an SA-only — TA/U/M Oto Yıkama lokasyonu QR'larını indiremez
+  const otoIds = !isSA ? await getOtoYikamaLokasyonIds(admin, effectiveFirmaId) : new Set<string>()
+  if (!isSA && ustLokasyonId && otoIds.has(ustLokasyonId)) {
+    return NextResponse.json({ error: 'Bu lokasyon için yetkiniz yok' }, { status: 403 })
+  }
+
   let lokQuery = admin
     .from('lokasyonlar')
     .select('id,tanim,qr_veri,parent_id,aktif')
@@ -71,6 +78,10 @@ export async function GET(req: NextRequest) {
     const altIds = new Set(getAllDescendantIds(ustLokasyonId))
     altIds.delete(ustLokasyonId)
     lokasyonlar = lokasyonlar.filter((l: any) => altIds.has(l.id))
+  }
+  // SA değilse Oto Yıkama lokasyonlarını hariç tut
+  if (!isSA && otoIds.size > 0) {
+    lokasyonlar = lokasyonlar.filter((l: any) => !otoIds.has(l.id))
   }
   if (!lokasyonlar.length) return NextResponse.json({ error: 'QR kodu olan aktif lokasyon bulunamadı' }, { status: 404 })
 

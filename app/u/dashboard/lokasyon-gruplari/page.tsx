@@ -4,6 +4,7 @@ import Topbar from '@/components/layout/Topbar'
 import LokasyonGruplariClient from '@/components/lokasyon-grup/LokasyonGruplariClient'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getLokasyonYetki, getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +50,11 @@ export default async function ULokasyonGruplariPage() {
   ])
 
   const groups = groupsRes.data ?? []
-  const locations = locationsRes.data ?? []
+  let locations = locationsRes.data ?? []
+
+  // Oto Yıkama modülü şu an SA-only — U/M için bu lokasyonları gizle
+  const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
+  if (otoIds.size > 0) locations = locations.filter((l: any) => !otoIds.has(l.id))
 
   const initialGroups = groups.map((g: any) => ({
     ...g,

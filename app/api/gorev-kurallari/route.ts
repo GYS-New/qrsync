@@ -34,6 +34,16 @@ export async function GET(req: NextRequest) {
     return q
   })
 
+  // Oto Yıkama modülü şu an SA-only — TA/U/M için bu lokasyonların kurallarını gizle
+  const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
+  if (!isSA) {
+    const { getOtoYikamaLokasyonIds } = await import('@/lib/yetki/getOtoYikamaLokasyonIds')
+    const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
+    if (otoIds.size > 0) {
+      return NextResponse.json((data ?? []).filter((k: any) => !otoIds.has(k.lokasyon_id)))
+    }
+  }
+
   return NextResponse.json(data)
 }
 
@@ -91,7 +101,7 @@ export async function POST(req: NextRequest) {
   // Lokasyonun firmaya ait olduğunu doğrula
   const { data: lok } = await supabase
     .from('lokasyonlar')
-.select('firma_id, proje_id')
+.select('firma_id, proje_id, parent_id, oto_yikama_lokasyon')
 .eq('id', lokasyon_id)
 .single()
   if (!lok) return NextResponse.json({ error: 'Lokasyon bulunamadı' }, { status: 404 })
@@ -102,6 +112,15 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient()
+
+  // Oto Yıkama modülü şu an SA-only — TA/U/M Oto Yıkama lokasyonuna kural açamaz
+  if (me.rol !== 'super_admin' && me.rol !== 'alt_super_admin') {
+    const { getOtoYikamaLokasyonIds } = await import('@/lib/yetki/getOtoYikamaLokasyonIds')
+    const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
+    if (otoIds.has(lokasyon_id)) {
+      return NextResponse.json({ error: 'Bu lokasyona kural açma yetkiniz yok' }, { status: 403 })
+    }
+  }
 
   const { data, error } = await admin
     .from('gorev_kurallari')

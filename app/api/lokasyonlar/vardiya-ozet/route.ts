@@ -26,6 +26,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,11 +116,15 @@ export async function GET(req: NextRequest) {
   if (projeId) q = (q as any).eq('proje_id', projeId)
   const { data: gorevler } = await q
 
+  // Oto Yıkama modülü şu an SA-only — TA/U/M için bu lokasyonların özetini gizle
+  const otoIds = !isSA ? await getOtoYikamaLokasyonIds(admin, firmaId) : new Set<string>()
+
   type Bucket = { tamamlandi: number; islemde: number; acik: number }
   const ozet: Record<string, Record<number, Bucket>> = {}
 
   for (const g of (gorevler ?? []) as any[]) {
     if (!g.lokasyon_id || !g.aktif_olma_tarihi) continue
+    if (otoIds.has(g.lokasyon_id)) continue
     const dk = trDakika(g.aktif_olma_tarihi)
     const vno = vardiyaNoBul(dk, ayarlar)
     if (vno == null) continue

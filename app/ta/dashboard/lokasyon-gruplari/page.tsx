@@ -4,6 +4,7 @@ import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import Topbar from '@/components/layout/Topbar'
 import LokasyonGruplariClient from '@/components/lokasyon-grup/LokasyonGruplariClient'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -40,6 +41,13 @@ export default async function TALokasyonGruplariPage() {
     lokasyonIds: (membersRes.data ?? []).filter((m: any) => m.grup_id === g.id).map((m: any) => m.lokasyon_id),
   }))
 
+  // Oto Yıkama modülü şu an SA-only — TA için bu lokasyonları gizle
+  let filteredLocations = (locationsRes.data ?? []) as any[]
+  if (firmaId) {
+    const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
+    if (otoIds.size > 0) filteredLocations = filteredLocations.filter(l => !otoIds.has(l.id))
+  }
+
   return (
     <div>
       <Topbar title="Lokasyon Gruplari" base="/ta" breadcrumbs={[{ label: 'Yonetim' }, { label: aktifProje.ad }, { label: 'Lokasyon Gruplari' }]} />
@@ -47,7 +55,7 @@ export default async function TALokasyonGruplariPage() {
         base="/ta"
         initialFirmaId={firmaId}
         initialGroups={initialGroups as any}
-        initialLocations={(locationsRes.data as any) ?? []}
+        initialLocations={filteredLocations as any}
         projeId={aktifProje.id}
       />
     </div>
