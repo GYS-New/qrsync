@@ -29,18 +29,25 @@ export default async function Dashboard() {
   ])
 
   // Oto Yıkama modülü şu an SA-only — TA için bu lokasyonları yetkiliLokIds'ten hariç tut
-  let yetkiliLokIds = descendantIds
+  let yetkiliLokIds: string[] | null = descendantIds
   if (firmaId) {
-    const admin = createAdminClient()
-    const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
-    if (otoIds.size > 0) {
-      if (yetkiliLokIds === null) {
-        // Tüm firma lokasyonları minus Oto Yıkama
-        const { data: tum } = await admin.from('lokasyonlar').select('id').eq('firma_id', firmaId)
-        yetkiliLokIds = (tum ?? []).map((l: any) => l.id).filter((id: string) => !otoIds.has(id))
-      } else {
-        yetkiliLokIds = yetkiliLokIds.filter(id => !otoIds.has(id))
+    try {
+      const admin = createAdminClient()
+      const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
+      if (otoIds.size > 0) {
+        if (yetkiliLokIds === null) {
+          // Tüm firma lokasyonları minus Oto Yıkama
+          const { data: tum } = await admin.from('lokasyonlar').select('id').eq('firma_id', firmaId)
+          yetkiliLokIds = (tum ?? []).map((l: any) => l.id).filter((id: string) => !otoIds.has(id))
+        } else {
+          yetkiliLokIds = yetkiliLokIds.filter(id => !otoIds.has(id))
+        }
       }
+      // Empty array Supabase .in() sorgularını patlatır → null'a düşür (tüm erişim)
+      if (yetkiliLokIds && yetkiliLokIds.length === 0) yetkiliLokIds = null
+    } catch {
+      // Filter hata verirse orijinal yetkiliLokIds (descendantIds) kalsın
+      yetkiliLokIds = descendantIds
     }
   }
 
