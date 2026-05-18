@@ -1143,13 +1143,20 @@ async function del() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: 4 }}>
         <input ref={importInputRef} type="file" accept=".xlsx" style={{ display:'none' }} onChange={onImportFile} />
 
-        {/* SOL — Canlı Görev Akışı */}
+        {/* SOL — Canlı Görev Akışı + Frekans Sayıları */}
         <a href={`${base}/dashboard/canli-islemler`} style={{ textDecoration: 'none', flexShrink: 0 }}>
           <button type="button" style={{
             height: 36, padding: '0 16px', borderRadius: 8, border: 'none',
             background: '#111827', color: '#fff', fontWeight: 800, fontSize: 13.5,
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
           }}>📡 Canlı Görev Akışı</button>
+        </a>
+        <a href={`${base}/dashboard/canli-islemler/tum-gorevler/frekans-sayilari`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', flexShrink: 0 }}>
+          <button type="button" style={{
+            height: 36, padding: '0 14px', borderRadius: 8, border: '1px solid #d1d5db',
+            background: '#fff', color: '#111827', fontWeight: 700, fontSize: 13,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+          }}>📊 Frekans Sayıları</button>
         </a>
 
         <div style={{ flex: 1 }} />
