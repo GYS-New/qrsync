@@ -56,16 +56,51 @@ export async function GET(req: Request) {
   const aktifGorevler: any[] = []
   const aktifCanliGorevler: any[] = []
 
+  // 4. Oto Yıkama metadata (km/notlar/foto) — gorevler içindekiler için
+  const spesifikGorevIds = (gorevler ?? []).map((g: any) => g.id)
+  const otoMetaMap = new Map<string, { km: number | null; notlar: string | null; foto_oncesi_url: string | null; foto_sonrasi_url: string | null; ekstra: boolean; plaka_snapshot: string | null }>()
+  if (spesifikGorevIds.length > 0) {
+    const { data: otoMeta } = await admin
+      .from('oto_yikama_gorev_metadata')
+      .select('gorev_id, plaka_snapshot, ekstra, km, notlar, foto_oncesi_url, foto_sonrasi_url')
+      .in('gorev_id', spesifikGorevIds)
+    for (const m of (otoMeta ?? []) as any[]) {
+      otoMetaMap.set(m.gorev_id, {
+        km: m.km ?? null,
+        notlar: m.notlar ?? null,
+        foto_oncesi_url: m.foto_oncesi_url ?? null,
+        foto_sonrasi_url: m.foto_sonrasi_url ?? null,
+        ekstra: !!m.ekstra,
+        plaka_snapshot: m.plaka_snapshot ?? null,
+      })
+    }
+  }
+
   // Spesifik görevleri kategorize et
   const spesifikTamamlanan = (gorevler ?? []).filter((g: any) => g.durum === 'TAMAMLANDI')
   const spesifikBekleyen = (gorevler ?? []).filter((g: any) => ['ACIK', 'ISLEMDE'].includes(g.durum))
   const spesifikDiger = (gorevler ?? []).filter((g: any) => !['TAMAMLANDI', 'ACIK', 'ISLEMDE'].includes(g.durum))
+
+  function withOtoMeta(g: any) {
+    const meta = otoMetaMap.get(g.id)
+    if (!meta) return null
+    return {
+      oto_yikama: true,
+      plaka: meta.plaka_snapshot,
+      ekstra: meta.ekstra,
+      km: meta.km,
+      notlar: meta.notlar,
+      foto_oncesi_url: meta.foto_oncesi_url,
+      foto_sonrasi_url: meta.foto_sonrasi_url,
+    }
+  }
 
   const tamamlananlar = [
     ...spesifikTamamlanan.map((g: any) => ({
       id: g.id, tanim: g.tanim, durum: g.durum,
       tarih: g.tamamlanma_tarihi || g.durum_degisim_tarihi,
       lokasyon: g.lokasyonlar?.tanim || '', tip: 'manuel', kategori: 'tamamlanan',
+      ...(withOtoMeta(g) ?? {}),
     })),
     ...(canliGorevler ?? []).map((g: any) => ({
       id: g.id, tanim: g.tanim, durum: g.durum,
@@ -79,11 +114,13 @@ export async function GET(req: Request) {
       id: g.id, tanim: g.tanim, durum: g.durum,
       tarih: g.olusturma_tarihi || g.durum_degisim_tarihi,
       lokasyon: g.lokasyonlar?.tanim || '', tip: 'manuel', kategori: 'bekleyen',
+      ...(withOtoMeta(g) ?? {}),
     })),
     ...spesifikDiger.map((g: any) => ({
       id: g.id, tanim: g.tanim, durum: g.durum,
       tarih: g.olusturma_tarihi || g.durum_degisim_tarihi,
       lokasyon: g.lokasyonlar?.tanim || '', tip: 'manuel', kategori: 'tamamlanan',
+      ...(withOtoMeta(g) ?? {}),
     })),
   ].sort((a, b) => new Date(b.tarih || 0).getTime() - new Date(a.tarih || 0).getTime())
 
