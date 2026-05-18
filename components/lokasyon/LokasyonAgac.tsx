@@ -4,6 +4,9 @@ import { useState } from 'react'
 import type { Lokasyon } from '@/types'
 import RowActionButton from '@/components/ui/RowActionButton'
 
+export type VardiyaBucket = { tamamlandi: number; islemde: number; acik: number }
+export type VardiyaOzet = Record<string, Record<number, VardiyaBucket>>
+
 interface LokasyonAgacProps {
   lokasyonlar: Lokasyon[]
   onEdit?: (l: Lokasyon) => void
@@ -19,12 +22,43 @@ interface LokasyonAgacProps {
   readonly?: boolean
   /** readonly olsa bile salt-okunur aksiyonları göster (QR/↓QR/↓Kart) */
   showReadOnlyActions?: boolean
+  /** Bugün vardiya × durum dağılımı — lokasyon başına */
+  vardiyaOzet?: VardiyaOzet
+}
+
+/** Vardiya rozetleri — V1/V2/V3 etiket + sayı kutusu (dominant renk) */
+function VardiyaRozetleri({ ozet }: { ozet?: Record<number, VardiyaBucket> }) {
+  if (!ozet) return null
+  const entries = Object.entries(ozet)
+    .map(([k, v]) => ({ v: Number(k), b: v }))
+    .filter(x => x.b.tamamlandi + x.b.islemde + x.b.acik > 0)
+    .sort((a, b) => a.v - b.v)
+  if (entries.length === 0) return null
+  return (
+    <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+      {entries.map(({ v, b }) => {
+        const toplam = b.tamamlandi + b.islemde + b.acik
+        // Renk önceliği: ACIK > ISLEMDE > TAMAMLANDI (en kötü durum baskın)
+        const bg = b.acik > 0 ? '#fef3c7' : b.islemde > 0 ? '#dbeafe' : '#dcfce7'
+        const fg = b.acik > 0 ? '#92400e' : b.islemde > 0 ? '#1e40af' : '#166534'
+        const tooltip = `Vardiya ${v} — Tamamlandı: ${b.tamamlandi}, İşlemde: ${b.islemde}, Açık: ${b.acik}`
+        return (
+          <div key={v} title={tooltip} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11 }}>
+            <span style={{ color: '#6b7280', fontWeight: 600 }}>V{v}</span>
+            <span style={{ background: bg, color: fg, padding: '1px 6px', borderRadius: 4, fontWeight: 800, minWidth: 18, textAlign: 'center' }}>
+              {toplam}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function LokasyonNode({
   lok, depth, onEdit, onDelete, onToggleAktif, onQR, onAddChild,
   onQrIndir, onQrSablonIndir, qrIndiriliyor, qrSablonIndiriliyor, qrSablonAktif, readonly,
-  showReadOnlyActions,
+  showReadOnlyActions, vardiyaOzet,
 }: {
   lok: Lokasyon; depth: number
   onEdit?: (l: Lokasyon) => void
@@ -39,6 +73,7 @@ function LokasyonNode({
   qrSablonAktif?: boolean
   readonly?: boolean
   showReadOnlyActions?: boolean
+  vardiyaOzet?: VardiyaOzet
 }) {
   const [open, setOpen] = useState(false)
   const hasChildren = (lok.children?.length ?? 0) > 0
@@ -68,7 +103,10 @@ function LokasyonNode({
 
         <span style={{ fontSize: 15 }}>📍</span>
 
-        <span style={{ flex: 1, fontSize: 14, fontWeight: isRoot ? 600 : 500, color: '#111827' }}>{lok.tanim}</span>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: isRoot ? 600 : 500, color: '#111827', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          <span>{lok.tanim}</span>
+          <VardiyaRozetleri ozet={vardiyaOzet?.[lok.id]} />
+        </span>
         {lok.aciklama && <span style={{ fontSize: 13, color: '#6b7280' }}>{lok.aciklama}</span>}
 
         <span className={`verde-badge ${lok.aktif ? 'status-islemde' : 'status-iptal'}`} style={{ fontSize: 13 }}>
@@ -139,6 +177,7 @@ function LokasyonNode({
           qrSablonAktif={qrSablonAktif}
           readonly={readonly}
           showReadOnlyActions={showReadOnlyActions}
+          vardiyaOzet={vardiyaOzet}
         />
       ))}
     </div>
@@ -148,7 +187,7 @@ function LokasyonNode({
 export default function LokasyonAgac({
   lokasyonlar, onEdit, onDelete, onToggleAktif, onQR, onAddChild,
   onQrIndir, onQrSablonIndir, qrIndiriliyor, qrSablonIndiriliyor, qrSablonAktif, readonly,
-  showReadOnlyActions,
+  showReadOnlyActions, vardiyaOzet,
 }: LokasyonAgacProps) {
   const map = new Map<string, Lokasyon>()
   lokasyonlar.forEach(l => map.set(l.id, { ...l, children: [] }))
@@ -182,6 +221,7 @@ export default function LokasyonAgac({
           qrSablonAktif={qrSablonAktif}
           readonly={readonly}
           showReadOnlyActions={showReadOnlyActions}
+          vardiyaOzet={vardiyaOzet}
         />
       ))}
     </div>

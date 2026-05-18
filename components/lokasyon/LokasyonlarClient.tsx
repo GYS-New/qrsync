@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import LokasyonAgac from '@/components/lokasyon/LokasyonAgac'
+import LokasyonAgac, { type VardiyaOzet } from '@/components/lokasyon/LokasyonAgac'
 import QrKodModal from '@/components/lokasyon/QrKodModal'
 import type { Lokasyon } from '@/types'
 import Button from '@/components/ui/Button'
@@ -166,6 +166,7 @@ export default function LokasyonlarClient({
   const [parentId, setParentId] = useState<string | null>(null)
   const [form, setForm] = useState({ tanim:'', aciklama:'', nfc_token:'', checklist_sablon_id:'', sureli_gorev_aktif:false, tamamlama_qr_zorunlu:false, oto_yikama_lokasyon:false })
   const [firmaOtoYikamaAktif, setFirmaOtoYikamaAktif] = useState(false)
+  const [vardiyaOzet, setVardiyaOzet] = useState<VardiyaOzet>({})
 
   // Firma'nın Oto Yıkama modülü aktif mi? Checkbox sadece aktifse görünür.
   useEffect(() => {
@@ -173,6 +174,25 @@ export default function LokasyonlarClient({
     supabase.from('firmalar').select('oto_yikama_aktif').eq('id', firmaId).single()
       .then(({ data }) => setFirmaOtoYikamaAktif(!!(data as any)?.oto_yikama_aktif))
   }, [firmaId])
+
+  // Bugünün vardiya × durum özetini çek (lokasyon rozetleri için)
+  useEffect(() => {
+    if (!firmaId) { setVardiyaOzet({}); return }
+    const p = new URLSearchParams({ firma_id: firmaId })
+    if (projeId) p.set('proje_id', projeId)
+    fetch(`/api/lokasyonlar/vardiya-ozet?${p}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(j => setVardiyaOzet(j?.ozet ?? {}))
+      .catch(() => setVardiyaOzet({}))
+    // 60sn'de bir yenile (canlı görev durumu değişebilir)
+    const t = setInterval(() => {
+      fetch(`/api/lokasyonlar/vardiya-ozet?${p}`, { cache: 'no-store' })
+        .then(r => r.json())
+        .then(j => setVardiyaOzet(j?.ozet ?? {}))
+        .catch(() => {})
+    }, 60000)
+    return () => clearInterval(t)
+  }, [firmaId, projeId])
 
   useEffect(() => {
     // when firm changes, refresh
@@ -422,6 +442,7 @@ export default function LokasyonlarClient({
               qrSablonIndiriliyor={qrSablonIndiriliyor}
               qrSablonAktif={qrSablonAktif}
               showReadOnlyActions={showReadOnlyActions}
+              vardiyaOzet={vardiyaOzet}
             />
           </div>
         )}
