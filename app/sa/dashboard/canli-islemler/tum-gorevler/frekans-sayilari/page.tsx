@@ -27,7 +27,7 @@ export default async function SAFrekansSayilariPage() {
           { label: 'Tüm Görevler', href: '/sa/dashboard/canli-islemler/tum-gorevler' },
           { label: 'Frekans Sayıları' },
         ]} />
-      <FrekansSayilariClient firmaId={firmaId} projeId={aktifProje?.id ?? null} />
+      <FrekansSayilariClient firmaId={firmaId} projeId={aktifProje?.id ?? null} collapsibleDefault />
     </div>
   )
 }

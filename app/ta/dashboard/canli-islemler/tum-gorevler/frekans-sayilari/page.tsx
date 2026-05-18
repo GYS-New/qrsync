@@ -26,7 +26,7 @@ export default async function TAFrekansSayilariPage() {
           { label: 'Tüm Görevler', href: '/ta/dashboard/canli-islemler/tum-gorevler' },
           { label: 'Frekans Sayıları' },
         ]} />
-      <FrekansSayilariClient firmaId={firmaId} projeId={aktifProje?.id ?? null} />
+      <FrekansSayilariClient firmaId={firmaId} projeId={aktifProje?.id ?? null} collapsibleDefault />
     </div>
   )
 }

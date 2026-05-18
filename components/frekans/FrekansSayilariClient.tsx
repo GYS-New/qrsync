@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, RefreshCw, Search } from 'lucide-react'
+import { Loader2, RefreshCw, Search, ChevronDown, ChevronRight } from 'lucide-react'
 
 type Kural = {
   id: string
@@ -34,7 +34,14 @@ const VARDIYA_RENK: Record<number, { bg: string; fg: string }> = {
   4: { bg: '#f3e8ff', fg: '#6b21a8' },  // mor
 }
 
-export default function FrekansSayilariClient({ firmaId, projeId }: { firmaId: string | null; projeId: string | null }) {
+export default function FrekansSayilariClient({
+  firmaId, projeId, collapsibleDefault = false,
+}: {
+  firmaId: string | null
+  projeId: string | null
+  /** SA/TA için true (üst lokasyon kartları varsayılan kapalı); U/M için false (açık) */
+  collapsibleDefault?: boolean
+}) {
   const [kurallar, setKurallar] = useState<Kural[]>([])
   const [vardiyaSayisi, setVardiyaSayisi] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -42,6 +49,7 @@ export default function FrekansSayilariClient({ firmaId, projeId }: { firmaId: s
   const [q, setQ] = useState('')
   const [vardiyaFilter, setVardiyaFilter] = useState<number | 'all'>('all')
   const [ustLokFilter, setUstLokFilter] = useState<string>('all')
+  const [acikUstler, setAcikUstler] = useState<Set<string>>(new Set())
 
   async function yukle() {
     if (!firmaId) { setKurallar([]); setLoading(false); return }
@@ -122,6 +130,29 @@ export default function FrekansSayilariClient({ firmaId, projeId }: { firmaId: s
       .sort((a, b) => a.ust_lokasyon_tanim.localeCompare(b.ust_lokasyon_tanim, 'tr'))
   }, [filtered])
 
+  // İlk yükleme veya filter sonrası açık ust seti default'a senkronla
+  // collapsibleDefault=true → hepsi kapalı, false → hepsi açık
+  useEffect(() => {
+    if (collapsibleDefault) {
+      setAcikUstler(new Set())
+    } else {
+      setAcikUstler(new Set(kurallar.map(k => k.ust_lokasyon_id)))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapsibleDefault, kurallar.length === 0])
+
+  function toggleUst(id: string) {
+    setAcikUstler(prev => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  }
+
+  function tumunuAc() { setAcikUstler(new Set(grouped.map(g => g.ust_lokasyon_id))) }
+  function tumunuKapat() { setAcikUstler(new Set()) }
+
   const ozetSayi = useMemo(() => {
     const t = { kural: filtered.length, gunluk_toplam: 0, haftalik_toplam: 0 }
     for (const k of filtered) {
@@ -168,6 +199,18 @@ export default function FrekansSayilariClient({ firmaId, projeId }: { firmaId: s
             günlük <strong style={{ color: T.text }}>{ozetSayi.gunluk_toplam}</strong>
             {ozetSayi.haftalik_toplam > 0 && <> · haftalık <strong style={{ color: T.text }}>{ozetSayi.haftalik_toplam}</strong></>}
           </span>
+          {collapsibleDefault && grouped.length > 0 && (
+            <>
+              <button onClick={tumunuAc}
+                style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                Tümünü Aç
+              </button>
+              <button onClick={tumunuKapat}
+                style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                Tümünü Kapat
+              </button>
+            </>
+          )}
           <button onClick={yukle} disabled={loading}
             style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <RefreshCw size={11} style={{ animation: loading ? 'spin 0.9s linear infinite' : undefined }} />
@@ -192,14 +235,21 @@ export default function FrekansSayilariClient({ firmaId, projeId }: { firmaId: s
           Bu kriterlere uygun kural yok.
         </div>
       ) : (
-        grouped.map(ust => (
+        grouped.map(ust => {
+          const acik = acikUstler.has(ust.ust_lokasyon_id)
+          const kuralAdet = ust.altlar.reduce((s, a) => s + a.vardiyalar.reduce((sv, v) => sv + v.kurallar.length, 0), 0)
+          return (
           <div key={ust.ust_lokasyon_id} className="verde-card" style={{ overflow: 'hidden' }}>
-            <div style={{ padding: '10px 14px', background: T.grayLight, borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div
+              onClick={() => toggleUst(ust.ust_lokasyon_id)}
+              style={{ padding: '12px 14px', background: T.grayLight, borderBottom: acik ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+              {acik ? <ChevronDown size={16} color={T.textSoft} /> : <ChevronRight size={16} color={T.textSoft} />}
               <span style={{ fontSize: 14, fontWeight: 800, color: T.text }}>📍 {ust.ust_lokasyon_tanim}</span>
               <span style={{ fontSize: 11, color: T.textSoft }}>
-                ({ust.altlar.length} alt lokasyon, {ust.altlar.reduce((s, a) => s + a.vardiyalar.reduce((sv, v) => sv + v.kurallar.length, 0), 0)} kural)
+                ({ust.altlar.length} alt lokasyon, {kuralAdet} kural)
               </span>
             </div>
+            {acik && (
             <table className="verde-table" style={{ width: '100%', tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: '32%' }} />
@@ -239,7 +289,7 @@ export default function FrekansSayilariClient({ firmaId, projeId }: { firmaId: s
                             </span>
                           )}
                         </td>
-                        <td style={{ fontSize: 12, color: T.textSoft, fontFamily: 'monospace' }}>
+                        <td style={{ fontSize: 13.5, color: T.text, fontFamily: 'monospace', fontWeight: 600 }}>
                           {idx === 0 ? k.aktif_olma_saati : ''}
                         </td>
                         <td style={{ fontSize: 12.5, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={k.tanim}>
@@ -259,8 +309,10 @@ export default function FrekansSayilariClient({ firmaId, projeId }: { firmaId: s
                 )}
               </tbody>
             </table>
+            )}
           </div>
-        ))
+          )
+        })
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
