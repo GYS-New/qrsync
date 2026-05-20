@@ -564,11 +564,15 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     let tamamlanan = 0, sapma = 0, kayip = 0, ekstra = 0
     for (const id of ids) {
       const e = lokGorevCount.get(id)
-      if (!e) continue
-      tamamlanan += e.tamamlanan
-      sapma      += e.sapma
-      kayip      += e.kayip
-      ekstra     += lokEkstraCount.get(id) ?? 0
+      if (e) {
+        tamamlanan += e.tamamlanan
+        sapma      += e.sapma
+        kayip      += e.kayip
+      }
+      // Ekstra (kural_id NULL & TAMAMLANDI) lokasyonda planlı kural-üretimli görev
+      // olup olmamasından bağımsız sayılır. Aksi halde planlısı olmayan lokasyonlarda
+      // yapılan ekstralar KPI'da görünür ama grup metriğine girmezdi.
+      ekstra += lokEkstraCount.get(id) ?? 0
     }
     // Vardiya frekans: lokasyonlar tablosundaki gunluk_frekans_sayisi toplamı
     let gunlukFrekans = 0
