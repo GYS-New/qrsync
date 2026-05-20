@@ -130,9 +130,12 @@ export async function GET(req: NextRequest) {
       const birimFiyat = grupId ? (grupFiyat.get(grupId) ?? 0) : 0
       const toplam = m.hedef * birimFiyat
       const kayipH = m.kayip * birimFiyat
+      // FREKANS FAZLASI sütunu ₺ biçiminde olduğu için adet yerine tutar yazılır
+      // (KAYIP HAKEDİŞ ile simetri). birim_fiyat=0 ise tüm fazla satırları da 0 olur.
+      const fazlaH = m.fazla * birimFiyat
       hakedisRows.push({
         grup: grupAd, hedef: m.hedef, birimFiyat, toplam,
-        kayipF: m.kayip, kayipH, fazla: m.fazla,
+        kayipF: m.kayip, kayipH, fazla: fazlaH,
         gerceklesen: toplam - kayipH,
       })
     }
