@@ -596,6 +596,10 @@ useEffect(() => {
     // Önceden durum_degisim_tarihi'ne göre filtreliyordu — bu yüzden dün aktif
     // olup bugün PD cron'la ZYS'ye düşen görevler "bugünün" gecikmelisine
     // sayılıyordu. Artık görev hangi vardiyada aktif olduysa o günün özetinde.
+    // Limit KPI ile aynı (10000). Önceden 500'dü ve toplam görev sayısı
+    // 500'ü aşan firmalarda, durum_degisim_tarihi sıralamasında alta düşen
+    // BEKLEMEDE/IPTAL kayıtları listeden kayboluyor, ama KPI'da sayılıyordu —
+    // kullanıcı kart üzerine basınca "Bu filtrede görev yok" görüyordu.
     let liveQ = supabase
       .from('canli_gorevler')
       .select(liveSelect)
@@ -603,7 +607,7 @@ useEffect(() => {
       .not('durum', 'in', '(HAZIR,ACIK)')
       .gte('aktif_olma_tarihi', liveSinceISO)
       .order('durum_degisim_tarihi', { ascending: false })
-      .limit(500)
+      .limit(10000)
 
     if (projeId) liveQ = liveQ.eq('proje_id', projeId)
     if (yetkiliLokIds) liveQ = liveQ.in('lokasyon_id', yetkiliLokIds)
@@ -638,7 +642,7 @@ useEffect(() => {
         .not('durum', 'in', '(HAZIR,ACIK)')
         .gte('aktif_olma_tarihi', liveSinceISO)
         .order('durum_degisim_tarihi', { ascending: false })
-        .limit(500)
+        .limit(10000)
       if (projeId) fallbackQ = fallbackQ.eq('proje_id', projeId)
       if (yetkiliLokIds) fallbackQ = fallbackQ.in('lokasyon_id', yetkiliLokIds)
 
