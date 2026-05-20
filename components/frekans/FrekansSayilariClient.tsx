@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, RefreshCw, Search, ChevronDown, ChevronRight } from 'lucide-react'
+import { Loader2, RefreshCw, Search, ChevronDown, ChevronRight, Download } from 'lucide-react'
 
 type Kural = {
   id: string
@@ -153,6 +153,59 @@ export default function FrekansSayilariClient({
   function tumunuAc() { setAcikUstler(new Set(grouped.map(g => g.ust_lokasyon_id))) }
   function tumunuKapat() { setAcikUstler(new Set()) }
 
+  // Mevcut filtre + sıralama uygulanmış kuralları Excel olarak indir
+  async function exportExcel() {
+    if (filtered.length === 0) return
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
+    const ws = wb.addWorksheet('Frekans Sayıları')
+    ws.columns = [
+      { header: 'Üst Lokasyon',    key: 'ust',    width: 26 },
+      { header: 'Alt Lokasyon',    key: 'alt',    width: 30 },
+      { header: 'Vardiya',         key: 'vard',   width: 10 },
+      { header: 'Aktif Saat',      key: 'saat',   width: 12 },
+      { header: 'Görev Tanımı',    key: 'tanim',  width: 36 },
+      { header: 'Frekans Sayısı',  key: 'sayi',   width: 14 },
+      { header: 'Tip',             key: 'tip',    width: 12 },
+      { header: 'Aktif Günler',    key: 'gunler', width: 22 },
+    ]
+    ws.getRow(1).font = { bold: true }
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } }
+
+    const GUN = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz']
+    // grouped sırasıyla yaz (UI ile aynı: üst lok → alt lok → vardiya → kural)
+    for (const ust of grouped) {
+      for (const alt of ust.altlar) {
+        for (const v of alt.vardiyalar) {
+          for (const k of v.kurallar) {
+            ws.addRow({
+              ust: ust.ust_lokasyon_tanim,
+              alt: alt.lokasyon_tanim,
+              vard: typeof v.vardiya_no === 'number' ? `V${v.vardiya_no}` : '—',
+              saat: k.aktif_olma_saati || '',
+              tanim: k.tanim,
+              sayi: k.sayi,
+              tip: k.frekans_tipi === 'haftalik' ? 'Haftalık' : 'Günlük',
+              gunler: k.frekans_tipi === 'haftalik' && Array.isArray(k.aktif_gunler) && k.aktif_gunler.length > 0
+                ? k.aktif_gunler.map(g => GUN[(g - 1 + 7) % 7] ?? `?${g}`).join(', ')
+                : '',
+            })
+          }
+        }
+      }
+    }
+
+    const buf = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const ts = new Date().toISOString().slice(0, 10)
+    a.download = `frekans-sayilari_${ts}.xlsx`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const ozetSayi = useMemo(() => {
     const t = { kural: filtered.length, gunluk_toplam: 0, haftalik_toplam: 0 }
     for (const k of filtered) {
@@ -215,6 +268,12 @@ export default function FrekansSayilariClient({
             style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <RefreshCw size={11} style={{ animation: loading ? 'spin 0.9s linear infinite' : undefined }} />
             Yenile
+          </button>
+          <button onClick={exportExcel} disabled={filtered.length === 0}
+            title="Mevcut filtreyle Excel olarak indir"
+            style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: '#16a34a', color: '#fff', cursor: filtered.length === 0 ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4, opacity: filtered.length === 0 ? 0.5 : 1 }}>
+            <Download size={11} />
+            Excel
           </button>
         </div>
       </div>
