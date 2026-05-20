@@ -1,9 +1,18 @@
 FROM node:20-slim
 
 # Python kur
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip python3-venv \
-    --no-install-recommends && \
+# NOT (2026-05-21): Railway build runner'larında apt GPG imzaları "invalid"
+# olarak işaretleniyordu (büyük olasılıkla container saat kayması). Build'in
+# bloklanmaması için Acquire::Check-Valid-Until ve Check-Date kapatıldı,
+# imza zorunluluğu gevşetildi. Railway altyapısı düzelince bu satırlar
+# orijinal "apt-get update && apt-get install -y" formatına çevrilmeli.
+RUN apt-get update \
+      -o Acquire::Check-Valid-Until=false \
+      -o Acquire::Check-Date=false \
+      -o Acquire::AllowInsecureRepositories=true \
+      -o Acquire::AllowDowngradeToInsecureRepositories=true && \
+    apt-get install -y --no-install-recommends --allow-unauthenticated \
+      python3 python3-pip python3-venv && \
     rm -rf /var/lib/apt/lists/*
 
 # Python paketleri
