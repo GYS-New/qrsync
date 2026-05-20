@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
 import { buildGenelRaporData } from '@/lib/reports/genel-rapor-data'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 import { fillXlsxTemplate, type SheetData, type CellData } from '@/lib/reports/xlsx-template-filler'
 
 export const dynamic = 'force-dynamic'
@@ -55,8 +56,11 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 3. Lokasyon hedef süreleri + günlük frekans sayıları ──────────────
+  // Oto Yıkama lokasyonları bu rapora dahil değil (üst lok + tüm alt soylar hariç)
+  const otoYikamaIds = await getOtoYikamaLokasyonIds(admin, firmaId as string)
   let lokQ = admin.from('lokasyonlar').select('id,tanim,hedef_sure_dakika,gunluk_frekans_sayisi').eq('firma_id', firmaId)
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+  if (otoYikamaIds.size > 0) lokQ = lokQ.not('id', 'in', `(${[...otoYikamaIds].join(',')})`)
   const { data: lokSureList } = await lokQ
   const lokHedefMap = new Map<string, number>()
   const lokFrekansMap = new Map<string, number>()       // id → frekans
@@ -73,6 +77,7 @@ export async function GET(req: NextRequest) {
   function buildSureQ(table: string) {
     let q = admin.from(table).select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI')
     if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (otoYikamaIds.size > 0) q = q.not('lokasyon_id', 'in', `(${[...otoYikamaIds].join(',')})`)
     if (baslangic) { const v = new Date(baslangic + 'T00:00:00+03:00').toISOString(); q = q.gte('aktif_olma_tarihi', v) }
     if (bitis) { const v = new Date(bitis + 'T23:59:59+03:00').toISOString(); q = q.lte('aktif_olma_tarihi', v) }
     return q

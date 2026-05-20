@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
 import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliUserIds'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
 export type VardiyaFilter = 'all' | 'v1' | 'v2' | 'v3'
@@ -284,7 +285,12 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     .eq('firma_id', filters.firmaId)
   if (filters.projeId) lokQ = (lokQ as any).eq('proje_id', filters.projeId)
   const { data: lokasyonlar } = await lokQ
-  const allLokasyonlar = lokasyonlar ?? []
+
+  // Oto Yıkama üst lokasyonları + tüm alt soyları bu rapordan hariç tutulur
+  // (KPI, departman analizi, gruplar, görev listeleri, grafikler — hiçbiri Oto
+  //  Yıkama verisi içermez). Tüm roller için geçerli.
+  const otoYikamaIds = await getOtoYikamaLokasyonIds(admin, filters.firmaId)
+  const allLokasyonlar = (lokasyonlar ?? []).filter((l: any) => !otoYikamaIds.has(l.id))
   const lokMap = new Map(allLokasyonlar.map((l: any) => [l.id, l]))
 
   // Bir lokasyonun tüm alt ağacını (recursive) toplayan yardımcı fonksiyon
@@ -363,6 +369,13 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     targetLokasyonIds = filters.yetkiliUstLokIds.flatMap(id => getAllDescendants(id))
   }
 
+  // Oto Yıkama: kullanıcı filtre olarak Oto Yıkama üst lokasyonu seçmiş olsa bile
+  // bu raporda gösterilmemeli — hedef ID listesinden çıkar (sonuç boşalırsa
+  // rapor boş döner, beklendiği gibi).
+  if (targetLokasyonIds && otoYikamaIds.size > 0) {
+    targetLokasyonIds = targetLokasyonIds.filter(id => !otoYikamaIds.has(id))
+  }
+
   // 3. Görevleri çek: aktif tablo + arşiv tablosu birleşik
   // Arşiv tablosu terminal durumları (TAMAMLANDI, ZAMANI_GECMIS vb.) tutar.
   //
@@ -382,6 +395,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     let q = admin.from(table).select(SELECT_COLS).eq('firma_id', filters.firmaId)
     if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
     if (targetLokasyonIds && targetLokasyonIds.length > 0) q = q.in('lokasyon_id', targetLokasyonIds)
+    // Oto Yıkama görevleri hariç tutulur (kullanıcı genel ya da yetki-scope sorgu yapsa bile)
+    if (otoYikamaIds.size > 0) q = q.not('lokasyon_id', 'in', `(${[...otoYikamaIds].join(',')})`)
     if (baslangicUTC) q = q.gte('aktif_olma_tarihi', baslangicUTC)
     if (bitisUTC) q = q.lte('aktif_olma_tarihi', bitisUTC)
     return q
@@ -463,6 +478,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
 
   const grupLokMap = new Map<string, string[]>() // grup_id -> lokasyon_id[]
   for (const u of grupUyeler ?? []) {
+    // Oto Yıkama lokasyon üyelerini grup metriklerine sokma
+    if (otoYikamaIds.has((u as any).lokasyon_id)) continue
     const arr = grupLokMap.get((u as any).grup_id) ?? []
     arr.push((u as any).lokasyon_id)
     grupLokMap.set((u as any).grup_id, arr)
