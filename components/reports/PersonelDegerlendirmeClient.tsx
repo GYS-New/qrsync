@@ -29,6 +29,7 @@ type Meta = {
   tarih_bitis: string
   ust_lokasyonlar: { id: string; tanim: string }[]
   personeller: { id: string; isim_soyisim: string; ust_lokasyon_id: string | null }[]
+  vardiyalar: { no: number; baslangic: string; bitis: string }[]
 }
 
 const T = {
@@ -65,8 +66,14 @@ function fmtSure(sn: number | null): string {
   if (m > 0) return `${m}dk ${s}sn`
   return `${s}sn`
 }
-function bugunISO(): string { return new Date().toISOString().slice(0, 10) }
-function gunOnceISO(g: number): string { const d = new Date(); d.setDate(d.getDate() - g); return d.toISOString().slice(0, 10) }
+// TR günü (Europe/Istanbul) — API de TR'ye göre pencere kuruyor, eşleşmeli.
+function bugunISO(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+}
+function gunOnceISO(g: number): string {
+  const d = new Date(Date.now() - g * 24 * 60 * 60 * 1000)
+  return d.toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+}
 
 type SortKey = 'isim_soyisim' | 'cihaz_eslesti' | 'ust_lokasyon_adi' | 'aktif' | 'tamamlandi_sayi' | 'iptal_sayi' | 'ortalama_sure_saniye' | 'aktif_gun_sayisi' | 'basari_kategori'
 type SortDir = 'asc' | 'desc'
@@ -82,6 +89,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
   const [tarihBitis, setTarihBitis] = useState(bugunISO())
   const [ustLokFilter, setUstLokFilter] = useState('')
   const [personelFilter, setPersonelFilter] = useState('')
+  const [vardiyaFilter, setVardiyaFilter] = useState('')
 
   // Kolon filtreleri (sadece client tarafında)
   const [colFiltreIsim, setColFiltreIsim] = useState('')
@@ -105,6 +113,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
       if (projeId) p.set('proje_id', projeId)
       if (ustLokFilter) p.set('ust_lokasyon_id', ustLokFilter)
       if (personelFilter) p.set('personel_id', personelFilter)
+      if (vardiyaFilter) p.set('vardiya_no', vardiyaFilter)
       const res = await fetch(`/api/raporlar/personel-degerlendirme?${p}`, { cache: 'no-store' })
       const json = await res.json()
       if (!json.ok) {
@@ -120,7 +129,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
     } finally {
       setLoading(false)
     }
-  }, [firmaId, projeId, tarihBaslangic, tarihBitis, ustLokFilter, personelFilter])
+  }, [firmaId, projeId, tarihBaslangic, tarihBitis, ustLokFilter, personelFilter, vardiyaFilter])
 
   useEffect(() => { yukle() }, [yukle])
 
@@ -265,7 +274,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
       <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14, height: 'calc(100vh - 60px)', minHeight: 0 }}>
 
         {/* ─── Üst filtre bandı ─────────────────────────────────────────────── */}
-        <div className="verde-card" style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto auto auto', gap: 10, alignItems: 'end' }}>
+        <div className="verde-card" style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr) auto auto auto', gap: 10, alignItems: 'end' }}>
           <label style={lbl}>
             <span style={lblTxt}>Başlangıç</span>
             <input type="date" value={tarihBaslangic} onChange={e => setTarihBaslangic(e.target.value)} style={inp} />
@@ -273,6 +282,15 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
           <label style={lbl}>
             <span style={lblTxt}>Bitiş</span>
             <input type="date" value={tarihBitis} onChange={e => setTarihBitis(e.target.value)} style={inp} />
+          </label>
+          <label style={lbl}>
+            <span style={lblTxt}>Vardiya</span>
+            <select value={vardiyaFilter} onChange={e => setVardiyaFilter(e.target.value)} style={inp}>
+              <option value="">Tümü</option>
+              {(meta?.vardiyalar ?? []).map(v => (
+                <option key={v.no} value={String(v.no)}>{`V${v.no} (${v.baslangic}–${v.bitis})`}</option>
+              ))}
+            </select>
           </label>
           <label style={lbl}>
             <span style={lblTxt}>Üst Lokasyon</span>

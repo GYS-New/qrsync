@@ -13,14 +13,19 @@ const SAYFA_KODU = 'personel-degerlendirme-raporlari'
  * Query params:
  *   firma_id        — zorunlu (TA/U için kendi firma_id'si ile eşleşmeli)
  *   proje_id        — opsiyonel
- *   tarih_baslangic — ISO date (YYYY-MM-DD), default: 30 gün önce
- *   tarih_bitis     — ISO date, default: bugün
+ *   tarih_baslangic — ISO date (YYYY-MM-DD), default: 30 gün önce  (TR günü)
+ *   tarih_bitis     — ISO date, default: bugün                    (TR günü)
  *   ust_lokasyon_id — opsiyonel filtre (yalnızca o üst lokasyonda görev yapanlar)
  *   personel_id     — opsiyonel filtre (tek personel)
+ *   vardiya_no      — opsiyonel (1..N) — sadece o vardiyada tamamlanan/iptal edilen
  *
  * Tarih aralığında personel başına tamamlanan, iptal edilen görev sayısı,
  * ortalama tamamlanma süresi, cihaz eşleşme ve aktiflik durumu döner.
- * Hem canli_gorevler hem de canli_gorevler_arsiv'den veri çeker.
+ *
+ * NOT: Tarih penceresi TR (+03:00) gün sınırlarına göre kurulur. TAMAMLANDI
+ *      kayıtları `tamamlanma_tarihi`, IPTAL kayıtları `iptal_tarihi` üzerinden
+ *      süzülür. Aksi durumda gece vardiyası tamamlamaları (TR 00:00–03:00) eksik
+ *      sayılırdı.
  */
 export async function GET(req: NextRequest) {
   const supabase = createClient()
@@ -52,20 +57,26 @@ export async function GET(req: NextRequest) {
 
   const ustLokFilter = p.get('ust_lokasyon_id') || null
   const personelFilter = p.get('personel_id') || null
+  const vardiyaNoParam = p.get('vardiya_no')
+  const vardiyaNoFilter = vardiyaNoParam ? Number(vardiyaNoParam) : null
 
-  // Tarih aralığı (default: son 30 gün)
-  const today = new Date()
-  const defaultStart = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
-  const tarihBaslangic = p.get('tarih_baslangic') || defaultStart.toISOString().slice(0, 10)
-  const tarihBitis = p.get('tarih_bitis') || today.toISOString().slice(0, 10)
-  const tarihBitisInclusive = `${tarihBitis}T23:59:59.999Z`
-  const tarihBaslangicInclusive = `${tarihBaslangic}T00:00:00.000Z`
+  // ── Tarih aralığı (TR günü; +03:00 sabit, TR'de DST yok) ───────────────────
+  function trBugunISO(): string {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+  }
+  function trGunOnceISO(g: number): string {
+    const d = new Date(Date.now() - g * 24 * 60 * 60 * 1000)
+    return d.toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+  }
+  const tarihBaslangic = p.get('tarih_baslangic') || trGunOnceISO(30)
+  const tarihBitis = p.get('tarih_bitis') || trBugunISO()
+  // TR yerel gün sınırları (UTC ISO'ya çevrilmiş)
+  const tarihBaslangicIso = new Date(`${tarihBaslangic}T00:00:00+03:00`).toISOString()
+  const tarihBitisIso = new Date(`${tarihBitis}T23:59:59.999+03:00`).toISOString()
 
   const admin = createAdminClient()
 
   // ── 0. U/M için lokasyon scope kontrolü ────────────────────────────────────
-  // SA/TA = sınırsız. U/M = kullanici_lokasyon_yetkileri'deki ust_lokasyon_id'lere bağlı.
-  // Yetki kaydı yoksa = sınırsız (geriye dönük uyumluluk — diğer raporlarla aynı pattern).
   let yetkiliUstLokIds: string[] | null = null  // null = sınırsız
   if (me.rol === 'tenant_user' || me.rol === 'musteri') {
     const { data: ylk } = await admin
@@ -76,14 +87,17 @@ export async function GET(req: NextRequest) {
     if (ids.length > 0) yetkiliUstLokIds = ids
   }
 
-  // Eğer URL'de gelen ust_lokasyon_id, kullanıcının yetkili listesinde değilse bypass et —
-  // sessizce reddedip boş dönmek yerine, scope filtresi zaten istenmeyeni süzer.
   if (yetkiliUstLokIds && ustLokFilter && !yetkiliUstLokIds.includes(ustLokFilter)) {
-    return NextResponse.json({ ok: true, data: [], meta: { tarih_baslangic: tarihBaslangic, tarih_bitis: tarihBitis, ust_lokasyonlar: [], personeller: [] } })
+    return NextResponse.json({
+      ok: true, data: [],
+      meta: {
+        tarih_baslangic: tarihBaslangic, tarih_bitis: tarihBitis,
+        ust_lokasyonlar: [], personeller: [], vardiyalar: [],
+      },
+    })
   }
 
   // ── 1. Personeller ─────────────────────────────────────────────────────────
-  // ust_lokasyon_id doğrudan users tablosunda — kullanıcı oluşturulurken atanır
   let userQ = admin
     .from('users')
     .select('id, isim_soyisim, aktif, rol, ust_lokasyon_id')
@@ -94,20 +108,34 @@ export async function GET(req: NextRequest) {
   const { data: personeller } = await userQ.order('isim_soyisim', { ascending: true })
 
   const personelIds = (personeller ?? []).map((u: any) => u.id)
+
+  // ── 2. Firma vardiya ayarları ──────────────────────────────────────────────
+  const { data: firmaRow } = await admin
+    .from('firmalar')
+    .select('vardiya_sayisi, vardiya_saatleri, tum_vardiya_ayarlari')
+    .eq('id', firmaId)
+    .single()
+  const vardiyaSayisi = (firmaRow as any)?.vardiya_sayisi ?? 0
+  const tumAyarlar = (firmaRow as any)?.tum_vardiya_ayarlari ?? {}
+  const vardiyaList: { no: number; baslangic: string; bitis: string }[] = (() => {
+    const key = String(vardiyaSayisi)
+    const raw = (tumAyarlar?.[key] ?? (firmaRow as any)?.vardiya_saatleri ?? []) as any[]
+    return raw
+      .filter(v => v && v.baslangic && v.bitis)
+      .map((v: any) => ({ no: Number(v.no), baslangic: String(v.baslangic), bitis: String(v.bitis) }))
+  })()
+
   if (personelIds.length === 0) {
     return NextResponse.json({
-      ok: true,
-      data: [],
+      ok: true, data: [],
       meta: {
-        tarih_baslangic: tarihBaslangic,
-        tarih_bitis: tarihBitis,
-        ust_lokasyonlar: [],
-        personeller: [],
+        tarih_baslangic: tarihBaslangic, tarih_bitis: tarihBitis,
+        ust_lokasyonlar: [], personeller: [], vardiyalar: vardiyaList,
       },
     })
   }
 
-  // ── 2. Üst lokasyonlar (root: parent_id IS NULL) ───────────────────────────
+  // ── 3. Üst lokasyonlar (root) ──────────────────────────────────────────────
   let ustLokQ = admin
     .from('lokasyonlar')
     .select('id, tanim')
@@ -120,30 +148,56 @@ export async function GET(req: NextRequest) {
   for (const l of ustLokRows ?? []) lokAdMap.set((l as any).id, (l as any).tanim)
   const ustLokasyonlar = (ustLokRows ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim }))
 
-  // ── 3. Görevler — canli_gorevler + canli_gorevler_arsiv ────────────────────
-  const SELECT_COLS = 'tamamlayan_kullanici_id, iptal_eden_id, durum, tamamlanma_suresi_saniye, tamamlanma_tarihi'
+  // ── 4. Görevler ────────────────────────────────────────────────────────────
+  // TAMAMLANAN: durum=TAMAMLANDI + tamamlanma_tarihi pencere içinde
+  // İPTAL:      durum=IPTAL + iptal_tarihi pencere içinde
+  const SELECT_TAM = 'tamamlayan_kullanici_id, durum, tamamlanma_suresi_saniye, tamamlanma_tarihi'
+  const SELECT_IPT = 'iptal_eden_id, durum, iptal_tarihi'
 
-  let liveQ = admin
+  let liveTamQ = admin
     .from('canli_gorevler')
-    .select(SELECT_COLS)
+    .select(SELECT_TAM)
     .eq('firma_id', firmaId)
-    .gte('aktif_olma_tarihi', tarihBaslangicInclusive)
-    .lte('aktif_olma_tarihi', tarihBitisInclusive)
-  if (projeId) liveQ = (liveQ as any).eq('proje_id', projeId)
-  const { data: liveTasks } = await liveQ
+    .eq('durum', 'TAMAMLANDI')
+    .gte('tamamlanma_tarihi', tarihBaslangicIso)
+    .lte('tamamlanma_tarihi', tarihBitisIso)
+  if (projeId) liveTamQ = (liveTamQ as any).eq('proje_id', projeId)
+  const { data: liveTam } = await liveTamQ
 
-  let arsivQ = admin
+  let arsivTamQ = admin
     .from('canli_gorevler_arsiv')
-    .select(SELECT_COLS)
+    .select(SELECT_TAM)
     .eq('firma_id', firmaId)
-    .gte('aktif_olma_tarihi', tarihBaslangicInclusive)
-    .lte('aktif_olma_tarihi', tarihBitisInclusive)
-  if (projeId) arsivQ = (arsivQ as any).eq('proje_id', projeId)
-  const { data: arsivTasks } = await arsivQ
+    .eq('durum', 'TAMAMLANDI')
+    .gte('tamamlanma_tarihi', tarihBaslangicIso)
+    .lte('tamamlanma_tarihi', tarihBitisIso)
+  if (projeId) arsivTamQ = (arsivTamQ as any).eq('proje_id', projeId)
+  const { data: arsivTam } = await arsivTamQ
 
-  const allTasks = [...(liveTasks ?? []), ...(arsivTasks ?? [])]
+  let liveIptQ = admin
+    .from('canli_gorevler')
+    .select(SELECT_IPT)
+    .eq('firma_id', firmaId)
+    .eq('durum', 'IPTAL')
+    .gte('iptal_tarihi', tarihBaslangicIso)
+    .lte('iptal_tarihi', tarihBitisIso)
+  if (projeId) liveIptQ = (liveIptQ as any).eq('proje_id', projeId)
+  const { data: liveIpt } = await liveIptQ
 
-  // ── 4. Cihaz eşleşme ───────────────────────────────────────────────────────
+  let arsivIptQ = admin
+    .from('canli_gorevler_arsiv')
+    .select(SELECT_IPT)
+    .eq('firma_id', firmaId)
+    .eq('durum', 'IPTAL')
+    .gte('iptal_tarihi', tarihBaslangicIso)
+    .lte('iptal_tarihi', tarihBitisIso)
+  if (projeId) arsivIptQ = (arsivIptQ as any).eq('proje_id', projeId)
+  const { data: arsivIpt } = await arsivIptQ
+
+  const tamamTasks = [...(liveTam ?? []), ...(arsivTam ?? [])]
+  const iptalTasks = [...(liveIpt ?? []), ...(arsivIpt ?? [])]
+
+  // ── 5. Cihaz eşleşme ───────────────────────────────────────────────────────
   const { data: deviceRows } = await admin
     .from('device_tokens')
     .select('user_id')
@@ -152,54 +206,86 @@ export async function GET(req: NextRequest) {
     .not('fcm_token', 'is', null)
   const eslesenSet = new Set((deviceRows ?? []).map((r: any) => r.user_id))
 
-  // ── 5. Personel başına agregasyon ──────────────────────────────────────────
-  // NOT: Tamamlanma — frekansiyel görevlerde atanan_kullanici_id NULL,
-  //      iş mobilde tamamlanınca tamamlayan_kullanici_id dolar. O yüzden
-  //      "tamamladığı görev" = tamamlayan_kullanici_id eşleşmesi.
+  // ── 6. Vardiya yardımcıları ────────────────────────────────────────────────
+  // TR-saat (dakika cinsinden, gün-içi: 0..1439)
+  function trDakika(iso: string | null | undefined): number | null {
+    if (!iso) return null
+    const hhmm = new Date(iso).toLocaleTimeString('en-GB', {
+      timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
+    })
+    const [h, m] = hhmm.split(':').map(Number)
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null
+    return h * 60 + m
+  }
+  function trDateStr(iso: string | null | undefined): string | null {
+    if (!iso) return null
+    try { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' }) }
+    catch { return null }
+  }
+
+  // Seçili vardiyanın TR saat aralığı (sarkan vardiya desteği)
+  // Dönüş: [{ baslaMin, bitMin }] — bitMin > 1440 ise sarkan, [bas..1440) ∪ [0..bit-1440)
+  type Aralik = { bas: number; bit: number }  // dakika (bit > 1440 ise sarkan)
+  const seciliVardiyaAralik: Aralik | null = (() => {
+    if (!vardiyaNoFilter) return null
+    const v = vardiyaList.find(x => x.no === vardiyaNoFilter)
+    if (!v) return null
+    const [bh, bm] = v.baslangic.split(':').map(Number)
+    const [eh, em] = v.bitis.split(':').map(Number)
+    if (![bh, bm, eh, em].every(Number.isFinite)) return null
+    const bas = bh * 60 + bm
+    let bit = eh * 60 + em
+    if (bit === 0 && bas !== 0) bit = 24 * 60          // "00:00" bitiş → ertesi 24:00
+    if (bit <= bas && bit !== 24 * 60) bit += 24 * 60  // sarkan
+    return { bas, bit }
+  })()
+
+  function vardiyaIcinde(iso: string | null | undefined): boolean {
+    if (!seciliVardiyaAralik) return true
+    const dk = trDakika(iso)
+    if (dk == null) return false
+    const { bas, bit } = seciliVardiyaAralik
+    if (bit <= 24 * 60) return dk >= bas && dk < bit
+    // Sarkan: dk ∈ [bas, 1440) ∪ [0, bit-1440)
+    return dk >= bas || dk < (bit - 24 * 60)
+  }
+
+  // ── 7. Personel başına agregasyon ──────────────────────────────────────────
   type Agg = {
     tamamlandi: number
     iptal: number
     sureToplam: number
     sureSayi: number
-    aktifGunler: Set<string>  // YYYY-MM-DD (TR timezone) — distinct çalışma günleri
+    aktifGunler: Set<string>
   }
   const aggMap = new Map<string, Agg>()
   for (const pid of personelIds) {
     aggMap.set(pid, { tamamlandi: 0, iptal: 0, sureToplam: 0, sureSayi: 0, aktifGunler: new Set() })
   }
 
-  function trDateStr(iso: string | null | undefined): string | null {
-    if (!iso) return null
-    try {
-      // 'en-CA' locale → YYYY-MM-DD; timeZone Europe/Istanbul ile gün sınırı TR'ye göre
-      return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
-    } catch { return null }
+  for (const t of tamamTasks as any[]) {
+    const uid = t.tamamlayan_kullanici_id as string | null
+    if (!uid || !aggMap.has(uid)) continue
+    if (!vardiyaIcinde(t.tamamlanma_tarihi)) continue
+    const a = aggMap.get(uid)!
+    a.tamamlandi++
+    if (typeof t.tamamlanma_suresi_saniye === 'number' && t.tamamlanma_suresi_saniye > 0) {
+      a.sureToplam += t.tamamlanma_suresi_saniye
+      a.sureSayi++
+    }
+    const gun = trDateStr(t.tamamlanma_tarihi)
+    if (gun) a.aktifGunler.add(gun)
   }
 
-  for (const t of allTasks as any[]) {
-    const tamamlayan = t.tamamlayan_kullanici_id as string | null
-    const iptalEden = t.iptal_eden_id as string | null
-    const durum = t.durum as string
-
-    if (tamamlayan && aggMap.has(tamamlayan) && durum === 'TAMAMLANDI') {
-      const a = aggMap.get(tamamlayan)!
-      a.tamamlandi++
-      if (typeof t.tamamlanma_suresi_saniye === 'number' && t.tamamlanma_suresi_saniye > 0) {
-        a.sureToplam += t.tamamlanma_suresi_saniye
-        a.sureSayi++
-      }
-      const gun = trDateStr(t.tamamlanma_tarihi)
-      if (gun) a.aktifGunler.add(gun)
-    }
-
-    if (iptalEden && aggMap.has(iptalEden) && durum === 'IPTAL') {
-      const a = aggMap.get(iptalEden)!
-      a.iptal++
-    }
+  for (const t of iptalTasks as any[]) {
+    const uid = t.iptal_eden_id as string | null
+    if (!uid || !aggMap.has(uid)) continue
+    if (!vardiyaIcinde(t.iptal_tarihi)) continue
+    const a = aggMap.get(uid)!
+    a.iptal++
   }
 
   // Başarı kategori — günlük ortalama tamamlama süresine göre
-  // ≥6sa BAŞARILI, 3-6sa NORMAL, 1-3sa YETERSİZ, 0-1sa BAŞARISIZ, hiç çalışmamışsa null
   function basariKategoriBul(gunlukOrtSn: number | null): string | null {
     if (gunlukOrtSn == null) return null
     if (gunlukOrtSn >= 21600) return 'BAŞARILI'
@@ -208,7 +294,7 @@ export async function GET(req: NextRequest) {
     return 'BAŞARISIZ'
   }
 
-  // ── 6. Sonuç satırları ─────────────────────────────────────────────────────
+  // ── 8. Sonuç satırları ─────────────────────────────────────────────────────
   let rows = (personeller ?? []).map((u: any) => {
     const a = aggMap.get(u.id)!
     const ustLokId = u.ust_lokasyon_id ?? null
@@ -230,7 +316,6 @@ export async function GET(req: NextRequest) {
     }
   })
 
-  // Filtreler
   if (ustLokFilter) rows = rows.filter(r => r.ust_lokasyon_id === ustLokFilter)
   if (personelFilter) rows = rows.filter(r => r.personel_id === personelFilter)
 
@@ -242,6 +327,7 @@ export async function GET(req: NextRequest) {
       tarih_bitis: tarihBitis,
       ust_lokasyonlar: ustLokasyonlar,
       personeller: (personeller ?? []).map((u: any) => ({ id: u.id, isim_soyisim: u.isim_soyisim, ust_lokasyon_id: u.ust_lokasyon_id ?? null })),
+      vardiyalar: vardiyaList,
     },
   })
 }
