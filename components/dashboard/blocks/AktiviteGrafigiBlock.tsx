@@ -67,13 +67,19 @@ export default function AktiviteGrafigiBlock({
   }, [mode])
 
   async function fetchData() {
+    // VARDİYA TABANLI gruplama:
+    // Tamamlanmış görevleri 'tamamlanma_tarihi' yerine 'aktif_olma_tarihi'nin
+    // TR gününe yazıyoruz. Sebep: Pzt 16:00 3.vardiya görevi Sal 00:30'da
+    // tamamlanırsa "Tamamlanan Görev" grafiğinde Pzt sütununa düşer (vardiya
+    // sahibi gün). Aksi halde gece vardiyası tamamlamaları ertesi güne düşüp
+    // "çalışmadığım gün" sezgisini bozuyordu.
     const rangeISO = rangeStart.toISOString()
 
     // Tamamlanan canlı görevler (frekansiyel)
     const buildCanli = () => {
-      let q = supabase.from("canli_gorevler").select("tamamlanma_tarihi")
+      let q = supabase.from("canli_gorevler").select("aktif_olma_tarihi")
         .not("tamamlanma_tarihi", "is", null)
-        .gte("tamamlanma_tarihi", rangeISO)
+        .gte("aktif_olma_tarihi", rangeISO)
       if (firmaId) q = q.eq("firma_id", firmaId)
       if (projeId) q = (q as any).eq("proje_id", projeId)
       if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
@@ -82,9 +88,9 @@ export default function AktiviteGrafigiBlock({
 
     // Tamamlanan arşiv görevler
     const buildArsiv = () => {
-      let q = supabase.from("canli_gorevler_arsiv").select("tamamlanma_tarihi")
+      let q = supabase.from("canli_gorevler_arsiv").select("aktif_olma_tarihi")
         .not("tamamlanma_tarihi", "is", null)
-        .gte("tamamlanma_tarihi", rangeISO)
+        .gte("aktif_olma_tarihi", rangeISO)
       if (firmaId) q = q.eq("firma_id", firmaId)
       if (projeId) q = (q as any).eq("proje_id", projeId)
       if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
@@ -93,10 +99,10 @@ export default function AktiviteGrafigiBlock({
 
     // Tamamlanan spesifik görevler
     const buildSpesifik = () => {
-      let q = supabase.from("gorevler").select("tamamlanma_tarihi")
+      let q = supabase.from("gorevler").select("aktif_olma_tarihi")
         .eq("durum", "TAMAMLANDI")
         .not("tamamlanma_tarihi", "is", null)
-        .gte("tamamlanma_tarihi", rangeISO)
+        .gte("aktif_olma_tarihi", rangeISO)
       if (firmaId) q = q.eq("firma_id", firmaId)
       if (projeId) q = (q as any).eq("proje_id", projeId)
       if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
@@ -117,7 +123,7 @@ export default function AktiviteGrafigiBlock({
         grouped[label] = 0
       }
       rows.forEach((r: any) => {
-        const d = startOfHourTR(new Date(r.tamamlanma_tarihi))
+        const d = startOfHourTR(new Date(r.aktif_olma_tarihi))
         const label = d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false })
         if (label in grouped) grouped[label] = (grouped[label] || 0) + 1
       })
@@ -129,7 +135,7 @@ export default function AktiviteGrafigiBlock({
         grouped[key] = 0
       })
       rows.forEach((r: any) => {
-        const d = startOfDayTR(new Date(r.tamamlanma_tarihi))
+        const d = startOfDayTR(new Date(r.aktif_olma_tarihi))
         const key = d.toLocaleDateString("tr-TR", { weekday: "short", timeZone: "Europe/Istanbul" })
         if (key in grouped) grouped[key] = (grouped[key] || 0) + 1
       })
@@ -138,7 +144,7 @@ export default function AktiviteGrafigiBlock({
       const weeks = ["Hafta 1", "Hafta 2", "Hafta 3", "Hafta 4", "Hafta 5"]
       weeks.forEach((w) => (grouped[w] = 0))
       rows.forEach((r: any) => {
-        const d = new Date(r.tamamlanma_tarihi)
+        const d = new Date(r.aktif_olma_tarihi)
         const diffDays = Math.floor((d.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
         const bucket = Math.min(4, Math.max(0, Math.floor(diffDays / 7)))
         grouped[weeks[bucket]] = (grouped[weeks[bucket]] || 0) + 1
