@@ -1151,7 +1151,7 @@ async function del() {
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
           }}>📡 Canlı Görev Akışı</button>
         </a>
-        <a href={`${base}/dashboard/canli-islemler/tum-gorevler/frekans-sayilari`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', flexShrink: 0 }}>
+        <a href={`${base}/dashboard/canli-islemler/tum-gorevler/frekans-sayilari`} style={{ textDecoration: 'none', flexShrink: 0 }}>
           <button type="button" style={{
             height: 36, padding: '0 14px', borderRadius: 8, border: '1px solid #d1d5db',
             background: '#fff', color: '#111827', fontWeight: 700, fontSize: 13,
