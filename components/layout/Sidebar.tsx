@@ -42,6 +42,7 @@ function getNav(base: string, rol: UserRole, otoYikamaAktif: boolean): NavGroup[
         { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
         { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
         { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
+        { label: 'Mobil Anketler', href: `${base}/dashboard/anketler`, icon: '📋' },
         { label: 'Push Bildirim Geçmişi', href: `${base}/dashboard/push-log`, icon: '🔔' },
       ]
     : isTA

@@ -14,7 +14,13 @@ function brandedTitle(t: string): string {
   return `${BRAND_PREFIX} • ${t}`
 }
 
-export async function sendFCMToUser(userId: string, title: string, body: string, channelId: string = 'default') {
+export async function sendFCMToUser(
+  userId: string,
+  title: string,
+  body: string,
+  channelId: string = 'default',
+  data?: Record<string, string>,
+) {
   try {
     const konfig = await getSistemKonfig()
     const projectId = konfig.firebase_project_id
@@ -78,6 +84,7 @@ export async function sendFCMToUser(userId: string, title: string, body: string,
             message: {
               token: d.fcm_token,
               notification: { title: brandedTitle(title), body },
+              ...(data && Object.keys(data).length > 0 ? { data } : {}),
               android: {
                 priority: 'high',
                 notification: {
