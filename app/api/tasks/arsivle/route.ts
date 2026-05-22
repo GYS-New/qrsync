@@ -151,8 +151,15 @@ export async function POST(req: NextRequest) {
       } catch (e: any) { r.musteri_err = e.message }
 
       // ── 3. SPESİFİK GÖREVLER ──────────────────────────────────────
+      // Sadece terminal duruma geçmiş görevler arşivlenir.
+      // Süre referansı durum_degisim_tarihi — yani "tamamlandı/iptal edildikten X saat sonra".
+      // (Daha önce olusturma_tarihi kullanılıyordu → açık görev bile eskiyse arşivlenip
+      //  kullanıcı ekranından kayboluyordu, bug fix.)
       try {
-        let q = admin.from('gorevler').select('*').eq('firma_id', s.firmaId).lt('olusturma_tarihi', cutoffSpesifik).limit(5000)
+        let q = admin.from('gorevler').select('*').eq('firma_id', s.firmaId)
+          .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'SILINDI', 'KAPATILDI'])
+          .lt('durum_degisim_tarihi', cutoffSpesifik)
+          .limit(5000)
         if (s.projeId) q = (q as any).eq('proje_id', s.projeId)
         const { data: gorevler } = await q
         if (gorevler?.length) {
