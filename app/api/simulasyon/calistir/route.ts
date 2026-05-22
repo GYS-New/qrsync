@@ -417,7 +417,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
       // tamamlama yaptıysa veya başka biri iptal etmişse no-op).
       await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'QR', {
         at: tamamlanmaIso,
-        iptal_sebep: 'Otomatik iptal — simülasyon',
+        iptal_sebep: 'Otomatik iptal',
         ek: {
           iptal_eden_id: personelId, iptal_tarihi: tamamlanmaIso,
           islemi_yapan_id: personelId, simule_tamamlandi: true,
@@ -486,7 +486,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
         // Race-safe: yalnızca hâlâ ACIK ise yaz.
         await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'QR', {
           at: iptalIso,
-          iptal_sebep: 'Otomatik iptal — simülasyon',
+          iptal_sebep: 'Otomatik iptal',
           ek: {
             iptal_eden_id: personelId,
             iptal_tarihi: iptalIso,
