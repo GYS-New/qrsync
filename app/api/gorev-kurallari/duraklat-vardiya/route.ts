@@ -54,6 +54,25 @@ export async function POST(req: NextRequest) {
   })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Audit log — kim, ne, hangi üst lokasyon
+  const { data: ustLok } = await admin.from('lokasyonlar').select('tanim').eq('id', ustLokasyonId).maybeSingle()
+  await auditLog({
+    tip: 'kural_duraklatma_ekle',
+    tablo: 'kural_duraklatmalari',
+    firma_id: firmaId,
+    proje_id: projeId,
+    kullanici_id: me.id,
+    satir_sayisi: rows.length,
+    basarili: true,
+    detay: {
+      ust_lokasyon_id: ustLokasyonId,
+      ust_lokasyon_adi: (ustLok as any)?.tanim ?? null,
+      tanim,
+      tarihler,
+      vardiyalar,
+    },
+  })
+
   return NextResponse.json({ ok: true, eklenen: rows.length })
 }
 
