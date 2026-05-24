@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auditLog } from '@/lib/audit/log'
 
 /**
  * POST /api/gorev-kurallari/duraklat-vardiya
@@ -70,6 +71,21 @@ export async function DELETE(req: NextRequest) {
 
   const admin = createAdminClient()
 
+  // Silmeden ÖNCE silinecek kayıtları çek (audit_log için)
+  let silinecekQ = admin.from('kural_duraklatmalari')
+    .select('id,tanim,tarih,vardiya_no,olusturan_id,olusturma_tarihi')
+    .eq('firma_id', firmaId)
+    .eq('ust_lokasyon_id', ustLokasyonId)
+  if (projeId) silinecekQ = silinecekQ.eq('proje_id', projeId)
+  else silinecekQ = silinecekQ.is('proje_id', null)
+  if (tanim) silinecekQ = silinecekQ.eq('tanim', tanim)
+  if (tarih) silinecekQ = silinecekQ.eq('tarih', tarih)
+  if (vardiya_no != null) silinecekQ = silinecekQ.eq('vardiya_no', vardiya_no)
+  const { data: silinecek } = await silinecekQ
+
+  // Üst lokasyon adını al (audit detayda görünsün)
+  const { data: ustLok } = await admin.from('lokasyonlar').select('tanim').eq('id', ustLokasyonId).single()
+
   if (tarih && vardiya_no != null) {
     // Tek kayıt sil
     let q = admin.from('kural_duraklatmalari').delete()
@@ -92,7 +108,31 @@ export async function DELETE(req: NextRequest) {
     await q
   }
 
-  return NextResponse.json({ ok: true })
+  // Audit log — kim, ne zaman, hangi kayıtları sildi
+  if ((silinecek ?? []).length > 0) {
+    await auditLog({
+      tip: 'kural_duraklatma_sil',
+      tablo: 'kural_duraklatmalari',
+      firma_id: firmaId,
+      kullanici_id: user.id,
+      satir_sayisi: silinecek!.length,
+      basarili: true,
+      detay: {
+        ust_lokasyon_id: ustLokasyonId,
+        ust_lokasyon_adi: ustLok?.tanim ?? null,
+        proje_id: projeId ?? null,
+        tanim: tanim ?? null,
+        tarih: tarih ?? null,
+        vardiya_no: vardiya_no ?? null,
+        silinen_kayitlar: silinecek!.map((k: any) => ({
+          id: k.id, tanim: k.tanim, tarih: k.tarih, vardiya_no: k.vardiya_no,
+          olusturan_id: k.olusturan_id, olusturma_tarihi: k.olusturma_tarihi,
+        })),
+      },
+    })
+  }
+
+  return NextResponse.json({ ok: true, silinen: (silinecek ?? []).length })
 }
 
 export async function GET(req: NextRequest) {
