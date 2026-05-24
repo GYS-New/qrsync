@@ -5,17 +5,23 @@
  * SA tüm firmaları görebilir; TA sadece kendi firmasını.
  *
  * Query params:
- *   gun         son N gün (1/7/30/90/365, default 30)
- *   seviye      bilgi|uyari|hata|kritik (opsiyonel, virgülle çoklu)
- *   firmaId     SA için firma filtresi
- *   cihazModeli distinct cihaz modeli filtresi
- *   q           free-text arama (mesaj / konum / cihaz_id ILIKE)
- *   limit       default 200 (max 1000)
+ *   gun           son N gün (1/7/30/90/365, default 30)
+ *   seviye        bilgi|uyari|hata|kritik (çoklu, virgülle)
+ *   firmaId       SA için firma filtresi
+ *   cihazModeli   distinct cihaz modeli filtresi
+ *   networkType   wifi/5g/4g/3g/cellular/none/unknown filter
+ *   q             free-text arama (mesaj / konum / cihaz_id ILIKE)
+ *   konumIcerir   konum ILIKE filtresi (hızlı filtreler için)
+ *   konumExact    konum tam eşleşme (drawer'dan "benzerleri" filtresi için)
+ *   mesajIcerir   mesaj ILIKE filtresi
+ *   limit         default 200 (max 1000)
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
+
+const SELECT_COLS = 'id, olusturuldu, seviye, mesaj, cihaz_id, cihaz_modeli, platform, uygulama_versiyonu, konum, stack, detay, firma_id, network_type'
 
 export async function GET(req: NextRequest) {
   const supabase = createClient()
@@ -35,7 +41,11 @@ export async function GET(req: NextRequest) {
   const seviyeler = seviyeRaw ? seviyeRaw.split(',').map(s => s.trim()).filter(Boolean) : []
   const firmaIdReq = sp.get('firmaId') || null
   const cihazModeli = sp.get('cihazModeli') || null
+  const networkType = sp.get('networkType') || null
   const q = (sp.get('q') ?? '').trim()
+  const konumIcerir = (sp.get('konumIcerir') ?? '').trim()
+  const konumExact = (sp.get('konumExact') ?? '').trim()
+  const mesajIcerir = (sp.get('mesajIcerir') ?? '').trim()
   const limit = Math.min(1000, Math.max(1, Number(sp.get('limit') ?? 200)))
 
   // TA için zorla kendi firma
@@ -44,9 +54,10 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
   const sinir = new Date(Date.now() - gun * 24 * 60 * 60 * 1000).toISOString()
 
+  // — ana sorgu —
   let query = admin
     .from('mobil_hata_log')
-    .select('id, olusturuldu, seviye, mesaj, cihaz_id, cihaz_modeli, platform, uygulama_versiyonu, konum, stack, detay, firma_id')
+    .select(SELECT_COLS, { count: 'exact' })
     .gte('olusturuldu', sinir)
     .order('olusturuldu', { ascending: false })
     .limit(limit)
@@ -54,12 +65,22 @@ export async function GET(req: NextRequest) {
   if (seviyeler.length > 0) query = query.in('seviye', seviyeler)
   if (firmaIdEfektif) query = query.eq('firma_id', firmaIdEfektif)
   if (cihazModeli) query = query.eq('cihaz_modeli', cihazModeli)
+  if (networkType) query = query.eq('network_type', networkType)
+  if (konumExact) query = query.eq('konum', konumExact)
+  else if (konumIcerir) {
+    const safe = konumIcerir.replace(/[%,]/g, '')
+    query = query.ilike('konum', `%${safe}%`)
+  }
+  if (mesajIcerir) {
+    const safe = mesajIcerir.replace(/[%,]/g, '')
+    query = query.ilike('mesaj', `%${safe}%`)
+  }
   if (q) {
     const safe = q.replace(/[%,]/g, '')
     query = query.or(`mesaj.ilike.%${safe}%,konum.ilike.%${safe}%,cihaz_id.ilike.%${safe}%`)
   }
 
-  const { data: rows, error } = await query
+  const { data: rows, error, count } = await query
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
   // device_tokens + firmalar JOIN — bellekte yap (cihaz_id distinct setine göre)
@@ -103,19 +124,11 @@ export async function GET(req: NextRequest) {
     const personel = personelId ? (userMap.get(personelId) ?? null) : null
     const firmaId = r.firma_id ?? dt?.firma_id ?? null
     const firma = firmaId ? (firmaMap.get(firmaId) ?? null) : null
-    return {
-      ...r,
-      personel,
-      personel_id: personelId,
-      firma,
-      firma_id: firmaId,
-    }
+    return { ...r, personel, personel_id: personelId, firma, firma_id: firmaId }
   })
 
   // TA için: device_tokens üzerinden farklı firma olabilir → zorla filtre
-  const filtered = isTA && me.firma_id
-    ? data.filter(d => d.firma_id === me.firma_id)
-    : data
+  const filtered = isTA && me.firma_id ? data.filter(d => d.firma_id === me.firma_id) : data
 
   // Cihaz modeli distinct (filtre dropdown için son 90 gün)
   const { data: distinctRaw } = await admin
@@ -127,5 +140,38 @@ export async function GET(req: NextRequest) {
   const cihazModelleri = [...new Set((distinctRaw ?? []).map((r: any) => r.cihaz_modeli as string).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, 'tr'))
 
-  return NextResponse.json({ ok: true, data: filtered, cihaz_modelleri: cihazModelleri })
+  // Network type distinct
+  const { data: ntRaw } = await admin
+    .from('mobil_hata_log')
+    .select('network_type')
+    .gte('olusturuldu', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    .not('network_type', 'is', null)
+    .limit(5000)
+  const networkTypes = [...new Set((ntRaw ?? []).map((r: any) => r.network_type as string).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'tr'))
+
+  // Son 24 saat özet (filtresiz, sadece firma scope)
+  const ozet24 = { kritik: 0, hata: 0, uyari: 0, bilgi: 0 }
+  {
+    let oz = admin
+      .from('mobil_hata_log')
+      .select('seviye', { count: 'exact', head: false })
+      .gte('olusturuldu', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .limit(5000)
+    if (firmaIdEfektif) oz = oz.eq('firma_id', firmaIdEfektif)
+    const { data: ozetRows } = await oz
+    for (const r of ozetRows ?? []) {
+      const s = (r as any).seviye as string
+      if (s in ozet24) (ozet24 as any)[s]++
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    data: filtered,
+    toplam: count ?? filtered.length,
+    cihaz_modelleri: cihazModelleri,
+    network_types: networkTypes,
+    ozet_24_saat: ozet24,
+  })
 }
