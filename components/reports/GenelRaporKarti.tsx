@@ -425,6 +425,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
   const [raporBitis,     setRaporBitis]     = useState(todayLocal)
   // Vardiya filtresi: aktif_olma_tarihi'nin TR saatine göre dilim
   const [vardiyaFilter,  setVardiyaFilter]  = useState<'all' | 'v1' | 'v2' | 'v3'>('all')
+  // Firma vardiya ayarı — dropdown label'ları için (yeni vardiya saatleriyle dinamik)
+  const [firmaVardiyalari, setFirmaVardiyalari] = useState<{ no: number; baslangic: string; bitis: string }[]>([])
   const [raporuAlan,     setRaporuAlan]     = useState('')
   const [data,           setData]           = useState<RaporData | null>(null)
   const [loading,        setLoading]        = useState(false)
@@ -477,6 +479,15 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       .then(r => r.json()).then(d => setLokasyonlar(Array.isArray(d) ? d : []))
       .catch(() => setLokasyonlar([]))
   }, [currentFirmaId, projeId])
+
+  // Firma vardiya ayarını çek (dropdown label'ları için)
+  useEffect(() => {
+    if (!currentFirmaId) { setFirmaVardiyalari([]); return }
+    fetch(`/api/firma/vardiya-ayarlari?firma_id=${currentFirmaId}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(j => setFirmaVardiyalari(j?.ok ? (j.vardiyalar ?? []) : []))
+      .catch(() => setFirmaVardiyalari([]))
+  }, [currentFirmaId])
 
   // Tek üst lokasyona yetkisi olan U/M rollerinde otomatik seç — alt lokasyon filtresi açılsın
   useEffect(() => {
@@ -700,9 +711,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 <select value={vardiyaFilter} onChange={e => setVardiyaFilter(e.target.value as any)} style={inp}
                   title="Aktif olma saatine göre vardiya filtresi (TRT)">
                   <option value="all">Tümü</option>
-                  <option value="v1">1. Vardiya (00-08)</option>
-                  <option value="v2">2. Vardiya (08-16)</option>
-                  <option value="v3">3. Vardiya (16-24)</option>
+                  {firmaVardiyalari.map(v => (
+                    <option key={v.no} value={`v${v.no}`}>{v.no}. Vardiya ({v.baslangic.slice(0,5)}-{v.bitis.slice(0,5)})</option>
+                  ))}
                 </select>
               )},
               { label: 'Üst Lokasyon', node: (

@@ -4,7 +4,11 @@ import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliU
 import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 
-export type VardiyaFilter = 'all' | 'v1' | 'v2' | 'v3'
+// VardiyaFilter: 'all' veya vardiya numarası (1/2/3/4). Eski 'v1'/'v2'/'v3'
+// string'leri firma vardiya ayarına dinamik bağlanabilmesi için number'a
+// taşındı. Backward-compat: 'v1' = 1, 'v2' = 2, 'v3' = 3 dönüşümü API
+// route'unda yapılıyor.
+export type VardiyaFilter = 'all' | 1 | 2 | 3 | 4
 
 export interface GenelRaporFilters {
   firmaId: string
@@ -15,8 +19,9 @@ export interface GenelRaporFilters {
   raporBaslangic?: string | null   // 'YYYY-MM-DD'
   raporBitis?: string | null       // 'YYYY-MM-DD'
   raporuAlan?: string | null
-  /** Vardiya filtresi — aktif_olma_tarihi'nin TR saatine göre.
-   *  v1: 00-08, v2: 08-16, v3: 16-24. 'all' veya undefined → filtre yok. */
+  /** Vardiya filtresi — aktif_olma_tarihi'nin TR saatine göre filtreler.
+   *  Sarkan vardiya (örn V1 23:30-07:30) desteklenir. Firma vardiya
+   *  ayarından (vardiya_saatleri) saat aralığı çekilir. */
   vardiya?: VardiyaFilter
   /** U/M rolü için yetkili üst lokasyon ID listesi. null = tüm erişim (SA/TA).
    *  Verildiğinde tüm sorgular ve Departman Analizi sadece bu üst lokasyonlar +
@@ -410,19 +415,54 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   // Birleştir, çakışan id varsa aktif tablosu öncelikli
   const arsivMap = new Map((arsivGorevler ?? []).map((g: any) => [g.id, g]))
   for (const g of (aktifGorevler ?? [])) arsivMap.set((g as any).id, g)
-  // Vardiya filtresi — aktif_olma_tarihi'nin TR saatine göre filtreler.
-  const vardiya = filters.vardiya ?? 'all'
-  const vardiyaRange: { from: number; to: number } | null =
-    vardiya === 'v1' ? { from: 0, to: 8 } :
-    vardiya === 'v2' ? { from: 8, to: 16 } :
-    vardiya === 'v3' ? { from: 16, to: 24 } : null
+
+  // Vardiya filtresi — firma vardiya ayarından dinamik (sarkan dahil destekli)
+  // Eski 'v1'/'v2'/'v3' string'leri 1/2/3'e map'lenir (geriye uyumluluk)
+  const vardiyaRaw: any = filters.vardiya ?? 'all'
+  const vardiyaNoRequested: number | null =
+    typeof vardiyaRaw === 'number' ? vardiyaRaw
+    : vardiyaRaw === 'v1' ? 1
+    : vardiyaRaw === 'v2' ? 2
+    : vardiyaRaw === 'v3' ? 3
+    : vardiyaRaw === 'v4' ? 4
+    : null
+
+  // Firma vardiya ayarını çek (saat aralığı için)
+  let vardiyaAralik: { basMin: number; bitMin: number } | null = null
+  if (vardiyaNoRequested) {
+    const { data: firmaRow } = await admin
+      .from('firmalar')
+      .select('vardiya_sayisi, tum_vardiya_ayarlari, vardiya_saatleri')
+      .eq('id', filters.firmaId).single()
+    const vs = (firmaRow as any)?.vardiya_sayisi ?? 0
+    const ayarlar = (firmaRow as any)?.tum_vardiya_ayarlari?.[String(vs)] ?? (firmaRow as any)?.vardiya_saatleri ?? []
+    const v = (ayarlar as any[]).find((x: any) => Number(x.no) === vardiyaNoRequested)
+    if (v && v.baslangic && v.bitis) {
+      const [bh, bm] = v.baslangic.split(':').map(Number)
+      const [eh, em] = v.bitis.split(':').map(Number)
+      if ([bh, bm, eh, em].every(Number.isFinite)) {
+        const basMin = bh * 60 + bm
+        let bitMin = eh * 60 + em
+        if (bitMin === 0 && basMin !== 0) bitMin = 24 * 60          // "00:00" bitiş → 24:00
+        if (bitMin <= basMin && bitMin !== 24 * 60) bitMin += 24 * 60  // sarkan vardiya
+        vardiyaAralik = { basMin, bitMin }
+      }
+    }
+  }
+
   function isInShift(iso: string | null | undefined): boolean {
-    if (!vardiyaRange) return true
+    if (!vardiyaAralik) return true
     if (!iso) return false
-    const h = Number(new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false,
-    }).format(new Date(iso)))
-    return h >= vardiyaRange.from && h < vardiyaRange.to
+    const hm = new Date(iso).toLocaleTimeString('en-GB', {
+      timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
+    })
+    const [h, m] = hm.split(':').map(Number)
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return false
+    const dk = h * 60 + m
+    const { basMin, bitMin } = vardiyaAralik
+    if (bitMin <= 24 * 60) return dk >= basMin && dk < bitMin
+    // Sarkan: dk ∈ [basMin, 1440) ∪ [0, bitMin-1440)
+    return dk >= basMin || dk < (bitMin - 24 * 60)
   }
   const tumGorevler = Array.from(arsivMap.values()).filter((g: any) =>
     withinRange(g.aktif_olma_tarihi, filters.raporBaslangic, filters.raporBitis)

@@ -791,9 +791,34 @@ async function del() {
   // İşlem tarihi (durum_degisim_tarihi) filtresi kaldırıldı.
   const [from, setFrom] = useState('')        // 'YYYY-MM-DD'
   const [to, setTo] = useState('')            // 'YYYY-MM-DD'
-  // Vardiya filtresi — aktif_olma_tarihi'nin TR saatine göre.
-  // V1: 00:00-08:00, V2: 08:00-16:00, V3: 16:00-24:00
-  const [vardiyaFilter, setVardiyaFilter] = useState<'all' | 'v1' | 'v2' | 'v3'>('all')
+  // Vardiya filtresi — aktif_olma_tarihi'nin TR saatine göre. Saat aralığı
+  // firma vardiya ayarından dinamik (sarkan vardiya — örn V1 23:30-07:30 — destekli).
+  const [vardiyaFilter, setVardiyaFilter] = useState<'all' | 'v1' | 'v2' | 'v3' | 'v4'>('all')
+  const [firmaVardiyalari, setFirmaVardiyalari] = useState<{ no: number; baslangic: string; bitis: string }[]>([])
+
+  useEffect(() => {
+    if (!firmaId) { setFirmaVardiyalari([]); return }
+    fetch(`/api/firma/vardiya-ayarlari?firma_id=${firmaId}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(j => setFirmaVardiyalari(j?.ok ? (j.vardiyalar ?? []) : []))
+      .catch(() => setFirmaVardiyalari([]))
+  }, [firmaId])
+
+  // Vardiya filtre aralığı (dakika cinsinden, sarkan vardiya için bit > 1440)
+  const vardiyaAralik = useMemo<{ basMin: number; bitMin: number } | null>(() => {
+    if (vardiyaFilter === 'all') return null
+    const vNo = Number(vardiyaFilter.replace('v', ''))
+    const v = firmaVardiyalari.find(x => x.no === vNo)
+    if (!v) return null
+    const [bh, bm] = v.baslangic.split(':').map(Number)
+    const [eh, em] = v.bitis.split(':').map(Number)
+    if (![bh, bm, eh, em].every(Number.isFinite)) return null
+    const basMin = bh * 60 + bm
+    let bitMin = eh * 60 + em
+    if (bitMin === 0 && basMin !== 0) bitMin = 24 * 60
+    if (bitMin <= basMin && bitMin !== 24 * 60) bitMin += 24 * 60
+    return { basMin, bitMin }
+  }, [vardiyaFilter, firmaVardiyalari])
 
   // Seçili lokasyon filtresi (3 seviyeden en derini)
   const lokasyonId = filterLoc3 || filterLoc2 || filterLoc1
@@ -945,26 +970,30 @@ async function del() {
       if (durum && g.durum !== durum) return false
       if (actor && getIslemiYapan(g, { meId, meName, kullanicilar }) !== actor) return false
 
-      if (fromTs !== null || toTs !== null || vardiyaFilter !== 'all') {
+      if (fromTs !== null || toTs !== null || vardiyaAralik) {
         if (!g.aktif_olma_tarihi) return false
         const ts = new Date(g.aktif_olma_tarihi).getTime()
         if (fromTs !== null && ts < fromTs) return false
         if (toTs !== null && ts > toTs) return false
-        if (vardiyaFilter !== 'all') {
-          // TR saatini Intl ile çıkar (timezone-safe)
-          const trHourStr = new Intl.DateTimeFormat('en-GB', {
-            timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false,
-          }).format(new Date(g.aktif_olma_tarihi))
-          const trHour = Number(trHourStr)
-          if (vardiyaFilter === 'v1' && !(trHour >= 0 && trHour < 8)) return false
-          if (vardiyaFilter === 'v2' && !(trHour >= 8 && trHour < 16)) return false
-          if (vardiyaFilter === 'v3' && !(trHour >= 16 && trHour < 24)) return false
+        if (vardiyaAralik) {
+          // TR saat:dk (timezone-safe)
+          const hm = new Date(g.aktif_olma_tarihi).toLocaleTimeString('en-GB', {
+            timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
+          })
+          const [h, m] = hm.split(':').map(Number)
+          if (!Number.isFinite(h) || !Number.isFinite(m)) return false
+          const dk = h * 60 + m
+          const { basMin, bitMin } = vardiyaAralik
+          const icinde = bitMin <= 24 * 60
+            ? (dk >= basMin && dk < bitMin)
+            : (dk >= basMin || dk < (bitMin - 24 * 60))  // sarkan
+          if (!icinde) return false
         }
       }
 
       return true
     })
-  }, [q, lokasyonSet, atananId, durum, actor, from, to, vardiyaFilter, gorevler])
+  }, [q, lokasyonSet, atananId, durum, actor, from, to, vardiyaAralik, gorevler])
 
   const sorted = useMemo(() => {
     // Varsayılan 3-seviyeli grup sıralaması:
@@ -1292,12 +1321,12 @@ async function del() {
           <input type="date" className="verde-input" style={{ width: 140 }} value={to} onChange={e => setTo(e.target.value)} />
         </div>
 
-        <select className="verde-select" value={vardiyaFilter} onChange={e => setVardiyaFilter(e.target.value as any)} style={{ width: 138 }}
-          title="Aktif olma saatine göre vardiya filtresi">
+        <select className="verde-select" value={vardiyaFilter} onChange={e => setVardiyaFilter(e.target.value as any)} style={{ width: 180 }}
+          title="Aktif olma saatine göre vardiya filtresi (firma vardiya ayarından)">
           <option value="all">Vardiya (Tümü)</option>
-          <option value="v1">1. Vardiya (00-08)</option>
-          <option value="v2">2. Vardiya (08-16)</option>
-          <option value="v3">3. Vardiya (16-24)</option>
+          {firmaVardiyalari.map(v => (
+            <option key={v.no} value={`v${v.no}`}>{v.no}. Vardiya ({v.baslangic.slice(0,5)}-{v.bitis.slice(0,5)})</option>
+          ))}
         </select>
 
         <button type="button" onClick={uygula} disabled={arsivLoading}
