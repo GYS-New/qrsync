@@ -69,12 +69,11 @@ export default function AktiviteGrafigiBlock({
   async function fetchData() {
     // Grup kolonu mode'a göre:
     //  - GÜNLÜK (saatlik): tamamlanma_tarihi — gün içinde gerçek dağılım için.
-    //    aktif_olma_tarihi kullanılırsa tüm görevler vardiya başlangıç saatlerine
-    //    (00:00, 08:00, 16:00) yığılır.
-    //  - HAFTALIK/AYLIK: aktif_olma_tarihi — vardiya gününde say. Pzt gece
-    //    vardiyası Sal 00:30 tamamlanırsa Pzt sütununda görünür.
-    const groupCol: 'tamamlanma_tarihi' | 'aktif_olma_tarihi' =
-      mode === 'gunluk' ? 'tamamlanma_tarihi' : 'aktif_olma_tarihi'
+    //  - HAFTALIK/AYLIK: vardiya_gunu — "ait olduğu vardiya günü". Sarkan V1
+    //    görevleri kendi günlerinde gruplandırılır (1 Haz V1 görevi 31 May
+    //    23:35'te aktif olsa bile, grafikte 1 Haz sütununda görünür).
+    const groupCol: 'tamamlanma_tarihi' | 'vardiya_gunu' =
+      mode === 'gunluk' ? 'tamamlanma_tarihi' : 'vardiya_gunu'
 
     const rangeISO = rangeStart.toISOString()
 

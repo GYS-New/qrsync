@@ -389,21 +389,19 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   //     Personel/lokasyon/kayıp-neden top-N grafikleri response.ozetAgg üzerinden
   //     hesaplanır (frontend artık detay listelerden değil bu agg'lerden okur).
   //   - true (Excel/Export/Mail): tüm sütunlar, mevcut davranış korunur.
-  const SELECT_COLS_MID = 'id,firma_id,lokasyon_id,durum,aktif_olma_tarihi,gunluk_frekans_sayisi,kural_id,islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id,iptal_sebep'
-  const SELECT_COLS_FULL = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
+  const SELECT_COLS_MID = 'id,firma_id,lokasyon_id,durum,aktif_olma_tarihi,vardiya_gunu,gunluk_frekans_sayisi,kural_id,islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id,iptal_sebep'
+  const SELECT_COLS_FULL = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
   const SELECT_COLS = includeDetails ? SELECT_COLS_FULL : SELECT_COLS_MID
 
-  const baslangicUTC = filters.raporBaslangic ? new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString() : null
-  const bitisUTC = filters.raporBitis ? new Date(filters.raporBitis + 'T23:59:59+03:00').toISOString() : null
-
-  function buildGorevQuery(table: string) {
-    let q = admin.from(table).select(SELECT_COLS).eq('firma_id', filters.firmaId)
-    if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+  // Tarih filtresi vardiya_gunu üzerinden (sarkan V1 görevleri kendi günlerinde gösterilir)
+  // aktif_olma_tarihi yerine vardiya_gunu (date) kullanıyoruz — saat shift'i gerekmez
+  function buildGorevQuery(table: string): any {
+    let q: any = (admin.from(table) as any).select(SELECT_COLS).eq('firma_id', filters.firmaId)
+    if (filters.projeId) q = q.eq('proje_id', filters.projeId)
     if (targetLokasyonIds && targetLokasyonIds.length > 0) q = q.in('lokasyon_id', targetLokasyonIds)
-    // Oto Yıkama görevleri hariç tutulur (kullanıcı genel ya da yetki-scope sorgu yapsa bile)
     if (otoYikamaIds.size > 0) q = q.not('lokasyon_id', 'in', `(${[...otoYikamaIds].join(',')})`)
-    if (baslangicUTC) q = q.gte('aktif_olma_tarihi', baslangicUTC)
-    if (bitisUTC) q = q.lte('aktif_olma_tarihi', bitisUTC)
+    if (filters.raporBaslangic) q = q.gte('vardiya_gunu', filters.raporBaslangic)
+    if (filters.raporBitis)     q = q.lte('vardiya_gunu', filters.raporBitis)
     return q
   }
 
@@ -464,10 +462,14 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     // Sarkan: dk ∈ [basMin, 1440) ∪ [0, bitMin-1440)
     return dk >= basMin || dk < (bitMin - 24 * 60)
   }
-  const tumGorevler = Array.from(arsivMap.values()).filter((g: any) =>
-    withinRange(g.aktif_olma_tarihi, filters.raporBaslangic, filters.raporBitis)
-    && isInShift(g.aktif_olma_tarihi)
-  )
+  // Tarih filtresi DB seviyesinde vardiya_gunu üzerinde uygulandı; ayrıca client-side
+  // bir kez daha kontrol — savunmacı (silinmiş ay-sınırı vb. kenar durum). Vardiya
+  // saat filtresi yine aktif_olma_tarihi'nin TR-saatine bakar (sarkan dahil).
+  const tumGorevler = Array.from(arsivMap.values()).filter((g: any) => {
+    if (filters.raporBaslangic && (!g.vardiya_gunu || g.vardiya_gunu < filters.raporBaslangic)) return false
+    if (filters.raporBitis     && (!g.vardiya_gunu || g.vardiya_gunu > filters.raporBitis))     return false
+    return isInShift(g.aktif_olma_tarihi)
+  })
 
   // KURAL ÜRETİMLİ vs EKSTRA FREKANSİYEL AYRIMI
   //   kural_id IS NOT NULL → kural tarafından üretilmiş frekansiyel görev (hedef hesabına girer)

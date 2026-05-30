@@ -159,8 +159,8 @@ export async function GET(req: NextRequest) {
     .select(SELECT_TAM)
     .eq('firma_id', firmaId)
     .eq('durum', 'TAMAMLANDI')
-    .gte('tamamlanma_tarihi', tarihBaslangicIso)
-    .lte('tamamlanma_tarihi', tarihBitisIso)
+    .gte('vardiya_gunu', tarihBaslangic)
+    .lte('vardiya_gunu', tarihBitis)
   if (projeId) liveTamQ = (liveTamQ as any).eq('proje_id', projeId)
   const { data: liveTam } = await liveTamQ
 
@@ -169,8 +169,8 @@ export async function GET(req: NextRequest) {
     .select(SELECT_TAM)
     .eq('firma_id', firmaId)
     .eq('durum', 'TAMAMLANDI')
-    .gte('tamamlanma_tarihi', tarihBaslangicIso)
-    .lte('tamamlanma_tarihi', tarihBitisIso)
+    .gte('vardiya_gunu', tarihBaslangic)
+    .lte('vardiya_gunu', tarihBitis)
   if (projeId) arsivTamQ = (arsivTamQ as any).eq('proje_id', projeId)
   const { data: arsivTam } = await arsivTamQ
 
@@ -179,8 +179,8 @@ export async function GET(req: NextRequest) {
     .select(SELECT_IPT)
     .eq('firma_id', firmaId)
     .eq('durum', 'IPTAL')
-    .gte('iptal_tarihi', tarihBaslangicIso)
-    .lte('iptal_tarihi', tarihBitisIso)
+    .gte('vardiya_gunu', tarihBaslangic)
+    .lte('vardiya_gunu', tarihBitis)
   if (projeId) liveIptQ = (liveIptQ as any).eq('proje_id', projeId)
   const { data: liveIpt } = await liveIptQ
 
@@ -189,8 +189,8 @@ export async function GET(req: NextRequest) {
     .select(SELECT_IPT)
     .eq('firma_id', firmaId)
     .eq('durum', 'IPTAL')
-    .gte('iptal_tarihi', tarihBaslangicIso)
-    .lte('iptal_tarihi', tarihBitisIso)
+    .gte('vardiya_gunu', tarihBaslangic)
+    .lte('vardiya_gunu', tarihBitis)
   if (projeId) arsivIptQ = (arsivIptQ as any).eq('proje_id', projeId)
   const { data: arsivIpt } = await arsivIptQ
 
