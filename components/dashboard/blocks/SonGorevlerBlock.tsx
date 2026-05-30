@@ -28,9 +28,14 @@ export default async function SonGorevlerBlock({ firmaId, projeId,
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null; limit?: number }) {
   const supabase = createClient()
 
+  // GorevlerClient default filtresi ile aynı: ACIK + ISLEMDE + son 24h TAMAMLANDI
+  // (arşive geçmesi gereken eski terminal kayıtlar listede görünmesin)
+  const sinir24sIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
   let q = supabase
     .from('gorevler')
     .select('id,tanim,durum,olusturma_tarihi,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)')
+    .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24sIso})`)
     .order('olusturma_tarihi', { ascending: false })
     .limit(limit)
 
