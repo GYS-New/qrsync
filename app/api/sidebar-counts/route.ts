@@ -36,6 +36,12 @@ export async function GET(request: Request) {
   const usersBase = supabase.from('users').select('id', { count: 'exact', head: true })
   const tasksBase = supabase.from('gorevler').select('id', { count: 'exact', head: true })
   const locationsBase = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true })
+
+  // GorevlerClient default filter ile aynı: ACIK + ISLEMDE + son 24h TAMAMLANDI
+  // Aksi halde sidebar "23" gösterip sayfa "5" gösterir → kafa karışıklığı
+  const sinir24sIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const ACIK_GOREV_FILTER = `durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24sIso})`
+  const applyAcik = <T extends { or: (s: string) => any }>(q: T) => q.or(ACIK_GOREV_FILTER) as T
   const liveBase = supabase
     .from('canli_gorevler')
     .select('id', { count: 'exact', head: true })
@@ -50,17 +56,17 @@ export async function GET(request: Request) {
 
     if (filterFirma && filterProje) {
       usersQuery = usersBase.eq('firma_id', filterFirma).eq('proje_id', filterProje)
-      tasksQuery = tasksBase.eq('firma_id', filterFirma).eq('proje_id', filterProje)
+      tasksQuery = applyAcik(tasksBase.eq('firma_id', filterFirma).eq('proje_id', filterProje))
       liveQuery = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('firma_id', filterFirma).eq('proje_id', filterProje)
       locationsQuery = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('firma_id', filterFirma).eq('proje_id', filterProje)
     } else if (filterFirma) {
       usersQuery = usersBase.eq('firma_id', filterFirma)
-      tasksQuery = tasksBase.eq('firma_id', filterFirma)
+      tasksQuery = applyAcik(tasksBase.eq('firma_id', filterFirma))
       liveQuery = liveBase.eq('firma_id', filterFirma)
       locationsQuery = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('firma_id', filterFirma)
     } else {
       usersQuery = usersBase
-      tasksQuery = tasksBase
+      tasksQuery = applyAcik(tasksBase)
       liveQuery = liveBase
       locationsQuery = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true })
     }
@@ -91,9 +97,9 @@ export async function GET(request: Request) {
       let tQ = supabase.from('gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
       let lQ = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
       if (yetkiliLokIds) { tQ = tQ.in('lokasyon_id', yetkiliLokIds); lQ = lQ.in('lokasyon_id', yetkiliLokIds) }
-      tasksQuery = tQ; liveQuery = lQ
+      tasksQuery = applyAcik(tQ); liveQuery = lQ
     } else {
-      tasksQuery = !firmaId ? tasksBase : tasksBase.eq('firma_id', firmaId)
+      tasksQuery = applyAcik(!firmaId ? tasksBase : tasksBase.eq('firma_id', firmaId))
       liveQuery = !firmaId ? liveBase : liveBase.eq('firma_id', firmaId)
     }
 
