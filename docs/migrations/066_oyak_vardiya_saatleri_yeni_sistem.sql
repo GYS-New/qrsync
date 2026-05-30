@@ -12,9 +12,12 @@
 --     08:00 → 07:30  (179 kural — V2)
 --     16:00 → 15:30  (128 kural — V3)
 --
--- ÇALIŞTIRMA ZAMANI: 2026-05-31 22:30 TR (≈ 19:30 UTC) — kullanıcı onayıyla
---   manuel olarak Supabase SQL Editor'da çalıştırılacak.
---   Migration başında bir guard var: 31 Mayıs 22:00 TR öncesi çalışmaz.
+-- ÇALIŞTIRMA ZAMANI: 2026-05-30 (kullanıcı onayı sonrası erkene alındı).
+--   Sebep: 30 ve 31 May için kural_duraklatmalari kayıtları eklendi —
+--   bu iki günde görev üretilmeyecek. Migration erken çalıştırılabilir.
+--   30 May 23:30 TR cron çalıştığında 31 May için üretim deneyecek ama
+--   duraklatma var → 0 üretim. 31 May 23:30 TR cron 1 Haziran için
+--   üretim yapacak (~375 görev) → V1 23:30'da başlar.
 --
 -- KAPSAM: ATALIAN firmasının firma-level vardiya ayarı + OYAK RENAULT projesinin
 -- aktif gorev_kurallari + pg_cron schedule + gece_tam_dongu() fonksiyonu.
@@ -22,14 +25,6 @@
 -- ATALIAN'ın diğer projeleri (BOSCH, Rexroth, SİRO ENERJİ, TOGG) pasif ve hiç
 -- kuralı yok → firma vardiya ayarı değişimi onları etkilemez.
 -- ─────────────────────────────────────────────────────────────────────────────
-
--- ─── ZAMAN GUARD: yanlışlıkla erken çalıştırılırsa hata ver ────────────────
-DO $$
-BEGIN
-  IF NOW() < '2026-05-31 19:00:00+00'::timestamptz THEN  -- TR 22:00
-    RAISE EXCEPTION 'BU MIGRATION 2026-05-31 22:00 TR (19:00 UTC) ÖNCESI ÇALIŞTIRILAMAZ. Şu an: %', NOW();
-  END IF;
-END $$;
 
 
 -- ─── 1) ATALIAN firma vardiya ayarı güncelle ──────────────────────────────

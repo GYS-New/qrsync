@@ -1,8 +1,22 @@
 # Runbook — OYAK Vardiya Saatleri Geçişi
 
-**Hedef tarih:** 2026-05-31 22:30 TR (çalıştırma anı)
-**Aktivasyon:** 2026-05-31 23:30 TR (yeni cron çalışır, 1 Haz V1 başlar)
+**DURUM: ✅ TAMAMLANDI (2026-05-30)**
+**Migration apply edildi:** 066_oyak_vardiya_saatleri_yeni_sistem
+**İlk yeni cron çalışması:** 2026-05-30 23:30 TR (31 May için üretim deneyecek, duraklatma var → 0)
+**Aktivasyon:** 2026-05-31 23:30 TR (1 Haz için üretim, ~375 görev, V1 23:30 başlar)
 **Migration:** `docs/migrations/066_oyak_vardiya_saatleri_yeni_sistem.sql`
+
+---
+
+## Uygulama özeti (sonradan kayıt için)
+
+| Adım | Sonuç |
+|---|---|
+| 30 May duraklatmaları 31 May için kopyalandı | 49 kayıt eklendi |
+| ATALIAN firma vardiya | 23:30-07:30 / 07:30-15:30 / 15:30-23:30 ✓ |
+| OYAK 375 kural saati -30 dk | 07:30 (179) / 15:30 (128) / 23:35 (68) ✓ |
+| pg_cron qrsync-gece-dongu | `30 20 * * *` (UTC 20:30 = TR 23:30) ✓ |
+| gece_tam_dongu() | +1 day mantığı eklendi (yarın için üretim) ✓ |
 
 ---
 
