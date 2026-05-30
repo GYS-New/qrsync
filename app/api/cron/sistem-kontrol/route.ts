@@ -503,7 +503,7 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
     const { data: kurallar } = await admin
       .from('gorev_kurallari')
       .select(`
-        id, frekans_tipi, gunluk_frekans_sayisi, aktif_gunler,
+        id, tanim, aktif_olma_saati, lokasyon_id, frekans_tipi, gunluk_frekans_sayisi, aktif_gunler,
         baslangic_tarihi, bitis_tarihi,
         lokasyonlar!inner ( proje_id, projeler ( aktif ) )
       `)
@@ -512,14 +512,72 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
       .lte('baslangic_tarihi', trDate)
       .or(`bitis_tarihi.is.null,bitis_tarihi.gte.${trDate}`)
 
-    // Beklenen hesabı: bugünün DOW'unda aktif olan + projesi aktif olan kurallar
+    // Duraklatmalar — bugün için (tanim, ust_lokasyon_id, vardiya_no) tripletleri
+    // gece_gorev_uret bunları atladığı için "beklenen"den de düşülmeli
+    const { data: duraklatmalar } = await admin
+      .from('kural_duraklatmalari')
+      .select('tanim, ust_lokasyon_id, vardiya_no')
+      .eq('firma_id', f.id)
+      .eq('tarih', trDate)
+      .not('ust_lokasyon_id', 'is', null)
+    const duraklatSet = new Set(
+      (duraklatmalar ?? []).map((d: any) => `${d.tanim}::${d.ust_lokasyon_id}::${d.vardiya_no}`)
+    )
+
+    // Lokasyon hiyerarşisi — kural'ın üst lokasyonunu bulmak için
+    const { data: tumLoks } = await admin
+      .from('lokasyonlar').select('id, parent_id').eq('firma_id', f.id)
+    const parentMap = new Map<string, string | null>(
+      (tumLoks ?? []).map((l: any) => [l.id, l.parent_id])
+    )
+    function ustBul(lokId: string): string | null {
+      let cur: string | null | undefined = lokId
+      let safety = 0
+      while (cur && parentMap.get(cur) && safety < 20) {
+        cur = parentMap.get(cur) as string
+        safety++
+      }
+      return cur ?? null
+    }
+
+    // Firma vardiya ayarı — kuralın aktif_olma_saati'nden vardiya_no çıkar
+    const { data: firmaDetay } = await admin
+      .from('firmalar')
+      .select('vardiya_sayisi, tum_vardiya_ayarlari')
+      .eq('id', f.id).single()
+    const vardiyaSayisi = (firmaDetay as any)?.vardiya_sayisi ?? 3
+    const vardiyaAyarlari: any[] = (firmaDetay as any)?.tum_vardiya_ayarlari?.[String(vardiyaSayisi)] ?? []
+    function vardiyaNoBul(saatStr: string): number | null {
+      for (const v of vardiyaAyarlari) {
+        const bas = v.baslangic as string
+        const bit = v.bitis as string
+        if (!bas || !bit) continue
+        const gece = bit <= bas
+        const eslesme = gece ? (saatStr >= bas || saatStr < bit) : (saatStr >= bas && saatStr < bit)
+        if (eslesme) return v.no as number
+      }
+      return null
+    }
+
+    // Beklenen hesabı: bugünün DOW'unda aktif + projesi aktif + DURAKLATILMAMIŞ
     let beklenen = 0
     let aktifKural = 0
+    let duraklatildiAdet = 0
     for (const k of (kurallar ?? []) as any[]) {
       const aktifGunler: number[] = k.aktif_gunler ?? []
       if (!aktifGunler.includes(trDow)) continue
       const projeAktif = k.lokasyonlar?.proje_id == null || k.lokasyonlar?.projeler?.aktif === true
       if (!projeAktif) continue
+
+      // Duraklatma kontrolü — gece_gorev_uret ile aynı mantık
+      const ustLok = k.lokasyon_id ? ustBul(k.lokasyon_id) : null
+      const saatStr = String(k.aktif_olma_saati ?? '').slice(0, 5)
+      const vNo = saatStr ? vardiyaNoBul(saatStr) : null
+      if (ustLok && vNo !== null && duraklatSet.has(`${k.tanim}::${ustLok}::${vNo}`)) {
+        duraklatildiAdet++
+        continue
+      }
+
       aktifKural++
       if (k.frekans_tipi === 'haftalik') {
         beklenen += 1   // haftalık kural başına 1 görev (yaklaşım)
@@ -555,6 +613,7 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
       firma_id: f.id,
       ad: firmaAdi,
       aktif_kural: aktifKural,
+      duraklatilmis_kural: duraklatildiAdet,
       beklenen,
       gercek,
       eksiklik_yuzde: eksiklikYuzde,
