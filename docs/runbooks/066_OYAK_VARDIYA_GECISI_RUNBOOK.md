@@ -17,6 +17,20 @@
 | OYAK 375 kural saati -30 dk | 07:30 (179) / 15:30 (128) / 23:35 (68) ✓ |
 | pg_cron qrsync-gece-dongu | `30 20 * * *` (UTC 20:30 = TR 23:30) ✓ |
 | gece_tam_dongu() | +1 day mantığı eklendi (yarın için üretim) ✓ |
+| **gece_gorev_uret() — Migration 067** | Sarkan vardiya v_gun_offset hesabı eklendi ✓ |
+
+## Migration 067 — sarkan vardiya tarih düzeltmesi
+
+`gece_gorev_uret` V1 (sarkan vardiya) rule'ları için aktif_olma_tarihi'ni
+"yarın - 1 gün + saat" olarak hesaplar artık. Örnek:
+
+- p_tarih = **1 Haz**
+- V1 rule (saat 23:35): v_gun_offset = -1 → **31 May 23:35** ✓
+- V2 rule (saat 07:30): v_gun_offset = 0 → 1 Haz 07:30 ✓
+- V3 rule (saat 15:30): v_gun_offset = 0 → 1 Haz 15:30 ✓
+
+İdempotence kontrolü (v_mevcut) de aynı offset ile yapılır → çift üretim
+riski yok.
 
 ---
 
