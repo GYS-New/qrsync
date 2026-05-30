@@ -994,7 +994,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       ? new Set(filters.yetkiliUstLokIds)
       : null
     const departmanAgg = new Map<string, DepartmanMetrik>()
-    for (const l of (lokasyonlar ?? []) as any[]) {
+    // allLokasyonlar Oto Yıkama'sız (yukarıda filtrelenmişti) — bu sayede
+    // Departman Analizi kartlarında "ARAÇ YIKAMA" gözükmez (SA-only modül).
+    for (const l of allLokasyonlar as any[]) {
       if (l.parent_id) continue
       if (l.aktif === false) continue
       if (yetkiliSet && !yetkiliSet.has(l.id)) continue
