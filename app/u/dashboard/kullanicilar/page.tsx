@@ -4,6 +4,7 @@ import KullanicilarClient from '@/components/users/KullanicilarClient'
 import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,7 +48,12 @@ export default async function UKullanicilarPage() {
   let lokQ = supabase.from('lokasyonlar').select('id,tanim').eq('firma_id', firmaId).is('parent_id', null).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
   if (yetkiliUstLokIds) lokQ = lokQ.in('id', yetkiliUstLokIds)
-  const { data: lokasyonlar } = await lokQ
+  const { data: lokasyonlarRaw } = await lokQ
+
+  // Oto Yıkama üst lokasyonu U/M için gizli — SA-only modül
+  const admin2 = createAdminClient()
+  const otoIds = await getOtoYikamaLokasyonIds(admin2, firmaId ?? '')
+  const lokasyonlar = (lokasyonlarRaw ?? []).filter((l: any) => !otoIds.has(l.id))
 
   return (
     <div>
