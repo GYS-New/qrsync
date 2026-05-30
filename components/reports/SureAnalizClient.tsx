@@ -813,8 +813,15 @@ export default function SureAnalizClient({ base, isSA, tenantFirmaId, projeId, s
   const { firmaId: saFirmaId } = useFirma()
   const currentFirmaId = isSA ? (saFirmaId ?? '') : (tenantFirmaId ?? '')
 
-  const [baslangic, setBaslangic] = useState('')
-  const [bitis,     setBitis]     = useState('')
+  // Default: son 30 gün (boş bırakılırsa tüm zaman → büyük veri → uzun yükleme)
+  // TR günü bazlı tarih (Personel Değerlendirme ile uyumlu)
+  const [baslangic, setBaslangic] = useState(() => {
+    const d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    return d.toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+  })
+  const [bitis,     setBitis]     = useState(() =>
+    new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+  )
   const [data,      setData]      = useState<SureData | null>(null)
   const [loading,   setLoading]   = useState(false)
   const [activeTab, setActiveTab] = useState<AnaTab>('Frekansiyel Görevler')
