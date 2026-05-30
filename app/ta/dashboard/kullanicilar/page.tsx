@@ -1,9 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import KullanicilarClient from '@/components/users/KullanicilarClient'
 import { redirect } from 'next/navigation'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,10 +27,15 @@ export default async function TAKullanicilarPage() {
   // Aktif projeye bağlı tenant_user (personel) + musteri rollerini göster
   // (Müşteri rolü değerlendirme/QR ile uygulamayı kullanır; mobil eşleşme
   //  listesinde görünmesi için SA sayfasıyla aynı .in() filtresi.)
-  const [{ data: users }, { data: lokasyonlar }] = await Promise.all([
+  // Oto Yıkama üst lokasyonu TA için gizli — SA-only modül
+  const admin = createAdminClient()
+  const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId ?? '')
+
+  const [{ data: users }, { data: lokasyonlarRaw }] = await Promise.all([
     supabase.from('users').select('*').eq('firma_id', firmaId).in('rol', ['tenant_user', 'musteri']).eq('proje_id', aktifProje.id).order('kayit_tarihi', { ascending: false }),
     supabase.from('lokasyonlar').select('id,tanim').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).is('parent_id', null).eq('aktif', true).order('tanim'),
   ])
+  const lokasyonlar = (lokasyonlarRaw ?? []).filter((l: any) => !otoIds.has(l.id))
 
   return (
     <div>
