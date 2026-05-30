@@ -474,15 +474,16 @@ useEffect(() => {
   }, [firmaId])
 
   // Bugünün TR günü için tüm canlı görevleri çek (vardiya özet kartları)
+  // Sarkan V1 görevleri (aktif_olma_tarihi=dün 23:35, vardiya_gunu=bugün) dahil
+  // edilsin diye vardiya_gunu üzerinden çekiyoruz, aktif_olma_tarihi değil.
   async function refreshBugun() {
     if (!firmaId) return
     const trDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
-    const trStartISO = new Date(`${trDate}T00:00:00+03:00`).toISOString()
     let q = supabase
       .from('canli_gorevler')
-      .select('id,durum,aktif_olma_tarihi')
+      .select('id,durum,aktif_olma_tarihi,vardiya_gunu')
       .eq('firma_id', firmaId)
-      .gte('aktif_olma_tarihi', trStartISO)
+      .eq('vardiya_gunu', trDate)
       .limit(2000)
     if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
     if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
@@ -525,9 +526,11 @@ useEffect(() => {
     const sayac: Record<number, { toplam: number; tamamlanan: number; sapma: number; kayip: number }> = {}
     for (const v of vardiyaAyari) sayac[v.no] = { toplam: 0, tamamlanan: 0, sapma: 0, kayip: 0 }
     for (const g of bugunGorevler) {
+      // Defansif kontrol — DB seviyesinde vardiya_gunu = bugün filtrelendi
+      // ama eski snapshot durumunda yanlış görev gelmesin
+      if (!g.vardiya_gunu || g.vardiya_gunu !== bugunTR) continue
       if (!g.aktif_olma_tarihi) continue
-      const { tarih, saat } = trIsoParts(g.aktif_olma_tarihi)
-      if (tarih !== bugunTR) continue
+      const { saat } = trIsoParts(g.aktif_olma_tarihi)
       const vNo = vardiyaBul(saat)
       if (vNo === null || !sayac[vNo]) continue
       sayac[vNo].toplam++
