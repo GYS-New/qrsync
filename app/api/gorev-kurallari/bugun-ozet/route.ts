@@ -30,19 +30,17 @@ export async function GET(req: NextRequest) {
   const trtOffset = 3 * 60 * 60 * 1000
   const trtNow = new Date(now.getTime() + trtOffset)
   const bugunTRT = trtNow.toISOString().slice(0, 10) // 'YYYY-MM-DD' TRT tarih
-  // TRT günü 00:00 = UTC 21:00 önceki gün, TRT günü 23:59 = UTC 20:59 aynı gün
-  const bugunStart = new Date(bugunTRT + 'T00:00:00+03:00').toISOString()
-  const bugunEnd   = new Date(bugunTRT + 'T23:59:59+03:00').toISOString()
 
-  // Aktif tablo + arşiv tablosundan bugünkü kayıtları çek (fetchAll ile PostgREST 1000 limitini aş)
+  // Bugünkü kayıtları çek — vardiya_gunu (date) üzerinden
+  // Sarkan V1 görevleri (aktif_olma_tarihi=dün 23:35, vardiya_gunu=bugün)
+  // "bugün özet"e doğru sayıda dahil olur.
   const buildQuery = (table: 'canli_gorevler' | 'canli_gorevler_arsiv') => () =>
     admin
       .from(table)
       .select('kural_id, durum')
       .eq('firma_id', firmaId)
       .not('kural_id', 'is', null)
-      .gte('aktif_olma_tarihi', bugunStart)
-      .lte('aktif_olma_tarihi', bugunEnd)
+      .eq('vardiya_gunu', bugunTRT)
 
   const [aktif, arsiv] = await Promise.all([
     fetchAll(buildQuery('canli_gorevler')),

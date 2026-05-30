@@ -591,18 +591,15 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
       continue
     }
 
-    // Gerçek üretim: bugün için canlı + arşiv
-    const trGunBaslangic = `${trDate}T00:00:00+03:00`
-    const trGunBitis = `${trDate}T23:59:59.999+03:00`
+    // Gerçek üretim: bugün için canlı + arşiv — vardiya_gunu üzerinden
+    // (sarkan V1 görevleri "bugün üretildi" sayılır)
     const [{ count: canliCount }, { count: arsivCount }] = await Promise.all([
       admin.from('canli_gorevler').select('id', { count: 'exact', head: true })
         .eq('firma_id', f.id)
-        .gte('aktif_olma_tarihi', trGunBaslangic)
-        .lte('aktif_olma_tarihi', trGunBitis),
+        .eq('vardiya_gunu', trDate),
       admin.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true })
         .eq('firma_id', f.id)
-        .gte('aktif_olma_tarihi', trGunBaslangic)
-        .lte('aktif_olma_tarihi', trGunBitis),
+        .eq('vardiya_gunu', trDate),
     ])
 
     const gercek = (canliCount ?? 0) + (arsivCount ?? 0)

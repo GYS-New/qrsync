@@ -85,27 +85,28 @@ export async function GET(req: NextRequest) {
   // Görevleri çek
   let gorevler: any[] = []
   if (tip === 'frekansiyel') {
-    const SEL = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,aktif_olma_tarihi'
+    // Frekansiyel: tarih filtresi vardiya_gunu üzerinden (sarkan V1 kendi günü altında)
+    const SEL = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,aktif_olma_tarihi,vardiya_gunu'
     let qA = admin.from('canli_gorevler').select(SEL).eq('firma_id', firmaId)
     let qB = admin.from('canli_gorevler_arsiv').select(SEL).eq('firma_id', firmaId)
     if (projeId) { qA = (qA as any).eq('proje_id', projeId); qB = (qB as any).eq('proje_id', projeId) }
+    if (baslangic) { qA = qA.gte('vardiya_gunu', baslangic); qB = qB.gte('vardiya_gunu', baslangic) }
+    if (bitis)     { qA = qA.lte('vardiya_gunu', bitis);     qB = qB.lte('vardiya_gunu', bitis)     }
     const [a, b] = await Promise.all([fetchAll(() => qA), fetchAll(() => qB)])
     const m = new Map<string, any>()
     for (const r of b) m.set(r.id, r)
     for (const r of a) m.set(r.id, r)
     gorevler = Array.from(m.values())
   } else {
+    // Spesifik görevler vardiya bazlı değil — tamamlanma/oluşturma TR günü ile filter (client-side)
     const SEL = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'
     let q = admin.from('gorevler').select(SEL).eq('firma_id', firmaId)
     if (projeId) q = (q as any).eq('proje_id', projeId)
     const { data } = await q
-    gorevler = data ?? []
+    gorevler = (data ?? []).filter(g =>
+      !baslangic && !bitis ? true : withinRange(g.tamamlanma_tarihi ?? g.olusturma_tarihi, baslangic, bitis)
+    )
   }
-
-  // Tarih filtresi
-  gorevler = gorevler.filter(g =>
-    !baslangic && !bitis ? true : withinRange(g.tamamlanma_tarihi ?? g.olusturma_tarihi, baslangic, bitis)
-  )
 
   // ── Hesaplamalar ──────────────────────────────────────────────────────────
   const tamamlananlar = gorevler.filter(g => g.durum === 'TAMAMLANDI' && g.tamamlanma_suresi_saniye > 0)

@@ -99,20 +99,16 @@ export async function GET(req: NextRequest) {
     : []
   if (ayarlar.length === 0) return NextResponse.json({ ok: true, ozet: {} })
 
-  // Bugün TR — UTC aralığı (TR 00:00..ertesi gün 00:00)
+  // Bugünün canlı görevleri (kural-tabanlı) — vardiya_gunu üzerinden
+  // (sarkan V1 görevleri 'bugünün V1'i' olarak doğru sayılır)
   const trBugun = bugunTRDate()
-  const baslangicIso = new Date(`${trBugun}T00:00:00+03:00`).toISOString()
-  const bitisIso = new Date(`${trBugun}T00:00:00+03:00`)
-  bitisIso.setUTCDate(bitisIso.getUTCDate() + 1)
 
-  // Bugünün canlı görevleri (kural-tabanlı)
   let q = admin
     .from('canli_gorevler')
     .select('id, lokasyon_id, durum, aktif_olma_tarihi')
     .eq('firma_id', firmaId)
     .not('kural_id', 'is', null)
-    .gte('aktif_olma_tarihi', baslangicIso)
-    .lt('aktif_olma_tarihi', bitisIso.toISOString())
+    .eq('vardiya_gunu', trBugun)
   if (projeId) q = (q as any).eq('proje_id', projeId)
   const { data: gorevler } = await q
 
