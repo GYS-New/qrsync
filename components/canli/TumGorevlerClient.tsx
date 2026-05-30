@@ -925,9 +925,12 @@ async function del() {
     const sayac: Record<number, { toplam: number; tamamlanan: number; sapma: number; kayip: number }> = {}
     for (const v of vardiyaAyari) sayac[v.no] = { toplam: 0, tamamlanan: 0, sapma: 0, kayip: 0 }
     for (const g of gorevler ?? []) {
+      // Bugün vardiya sayacı — görevin AİT olduğu güne göre (vardiya_gunu).
+      // V1 sarkan görevi 31 May 23:35 aktif olsa bile vardiya_gunu='1 Haz'
+      // olduğu için 1 Haz açıldığında doğru vardiya sayacına girer.
+      if (!g.vardiya_gunu || g.vardiya_gunu !== bugunTR) continue
       if (!g.aktif_olma_tarihi) continue
-      const { tarih, saat } = trIsoParts(g.aktif_olma_tarihi)
-      if (tarih !== bugunTR) continue  // Sadece bugünün görevleri (eski takılı kalanları dışla)
+      const { saat } = trIsoParts(g.aktif_olma_tarihi)
       const vNo = vardiyaBul(saat)
       if (vNo === null || !sayac[vNo]) continue
       sayac[vNo].toplam++
@@ -949,8 +952,11 @@ async function del() {
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
     // Date input string'leri → TRT gün sınırlı ms (00:00 ve 23:59:59 +03:00)
-    const fromTs = from ? new Date(`${from}T00:00:00+03:00`).getTime() : null
-    const toTs   = to   ? new Date(`${to}T23:59:59.999+03:00`).getTime() : null
+    // Tarih filtresi vardiya_gunu (date) üzerinden — YYYY-MM-DD string
+    // karşılaştırması yeterli. Sarkan V1 görevi 31 May 23:35'te aktif olsa
+    // bile vardiya_gunu='1 Haz' olduğu için "1 Haz" filtresine girer.
+    const fromDate: string | null = from || null
+    const toDate: string | null   = to   || null
 
     return (gorevler ?? []).filter((g: any) => {
       if (s) {
@@ -970,25 +976,24 @@ async function del() {
       if (durum && g.durum !== durum) return false
       if (actor && getIslemiYapan(g, { meId, meName, kullanicilar }) !== actor) return false
 
-      if (fromTs !== null || toTs !== null || vardiyaAralik) {
+      if (fromDate || toDate) {
+        if (!g.vardiya_gunu) return false
+        if (fromDate && g.vardiya_gunu < fromDate) return false
+        if (toDate   && g.vardiya_gunu > toDate)   return false
+      }
+      if (vardiyaAralik) {
         if (!g.aktif_olma_tarihi) return false
-        const ts = new Date(g.aktif_olma_tarihi).getTime()
-        if (fromTs !== null && ts < fromTs) return false
-        if (toTs !== null && ts > toTs) return false
-        if (vardiyaAralik) {
-          // TR saat:dk (timezone-safe)
-          const hm = new Date(g.aktif_olma_tarihi).toLocaleTimeString('en-GB', {
-            timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
-          })
-          const [h, m] = hm.split(':').map(Number)
-          if (!Number.isFinite(h) || !Number.isFinite(m)) return false
-          const dk = h * 60 + m
-          const { basMin, bitMin } = vardiyaAralik
-          const icinde = bitMin <= 24 * 60
-            ? (dk >= basMin && dk < bitMin)
-            : (dk >= basMin || dk < (bitMin - 24 * 60))  // sarkan
-          if (!icinde) return false
-        }
+        const hm = new Date(g.aktif_olma_tarihi).toLocaleTimeString('en-GB', {
+          timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
+        })
+        const [h, m] = hm.split(':').map(Number)
+        if (!Number.isFinite(h) || !Number.isFinite(m)) return false
+        const dk = h * 60 + m
+        const { basMin, bitMin } = vardiyaAralik
+        const icinde = bitMin <= 24 * 60
+          ? (dk >= basMin && dk < bitMin)
+          : (dk >= basMin || dk < (bitMin - 24 * 60))  // sarkan
+        if (!icinde) return false
       }
 
       return true

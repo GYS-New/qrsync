@@ -40,20 +40,17 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Tarih filtresi: TR günü bazlı (UTC dönüşümlü), aktif_olma_tarihi üzerinden.
-  // Frontend "Aktif Olma Tarihi" etiketi ile bu kolonu bekliyor — eskiden arsiv_tarihi
-  // üzerinde uygulanıyordu (BUG: 11 May aktif olan görev 12 May arşivlendiğinde
-  // 11 May filtresi boş dönüyordu).
-  const fromUTC = fromD ? new Date(fromD + 'T00:00:00+03:00').toISOString() : null
-  const toUTC   = toD   ? new Date(toD + 'T23:59:59.999+03:00').toISOString() : null
+  // Tarih filtresi: vardiya_gunu (date) — görevin "ait olduğu vardiya günü".
+  // Sarkan V1 görevleri (örn 31 May 23:35 aktif, vardiya_gunu=1 Haz) kendi
+  // günleri altında listelenir. YYYY-MM-DD string karşılaştırması yeterli.
 
   // Count query
   let countQ = admin.from('canli_gorevler_arsiv').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId)
   if (projeId) countQ = countQ.eq('proje_id', projeId)
   if (durum) countQ = countQ.eq('durum', durum)
   if (neden) countQ = countQ.eq('arsiv_nedeni', neden)
-  if (fromUTC) countQ = countQ.gte('aktif_olma_tarihi', fromUTC)
-  if (toUTC) countQ = countQ.lte('aktif_olma_tarihi', toUTC)
+  if (fromD) countQ = countQ.gte('vardiya_gunu', fromD)
+  if (toD)   countQ = countQ.lte('vardiya_gunu', toD)
   if (q) countQ = countQ.ilike('tanim', `%${q}%`)
   if (lokasyonIds.length > 0) countQ = countQ.in('lokasyon_id', lokasyonIds)
   else if (lokasyonId) countQ = countQ.eq('lokasyon_id', lokasyonId)
@@ -68,15 +65,15 @@ export async function GET(req: NextRequest) {
 
   // Data query
   const offset = (page - 1) * limit
-  const sel = 'id,firma_id,proje_id,tanim,lokasyon_id,durum,arsiv_tarihi,arsiv_nedeni,aktif_olma_tarihi,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,iptal_eden_id,islemi_yapan_id,kural_id,gunluk_frekans_sayisi,son_tamamlama_kanali,simule_tamamlandi'
+  const sel = 'id,firma_id,proje_id,tanim,lokasyon_id,durum,arsiv_tarihi,arsiv_nedeni,aktif_olma_tarihi,vardiya_gunu,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,iptal_eden_id,islemi_yapan_id,kural_id,gunluk_frekans_sayisi,son_tamamlama_kanali,simule_tamamlandi'
 
   let dataQ = admin.from('canli_gorevler_arsiv').select(sel).eq('firma_id', firmaId)
     .order('aktif_olma_tarihi', { ascending: false })
   if (projeId) dataQ = dataQ.eq('proje_id', projeId)
   if (durum) dataQ = dataQ.eq('durum', durum)
   if (neden) dataQ = dataQ.eq('arsiv_nedeni', neden)
-  if (fromUTC) dataQ = dataQ.gte('aktif_olma_tarihi', fromUTC)
-  if (toUTC) dataQ = dataQ.lte('aktif_olma_tarihi', toUTC)
+  if (fromD) dataQ = dataQ.gte('vardiya_gunu', fromD)
+  if (toD)   dataQ = dataQ.lte('vardiya_gunu', toD)
   if (q) dataQ = dataQ.ilike('tanim', `%${q}%`)
   if (lokasyonIds.length > 0) dataQ = dataQ.in('lokasyon_id', lokasyonIds)
   else if (lokasyonId) dataQ = dataQ.eq('lokasyon_id', lokasyonId)
@@ -94,15 +91,38 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   let rows = rowsRaw ?? []
 
-  // Vardiya post-filter (TR saati)
+  // Vardiya post-filter — firma vardiya ayarından dinamik (sarkan dahil destekli)
   if (vardiya !== 'all') {
-    const range = vardiya === 'v1' ? { from: 0, to: 8 } : vardiya === 'v2' ? { from: 8, to: 16 } : { from: 16, to: 24 }
+    const vNo = vardiya === 'v1' ? 1 : vardiya === 'v2' ? 2 : vardiya === 'v3' ? 3 : 0
+    const { data: firmaRow } = await admin
+      .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari, vardiya_saatleri')
+      .eq('id', firmaId).single()
+    const vs = (firmaRow as any)?.vardiya_sayisi ?? 0
+    const ayarlar = (firmaRow as any)?.tum_vardiya_ayarlari?.[String(vs)] ?? (firmaRow as any)?.vardiya_saatleri ?? []
+    const v = (ayarlar as any[]).find((x: any) => Number(x.no) === vNo)
+    let aralik: { basMin: number; bitMin: number } | null = null
+    if (v?.baslangic && v?.bitis) {
+      const [bh, bm] = v.baslangic.split(':').map(Number)
+      const [eh, em] = v.bitis.split(':').map(Number)
+      if ([bh, bm, eh, em].every(Number.isFinite)) {
+        const basMin = bh * 60 + bm
+        let bitMin = eh * 60 + em
+        if (bitMin === 0 && basMin !== 0) bitMin = 24 * 60
+        if (bitMin <= basMin && bitMin !== 24 * 60) bitMin += 24 * 60
+        aralik = { basMin, bitMin }
+      }
+    }
     rows = rows.filter(r => {
-      if (!r.aktif_olma_tarihi) return false
-      const h = Number(new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false,
-      }).format(new Date(r.aktif_olma_tarihi)))
-      return h >= range.from && h < range.to
+      if (!aralik || !r.aktif_olma_tarihi) return false
+      const hm = new Date(r.aktif_olma_tarihi).toLocaleTimeString('en-GB', {
+        timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
+      })
+      const [h, m] = hm.split(':').map(Number)
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return false
+      const dk = h * 60 + m
+      return aralik.bitMin <= 24 * 60
+        ? (dk >= aralik.basMin && dk < aralik.bitMin)
+        : (dk >= aralik.basMin || dk < (aralik.bitMin - 24 * 60))
     })
     totalRaw = rows.length
     rows = rows.slice(offset, offset + limit)
