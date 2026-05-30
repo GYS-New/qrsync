@@ -41,7 +41,7 @@ export interface DetayResponse {
   islemSureleriAktif: boolean
 }
 
-const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,iptal_sebep,kural_id'
+const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,iptal_sebep,kural_id'
 
 // Kayıp tablosuna giren durumlar (TAMAMLANDI ve ara durumlar hariç).
 const KAYIP_DURUMLAR = ['ZAMANI_GECMIS', 'IPTAL', 'SILINDI', 'BEKLEMEDE', 'KAPATILDI']
@@ -110,9 +110,8 @@ export async function buildGenelRaporDetay(
     targetLokIds = filters.yetkiliUstLokIds.flatMap(id => getAllDescendants(id, lokMap))
   }
 
-  // 3. Tarih sınırları
-  const baslangicUTC = filters.raporBaslangic ? new Date(filters.raporBaslangic + 'T00:00:00+03:00').toISOString() : null
-  const bitisUTC = filters.raporBitis ? new Date(filters.raporBitis + 'T23:59:59+03:00').toISOString() : null
+  // 3. Tarih sınırları — vardiya_gunu (date) üzerinden (sarkan V1 görevi
+  //    kendi günü altında listelenir; aktif_olma_tarihi'nin TR günü değil)
 
   // 4. Tip'e göre durum filter + sort sütunu
   let durumFilter: string[] | null = null
@@ -130,8 +129,8 @@ export async function buildGenelRaporDetay(
     let q: any = admin.from(table).select(SELECT_COLS, withCount ? { count: 'exact' } : undefined).eq('firma_id', filters.firmaId)
     if (filters.projeId) q = q.eq('proje_id', filters.projeId)
     if (targetLokIds && targetLokIds.length > 0) q = q.in('lokasyon_id', targetLokIds)
-    if (baslangicUTC) q = q.gte('aktif_olma_tarihi', baslangicUTC)
-    if (bitisUTC) q = q.lte('aktif_olma_tarihi', bitisUTC)
+    if (filters.raporBaslangic) q = q.gte('vardiya_gunu', filters.raporBaslangic)
+    if (filters.raporBitis)     q = q.lte('vardiya_gunu', filters.raporBitis)
     if (durumFilter) q = q.in('durum', durumFilter)
     if (kuralNotNull === true) q = q.not('kural_id', 'is', null)
     if (kuralNotNull === false) q = q.is('kural_id', null)
@@ -163,18 +162,43 @@ export async function buildGenelRaporDetay(
     const bv = b[sortCol] ? new Date(b[sortCol]).getTime() : 0
     return bv - av
   })
-  // Vardiya filtresi (TR saati)
+  // Vardiya filtresi — firma vardiya ayarından dinamik (sarkan dahil destekli)
   const vardiya = filters.vardiya ?? 'all'
   if (vardiya !== 'all') {
-    const range = vardiya === 'v1' ? { from: 0, to: 8 } : vardiya === 'v2' ? { from: 8, to: 16 } : { from: 16, to: 24 }
-    merged = merged.filter((g: any) => {
-      if (!g.aktif_olma_tarihi) return false
-      const h = Number(new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false,
-      }).format(new Date(g.aktif_olma_tarihi)))
-      return h >= range.from && h < range.to
-    })
-    total = merged.length
+    const vNo = vardiya === 'v1' ? 1 : vardiya === 'v2' ? 2 : vardiya === 'v3' ? 3 : 0
+    const { data: firmaRow } = await admin
+      .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari, vardiya_saatleri')
+      .eq('id', filters.firmaId).single()
+    const vs = (firmaRow as any)?.vardiya_sayisi ?? 0
+    const ayarlar = (firmaRow as any)?.tum_vardiya_ayarlari?.[String(vs)] ?? (firmaRow as any)?.vardiya_saatleri ?? []
+    const v = (ayarlar as any[]).find((x: any) => Number(x.no) === vNo)
+    let aralik: { basMin: number; bitMin: number } | null = null
+    if (v?.baslangic && v?.bitis) {
+      const [bh, bm] = v.baslangic.split(':').map(Number)
+      const [eh, em] = v.bitis.split(':').map(Number)
+      if ([bh, bm, eh, em].every(Number.isFinite)) {
+        const basMin = bh * 60 + bm
+        let bitMin = eh * 60 + em
+        if (bitMin === 0 && basMin !== 0) bitMin = 24 * 60
+        if (bitMin <= basMin && bitMin !== 24 * 60) bitMin += 24 * 60
+        aralik = { basMin, bitMin }
+      }
+    }
+    if (aralik) {
+      merged = merged.filter((g: any) => {
+        if (!g.aktif_olma_tarihi) return false
+        const hm = new Date(g.aktif_olma_tarihi).toLocaleTimeString('en-GB', {
+          timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
+        })
+        const [h, m] = hm.split(':').map(Number)
+        if (!Number.isFinite(h) || !Number.isFinite(m)) return false
+        const dk = h * 60 + m
+        return aralik!.bitMin <= 24 * 60
+          ? (dk >= aralik!.basMin && dk < aralik!.bitMin)
+          : (dk >= aralik!.basMin || dk < (aralik!.bitMin - 24 * 60))
+      })
+      total = merged.length
+    }
   }
   const slice = merged.slice(offset, offset + limit)
 

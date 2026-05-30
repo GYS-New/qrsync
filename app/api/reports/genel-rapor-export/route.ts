@@ -78,8 +78,9 @@ export async function GET(req: NextRequest) {
     let q = admin.from(table).select(SEL_SURE).eq('firma_id', firmaId).eq('durum', 'TAMAMLANDI')
     if (projeId) q = (q as any).eq('proje_id', projeId)
     if (otoYikamaIds.size > 0) q = q.not('lokasyon_id', 'in', `(${[...otoYikamaIds].join(',')})`)
-    if (baslangic) { const v = new Date(baslangic + 'T00:00:00+03:00').toISOString(); q = q.gte('aktif_olma_tarihi', v) }
-    if (bitis) { const v = new Date(bitis + 'T23:59:59+03:00').toISOString(); q = q.lte('aktif_olma_tarihi', v) }
+    // Tarih filtresi vardiya_gunu (date) üzerinden — sarkan V1 görevler kendi günü altında
+    if (baslangic) q = q.gte('vardiya_gunu', baslangic)
+    if (bitis)     q = q.lte('vardiya_gunu', bitis)
     return q
   }
   const [sureLive, sureArsiv] = await Promise.all([
