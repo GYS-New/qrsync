@@ -12,6 +12,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Pause, Play, Square } from 'lucide-react'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { iptalSebepKontrol } from '@/lib/validation/iptalSebep'
+import { suankiVardiyaGunu } from '@/lib/gorev/vardiyaGunu'
 
 // ── Tarih/saat formatlama yardımcıları (TR — Europe/Istanbul) ────────────
 function formatTarihTR(value?: string | null): string {
@@ -474,11 +475,11 @@ useEffect(() => {
   }, [firmaId])
 
   // Bugünün TR günü için tüm canlı görevleri çek (vardiya özet kartları)
-  // Sarkan V1 görevleri (aktif_olma_tarihi=dün 23:35, vardiya_gunu=bugün) dahil
-  // edilsin diye vardiya_gunu üzerinden çekiyoruz, aktif_olma_tarihi değil.
+  // Sarkan V1 (örn 23:30-07:30) aktif olduğunda "şu anki vardiya günü" yarına ait
+  // olabilir; suankiVardiyaGunu() bu kaymayı handle eder.
   async function refreshBugun() {
     if (!firmaId) return
-    const trDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+    const trDate = suankiVardiyaGunu(vardiyaAyari)
     let q = supabase
       .from('canli_gorevler')
       .select('id,durum,aktif_olma_tarihi,vardiya_gunu')
@@ -492,13 +493,15 @@ useEffect(() => {
   }
 
   // Vardiya özet kartlarını her dakika tazele (canlı veriden ayrı, hafif sorgu)
+  // vardiyaAyari geldikten sonra da tekrar tetikle — sarkan vardiya hesabı
+  // doğru trDate'i ancak vardiyaAyari geldikten sonra üretebilir.
   useEffect(() => {
     if (!firmaId) return
     refreshBugun()
     const id = setInterval(refreshBugun, 60 * 1000)
     return () => clearInterval(id)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmaId, projeId, yetkiliLokIds])
+  }, [firmaId, projeId, yetkiliLokIds, vardiyaAyari])
 
   // Vardiya özetleri — TumGorevlerClient ile aynı mantık
   const vardiyaOzetleri = useMemo(() => {
@@ -521,7 +524,7 @@ useEffect(() => {
       }
       return null
     }
-    const bugunTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+    const bugunTR = suankiVardiyaGunu(vardiyaAyari)
     const KAYIP_DURUMLAR = new Set(['IPTAL', 'BEKLEMEDE', 'ZAMANI_GECMIS'])
     const sayac: Record<number, { toplam: number; tamamlanan: number; sapma: number; kayip: number }> = {}
     for (const v of vardiyaAyari) sayac[v.no] = { toplam: 0, tamamlanan: 0, sapma: 0, kayip: 0 }

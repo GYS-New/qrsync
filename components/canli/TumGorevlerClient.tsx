@@ -13,6 +13,7 @@ import { IMPORT_EXPORT_BUTTON_STYLE } from '@/lib/import-export/constants'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { useYetki } from '@/lib/yetki/useYetki'
 import { KanalBadge } from '@/components/shared/KanalBadge'
+import { suankiVardiyaGunu } from '@/lib/gorev/vardiyaGunu'
 
 type SortKey = 'grup' | 'tanim' | 'lokasyon' | 'atanan' | 'aktif' | 'islem' | 'durum' | 'actor'
 
@@ -919,7 +920,8 @@ async function del() {
       }
       return null
     }
-    const bugunTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+    // Sarkan V1 (23:30-07:30) aktifken bugun=yarının vardiya_gunu'na ait olur
+    const bugunTR = suankiVardiyaGunu(vardiyaAyari)
     // Kayıp = IPTAL + BEKLEMEDE + ZAMANI_GECMIS (yapılamayan görevler)
     const KAYIP_DURUMLAR = new Set(['IPTAL', 'BEKLEMEDE', 'ZAMANI_GECMIS'])
     const sayac: Record<number, { toplam: number; tamamlanan: number; sapma: number; kayip: number }> = {}
