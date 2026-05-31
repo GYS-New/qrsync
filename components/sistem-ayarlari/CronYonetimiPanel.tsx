@@ -9,7 +9,7 @@ import { Play, RefreshCw, Clock } from 'lucide-react'
 type CronTipi = 'personel_destek' | 'max_sure' | 'arsivleme' | 'simulasyon' | 'sistem_kontrol' | 'rapor_gonder' | 'gece_dongu' | 'yedekleme'
 
 const CRONLAR: { tip: CronTipi; ad: string; aciklama: string; periyot: string; tehlike?: boolean }[] = [
-  { tip: 'gece_dongu',      ad: 'Gece Tam Döngü',         aciklama: 'Durum geçişleri (HAZIR→ACIK→BEKLEMEDE→ZAMANI_GECMIS) + arşivleme + ertesi gün görev üretimi.', periyot: 'Her gece 00:01 TRT', tehlike: true },
+  { tip: 'gece_dongu',      ad: 'Gece Tam Döngü',         aciklama: 'Durum geçişleri (HAZIR→ACIK→BEKLEMEDE→ZAMANI_GECMIS) + arşivleme + yarınki vardiya günü görev üretimi (V1 sarkan dahil).', periyot: 'Her gece 23:30 TRT', tehlike: true },
   { tip: 'yedekleme',       ad: 'Veri Yedekleme',          aciklama: 'Kritik tabloları JSON+gzip olarak Supabase Storage\'a yedekler (26 tablo). 90 günden eski yedekler otomatik silinir.', periyot: 'Her gece 00:30 TRT' },
   { tip: 'personel_destek', ad: 'Personel Görev Desteği', aciklama: 'Vardiya bitiminde BEKLEMEDE görevleri ZAMANINDA_YAPILAMAYAN olarak destek personeline yazar (hedef oran %).', periyot: '00:00, 08:00, 16:00 TRT' },
   { tip: 'max_sure',        ad: 'Max Süre Kontrol',        aciklama: 'ISLEMDE durumdaki görevleri max_sure_dakika dolduğunda otomatik tamamlar; ek olarak 10 dk kala uyarı bildirimi gönderir.', periyot: 'Her 5 dakika' },
