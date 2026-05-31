@@ -423,16 +423,18 @@ useEffect(() => {
       clearInterval(liveInterval)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmaId])
+  }, [firmaId, vardiyaAyari])
 
   // Görevlere göz at listesi için: 10 sn yenile
+  // vardiyaAyari dependency — sarkan V1 sinceISO hesabı ayarlar yüklendikten sonra
+  // doğru çalışsın diye refresh tetiklenir.
   useEffect(() => {
     if (!firmaId) return
     refreshBrowse()
     const interval = setInterval(refreshBrowse, 10000)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmaId])
+  }, [firmaId, vardiyaAyari])
 
   // Hazır -> Aktif otomasyonu (dev ortamında cron yoksa): 10 sn'de bir kontrol et
   useEffect(() => {
@@ -445,12 +447,21 @@ useEffect(() => {
   }, [streamState])
 
   // Listeleme süresinin başlangıcını hesapla.
-  //   canliAkisSureSaat = -1 → "Bugün" → TR günü 00:00:00
+  //   canliAkisSureSaat = -1 → "Bugün" → şu anki vardiya gününün başlangıç anı
+  //     (sarkan V1 varsa önceki gün TR 23:30, yoksa TR 00:00)
   //   canliAkisSureSaat > 0 → Son N saat → şimdi - N saat
   function computeSinceISO(): string {
     if (canliAkisSureSaat === -1) {
-      const trDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })  // 'YYYY-MM-DD'
-      return new Date(`${trDate}T00:00:00+03:00`).toISOString()
+      const bugunVG = suankiVardiyaGunu(vardiyaAyari) // 'YYYY-MM-DD'
+      const sarkan = vardiyaAyari.find(v => v.bitis <= v.baslangic)
+      if (sarkan) {
+        // Sarkan vardiya varsa "bugünün başı" gerçekte dün akşamında (V1 başlangıç saatinde)
+        const d = new Date(bugunVG + 'T00:00:00Z')
+        d.setUTCDate(d.getUTCDate() - 1)
+        const oncekiGun = d.toISOString().slice(0, 10)
+        return new Date(`${oncekiGun}T${sarkan.baslangic}:00+03:00`).toISOString()
+      }
+      return new Date(`${bugunVG}T00:00:00+03:00`).toISOString()
     }
     return new Date(Date.now() - canliAkisSureSaat * 60 * 60 * 1000).toISOString()
   }
