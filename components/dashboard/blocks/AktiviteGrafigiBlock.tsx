@@ -116,12 +116,17 @@ export default function AktiviteGrafigiBlock({
     ])
     const rows = [...canliRows, ...arsivRows, ...spesifikRows]
 
+    // Label sırasını ayrı bir array'de tutuyoruz; Object key'lerinde "10".."23"
+    // integer-index olarak numeric sıralanır, "00".."09" insertion order'da kalır
+    // → Object.entries ile chronological order bozulur. Array ile garanti veriyoruz.
+    const labels: string[] = []
     const grouped: Record<string, number> = {}
 
     if (mode === "gunluk") {
       for (let i = 23; i >= 0; i--) {
         const d = new Date(Date.now() - i * 60 * 60 * 1000)
         const label = d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false })
+        labels.push(label)
         grouped[label] = 0
       }
       rows.forEach((r: any) => {
@@ -134,6 +139,7 @@ export default function AktiviteGrafigiBlock({
       for (let i = 6; i >= 0; i--) days.push(startOfDayTR(new Date(Date.now() - i * 24 * 60 * 60 * 1000)))
       days.forEach((d) => {
         const key = d.toLocaleDateString("tr-TR", { weekday: "short", timeZone: "Europe/Istanbul" })
+        labels.push(key)
         grouped[key] = 0
       })
       rows.forEach((r: any) => {
@@ -144,7 +150,7 @@ export default function AktiviteGrafigiBlock({
     } else {
       const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       const weeks = ["Hafta 1", "Hafta 2", "Hafta 3", "Hafta 4", "Hafta 5"]
-      weeks.forEach((w) => (grouped[w] = 0))
+      weeks.forEach((w) => { labels.push(w); grouped[w] = 0 })
       rows.forEach((r: any) => {
         const d = new Date(r[groupCol])
         const diffDays = Math.floor((d.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
@@ -153,7 +159,7 @@ export default function AktiviteGrafigiBlock({
       })
     }
 
-    setData(Object.entries(grouped).map(([label, value]) => ({ label, value })))
+    setData(labels.map((label) => ({ label, value: grouped[label] || 0 })))
   }
 
   useEffect(() => {
