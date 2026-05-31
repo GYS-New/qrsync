@@ -14,6 +14,8 @@ interface AuditRow {
   proje_id: string | null
   kullanici_id: string | null
   kullanici_isim: string | null
+  firma_adi: string | null
+  proje_adi: string | null
   detay: any
 }
 
@@ -299,9 +301,22 @@ export default function AuditLogClient({ isSA, firmalarListesi = [] }: Props) {
               <div><strong>Tablo:</strong> {detay.tablo}</div>
               <div><strong>Satır Sayısı:</strong> {detay.satir_sayisi}</div>
               <div><strong>Durum:</strong> {detay.basarili ? <span style={{ color: '#166534', fontWeight: 700 }}>✓ Başarılı</span> : <span style={{ color: '#991b1b', fontWeight: 700 }}>✕ Başarısız</span>}</div>
-              <div><strong>İşlemi Yapan:</strong> {detay.kullanici_isim ?? <em>sistem (cron)</em>}</div>
-              {detay.firma_id && <div><strong>Firma:</strong> <code style={{ fontSize: 11 }}>{detay.firma_id}</code></div>}
-              {detay.proje_id && <div><strong>Proje:</strong> <code style={{ fontSize: 11 }}>{detay.proje_id}</code></div>}
+              <div>
+                <strong>İşlemi Yapan:</strong>{' '}
+                {detay.kullanici_isim ?? (detay.detay?.kullanici_adi ?? <em>sistem (cron)</em>)}
+              </div>
+              {(detay.firma_adi || detay.detay?.firma_adi || detay.firma_id) && (
+                <div>
+                  <strong>Firma:</strong>{' '}
+                  {detay.firma_adi ?? detay.detay?.firma_adi ?? <code style={{ fontSize: 11 }}>{detay.firma_id}</code>}
+                </div>
+              )}
+              {(detay.proje_adi || detay.detay?.proje_adi || detay.proje_id) && (
+                <div>
+                  <strong>Proje:</strong>{' '}
+                  {detay.proje_adi ?? detay.detay?.proje_adi ?? <code style={{ fontSize: 11 }}>{detay.proje_id}</code>}
+                </div>
+              )}
               {detay.hata_mesaji && (
                 <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '8px 12px', borderRadius: 8, color: '#991b1b' }}>
                   <strong>Hata:</strong> {detay.hata_mesaji}

@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   const ua = req.headers.get('user-agent') ?? ''
 
   // Hafif log — mobilin entegrasyonu doğrulanıyor. Tüm çağrılar loglanır, hata olsa bile.
-  const logPayload = {
+  const logPayload: Record<string, any> = {
     user_id_preview: userId ? String(userId).slice(0, 8) + '…' : null,
     device_token_preview: deviceToken ? String(deviceToken).slice(0, 8) + '…' : null,
     bildirim_izni: bildirimIzni,
@@ -46,6 +46,35 @@ export async function POST(req: NextRequest) {
   }
   console.log('[bildirim-izni]', JSON.stringify(logPayload))
 
+  // Audit log için kullanıcı/firma/proje çözümlemesi (cihaz eşleştirmesinin kim'i olduğunu görmek için)
+  let logUserId: string | null = null
+  let logFirmaId: string | null = null
+  let logProjeId: string | null = null
+  try {
+    if (userId) {
+      const adminPre = createAdminClient()
+      const { data: u } = await adminPre
+        .from('users')
+        .select('id,isim_soyisim,firma_id,proje_id')
+        .eq('id', userId)
+        .maybeSingle()
+      if (u) {
+        logUserId = (u as any).id
+        logFirmaId = (u as any).firma_id ?? null
+        logProjeId = (u as any).proje_id ?? null
+        logPayload.kullanici_adi = (u as any).isim_soyisim ?? null
+        if (logFirmaId) {
+          const { data: f } = await adminPre.from('firmalar').select('firma_adi,ticari_unvan').eq('id', logFirmaId).maybeSingle()
+          logPayload.firma_adi = (f as any)?.firma_adi ?? (f as any)?.ticari_unvan ?? null
+        }
+        if (logProjeId) {
+          const { data: p } = await adminPre.from('projeler').select('ad').eq('id', logProjeId).maybeSingle()
+          logPayload.proje_adi = (p as any)?.ad ?? null
+        }
+      }
+    }
+  } catch {}
+
   // Audit log — Railway log'u yanında DB'ye de iz bırak (mobil deploy takibi için)
   try {
     const adminLog = createAdminClient()
@@ -53,6 +82,9 @@ export async function POST(req: NextRequest) {
       tip: 'mobil_bildirim_izni_rapor',
       tablo: 'device_tokens',
       basarili: true,
+      kullanici_id: logUserId,
+      firma_id: logFirmaId,
+      proje_id: logProjeId,
       detay: logPayload,
     })
   } catch {}
