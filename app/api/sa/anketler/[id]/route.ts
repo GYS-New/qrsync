@@ -68,18 +68,25 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
   }
 
-  // Ek seçilmiş kişiler — hedef_user_ids dizisi (firma'dan dolaylı gelmeyenler vurgulanır)
+  // Ek seçilmiş kişiler — hedef_user_ids dizisi
+  // (firmalar JOIN PostgREST embed yerine ayrı sorgu — daha güvenli)
   const hedefKisiler: { id: string; isim: string; firma_adi: string }[] = []
   const ekUserIds = (anket as any).hedef_user_ids ?? []
   if (ekUserIds.length > 0) {
     const { data: us } = await admin
-      .from('users').select('id,isim_soyisim,firma_id,firmalar(firma_adi,ticari_unvan)')
+      .from('users').select('id,isim_soyisim,firma_id')
       .in('id', ekUserIds)
+    const kisiFirmaIds = Array.from(new Set((us ?? []).map((u: any) => u.firma_id).filter(Boolean)))
+    const kisiFirmaAdMap = new Map<string, string>()
+    if (kisiFirmaIds.length > 0) {
+      const { data: fs } = await admin.from('firmalar').select('id,firma_adi,ticari_unvan').in('id', kisiFirmaIds)
+      for (const f of fs ?? []) kisiFirmaAdMap.set((f as any).id, (f as any).firma_adi ?? (f as any).ticari_unvan ?? '—')
+    }
     for (const u of us ?? []) {
       hedefKisiler.push({
         id: (u as any).id,
         isim: (u as any).isim_soyisim ?? '—',
-        firma_adi: (u as any).firmalar?.firma_adi ?? (u as any).firmalar?.ticari_unvan ?? '—',
+        firma_adi: kisiFirmaAdMap.get((u as any).firma_id) ?? '—',
       })
     }
   }
@@ -99,12 +106,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (userIds.length > 0) {
     const { data: us } = await admin
       .from('users')
-      .select('id,isim_soyisim,firma_id,firmalar(firma_adi)')
+      .select('id,isim_soyisim,firma_id')
       .in('id', userIds)
+    const cFirmaIds = Array.from(new Set((us ?? []).map((u: any) => u.firma_id).filter(Boolean)))
+    const cFirmaMap = new Map<string, string>()
+    if (cFirmaIds.length > 0) {
+      const { data: fs } = await admin.from('firmalar').select('id,firma_adi,ticari_unvan').in('id', cFirmaIds)
+      for (const f of fs ?? []) cFirmaMap.set((f as any).id, (f as any).firma_adi ?? (f as any).ticari_unvan ?? '—')
+    }
     for (const u of us ?? []) {
       usersMap.set((u as any).id, {
         isim: (u as any).isim_soyisim ?? '—',
-        firma_adi: (u as any).firmalar?.firma_adi ?? '—',
+        firma_adi: cFirmaMap.get((u as any).firma_id) ?? '—',
       })
     }
   }
@@ -153,13 +166,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (eksikIds.length > 0) {
     const { data: us } = await admin
       .from('users')
-      .select('id,isim_soyisim,firma_id,firmalar(firma_adi)')
+      .select('id,isim_soyisim,firma_id')
       .in('id', eksikIds)
+    const eFirmaIds = Array.from(new Set((us ?? []).map((u: any) => u.firma_id).filter(Boolean)))
+    const eFirmaMap = new Map<string, string>()
+    if (eFirmaIds.length > 0) {
+      const { data: fs } = await admin.from('firmalar').select('id,firma_adi,ticari_unvan').in('id', eFirmaIds)
+      for (const f of fs ?? []) eFirmaMap.set((f as any).id, (f as any).firma_adi ?? (f as any).ticari_unvan ?? '—')
+    }
     for (const u of us ?? []) {
       eksikUsers.push({
         id: (u as any).id,
         isim: (u as any).isim_soyisim ?? '—',
-        firma_adi: (u as any).firmalar?.firma_adi ?? '—',
+        firma_adi: eFirmaMap.get((u as any).firma_id) ?? '—',
       })
     }
   }
