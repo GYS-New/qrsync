@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest) {
 
   const { data: anketler, error } = await admin
     .from('mobil_anket')
-    .select('id,olusturuldu,baslik,soru,tip,secenekler,hedef_user_ids,hedef_firma_ids,son_gecerli,aciklama_iste,durum')
+    .select('id,olusturuldu,olusturan_id,baslik,soru,tip,secenekler,hedef_user_ids,hedef_firma_ids,son_gecerli,aciklama_iste,durum')
     .order('olusturuldu', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -48,22 +48,37 @@ export async function GET(_req: NextRequest) {
     }
   }
 
-  // Hedef sayısını hesapla (hedef_user_ids + hedef_firma_ids için firma personeli)
-  // distinct user_id set'i; firma id'leri için tek sorguda topluca çek
+  // Hedef firma ID'leri ve hedef kişi ID'leri için tek sorguda firma/personel haritası
   const tumFirmaIds = Array.from(new Set((anketler ?? []).flatMap((a: any) => a.hedef_firma_ids ?? [])))
-  const firmaUserMap = new Map<string, Set<string>>()  // firma_id → user_id set
-  if (tumFirmaIds.length > 0) {
-    const { data: firmaUsers } = await admin
-      .from('users')
-      .select('id,firma_id')
-      .in('firma_id', tumFirmaIds)
-      .eq('aktif', true)
-    for (const u of firmaUsers ?? []) {
-      const fid = (u as any).firma_id as string
-      if (!firmaUserMap.has(fid)) firmaUserMap.set(fid, new Set())
-      firmaUserMap.get(fid)!.add((u as any).id)
-    }
+  const tumHedefUserIds = Array.from(new Set((anketler ?? []).flatMap((a: any) => a.hedef_user_ids ?? [])))
+  const tumGonderenIds = Array.from(new Set((anketler ?? []).map((a: any) => a.olusturan_id).filter(Boolean)))
+
+  const firmaUserMap = new Map<string, Set<string>>()      // firma_id → user_id set (hedef sayımı)
+  const firmaAdMap = new Map<string, string>()              // firma_id → firma_adi
+  const userAdMap = new Map<string, string>()               // user_id → isim_soyisim
+
+  const [firmaUsersRes, firmalarRes, hedefUsersRes, gonderenRes] = await Promise.all([
+    tumFirmaIds.length > 0
+      ? admin.from('users').select('id,firma_id').in('firma_id', tumFirmaIds).eq('aktif', true)
+      : Promise.resolve({ data: [] as any[] }),
+    tumFirmaIds.length > 0
+      ? admin.from('firmalar').select('id,firma_adi,ticari_unvan').in('id', tumFirmaIds)
+      : Promise.resolve({ data: [] as any[] }),
+    tumHedefUserIds.length > 0
+      ? admin.from('users').select('id,isim_soyisim').in('id', tumHedefUserIds)
+      : Promise.resolve({ data: [] as any[] }),
+    tumGonderenIds.length > 0
+      ? admin.from('users').select('id,isim_soyisim').in('id', tumGonderenIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ])
+
+  for (const u of (firmaUsersRes.data ?? []) as any[]) {
+    if (!firmaUserMap.has(u.firma_id)) firmaUserMap.set(u.firma_id, new Set())
+    firmaUserMap.get(u.firma_id)!.add(u.id)
   }
+  for (const f of (firmalarRes.data ?? []) as any[]) firmaAdMap.set(f.id, f.firma_adi ?? f.ticari_unvan ?? '—')
+  for (const u of (hedefUsersRes.data ?? []) as any[]) userAdMap.set(u.id, u.isim_soyisim ?? '—')
+  for (const u of (gonderenRes.data ?? []) as any[]) userAdMap.set(u.id, u.isim_soyisim ?? '—')
 
   const items = (anketler ?? []).map((a: any) => {
     const userSet = new Set<string>([...(a.hedef_user_ids ?? [])])
@@ -75,6 +90,10 @@ export async function GET(_req: NextRequest) {
       ...a,
       hedef_sayisi: userSet.size,
       cevap_sayisi: cevapSayiMap.get(a.id) ?? 0,
+      gonderen_adi: a.olusturan_id ? (userAdMap.get(a.olusturan_id) ?? '—') : '—',
+      hedef_firmalar: (a.hedef_firma_ids ?? []).map((fid: string) => firmaAdMap.get(fid) ?? '—'),
+      hedef_kisi_sayisi: (a.hedef_user_ids ?? []).length,
+      hedef_kisi_ornekleri: (a.hedef_user_ids ?? []).slice(0, 3).map((uid: string) => userAdMap.get(uid) ?? '—'),
     }
   })
 

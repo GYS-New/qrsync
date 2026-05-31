@@ -18,6 +18,10 @@ type AnketRow = {
   durum: 'aktif' | 'kapali' | 'taslak'
   hedef_sayisi: number
   cevap_sayisi: number
+  gonderen_adi: string
+  hedef_firmalar: string[]
+  hedef_kisi_sayisi: number
+  hedef_kisi_ornekleri: string[]
 }
 
 const T = {
@@ -99,6 +103,8 @@ export default function AnketListClient({ base }: { base: string }) {
                 <tr style={{ borderBottom: `2px solid ${T.border}` }}>
                   <th style={th}>Başlık</th>
                   <th style={th}>Tip</th>
+                  <th style={th}>Gönderen</th>
+                  <th style={th}>Alıcılar</th>
                   <th style={{ ...th, textAlign: 'center' }}>Hedef</th>
                   <th style={{ ...th, textAlign: 'center' }}>Cevap</th>
                   <th style={{ ...th, textAlign: 'center' }}>Oran</th>
@@ -110,6 +116,16 @@ export default function AnketListClient({ base }: { base: string }) {
               <tbody>
                 {rows.map((r, i) => {
                   const oran = r.hedef_sayisi > 0 ? Math.round((r.cevap_sayisi / r.hedef_sayisi) * 100) : 0
+                  // Alıcı özeti: firma adları + (varsa) ek kişi sayısı
+                  const aliciFirmaText = (r.hedef_firmalar ?? []).join(', ')
+                  const aliciKisiText = r.hedef_kisi_sayisi > 0
+                    ? `${r.hedef_kisi_sayisi} kişi`
+                    : ''
+                  const aliciOzet = [aliciFirmaText, aliciKisiText].filter(Boolean).join(' + ') || '—'
+                  const aliciTooltip = [
+                    aliciFirmaText && `Firmalar: ${aliciFirmaText}`,
+                    r.hedef_kisi_ornekleri?.length > 0 && `Kişiler: ${r.hedef_kisi_ornekleri.join(', ')}${r.hedef_kisi_sayisi > r.hedef_kisi_ornekleri.length ? '…' : ''}`,
+                  ].filter(Boolean).join(' | ')
                   return (
                     <tr key={r.id}
                       style={{ borderBottom: `1px solid ${T.border}`, background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
@@ -118,12 +134,18 @@ export default function AnketListClient({ base }: { base: string }) {
                           style={{ color: T.blue, fontWeight: 700, textDecoration: 'none' }}>
                           {r.baslik}
                         </Link>
-                        <div style={{ fontSize: 11.5, color: T.textSoft, marginTop: 2, maxWidth: 380, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.soru}>
+                        <div style={{ fontSize: 11.5, color: T.textSoft, marginTop: 2, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.soru}>
                           {r.soru}
                         </div>
                       </td>
                       <td style={td}>
                         <Badge text={TIP_LABEL[r.tip] ?? r.tip} bg={T.blueLight} fg={T.blue} />
+                      </td>
+                      <td style={{ ...td, fontSize: 12.5, color: T.text, fontWeight: 600 }}>
+                        {r.gonderen_adi || '—'}
+                      </td>
+                      <td style={{ ...td, fontSize: 12, color: T.text, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={aliciTooltip}>
+                        {aliciOzet}
                       </td>
                       <td style={{ ...td, textAlign: 'center', fontWeight: 700 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>

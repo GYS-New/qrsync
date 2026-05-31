@@ -25,6 +25,9 @@ type Detay = {
     son_gecerli: string | null; aciklama_iste: boolean; durum: 'aktif' | 'kapali' | 'taslak'
     olusturuldu: string
   }
+  gonderen: { id: string; isim: string } | null
+  hedef_firmalar: { id: string; firma_adi: string; personel_sayisi: number }[]
+  hedef_kisiler: { id: string; isim: string; firma_adi: string }[]
   hedef_sayisi: number
   cevap_sayisi: number
   cevaplar: Cevap[]
@@ -172,6 +175,55 @@ export default function AnketDetayClient({ base, anketId }: { base: string; anke
               <div style={{ fontSize: 14, color: T.textSoft, fontStyle: 'italic' }}>"{a.soru}"</div>
             </div>
             <Badge text={DURUM_RENK[a.durum].label} bg={DURUM_RENK[a.durum].bg} fg={DURUM_RENK[a.durum].fg} />
+          </div>
+
+          {/* Gönderen + alıcılar bilgi satırı */}
+          <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start', flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+            <div style={{ minWidth: 180 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                Gönderen
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: T.text, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 26, height: 26, borderRadius: 999, background: T.blueLight, color: T.blue, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 12 }}>
+                  {(data.gonderen?.isim ?? '?').split(' ').slice(0,2).map(s => s[0]?.toUpperCase()).join('')}
+                </span>
+                {data.gonderen?.isim ?? '—'}
+              </div>
+              <div style={{ fontSize: 11, color: T.textSoft, marginTop: 2 }}>
+                {fmtTarih(a.olusturuldu)}
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minWidth: 280 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                Alıcılar
+              </div>
+              {data.hedef_firmalar.length === 0 && data.hedef_kisiler.length === 0 ? (
+                <div style={{ fontSize: 13, color: T.textSoft, fontStyle: 'italic' }}>— hedef yok —</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {data.hedef_firmalar.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {data.hedef_firmalar.map(f => (
+                        <span key={f.id} style={{ padding: '3px 10px', borderRadius: 999, background: T.blueLight, color: T.blue, fontSize: 12, fontWeight: 700 }}>
+                          🏢 {f.firma_adi} <span style={{ opacity: 0.7, fontWeight: 400 }}>({f.personel_sayisi})</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {data.hedef_kisiler.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {data.hedef_kisiler.map(u => (
+                        <span key={u.id} title={u.firma_adi}
+                          style={{ padding: '3px 10px', borderRadius: 999, background: T.greenLight, color: T.green, fontSize: 12, fontWeight: 600 }}>
+                          👤 {u.isim}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 14 }}>

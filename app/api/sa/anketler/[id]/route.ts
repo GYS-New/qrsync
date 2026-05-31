@@ -40,6 +40,50 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
   const hedefSayisi = userSet.size
 
+  // GÖNDEREN bilgisi
+  let gonderen: { id: string; isim: string } | null = null
+  if ((anket as any).olusturan_id) {
+    const { data: g } = await admin.from('users').select('id,isim_soyisim').eq('id', (anket as any).olusturan_id).maybeSingle()
+    gonderen = g ? { id: (g as any).id, isim: (g as any).isim_soyisim ?? '—' } : null
+  }
+
+  // ALICILAR — hedef firma listesi (adlarıyla + personel sayısı) + ek seçilmiş kişiler
+  const hedefFirmalar: { id: string; firma_adi: string; personel_sayisi: number }[] = []
+  if (firmaIds.length > 0) {
+    const [{ data: firmaRows }, { data: firmaPersonelRows }] = await Promise.all([
+      admin.from('firmalar').select('id,firma_adi,ticari_unvan').in('id', firmaIds),
+      admin.from('users').select('id,firma_id').in('firma_id', firmaIds).eq('aktif', true),
+    ])
+    const sayMap = new Map<string, number>()
+    for (const u of firmaPersonelRows ?? []) {
+      const fid = (u as any).firma_id
+      sayMap.set(fid, (sayMap.get(fid) ?? 0) + 1)
+    }
+    for (const f of firmaRows ?? []) {
+      hedefFirmalar.push({
+        id: (f as any).id,
+        firma_adi: (f as any).firma_adi ?? (f as any).ticari_unvan ?? '—',
+        personel_sayisi: sayMap.get((f as any).id) ?? 0,
+      })
+    }
+  }
+
+  // Ek seçilmiş kişiler — hedef_user_ids dizisi (firma'dan dolaylı gelmeyenler vurgulanır)
+  const hedefKisiler: { id: string; isim: string; firma_adi: string }[] = []
+  const ekUserIds = (anket as any).hedef_user_ids ?? []
+  if (ekUserIds.length > 0) {
+    const { data: us } = await admin
+      .from('users').select('id,isim_soyisim,firma_id,firmalar(firma_adi,ticari_unvan)')
+      .in('id', ekUserIds)
+    for (const u of us ?? []) {
+      hedefKisiler.push({
+        id: (u as any).id,
+        isim: (u as any).isim_soyisim ?? '—',
+        firma_adi: (u as any).firmalar?.firma_adi ?? (u as any).firmalar?.ticari_unvan ?? '—',
+      })
+    }
+  }
+
   // Cevaplar
   const { data: cevaplar } = await admin
     .from('mobil_anket_cevap')
@@ -123,6 +167,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({
     ok: true,
     anket,
+    gonderen,
+    hedef_firmalar: hedefFirmalar,
+    hedef_kisiler: hedefKisiler,
     hedef_sayisi: hedefSayisi,
     cevap_sayisi: cevaplarFull.length,
     cevaplar: cevaplarFull,
