@@ -1,6 +1,8 @@
 /**
  * POST /api/personel-destek/calistir
- * Personel Görev Desteği motoru — vardiya bitişinden 15 dk SONRA çalışır
+ * Personel Görev Desteği motoru — vardiya bitişinden 30 dk SONRA çalışır
+ * (Yeni OYAK vardiyaları: V1 23:30-07:30 / V2 07:30-15:30 / V3 15:30-23:30
+ *  → tetik: 00:00 / 08:00 / 16:00 TRT — bkz lib/cron/job.js)
  *
  * Mantık:
  * 1. Aktif personel_gorev_destegi kayıtlarını çek
