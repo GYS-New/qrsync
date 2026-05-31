@@ -89,7 +89,24 @@ type GorevRow = {
   arsiv_tarihi?: string | null
   lokasyon_id?: string | null
   durum_degisim_tarihi: string | null
+  vardiya_gunu?: string | null
   dbKaynak: 'canli' | 'arsiv' | 'spesifik'
+}
+
+// kayit_tarihi (UTC ISO) → TR takvim günü (YYYY-MM-DD)
+// Sarkan V1 (23:30-07:30) gibi vardiyalar için, görev yoksa fallback olarak kullanılır.
+function trDateOf(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  if (!Number.isFinite(t)) return null
+  return new Date(t + 3 * 3600 * 1000).toISOString().slice(0, 10)
+}
+
+// 'YYYY-MM-DD' tarih stringi üzerinde ±gün kaydırma
+function shiftDateStr(d: string, deltaDays: number): string {
+  const dt = new Date(d + 'T00:00:00Z')
+  dt.setUTCDate(dt.getUTCDate() + deltaDays)
+  return dt.toISOString().slice(0, 10)
 }
 
 async function kayitlarGetir(
@@ -191,6 +208,13 @@ async function kayitlarGetir(
     for (const s of sablonlar ?? []) sablonMap[s.id] = s.baslik
   }
 
+  // DB ön-filtre penceresi: kullanıcının istediği tarih aralığını ±1 gün genişletiyoruz.
+  // Sebep: V1 sarkan vardiya (23:30-07:30 TR) çeklisti, vardiya_gunu='2026-06-01' olsa bile
+  // kayit_tarihi 31 May TR (= 20:30 UTC) olabiliyor. ±1 gün marj boundary kayıtları korur.
+  // Final filtre, görev join'inden sonra vardiya_gunu üzerinden uygulanır.
+  const dbBaslangic = baslangic ? shiftDateStr(baslangic, -1) : null
+  const dbBitis     = bitis     ? shiftDateStr(bitis,      1) : null
+
   // 3. Çeklist başlıkları
   let basliklar: any[] = []
   if (cikti !== 'arsiv') {
@@ -198,8 +222,8 @@ async function kayitlarGetir(
       .select('id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi')
       .order('kayit_tarihi', { ascending: false })
       .limit(5000)
-    if (baslangic) sbQ = sbQ.gte('kayit_tarihi', baslangic)
-    if (bitis)     sbQ = sbQ.lte('kayit_tarihi', bitis + 'T23:59:59')
+    if (dbBaslangic) sbQ = sbQ.gte('kayit_tarihi', dbBaslangic)
+    if (dbBitis)     sbQ = sbQ.lte('kayit_tarihi', dbBitis + 'T23:59:59')
     const { data: sbData } = await sbQ
     const lokSet = new Set(lokIds)
     basliklar = (sbData ?? []).filter((b: any) => lokSet.has(b.lokasyon_id))
@@ -213,8 +237,8 @@ async function kayitlarGetir(
       .eq('firma_id', firmaId)
       .order('kayit_tarihi', { ascending: false })
       .limit(5000)
-    if (baslangic) arSbQ = arSbQ.gte('kayit_tarihi', baslangic)
-    if (bitis)     arSbQ = arSbQ.lte('kayit_tarihi', bitis + 'T23:59:59')
+    if (dbBaslangic) arSbQ = arSbQ.gte('kayit_tarihi', dbBaslangic)
+    if (dbBitis)     arSbQ = arSbQ.lte('kayit_tarihi', dbBitis + 'T23:59:59')
 
     const { data: arData, error: arErr } = await arSbQ
     if (!arErr && arData) {
@@ -247,7 +271,7 @@ async function kayitlarGetir(
     for (let i = 0; i < canliGorevIds.length; i += BATCH) {
       const chunk = canliGorevIds.slice(i, i + BATCH)
       const { data: canliGorevler } = await admin.from('canli_gorevler')
-        .select('id,tanim,durum,tamamlanma_tarihi,lokasyon_id,durum_degisim_tarihi')
+        .select('id,tanim,durum,tamamlanma_tarihi,lokasyon_id,durum_degisim_tarihi,vardiya_gunu')
         .in('id', chunk)
         .in('durum', GECERLI_DURUMLAR)
       for (const g of canliGorevler ?? []) {
@@ -255,6 +279,7 @@ async function kayitlarGetir(
           id: g.id, tanim: g.tanim, durum: g.durum,
           tamamlanma_tarihi: g.tamamlanma_tarihi ?? null, arsiv_tarihi: null,
           lokasyon_id: g.lokasyon_id, durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
+          vardiya_gunu: (g as any).vardiya_gunu ?? null,
           dbKaynak: 'canli',
         }
       }
@@ -264,7 +289,7 @@ async function kayitlarGetir(
       for (let i = 0; i < eksik.length; i += BATCH) {
         const chunk = eksik.slice(i, i + BATCH)
         const { data: arsivGorevler } = await admin.from('canli_gorevler_arsiv')
-          .select('id,tanim,durum,tamamlanma_tarihi,arsiv_tarihi,lokasyon_id,durum_degisim_tarihi')
+          .select('id,tanim,durum,tamamlanma_tarihi,arsiv_tarihi,lokasyon_id,durum_degisim_tarihi,vardiya_gunu')
           .in('id', chunk)
           .in('durum', GECERLI_DURUMLAR)
         for (const g of arsivGorevler ?? []) {
@@ -272,6 +297,7 @@ async function kayitlarGetir(
             id: g.id, tanim: g.tanim, durum: g.durum,
             tamamlanma_tarihi: g.tamamlanma_tarihi ?? null, arsiv_tarihi: g.arsiv_tarihi ?? null,
             lokasyon_id: g.lokasyon_id, durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
+            vardiya_gunu: (g as any).vardiya_gunu ?? null,
             dbKaynak: 'arsiv',
           }
         }
@@ -441,6 +467,7 @@ async function kayitlarGetir(
       gorev_task_type,
       _refMs:              rref,
       _fromArsiv:          b._fromArsiv,
+      _vardiyaGunu:        gorev?.vardiya_gunu ?? null,
     }
     sonuclar.push(row)
   }
@@ -449,10 +476,25 @@ async function kayitlarGetir(
   //   rapor    → aktif tablo, son 24 saat (cron tarafından arşive taşınmamış taze kayıtlar)
   //   arsiv    → fiziksel arşiv tablosu + henüz taşınmamış eski aktif kayıtlar
   //   birlesik → tümü (tarih filtresiyle eski kayıtlara ulaşmak için)
+  // EK: Vardiya günü filtresi — DB'den ±1 gün marjla aldığımız kayıtları, kullanıcının
+  // istediği tarih aralığına `gorev.vardiya_gunu` üzerinden daraltıyoruz. Görev yoksa
+  // (yetim kayıt) fallback olarak `kayit_tarihi`nin TR-date'ini kullanırız.
   const filtered = sonuclar.filter((row) => {
     const r = row._refMs as number
-    if (cikti === 'rapor') return !row._fromArsiv && !!r && r >= cutoff
-    if (cikti === 'arsiv') return !!row._fromArsiv || (!row._fromArsiv && !!r && r < cutoff)
+    // Önce kaynak (rapor/arsiv) filtresi
+    if (cikti === 'rapor') {
+      if (!(!row._fromArsiv && !!r && r >= cutoff)) return false
+    } else if (cikti === 'arsiv') {
+      if (!(!!row._fromArsiv || (!row._fromArsiv && !!r && r < cutoff))) return false
+    }
+    // Vardiya günü ön-filtresi (tarih aralığı belirtilmişse)
+    if (baslangic || bitis) {
+      const vg = (row._vardiyaGunu as string | null)
+                  ?? trDateOf(row.kayit_tarihi)
+      if (!vg) return true // tarih çıkarılamazsa geriye dönük uyumluluk: dahil et
+      if (baslangic && vg < baslangic) return false
+      if (bitis     && vg > bitis)     return false
+    }
     return true
   })
 
@@ -463,6 +505,7 @@ async function kayitlarGetir(
     }
     delete row._refMs
     delete row._fromArsiv
+    delete row._vardiyaGunu
   }
 
   return filtered.sort(

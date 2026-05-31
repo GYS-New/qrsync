@@ -6,7 +6,26 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
  * Server-side paginated çeklist arşiv
  *
  * Query: firma_id, proje_id, page, limit, q, from, to
+ *
+ * NOT: V1 sarkan vardiya (23:30-07:30 TR) destekli. Tarih filtresi `gorev.vardiya_gunu`
+ * üzerinden çalışır; görev yoksa fallback olarak `kayit_tarihi`nin TR-date'i kullanılır.
  */
+
+// kayit_tarihi (UTC ISO) → TR takvim günü (YYYY-MM-DD)
+function trDateOf(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  if (!Number.isFinite(t)) return null
+  return new Date(t + 3 * 3600 * 1000).toISOString().slice(0, 10)
+}
+
+// 'YYYY-MM-DD' tarih stringi üzerinde ±gün kaydırma
+function shiftDateStr(d: string, deltaDays: number): string {
+  const dt = new Date(d + 'T00:00:00Z')
+  dt.setUTCDate(dt.getUTCDate() + deltaDays)
+  return dt.toISOString().slice(0, 10)
+}
+
 export async function GET(req: NextRequest) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -53,6 +72,13 @@ export async function GET(req: NextRequest) {
   // firma_id ile çek, lokasyon filtresi sonradan uygula (lokIds 400+ olabilir, URL limit aşılır)
   const lokSet = new Set(lokIds)
 
+  // DB ön-filtre penceresi: kullanıcının istediği tarih aralığını ±1 gün genişletiyoruz.
+  // Sebep: V1 sarkan vardiya (23:30-07:30 TR) çeklisti, vardiya_gunu='2026-06-01' olsa bile
+  // kayit_tarihi 31 May TR (= 20:30 UTC) olabiliyor. Final filtre, görev join'inden sonra
+  // vardiya_gunu üzerinden daraltır.
+  const dbFromD = fromD ? shiftDateStr(fromD, -1) : ''
+  const dbToD   = toD   ? shiftDateStr(toD,    1) : ''
+
   // Tüm firma arşiv başlıklarını çek, lokasyon filtresi uygula, sonra sayfala
   // (firma başına max birkaç bin kayıt — tek seferde çekilebilir)
   const sel = 'id,canli_gorev_id,gorev_id,lokasyon_id,sablon_id,kullanici_id,kanal,kayit_tarihi'
@@ -65,8 +91,8 @@ export async function GET(req: NextRequest) {
       .select(sel).eq('firma_id', firmaId)
       .order('kayit_tarihi', { ascending: false })
       .range(dbOffset, dbOffset + CHUNK - 1)
-    if (fromD) q = q.gte('kayit_tarihi', fromD + 'T00:00:00')
-    if (toD) q = q.lte('kayit_tarihi', toD + 'T23:59:59')
+    if (dbFromD) q = q.gte('kayit_tarihi', dbFromD + 'T00:00:00')
+    if (dbToD) q = q.lte('kayit_tarihi', dbToD + 'T23:59:59')
     const { data: chunk, error } = await q
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!chunk?.length) break
@@ -77,13 +103,50 @@ export async function GET(req: NextRequest) {
 
   // Lokasyon filtresi
   const lokFiltered = allRows.filter(b => lokSet.has(b.lokasyon_id))
-  const total = lokFiltered.length
+
+  const BATCH = 80
+
+  // ── Vardiya günü ön-filtresi ──
+  // Tarih aralığı varsa: önce tüm lokFiltered için (id → vardiya_gunu) map'i kur
+  // (canli + arsiv), sonra vardiya_gunu üzerinden daralt. Görev yoksa fallback:
+  // kayit_tarihi'nin TR-date'i.
+  const vardiyaGunuMap: Record<string, string | null> = {}
+  if (fromD || toD) {
+    const tumCanliGorevIds = [...new Set(
+      lokFiltered.filter(b => b.canli_gorev_id).map(b => b.canli_gorev_id),
+    )] as string[]
+    for (let i = 0; i < tumCanliGorevIds.length; i += BATCH) {
+      const chunk = tumCanliGorevIds.slice(i, i + BATCH)
+      const { data } = await admin.from('canli_gorevler').select('id,vardiya_gunu').in('id', chunk)
+      for (const g of data ?? []) vardiyaGunuMap[(g as any).id] = (g as any).vardiya_gunu ?? null
+    }
+    const eksikVgIds = tumCanliGorevIds.filter(id => !(id in vardiyaGunuMap))
+    for (let i = 0; i < eksikVgIds.length; i += BATCH) {
+      const chunk = eksikVgIds.slice(i, i + BATCH)
+      const { data } = await admin.from('canli_gorevler_arsiv').select('id,vardiya_gunu').in('id', chunk)
+      for (const g of data ?? []) vardiyaGunuMap[(g as any).id] = (g as any).vardiya_gunu ?? null
+    }
+  }
+
+  const vardiyaFiltered = (fromD || toD)
+    ? lokFiltered.filter(b => {
+        const gid = b.canli_gorev_id as string | null
+        const vg = (gid && gid in vardiyaGunuMap)
+                    ? vardiyaGunuMap[gid]
+                    : trDateOf(b.kayit_tarihi)
+        if (!vg) return true // tarih çıkarılamazsa dahil et (geriye dönük uyumluluk)
+        if (fromD && vg < fromD) return false
+        if (toD   && vg > toD)   return false
+        return true
+      })
+    : lokFiltered
+
+  const total = vardiyaFiltered.length
   const skip = (page - 1) * limit
-  const filtreliBsl = lokFiltered.slice(skip, skip + limit)
+  const filtreliBsl = vardiyaFiltered.slice(skip, skip + limit)
   if (!filtreliBsl.length) return NextResponse.json({ data: [], total })
 
   // Görev bilgilerini çek (batch)
-  const BATCH = 80
   const canliGorevIds = [...new Set(filtreliBsl.filter(b => b.canli_gorev_id).map(b => b.canli_gorev_id))]
   const specGorevIds = [...new Set(filtreliBsl.filter(b => !b.canli_gorev_id && b.gorev_id).map(b => b.gorev_id))]
   const gorevMap: Record<string, any> = {}
