@@ -90,7 +90,7 @@ export default function BildirimBar({ rol }: { rol: 'super_admin' | 'alt_super_a
             if (!fn) continue
             const m = fn(log.sonuc)
             if (m.includes(' 0 ')) continue
-            const saat = new Date(log.tarih).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+            const saat = new Date(log.tarih).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' })
             items.push({ id: `cron-${log.tip}-${log.tarih}`, mesaj: `${m} (${saat})`, tip: 'cron' })
           }
         } catch {}

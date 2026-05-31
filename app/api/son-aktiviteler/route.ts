@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
   // Görev aktiviteleri
   for (const g of gorevler ?? []) {
     const kim = isimMap[g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? ''] ?? 'Sistem'
-    const saat = new Date(g.durum_degisim_tarihi).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+    const saat = new Date(g.durum_degisim_tarihi).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' })
     aktiviteler.push({
       id: `gorev-${g.id}`,
       mesaj: `✅ ${kim} — ${(g.tanim ?? '').slice(0, 30)} tamamladı`,
@@ -75,11 +75,11 @@ export async function GET(req: NextRequest) {
   for (const m of mesailar ?? []) {
     const kim = isimMap[m.user_id] ?? ''
     if (m.cikis_saati) {
-      const saat = new Date(m.cikis_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+      const saat = new Date(m.cikis_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' })
       aktiviteler.push({ id: `mesai-cikis-${m.id}`, mesaj: `🔴 ${kim} — iş çıkışı`, tarih: m.cikis_saati, saat })
     }
     if (m.giris_saati) {
-      const saat = new Date(m.giris_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+      const saat = new Date(m.giris_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' })
       aktiviteler.push({ id: `mesai-giris-${m.id}`, mesaj: `🟢 ${kim} — iş başı`, tarih: m.giris_saati, saat })
     }
   }
