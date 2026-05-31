@@ -4,14 +4,16 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { DashboardBlockProps } from '../types'
+import { suankiVardiyaGunu, type VardiyaAyar } from '@/lib/gorev/vardiyaGunu'
 
 type Mode = 'gunluk' | 'haftalik' | 'aylik'
 
-function rangeStartFor(mode: Mode) {
-  const now = new Date()
-  if (mode === 'gunluk')   return new Date(now.getTime() - 24 * 60 * 60 * 1000)
-  if (mode === 'haftalik') return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-  return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+// Vardiya günü range hesabı — bugün VG'den N gün geri (DATE string)
+function rangeStartDateFor(mode: Mode, bugunVG: string): string {
+  const days = mode === 'gunluk' ? 1 : mode === 'haftalik' ? 7 : 30
+  const d = new Date(bugunVG + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() - days)
+  return d.toISOString().slice(0, 10)
 }
 
 export default function PersonelBasariAnaliziBlock({
@@ -22,8 +24,8 @@ export default function PersonelBasariAnaliziBlock({
   const [rows, setRows] = useState<Array<{ id: string; name: string; value: number }>>([])
   const [loading, setLoading] = useState(false)
   const [yoneticiIds, setYoneticiIds] = useState<Set<string>>(new Set())
+  const [vardiyaAyari, setVardiyaAyari] = useState<VardiyaAyar[]>([])
   const lastReq = useRef(0)
-  const rangeStart = useMemo(() => rangeStartFor(mode), [mode])
   const yetkiliLokIdsKey = useMemo(() => (yetkiliLokIds ?? []).slice().sort().join(','), [yetkiliLokIds])
 
   // Üst lokasyona yetkilendirilmiş yönetici id'lerini çek (başarı analizinden hariç tutulacak)
@@ -35,24 +37,38 @@ export default function PersonelBasariAnaliziBlock({
       .catch(() => setYoneticiIds(new Set()))
   }, [firmaId])
 
+  // Firma vardiya ayarlarını çek (sarkan V1 için bugünVG hesabı)
+  useEffect(() => {
+    if (!firmaId) { setVardiyaAyari([]); return }
+    supabase.from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single()
+      .then(({ data }: any) => {
+        if (!data) return
+        const sayisi = data.vardiya_sayisi ?? 3
+        const set = (data.tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as VardiyaAyar[]
+        setVardiyaAyari(Array.isArray(set) ? set : [])
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaId])
+
   async function fetchData() {
     const reqId = Date.now()
     lastReq.current = reqId
     setLoading(true)
     try {
-      const rangeISO = rangeStart.toISOString()
-      const sel = 'islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id,olusturma_tarihi,durum,tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)'
+      const bugunVG = suankiVardiyaGunu(vardiyaAyari)
+      const rangeStartDate = rangeStartDateFor(mode, bugunVG)
+      const sel = 'islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id,vardiya_gunu,durum,tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim)'
 
-      // Canlı tamamlananlar
+      // Canlı tamamlananlar — vardiya_gunu üzerinden (sarkan V1 dahil)
       let qC = supabase.from('canli_gorevler').select(sel)
-        .gte('olusturma_tarihi', rangeISO).in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
+        .gte('vardiya_gunu', rangeStartDate).in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
       if (firmaId) qC = qC.eq('firma_id', firmaId)
       if (projeId) qC = (qC as any).eq('proje_id', projeId)
       if (yetkiliLokIds?.length) qC = (qC as any).in('lokasyon_id', yetkiliLokIds)
 
       // Arşiv tamamlananlar
       let qA = supabase.from('canli_gorevler_arsiv').select(sel)
-        .gte('olusturma_tarihi', rangeISO).in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
+        .gte('vardiya_gunu', rangeStartDate).in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
       if (firmaId) qA = qA.eq('firma_id', firmaId)
       if (projeId) qA = (qA as any).eq('proje_id', projeId)
       if (yetkiliLokIds?.length) qA = (qA as any).in('lokasyon_id', yetkiliLokIds)
@@ -91,7 +107,7 @@ export default function PersonelBasariAnaliziBlock({
       .subscribe()
     return () => { supabase.removeChannel(ch) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, firmaId, projeId, yoneticiIds, yetkiliLokIdsKey])
+  }, [mode, firmaId, projeId, yoneticiIds, yetkiliLokIdsKey, vardiyaAyari])
 
   const maxVal = Math.max(1, ...rows.map((r) => r.value))
 

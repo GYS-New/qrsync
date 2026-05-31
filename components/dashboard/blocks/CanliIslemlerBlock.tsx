@@ -1,5 +1,6 @@
 import KpiCard from '@/components/dashboard/KpiCard'
 import { createClient } from '@/lib/supabase/server'
+import { suankiVardiyaGunu } from '@/lib/gorev/vardiyaGunu'
 
 /** Türkiye saatiyle bugünün UTC başlangıcını döndürür (UTC+3) */
 function bugunTR(): Date {
@@ -21,6 +22,18 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
   const todayISO = today.toISOString()
   const onlineSince = new Date(Date.now() - 120 * 1000).toISOString()
 
+  // Firma vardiya ayarlarını çek — sarkan V1 (örn 23:30-07:30) için bugünVG hesabı
+  let bugunVG: string = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+  if (firmaId) {
+    const { data: firma } = await supabase
+      .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single()
+    if (firma) {
+      const sayisi = (firma as any).vardiya_sayisi ?? 3
+      const set = ((firma as any).tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
+      bugunVG = suankiVardiyaGunu(Array.isArray(set) ? set : [])
+    }
+  }
+
   // Görev sorguları: firma + proje + lokasyon yetki filtresi
   const gf = (q: any) => {
     let r = firmaId ? q.eq('firma_id', firmaId) : q
@@ -37,16 +50,16 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
     // [1] Spesifik tamamlanan bugün
     gf(supabase.from('gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').gte('olusturma_tarihi', todayISO)),
 
-    // [2] Frekansiyel canlı toplam bugün
-    gf(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', todayISO)),
+    // [2] Frekansiyel canlı toplam bugün — vardiya_gunu üzerinden (sarkan V1 dahil)
+    gf(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('vardiya_gunu', bugunVG)),
     // [3] Frekansiyel canlı tamamlanan bugün
-    gf(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').gte('olusturma_tarihi', todayISO)),
+    gf(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').eq('vardiya_gunu', bugunVG)),
 
     // [4] Frekansiyel ARŞİV toplam bugün (arşive taşınanlar)
-    gf(supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', todayISO)),
+    gf(supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true }).eq('vardiya_gunu', bugunVG)),
     // [5] Frekansiyel ARŞİV tamamlanan bugün
     gf(supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true })
-      .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN']).gte('olusturma_tarihi', todayISO)),
+      .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN']).eq('vardiya_gunu', bugunVG)),
 
     // [6] Kullanıcılar toplam (proje + lokasyon yetki filtreli)
     (() => {
@@ -74,8 +87,8 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
     })(),
     // [8] Lokasyonlar toplam (proje + lokasyon yetki filtreli)
     (() => { let lq = supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true); if (firmaId) lq = lq.eq('firma_id', firmaId); if (projeId) lq = (lq as any).eq('proje_id', projeId); if (yetkiliLokIds && yetkiliLokIds.length > 0) lq = lq.in('id', yetkiliLokIds); return lq })(),
-    // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar)
-    gf(supabase.from('canli_gorevler').select('lokasyon_id').gte('aktif_olma_tarihi', todayISO).limit(3000)),
+    // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar, vardiya_gunu üzerinden)
+    gf(supabase.from('canli_gorevler').select('lokasyon_id').eq('vardiya_gunu', bugunVG).limit(3000)),
     // [10] Görevli lokasyonlar — spesifik (bugün tüm durumlar)
     gf(supabase.from('gorevler').select('lokasyon_id').gte('olusturma_tarihi', todayISO).limit(3000)),
   ])

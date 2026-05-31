@@ -5,14 +5,16 @@ import { createClient } from '@/lib/supabase/client'
 import BlockWrapper from './BlockWrapper'
 import type { DashboardBlockProps } from '../types'
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { suankiVardiyaGunu, type VardiyaAyar } from '@/lib/gorev/vardiyaGunu'
 
 type Mode = 'gunluk' | 'haftalik' | 'aylik'
 
-function getRangeStart(mode: Mode) {
-  const now = new Date()
-  if (mode === 'gunluk')   return new Date(now.getTime() - 24 * 60 * 60 * 1000)
-  if (mode === 'haftalik') return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-  return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+// Vardiya günü range hesabı — bugün VG'den N gün geri (DATE string)
+function getRangeStartDate(mode: Mode, bugunVG: string): string {
+  const days = mode === 'gunluk' ? 1 : mode === 'haftalik' ? 7 : 30
+  const d = new Date(bugunVG + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() - days)
+  return d.toISOString().slice(0, 10)
 }
 
 function pct(num: number, den: number) {
@@ -27,6 +29,7 @@ export default function FrekansiyelGorevAnaliziBlock({
   const [mode, setMode] = useState<Mode>('gunluk')
   const [loading, setLoading] = useState(false)
   const [counts, setCounts] = useState({ total: 0, completed: 0, late: 0, pending: 0 })
+  const [vardiyaAyari, setVardiyaAyari] = useState<VardiyaAyar[]>([])
 
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const [w, setW] = useState(0)
@@ -41,7 +44,18 @@ export default function FrekansiyelGorevAnaliziBlock({
     return () => ro.disconnect()
   }, [])
 
-  const rangeStart = useMemo(() => getRangeStart(mode), [mode])
+  // Firma vardiya ayarlarını çek (sarkan V1 için bugünVG hesabı)
+  useEffect(() => {
+    if (!firmaId) { setVardiyaAyari([]); return }
+    supabase.from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single()
+      .then(({ data }: any) => {
+        if (!data) return
+        const sayisi = data.vardiya_sayisi ?? 3
+        const set = (data.tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as VardiyaAyar[]
+        setVardiyaAyari(Array.isArray(set) ? set : [])
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaId])
 
   async function fetchCounts() {
     setLoading(true)
@@ -51,8 +65,10 @@ export default function FrekansiyelGorevAnaliziBlock({
       if (yetkiliLokIds?.length) r = r.in('lokasyon_id', yetkiliLokIds)
       return r
     }
+    const bugunVG = suankiVardiyaGunu(vardiyaAyari)
+    const rangeStartDate = getRangeStartDate(mode, bugunVG)
     const base = (tablo: string, q?: any) =>
-      ff((q ?? supabase.from(tablo).select('*', { count: 'exact', head: true })).gte('olusturma_tarihi', rangeStart.toISOString()))
+      ff((q ?? supabase.from(tablo).select('*', { count: 'exact', head: true })).gte('vardiya_gunu', rangeStartDate))
 
     // Canlı + Arşiv sorguları paralel çek
     const results = await Promise.allSettled([
@@ -90,7 +106,7 @@ export default function FrekansiyelGorevAnaliziBlock({
       .subscribe()
     return () => { supabase.removeChannel(ch) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, firmaId, projeId, yetkiliLokIdsKey])
+  }, [mode, firmaId, projeId, yetkiliLokIdsKey, vardiyaAyari])
 
   const other   = Math.max(0, counts.total - counts.completed)
   const success = pct(counts.completed, counts.total)
