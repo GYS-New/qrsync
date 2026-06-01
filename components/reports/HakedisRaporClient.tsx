@@ -34,6 +34,7 @@ type Ozet = {
 
 type Grup = { id: string; ad: string; ust_lokasyon_id: string | null }
 type Lokasyon = { id: string; tanim: string; parent_id: string | null }
+type GrupUye = { grup_id: string; lokasyon_id: string }
 
 interface Props {
   firmaId: string
@@ -66,6 +67,7 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
 
   const [gruplar, setGruplar]       = useState<Grup[]>([])
   const [lokasyonlar, setLokasyonlar] = useState<Lokasyon[]>([])
+  const [grupUyeleri, setGrupUyeleri] = useState<GrupUye[]>([])
 
   const [rows, setRows]   = useState<Row[]>([])
   const [ozet, setOzet]   = useState<Ozet | null>(null)
@@ -92,18 +94,35 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
   })()
 
   // Cascade: üst seçilirse lokasyon ve grup dropdown'ları daralt
-  const filteredLokasyonlar = ustDescIds
-    ? lokasyonlar.filter(l => ustDescIds.has(l.id))
-    : lokasyonlar
-
   const filteredGruplar = ustLokasyonFilter
     ? gruplar.filter(g => g.ust_lokasyon_id === ustLokasyonFilter)
     : gruplar
 
-  // Merge same-named groups for dropdown
-  const mergedGruplar = Array.from(
+  // Seçili grup'ların üye lokasyon ID seti (aynı isimli grupları merge ettiğimiz için
+  // dropdown'da gösterilen tek ID ama backend'de farklı grup ID'leri olabilir →
+  // merged grubun ID'si seçilince, AYNI ADLI tüm grupların üyelerini birleştir)
+  const mergedGruplarList = Array.from(
     filteredGruplar.reduce((acc, g) => { if (!acc.has(g.ad)) acc.set(g.ad, g.id); return acc }, new Map<string, string>())
   ).map(([ad, id]) => ({ id, ad }))
+
+  const grupUyeLokIds = (() => {
+    if (!grupFilter) return null
+    // Seçili merged grup'un adı
+    const seciliGrupAd = mergedGruplarList.find(g => g.id === grupFilter)?.ad
+    if (!seciliGrupAd) return new Set<string>()
+    // Aynı ada sahip tüm filtreli grup ID'leri
+    const ayniAdliGrupIds = new Set(filteredGruplar.filter(g => g.ad === seciliGrupAd).map(g => g.id))
+    // Bu grupların üye lokasyon ID'leri
+    return new Set(grupUyeleri.filter(u => ayniAdliGrupIds.has(u.grup_id)).map(u => u.lokasyon_id))
+  })()
+
+  // Lokasyon dropdown: önce üst, sonra grup ile daralt
+  let filteredLokasyonlar = ustDescIds
+    ? lokasyonlar.filter(l => ustDescIds.has(l.id))
+    : lokasyonlar
+  if (grupUyeLokIds) {
+    filteredLokasyonlar = filteredLokasyonlar.filter(l => grupUyeLokIds.has(l.id))
+  }
 
   // Üst değişirse alt filter'lar geçersizse otomatik temizle
   useEffect(() => {
@@ -113,6 +132,13 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ustLokasyonFilter])
 
+  // Grup değişirse mevcut lokasyon seçimi grup üyesi değilse temizle
+  useEffect(() => {
+    if (!grupFilter || !lokasyonFilter) return
+    if (grupUyeLokIds && !grupUyeLokIds.has(lokasyonFilter)) setLokasyonFilter('')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grupFilter])
+
   useEffect(() => {
     fetch(`/api/birim-fiyatlar?proje_id=${projeId}`)
       .then(r => r.json())
@@ -120,6 +146,7 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
         if (j.ok) {
           setGruplar(j.gruplar ?? [])
           setLokasyonlar(j.lokasyonlar ?? [])
+          setGrupUyeleri(j.grup_uyeleri ?? [])
         }
       })
   }, [projeId])
@@ -224,7 +251,7 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
             <select value={grupFilter} onChange={e => setGrupFilter(e.target.value)}
               style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, minWidth: 160 }}>
               <option value="">Tümü</option>
-              {mergedGruplar.map(g => <option key={g.id} value={g.id}>{g.ad}</option>)}
+              {mergedGruplarList.map(g => <option key={g.id} value={g.id}>{g.ad}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
