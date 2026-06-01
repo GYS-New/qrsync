@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
   const bitis     = p.get('bitis')
   const grupIdF   = p.get('grup_id')
   const lokIdF    = p.get('lokasyon_id')
+  const ustLokIdF = p.get('ust_lokasyon_id')
 
   if (!firmaId || !projeId) return NextResponse.json({ error: 'firma_id ve proje_id zorunlu' }, { status: 400 })
 
@@ -73,7 +74,25 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Üst lokasyon descendant set hesabı (üst seçilirse o ağacın tüm altları)
+  const ustDescIds: Set<string> | null = (() => {
+    if (!ustLokIdF) return null
+    const set = new Set<string>([ustLokIdF])
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const l of lokasyonlar as any[]) {
+        if (!set.has(l.id) && l.parent_id && set.has(l.parent_id)) {
+          set.add(l.id)
+          changed = true
+        }
+      }
+    }
+    return set
+  })()
+
   let filteredLoks = lokasyonlar.filter((l: any) => efektifMap.has(l.id))
+  if (ustDescIds) filteredLoks = filteredLoks.filter((l: any) => ustDescIds.has(l.id))
   if (grupIdF) { const s = new Set(grupLokMap.get(grupIdF) ?? []); filteredLoks = filteredLoks.filter((l: any) => s.has(l.id)) }
   if (lokIdF)  filteredLoks = filteredLoks.filter((l: any) => l.id === lokIdF)
 

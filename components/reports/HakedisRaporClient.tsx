@@ -32,7 +32,7 @@ type Ozet = {
   toplam_gorev: number
 }
 
-type Grup = { id: string; ad: string }
+type Grup = { id: string; ad: string; ust_lokasyon_id: string | null }
 type Lokasyon = { id: string; tanim: string; parent_id: string | null }
 
 interface Props {
@@ -60,6 +60,7 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
 
   const [baslangic, setBaslangic] = useState(firstOfMonth())
   const [bitis, setBitis]         = useState(todayStr())
+  const [ustLokasyonFilter, setUstLokasyonFilter] = useState('')
   const [grupFilter, setGrupFilter]       = useState('')
   const [lokasyonFilter, setLokasyonFilter] = useState('')
 
@@ -71,13 +72,46 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
 
+  // Üst lokasyonlar (parent_id IS NULL) — dropdown için
+  const ustLokasyonlar = lokasyonlar.filter(l => !l.parent_id)
+
+  // Üst seçilirse o üstün descendant'ları (kendisi dahil)
+  const ustDescIds = (() => {
+    if (!ustLokasyonFilter) return null
+    const set = new Set<string>([ustLokasyonFilter])
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const l of lokasyonlar) {
+        if (!set.has(l.id) && l.parent_id && set.has(l.parent_id)) {
+          set.add(l.id); changed = true
+        }
+      }
+    }
+    return set
+  })()
+
+  // Cascade: üst seçilirse lokasyon ve grup dropdown'ları daralt
+  const filteredLokasyonlar = ustDescIds
+    ? lokasyonlar.filter(l => ustDescIds.has(l.id))
+    : lokasyonlar
+
+  const filteredGruplar = ustLokasyonFilter
+    ? gruplar.filter(g => g.ust_lokasyon_id === ustLokasyonFilter)
+    : gruplar
+
   // Merge same-named groups for dropdown
   const mergedGruplar = Array.from(
-    gruplar.reduce((acc, g) => { if (!acc.has(g.ad)) acc.set(g.ad, g.id); return acc }, new Map<string, string>())
+    filteredGruplar.reduce((acc, g) => { if (!acc.has(g.ad)) acc.set(g.ad, g.id); return acc }, new Map<string, string>())
   ).map(([ad, id]) => ({ id, ad }))
 
-  // Filter lokasyons for dropdown (only parent-level or all)
-  const rootLokasyonlar = lokasyonlar.filter(l => !l.parent_id)
+  // Üst değişirse alt filter'lar geçersizse otomatik temizle
+  useEffect(() => {
+    if (!ustLokasyonFilter) return
+    if (lokasyonFilter && !ustDescIds?.has(lokasyonFilter)) setLokasyonFilter('')
+    if (grupFilter && !filteredGruplar.some(g => g.id === grupFilter)) setGrupFilter('')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ustLokasyonFilter])
 
   useEffect(() => {
     fetch(`/api/birim-fiyatlar?proje_id=${projeId}`)
@@ -96,8 +130,9 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
       const params = new URLSearchParams({ firma_id: firmaId, proje_id: projeId })
       if (baslangic) params.set('baslangic', baslangic)
       if (bitis)     params.set('bitis', bitis)
-      if (grupFilter)    params.set('grup_id', grupFilter)
-      if (lokasyonFilter) params.set('lokasyon_id', lokasyonFilter)
+      if (ustLokasyonFilter) params.set('ust_lokasyon_id', ustLokasyonFilter)
+      if (grupFilter)        params.set('grup_id', grupFilter)
+      if (lokasyonFilter)    params.set('lokasyon_id', lokasyonFilter)
 
       const res = await fetch(`/api/reports/hakedis?${params}`)
       const json = await res.json()
@@ -109,7 +144,7 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [firmaId, projeId, baslangic, bitis, grupFilter, lokasyonFilter, toast])
+  }, [firmaId, projeId, baslangic, bitis, ustLokasyonFilter, grupFilter, lokasyonFilter, toast])
 
   useEffect(() => { fetchRapor() }, [fetchRapor])
 
@@ -118,8 +153,9 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
     const params = new URLSearchParams({ firma_id: firmaId, proje_id: projeId })
     if (baslangic) params.set('baslangic', baslangic)
     if (bitis)     params.set('bitis', bitis)
-    if (grupFilter)    params.set('grup_id', grupFilter)
-    if (lokasyonFilter) params.set('lokasyon_id', lokasyonFilter)
+    if (ustLokasyonFilter) params.set('ust_lokasyon_id', ustLokasyonFilter)
+    if (grupFilter)        params.set('grup_id', grupFilter)
+    if (lokasyonFilter)    params.set('lokasyon_id', lokasyonFilter)
     window.location.href = `/api/reports/hakedis/export?${params}`
     setTimeout(() => setExporting(false), 2000)
   }
@@ -176,6 +212,14 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
               style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13 }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#4b5563' }}>ÜST LOKASYON</label>
+            <select value={ustLokasyonFilter} onChange={e => setUstLokasyonFilter(e.target.value)}
+              style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, minWidth: 160 }}>
+              <option value="">Tümü</option>
+              {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <label style={{ fontSize: 11, fontWeight: 700, color: '#4b5563' }}>LOKASYON GRUBU</label>
             <select value={grupFilter} onChange={e => setGrupFilter(e.target.value)}
               style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, minWidth: 160 }}>
@@ -188,7 +232,7 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
             <select value={lokasyonFilter} onChange={e => setLokasyonFilter(e.target.value)}
               style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, minWidth: 160 }}>
               <option value="">Tümü</option>
-              {lokasyonlar.map(l => (
+              {filteredLokasyonlar.map(l => (
                 <option key={l.id} value={l.id}>
                   {l.parent_id ? '  └─ ' : ''}{l.tanim}
                 </option>
