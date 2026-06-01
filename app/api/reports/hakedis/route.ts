@@ -62,25 +62,33 @@ export async function GET(req: NextRequest) {
     grupLokMap.set(u.grup_id, arr)
   }
 
+  // Birim fiyatları oku — 0 dahil tüm tanımlı fiyatları al
   const lokFiyatMap = new Map<string, { fiyat: number; para_birimi: string }>()
   const grupFiyatMap = new Map<string, { fiyat: number; para_birimi: string }>()
   for (const f of birimFiyatlar) {
-    if (f.lokasyon_id && f.fiyat > 0) lokFiyatMap.set(f.lokasyon_id, { fiyat: f.fiyat, para_birimi: f.para_birimi })
-    if (f.grup_id && f.fiyat > 0) grupFiyatMap.set(f.grup_id, { fiyat: f.fiyat, para_birimi: f.para_birimi })
+    const fiyat = Math.max(0, Number(f.fiyat) || 0)
+    if (f.lokasyon_id) lokFiyatMap.set(f.lokasyon_id, { fiyat, para_birimi: f.para_birimi ?? 'TRY' })
+    if (f.grup_id) grupFiyatMap.set(f.grup_id, { fiyat, para_birimi: f.para_birimi ?? 'TRY' })
   }
 
-  // Efektif birim fiyat per lokasyon
-  type EfektifFiyat = { fiyat: number; para_birimi: string; turu: 'lokasyon' | 'grup'; grup_id?: string }
+  // Efektif birim fiyat per lokasyon — fiyat tanımlı değilse 0 TL default
+  type EfektifFiyat = { fiyat: number; para_birimi: string; turu: 'lokasyon' | 'grup' | 'yok'; grup_id?: string }
   const efektifMap = new Map<string, EfektifFiyat>()
   for (const l of lokasyonlar) {
     if (lokFiyatMap.has(l.id)) {
       efektifMap.set(l.id, { ...lokFiyatMap.get(l.id)!, turu: 'lokasyon' })
     } else {
+      let found = false
       for (const gid of lokGrupMap.get(l.id) ?? []) {
         if (grupFiyatMap.has(gid)) {
           efektifMap.set(l.id, { ...grupFiyatMap.get(gid)!, turu: 'grup', grup_id: gid })
+          found = true
           break
         }
+      }
+      if (!found) {
+        // Fiyat tanımsız → 0 TL ile raporda gözüksün (görev sayıları için)
+        efektifMap.set(l.id, { fiyat: 0, para_birimi: 'TRY', turu: 'yok' })
       }
     }
   }

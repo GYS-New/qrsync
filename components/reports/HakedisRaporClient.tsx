@@ -12,7 +12,7 @@ type Row = {
   grup_adi: string | null
   birim_fiyat: number
   para_birimi: string
-  fiyat_turu: 'lokasyon' | 'grup'
+  fiyat_turu: 'lokasyon' | 'grup' | 'yok'
   toplam: number
   tamamlanan: number
   gecikmeli: number
@@ -314,7 +314,7 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
             <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Yükleniyor…</div>
           ) : rows.length === 0 ? (
             <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>
-              Seçilen tarih aralığında birim fiyatı olan lokasyonlara ait görev bulunamadı.
+              Seçilen tarih aralığında görev bulunamadı.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -338,7 +338,15 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
                       <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1a3a1a' }}>{r.lokasyon_tanim}</td>
                       <td style={{ padding: '8px 12px', color: '#4b5563' }}>{r.ust_tanim ?? '—'}</td>
                       <td style={{ padding: '8px 12px', color: '#4b5563' }}>{r.grup_adi ?? '—'}</td>
-                      <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1a3a1a' }}>{r.birim_fiyat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: '8px 12px', fontWeight: 600, color: r.fiyat_turu === 'yok' ? '#92400e' : '#1a3a1a' }}>
+                        {r.birim_fiyat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                        {r.fiyat_turu === 'yok' && (
+                          <span title="Bu lokasyon için birim fiyat tanımlı değil — 0 TL üzerinden hesaplanıyor"
+                            style={{ marginLeft: 6, fontSize: 10, padding: '1px 5px', borderRadius: 4, background: '#fef3c7', color: '#92400e', fontWeight: 700, verticalAlign: 'middle' }}>
+                            FİYAT YOK
+                          </span>
+                        )}
+                      </td>
                       <td style={{ padding: '8px 12px', color: '#4b5563' }}>{r.para_birimi}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>{r.toplam}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', color: '#15803d', fontWeight: 600 }}>{r.tamamlanan}</td>
