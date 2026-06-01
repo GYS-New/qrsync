@@ -39,6 +39,19 @@ const RESTORE_TABLOLAR = [
   'users',
   'gorev_kurallari',
   'kullanici_lokasyon_yetkileri',
+  // Görev / mesai / değerlendirme tabloları —
+  // CASCADE yerine SET NULL davranışı varsa silme sonrası FK kolonları NULL'a çekilir.
+  // Yedekteki orijinal FK değerleri upsert ile geri getirilir.
+  'canli_gorevler',
+  'canli_gorevler_arsiv',
+  'gorevler',
+  'gorevler_arsiv',
+  'personel_mesai_kayitlari',
+  'personel_mesai_kayitlari_arsiv',
+  'musteri_degerlendirmeleri',
+  'musteri_degerlendirmeleri_arsiv',
+  'musteri_degerlendirme_aksiyonlari',
+  'musteri_degerlendirme_aksiyonlari_arsiv',
 ] as const
 
 type RestoreSonuc = {
