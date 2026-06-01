@@ -308,6 +308,7 @@ export async function buildGenelRaporDetay(
 
     if (tip === 'frekans_disi') {
       const personelId = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? ''
+      const sure = Number(g.tamamlanma_suresi_saniye) || 0
       return {
         sn,
         ustLokasyon: ust,
@@ -317,7 +318,7 @@ export async function buildGenelRaporDetay(
         tarihSaat: formatDate(g.tamamlanma_tarihi ?? g.durum_degisim_tarihi),
         tarih: formatTarihTR(g.tamamlanma_tarihi ?? g.durum_degisim_tarihi),
         gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
-        gorevSuresi: 'Ekstra',
+        gorevSuresi: sure > 0 ? formatGorevSuresi(sure) : 'Tek tık',
         aciklama: g.tanim ?? '',
       } as FrekansDisiRow
     }
