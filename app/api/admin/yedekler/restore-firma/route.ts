@@ -126,6 +126,32 @@ export async function POST(req: NextRequest) {
       return { basarili, hata, mesaj: ilkHata }
     }
 
+    // Lokasyonlar için özel restore: (1) orphan checklist_sablon_id NULL'a çek,
+    // (2) önce parent (parent_id NULL), sonra child sırasıyla upsert
+    async function upsertLokasyonlar(rows: any[]): Promise<{ basarili: number; hata: number; mesaj?: string }> {
+      // Mevcut checklist_sablonlari ID seti
+      const { data: sablonRows } = await admin.from('checklist_sablonlari').select('id')
+      const sablonIds = new Set<string>((sablonRows ?? []).map((s: any) => s.id))
+      // Orphan referansları NULL'a çek
+      const temizlenmis = rows.map((l: any) => ({
+        ...l,
+        checklist_sablon_id: l.checklist_sablon_id && sablonIds.has(l.checklist_sablon_id)
+          ? l.checklist_sablon_id
+          : null,
+      }))
+      // 2 pass: önce parent_id NULL, sonra dolu
+      const root = temizlenmis.filter((l: any) => !l.parent_id)
+      const child = temizlenmis.filter((l: any) => l.parent_id)
+      const r1 = await upsertBatch('lokasyonlar', root)
+      if (r1.hata > 0) return r1
+      const r2 = await upsertBatch('lokasyonlar', child)
+      return {
+        basarili: r1.basarili + r2.basarili,
+        hata: r1.hata + r2.hata,
+        mesaj: r2.mesaj ?? r1.mesaj,
+      }
+    }
+
     // Tablo bazlı filtre fonksiyonları
     function filtrele(tablo: string, rows: any[]): any[] {
       if (tablo === 'firmalar') {
@@ -155,7 +181,10 @@ export async function POST(req: NextRequest) {
         sonuclar.push({ tablo, yedek_satir: yedek.length, filtre_satir: 0, upsert_basarili: 0, upsert_hata: 0 })
         continue
       }
-      const { basarili, hata, mesaj } = await upsertBatch(tablo, filtreli)
+      // Lokasyonlar için özel restore (orphan sablon temizliği + parent/child sırası)
+      const { basarili, hata, mesaj } = tablo === 'lokasyonlar'
+        ? await upsertLokasyonlar(filtreli)
+        : await upsertBatch(tablo, filtreli)
       sonuclar.push({
         tablo,
         yedek_satir: yedek.length,
