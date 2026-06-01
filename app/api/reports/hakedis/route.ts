@@ -5,6 +5,18 @@ import { fetchAll } from '@/lib/supabase/fetchAll'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
+  try {
+    return await handleHakedis(req)
+  } catch (e: any) {
+    console.error('[reports/hakedis] iç hata:', e)
+    return NextResponse.json({
+      ok: false,
+      error: e?.message ?? 'Sunucu hatası — rapor üretilemedi',
+    }, { status: 500 })
+  }
+}
+
+async function handleHakedis(req: NextRequest) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
@@ -126,21 +138,26 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  const lokIds = filteredLoks.map(l => l.id)
+  const lokIdSet = new Set(filteredLoks.map(l => l.id))
 
-  // Görevleri çek (aktif + arşiv) — tarih filtresi vardiya_gunu üzerinden
+  // Görevleri çek (aktif + arşiv) — tarih filtresi vardiya_gunu üzerinden.
+  // lokIds IN filtresi çok uzun URL'e yol açabilir (400+ lokasyon → 14KB+).
+  // Bunun yerine firma+proje+date ile sınırlı bir sorgu çekip lokasyon filtresini
+  // client-side uyguluyoruz (görev sayısı genelde ~1000-5000 aralığı, sorun yok).
   const buildQ = (table: string) => {
     let q = admin.from(table).select('lokasyon_id,durum')
-      .eq('firma_id', firmaId).eq('proje_id', projeId).in('lokasyon_id', lokIds)
+      .eq('firma_id', firmaId).eq('proje_id', projeId)
     if (baslangic) q = (q as any).gte('vardiya_gunu', baslangic)
     if (bitis)     q = (q as any).lte('vardiya_gunu', bitis)
     return q
   }
 
-  const [aktif, arsiv] = await Promise.all([
+  const [aktifRaw, arsivRaw] = await Promise.all([
     fetchAll(() => buildQ('canli_gorevler')),
     fetchAll(() => buildQ('canli_gorevler_arsiv')),
   ])
+  const aktif = (aktifRaw ?? []).filter((g: any) => g.lokasyon_id && lokIdSet.has(g.lokasyon_id))
+  const arsiv = (arsivRaw ?? []).filter((g: any) => g.lokasyon_id && lokIdSet.has(g.lokasyon_id))
 
   type Counts = { toplam: number; tamamlanan: number; gecikmeli: number; kayip: number; aktif_gorev: number }
   const countMap = new Map<string, Counts>()

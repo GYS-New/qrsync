@@ -101,21 +101,23 @@ export async function GET(req: NextRequest) {
   if (grupIdF) { const s = new Set(grupLokMap.get(grupIdF) ?? []); filteredLoks = filteredLoks.filter((l: any) => s.has(l.id)) }
   if (lokIdF)  filteredLoks = filteredLoks.filter((l: any) => l.id === lokIdF)
 
-  const lokIds = filteredLoks.map((l: any) => l.id)
+  const lokIdSet = new Set(filteredLoks.map((l: any) => l.id))
 
   let rows: any[] = []
   let ozet = { toplam_hakedis: 0, tamamlanan_hakedis: 0, gecikmeli_hakedis: 0, kayip_hakedis: 0, toplam_gorev: 0 }
 
-  if (lokIds.length > 0) {
+  if (lokIdSet.size > 0) {
+    // lokIds IN filtresi büyük URL'e yol açıyor — firma+proje+date çek, client-side filter
     const buildQ = (table: string) => {
       let q = admin.from(table).select('lokasyon_id,durum')
-        .eq('firma_id', firmaId).eq('proje_id', projeId).in('lokasyon_id', lokIds)
-      // Tarih filtresi vardiya_gunu üzerinden — sarkan V1 kendi günü altında
+        .eq('firma_id', firmaId).eq('proje_id', projeId)
       if (baslangic) q = (q as any).gte('vardiya_gunu', baslangic)
       if (bitis)     q = (q as any).lte('vardiya_gunu', bitis)
       return q
     }
-    const [aktif, arsiv] = await Promise.all([fetchAll(() => buildQ('canli_gorevler')), fetchAll(() => buildQ('canli_gorevler_arsiv'))])
+    const [aktifRaw, arsivRaw] = await Promise.all([fetchAll(() => buildQ('canli_gorevler')), fetchAll(() => buildQ('canli_gorevler_arsiv'))])
+    const aktif = (aktifRaw ?? []).filter((g: any) => g.lokasyon_id && lokIdSet.has(g.lokasyon_id))
+    const arsiv = (arsivRaw ?? []).filter((g: any) => g.lokasyon_id && lokIdSet.has(g.lokasyon_id))
 
     type Counts = { toplam: number; tamamlanan: number; gecikmeli: number; kayip: number; aktif_gorev: number }
     const countMap = new Map<string, Counts>()

@@ -162,8 +162,12 @@ export default function HakedisRaporClient({ firmaId, projeId, base }: Props) {
       if (lokasyonFilter)    params.set('lokasyon_id', lokasyonFilter)
 
       const res = await fetch(`/api/reports/hakedis?${params}`)
-      const json = await res.json()
-      if (!json.ok) throw new Error(json.error)
+      const text = await res.text()
+      let json: any
+      try { json = JSON.parse(text) } catch {
+        throw new Error(`Sunucu yanıtı geçersiz (HTTP ${res.status}). Lütfen tekrar deneyin.`)
+      }
+      if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
       setRows(json.rows ?? [])
       setOzet(json.ozet ?? null)
     } catch (e: any) {
