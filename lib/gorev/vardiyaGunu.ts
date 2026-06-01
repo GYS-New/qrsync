@@ -1,14 +1,15 @@
-// Sarkan vardiya (örn V1 23:30-07:30) destekli "şu an içinde olduğumuz vardiya günü" hesabı.
-// Normal saatlerde TR takvim günü dönülür. Saat sarkan vardiyanın akşam yarısındaysa
-// (örn 23:30+) vardiya yarının vardiya_gunu'na ait olduğu için +1 gün dönülür.
+// Sarkan vardiya (örn V1 23:30-07:30) destekli "verilen zamanın ait olduğu vardiya günü"
+// hesabı. Normal saatlerde TR takvim günü dönülür. Saat sarkan vardiyanın akşam
+// yarısındaysa (örn 23:30+) görevin ait olduğu gün YARIN (vardiya_gunu = +1) olur.
 
 export type VardiyaAyar = { no: number; baslangic: string; bitis: string }
 
-export function suankiVardiyaGunu(vardiyaAyari: VardiyaAyar[]): string {
-  const now = new Date()
-  const trDate = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+// Genel hesap: baseIso verilirse o zamanın, verilmezse şu anın vardiya günü
+export function vardiyaGunuHesapla(vardiyaAyari: VardiyaAyar[], baseIso?: string): string {
+  const t = baseIso ? new Date(baseIso) : new Date()
+  const trDate = t.toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
   if (!vardiyaAyari?.length) return trDate
-  const trSaat = now.toLocaleTimeString('tr-TR', {
+  const trSaat = t.toLocaleTimeString('tr-TR', {
     hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Istanbul',
   })
   for (const v of vardiyaAyari) {
@@ -22,3 +23,7 @@ export function suankiVardiyaGunu(vardiyaAyari: VardiyaAyar[]): string {
   }
   return trDate
 }
+
+// Geriye dönük uyumluluk — "şu anki" vardiya günü
+export const suankiVardiyaGunu = (vardiyaAyari: VardiyaAyar[]): string =>
+  vardiyaGunuHesapla(vardiyaAyari)

@@ -46,6 +46,7 @@ import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
 import { auditLog } from '@/lib/audit/log'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 import { getRequestMeta } from '@/lib/device/getRequestMeta'
+import { vardiyaGunuHesapla, type VardiyaAyar } from '@/lib/gorev/vardiyaGunu'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -317,6 +318,18 @@ async function ekstraGoreviOlustur(
   const nowIso = new Date().toISOString()
   const sure = sureSaniye(kayit.baslatilma_zamani, kayit.bitirme_zamani) ?? 0
 
+  // vardiya_gunu hesabı — görev başlatma zamanı (offline kayıt) baz alınır
+  let vardiyaGunu: string
+  try {
+    const { data: firma } = await admin
+      .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single()
+    const sayisi = (firma as any)?.vardiya_sayisi ?? 3
+    const set = ((firma as any)?.tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as VardiyaAyar[]
+    vardiyaGunu = vardiyaGunuHesapla(Array.isArray(set) ? set : [], kayit.baslatilma_zamani)
+  } catch {
+    vardiyaGunu = new Date(kayit.baslatilma_zamani).toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+  }
+
   const { data: inserted, error: insertErr } = await admin
     .from('canli_gorevler')
     .insert({
@@ -336,6 +349,7 @@ async function ekstraGoreviOlustur(
       tamamlayan_kullanici_id: userId,
       tamamlanma_suresi_saniye: sure,
       mobil_kayit_id:          kayit._mobil_kayit_id,
+      vardiya_gunu:            vardiyaGunu,
       ...gorevDurumPayload('TAMAMLANDI', 'OFFLINE', { at: kayit.bitirme_zamani }),
     } as any)
     .select('id')

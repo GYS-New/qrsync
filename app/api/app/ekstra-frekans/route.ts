@@ -4,6 +4,7 @@ import { auditLog } from '@/lib/audit/log'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
+import { vardiyaGunuHesapla, type VardiyaAyar } from '@/lib/gorev/vardiyaGunu'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -352,6 +353,19 @@ export async function POST(req: Request) {
 
     // Kayıt oluştur
     const nowIso = new Date().toISOString()
+
+    // vardiya_gunu hesabı — sarkan vardiya desteğiyle
+    let vardiyaGunu: string
+    try {
+      const { data: firma } = await admin
+        .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single()
+      const sayisi = (firma as any)?.vardiya_sayisi ?? 3
+      const set = ((firma as any)?.tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as VardiyaAyar[]
+      vardiyaGunu = vardiyaGunuHesapla(Array.isArray(set) ? set : [], nowIso)
+    } catch {
+      vardiyaGunu = new Date(nowIso).toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+    }
+
     const { data: insertedRows, error: insertErr } = await admin
       .from('canli_gorevler')
       .insert({
@@ -370,6 +384,7 @@ export async function POST(req: Request) {
         islemi_yapan_id:         userId,
         tamamlayan_kullanici_id: userId,
         tamamlanma_suresi_saniye: 0,
+        vardiya_gunu:            vardiyaGunu,
         ...gorevDurumPayload('TAMAMLANDI', 'MOBIL', { at: nowIso }),
       } as any)
       .select('id')
