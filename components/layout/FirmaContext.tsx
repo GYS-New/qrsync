@@ -39,28 +39,47 @@ export function FirmaProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   // Mount'ta localStorage'dan oku + firmalar listesini çek
+  // Window focus'ta da yeniden çek — firma pasif/aktif değiştiğinde
+  // başka sekmedeyse switcher anında güncellensin
   useEffect(() => {
-    fetch('/api/firmalar/liste', { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : [])
-      .then((data: Firma[]) => {
-        setFirmalar(data)
-        try {
-          const saved = getCookie(COOKIE_KEY) ?? localStorage.getItem(STORAGE_KEY)
-          if (saved && data.some(f => f.id === saved)) {
-            setFirmaIdState(saved)
-          } else {
-            // İlk kez girildiyse default olarak ilk firmayı seç
-            const first = data?.[0]?.id ?? null
-            if (first) {
+    let cancelled = false
+    function refetch(initial = false) {
+      fetch('/api/firmalar/liste', { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : [])
+        .then((data: Firma[]) => {
+          if (cancelled) return
+          setFirmalar(data)
+          try {
+            const saved = getCookie(COOKIE_KEY) ?? localStorage.getItem(STORAGE_KEY)
+            const savedAktif = saved && data.some(f => f.id === saved)
+            if (savedAktif) {
+              if (initial) setFirmaIdState(saved as string)
+            } else {
+              // Saved firma artık listede yok (pasifleştirildi/silindi) → temizle
+              // ve ilk aktif firmayı seç
+              const first = data?.[0]?.id ?? null
               setFirmaIdState(first)
-              localStorage.setItem(STORAGE_KEY, first)
-              setCookie(COOKIE_KEY, first)
+              if (first) {
+                localStorage.setItem(STORAGE_KEY, first)
+                setCookie(COOKIE_KEY, first)
+              } else {
+                localStorage.removeItem(STORAGE_KEY)
+                deleteCookie(COOKIE_KEY)
+              }
+              if (saved && !savedAktif && !initial) router.refresh()
             }
-          }
-        } catch {}
-        setLoading(false)
-      })
-  }, [])
+          } catch {}
+          if (initial) setLoading(false)
+        })
+    }
+    refetch(true)
+    function onFocus() { refetch(false) }
+    window.addEventListener('focus', onFocus)
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [router])
 
   const setFirmaId = useCallback((id: string | null) => {
     setFirmaIdState(id)

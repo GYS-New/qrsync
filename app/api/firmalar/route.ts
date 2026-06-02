@@ -32,6 +32,7 @@ export async function GET() {
   const { data: firmalar, error } = await supabase
     .from('firmalar')
     .select('id,ticari_unvan,firma_adi')
+    .eq('aktif', true)
     .order('ticari_unvan')
 
   if (error) {
