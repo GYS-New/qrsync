@@ -77,7 +77,7 @@ type BrowseFilter = 'ACIK' | 'IPTAL' | 'KAPALI' | 'TARIHI_GECMIS'
 function LiveHeader({
   kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly, showTumGorevler = true, canliAkisSureSaat = 8,
 }: {
-  kpi: { toplam: number; tamamlandi: number; islemde: number; beklemede: number; iptal: number; gecikmis: number; gecmis: number }
+  kpi: { toplam: number; tamamlandi: number; islemde: number; beklemede: number; iptal: number; gecikmis: number; gecmis: number; ekstra: number }
   durumFilter: string
   setDurumFilter: (v: string) => void
   clock: string
@@ -96,6 +96,7 @@ function LiveHeader({
     { key: 'IPTAL',     label: 'İptal',             count: kpi.iptal },
     { key: 'GECİKMİŞ', label: 'Gecikmeli',         count: kpi.gecikmis },
     { key: 'GECMİŞ',   label: 'Zamanı Geçmiş',    count: kpi.gecmis },
+    { key: 'EKSTRA',    label: 'Ekstra (Frekans Dışı)', count: kpi.ekstra },
   ]
   const dotColor = streamState === 'running' ? '#374151' : streamState === 'paused' ? '#d97706' : '#9ca3af'
   const kpiCards = [
@@ -106,6 +107,7 @@ function LiveHeader({
     { label: 'İptal',            val: kpi.iptal,       bg: '#f9fafb',      vColor: '#6b7280',  lColor: '#6b7280' },
     { label: 'Gecikmeli',        val: kpi.gecikmis,    bg: '#fef9c3',      vColor: '#854d0e',  lColor: '#854d0e' },
     { label: 'Zamanı Geçmiş',    val: kpi.gecmis,      bg: '#fef2f2',      vColor: '#991b1b',  lColor: '#A32D2D' },
+    { label: 'Ekstra',           val: kpi.ekstra,      bg: '#faf5ff',      vColor: '#7c3aed',  lColor: '#6d28d9' },
   ]
 
   return (
@@ -163,7 +165,7 @@ function LiveHeader({
       </div>
 
       {/* ── KPI KARTLARI (tıklanabilir filtre) ── */}
-      <div style={{ padding: '8px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6, alignItems: 'stretch' }}>
+      <div style={{ padding: '8px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 6, alignItems: 'stretch' }}>
         {kpiCards.map(({ label, val, bg, vColor, lColor }, i) => {
           const filterKey = FILTERS[i]?.key ?? 'TÜMÜ'
           const active = durumFilter === filterKey
@@ -255,7 +257,7 @@ const getLocPath = useMemo(() => {
 
   const [browseGorevler, setBrowseGorevler] = useState<any[]>(initialGorevler)
   const [liveFlowGorevler, setLiveFlowGorevler] = useState<any[]>([])
-  const [liveKpiRows, setLiveKpiRows] = useState<{ durum: string }[]>([])
+  const [liveKpiRows, setLiveKpiRows] = useState<{ durum: string; kural_id: string | null }[]>([])
   const [highlightId, setHighlightId] = useState<string | null>(null)
   const lastTopIdRef = useRef<string | null>(null)
   // Bugünün tüm canlı görevleri (vardiya özet kartları için).
@@ -629,10 +631,10 @@ useEffect(() => {
     if (projeId) liveQ = liveQ.eq('proje_id', projeId)
     if (yetkiliLokIds) liveQ = liveQ.in('lokasyon_id', yetkiliLokIds)
 
-    // KPI için ayrı count sorgusu — sadece durum kolonu, yüksek limit
+    // KPI için ayrı count sorgusu — durum + kural_id (ekstra görevleri ayırt etmek için)
     let kpiQ = supabase
       .from('canli_gorevler')
-      .select('durum')
+      .select('durum, kural_id')
       .eq('firma_id', firmaId)
       .not('durum', 'in', '(HAZIR,ACIK)')
       .gte('aktif_olma_tarihi', liveSinceISO)
@@ -646,7 +648,7 @@ useEffect(() => {
       console.error('[LiveFlow] kpi error:', kpiRes.error)
     }
     if (kpiRes.data && !kpiRes.error) {
-      setLiveKpiRows(kpiRes.data as { durum: string }[])
+      setLiveKpiRows(kpiRes.data as { durum: string; kural_id: string | null }[])
     }
 
     if (res.error) {
@@ -701,6 +703,7 @@ useEffect(() => {
 
   // KPI sayaçları — liveKpiRows'dan (ayrı/limitsiz sorgudan) hesaplanır.
   // liveFlowGorevler limit(500) ile sınırlı olduğu için KPI total yanlış gösteriyordu.
+  // EKSTRA: kural_id IS NULL → mobil operatörün kural dışı kaydettiği frekans dışı işler.
   const kpi = useMemo(() => ({
     toplam:     liveKpiRows.length,
     tamamlandi: liveKpiRows.filter(g => g.durum === 'TAMAMLANDI').length,
@@ -709,6 +712,7 @@ useEffect(() => {
     iptal:      liveKpiRows.filter(g => g.durum === 'IPTAL').length,
     gecikmis:   liveKpiRows.filter(g => g.durum === 'ZAMANINDA_YAPILAMAYAN').length,
     gecmis:     liveKpiRows.filter(g => g.durum === 'ZAMANI_GECMIS').length,
+    ekstra:     liveKpiRows.filter(g => g.kural_id == null).length,
   }), [liveKpiRows])
 
   // Durum filtreli canlı liste
@@ -720,6 +724,7 @@ useEffect(() => {
     if (durumFilter === 'IPTAL') return liveFlowGorevler.filter((g:any) => g.durum === 'IPTAL')
     if (durumFilter === 'GECİKMİŞ') return liveFlowGorevler.filter((g:any) => g.durum === 'ZAMANINDA_YAPILAMAYAN')
     if (durumFilter === 'GECMİŞ') return liveFlowGorevler.filter((g:any) => g.durum === 'ZAMANI_GECMIS')
+    if (durumFilter === 'EKSTRA') return liveFlowGorevler.filter((g:any) => g.kural_id == null)
     return liveFlowGorevler
   }, [liveFlowGorevler, durumFilter])
 
