@@ -254,39 +254,13 @@ async function destekCalistir(admin: any, ayar: any) {
 
   console.log(`${logPrefix} DÖNGÜ BİTTİ — tamamlanan=${tamamlananAdet}, skipPersonel=${skipPersonelCount}, updateError=${updateErrorCount}`)
 
-  // VARDIYA BITTI — simülasyon sonrası halen BEKLEMEDE kalan görevleri ZAMANI_GECMIS'e çek.
-  // (Kullanıcı taksonomisi: PD cron vardiya sonu +30 dk, sebep "vardiya bitti")
-  // Üst lokasyon altındaki tüm BEKLEMEDE'ler — atanan personel zorunlu değil.
-  const { data: kalanBekleyen, error: kalanErr } = await admin
-    .from('canli_gorevler')
-    .select('id')
-    .in('lokasyon_id', lokIds)
-    .eq('durum', 'BEKLEMEDE')
-  let zgYapilanAdet = 0
-  if (!kalanErr && kalanBekleyen && kalanBekleyen.length > 0) {
-    const kalanIds = kalanBekleyen.map((g: any) => g.id)
-    const zgIso = new Date().toISOString()
-    // BATCH (PostgREST URL limit) — 100'lük gruplar
-    const BATCH = 100
-    for (let i = 0; i < kalanIds.length; i += BATCH) {
-      const chunk = kalanIds.slice(i, i + BATCH)
-      const { error: zgErr } = await admin.from('canli_gorevler').update({
-        durum: 'ZAMANI_GECMIS',
-        durum_degisim_tarihi: zgIso,
-        iptal_sebep: 'vardiya bitti',
-      }).in('id', chunk)
-      if (zgErr) {
-        console.log(`${logPrefix} ZG HATA: ${zgErr.message}`)
-      } else {
-        zgYapilanAdet += chunk.length
-      }
-    }
-    console.log(`${logPrefix} ZAMANI_GECMIS: ${zgYapilanAdet} görev (vardiya bitti)`)
-  }
+  // NOT: Kalan BEKLEMEDE'lere PD cron dokunmaz. Hedef oran dışında kalan
+  // görevler (hedef %90 ise ~%10) BEKLEMEDE kalır ve gun_ici_durum_guncelle
+  // SQL fn'i bekleme_gecmis_saat dolduğunda ZAMANI_GECMIS yapar. O geçişte
+  // iptal_sebep="vardiya bitti" otomatik yazılır (Migration ile).
 
   return {
     tamamlanan: tamamlananAdet,
-    zamani_gecmis: zgYapilanAdet,
     bekleyen_toplam: bekleyenGorevler.length,
     hedef_max: kalanHedef,
     debug: { skipPersonel: skipPersonelCount, updateError: updateErrorCount, shuffled: shuffled.length },
