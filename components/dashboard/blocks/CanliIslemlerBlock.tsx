@@ -69,7 +69,9 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
       if (yetkiliLokIds?.length) uq = (uq as any).in('ust_lokasyon_id', yetkiliLokIds)
       return uq
     })(),
-    // [7] Online kullanıcılar (SİM + gerçek — firma filtreli, proje filtresi users üzerinden)
+    // [7] Online kullanıcılar (SİM + gerçek — firma + proje + üst lokasyon filtreli).
+    // Online Kullanıcılar bloğu /api/online-users aynı pattern uyguluyor → KPI ile blok
+    // tutarlı kalsın diye yetkiliLokIds (users.ust_lokasyon_id) filtresi de uygulanır.
     (async () => {
       let oq = supabase.from('device_tokens').select('user_id').eq('aktif', true)
         .gte('son_kullanim', new Date(Date.now() - 10 * 60 * 1000).toISOString())
@@ -77,9 +79,11 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
       const { data: dtRows } = await oq
       if (!dtRows?.length) return { data: [] }
       const onlineUserIds = [...new Set(dtRows.map((r: any) => r.user_id))]
-      // Proje filtresi users tablosundan
-      if (projeId) {
-        let uq = supabase.from('users').select('id').in('id', onlineUserIds).eq('aktif', true).eq('proje_id', projeId)
+      // Proje veya üst lokasyon filtresi varsa users tablosundan süz
+      if (projeId || (yetkiliLokIds && yetkiliLokIds.length > 0)) {
+        let uq = supabase.from('users').select('id').in('id', onlineUserIds).eq('aktif', true)
+        if (projeId) uq = (uq as any).eq('proje_id', projeId)
+        if (yetkiliLokIds && yetkiliLokIds.length > 0) uq = (uq as any).in('ust_lokasyon_id', yetkiliLokIds)
         const { data: filteredUsers } = await uq
         return { data: (filteredUsers ?? []).map((u: any) => ({ user_id: u.id })) }
       }
