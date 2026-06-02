@@ -16,14 +16,14 @@ export default function DashboardScopeControls({ base }: { base: string }) {
   // U kullanıcıları proje/lokasyon seçemez (kendi yetkilerine zorlanır)
   if (isU) return null
 
-  // Üst lokasyon switcher sadece dashboard + canli-islemler sayfalarında.
-  // Diğer sayfalarda (raporlar, görevler, sistem ayarları vb.) kendi içlerinde
-  // üst lokasyon filtresi var; iki ayrı seçici kafa karışıklığı yaratıyor.
-  const ustLokSwitcherGoster =
-    (isSA || isTA) && (
-      pathname === `${base}/dashboard` ||
-      pathname === `${base}/dashboard/canli-islemler`
-    )
+  // Üst lokasyon switcher sadece TA için ve sadece dashboard + canli-islemler
+  // sayfalarında. Diğer sayfalarda (raporlar, görevler, sistem ayarları vb.)
+  // kendi içlerinde üst lokasyon filtresi var; iki ayrı seçici kafa karışıklığı
+  // yaratıyor. SA için scope yok.
+  const ustLokSwitcherGoster = isTA && (
+    pathname === `${base}/dashboard` ||
+    pathname === `${base}/dashboard/canli-islemler`
+  )
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
