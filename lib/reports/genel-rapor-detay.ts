@@ -56,7 +56,7 @@ const kayipNedeniLabel: Record<string, string> = {
   ZAMANI_GECMIS: 'Süre aşıldı, gerçekleşmedi',
   IPTAL: 'Sebep belirtilmedi',
   SILINDI: 'Kayıt silindi',
-  BEKLEMEDE: 'Beklemede kaldı',
+  BEKLEMEDE: 'vardiya bitti', // PD cron sonrası hedef oran dışında kalan görevler
   KAPATILDI: 'Kapatıldı',
 }
 

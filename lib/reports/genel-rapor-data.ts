@@ -835,7 +835,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     ZAMANI_GECMIS: 'Süre aşıldı, gerçekleşmedi',
     IPTAL: 'Sebep belirtilmedi',  // sadece iptal_sebep null ise fallback olarak görünür
     SILINDI: 'Kayıt silindi',
-    BEKLEMEDE: 'Beklemede kaldı',
+    BEKLEMEDE: 'vardiya bitti',   // PD cron sonrası hedef oran dışında kalan görevler
     KAPATILDI: 'Kapatıldı',
   }
   // Kayıp görevler: sadece kural-üretimli (ekstra'da kayıp olmaz, TAMAMLANDI olarak açılır)
@@ -968,7 +968,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   const yoneticiSet = yoneticiIds
   const kayipNedeniLabelInline: Record<string, string> = {
     ZAMANI_GECMIS: 'Süre aşıldı, gerçekleşmedi', IPTAL: 'Sebep belirtilmedi',
-    SILINDI: 'Kayıt silindi', BEKLEMEDE: 'Beklemede kaldı', KAPATILDI: 'Kapatıldı',
+    SILINDI: 'Kayıt silindi', BEKLEMEDE: 'vardiya bitti', KAPATILDI: 'Kapatıldı',
   }
   function ustLokAd(lokId: string | null | undefined): string {
     if (!lokId) return '—'
