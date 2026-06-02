@@ -858,8 +858,13 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
         tarihSaat: formatDate(g.aktif_olma_tarihi),
-        // Kayıp görevlerin çoğu tamamlanmamış — tarih = aktif olma günü, görev saatleri/süresi varsa göster
-        tarih: formatTarihTR(g.durum_degisim_tarihi ?? g.aktif_olma_tarihi),
+        // Kayıp görevler için TARİH = vardiya_gunu (görevin AİT olduğu gün).
+        // durum_degisim_tarihi sarkan vardiyalarda yanıltıcı oluyordu (örn V1
+        // 23:35 aktif görev 24h sonra ertesi gün BEKLEMEDE → tarih ertesi gün
+        // görünüyor ama aslında dünün vardiyasının görevi).
+        tarih: g.vardiya_gunu
+          ? formatTarihTR(`${g.vardiya_gunu}T00:00:00+03:00`)
+          : formatTarihTR(g.durum_degisim_tarihi ?? g.aktif_olma_tarihi),
         gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
         gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
         durum: durumLabel[g.durum] ?? g.durum,

@@ -300,7 +300,12 @@ export async function buildGenelRaporDetay(
         gorevNo: g.id?.slice(-8)?.toUpperCase() ?? '',
         gorevTanimi: g.tanim ?? '',
         tarihSaat: formatDate(g.durum_degisim_tarihi ?? g.aktif_olma_tarihi),
-        tarih: formatTarihTR(g.durum_degisim_tarihi ?? g.aktif_olma_tarihi),
+        // Kayıp görevler için TARİH = vardiya_gunu (görevin AİT olduğu gün).
+        // Sarkan V1'de görev 23:35 aktif, BEKLEMEDE/ZG geçişi ertesi gün
+        // gerçekleşir; durum_degisim_tarihi yanıltıcı olur.
+        tarih: g.vardiya_gunu
+          ? formatTarihTR(`${g.vardiya_gunu}T00:00:00+03:00`)
+          : formatTarihTR(g.durum_degisim_tarihi ?? g.aktif_olma_tarihi),
         gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
         gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
         durum: durumLabel[g.durum] ?? g.durum ?? '',
