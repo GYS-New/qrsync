@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import CanliIslemlerClient from '@/components/canli/CanliIslemlerClient'
@@ -5,6 +6,7 @@ import { redirect } from 'next/navigation'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { getDescendantIds } from '@/lib/lokasyon/getDescendantIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +17,10 @@ export default async function CanliIslemlerPage() {
 
   const { data: me } = await supabase.from('users').select('*').eq('id', authUser.id).single()
   const firmaId = me?.firma_id
+
+  // Üst lokasyon scope filtresi — header'daki seçici cookie'ye yazıyor
+  const aktifUstLokasyonId = cookies().get('qrsync_aktif_ust_lokasyon_id')?.value ?? null
+  const yetkiliLokIds = await getDescendantIds(aktifUstLokasyonId, firmaId ?? null)
 
   const aktifProje = await getAktifProje(firmaId ?? null)
   if (!aktifProje) return (
@@ -47,6 +53,7 @@ export default async function CanliIslemlerPage() {
         meId={me.id}
         meName={me.isim_soyisim ?? undefined}
         projeId={aktifProje.id}
+        yetkiliLokIds={yetkiliLokIds}
         readonly={me.rol === 'tenant_user'}
         canliAkisSureSaat={efektifAyar.canli_akis_sure_saat}
         ceklistAktif={efektifAyar.frekansiyel_ceklist_aktif}
