@@ -1234,9 +1234,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
               const ds = detayState.frekans_disi
               if (ds.loading && ds.rows.length === 0) return <DetayLoader label="Frekans dışı çalışmalar" />
               const sureli = (ds.islemSureleriAktif ?? data.islemSureleriAktif) !== false
-              // Ekstra görevler için GÖREV SÜRESİ kolonu kaldırıldı (online=0, offline=gerçek
-              // ayrımı karışıklık yaratıyordu). GÖREV SAATLERİ yine gösteriliyor.
-              const headers = ['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ'] : []), 'AÇIKLAMA']
+              // Mobil v1.0.28+ ekstra görev akışı: baslat/tamamla ile gerçek süre + gerekçe
+              // (OYAK RENAULT talebi, 02 Haz 2026). Eski tek-POST kayıtlarda gerekçe boş,
+              // süre "Tek tık" gösterilir. SÜRE kolonu geri eklendi.
+              const headers = ['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'SÜRE'] : []), 'GÖREV TANIMI', 'GEREKÇE']
               return (
                 <div className="verde-card" style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -1245,7 +1246,12 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   </div>
                   <DataTable
                     headers={headers}
-                    rows={ds.rows.map((r: any) => [r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarih, ...(sureli ? [r.gorevSaatleri] : []), r.aciklama])}
+                    rows={ds.rows.map((r: any) => [
+                      r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarih,
+                      ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []),
+                      r.aciklama,
+                      r.gerekce || '—',
+                    ])}
                     filterable noFilterCols={[0]}
                   />
                   {ds.hasMore && <DahaFazlaButon loading={ds.loading} onClick={() => fetchDetay('frekans_disi', ds.rows.length, true)} />}

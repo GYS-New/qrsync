@@ -221,19 +221,26 @@ export async function GET(request: Request) {
     })
 
     // ── Sayfa 6: Frekans Dışı ────────────────────────────────────────────────
+    // Mobil v1.0.28+ ekstra görev akışı: baslat/tamamla → gerçek SÜRE + GEREKÇE.
+    // Eski tek-POST kayıtlarda gerekçe boş, süre "Tek tık".
     const ws6 = wb.addWorksheet('Frekans Dışı')
     setHdr(ws6, 1, [
-      { col: 1, text: 'SN',            width: 6  },
+      { col: 1, text: 'SN',           width: 6  },
       { col: 2, text: 'ÜST LOKASYON', width: 20 },
       { col: 3, text: 'GRUP TANIMI',  width: 26 },
       { col: 4, text: 'LOKASYON',     width: 22 },
       { col: 5, text: 'PERSONEL',     width: 22 },
-      { col: 6, text: 'TARİH-SAAT',  width: 18 },
-      { col: 7, text: 'AÇIKLAMA',     width: 32 },
+      { col: 6, text: 'TARİH-SAAT',   width: 18 },
+      { col: 7, text: 'GÖREV TANIMI', width: 26 },
+      { col: 8, text: 'SÜRE',         width: 14 },
+      { col: 9, text: 'GEREKÇE',      width: 40 },
     ])
     data.frekansDisiGorevler.forEach((f, i) => {
       const r = ws6.getRow(2 + i); r.height = 17
-      const vals: any[] = [f.sn, f.ustLokasyon, f.grupTanimi, f.lokasyonTanimi, f.personel, f.tarihSaat, f.aciklama]
+      const vals: any[] = [
+        f.sn, f.ustLokasyon, f.grupTanimi, f.lokasyonTanimi, f.personel,
+        f.tarihSaat, f.aciklama, f.gorevSuresi, f.gerekce || '',
+      ]
       vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
     })
 

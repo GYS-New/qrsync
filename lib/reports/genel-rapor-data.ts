@@ -115,8 +115,16 @@ export interface FrekansDisiRow {
   tarihSaat: string
   tarih: string
   gorevSaatleri: string
+  /** Önce: süre saniye / yoksa "Tek tık". Mobil v1.0.28+ baslat/tamamla akışıyla
+   *  gerçek süre döner, eski tek-POST kayıtlarında 0 → "Tek tık" gösterilir. */
   gorevSuresi: string
+  /** Görev tanımı (kural listesinden seçilen tanım, örn "Yer Temizliği").
+   *  NOT: Eski kod buradan "AÇIKLAMA" sütun adıyla okurdu — UI'da "GÖREV TANIMI"
+   *  olarak yeniden adlandırıldı, alan adı geriye uyumluluk için aynı kaldı. */
   aciklama: string
+  /** Mobil v1.0.28+ personelin yazdığı gerekçe (örn "Yağ döküldü"). Eski tek-POST
+   *  ekstra kayıtlarda boş. canli_gorevler.aciklama kolonundan okunur. */
+  gerekce: string
 }
 
 export interface AtananFrekanRow {
@@ -397,7 +405,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   //     hesaplanır (frontend artık detay listelerden değil bu agg'lerden okur).
   //   - true (Excel/Export/Mail): tüm sütunlar, mevcut davranış korunur.
   const SELECT_COLS_MID = 'id,firma_id,lokasyon_id,durum,aktif_olma_tarihi,vardiya_gunu,gunluk_frekans_sayisi,kural_id,islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id,iptal_eden_id,iptal_sebep'
-  const SELECT_COLS_FULL = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,iptal_eden_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
+  const SELECT_COLS_FULL = 'id,firma_id,tanim,aciklama,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,iptal_eden_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
   const SELECT_COLS = includeDetails ? SELECT_COLS_FULL : SELECT_COLS_MID
 
   // Tarih filtresi vardiya_gunu üzerinden (sarkan V1 görevleri kendi günlerinde gösterilir)
@@ -959,6 +967,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
         gorevSuresi: sure > 0 ? formatGorevSuresi(sure) : 'Tek tık',
         aciklama: g.tanim ?? '',
+        gerekce: typeof g.aciklama === 'string' ? g.aciklama : '',
       })
     })
   }

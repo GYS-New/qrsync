@@ -41,7 +41,7 @@ export interface DetayResponse {
   islemSureleriAktif: boolean
 }
 
-const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,iptal_eden_id,durum_degisim_tarihi,olusturma_tarihi,iptal_sebep,kural_id'
+const SELECT_COLS = 'id,firma_id,tanim,aciklama,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,iptal_eden_id,durum_degisim_tarihi,olusturma_tarihi,iptal_sebep,kural_id'
 
 // Kayıp tablosuna giren durumlar (TAMAMLANDI ve ara durumlar hariç).
 const KAYIP_DURUMLAR = ['ZAMANI_GECMIS', 'IPTAL', 'SILINDI', 'BEKLEMEDE', 'KAPATILDI']
@@ -347,6 +347,7 @@ export async function buildGenelRaporDetay(
         gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
         gorevSuresi: sure > 0 ? formatGorevSuresi(sure) : 'Tek tık',
         aciklama: g.tanim ?? '',
+        gerekce: typeof g.aciklama === 'string' ? g.aciklama : '',
       } as FrekansDisiRow
     }
 
