@@ -151,6 +151,10 @@ export async function GET(req: NextRequest) {
   // ── 4. Görevler ────────────────────────────────────────────────────────────
   // TAMAMLANAN: durum=TAMAMLANDI + tamamlanma_tarihi pencere içinde
   // İPTAL:      durum=IPTAL + iptal_tarihi pencere içinde
+  // NOT: .limit(MAX_ROWS) zorunlu — Supabase JS client default 1000 satırla sınırlıyor,
+  // büyük firmaların aylık arşivinde 10000+ görev olabilir. Limit eksikse aktif gün ve
+  // tamamlanan sayısı eksik dönüyordu (örn 19 aktif gün → 4 görünüyordu).
+  const MAX_ROWS = 200000
   const SELECT_TAM = 'tamamlayan_kullanici_id, durum, tamamlanma_suresi_saniye, tamamlanma_tarihi'
   const SELECT_IPT = 'iptal_eden_id, durum, iptal_tarihi'
 
@@ -161,6 +165,7 @@ export async function GET(req: NextRequest) {
     .eq('durum', 'TAMAMLANDI')
     .gte('vardiya_gunu', tarihBaslangic)
     .lte('vardiya_gunu', tarihBitis)
+    .limit(MAX_ROWS)
   if (projeId) liveTamQ = (liveTamQ as any).eq('proje_id', projeId)
   const { data: liveTam } = await liveTamQ
 
@@ -171,6 +176,7 @@ export async function GET(req: NextRequest) {
     .eq('durum', 'TAMAMLANDI')
     .gte('vardiya_gunu', tarihBaslangic)
     .lte('vardiya_gunu', tarihBitis)
+    .limit(MAX_ROWS)
   if (projeId) arsivTamQ = (arsivTamQ as any).eq('proje_id', projeId)
   const { data: arsivTam } = await arsivTamQ
 
@@ -181,6 +187,7 @@ export async function GET(req: NextRequest) {
     .eq('durum', 'IPTAL')
     .gte('vardiya_gunu', tarihBaslangic)
     .lte('vardiya_gunu', tarihBitis)
+    .limit(MAX_ROWS)
   if (projeId) liveIptQ = (liveIptQ as any).eq('proje_id', projeId)
   const { data: liveIpt } = await liveIptQ
 
@@ -191,6 +198,7 @@ export async function GET(req: NextRequest) {
     .eq('durum', 'IPTAL')
     .gte('vardiya_gunu', tarihBaslangic)
     .lte('vardiya_gunu', tarihBitis)
+    .limit(MAX_ROWS)
   if (projeId) arsivIptQ = (arsivIptQ as any).eq('proje_id', projeId)
   const { data: arsivIpt } = await arsivIptQ
 
