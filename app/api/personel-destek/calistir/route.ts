@@ -209,22 +209,11 @@ async function destekCalistir(admin: any, ayar: any) {
       continue
     }
 
-    // %1 iptal olasılığı (doğallık)
-    if (Math.random() < 0.01) {
-      const iptalIso = new Date().toISOString()
-      const { error: iptalErr } = await admin.from('canli_gorevler').update(gorevDurumPayload('IPTAL', 'WEB', {
-        at: iptalIso,
-        iptal_sebep: 'Otomatik iptal — personel destek (vardiya bitti)',
-        ek: {
-          iptal_eden_id: personelId,
-          iptal_tarihi: iptalIso,
-          islemi_yapan_id: personelId,
-        },
-      }) as any).eq('id', gorev.id)
-      if (iptalErr) { updateErrorCount++; console.log(`${logPrefix} IPTAL HATA: ${iptalErr.message}`) }
-      iptalAdet++
-      continue
-    }
+    // NOT: %1 IPTAL davranışı kaldırıldı (kullanıcı kararı). Kayıp iptal taksonomisi:
+    //   1) Mobil iptal (personel)          → IPTAL, sebep zorunlu
+    //   2) PD cron vardiya sonu +30 dk      → kalan BEKLEMEDE'ler ZAMANI_GECMIS, sebep="vardiya bitti"
+    //   3) Web manuel iptal (TA/SA)         → IPTAL, sebep zorunlu
+    // PD cron'un kendisi IPTAL yapmaz, ZAMANINDA_YAPILAMAYAN simülasyonunu yapar.
 
     // Doğal süre hesapla
     const hedefDk = lok?.hedef_sure_dakika ?? 10
@@ -263,11 +252,41 @@ async function destekCalistir(admin: any, ayar: any) {
     tamamlananAdet++
   }
 
-  console.log(`${logPrefix} DÖNGÜ BİTTİ — tamamlanan=${tamamlananAdet}, iptal=${iptalAdet}, skipPersonel=${skipPersonelCount}, updateError=${updateErrorCount}`)
+  console.log(`${logPrefix} DÖNGÜ BİTTİ — tamamlanan=${tamamlananAdet}, skipPersonel=${skipPersonelCount}, updateError=${updateErrorCount}`)
+
+  // VARDIYA BITTI — simülasyon sonrası halen BEKLEMEDE kalan görevleri ZAMANI_GECMIS'e çek.
+  // (Kullanıcı taksonomisi: PD cron vardiya sonu +30 dk, sebep "vardiya bitti")
+  // Üst lokasyon altındaki tüm BEKLEMEDE'ler — atanan personel zorunlu değil.
+  const { data: kalanBekleyen, error: kalanErr } = await admin
+    .from('canli_gorevler')
+    .select('id')
+    .in('lokasyon_id', lokIds)
+    .eq('durum', 'BEKLEMEDE')
+  let zgYapilanAdet = 0
+  if (!kalanErr && kalanBekleyen && kalanBekleyen.length > 0) {
+    const kalanIds = kalanBekleyen.map((g: any) => g.id)
+    const zgIso = new Date().toISOString()
+    // BATCH (PostgREST URL limit) — 100'lük gruplar
+    const BATCH = 100
+    for (let i = 0; i < kalanIds.length; i += BATCH) {
+      const chunk = kalanIds.slice(i, i + BATCH)
+      const { error: zgErr } = await admin.from('canli_gorevler').update({
+        durum: 'ZAMANI_GECMIS',
+        durum_degisim_tarihi: zgIso,
+        iptal_sebep: 'vardiya bitti',
+      }).in('id', chunk)
+      if (zgErr) {
+        console.log(`${logPrefix} ZG HATA: ${zgErr.message}`)
+      } else {
+        zgYapilanAdet += chunk.length
+      }
+    }
+    console.log(`${logPrefix} ZAMANI_GECMIS: ${zgYapilanAdet} görev (vardiya bitti)`)
+  }
 
   return {
     tamamlanan: tamamlananAdet,
-    iptal: iptalAdet,
+    zamani_gecmis: zgYapilanAdet,
     bekleyen_toplam: bekleyenGorevler.length,
     hedef_max: kalanHedef,
     debug: { skipPersonel: skipPersonelCount, updateError: updateErrorCount, shuffled: shuffled.length },

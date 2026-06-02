@@ -846,7 +846,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
       const iptalSebep = typeof g.iptal_sebep === 'string' ? g.iptal_sebep.trim() : ''
-      const kayipNedeni = (g.durum === 'IPTAL' && iptalSebep)
+      // iptal_sebep dolu ise her zaman onu göster (IPTAL = manuel sebep,
+      // ZAMANI_GECMIS = PD cron 'vardiya bitti' veya custom).
+      const kayipNedeni = iptalSebep
         ? iptalSebep
         : (kayipNedeniLabel[g.durum] ?? g.durum)
       return {
@@ -1066,9 +1068,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     for (const g of kuralGorevler) {
       const d = (g as any).durum
       if (d === 'TAMAMLANDI' || d === 'ZAMANINDA_YAPILAMAYAN' || d === 'HAZIR' || d === 'ACIK' || d === 'ISLEMDE') continue
-      // Kayıp neden
+      // Kayıp neden — iptal_sebep dolu ise her zaman göster
       const iptalSebep = typeof (g as any).iptal_sebep === 'string' ? (g as any).iptal_sebep.trim() : ''
-      const neden = (d === 'IPTAL' && iptalSebep) ? iptalSebep : (kayipNedeniLabelInline[d] ?? d)
+      const neden = iptalSebep ? iptalSebep : (kayipNedeniLabelInline[d] ?? d)
       kayipNedenSayac.set(neden, (kayipNedenSayac.get(neden) ?? 0) + 1)
       // Kayıp lokasyon
       const lokId = (g as any).lokasyon_id

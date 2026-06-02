@@ -288,7 +288,9 @@ export async function buildGenelRaporDetay(
     }
 
     if (tip === 'kayip') {
-      const kayipNedeni = (g.durum === 'IPTAL' && g.iptal_sebep)
+      // iptal_sebep dolu ise her zaman onu göster (IPTAL = manuel sebep,
+      // ZAMANI_GECMIS = PD cron 'vardiya bitti' veya custom).
+      const kayipNedeni = g.iptal_sebep
         ? g.iptal_sebep
         : (kayipNedeniLabel[g.durum] ?? '')
       return {
