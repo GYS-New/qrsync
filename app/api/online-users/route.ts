@@ -23,12 +23,14 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - ONLINE_WINDOW_SECONDS * 1000).toISOString()
   const admin = createAdminClient()
 
-  // device_tokens'tan son 10dk içinde aktif olan user_id'leri bul (SİM dahil)
-  let dtQ = admin.from('device_tokens').select('user_id, son_kullanim, isim_soyisim, firma_id')
+  // device_tokens'tan son 10dk içinde aktif olan tüm user_id'leri çek
+  // ÖNEMLİ: önce limit uygulayıp sonra filtrelersek bazı user'lar limit'ten önce
+  // düşer (örn MONTAJ user'ı 7. sırada → ilk 6'da yok → filter sonrası eksik).
+  // Bu yüzden TÜM online user_id'leri çekip → users filter et → en güncel ilk 6.
+  let dtQ = admin.from('device_tokens').select('user_id, son_kullanim, firma_id')
     .eq('aktif', true)
     .gte('son_kullanim', since)
     .order('son_kullanim', { ascending: false })
-    .limit(limit * 2)
 
   if (me.rol !== 'super_admin' && me.rol !== 'alt_super_admin') {
     if (me.firma_id) dtQ = (dtQ as any).eq('firma_id', me.firma_id)
@@ -41,24 +43,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, users: [], since, _error: dtErr.message })
   }
 
-  // Unique user_id'ler
+  // Unique user_id'ler (son_kullanim DESC sırasında — en güncel önce)
   const seenIds = new Set<string>()
-  const uniqueUserIds: string[] = []
+  const orderedUserIds: string[] = []
   for (const dt of (dtRows ?? [])) {
     if (!seenIds.has(dt.user_id)) {
       seenIds.add(dt.user_id)
-      uniqueUserIds.push(dt.user_id)
+      orderedUserIds.push(dt.user_id)
     }
   }
 
-  if (uniqueUserIds.length === 0) {
+  if (orderedUserIds.length === 0) {
     return NextResponse.json({ ok: true, users: [], since })
   }
 
-  // Kullanıcı detaylarını çek (proje + üst lokasyon filtresi dahil)
+  // Tüm online user'ları filter et (proje + üst lokasyon) — sonra slice
   let uQ = admin.from('users')
     .select('id,isim_soyisim,rol,profil_foto,firma_id,ust_lokasyon_id')
-    .in('id', uniqueUserIds.slice(0, limit))
+    .in('id', orderedUserIds)
     .eq('aktif', true)
   if (projeId) uQ = (uQ as any).eq('proje_id', projeId)
   if (lokIds.length) uQ = (uQ as any).in('ust_lokasyon_id', lokIds)
@@ -67,5 +69,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, users: [], since, _error: uErr.message })
   }
 
-  return NextResponse.json({ ok: true, users: users ?? [], since })
+  // Filter sonrası en güncel ilk N — orderedUserIds sırasına göre yeniden sırala
+  const userById = new Map((users ?? []).map((u: any) => [u.id, u]))
+  const sorted: any[] = []
+  for (const uid of orderedUserIds) {
+    const u = userById.get(uid)
+    if (u) sorted.push(u)
+    if (sorted.length >= limit) break
+  }
+
+  return NextResponse.json({ ok: true, users: sorted, since })
 }
