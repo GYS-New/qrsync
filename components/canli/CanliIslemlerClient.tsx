@@ -169,8 +169,15 @@ function LiveHeader({
         {kpiCards.map(({ label, val, bg, vColor, lColor }, i) => {
           const filterKey = FILTERS[i]?.key ?? 'TÜMÜ'
           const active = durumFilter === filterKey
+          // Toggle: aktif kart tekrar tıklanırsa TÜMÜ'ye dön (filtre kalksın).
+          // 'Toplam' kartı zaten TÜMÜ olduğu için ona tıklayınca kapanma davranışı yok.
+          const onClick = () => {
+            if (active && filterKey !== 'TÜMÜ') setDurumFilter('TÜMÜ')
+            else setDurumFilter(filterKey)
+          }
           return (
-            <button key={label} type="button" onClick={() => setDurumFilter(filterKey)}
+            <button key={label} type="button" onClick={onClick}
+              title={active && filterKey !== 'TÜMÜ' ? 'Filtreyi kaldır' : label}
               style={{
                 background: active ? vColor + '0F' : bg === 'transparent' ? '#fafafa' : bg,
                 borderRadius: 8, padding: '8px 8px', textAlign: 'left', cursor: 'pointer',
