@@ -36,6 +36,19 @@ export default function UserPanel({ base }: { base: string }) {
   }, [open])
 
   async function logout() {
+    // Scope cookie'leri ve localStorage'ı temizle — başka kullanıcı/rol ile
+    // giriş yapıldığında önceki seçim (firma, proje, üst lokasyon) sızmasın
+    try {
+      const cookieNames = [
+        'qrsync_sa_firma_id',
+        'qrsync_aktif_proje_id',
+        'qrsync_aktif_ust_lokasyon_id',
+      ]
+      for (const n of cookieNames) {
+        document.cookie = `${n}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
+      }
+      localStorage.removeItem('qrsync_sa_firma_id')
+    } catch {}
     await supabase.auth.signOut()
     router.push('/login')
   }

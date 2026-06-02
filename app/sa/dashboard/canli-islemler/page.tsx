@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import Topbar from '@/components/layout/Topbar'
 import CanliIslemlerClient from '@/components/canli/CanliIslemlerClient'
@@ -6,7 +5,6 @@ import { redirect } from 'next/navigation'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
-import { getDescendantIds } from '@/lib/lokasyon/getDescendantIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,9 +37,9 @@ export default async function SACanliIslemlerPage() {
   const aktifProje = await getAktifProje(firmaId)
   const projeId = aktifProje?.id ?? null
 
-  // Üst lokasyon scope filtresi — header'daki seçici cookie'ye yazıyor
-  const aktifUstLokasyonId = cookies().get('qrsync_aktif_ust_lokasyon_id')?.value ?? null
-  const yetkiliLokIds = await getDescendantIds(aktifUstLokasyonId, firmaId)
+  // SA'da üst lokasyon seçici YOK — scope filtresi sadece TA'da uygulanır.
+  // Cookie'den okumuyoruz ki TA → SA geçişlerinde eski filtre sızmasın.
+  const yetkiliLokIds: string[] | null = null
 
   let lokQ = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id').eq('firma_id', firmaId).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
