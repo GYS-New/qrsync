@@ -1205,8 +1205,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
             {activeTab === 'Kayıp Frekanslar' && (() => {
               const ds = detayState.kayip
               if (ds.loading && ds.rows.length === 0) return <DetayLoader label="Kayıp görevler" />
-              const sureli = (ds.islemSureleriAktif ?? data.islemSureleriAktif) !== false
-              const headers = ['SN', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'GÖREV SÜRESİ'] : []), 'DURUM', 'KAYIP NEDENİ']
+              // GÖREV SAATLERİ ve GÖREV SÜRESİ sütunları kaldırıldı (kayıp görevler
+              // tamamlanmamış olduğu için anlamsız). Yerine İPTAL EDEN sütunu eklendi.
+              const headers = ['SN', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', 'İPTAL EDEN', 'DURUM', 'KAYIP NEDENİ']
               return (
                 <div className="verde-card" style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -1215,7 +1216,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   </div>
                   <DataTable
                     headers={headers}
-                    rows={ds.rows.map((r: any) => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.durum, r.kayipNedeni])}
+                    rows={ds.rows.map((r: any) => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, r.iptalEden ?? 'sistem', r.durum, r.kayipNedeni])}
                     filterable noFilterCols={[0]}
                   />
                   {ds.hasMore && <DahaFazlaButon loading={ds.loading} onClick={() => fetchDetay('kayip', ds.rows.length, true)} />}

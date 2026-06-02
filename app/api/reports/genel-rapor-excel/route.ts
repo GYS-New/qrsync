@@ -205,13 +205,14 @@ export async function GET(request: Request) {
       { col: 3, text: 'LOKASYON',      width: 22 },
       { col: 4, text: 'GÖREV NO',      width: 14 },
       { col: 5, text: 'GÖREV TANIMI',  width: 32 },
-      { col: 6, text: 'TARİH-SAAT',   width: 18 },
-      { col: 7, text: 'DURUM',         width: 14 },
-      { col: 8, text: 'KAYIP NEDENİ', width: 24 },
+      { col: 6, text: 'TARİH',         width: 14 },
+      { col: 7, text: 'İPTAL EDEN',   width: 22 },
+      { col: 8, text: 'DURUM',         width: 14 },
+      { col: 9, text: 'KAYIP NEDENİ', width: 24 },
     ])
     data.kayipGorevler.forEach((k, i) => {
       const r = ws5.getRow(2 + i); r.height = 17
-      const vals: any[] = [k.sn, k.ustLokasyon, k.lokasyon, k.gorevNo, k.gorevTanimi, k.tarihSaat, k.durum, k.kayipNedeni]
+      const vals: any[] = [k.sn, k.ustLokasyon, k.lokasyon, k.gorevNo, k.gorevTanimi, k.tarih, k.iptalEden ?? 'sistem', k.durum, k.kayipNedeni]
       vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
     })
 

@@ -41,7 +41,7 @@ export interface DetayResponse {
   islemSureleriAktif: boolean
 }
 
-const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,iptal_sebep,kural_id'
+const SELECT_COLS = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,iptal_eden_id,durum_degisim_tarihi,olusturma_tarihi,iptal_sebep,kural_id'
 
 // Kayıp tablosuna giren durumlar (TAMAMLANDI ve ara durumlar hariç).
 const KAYIP_DURUMLAR = ['ZAMANI_GECMIS', 'IPTAL', 'SILINDI', 'BEKLEMEDE', 'KAPATILDI']
@@ -204,7 +204,7 @@ export async function buildGenelRaporDetay(
 
   // 7. User isim lookup (sadece bu sayfa için)
   const userIds = Array.from(new Set(
-    slice.flatMap((g: any) => [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id].filter(Boolean))
+    slice.flatMap((g: any) => [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id, g.iptal_eden_id].filter(Boolean))
   ))
   const userMap = new Map<string, string>()
   if (userIds.length > 0) {
@@ -308,6 +308,8 @@ export async function buildGenelRaporDetay(
           : formatTarihTR(g.durum_degisim_tarihi ?? g.aktif_olma_tarihi),
         gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
         gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
+        // Manuel iptal → personel ismi; otomatik (ZG/BEKLEMEDE) → 'sistem'
+        iptalEden: g.iptal_eden_id ? (userMap.get(g.iptal_eden_id) ?? 'sistem') : 'sistem',
         durum: durumLabel[g.durum] ?? g.durum ?? '',
         kayipNedeni,
       } as KayipRow

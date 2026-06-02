@@ -93,8 +93,12 @@ export interface KayipRow {
   gorevTanimi: string
   tarihSaat: string
   tarih: string
+  /** @deprecated Kayıp listesinde GÖREV SAATLERİ/SÜRESİ sütunu kaldırıldı (anlamsız), iptalEden eklendi. Geriye uyumluluk için tutuluyor. */
   gorevSaatleri: string
+  /** @deprecated bkz. gorevSaatleri */
   gorevSuresi: string
+  /** Manuel iptaller → personel ismi; otomatik (ZG/BEKLEMEDE) → 'sistem' */
+  iptalEden: string
   durum: string
   kayipNedeni: string
 }
@@ -389,8 +393,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   //     Personel/lokasyon/kayıp-neden top-N grafikleri response.ozetAgg üzerinden
   //     hesaplanır (frontend artık detay listelerden değil bu agg'lerden okur).
   //   - true (Excel/Export/Mail): tüm sütunlar, mevcut davranış korunur.
-  const SELECT_COLS_MID = 'id,firma_id,lokasyon_id,durum,aktif_olma_tarihi,vardiya_gunu,gunluk_frekans_sayisi,kural_id,islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id,iptal_sebep'
-  const SELECT_COLS_FULL = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
+  const SELECT_COLS_MID = 'id,firma_id,lokasyon_id,durum,aktif_olma_tarihi,vardiya_gunu,gunluk_frekans_sayisi,kural_id,islemi_yapan_id,tamamlayan_kullanici_id,atanan_kullanici_id,iptal_eden_id,iptal_sebep'
+  const SELECT_COLS_FULL = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,iptal_eden_id,durum_degisim_tarihi,olusturma_tarihi,gunluk_frekans_sayisi,iptal_sebep,kural_id'
   const SELECT_COLS = includeDetails ? SELECT_COLS_FULL : SELECT_COLS_MID
 
   // Tarih filtresi vardiya_gunu üzerinden (sarkan V1 görevleri kendi günlerinde gösterilir)
@@ -483,7 +487,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   const userMap = new Map<string, string>()
   let projePersonelIds: Set<string> | null = null
   const userIds = Array.from(new Set(tumGorevler.flatMap((g: any) =>
-    [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id].filter(Boolean)
+    [g.atanan_kullanici_id, g.tamamlayan_kullanici_id, g.islemi_yapan_id, g.iptal_eden_id].filter(Boolean)
   )))
   if (userIds.length > 0) {
     const { data: users } = await admin
@@ -867,6 +871,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
           : formatTarihTR(g.durum_degisim_tarihi ?? g.aktif_olma_tarihi),
         gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
         gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
+        // Manuel iptal (IPTAL, iptal_eden_id dolu) → personel ismi;
+        // Otomatik (ZG/BEKLEMEDE, iptal_eden_id NULL) → 'sistem'
+        iptalEden: g.iptal_eden_id ? (userMap.get(g.iptal_eden_id) ?? 'sistem') : 'sistem',
         durum: durumLabel[g.durum] ?? g.durum,
         kayipNedeni,
       }
