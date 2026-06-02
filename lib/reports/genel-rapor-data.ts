@@ -101,6 +101,9 @@ export interface KayipRow {
   iptalEden: string
   durum: string
   kayipNedeni: string
+  /** Görevin üretildiği vardiya numarası (1/2/3...). UI badge için — tanımda
+   *  zaten "VARDİYA" geçen görevlerde badge gösterilmez. */
+  vardiyaNo: number | null
 }
 
 export interface FrekansDisiRow {
@@ -429,27 +432,52 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     : vardiyaRaw === 'v4' ? 4
     : null
 
-  // Firma vardiya ayarını çek (saat aralığı için)
+  // Firma vardiya ayarını çek — hem mevcut tek-vardiya filtresi, hem her görev
+  // için vardiyaNo hesabı (kayıp listesi badge'i) için tüm vardiyalar gerekli.
   let vardiyaAralik: { basMin: number; bitMin: number } | null = null
-  if (vardiyaNoRequested) {
+  const tumVardiyaAraliklari: { no: number; basMin: number; bitMin: number }[] = []
+  {
     const { data: firmaRow } = await admin
       .from('firmalar')
       .select('vardiya_sayisi, tum_vardiya_ayarlari, vardiya_saatleri')
       .eq('id', filters.firmaId).single()
     const vs = (firmaRow as any)?.vardiya_sayisi ?? 0
     const ayarlar = (firmaRow as any)?.tum_vardiya_ayarlari?.[String(vs)] ?? (firmaRow as any)?.vardiya_saatleri ?? []
-    const v = (ayarlar as any[]).find((x: any) => Number(x.no) === vardiyaNoRequested)
-    if (v && v.baslangic && v.bitis) {
+    for (const v of (ayarlar as any[])) {
+      if (!v?.baslangic || !v?.bitis) continue
       const [bh, bm] = v.baslangic.split(':').map(Number)
       const [eh, em] = v.bitis.split(':').map(Number)
-      if ([bh, bm, eh, em].every(Number.isFinite)) {
-        const basMin = bh * 60 + bm
-        let bitMin = eh * 60 + em
-        if (bitMin === 0 && basMin !== 0) bitMin = 24 * 60          // "00:00" bitiş → 24:00
-        if (bitMin <= basMin && bitMin !== 24 * 60) bitMin += 24 * 60  // sarkan vardiya
+      if (![bh, bm, eh, em].every(Number.isFinite)) continue
+      const basMin = bh * 60 + bm
+      let bitMin = eh * 60 + em
+      if (bitMin === 0 && basMin !== 0) bitMin = 24 * 60
+      if (bitMin <= basMin && bitMin !== 24 * 60) bitMin += 24 * 60
+      const aralik = { no: Number(v.no), basMin, bitMin }
+      tumVardiyaAraliklari.push(aralik)
+      if (vardiyaNoRequested && Number(v.no) === vardiyaNoRequested) {
         vardiyaAralik = { basMin, bitMin }
       }
     }
+  }
+
+  // ISO'nun TR saatine göre hangi vardiya numarasına düşüyor? Yoksa null.
+  function gorevVardiyaNo(iso: string | null | undefined): number | null {
+    if (!iso || tumVardiyaAraliklari.length === 0) return null
+    const hm = new Date(iso).toLocaleTimeString('en-GB', {
+      timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
+    })
+    const [h, m] = hm.split(':').map(Number)
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null
+    const dk = h * 60 + m
+    for (const v of tumVardiyaAraliklari) {
+      const inSarkan = v.bitMin > 24 * 60
+      if (inSarkan) {
+        if (dk >= v.basMin || dk < (v.bitMin - 24 * 60)) return v.no
+      } else {
+        if (dk >= v.basMin && dk < v.bitMin) return v.no
+      }
+    }
+    return null
   }
 
   function isInShift(iso: string | null | undefined): boolean {
@@ -876,6 +904,7 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         iptalEden: g.iptal_eden_id ? (userMap.get(g.iptal_eden_id) ?? 'sistem') : 'sistem',
         durum: durumLabel[g.durum] ?? g.durum,
         kayipNedeni,
+        vardiyaNo: gorevVardiyaNo(g.aktif_olma_tarihi),
       }
     })
 

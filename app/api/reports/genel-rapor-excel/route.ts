@@ -212,7 +212,11 @@ export async function GET(request: Request) {
     ])
     data.kayipGorevler.forEach((k, i) => {
       const r = ws5.getRow(2 + i); r.height = 17
-      const vals: any[] = [k.sn, k.ustLokasyon, k.lokasyon, k.gorevNo, k.gorevTanimi, k.tarih, k.iptalEden ?? 'sistem', k.durum, k.kayipNedeni]
+      // Tanımda "VARDIYA" geçmiyorsa, üretildiği vardiya no'yu suffix olarak ekle
+      const tanim = (k.vardiyaNo && !/VARD[İI]YA/i.test(String(k.gorevTanimi ?? '')))
+        ? `${k.gorevTanimi}  ·  V${k.vardiyaNo}`
+        : k.gorevTanimi
+      const vals: any[] = [k.sn, k.ustLokasyon, k.lokasyon, k.gorevNo, tanim, k.tarih, k.iptalEden ?? 'sistem', k.durum, k.kayipNedeni]
       vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
     })
 

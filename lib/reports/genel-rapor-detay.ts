@@ -162,28 +162,45 @@ export async function buildGenelRaporDetay(
     const bv = b[sortCol] ? new Date(b[sortCol]).getTime() : 0
     return bv - av
   })
-  // Vardiya filtresi — firma vardiya ayarından dinamik (sarkan dahil destekli)
+  // Firma vardiya ayarlarını her zaman çek — hem filter hem row vardiyaNo için.
+  const { data: firmaRow } = await admin
+    .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari, vardiya_saatleri')
+    .eq('id', filters.firmaId).single()
+  const vs = (firmaRow as any)?.vardiya_sayisi ?? 0
+  const ayarlar = (firmaRow as any)?.tum_vardiya_ayarlari?.[String(vs)] ?? (firmaRow as any)?.vardiya_saatleri ?? []
+  const tumVardiyaAraliklari: { no: number; basMin: number; bitMin: number }[] = []
+  for (const v of (ayarlar as any[])) {
+    if (!v?.baslangic || !v?.bitis) continue
+    const [bh, bm] = v.baslangic.split(':').map(Number)
+    const [eh, em] = v.bitis.split(':').map(Number)
+    if (![bh, bm, eh, em].every(Number.isFinite)) continue
+    const basMin = bh * 60 + bm
+    let bitMin = eh * 60 + em
+    if (bitMin === 0 && basMin !== 0) bitMin = 24 * 60
+    if (bitMin <= basMin && bitMin !== 24 * 60) bitMin += 24 * 60
+    tumVardiyaAraliklari.push({ no: Number(v.no), basMin, bitMin })
+  }
+  function gorevVardiyaNo(iso: string | null | undefined): number | null {
+    if (!iso || tumVardiyaAraliklari.length === 0) return null
+    const hm = new Date(iso).toLocaleTimeString('en-GB', {
+      timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
+    })
+    const [h, m] = hm.split(':').map(Number)
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null
+    const dk = h * 60 + m
+    for (const v of tumVardiyaAraliklari) {
+      const inSarkan = v.bitMin > 24 * 60
+      if (inSarkan) { if (dk >= v.basMin || dk < (v.bitMin - 24 * 60)) return v.no }
+      else { if (dk >= v.basMin && dk < v.bitMin) return v.no }
+    }
+    return null
+  }
+
+  // Vardiya filtresi
   const vardiya = filters.vardiya ?? 'all'
   if (vardiya !== 'all') {
     const vNo = vardiya === 'v1' ? 1 : vardiya === 'v2' ? 2 : vardiya === 'v3' ? 3 : 0
-    const { data: firmaRow } = await admin
-      .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari, vardiya_saatleri')
-      .eq('id', filters.firmaId).single()
-    const vs = (firmaRow as any)?.vardiya_sayisi ?? 0
-    const ayarlar = (firmaRow as any)?.tum_vardiya_ayarlari?.[String(vs)] ?? (firmaRow as any)?.vardiya_saatleri ?? []
-    const v = (ayarlar as any[]).find((x: any) => Number(x.no) === vNo)
-    let aralik: { basMin: number; bitMin: number } | null = null
-    if (v?.baslangic && v?.bitis) {
-      const [bh, bm] = v.baslangic.split(':').map(Number)
-      const [eh, em] = v.bitis.split(':').map(Number)
-      if ([bh, bm, eh, em].every(Number.isFinite)) {
-        const basMin = bh * 60 + bm
-        let bitMin = eh * 60 + em
-        if (bitMin === 0 && basMin !== 0) bitMin = 24 * 60
-        if (bitMin <= basMin && bitMin !== 24 * 60) bitMin += 24 * 60
-        aralik = { basMin, bitMin }
-      }
-    }
+    const aralik = tumVardiyaAraliklari.find(a => a.no === vNo) ?? null
     if (aralik) {
       merged = merged.filter((g: any) => {
         if (!g.aktif_olma_tarihi) return false
@@ -193,9 +210,9 @@ export async function buildGenelRaporDetay(
         const [h, m] = hm.split(':').map(Number)
         if (!Number.isFinite(h) || !Number.isFinite(m)) return false
         const dk = h * 60 + m
-        return aralik!.bitMin <= 24 * 60
-          ? (dk >= aralik!.basMin && dk < aralik!.bitMin)
-          : (dk >= aralik!.basMin || dk < (aralik!.bitMin - 24 * 60))
+        return aralik.bitMin <= 24 * 60
+          ? (dk >= aralik.basMin && dk < aralik.bitMin)
+          : (dk >= aralik.basMin || dk < (aralik.bitMin - 24 * 60))
       })
       total = merged.length
     }
@@ -312,6 +329,7 @@ export async function buildGenelRaporDetay(
         iptalEden: g.iptal_eden_id ? (userMap.get(g.iptal_eden_id) ?? 'sistem') : 'sistem',
         durum: durumLabel[g.durum] ?? g.durum ?? '',
         kayipNedeni,
+        vardiyaNo: gorevVardiyaNo(g.aktif_olma_tarihi),
       } as KayipRow
     }
 

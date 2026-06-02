@@ -1216,7 +1216,13 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   </div>
                   <DataTable
                     headers={headers}
-                    rows={ds.rows.map((r: any) => [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, r.iptalEden ?? 'sistem', r.durum, r.kayipNedeni])}
+                    rows={ds.rows.map((r: any) => {
+                      // Görev tanımında "VARDIYA" geçmiyorsa, üretildiği vardiya no'yu suffix olarak ekle
+                      const tanim = (r.vardiyaNo && !/VARD[İI]YA/i.test(String(r.gorevTanimi ?? '')))
+                        ? `${r.gorevTanimi}  ·  V${r.vardiyaNo}`
+                        : r.gorevTanimi
+                      return [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, tanim, r.tarih, r.iptalEden ?? 'sistem', r.durum, r.kayipNedeni]
+                    })}
                     filterable noFilterCols={[0]}
                   />
                   {ds.hasMore && <DahaFazlaButon loading={ds.loading} onClick={() => fetchDetay('kayip', ds.rows.length, true)} />}
