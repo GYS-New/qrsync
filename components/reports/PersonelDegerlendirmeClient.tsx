@@ -201,7 +201,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
       { header: 'İptal', key: 'iptal', width: 10 },
       { header: 'Ort. Süre (sn)', key: 'ort_sure', width: 16 },
       { header: 'Aktif Gün', key: 'aktif_gun', width: 12 },
-      { header: 'Günlük Toplam (sa)', key: 'gunluk_ort', width: 18 },
+      { header: 'Günlük Görev Süresi (sa)', key: 'gunluk_ort', width: 22 },
       { header: 'Başarı', key: 'basari', width: 14 },
     ]
     ws.getRow(1).font = { bold: true }
@@ -236,7 +236,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
   // ── CSV indir ─────────────────────────────────────────────────────────────
   function exportCSV() {
     if (displayRows.length === 0) return
-    const header = ['#', 'Personel', 'Cihaz', 'Üst Lokasyon', 'Durum', 'Tamamlanan', 'İptal', 'Ort. Süre (sn)', 'Aktif Gün', 'Günlük Toplam (sn)', 'Başarı']
+    const header = ['#', 'Personel', 'Cihaz', 'Üst Lokasyon', 'Durum', 'Tamamlanan', 'İptal', 'Ort. Süre (sn)', 'Aktif Gün', 'Günlük Görev Süresi (sn)', 'Başarı']
     const lines = [header.join(';')]
     displayRows.forEach((r, i) => {
       lines.push([
@@ -364,7 +364,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
                     <ThS k="iptal_sayi"             sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('iptal_sayi')}             align="right" sticky>İptal</ThS>
                     <ThS k="ortalama_sure_saniye"   sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('ortalama_sure_saniye')}   align="right" sticky>Ort. Süre</ThS>
                     <ThS k="aktif_gun_sayisi"       sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('aktif_gun_sayisi')}       align="right" sticky>Aktif Gün</ThS>
-                    <ThS k="gunluk_ortalama_saniye" sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('gunluk_ortalama_saniye')} align="right" sticky>Günlük Toplam</ThS>
+                    <ThS k="gunluk_ortalama_saniye" sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('gunluk_ortalama_saniye')} align="right" sticky>Günlük Görev Süresi</ThS>
                     <ThS k="basari_kategori"        sortKey={sortKey} sortDir={sortDir} onClick={() => setSort('basari_kategori')} sticky>Başarı</ThS>
                   </tr>
                   {/* Kolon filtre satırı (sticky — scroll'da görünür kalır) */}
@@ -438,7 +438,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
                         <td style={{ ...tdS, textAlign: 'right', fontWeight: 600 }}>{fmtSure(r.ortalama_sure_saniye)}</td>
                         <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: r.aktif_gun_sayisi > 0 ? T.text : T.textSoft }}>{r.aktif_gun_sayisi}</td>
                         <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: r.basari_kategori ? BASARI_RENK[r.basari_kategori].fg : T.textSoft }}
-                            title="Başarı kategorisi bu süreden hesaplanır (toplam aktif süre / aktif gün sayısı)">
+                            title="Personelin gün içinde GÖREV TAMAMLAMAK için harcadığı toplam süre (tüm tamamlama sürelerinin toplamı / aktif gün sayısı). Başarı kategorisi bu süreden hesaplanır.">
                           {fmtSure(r.gunluk_ortalama_saniye)}
                         </td>
                         <td style={tdS}>
