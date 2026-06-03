@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { sayfaGorebilirMi } from '@/lib/yetki/sayfaYetkisi'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -149,61 +150,64 @@ export async function GET(req: NextRequest) {
   const ustLokasyonlar = (ustLokRows ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim }))
 
   // ── 4. Görevler ────────────────────────────────────────────────────────────
-  // TAMAMLANAN: durum=TAMAMLANDI + tamamlanma_tarihi pencere içinde
-  // İPTAL:      durum=IPTAL + iptal_tarihi pencere içinde
-  // NOT: .limit(MAX_ROWS) zorunlu — Supabase JS client default 1000 satırla sınırlıyor,
-  // büyük firmaların aylık arşivinde 10000+ görev olabilir. Limit eksikse aktif gün ve
-  // tamamlanan sayısı eksik dönüyordu (örn 19 aktif gün → 4 görünüyordu).
-  const MAX_ROWS = 200000
+  // TAMAMLANAN: durum=TAMAMLANDI + vardiya_gunu pencere içinde
+  // İPTAL:      durum=IPTAL + vardiya_gunu pencere içinde
+  // NOT: fetchAll() ile pagination — Supabase PostgREST gateway max-rows=1000
+  // server-side sınır var. .limit(200000) yazsak bile gateway 1000'de kesiyor.
+  // Büyük firmaların aylık arşivinde 10000+ satır olabilir (örn ATALIAN 30 gün
+  // arşiv: 10856 satır). fetchAll 1000'er sayfa çekip birleştirir.
   const SELECT_TAM = 'tamamlayan_kullanici_id, durum, tamamlanma_suresi_saniye, tamamlanma_tarihi'
   const SELECT_IPT = 'iptal_eden_id, durum, iptal_tarihi'
 
-  let liveTamQ = admin
-    .from('canli_gorevler')
-    .select(SELECT_TAM)
-    .eq('firma_id', firmaId)
-    .eq('durum', 'TAMAMLANDI')
-    .gte('vardiya_gunu', tarihBaslangic)
-    .lte('vardiya_gunu', tarihBitis)
-    .limit(MAX_ROWS)
-  if (projeId) liveTamQ = (liveTamQ as any).eq('proje_id', projeId)
-  const { data: liveTam } = await liveTamQ
+  const [liveTam, arsivTam, liveIpt, arsivIpt] = await Promise.all([
+    fetchAll(() => {
+      let q: any = admin
+        .from('canli_gorevler')
+        .select(SELECT_TAM)
+        .eq('firma_id', firmaId)
+        .eq('durum', 'TAMAMLANDI')
+        .gte('vardiya_gunu', tarihBaslangic)
+        .lte('vardiya_gunu', tarihBitis)
+      if (projeId) q = q.eq('proje_id', projeId)
+      return q
+    }),
+    fetchAll(() => {
+      let q: any = admin
+        .from('canli_gorevler_arsiv')
+        .select(SELECT_TAM)
+        .eq('firma_id', firmaId)
+        .eq('durum', 'TAMAMLANDI')
+        .gte('vardiya_gunu', tarihBaslangic)
+        .lte('vardiya_gunu', tarihBitis)
+      if (projeId) q = q.eq('proje_id', projeId)
+      return q
+    }),
+    fetchAll(() => {
+      let q: any = admin
+        .from('canli_gorevler')
+        .select(SELECT_IPT)
+        .eq('firma_id', firmaId)
+        .eq('durum', 'IPTAL')
+        .gte('vardiya_gunu', tarihBaslangic)
+        .lte('vardiya_gunu', tarihBitis)
+      if (projeId) q = q.eq('proje_id', projeId)
+      return q
+    }),
+    fetchAll(() => {
+      let q: any = admin
+        .from('canli_gorevler_arsiv')
+        .select(SELECT_IPT)
+        .eq('firma_id', firmaId)
+        .eq('durum', 'IPTAL')
+        .gte('vardiya_gunu', tarihBaslangic)
+        .lte('vardiya_gunu', tarihBitis)
+      if (projeId) q = q.eq('proje_id', projeId)
+      return q
+    }),
+  ])
 
-  let arsivTamQ = admin
-    .from('canli_gorevler_arsiv')
-    .select(SELECT_TAM)
-    .eq('firma_id', firmaId)
-    .eq('durum', 'TAMAMLANDI')
-    .gte('vardiya_gunu', tarihBaslangic)
-    .lte('vardiya_gunu', tarihBitis)
-    .limit(MAX_ROWS)
-  if (projeId) arsivTamQ = (arsivTamQ as any).eq('proje_id', projeId)
-  const { data: arsivTam } = await arsivTamQ
-
-  let liveIptQ = admin
-    .from('canli_gorevler')
-    .select(SELECT_IPT)
-    .eq('firma_id', firmaId)
-    .eq('durum', 'IPTAL')
-    .gte('vardiya_gunu', tarihBaslangic)
-    .lte('vardiya_gunu', tarihBitis)
-    .limit(MAX_ROWS)
-  if (projeId) liveIptQ = (liveIptQ as any).eq('proje_id', projeId)
-  const { data: liveIpt } = await liveIptQ
-
-  let arsivIptQ = admin
-    .from('canli_gorevler_arsiv')
-    .select(SELECT_IPT)
-    .eq('firma_id', firmaId)
-    .eq('durum', 'IPTAL')
-    .gte('vardiya_gunu', tarihBaslangic)
-    .lte('vardiya_gunu', tarihBitis)
-    .limit(MAX_ROWS)
-  if (projeId) arsivIptQ = (arsivIptQ as any).eq('proje_id', projeId)
-  const { data: arsivIpt } = await arsivIptQ
-
-  const tamamTasks = [...(liveTam ?? []), ...(arsivTam ?? [])]
-  const iptalTasks = [...(liveIpt ?? []), ...(arsivIpt ?? [])]
+  const tamamTasks = [...liveTam, ...arsivTam]
+  const iptalTasks = [...liveIpt, ...arsivIpt]
 
   // ── 5. Cihaz eşleşme ───────────────────────────────────────────────────────
   const { data: deviceRows } = await admin
