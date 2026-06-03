@@ -5,6 +5,8 @@ import { completeTask } from '@/lib/tasks/completeTask'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
 import { minSureKontrol } from '@/lib/tasks/minSureKontrol'
+import { maxSureKontrol } from '@/lib/tasks/maxSureKontrol'
+import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
 import { lokasyonEkstraFrekansDropdown } from '@/lib/scan/bugunTamamlananlar'
 import { auditLog } from '@/lib/audit/log'
@@ -262,6 +264,40 @@ export async function POST(req: Request, { params }: { params: { token: string }
         },
       })
       return NextResponse.json({ ok: false, ...minHata }, { status: 400, headers: CORS_HEADERS })
+    }
+
+    // Max süre validasyonu — aşıldıysa görevi IPTAL'e çek, completeTask çağırma.
+    // Spec madde 3.2-A: 400 + iptal_sebep='Max süre aşımı'.
+    const maxHata = await maxSureKontrol(supabase, task.id, tablo)
+    if (maxHata) {
+      const iptalIso = new Date().toISOString()
+      const iptalPayload = gorevDurumPayload('IPTAL', 'QR', {
+        at: iptalIso,
+        iptal_sebep: 'Max süre aşımı',
+        ek: {
+          iptal_eden_id: user.id,
+          iptal_tarihi: iptalIso,
+          islemi_yapan_id: user.id,
+          tamamlanma_suresi_saniye: maxHata.gercek_gecen_sn,
+        },
+      })
+      await supabase.from(tablo).update(iptalPayload as any).eq('id', task.id)
+
+      void auditLog({
+        tip: 'max_sure_asildi_iptal',
+        tablo,
+        firma_id: (user.firma_id as any) ?? null,
+        kullanici_id: user.id,
+        detay: {
+          gorev_id: task.id,
+          lokasyon_id: maxHata.lokasyon_id,
+          gercek_gecen_sn: maxHata.gercek_gecen_sn,
+          max_izin_sn: maxHata.max_izin_sn,
+          asim_sn: maxHata.asim_sn,
+          kanal: 'QR',
+        },
+      })
+      return NextResponse.json({ ok: false, ...maxHata }, { status: 400, headers: CORS_HEADERS })
     }
 
     await completeTask({ supabase, taskId: task.id, taskType: task.taskType, userId: user.id, channel: 'QR' })
