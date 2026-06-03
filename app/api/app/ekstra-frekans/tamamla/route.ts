@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
+import { minSureKontrol } from '@/lib/tasks/minSureKontrol'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -106,6 +107,29 @@ export async function POST(req: Request) {
         { ok: false, error: 'Görevin başlatılma zamanı bulunamadı', code: 'BASLATILMA_YOK' },
         { status: 500, headers: CORS }
       )
+    }
+
+    // Min süre validasyonu — /api/qr/[token] ile aynı kural (lokasyon.min_sure_dakika).
+    // Mobile 1.0.28+ wall-clock kontrolü yapıyor + Tamamla butonu disabled,
+    // backend defense-in-depth. Spec: docs/MOBIL_EKIBE_MIN_MAX_SURE_BACKEND.md
+    const minHata = await minSureKontrol(admin, gorevId, 'canli_gorevler')
+    if (minHata) {
+      void auditLog({
+        tip: 'min_sure_bypass_denemesi',
+        tablo: 'canli_gorevler',
+        firma_id: firmaId,
+        kullanici_id: userId,
+        detay: {
+          gorev_id: gorevId,
+          lokasyon_id: minHata.lokasyon_id,
+          gercek_gecen_sn: minHata.gercek_gecen_sn,
+          min_gereken_sn: minHata.min_gereken_sn,
+          kalan_sn: minHata.kalan_sn,
+          kanal: 'MOBIL',
+          akis: 'ekstra-frekans/tamamla',
+        },
+      })
+      return NextResponse.json({ ok: false, ...minHata }, { status: 400, headers: CORS })
     }
 
     const nowIso = new Date().toISOString()
