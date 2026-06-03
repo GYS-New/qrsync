@@ -1,18 +1,20 @@
 /**
  * POST /api/tasks/max-sure-kontrol
  *
- * Cron job: Her 5 dakikada bir çalışır.
+ * Cron job: dış scheduler tarafından düzensiz aralıklarla tetiklenir
+ * (Supabase pg_cron'da değil; ortalama ~30-60dk arası).
  * ISLEMDE durumundaki görevleri iki açıdan kontrol eder:
- *  1) Süre dolmaya 10 dk kala uyarı FCM bildirimi gönderir (5 dk genişliğinde
- *     pencere — cron 5 dk interval olduğu için tam 1 tick yakalar, çakışma yok).
- *  2) Lokasyonun max_sure_dakika süresi dolmuş görevleri TAMAMLANDI yapar
- *     (önceki davranış IPTAL idi — 2026-05-07 itibariyle "otomatik tamamla"
- *     olarak değiştirildi: max süre dolmuş görevler kayıp sayılmaz, sistem
- *     tarafından tamamlanmış işaretlenir).
+ *  1) Süre dolmaya 10 dk kala uyarı FCM bildirimi gönderir.
+ *  2) Lokasyonun max_sure_dakika süresi dolmuş görevleri IPTAL eder
+ *     (iptal_sebep='Görev Zaman Aşımı'). 2026-06-03 itibariyle eski "otomatik
+ *     tamamla" davranışı IPTAL'e geri çevrildi:
+ *     - Manuel tamamlama (kullanıcı geç de olsa kendi okutuyor) → TAMAMLANDI kalır
+ *     - Cron yakalıyor (unutulan görev) → IPTAL ('Görev Zaman Aşımı')
+ *     Bu ayrım kullanıcı niyetini yansıtır.
  *
  * Kontrol edilen tablolar:
  *  - gorevler       (SG - Spesifik Görevler)
- *  - canli_gorevler (FG - Frekansiyel Görevler) [isteğe bağlı - sureli_gorev_aktif kontrolüyle]
+ *  - canli_gorevler (FG - Frekansiyel Görevler) [sureli_gorev_aktif kontrolüyle]
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -26,38 +28,37 @@ const UYARI_PENCERE_BITIS     = 5   // dk: maxSure - 5'te biter
 
 const UYARI_TITLE = '⏰ Görev Süresi Bitiyor'
 function uyariBody(lokasyonAdi: string): string {
-  return `${lokasyonAdi || 'Lokasyon'} görevinizin süresi dolmak üzere. 10 dakika içinde işlem yapmazsanız sistem otomatik tamamlanmış olarak işaretleyecektir.`
+  return `${lokasyonAdi || 'Lokasyon'} görevinizin süresi dolmak üzere. 10 dakika içinde tamamlamazsanız sistem görevi otomatik iptal edecektir (sebep: Görev Zaman Aşımı).`
 }
 
-type OtomatikTamamla = { id: string; baslatilma_tarihi: string; baslatan_kullanici_id: string | null }
+type OtomatikIptal = { id: string; baslatilma_tarihi: string; baslatan_kullanici_id: string | null }
 
 /**
- * Süresi dolmuş görevleri TAMAMLANDI'ya çevirir.
- * Per-row update gerekir çünkü her görevin tamamlanma_suresi_saniye'si farklı.
+ * Süresi dolmuş ISLEMDE görevleri IPTAL'e çevirir.
+ * iptal_sebep='Görev Zaman Aşımı'. iptal_eden_id null (sistem iptali; UI 'sistem' gösterir).
+ * tamamlanma_suresi_saniye iz için kaydedilir.
  */
-async function otomatikTamamla(
+async function otomatikIptal(
   admin: any,
   tablo: 'gorevler' | 'canli_gorevler',
-  list: OtomatikTamamla[],
+  list: OtomatikIptal[],
   now: Date,
 ): Promise<number> {
   let basarili = 0
   for (const item of list) {
     const elapsedSec = Math.max(0, Math.floor((now.getTime() - new Date(item.baslatilma_tarihi).getTime()) / 1000))
-    const payload = gorevDurumPayload('TAMAMLANDI', 'MOBIL', {
+    const payload = gorevDurumPayload('IPTAL', 'MOBIL', {
       at: now.toISOString(),
+      iptal_sebep: 'Görev Zaman Aşımı',
       ek: {
-        tamamlanma_tarihi: now.toISOString(),
+        iptal_tarihi: now.toISOString(),
+        iptal_eden_id: null,
         tamamlanma_suresi_saniye: elapsedSec,
-        ...(item.baslatan_kullanici_id ? {
-          tamamlayan_kullanici_id: item.baslatan_kullanici_id,
-          islemi_yapan_id: item.baslatan_kullanici_id,
-        } : {}),
       },
     })
     const { error } = await admin.from(tablo).update(payload).eq('id', item.id)
     if (!error) basarili++
-    else console.error(`[max-sure-kontrol] ${tablo} oto-tamamla hatası id=${item.id}`, error)
+    else console.error(`[max-sure-kontrol] ${tablo} oto-iptal hatası id=${item.id}`, error)
   }
   return basarili
 }
@@ -73,8 +74,8 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient()
     const now = new Date()
     const results = {
-      gorevler_otomatik_tamamla: 0,
-      canli_gorevler_otomatik_tamamla: 0,
+      gorevler_otomatik_iptal: 0,
+      canli_gorevler_otomatik_iptal: 0,
       uyari_gonderildi: 0,
     }
 
@@ -90,14 +91,14 @@ export async function POST(req: NextRequest) {
 
     if (sgErr) throw sgErr
 
-    const sgTamamla: OtomatikTamamla[] = []
+    const sgIptal: OtomatikIptal[] = []
     for (const row of (sgRows ?? []) as any[]) {
       const maxSure: number | null = row.lokasyonlar?.max_sure_dakika ?? null
       if (!maxSure || maxSure <= 0) continue
       const baslatilma = new Date(row.baslatilma_tarihi)
       const gecenDakika = (now.getTime() - baslatilma.getTime()) / 60000
       if (gecenDakika >= maxSure) {
-        sgTamamla.push({
+        sgIptal.push({
           id: row.id,
           baslatilma_tarihi: row.baslatilma_tarihi,
           baslatan_kullanici_id: row.baslatan_kullanici_id ?? null,
@@ -114,8 +115,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (sgTamamla.length > 0) {
-      results.gorevler_otomatik_tamamla = await otomatikTamamla(admin, 'gorevler', sgTamamla, now)
+    if (sgIptal.length > 0) {
+      results.gorevler_otomatik_iptal = await otomatikIptal(admin, 'gorevler', sgIptal, now)
     }
 
     // ── 2. canli_gorevler (Frekansiyel Görevler) ────────────────────────────
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
 
     if (fgErr) throw fgErr
 
-    const fgTamamla: OtomatikTamamla[] = []
+    const fgIptal: OtomatikIptal[] = []
     for (const row of (fgRows ?? []) as any[]) {
       const lok = row.lokasyonlar ?? {}
       if (!lok.sureli_gorev_aktif) continue
@@ -136,7 +137,7 @@ export async function POST(req: NextRequest) {
       const baslatilma = new Date(row.baslatilma_tarihi)
       const gecenDakika = (now.getTime() - baslatilma.getTime()) / 60000
       if (gecenDakika >= maxSure) {
-        fgTamamla.push({
+        fgIptal.push({
           id: row.id,
           baslatilma_tarihi: row.baslatilma_tarihi,
           baslatan_kullanici_id: row.baslatan_kullanici_id ?? null,
@@ -153,8 +154,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (fgTamamla.length > 0) {
-      results.canli_gorevler_otomatik_tamamla = await otomatikTamamla(admin, 'canli_gorevler', fgTamamla, now)
+    if (fgIptal.length > 0) {
+      results.canli_gorevler_otomatik_iptal = await otomatikIptal(admin, 'canli_gorevler', fgIptal, now)
     }
 
     // ── 3. 10 dk uyarı bildirimleri ─────────────────────────────────────────
@@ -175,7 +176,7 @@ export async function POST(req: NextRequest) {
     console.log('[MAX-SURE-KONTROL]', now.toISOString(), results)
 
     // Cron audit — sadece bir şey olduysa
-    const toplam = results.gorevler_otomatik_tamamla + results.canli_gorevler_otomatik_tamamla + results.uyari_gonderildi
+    const toplam = results.gorevler_otomatik_iptal + results.canli_gorevler_otomatik_iptal + results.uyari_gonderildi
     if (toplam > 0) {
       const { auditLog } = await import('@/lib/audit/log')
       await auditLog({
