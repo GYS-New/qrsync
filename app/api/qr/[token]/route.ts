@@ -4,8 +4,10 @@ import { resolveScanContext } from '@/lib/scan/core'
 import { completeTask } from '@/lib/tasks/completeTask'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
+import { minSureKontrol } from '@/lib/tasks/minSureKontrol'
 import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
 import { lokasyonEkstraFrekansDropdown } from '@/lib/scan/bugunTamamlananlar'
+import { auditLog } from '@/lib/audit/log'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -238,6 +240,30 @@ export async function POST(req: Request, { params }: { params: { token: string }
       // Local task objesini güncelle — completeTask süre hesaplasın
       ;(task as any).baslatilma_tarihi = nowIso
     }
+
+    // Min süre validasyonu — backend defense-in-depth (mobil 1.0.28+ ile birlikte 2. katman).
+    // Auto-baslat SONRASI çağrılıyor: tek-tık tamamlamada baslatilma_tarihi=now → kontrol REDDEDER.
+    // Spec: docs/MOBIL_EKIBE_MIN_SURE_VALIDASYON.md
+    const tablo = task.taskType === 'gorevler' ? 'gorevler' : 'canli_gorevler'
+    const minHata = await minSureKontrol(supabase, task.id, tablo)
+    if (minHata) {
+      void auditLog({
+        tip: 'min_sure_bypass_denemesi',
+        tablo,
+        firma_id: (user.firma_id as any) ?? null,
+        kullanici_id: user.id,
+        detay: {
+          gorev_id: task.id,
+          lokasyon_id: minHata.lokasyon_id,
+          gercek_gecen_sn: minHata.gercek_gecen_sn,
+          min_gereken_sn: minHata.min_gereken_sn,
+          kalan_sn: minHata.kalan_sn,
+          kanal: 'QR',
+        },
+      })
+      return NextResponse.json({ ok: false, ...minHata }, { status: 400, headers: CORS_HEADERS })
+    }
+
     await completeTask({ supabase, taskId: task.id, taskType: task.taskType, userId: user.id, channel: 'QR' })
     return NextResponse.json({ ok: true, message: 'Görev QR ile tamamlandı' }, { headers: CORS_HEADERS })
   } catch (error: any) {
