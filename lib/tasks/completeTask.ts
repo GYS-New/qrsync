@@ -91,7 +91,7 @@ export async function completeTask(input: CompleteTaskInput) {
   // canli_gorevler
   const { data: liveTask, error: liveError } = await supabase
     .from('canli_gorevler')
-    .select('id,durum,atanan_kullanici_id,baslatilma_tarihi,aktif_olma_tarihi,lokasyon_id')
+    .select('id,durum,atanan_kullanici_id,baslatilma_tarihi,aktif_olma_tarihi,lokasyon_id,acik_bekleme_saat')
     .eq('id', taskId)
     .single()
 

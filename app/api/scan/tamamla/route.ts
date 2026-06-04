@@ -69,9 +69,13 @@ export async function POST(req: Request) {
     const admin  = createAdminClient()
     const nowIso = new Date().toISOString()
 
-    // Görevi çek
+    // Görevi çek — canli_gorevler'a özel kolonlar (acik_bekleme_saat, aktif_olma_tarihi)
+    // resolveLiveCompletionStatusByTask kural-bazlı eşik için gerekli; gorevler tablosunda yok
+    const selectCols = kaynak === 'canli_gorevler'
+      ? 'id,firma_id,durum,atanan_kullanici_id,baslatilma_tarihi,aktif_olma_tarihi,acik_bekleme_saat'
+      : 'id,firma_id,durum,atanan_kullanici_id,baslatilma_tarihi'
     const { data: gorev, error: gorevErr } = await admin
-      .from(kaynak).select('id,firma_id,durum,atanan_kullanici_id,baslatilma_tarihi').eq('id', gorev_id).single()
+      .from(kaynak).select(selectCols).eq('id', gorev_id).single()
     if (gorevErr || !gorev) return NextResponse.json({ ok: false, error: 'Görev bulunamadı' }, { status: 404 })
 
     if (me.rol !== 'super_admin' && me.rol !== 'alt_super_admin' && gorev.firma_id !== me.firma_id) {

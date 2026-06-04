@@ -14,9 +14,32 @@ export function calcLiveElapsedHours(fromIso?: string | null, nowIso?: string) {
   return Math.max(0, (to - from) / HOUR)
 }
 
-export function resolveLiveCompletionStatus(openedAt?: string | null, nowIso?: string) {
+/**
+ * ACIK durumdaki bir görevin tamamlama anındaki durumunu belirler.
+ *
+ * @param openedAt aktif_olma_tarihi
+ * @param nowIso şimdi
+ * @param acikBeklemeSaat görev-kural bazlı eşik (saat). Verilmezse sistem
+ *        varsayılanı LIVE_OPEN_TO_LATE_COMPLETE_HOURS (8) kullanılır.
+ *
+ * Mantık: aktif olduktan sonra `acikBeklemeSaat` kadar süre geçmişse görev
+ * ACIK → BEKLEMEDE eşiğini aşmıştır, "geç tamamlama" sayılır. Aksi halde
+ * normal TAMAMLANDI.
+ *
+ * NOT: Önceden eşik hardcoded 8 saat idi; canli_gorevler.acik_bekleme_saat
+ * (veya kural ayarı) farklı olan görevler (örn 24 saat günlük zemin yıkama)
+ * yanlışça "geç" sayılıyordu. 2026-06-04 itibariyle kural bazlı eşik aktif.
+ */
+export function resolveLiveCompletionStatus(
+  openedAt?: string | null,
+  nowIso?: string,
+  acikBeklemeSaat?: number | null,
+) {
   const elapsedHours = calcLiveElapsedHours(openedAt, nowIso)
-  return elapsedHours >= LIVE_OPEN_TO_LATE_COMPLETE_HOURS ? 'ZAMANINDA_YAPILAMAYAN' : 'TAMAMLANDI'
+  const threshold = (typeof acikBeklemeSaat === 'number' && acikBeklemeSaat > 0)
+    ? acikBeklemeSaat
+    : LIVE_OPEN_TO_LATE_COMPLETE_HOURS
+  return elapsedHours >= threshold ? 'ZAMANINDA_YAPILAMAYAN' : 'TAMAMLANDI'
 }
 
 export async function syncLiveTaskStatuses(opts: { supabase: SupabaseClient; locationId?: string | null }) {
@@ -72,9 +95,21 @@ export async function syncLiveTaskStatuses(opts: { supabase: SupabaseClient; loc
 }
 
 
-export function resolveLiveCompletionStatusByTask(task: { durum?: string | null; aktif_olma_tarihi?: string | null; durum_degisim_tarihi?: string | null }, nowIso?: string) {
+export function resolveLiveCompletionStatusByTask(
+  task: {
+    durum?: string | null
+    aktif_olma_tarihi?: string | null
+    durum_degisim_tarihi?: string | null
+    acik_bekleme_saat?: number | null
+  },
+  nowIso?: string,
+) {
   const durum = task?.durum ?? null
   if (durum === 'ZAMANI_GECMIS') return 'ZAMANI_GECMIS'
   if (durum === 'BEKLEMEDE') return 'ZAMANINDA_YAPILAMAYAN'
-  return resolveLiveCompletionStatus(task?.aktif_olma_tarihi ?? task?.durum_degisim_tarihi ?? null, nowIso)
+  return resolveLiveCompletionStatus(
+    task?.aktif_olma_tarihi ?? task?.durum_degisim_tarihi ?? null,
+    nowIso,
+    task?.acik_bekleme_saat ?? null,
+  )
 }
