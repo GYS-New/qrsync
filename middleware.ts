@@ -204,8 +204,36 @@ export async function middleware(request: NextRequest) {
   const publicPaths = new Set(['/login', '/forgot-password', '/reset-password'])
   const isAuthPage = publicPaths.has(pathname)
 
+  // Tablet/mobil bypass — onaylı cihazlar (Atalian saha yöneticileri vb.) için.
+  // 1. Bir kez ?tablet_izin=evet ile ziyaret edildiğinde cookie set edilir
+  // 2. Sonraki tüm isteklerde cookie varsa mobil engelleme atlanır
+  // 3. ?tablet_izin=hayir ile cookie silinir (geri al)
+  const tabletIzinParam = request.nextUrl.searchParams.get('tablet_izin')
+  const tabletIzinCookie = request.cookies.get('iogys_tablet_izin')?.value === 'evet'
+  let setTabletIzinResponse: NextResponse | null = null
+  if (tabletIzinParam === 'evet') {
+    // Query param'i temizleyip cookie set ederek yeniden yönlendir
+    const cleanUrl = new URL(request.url)
+    cleanUrl.searchParams.delete('tablet_izin')
+    setTabletIzinResponse = NextResponse.redirect(cleanUrl)
+    setTabletIzinResponse.cookies.set('iogys_tablet_izin', 'evet', {
+      maxAge: 60 * 60 * 24 * 365, // 1 yıl
+      path: '/',
+      sameSite: 'lax',
+    })
+    return setTabletIzinResponse
+  }
+  if (tabletIzinParam === 'hayir') {
+    const cleanUrl = new URL(request.url)
+    cleanUrl.searchParams.delete('tablet_izin')
+    const r = NextResponse.redirect(cleanUrl)
+    r.cookies.delete('iogys_tablet_izin')
+    return r
+  }
+
   // Mobil cihaz + web sayfası (scan/api/landing/auth hariç) → landing'e yönlendir
-  if (isMobile && !isLandingPage && !isPublicScanPath && !isApiPath && !isAuthPage && !isAuthCallback) {
+  // Tablet izni varsa atla.
+  if (isMobile && !tabletIzinCookie && !isLandingPage && !isPublicScanPath && !isApiPath && !isAuthPage && !isAuthCallback) {
     return NextResponse.redirect(new URL('/landing.html', request.url))
   }
 
