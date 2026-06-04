@@ -140,14 +140,16 @@ export async function POST(req: Request) {
 
     // canli_gorevler'a özel kolonlar (acik_bekleme_saat, aktif_olma_tarihi) sadece o tabloda var.
     // resolveLiveCompletionStatusByTask kural-bazlı eşik için gerekli.
+    // Dinamik select string TS tip çıkarımıyla uyuşmadığı için sonuç any cast'lendi.
     const gorevSelectCols = gorevTipi === 'canli_gorevler'
       ? 'id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi, lokasyon_id, aktif_olma_tarihi, acik_bekleme_saat'
       : 'id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi, lokasyon_id'
-    const { data: gorev, error: gorevErr } = await admin
+    const { data: gorevRaw, error: gorevErr } = await (admin as any)
       .from(gorevTipi)
       .select(gorevSelectCols)
       .eq('id', gorevId)
       .single()
+    const gorev: any = gorevRaw
 
     if (gorevErr || !gorev) {
       return NextResponse.json({ ok: false, error: 'Görev bulunamadı' }, { status: 404, headers: CORS })

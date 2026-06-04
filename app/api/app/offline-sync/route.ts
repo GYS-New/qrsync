@@ -154,14 +154,16 @@ async function normalGoreviTamamla(
 
   // Görevi çek — canli_gorevler'a özel kolonlar (acik_bekleme_saat, aktif_olma_tarihi)
   // resolveLiveCompletionStatusByTask kural-bazlı eşik için gerekli.
+  // Dinamik select string TS tip çıkarımıyla uyuşmadığı için sonuç any cast.
   const offlineSelectCols = kayit.gorev_tipi === 'canli_gorevler'
     ? 'id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi, lokasyon_id, proje_id, aktif_olma_tarihi, acik_bekleme_saat'
     : 'id, firma_id, durum, atanan_kullanici_id, baslatilma_tarihi, lokasyon_id, proje_id'
-  const { data: gorev, error: gorevErr } = await admin
+  const { data: gorevRaw, error: gorevErr } = await (admin as any)
     .from(kayit.gorev_tipi)
     .select(offlineSelectCols)
     .eq('id', kayit.gorev_id)
     .maybeSingle()
+  const gorev: any = gorevRaw
 
   if (gorevErr || !gorev) {
     return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'hata', error: 'Görev bulunamadı' }
