@@ -32,6 +32,11 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const { taskId, lokasyonAdi, minSureDakika, maxSureDakika } = body
+    // gorevTipi opsiyonel — mobile yeni sürüm gönderiyor. Eski sürümler için
+    // varsayılan 'canli_gorevler' (frekansiyel ana akış). 'gorevler' sadece
+    // oto yıkama görevleri için.
+    const gorevTipi: 'canli_gorevler' | 'gorevler' =
+      body.gorevTipi === 'gorevler' ? 'gorevler' : 'canli_gorevler'
 
     // Bildirim zamanlamaları (fire-and-forget, response hemen dön)
     const zamanlamalar: { beklemeDk: number; baslik: string; mesaj: string; kanal: string }[] = []
@@ -76,14 +81,21 @@ export async function POST(req: Request) {
     ;(async () => {
       for (const z of zamanlamalar) {
         await new Promise(r => setTimeout(r, z.beklemeDk * 60 * 1000))
-        // Görev hâlâ açık mı kontrol et
+        // Görev hâlâ açık mı kontrol et — doğru tabloda ara (frekansiyel
+        // canli_gorevler'da, spesifik/oto-yıkama gorevler'de). Önceden her zaman
+        // gorevler'a bakıyordu → frekansiyel görevde !gorev true olup break,
+        // ya da oto-yıkama'da yanlış kayıt yakalanıp ALAKASIZ bildirim
+        // gönderiliyordu.
         try {
           const { data: gorev } = await admin
-            .from('gorevler')
+            .from(gorevTipi)
             .select('durum')
             .eq('id', taskId)
-            .single()
-          if (!gorev || gorev.durum === 'TAMAMLANDI' || gorev.durum === 'IPTAL') break
+            .maybeSingle()
+          // Görev bulunamadıysa veya terminal durumda ise zincir kesilir
+          if (!gorev) break
+          const terminalDurumlar = ['TAMAMLANDI', 'IPTAL', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'KAPATILDI']
+          if (terminalDurumlar.includes((gorev as any).durum)) break
           await sendFCMToUser(user.id, z.baslik, z.mesaj, z.kanal)
         } catch {}
       }
