@@ -155,7 +155,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
           }
           if (['ACIK', 'BEKLEMEDE', 'ISLEMDE'].includes(dbGorev.durum)) {
             // Tamamlanabilir durumda — devam et
-            task = { id: dbGorev.id, taskType: tablo as any, tanim: dbGorev.tanim ?? '', durum: dbGorev.durum, atanan_kullanici_id: dbGorev.atanan_kullanici_id, baslatilma_tarihi: dbGorev.baslatilma_tarihi }
+            task = { id: dbGorev.id, taskType: tablo as any, tanim: dbGorev.tanim ?? '', durum: dbGorev.durum, atanan_kullanici_id: dbGorev.atanan_kullanici_id, atanan_kullanici_adi: null, baslatan_kullanici_id: null, baslatan_kullanici_adi: null, baslatilma_tarihi: dbGorev.baslatilma_tarihi }
             break
           }
         }

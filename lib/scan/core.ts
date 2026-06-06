@@ -9,6 +9,12 @@ export type ScanTask = {
   tanim: string
   durum: string
   atanan_kullanici_id: string | null
+  /** Görev başka biri tarafından başlatılmışsa mobile UI'da "X tarafından başlatılmış"
+   *  mesajını gösterebilsin. Mobile spec: atanan_kullanici_adi || baslatan_kullanici_adi
+   *  fallback zinciri kullanıyor. KVKK uyumlu (firma içi paylaşım, yaka kartında zaten görünür). */
+  atanan_kullanici_adi: string | null
+  baslatan_kullanici_id: string | null
+  baslatan_kullanici_adi: string | null
   olusturma_tarihi?: string | null
   baslatilma_tarihi?: string | null
 }
@@ -112,16 +118,20 @@ export async function resolveScanContext(opts: {
 
   await syncLiveTaskStatuses({ supabase, locationId: loc.id })
 
+  // users tablosundan isim_soyisim'i JOIN ile çek — embedded resource syntax (Supabase PostgREST)
+  // atanan ve baslatan için iki ayrı alias gerek (foreign key ambiguity önlemek için constraint adı kullanılır).
+  const TASK_SELECT_COLS = 'id,tanim,durum,atanan_kullanici_id,baslatan_kullanici_id,olusturma_tarihi,baslatilma_tarihi'
+
   const [manualRes, liveRes] = await Promise.all([
     supabase
       .from('gorevler')
-      .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi,baslatilma_tarihi')
+      .select(TASK_SELECT_COLS)
       .eq('lokasyon_id', loc.id)
       .in('durum', ['ACIK', 'ISLEMDE'])
       .order('olusturma_tarihi', { ascending: true }),
     supabase
       .from('canli_gorevler')
-      .select('id,tanim,durum,atanan_kullanici_id,olusturma_tarihi,baslatilma_tarihi')
+      .select(TASK_SELECT_COLS)
       .eq('lokasyon_id', loc.id)
       .in('durum', ['ACIK', 'ISLEMDE'])
       .order('olusturma_tarihi', { ascending: true }),
@@ -130,13 +140,42 @@ export async function resolveScanContext(opts: {
   if (manualRes.error) throw new Error(manualRes.error.message)
   if (liveRes.error) throw new Error(liveRes.error.message)
 
+  // İlgili kullanıcıların isim_soyisim'lerini tek sorguda toplu çek (N+1 önlemek için)
+  const allTasksRaw = [...(manualRes.data ?? []), ...(liveRes.data ?? [])] as any[]
+  const userIds = Array.from(new Set(
+    allTasksRaw.flatMap((t) => [t.atanan_kullanici_id, t.baslatan_kullanici_id].filter(Boolean))
+  )) as string[]
+  const userIsimMap = new Map<string, string>()
+  if (userIds.length > 0) {
+    const { data: users } = await supabase
+      .from('users')
+      .select('id,isim_soyisim')
+      .in('id', userIds)
+    for (const u of users ?? []) userIsimMap.set((u as any).id, (u as any).isim_soyisim ?? '')
+  }
+
+  function enrichTask(t: any, taskType: SupportedTaskType): ScanTask {
+    return {
+      id: t.id,
+      taskType,
+      tanim: t.tanim,
+      durum: t.durum,
+      atanan_kullanici_id: t.atanan_kullanici_id ?? null,
+      atanan_kullanici_adi: t.atanan_kullanici_id ? (userIsimMap.get(t.atanan_kullanici_id) ?? null) : null,
+      baslatan_kullanici_id: t.baslatan_kullanici_id ?? null,
+      baslatan_kullanici_adi: t.baslatan_kullanici_id ? (userIsimMap.get(t.baslatan_kullanici_id) ?? null) : null,
+      olusturma_tarihi: t.olusturma_tarihi ?? null,
+      baslatilma_tarihi: t.baslatilma_tarihi ?? null,
+    }
+  }
+
   const visibleManual: ScanTask[] = (manualRes.data ?? [])
     .filter((t: any) => !t.atanan_kullanici_id || t.atanan_kullanici_id === userId)
-    .map((t: any) => ({ ...t, taskType: 'gorevler' }))
+    .map((t: any) => enrichTask(t, 'gorevler'))
 
   const visibleLive: ScanTask[] = (liveRes.data ?? [])
     .filter((t: any) => !t.atanan_kullanici_id || t.atanan_kullanici_id === userId)
-    .map((t: any) => ({ ...t, taskType: 'canli_gorevler' }))
+    .map((t: any) => enrichTask(t, 'canli_gorevler'))
 
   let checklistTemplate: ScanContext['checklistTemplate'] = null
   const checklistTemplateId = (loc as any).checklist_sablon_id as string | null
