@@ -30,11 +30,23 @@ export async function GET(req: NextRequest) {
     const now = new Date().toISOString()
 
     // Tüm kategorileri tarayan kapsamlı PG fonksiyonu
-    const { data: bulgular, error: rpcErr } = await admin.rpc('veri_butunluk_kontrol_tam')
+    const { data: bulgularRaw, error: rpcErr } = await admin.rpc('veri_butunluk_kontrol_tam')
     if (rpcErr) throw new Error('butunluk kontrol: ' + rpcErr.message)
 
-    const toplam = (bulgular ?? []).reduce((s: number, b: any) => s + Number(b.sayi ?? 0), 0)
-    const kategoriSayisi = (bulgular ?? []).length
+    // PASIF firmaları atla — kapatılmış/devre dışı firma kayıtları aktif uyarı
+    // olarak görünmesin, sürekli yeniden tetiklenmesin.
+    const { data: aktifFirmalar } = await admin
+      .from('firmalar')
+      .select('id')
+      .eq('aktif', true)
+    const aktifFirmaSet = new Set((aktifFirmalar ?? []).map((f: any) => f.id as string))
+    const bulgular = (bulgularRaw ?? []).filter((b: any) =>
+      b.firma_id == null || aktifFirmaSet.has(b.firma_id)
+    )
+    const pasifAtlanan = (bulgularRaw?.length ?? 0) - bulgular.length
+
+    const toplam = bulgular.reduce((s: number, b: any) => s + Number(b.sayi ?? 0), 0)
+    const kategoriSayisi = bulgular.length
 
     // Audit log
     await admin.from('audit_log').insert({
@@ -131,6 +143,7 @@ export async function GET(req: NextRequest) {
       ok: true, toplam, kategori_sayisi: kategoriSayisi,
       bulgular: bulgular ?? [],
       alert_yeni: yeniSayi, alert_guncel: guncelSayi, alert_otomatik_cozulen: otomatikCozulen.length,
+      pasif_firma_atlanan: pasifAtlanan,
     })
   } catch (err: any) {
     console.error('[veri-butunluk-kontrol] HATA:', err.message)
