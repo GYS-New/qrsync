@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getRequestMeta } from '@/lib/device/getRequestMeta'
+import { auditLog } from '@/lib/audit/log'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -97,11 +98,38 @@ export async function POST(req: Request) {
       .eq('firma_id', firmaId)
       .single()
 
+    // Başarısız register audit'i için ortak meta (kullanıcı bulunamasa bile log için)
+    const { ip: auditIp, ua: auditUa } = getRequestMeta(req)
+    const auditMetaBase = {
+      device_id_kisaltma: typeof device_id === 'string' ? device_id.slice(0, 16) : null,
+      isim_soyisim,
+      ip: auditIp,
+      ua: auditUa ? auditUa.slice(0, 160) : null,
+    }
+
     if (kullaniciErr || !kullanici) {
+      void auditLog({
+        tip: 'mobil_register_basarisiz',
+        tablo: 'device_tokens',
+        firma_id: firmaId,
+        kullanici_id: user_id ?? null,
+        basarili: false,
+        hata_mesaji: 'Kullanıcı bulunamadı',
+        detay: { ...auditMetaBase, hata_kodu: 'KULLANICI_YOK' },
+      })
       return NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 404, headers: CORS_HEADERS })
     }
 
     if (!kullanici.aktif) {
+      void auditLog({
+        tip: 'mobil_register_basarisiz',
+        tablo: 'device_tokens',
+        firma_id: firmaId,
+        kullanici_id: user_id,
+        basarili: false,
+        hata_mesaji: 'Hesap pasif',
+        detay: { ...auditMetaBase, hata_kodu: 'HESAP_PASIF' },
+      })
       return NextResponse.json({ ok: false, error: 'Hesabınız aktif değil' }, { status: 403, headers: CORS_HEADERS })
     }
 
@@ -112,6 +140,15 @@ export async function POST(req: Request) {
       // Rate limit — brute force koruması
       const rl = kontrolRateLimit(device_id)
       if (!rl.izin) {
+        void auditLog({
+          tip: 'mobil_register_basarisiz',
+          tablo: 'device_tokens',
+          firma_id: firmaId,
+          kullanici_id: user_id,
+          basarili: false,
+          hata_mesaji: `Rate limit kilidi, ${rl.kalanSn}sn kaldı`,
+          detay: { ...auditMetaBase, hata_kodu: 'RATE_LIMIT_KILIDI', kalan_sn: rl.kalanSn },
+        })
         return NextResponse.json({
           ok: false,
           error: `Çok fazla yanlış deneme. ${rl.kalanSn} saniye sonra tekrar deneyin.`,
@@ -123,6 +160,15 @@ export async function POST(req: Request) {
       // Kullanıcının email'ini auth.users'dan çek
       const { data: authUser, error: authErr } = await admin.auth.admin.getUserById(user_id)
       if (authErr || !authUser?.user?.email) {
+        void auditLog({
+          tip: 'mobil_register_basarisiz',
+          tablo: 'device_tokens',
+          firma_id: firmaId,
+          kullanici_id: user_id,
+          basarili: false,
+          hata_mesaji: 'Auth kimlik bilgisi okunamadı',
+          detay: { ...auditMetaBase, hata_kodu: 'AUTH_KIMLIK_YOK' },
+        })
         return NextResponse.json({ ok: false, error: 'Kullanıcı kimlik bilgileri alınamadı' }, { status: 500, headers: CORS_HEADERS })
       }
 
@@ -145,6 +191,21 @@ export async function POST(req: Request) {
           message: signErr.message,
           status: (signErr as any).status,
           code: (signErr as any).code,
+        })
+        void auditLog({
+          tip: 'mobil_register_basarisiz',
+          tablo: 'device_tokens',
+          firma_id: firmaId,
+          kullanici_id: user_id,
+          basarili: false,
+          hata_mesaji: signErr.message ?? 'Şifre hatalı',
+          detay: {
+            ...auditMetaBase,
+            hata_kodu: 'SIFRE_HATALI',
+            email: authUser.user.email,
+            supabase_status: (signErr as any).status ?? null,
+            supabase_code: (signErr as any).code ?? null,
+          },
         })
         return NextResponse.json({
           ok: false,
