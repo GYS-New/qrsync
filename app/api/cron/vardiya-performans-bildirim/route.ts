@@ -182,31 +182,53 @@ export async function POST(req: NextRequest) {
 
             const altIds = bfsAltLokIds(loks as any, ust.id)
 
-            const { data: planli } = await admin
-              .from('canli_gorevler')
-              .select('id, durum, kural_id')
-              .eq('firma_id', f.id)
-              .in('lokasyon_id', altIds)
-              .not('kural_id', 'is', null)
-              .gte('aktif_olma_tarihi', baslangicIso)
-              .lt('aktif_olma_tarihi', bitisIso)
+            // KRİTİK: Hem canli hem arşive bak. Vardiya bitiminde (örn 23:30) gece
+            // arşivleme cron'u TAMAMLANDI'ları arşive taşır; 10-20 dk sonra
+            // (23:40-00:00) çalışan bu cron sadece canli'ye baksa boş bulurdu
+            // → %0 tamamlandı / %100 ZY gibi yanlış oranlar üretirdi.
+            const [{ data: planliCanli }, { data: planliArsiv }] = await Promise.all([
+              admin.from('canli_gorevler')
+                .select('id, durum, kural_id')
+                .eq('firma_id', f.id)
+                .in('lokasyon_id', altIds)
+                .not('kural_id', 'is', null)
+                .gte('aktif_olma_tarihi', baslangicIso)
+                .lt('aktif_olma_tarihi', bitisIso),
+              admin.from('canli_gorevler_arsiv')
+                .select('id, durum, kural_id')
+                .eq('firma_id', f.id)
+                .in('lokasyon_id', altIds)
+                .not('kural_id', 'is', null)
+                .gte('aktif_olma_tarihi', baslangicIso)
+                .lt('aktif_olma_tarihi', bitisIso),
+            ])
 
-            const { data: ekstraRows } = await admin
-              .from('canli_gorevler')
-              .select('id')
-              .eq('firma_id', f.id)
-              .in('lokasyon_id', altIds)
-              .is('kural_id', null)
-              .eq('durum', 'TAMAMLANDI')
-              .gte('tamamlanma_tarihi', baslangicIso)
-              .lt('tamamlanma_tarihi', bitisIso)
+            const [{ data: ekstraCanli }, { data: ekstraArsiv }] = await Promise.all([
+              admin.from('canli_gorevler')
+                .select('id')
+                .eq('firma_id', f.id)
+                .in('lokasyon_id', altIds)
+                .is('kural_id', null)
+                .eq('durum', 'TAMAMLANDI')
+                .gte('tamamlanma_tarihi', baslangicIso)
+                .lt('tamamlanma_tarihi', bitisIso),
+              admin.from('canli_gorevler_arsiv')
+                .select('id')
+                .eq('firma_id', f.id)
+                .in('lokasyon_id', altIds)
+                .is('kural_id', null)
+                .eq('durum', 'TAMAMLANDI')
+                .gte('tamamlanma_tarihi', baslangicIso)
+                .lt('tamamlanma_tarihi', bitisIso),
+            ])
 
-            const planliArr = planli ?? []
+            const planliArr = [...(planliCanli ?? []), ...(planliArsiv ?? [])]
+            const ekstraRows = [...(ekstraCanli ?? []), ...(ekstraArsiv ?? [])]
             const hedef = planliArr.length
             const tamamlandi = planliArr.filter((g: any) => g.durum === 'TAMAMLANDI').length
             const iptal = planliArr.filter((g: any) => g.durum === 'IPTAL').length
             const zy = hedef - tamamlandi - iptal
-            const ekstra = (ekstraRows ?? []).length
+            const ekstra = ekstraRows.length
 
             // Hedef 0 ise bildirim gönderme — anlamsız (o vardiya o üst lokasyonda iş yok)
             if (hedef === 0) continue
