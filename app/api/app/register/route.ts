@@ -139,9 +139,7 @@ export async function POST(req: Request) {
 
       if (signErr) {
         yanlisDenemeKaydet(device_id)
-        // Debug: gerçek hata mesajını log'la — Supabase rate limit, captcha vs.
-        // ayırt edebilmek için. Üretim için 'Şifre hatalı' kullanıcıya dönmeye
-        // devam ediyor ama _supabase_error detayı dahil ediliyor.
+        // Hata detayı sunucu log'una düşer (debug için), kullanıcıya generik mesaj döner
         console.error('[register] signInWithPassword fail:', {
           email: authUser.user.email,
           message: signErr.message,
@@ -152,9 +150,6 @@ export async function POST(req: Request) {
           ok: false,
           error: 'Şifre hatalı',
           sifre_hatali: true,
-          _supabase_error: signErr.message,
-          _supabase_status: (signErr as any).status ?? null,
-          _supabase_code: (signErr as any).code ?? null,
         }, { status: 401, headers: CORS_HEADERS })
       }
 
