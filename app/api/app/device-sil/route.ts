@@ -13,6 +13,7 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: CORS_HEADERS })
 }
 
+// Basit in-memory rate limit — token bazlı, 1dk içinde max 5 deneme.
 const RL_MAX_DENEME = 5
 const RL_PENCERE_MS = 60 * 1000
 const denemeler = new Map<string, { sayi: number; pencereBitis: number }>()
@@ -30,23 +31,31 @@ function rateLimitOK(token: string): boolean {
 }
 
 /**
- * POST /api/app/device-deaktif
+ * POST /api/app/device-sil
  *
- * GERİYE UYUMLULUK: Mobile spec başlangıçta "device-deaktif" endpoint adıyla
- * geldi (aktif=false davranışı). Sonra spec değişti, yeni endpoint adı
- * "device-sil" (DELETE FROM davranışı). Mobile build hangi endpoint'i çağırırsa
- * çağırsın aynı sonuç olsun diye bu endpoint de DELETE davranışına geçirildi.
+ * Mobile fabrika ayarlarına dönmeden önce backend'e haber verir. Endpoint
+ * cihazın device_tokens kaydını GERÇEKTEN SİLER (DELETE FROM).
  *
- * Ana spec: docs/MOBIL_EKIBE_DEVICE_SIL.md (07 Haz 2026)
- * Asıl endpoint: POST /api/app/device-sil
+ * Spec: docs/MOBIL_EKIBE_DEVICE_SIL.md (07 Haz 2026)
  *
- * Davranış (device-sil ile birebir aynı):
- *   - X-Device-Token zorunlu (yoksa 401)
- *   - Token DB'de yoksa → { ok: true, noop: true }
- *   - Bulunduysa → audit yaz, DELETE FROM device_tokens, { ok: true, silindi: true }
+ * Header:
+ *   X-Device-Token: <token>  (zorunlu)
  *
- * Audit tipi: 'device_sil_fabrika' (device-sil ile aynı, raporlama tutarlılığı)
- * Audit detayında ek alan: { endpoint: 'device-deaktif' } — hangi isimle çağrıldığı izlenebilir.
+ * Body:
+ *   { sebep: "fabrika_ayarlari" | "logout" | "yonetici" | ... }
+ *
+ * NE SİLİNİR / NE SİLİNMEZ:
+ *   ✅ device_tokens satırı (sadece bu cihaz-firma eşleşmesi)
+ *   ❌ users (personel hesabı + şifre)
+ *   ❌ canli_gorevler / canli_gorevler_arsiv (görev geçmişi)
+ *   ❌ personel_mesai_kayitlari
+ *   ❌ bildirimler
+ *   ➕ audit_log (silmeden ÖNCE yazılır, iz kalır)
+ *
+ * Davranış:
+ *   - Token yoksa → 401
+ *   - Token DB'de yoksa → 200 + noop (idempotent)
+ *   - Bulunduysa → audit yaz, DELETE FROM device_tokens, 200 + silindi
  */
 export async function POST(req: Request) {
   try {
@@ -73,6 +82,7 @@ export async function POST(req: Request) {
     const admin = createAdminClient()
     const { ip: reqIp, ua: reqUa } = getRequestMeta(req)
 
+    // 1) Önce kaydın bilgisini al — audit silmeden ÖNCE yazılsın
     const { data: kayit } = await admin
       .from('device_tokens')
       .select('id, device_id, user_id, firma_id, isim_soyisim')
@@ -80,12 +90,14 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     if (!kayit) {
+      // Idempotent: token yoksa noop OK
       return NextResponse.json(
         { ok: true, noop: true },
         { headers: CORS_HEADERS },
       )
     }
 
+    // 2) Audit log — silmeden önce kayıt bilgisi ile birlikte
     void auditLog({
       tip: 'device_sil_fabrika',
       tablo: 'device_tokens',
@@ -93,7 +105,6 @@ export async function POST(req: Request) {
       kullanici_id: kayit.user_id ?? null,
       detay: {
         sebep,
-        endpoint: 'device-deaktif',  // hangi isim çağrıldı, geriye uyumluluk için
         device_token_id: kayit.id,
         device_id_prefix: typeof kayit.device_id === 'string' ? kayit.device_id.slice(0, 12) : null,
         isim_soyisim: kayit.isim_soyisim ?? null,
@@ -102,6 +113,7 @@ export async function POST(req: Request) {
       },
     })
 
+    // 3) DELETE — kayıt tablodan silinir
     const { error: delErr } = await admin
       .from('device_tokens')
       .delete()
