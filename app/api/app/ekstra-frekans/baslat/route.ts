@@ -276,8 +276,22 @@ export async function POST(req: Request) {
       .select('id, baslatilma_tarihi')
 
     if (insertErr || !insertedRows || insertedRows.length === 0) {
+      // PG unique constraint (23505) — DB-level "personel ISLEMDE'de tek görev"
+      // garantisi. devamEdenGorevKontrol race condition / atanan filtre nedeniyle
+      // yakalayamamış olabilir. Kullanıcı dostu mesajla 409 dön.
+      const isDuplicate =
+        (insertErr as any)?.code === '23505' ||
+        (insertErr?.message ?? '').includes('canli_gorevler_personel_islemde_uniq')
+      if (isDuplicate) {
+        return NextResponse.json({
+          ok: false,
+          error: 'Aktif başka bir göreviniz var. Önce onu tamamlayın, sonra ekstra görev başlatın.',
+          code: 'DEVAM_EDEN_GOREV',
+        }, { status: 409, headers: CORS })
+      }
+      console.error('[ekstra-frekans/baslat] insert error:', insertErr)
       return NextResponse.json(
-        { ok: false, error: insertErr?.message ?? 'Ekstra görev başlatılamadı' },
+        { ok: false, error: 'Ekstra görev başlatılamadı. Lütfen tekrar deneyin.' },
         { status: 500, headers: CORS }
       )
     }
