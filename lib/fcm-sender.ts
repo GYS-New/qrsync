@@ -20,6 +20,7 @@ export async function sendFCMToUser(
   body: string,
   channelId: string = 'default',
   data?: Record<string, string>,
+  opts?: { skipLog?: boolean },
 ) {
   try {
     const konfig = await getSistemKonfig()
@@ -35,7 +36,59 @@ export async function sendFCMToUser(
       { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
     )
     const devices: { fcm_token: string; ses_kanali?: string }[] = await res.json()
-    if (!devices?.length) return
+
+    // Alıcı kullanıcı bilgisi — push_bildirim_log için (firma, proje, isim)
+    let aliciFirmaId: string | null = null
+    let aliciProjeId: string | null = null
+    let aliciIsim: string | null = null
+    try {
+      const uRes = await fetch(
+        `${supabaseUrl}/rest/v1/users?id=eq.${userId}&select=isim_soyisim,firma_id,proje_id`,
+        { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+      )
+      const uArr = await uRes.json()
+      if (Array.isArray(uArr) && uArr[0]) {
+        aliciFirmaId = uArr[0].firma_id ?? null
+        aliciProjeId = uArr[0].proje_id ?? null
+        aliciIsim = uArr[0].isim_soyisim ?? null
+      }
+    } catch {}
+
+    // Helper: push_bildirim_log'a kayıt at (cron+sistem tüm FCM'leri logla).
+    // opts.skipLog=true ise atla — manuel push endpoint'i kendi (zengin) log'unu yazıyor.
+    async function logPush(basarili: boolean, hataMesaji: string | null) {
+      if (opts?.skipLog) return
+      try {
+        await fetch(`${supabaseUrl}/rest/v1/push_bildirim_log`, {
+          method: 'POST',
+          headers: {
+            apikey: supabaseKey!,
+            Authorization: `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify({
+            firma_id: aliciFirmaId,
+            proje_id: aliciProjeId,
+            gonderen_id: null,           // cron/sistem → null
+            gonderen_isim: 'Sistem',     // manuel push endpoint kendi log'unu zaten yazıyor (cihaz_sayisi vs)
+            alici_id: userId,
+            alici_isim: aliciIsim ?? '—',
+            baslik: brandedTitle(title),
+            icerik: body,
+            kanal: channelId,
+            cihaz_sayisi: devices?.length ?? 0,
+            basarili,
+            hata_mesaji: hataMesaji,
+          }),
+        })
+      } catch {}
+    }
+
+    if (!devices?.length) {
+      await logPush(false, 'Aktif cihaz yok')
+      return
+    }
 
     const now = Math.floor(Date.now() / 1000)
     const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
@@ -59,6 +112,8 @@ export async function sendFCMToUser(
     })
     const { access_token } = await tokenRes.json()
 
+    let basariliFcm = 0
+    let sonHata: string | null = null
     for (const d of devices) {
       if (!d.fcm_token) continue
       // ses_kanali bazlı channel_id ve sound seçimi
@@ -83,7 +138,7 @@ export async function sendFCMToUser(
       // (genelde aynı tip bildirimde son durumun gösterilmesi istenen davranış).
       const dedupTag = `${effectiveChannelId}_${userId}`
       try {
-        await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
+        const fcmRes = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${access_token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -116,7 +171,36 @@ export async function sendFCMToUser(
             },
           }),
         })
-      } catch {}
+        if (fcmRes.ok) basariliFcm++
+        else {
+          try { sonHata = ((await fcmRes.json())?.error?.message ?? `HTTP ${fcmRes.status}`) } catch { sonHata = `HTTP ${fcmRes.status}` }
+        }
+      } catch (e: any) {
+        sonHata = e?.message ?? 'FCM hata'
+      }
     }
-  } catch {}
+
+    await logPush(basariliFcm > 0, basariliFcm === 0 ? (sonHata ?? 'Bilinmeyen hata') : null)
+  } catch (e: any) {
+    // En dış catch — auth/JWT hatası vs. log için
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (supabaseUrl && supabaseKey && !opts?.skipLog) {
+        await fetch(`${supabaseUrl}/rest/v1/push_bildirim_log`, {
+          method: 'POST',
+          headers: {
+            apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json', Prefer: 'return=minimal',
+          },
+          body: JSON.stringify({
+            alici_id: userId, alici_isim: '—',
+            gonderen_isim: 'Sistem', baslik: brandedTitle(title), icerik: body,
+            kanal: channelId, cihaz_sayisi: 0, basarili: false,
+            hata_mesaji: e?.message ?? 'Sender hata',
+          }),
+        })
+      }
+    } catch {}
+  }
 }

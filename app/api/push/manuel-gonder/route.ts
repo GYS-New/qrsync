@@ -106,7 +106,9 @@ export async function POST(req: NextRequest) {
     })
 
     try {
-      await sendFCMToUser(a.id, title, icerik, kanal)
+      // skipLog: manuel push kendi (zengin) push_bildirim_log INSERT'ini aşağıda yapıyor
+      // sendFCMToUser'ın otomatik logu burada yinelemesin diye atla.
+      await sendFCMToUser(a.id, title, icerik, kanal, undefined, { skipLog: true })
       basariliSayisi++
       logKayitlari.push({
         firma_id: firmaId, proje_id: a.proje_id ?? null,

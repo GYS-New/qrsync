@@ -32,13 +32,21 @@ export async function GET(req: NextRequest) {
   const projeId = url.searchParams.get('projeId')
   const basarili = url.searchParams.get('basarili')
   const gunRaw = url.searchParams.get('gun')
-  const gun = gunRaw ? Math.max(1, Math.min(365, Number(gunRaw) || 30)) : 30
+  // Push log ömrü 24 saat — default 1 gün, 'gun' param ile uzatılabilir
+  // (debug için max 7). 24h üzeri otomatik silinir (lazy delete aşağıda).
+  const gun = gunRaw ? Math.max(1, Math.min(7, Number(gunRaw) || 1)) : 1
   const q = (url.searchParams.get('q') ?? '').trim()
   const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit')) || 200))
 
   const kesim = new Date(Date.now() - gun * 86400000).toISOString()
+  const omurEsigi = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
 
   const admin = createAdminClient()
+
+  // Lazy temizlik: her GET'te 24 saatten eski kayıtları sil (fire-and-forget).
+  // Ayrı cron yerine bu pratik; tablo büyümesini sınırlar.
+  void admin.from('push_bildirim_log').delete().lt('olusturma_tarihi', omurEsigi).then(() => {}, () => {})
+
   let query = admin.from('push_bildirim_log')
     .select('*')
     .gte('olusturma_tarihi', kesim)
