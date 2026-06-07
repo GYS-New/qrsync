@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getRequestMeta } from '@/lib/device/getRequestMeta'
+import { auditLog } from '@/lib/audit/log'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -16,20 +17,29 @@ export async function OPTIONS() {
  * GET /api/app/check-device
  *
  * Parametreler:
- *  - device_id       (zorunlu)
- *  - firma_id        (opsiyonel, yeni mobil — firma kodu çözümü sonrası)
- *  - firma           (opsiyonel, eski mobil — app_download_links.link_token)
+ *  - device_id           (zorunlu)
+ *  - fallback_device_id  (opsiyonel, mobil 1.0.28+) — eski Capacitor UUID
+ *                        formatından ANDROID_ID formatına geçişte recovery için
+ *  - firma_id            (opsiyonel, yeni mobil — firma kodu çözümü sonrası)
+ *  - firma               (opsiyonel, eski mobil — app_download_links.link_token)
  *
  * Davranış:
  *  1) firma_id / firma verilmişse → o firmaya göre eşleşme ara.
  *  2) Hiçbiri verilmemişse → yalnızca device_id ile ara, en son kullanılan
  *     kaydı döndür (uygulama silinip yeniden kurulduğunda auto-restore için).
- *  3) Eşleşme yoksa { ok: true, eskiKayit: null }
+ *  3) device_id ile bulunamazsa ve fallback_device_id verilmişse o ID ile ara.
+ *     Bulursa device_tokens.device_id'yi yeni device_id ile günceller — bir
+ *     sonraki recovery'de fallback gerekmez (silent migration).
+ *  4) Eşleşme yoksa { ok: true, eskiKayit: null }
  */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
-    const deviceId   = searchParams.get('device_id')
+    const deviceId           = searchParams.get('device_id')
+    const fallbackDeviceIdRaw = searchParams.get('fallback_device_id')
+    const fallbackDeviceId   = fallbackDeviceIdRaw && fallbackDeviceIdRaw !== deviceId
+      ? fallbackDeviceIdRaw
+      : null
     const firmaIdParam = searchParams.get('firma_id')
     const firmaToken = searchParams.get('firma')
 
@@ -61,22 +71,29 @@ export async function GET(req: Request) {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // 2) device_tokens'ta eşleşme ara
+    // 2) device_tokens'ta eşleşme ara — önce yeni device_id, bulunmazsa fallback
     // ─────────────────────────────────────────────────────────────────────
-    let query = admin
-      .from('device_tokens')
-      .select('id, device_token, user_id, isim_soyisim, proje_id, firma_id, son_kullanim')
-      .eq('device_id', deviceId)
-      .eq('aktif', true)
-      .order('son_kullanim', { ascending: false, nullsFirst: false })
-      .limit(1)
-
-    if (targetFirmaId) {
-      query = query.eq('firma_id', targetFirmaId)
+    async function searchByDeviceId(did: string) {
+      let q = admin
+        .from('device_tokens')
+        .select('id, device_token, user_id, isim_soyisim, proje_id, firma_id, son_kullanim, device_id')
+        .eq('device_id', did)
+        .eq('aktif', true)
+        .order('son_kullanim', { ascending: false, nullsFirst: false })
+        .limit(1)
+      if (targetFirmaId) q = q.eq('firma_id', targetFirmaId)
+      const { data } = await q
+      return data?.[0] ?? null
     }
 
-    const { data: rows } = await query
-    const mevcutKayit = rows?.[0] ?? null
+    let mevcutKayit = await searchByDeviceId(deviceId)
+    let fallbackKullanildi = false
+
+    if (!mevcutKayit && fallbackDeviceId) {
+      // Mobil 1.0.28+ silent migration: eski Capacitor UUID ile ara
+      mevcutKayit = await searchByDeviceId(fallbackDeviceId)
+      fallbackKullanildi = !!mevcutKayit
+    }
 
     if (!mevcutKayit) {
       return NextResponse.json({ ok: true, eskiKayit: null }, { headers: CORS_HEADERS })
@@ -112,12 +129,49 @@ export async function GET(req: Request) {
       firmaAdi = firma?.firma_adi || firma?.ticari_unvan || null
     }
 
-    // Aktif kullanım anı — cihaz tekrar tanınıyor
+    // Aktif kullanım anı — cihaz tekrar tanınıyor.
+    // Fallback ile bulunmuşsa device_id'yi yeni (Android ID) ile güncelle ki
+    // sonraki recovery direkt eşleşsin (silent migration).
+    // Çakışma koruması: yeni device_id ile başka aktif kayıt varsa overwrite etme,
+    // race condition'a düşmemek için (madde 6 spec).
     const { ip: reqIp, ua: reqUa } = getRequestMeta(req)
+    const updatePayload: Record<string, any> = {
+      son_kullanim: new Date().toISOString(),
+      son_ip: reqIp,
+      son_user_agent: reqUa,
+    }
+    if (fallbackKullanildi) {
+      const { data: cakisma } = await admin
+        .from('device_tokens')
+        .select('id')
+        .eq('device_id', deviceId)
+        .eq('aktif', true)
+        .neq('id', mevcutKayit.id)
+        .limit(1)
+      if (!cakisma || cakisma.length === 0) {
+        updatePayload.device_id = deviceId
+      }
+    }
     await admin
       .from('device_tokens')
-      .update({ son_kullanim: new Date().toISOString(), son_ip: reqIp, son_user_agent: reqUa })
+      .update(updatePayload)
       .eq('id', mevcutKayit.id)
+
+    if (fallbackKullanildi) {
+      void auditLog({
+        tip: 'check_device_fallback_recovery',
+        tablo: 'device_tokens',
+        firma_id: mevcutKayit.firma_id ?? null,
+        kullanici_id: mevcutKayit.user_id ?? null,
+        detay: {
+          device_token_id: mevcutKayit.id,
+          eski_device_id_prefix: fallbackDeviceId!.slice(0, 8),
+          yeni_device_id_prefix: deviceId.slice(0, 8),
+          device_id_guncellendi: updatePayload.device_id != null,
+          ip: reqIp,
+        },
+      })
+    }
 
     return NextResponse.json({
       ok: true,
