@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { sendFCMToUser } from '@/lib/fcm-sender'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -54,22 +53,15 @@ export async function POST(req: Request) {
   const deviceToken = req.headers.get('X-Device-Token')
 
   // ── Supabase Webhook ──────────────────────────────────────────
+  // ARTIK FCM ATMIYOR. Endpoint'ler bildirimler tablosuna INSERT yaparken
+  // direkt sendFCMToUser çağırıyor (doğru kanal/channel ile). Webhook'tan
+  // ikinci kez FCM atmak ÇİFT BİLDİRİM yaratıyordu (kullanıcı şikayeti
+  // 2026-06-07). Endpoint güvenli boş cevap döner — geriye uyumluluk için.
   if (webhookSecret) {
     if (webhookSecret !== process.env.WEBHOOK_SECRET) {
       return NextResponse.json({ ok: false }, { status: 401, headers: CORS_HEADERS })
     }
-    try {
-      const body = await req.json()
-      const record = body.record
-      if (!record?.alici_id || !record?.baslik) {
-        return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
-      }
-      const mesajKisa = (record.mesaj || '').split('\n').slice(0, 2).join(' ').substring(0, 100)
-      await sendFCMToUser(record.alici_id, record.baslik, mesajKisa)
-      return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
-    } catch (e: any) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 500, headers: CORS_HEADERS })
-    }
+    return NextResponse.json({ ok: true, mesaj: 'webhook devre dışı (çift bildirim önleme)' }, { headers: CORS_HEADERS })
   }
 
   // ── Mobil uygulama — okundu işaretle ─────────────────────────

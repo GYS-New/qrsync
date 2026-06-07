@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatDateTime, GOREV_DURUM_LABEL } from '@/lib/utils'
+import { sendFCMToUser } from '@/lib/fcm-sender'
 
 export type GorevDurum = 'ACIK' | 'ISLEMDE' | 'IPTAL' | 'TAMAMLANDI'
 
@@ -49,18 +50,17 @@ export async function createGorevAtamaNotification(opts: {
     tip: 'gorev_atama',
   })
 
-  // FCM push bildirim gönder (server-side API üzerinden)
+  // FCM push bildirim — server-side ortamda doğrudan helper çağrısı
+  // (önceden relative URL fetch'i çalışmıyordu, sessizce fail oluyordu;
+  //  o yüzden FCM atılmıyor, sadece webhook ile gidiyor zannediliyordu.
+  //  Çift bildirim cleanup'ı sonrası direkt çağırıyoruz.)
   try {
-    await fetch('/api/notifications/send-push', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        aliciId,
-        title: 'Yeni Görev Ataması',
-        message: `${tanim}${lokasyonTanim ? ' — ' + lokasyonTanim : ''}`,
-        channelId: 'gorev_uyari',
-      }),
-    })
+    await sendFCMToUser(
+      aliciId,
+      'Yeni Görev Ataması',
+      `${tanim}${lokasyonTanim ? ' — ' + lokasyonTanim : ''}`,
+      'gorev_uyari',
+    )
   } catch {}
 }
 
@@ -116,4 +116,10 @@ export async function notifyTenantAdminsOnGorevStatusChange(opts: {
   }))
 
   await supabase.from('bildirimler').insert(payload)
+
+  // FCM — webhook devre dışı olduğu için direkt gönder (kısa mesaj formatı)
+  const mesajKisa = mesajLines.slice(0, 2).join(' ').substring(0, 100)
+  for (const aId of adminIds) {
+    try { await sendFCMToUser(aId, 'Görev durumu güncellendi', mesajKisa, 'default') } catch {}
+  }
 }

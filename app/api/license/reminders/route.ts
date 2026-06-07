@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { differenceInCalendarDays, startOfDay } from 'date-fns'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { sendMail } from '@/lib/email'
+import { sendFCMToUser } from '@/lib/fcm-sender'
 
 function isoNow() {
   return new Date().toISOString()
@@ -48,13 +49,16 @@ export async function GET() {
     if (inWindow && me.rol === 'tenant_admin') {
       const already = !!(firma as any)?.lisans_uyari_ta_bildirim_gonderildi
       if (!already) {
+        const taBaslik = 'Lisans Süreniz Dolmak Üzere'
+        const taMesaj = `Lisans süreniz ${daysLeft} gün içinde dolacak. Lütfen en kısa zamanda lisansınızı yenileyiniz.`
         await admin.from('bildirimler').insert({
           alici_id: me.id,
-          baslik: 'Lisans Süreniz Dolmak Üzere',
-          mesaj: `Lisans süreniz ${daysLeft} gün içinde dolacak. Lütfen en kısa zamanda lisansınızı yenileyiniz.`,
+          baslik: taBaslik,
+          mesaj: taMesaj,
           okundu: false,
           tip: 'sistem',
         })
+        try { await sendFCMToUser(me.id, taBaslik, taMesaj, 'default') } catch {}
         await admin.from('firmalar').update({ lisans_uyari_ta_bildirim_gonderildi: true }).eq('id', firmaId)
       }
     }
@@ -68,15 +72,20 @@ export async function GET() {
           .select('id')
           .in('rol', ['super_admin', 'alt_super_admin'])
         if (sas?.length) {
+          const saBaslik = 'Firmanın Lisansı Dolmak Üzere'
+          const saMesaj = `${firmaName} firmasının lisansı ${daysLeft} gün içinde dolacak.`
           await admin.from('bildirimler').insert(
             sas.map((u: any) => ({
               alici_id: u.id,
-              baslik: 'Firmanın Lisansı Dolmak Üzere',
-              mesaj: `${firmaName} firmasının lisansı ${daysLeft} gün içinde dolacak.`,
+              baslik: saBaslik,
+              mesaj: saMesaj,
               okundu: false,
               tip: 'sistem',
             }))
           )
+          for (const u of sas) {
+            try { await sendFCMToUser(u.id as string, saBaslik, saMesaj, 'default') } catch {}
+          }
         }
         await admin.from('firmalar').update({ lisans_uyari_sa_bildirim_gonderildi: true }).eq('id', firmaId)
       }
