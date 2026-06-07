@@ -155,12 +155,17 @@ export async function POST(req: Request) {
     // Aktif kural görevi kontrolü — sadece ACIK/ISLEMDE engeller.
     // BEKLEMEDE = vardiya geçmiş, PD cron'un ZG'ye çekeceği görev; personelin
     // tamamlama yükümlülüğü yok → ekstra görev başlatmayı engellememeli.
+    // Atanan filtresi: başka kullanıcıya atanmış görev User B'nin ekstra
+    // başlatmasını engellemesin (Mobile UI atanan_kullanici_id ile filtreliyor;
+    // backend tutarlılığı için aynı mantık). Yani sadece atanmamış veya bu
+    // kullanıcıya atanmış aktif görev varsa engelle.
     const { data: aktifKural } = await admin
       .from('canli_gorevler')
       .select('id, durum')
       .eq('lokasyon_id', lokasyonId)
       .not('kural_id', 'is', null)
       .in('durum', ['ACIK', 'ISLEMDE'])
+      .or(`atanan_kullanici_id.is.null,atanan_kullanici_id.eq.${userId}`)
       .limit(1)
 
     if (aktifKural && aktifKural.length > 0) {
