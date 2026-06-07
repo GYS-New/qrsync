@@ -32,20 +32,28 @@ export async function GET(req: NextRequest) {
   const projeId = url.searchParams.get('projeId')
   const basarili = url.searchParams.get('basarili')
   const gunRaw = url.searchParams.get('gun')
-  // Push log ömrü 24 saat — default 1 gün, 'gun' param ile uzatılabilir
-  // (debug için max 7). 24h üzeri otomatik silinir (lazy delete aşağıda).
-  const gun = gunRaw ? Math.max(1, Math.min(7, Number(gunRaw) || 1)) : 1
+  // Default 1 gün (son 24h). Filtreyle 30 güne kadar geriye gidilebilir
+  // (manuel push arşivi için).
+  const gun = gunRaw ? Math.max(1, Math.min(30, Number(gunRaw) || 1)) : 1
   const q = (url.searchParams.get('q') ?? '').trim()
   const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit')) || 200))
 
   const kesim = new Date(Date.now() - gun * 86400000).toISOString()
-  const omurEsigi = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
 
   const admin = createAdminClient()
 
-  // Lazy temizlik: her GET'te 24 saatten eski kayıtları sil (fire-and-forget).
-  // Ayrı cron yerine bu pratik; tablo büyümesini sınırlar.
-  void admin.from('push_bildirim_log').delete().lt('olusturma_tarihi', omurEsigi).then(() => {}, () => {})
+  // Lazy temizlik (her GET'te, fire-and-forget):
+  // - CRON bildirimleri (gonderen_id IS NULL) → 24 saat ömür
+  // - MANUEL push'lar (gonderen_id IS NOT NULL) → 30 gün ömür
+  // Ayrı cron yerine pratik; tablo büyümesini sınırlar, denetim arşivini korur.
+  const cronEsik = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+  const manuelEsik = new Date(Date.now() - 30 * 86400000).toISOString()
+  void admin.from('push_bildirim_log').delete()
+    .is('gonderen_id', null).lt('olusturma_tarihi', cronEsik)
+    .then(() => {}, () => {})
+  void admin.from('push_bildirim_log').delete()
+    .not('gonderen_id', 'is', null).lt('olusturma_tarihi', manuelEsik)
+    .then(() => {}, () => {})
 
   let query = admin.from('push_bildirim_log')
     .select('*')
