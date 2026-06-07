@@ -152,13 +152,15 @@ export async function POST(req: Request) {
       }
     }
 
-    // Aktif kural görevi kontrolü — bu lokasyonda ACIK/ISLEMDE/BEKLEMEDE bir kural görevi varsa önce onu yap
+    // Aktif kural görevi kontrolü — sadece ACIK/ISLEMDE engeller.
+    // BEKLEMEDE = vardiya geçmiş, PD cron'un ZG'ye çekeceği görev; personelin
+    // tamamlama yükümlülüğü yok → ekstra görev başlatmayı engellememeli.
     const { data: aktifKural } = await admin
       .from('canli_gorevler')
       .select('id, durum')
       .eq('lokasyon_id', lokasyonId)
       .not('kural_id', 'is', null)
-      .in('durum', ['ACIK', 'ISLEMDE', 'BEKLEMEDE'])
+      .in('durum', ['ACIK', 'ISLEMDE'])
       .limit(1)
 
     if (aktifKural && aktifKural.length > 0) {
