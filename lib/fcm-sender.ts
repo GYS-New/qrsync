@@ -76,6 +76,12 @@ export async function sendFCMToUser(
         effectiveChannelId = 'default'
         soundName = 'default'
       }
+      // Dedup tag: aynı user + channel'a düşen bildirimler tek slot'ta birikir.
+      // Capacitor Firebase Messaging plugin 8.1.0 bazı senaryolarda çift display
+      // yapıyor; tag override sistem tray'de tekleştirir. Yan etki: aynı channel'a
+      // arda arda farklı içerikli bildirim gelirse sonuncu birincinin yerini alır
+      // (genelde aynı tip bildirimde son durumun gösterilmesi istenen davranış).
+      const dedupTag = `${effectiveChannelId}_${userId}`
       try {
         await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
           method: 'POST',
@@ -90,6 +96,7 @@ export async function sendFCMToUser(
                 notification: {
                   sound: soundName,
                   channel_id: effectiveChannelId,
+                  tag: dedupTag,
                 },
               },
               apns: {
@@ -103,6 +110,7 @@ export async function sendFCMToUser(
                 },
                 headers: {
                   'apns-priority': '10',
+                  'apns-collapse-id': dedupTag,
                 },
               },
             },
