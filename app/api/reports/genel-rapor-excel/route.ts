@@ -229,17 +229,17 @@ export async function GET(request: Request) {
       { col: 2, text: 'ÜST LOKASYON', width: 20 },
       { col: 3, text: 'GRUP TANIMI',  width: 26 },
       { col: 4, text: 'LOKASYON',     width: 22 },
-      { col: 5, text: 'PERSONEL',     width: 22 },
+      { col: 5, text: 'GÖREV TANIMI', width: 26 },
       { col: 6, text: 'TARİH-SAAT',   width: 18 },
-      { col: 7, text: 'GÖREV TANIMI', width: 26 },
-      { col: 8, text: 'SÜRE',         width: 14 },
+      { col: 7, text: 'SÜRE',         width: 14 },
+      { col: 8, text: 'PERSONEL',     width: 22 },
       { col: 9, text: 'GEREKÇE',      width: 40 },
     ])
     data.frekansDisiGorevler.forEach((f, i) => {
       const r = ws6.getRow(2 + i); r.height = 17
       const vals: any[] = [
-        f.sn, f.ustLokasyon, f.grupTanimi, f.lokasyonTanimi, f.personel,
-        f.tarihSaat, f.aciklama, f.gorevSuresi, f.gerekce || '',
+        f.sn, f.ustLokasyon, f.grupTanimi, f.lokasyonTanimi, f.aciklama,
+        f.tarihSaat, f.gorevSuresi, f.personel, f.gerekce || '',
       ]
       vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
     })

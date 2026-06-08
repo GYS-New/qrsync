@@ -1237,7 +1237,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
               // Mobil v1.0.28+ ekstra görev akışı: baslat/tamamla ile gerçek süre + gerekçe
               // (OYAK RENAULT talebi, 02 Haz 2026). Eski tek-POST kayıtlarda gerekçe boş,
               // süre "Tek tık" gösterilir. SÜRE kolonu geri eklendi.
-              const headers = ['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'PERSONEL', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'SÜRE'] : []), 'GÖREV TANIMI', 'GEREKÇE']
+              const headers = ['SN', 'ÜST LOKASYON', 'GRUP TANIMI', 'LOKASYON', 'GÖREV TANIMI', 'TARİH', ...(sureli ? ['GÖREV SAATLERİ', 'SÜRE'] : []), 'PERSONEL', 'GEREKÇE']
               return (
                 <div className="verde-card" style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -1247,9 +1247,9 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <DataTable
                     headers={headers}
                     rows={ds.rows.map((r: any) => [
-                      r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.personel, r.tarih,
+                      r.sn, r.ustLokasyon, r.grupTanimi, r.lokasyonTanimi, r.aciklama, r.tarih,
                       ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []),
-                      r.aciklama,
+                      r.personel,
                       r.gerekce || '—',
                     ])}
                     filterable noFilterCols={[0]}
