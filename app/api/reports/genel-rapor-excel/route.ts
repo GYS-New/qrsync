@@ -206,7 +206,7 @@ export async function GET(request: Request) {
       { col: 4, text: 'GÖREV NO',      width: 14 },
       { col: 5, text: 'GÖREV TANIMI',  width: 32 },
       { col: 6, text: 'TARİH',         width: 14 },
-      { col: 7, text: 'İPTAL EDEN',   width: 22 },
+      { col: 7, text: 'PERSONEL',     width: 22 },
       { col: 8, text: 'DURUM',         width: 14 },
       { col: 9, text: 'KAYIP NEDENİ', width: 24 },
     ])

@@ -1207,7 +1207,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
               if (ds.loading && ds.rows.length === 0) return <DetayLoader label="Kayıp görevler" />
               // GÖREV SAATLERİ ve GÖREV SÜRESİ sütunları kaldırıldı (kayıp görevler
               // tamamlanmamış olduğu için anlamsız). Yerine İPTAL EDEN sütunu eklendi.
-              const headers = ['SN', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', 'İPTAL EDEN', 'DURUM', 'KAYIP NEDENİ']
+              const headers = ['SN', altAltLokasyonId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokasyonId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'GÖREV NO', 'GÖREV TANIMI', 'TARİH', 'PERSONEL', 'DURUM', 'KAYIP NEDENİ']
               return (
                 <div className="verde-card" style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
