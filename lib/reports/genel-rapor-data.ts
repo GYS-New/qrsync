@@ -845,9 +845,11 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
     .sort((a: any, b: any) => tsMs(b.tamamlanma_tarihi ?? b.durum_degisim_tarihi) - tsMs(a.tamamlanma_tarihi ?? a.durum_degisim_tarihi))
     .map((g: any, i: number) => {
       const lok = lokMap.get(g.lokasyon_id) as any
-      const kullaniciIdS = g.islemi_yapan_id ?? g.atanan_kullanici_id ?? ''
-      const isProjePersonelS = !projePersonelIds || projePersonelIds.has(kullaniciIdS)
-      const kullanici = isProjePersonelS ? (userMap.get(kullaniciIdS) ?? '') : ''
+      // Sapma denetim listesi: proje personeli olmayan tamamlayıcılar (super_admin,
+      // tenant_admin vb. panelden manuel tamamlayanlar) da gösterilir — saha
+      // gerçekliği için "kim kapattı" net görünmeli.
+      const kullaniciIdS = g.islemi_yapan_id ?? g.tamamlayan_kullanici_id ?? g.atanan_kullanici_id ?? ''
+      const kullanici = userMap.get(kullaniciIdS) ?? ''
       const sapmaNedeni = g.durum === 'BEKLEMEDE' ? 'Zamanında tamamlanamadı' : 'Gecikme ile tamamlandı'
       return {
         sn: i + 1,
