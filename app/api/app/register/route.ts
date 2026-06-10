@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getRequestMeta } from '@/lib/device/getRequestMeta'
 import { auditLog } from '@/lib/audit/log'
@@ -157,54 +156,54 @@ export async function POST(req: Request) {
         }, { status: 429, headers: CORS_HEADERS })
       }
 
-      // Kullanıcının email'ini auth.users'dan çek
-      const { data: authUser, error: authErr } = await admin.auth.admin.getUserById(user_id)
-      if (authErr || !authUser?.user?.email) {
-        void auditLog({
-          tip: 'mobil_register_basarisiz',
-          tablo: 'device_tokens',
-          firma_id: firmaId,
-          kullanici_id: user_id,
-          basarili: false,
-          hata_mesaji: 'Auth kimlik bilgisi okunamadı',
-          detay: { ...auditMetaBase, hata_kodu: 'AUTH_KIMLIK_YOK' },
-        })
-        return NextResponse.json({ ok: false, error: 'Kullanıcı kimlik bilgileri alınamadı' }, { status: 500, headers: CORS_HEADERS })
-      }
-
-      // Ayrı (anon) client ile signInWithPassword — şifre doğrulaması
-      const anon = createSupabaseJsClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
-      )
-      const { error: signErr } = await anon.auth.signInWithPassword({
-        email: authUser.user.email,
-        password: sifre,
+      // ŞİFRE DOĞRULAMA — DB-side bcrypt (Supabase Auth rate limit bypass)
+      //
+      // Önceden anon.auth.signInWithPassword kullanılıyordu, fakat:
+      //   1) Supabase Auth servisinin kendi IP/email rate limit'i var
+      //   2) Bir tablette art arda 3-4 farklı personel deneyince Supabase
+      //      "Request rate limit reached" döndürüyor — kullanıcı doğru şifre
+      //      yazsa bile sistem test bile etmeden "Şifre hatalı" gösteriyordu
+      //      (10 Haz 2026 saha şikayeti: Cemil/Feride/Raşit).
+      //
+      // Çözüm: public.verify_user_password RPC (SECURITY DEFINER) doğrudan
+      // auth.users.encrypted_password ile bcrypt karşılaştırması yapar,
+      // Supabase Auth servisini hiç çağırmaz → rate limit tetiklenmez.
+      //
+      // Backend in-memory rate limit (yukarıdaki kontrolRateLimit) brute
+      // force koruması için aynen kalıyor.
+      const { data: rpcData, error: rpcErr } = await admin.rpc('verify_user_password', {
+        p_user_id: user_id,
+        p_password: sifre,
       })
 
-      if (signErr) {
-        yanlisDenemeKaydet(device_id)
-        // Hata detayı sunucu log'una düşer (debug için), kullanıcıya generik mesaj döner
-        console.error('[register] signInWithPassword fail:', {
-          email: authUser.user.email,
-          message: signErr.message,
-          status: (signErr as any).status,
-          code: (signErr as any).code,
-        })
+      if (rpcErr) {
+        console.error('[register] verify_user_password RPC fail:', rpcErr)
         void auditLog({
           tip: 'mobil_register_basarisiz',
           tablo: 'device_tokens',
           firma_id: firmaId,
           kullanici_id: user_id,
           basarili: false,
-          hata_mesaji: signErr.message ?? 'Şifre hatalı',
+          hata_mesaji: 'Şifre doğrulama hatası: ' + (rpcErr.message ?? 'RPC fail'),
+          detay: { ...auditMetaBase, hata_kodu: 'AUTH_RPC_HATA' },
+        })
+        return NextResponse.json({ ok: false, error: 'Sunucu hatası, lütfen tekrar deneyin' }, { status: 500, headers: CORS_HEADERS })
+      }
+
+      const sifreOk = rpcData === true
+      if (!sifreOk) {
+        yanlisDenemeKaydet(device_id)
+        void auditLog({
+          tip: 'mobil_register_basarisiz',
+          tablo: 'device_tokens',
+          firma_id: firmaId,
+          kullanici_id: user_id,
+          basarili: false,
+          hata_mesaji: 'Şifre hatalı',
           detay: {
             ...auditMetaBase,
             hata_kodu: 'SIFRE_HATALI',
-            email: authUser.user.email,
-            supabase_status: (signErr as any).status ?? null,
-            supabase_code: (signErr as any).code ?? null,
+            // RPC-based: artık supabase_status/code yok, sadece bool
           },
         })
         return NextResponse.json({
