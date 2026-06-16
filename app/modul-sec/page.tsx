@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getYetkiliModuller } from '@/lib/modul/yetkiliModuller'
-import { getAktifModul, modulLandingUrl, setAktifModul } from '@/lib/modul/cookie'
+import { getAktifModul, modulLandingUrl } from '@/lib/modul/cookie'
 import ModulSecClient from './ModulSecClient'
 
 export const dynamic = 'force-dynamic'
@@ -48,10 +48,12 @@ export default async function ModulSecPage({ searchParams }: { searchParams: { f
     }
   }
 
-  // 2. Tek modül → otomatik seç + cookie yaz + redirect (force=1 ise atlanır)
+  // 2. Tek modül → direkt landing'e redirect (cookie SET ETMİYORUZ; Next.js 14
+  // server component'ten cookie yazılamaz, production'da hata verir).
+  // Kullanıcı her login'de bu redirect'i geçer; cookie sadece çoklu modül
+  // seçiminden sonra POST /api/modul/sec ile yazılır.
   if (!force && aktifYetkili.length === 1) {
     const tek = aktifYetkili[0].kod
-    setAktifModul(tek)
     redirect(modulLandingUrl(tek, me.rol))
   }
 
