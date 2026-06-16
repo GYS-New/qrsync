@@ -188,11 +188,13 @@ export default function LoginPage() {
     }
 
     if (data.user) {
-      const { data: userData } = await supabase.from('users').select('rol').eq('id', data.user.id).single()
-      const rol = userData?.rol
-      if (rol === 'super_admin' || rol === 'alt_super_admin') router.push('/sa/dashboard')
-      else if (rol === 'tenant_admin') router.push('/ta/dashboard')
-      else router.push('/u/dashboard')  // tenant_user ve musteri
+      // Modül seçim ekranına yönlendir. Sayfanın server tarafı (app/modul-sec/page.tsx)
+      // kullanıcının cookie'sini ve yetkili modüllerini hesaplar:
+      //   - Tek yetkili modül → otomatik o modülün landing'ine düşer
+      //   - Çok modül → seçim kartları gösterilir
+      //   - Cookie'de aktif modül varsa → direkt o modüle gider
+      // Eski rol bazlı redirect mantığı modulLandingUrl() içine taşındı (lib/modul/cookie.ts).
+      router.push('/modul-sec')
     }
 
     setLoading(false)
