@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,21 @@ export default async function TAGorevlerPage() {
     </div>
   )
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları GYS UI'da gizlenir (görevler tarafında
+  // gorevler_normal view'i yıkama görevlerini zaten filtreliyor; sadece lokasyon
+  // dropdown'ını da temizlememiz gerekiyor).
+  const gizliOtoYikamaIds = await getOtoYikamaLokasyonIds(supabase as any, firmaId!)
+  const gizliFilterArg = gizliOtoYikamaIds.size > 0 ? `(${[...gizliOtoYikamaIds].join(',')})` : null
+
+  let lokQ = supabase
+    .from('lokasyonlar')
+    .select('id,tanim,aktif,parent_id,checklist_sablon_id')
+    .eq('firma_id', firmaId)
+    .eq('proje_id', aktifProje.id)
+    .eq('aktif', true)
+    .order('tanim')
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
+
   const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const [{ data: gorevler }, { data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
     // gorevler_normal view: yıkama görevleri hariç (Oto Yıkama için ayrı sayfa)
@@ -35,13 +51,7 @@ export default async function TAGorevlerPage() {
       .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
       .order('olusturma_tarihi', { ascending: false })
       .limit(200),
-    supabase
-      .from('lokasyonlar')
-      .select('id,tanim,aktif,parent_id,checklist_sablon_id')
-      .eq('firma_id', firmaId)
-      .eq('proje_id', aktifProje.id)
-      .eq('aktif', true)
-      .order('tanim'),
+    lokQ,
     supabase
       .from('users')
       .select('id,isim_soyisim,aktif')

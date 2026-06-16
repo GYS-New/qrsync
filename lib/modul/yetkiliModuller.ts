@@ -35,11 +35,16 @@ export interface YetkiliModullerResponse {
   tek_modul_kodu: ModulKodu | null
 }
 
-/** Sabit modül kataloğu — yeni modül eklenince buraya eklenir. */
-const KATALOG: Array<{ kod: ModulKodu; ad: string; ikon: string; flagKolon: string | null }> = [
-  { kod: 'gys',        ad: 'GYS',        ikon: 'shield',   flagKolon: null              },
-  { kod: 'oto_yikama', ad: 'Oto Yıkama', ikon: 'car',      flagKolon: 'oto_yikama_aktif'},
-  { kod: 'fms',        ad: 'FMS',        ikon: 'building', flagKolon: 'fms_aktif'       },
+/**
+ * Sabit modül kataloğu — yeni modül eklenince buraya eklenir.
+ *
+ * `implementasyonHazir`: false ise UI/sayfaları henüz mevcut değil; SA bile
+ * "aktif" göremez (UI'da "Yakında" gözükür). Sayfaları hazırlanınca true yapılır.
+ */
+const KATALOG: Array<{ kod: ModulKodu; ad: string; ikon: string; flagKolon: string | null; implementasyonHazir: boolean }> = [
+  { kod: 'gys',        ad: 'GYS',        ikon: 'shield',   flagKolon: null,               implementasyonHazir: true  },
+  { kod: 'oto_yikama', ad: 'Oto Yıkama', ikon: 'car',      flagKolon: 'oto_yikama_aktif', implementasyonHazir: true  },
+  { kod: 'fms',        ad: 'FMS',        ikon: 'building', flagKolon: 'fms_aktif',        implementasyonHazir: false },
 ]
 
 const MODUL_GIRIS_SAYFA_KODU = '_modul_giris'
@@ -99,9 +104,12 @@ export async function getYetkiliModuller(
 
   // 3. Katalog üzerinden modül listesini üret
   const moduller: ModulBilgisi[] = KATALOG.map(m => {
-    const aktif = isSA
-      ? true
-      : (m.flagKolon === null ? true : (firmaFlags as any)[m.flagKolon] === true)
+    // Implementasyon hazır değilse hiç kimse için (SA dahil) aktif değil → UI'da "Yakında"
+    const aktif = !m.implementasyonHazir
+      ? false
+      : isSA
+        ? true
+        : (m.flagKolon === null ? true : (firmaFlags as any)[m.flagKolon] === true)
 
     const yetkili = isSA
       ? true

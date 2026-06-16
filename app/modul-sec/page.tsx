@@ -10,14 +10,14 @@ export const dynamic = 'force-dynamic'
  * /modul-sec — Login sonrası kullanıcının yetkili olduğu modülü seçtiği ekran.
  *
  * Akış:
- * 1. Cookie'de aktif_modul varsa → o modülün landing URL'ine redirect.
- *    (Sessiz validate: hala yetkili mi? yoksa modul-sec'te kal)
- * 2. Yetkili modül sayısı 1 ise → direkt o modüle redirect, seçim ekranı atlanır.
- * 3. Çoklu yetkili modül → kart UI gösterilir.
- *
- * SA olmayan rollerde firma_id zorunlu — yoksa giriş kullanılamaz state'tedir.
+ * 1. ?force=1 → cookie temizlenir + seçim ekranı her zaman gösterilir.
+ *    Kullanıcı yanlış modüle düştüğünde (örn. henüz yapılmamış FMS'e)
+ *    veya "Modül Değiştir" linkinden geldiğinde kullanılır.
+ * 2. Cookie'de aktif_modul varsa → o modülün landing URL'ine redirect.
+ * 3. Yetkili modül sayısı 1 ise → direkt o modüle redirect, seçim ekranı atlanır.
+ * 4. Çoklu yetkili modül → kart UI gösterilir.
  */
-export default async function ModulSecPage() {
+export default async function ModulSecPage({ searchParams }: { searchParams: { force?: string } }) {
   const supabase = createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) redirect('/login')
@@ -29,21 +29,27 @@ export default async function ModulSecPage() {
     .single()
   if (!me) redirect('/login')
 
+  // ?force=1 → cookie'yi görmezden gel (server component'ten cookie SİLİNEMEZ;
+  // bu sınır Next.js 14'ün kuralı. Bunun yerine cookie'yi okumayı atla; kullanıcı
+  // yeni bir modül seçince POST /api/modul/sec cookie'yi üzerine yazar.)
+  const force = searchParams.force === '1'
+
   const yetkili = await getYetkiliModuller(me.rol, me.firma_id ?? null)
   const aktifYetkili = yetkili.moduller.filter(m => m.aktif)
 
-  // 1. Cookie'deki aktif modül hala yetkili+aktif mi?
-  const cookieModul = getAktifModul()
-  if (cookieModul) {
-    const cookieGecerli = aktifYetkili.find(m => m.kod === cookieModul)
-    if (cookieGecerli) {
-      redirect(modulLandingUrl(cookieModul, me.rol))
+  // 1. Cookie'deki aktif modül hala yetkili+aktif mi? (force=1 ise atlanır)
+  if (!force) {
+    const cookieModul = getAktifModul()
+    if (cookieModul) {
+      const cookieGecerli = aktifYetkili.find(m => m.kod === cookieModul)
+      if (cookieGecerli) {
+        redirect(modulLandingUrl(cookieModul, me.rol))
+      }
     }
-    // Cookie geçersiz → otomatik temizleme aşağıda render'da olmaz, sadece akış devam eder
   }
 
-  // 2. Tek modül → otomatik seç + cookie yaz + redirect
-  if (aktifYetkili.length === 1) {
+  // 2. Tek modül → otomatik seç + cookie yaz + redirect (force=1 ise atlanır)
+  if (!force && aktifYetkili.length === 1) {
     const tek = aktifYetkili[0].kod
     setAktifModul(tek)
     redirect(modulLandingUrl(tek, me.rol))
