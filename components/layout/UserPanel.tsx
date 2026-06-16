@@ -12,6 +12,7 @@ export default function UserPanel({ base }: { base: string }) {
   const supabase = useMemo(() => createClient(), [])
   const [me, setMe] = useState<User | null>(null)
   const [open, setOpen] = useState(false)
+  const [cokModul, setCokModul] = useState(false)
   const panelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -24,6 +25,16 @@ export default function UserPanel({ base }: { base: string }) {
     })()
     return () => { active = false }
   }, [supabase])
+
+  // Yetkili modül sayısı: 2+ ise "Modül Değiştir" menü kalemi görünür
+  useEffect(() => {
+    let active = true
+    fetch('/api/modul/yetkili', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (active && j?.ok) setCokModul((j.aktif_sayi ?? 0) > 1) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -129,18 +140,20 @@ export default function UserPanel({ base }: { base: string }) {
               </button>
             ))}
             <div style={{ height:1, background:'#f3f4f6', margin:'6px 6px' }} />
-            <button
-              type="button"
-              onClick={() => { setOpen(false); modulDegistir() }}
-              style={{
-                width:'100%', textAlign:'left', padding:'8px 10px',
-                border:'none', background:'transparent', cursor:'pointer',
-                borderRadius:8, fontSize:14.5, color:'#374151'
-              }}
-              onMouseDown={(e) => e.preventDefault()}
-            >
-              Modül Değiştir
-            </button>
+            {cokModul && (
+              <button
+                type="button"
+                onClick={() => { setOpen(false); modulDegistir() }}
+                style={{
+                  width:'100%', textAlign:'left', padding:'8px 10px',
+                  border:'none', background:'transparent', cursor:'pointer',
+                  borderRadius:8, fontSize:14.5, color:'#374151'
+                }}
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                Modül Değiştir
+              </button>
+            )}
             <button
               type="button"
               onClick={() => { setOpen(false); logout() }}
