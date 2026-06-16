@@ -45,7 +45,7 @@ export default function ModulYetkileriClient({ isSA, firmaId: initialFirmaId, fi
         setYetkiSet(set)
         setDirty(false)
       } else {
-        toast.show?.(data.error ?? 'Yetkiler yüklenemedi', 'hata' as any)
+        toast.toast({ type: 'error', message: data.error ?? 'Yetkiler yüklenemedi' })
       }
     } finally { setLoading(false) }
   }
@@ -77,10 +77,10 @@ export default function ModulYetkileriClient({ isSA, firmaId: initialFirmaId, fi
       })
       const data = await res.json()
       if (res.ok && data.ok) {
-        toast.show?.('Modül yetkileri kaydedildi', 'basari' as any)
+        toast.toast({ type: 'success', message: 'Modül yetkileri kaydedildi' })
         setDirty(false)
       } else {
-        toast.show?.(data.error ?? 'Kayıt başarısız', 'hata' as any)
+        toast.toast({ type: 'error', message: data.error ?? 'Kayıt başarısız' })
       }
     } finally { setSaving(false) }
   }
