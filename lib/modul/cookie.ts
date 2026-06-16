@@ -47,12 +47,20 @@ export function clearAktifModul(): void {
  * GYS için rol bazlı dashboard (mevcut davranış korunur).
  */
 export function modulLandingUrl(modul: ModulKodu, rol: string): string {
-  if (modul === 'gys') {
-    if (rol === 'super_admin' || rol === 'alt_super_admin') return '/sa/dashboard'
-    if (rol === 'tenant_admin') return '/ta/dashboard'
-    return '/u/dashboard' // tenant_user + musteri
-  }
+  if (modul === 'gys') return getRolBase(rol) + '/dashboard'
   if (modul === 'oto_yikama') return '/oto-yikama/dashboard'
   if (modul === 'fms')        return '/fms/dashboard'
   return '/modul-sec'
+}
+
+/**
+ * Rol'e göre GYS modülünün route base path'ini döner.
+ * Modül bağımsız sayfa linkleri (örn. Ayarlar) için Topbar/UserPanel'a
+ * geçilen `base` değeri. Kullanıcı Oto Yıkama'dan Ayarlar'a tıklarsa kendi
+ * rolünün GYS Ayarlar'ına gider.
+ */
+export function getRolBase(rol: string): string {
+  if (rol === 'super_admin' || rol === 'alt_super_admin') return '/sa'
+  if (rol === 'tenant_admin') return '/ta'
+  return '/u' // tenant_user + musteri
 }

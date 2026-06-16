@@ -154,6 +154,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Eski Oto Yıkama URL'leri yeni route'a kalıcı redirect (301).
+  // Bookmark yapan SA kullanıcıları için.
+  if (pathname.startsWith('/sa/dashboard/oto-yikama')) {
+    const yeni = pathname.replace('/sa/dashboard/oto-yikama', '/oto-yikama/dashboard')
+      .replace('/oto-yikama/dashboard/', '/oto-yikama/')
+    const url = request.nextUrl.clone()
+    url.pathname = yeni
+    return NextResponse.redirect(url, 301)
+  }
+
   // /privacy-policy — Apple App Store gereği herkese (web + mobil) açık olmalı,
   // auth ve mobil-redirect bypass.
   if (pathname === '/privacy-policy' || pathname.startsWith('/privacy-policy/')) {
@@ -242,21 +252,9 @@ export async function middleware(request: NextRequest) {
   }
 
   if (authUser && publicPaths.has(pathname)) {
-    const { data: user } = await supabase
-      .from('users')
-      .select('rol')
-      .eq('id', authUser.id)
-      .single()
-
-    const rol = user?.rol
-
-    if (rol === 'super_admin' || rol === 'alt_super_admin') {
-      return NextResponse.redirect(new URL('/sa/dashboard', request.url))
-    } else if (rol === 'tenant_admin') {
-      return NextResponse.redirect(new URL('/ta/dashboard', request.url))
-    } else {
-      return NextResponse.redirect(new URL('/u/dashboard', request.url))
-    }
+    // Auth'lu kullanıcı login sayfasındaysa modül seçim ekranına gönder
+    // (orada cookie ve yetkili modüllere göre otomatik landing yapılır).
+    return NextResponse.redirect(new URL('/modul-sec', request.url))
   }
 
   return response
