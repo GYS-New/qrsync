@@ -43,10 +43,13 @@ export async function GET(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // Modül izolasyonu: Oto Yıkama lokasyonları GYS UI'da hiçbir rol için
-    // gösterilmez (üst lokasyon dropdown'u dahil). Oto Yıkama modülünün kendi
-    // sayfaları bu lokasyonları kendi endpoint'lerinden çeker.
+    // gösterilmez (üst lokasyon dropdown'u dahil). İstisna: kullanıcı yetkilendirme
+    // sayfaları (Firma Kullanıcıları, Lokasyon Yetkileri Paneli) — buradan "Oto
+    // Yıkama" üst lokasyonuna atama yapılabilmesi gerekir. Bu sayfalar
+    // ?includeOtoYikama=1 query param ile çağırır.
+    const includeOtoYikama = searchParams.get('includeOtoYikama') === '1'
     let result = data ?? []
-    if (firmaId) {
+    if (firmaId && !includeOtoYikama) {
       const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
       if (otoIds.size > 0) result = result.filter((l: any) => !otoIds.has(l.id))
     }

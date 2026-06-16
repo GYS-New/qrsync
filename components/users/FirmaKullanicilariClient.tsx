@@ -28,10 +28,11 @@ export default function FirmaKullanicilariClient({
   const [ustLokasyonlar, setUstLokasyonlar] = useState<{ id: string; tanim: string }[]>([])
   useEffect(() => { setUsers(initialUsers) }, [initialUsers])
 
-  // Üst lokasyonları çek
+  // Üst lokasyonları çek — Kullanıcı atama UI'ı olduğu için Oto Yıkama dahil edilir
+  // (includeOtoYikama=1). SA/TA buradan kullanıcıya "ARAÇ YIKAMA" üst lokasyonu atar.
   useEffect(() => {
     if (!firmaId) return
-    const q = new URLSearchParams({ firmaId })
+    const q = new URLSearchParams({ firmaId, includeOtoYikama: '1' })
     if (projeId) q.set('projeId', projeId)
     fetch(`/api/lokasyonlar-list?${q}`)
       .then(r => r.json())
