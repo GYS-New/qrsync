@@ -7,28 +7,39 @@ export type SayfaYetki = {
   silebilir: boolean
 }
 
+export const VARSAYILAN_MODUL = 'gys' as const
+
 /**
  * Verilen rol + firma için belirtilen sayfanın gorebilir yetkisini kontrol eder.
  * Öncelik sırası: firma bazlı kayıt → global kayıt (firma_id IS NULL) → true (açık)
  * super_admin her zaman true döner.
+ *
+ * modulKodu opsiyonel; verilmezse 'gys' varsayılır (geriye uyumlu).
  */
 export async function sayfaGorebilirMi(
   rol: string,
   sayfaKodu: string,
   firmaId?: string | null,
+  modulKodu: string = VARSAYILAN_MODUL,
 ): Promise<boolean> {
-  const y = await sayfaYetkileri(rol, sayfaKodu, firmaId)
+  const y = await sayfaYetkileri(rol, sayfaKodu, firmaId, modulKodu)
   return y.gorebilir
 }
 
 /**
- * Verilen rol + firma için 4 yetki boyutunu döner (gorebilir, ekleyebilir, duzenleyebilir, silebilir).
+ * Verilen rol + firma + modül için 4 yetki boyutunu döner.
  * Öncelik sırası: firma bazlı → global → varsayılan (SA hariç her şey true)
+ *
+ * modulKodu opsiyonel; verilmezse 'gys' varsayılır (geriye uyumlu).
+ * Migration 075 ile tabloya modul_kodu kolonu eklendi; mevcut satırlar
+ * default 'gys' olduğu için bu parametre verilmeden çağrılan mevcut
+ * kodlar etkilenmez.
  */
 export async function sayfaYetkileri(
   rol: string,
   sayfaKodu: string,
   firmaId?: string | null,
+  modulKodu: string = VARSAYILAN_MODUL,
 ): Promise<SayfaYetki> {
   const ACIK: SayfaYetki = { gorebilir: true, ekleyebilir: true, duzenleyebilir: true, silebilir: true }
 
@@ -45,6 +56,7 @@ export async function sayfaYetkileri(
       .eq('firma_id', firmaId)
       .eq('rol', rol)
       .eq('sayfa_kodu', sayfaKodu)
+      .eq('modul_kodu', modulKodu)
       .maybeSingle()
 
     if (data) {
@@ -64,6 +76,7 @@ export async function sayfaYetkileri(
     .is('firma_id', null)
     .eq('rol', rol)
     .eq('sayfa_kodu', sayfaKodu)
+    .eq('modul_kodu', modulKodu)
     .maybeSingle()
 
   // 3. Kayıt yoksa açık
