@@ -42,27 +42,36 @@ export async function GET(req: Request) {
       .update({ son_kullanim: new Date().toISOString(), son_ip: reqIp, son_user_agent: reqUa })
       .eq('device_token', deviceToken)
 
-    // users tablosundan güncel bilgileri al
+    // users tablosundan güncel bilgileri al (ust_lokasyon_id dahil — Oto Yıkama
+    // personel tespiti hem bu kolonu hem kullanici_lokasyon_yetkileri tablosunu
+    // kapsar; iki atama yolundan biri yeterli)
     const { data: userData } = await admin
       .from('users')
-      .select('id, isim_soyisim, rol, firma_id, proje_id, email')
+      .select('id, isim_soyisim, rol, firma_id, proje_id, email, ust_lokasyon_id')
       .eq('id', tokenData.user_id)
       .single()
 
-    // Oto Yıkama personeli mi? — kullanici_lokasyon_yetkileri üzerinden
-    // oto_yikama_lokasyon=true olan üst lokasyonlara bağlı mı kontrolü.
+    // Oto Yıkama personeli mi? İki kaynak OR'lanır:
+    //   A) users.ust_lokasyon_id → oto_yikama_lokasyon=true bir üst lokasyonu işaret ediyor
+    //   B) kullanici_lokasyon_yetkileri'nde oto_yikama_lokasyon=true bir kayıt var
+    // Saha gerçekliği: bazı kullanıcılar (A) ile, bazıları (B) ile atanıyor — UI/DB
+    // sync inconsistency'si nedeniyle ikisi de kontrol edilmeli.
     let otoYikamaPersoneli = false
     {
+      const adayUstIds = new Set<string>()
+      if (userData?.ust_lokasyon_id) adayUstIds.add(userData.ust_lokasyon_id)
       const { data: yetkiler } = await admin
         .from('kullanici_lokasyon_yetkileri')
         .select('ust_lokasyon_id')
         .eq('user_id', tokenData.user_id)
-      const ustIds = (yetkiler ?? []).map((y: any) => y.ust_lokasyon_id).filter(Boolean)
-      if (ustIds.length > 0) {
+      for (const y of (yetkiler ?? [])) {
+        if (y.ust_lokasyon_id) adayUstIds.add(y.ust_lokasyon_id)
+      }
+      if (adayUstIds.size > 0) {
         const { data: loks } = await admin
           .from('lokasyonlar')
           .select('id')
-          .in('id', ustIds)
+          .in('id', [...adayUstIds])
           .eq('oto_yikama_lokasyon', true)
           .eq('aktif', true)
         otoYikamaPersoneli = (loks ?? []).length > 0
