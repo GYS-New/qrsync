@@ -38,9 +38,10 @@ export default async function GunlukPerformansBlock({
     }
   }
 
-  // Spesifik görevler (tek seferlik — vardiya kavramı yok, olusturma_tarihi korunur)
+  // Spesifik görevler (tek seferlik — vardiya kavramı yok, olusturma_tarihi korunur).
+  // gorevler_normal view'i Oto Yıkama görevlerini hariç tutar.
   const buildQ1 = () => {
-    let q = supabase.from('gorevler').select('durum').gte('olusturma_tarihi', today.toISOString())
+    let q = supabase.from('gorevler_normal').select('durum').gte('olusturma_tarihi', today.toISOString())
     if (firmaId) q = q.eq('firma_id', firmaId)
     if (projeId) q = (q as any).eq('proje_id', projeId)
     if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)

@@ -99,9 +99,9 @@ export default function AktiviteGrafigiBlock({
       return q
     }
 
-    // Tamamlanan spesifik görevler
+    // Tamamlanan spesifik görevler — gorevler_normal view Oto Yıkama'yı hariç tutar
     const buildSpesifik = () => {
-      let q = supabase.from("gorevler").select(groupCol)
+      let q = supabase.from("gorevler_normal").select(groupCol)
         .eq("durum", "TAMAMLANDI")
         .not("tamamlanma_tarihi", "is", null)
         .gte(groupCol, rangeISO)

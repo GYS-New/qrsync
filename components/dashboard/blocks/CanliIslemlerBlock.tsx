@@ -45,10 +45,10 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
   const ff = (q: any) => firmaId ? q.eq('firma_id', firmaId) : q
 
   const results = await Promise.allSettled([
-    // [0] Spesifik toplam bugün
-    gf(supabase.from('gorevler').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', todayISO)),
+    // [0] Spesifik toplam bugün — gorevler_normal view'i Oto Yıkama görevlerini hariç tutar
+    gf(supabase.from('gorevler_normal').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', todayISO)),
     // [1] Spesifik tamamlanan bugün
-    gf(supabase.from('gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').gte('olusturma_tarihi', todayISO)),
+    gf(supabase.from('gorevler_normal').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').gte('olusturma_tarihi', todayISO)),
 
     // [2] Frekansiyel canlı toplam bugün — vardiya_gunu üzerinden (sarkan V1 dahil)
     gf(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('vardiya_gunu', bugunVG)),
@@ -93,8 +93,8 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
     (() => { let lq = supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true); if (firmaId) lq = lq.eq('firma_id', firmaId); if (projeId) lq = (lq as any).eq('proje_id', projeId); if (yetkiliLokIds && yetkiliLokIds.length > 0) lq = lq.in('id', yetkiliLokIds); return lq })(),
     // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar, vardiya_gunu üzerinden)
     gf(supabase.from('canli_gorevler').select('lokasyon_id').eq('vardiya_gunu', bugunVG).limit(3000)),
-    // [10] Görevli lokasyonlar — spesifik (bugün tüm durumlar)
-    gf(supabase.from('gorevler').select('lokasyon_id').gte('olusturma_tarihi', todayISO).limit(3000)),
+    // [10] Görevli lokasyonlar — spesifik (bugün tüm durumlar). gorevler_normal Oto Yıkama hariç.
+    gf(supabase.from('gorevler_normal').select('lokasyon_id').gte('olusturma_tarihi', todayISO).limit(3000)),
   ])
 
   const n = (r: PromiseSettledResult<any>): number =>
