@@ -16,6 +16,13 @@ export function getOtoYikamaNav(): NavGroup[] {
       ],
     },
     {
+      label: 'Yönetim',
+      items: [
+        { label: 'Lokasyonlar',     href: '/oto-yikama/lokasyonlar', icon: '📍' },
+        { label: 'Kullanıcılar',    href: '/oto-yikama/kullanicilar', icon: '👥' },
+      ],
+    },
+    {
       label: 'Operasyon',
       items: [
         { label: 'Araç Kayıtları',  href: '/oto-yikama/araclar',        icon: '🚗' },
