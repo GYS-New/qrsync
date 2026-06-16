@@ -98,9 +98,10 @@ export async function GET(req: NextRequest) {
     for (const r of a) m.set(r.id, r)
     gorevler = Array.from(m.values())
   } else {
-    // Spesifik görevler vardiya bazlı değil — tamamlanma/oluşturma TR günü ile filter (client-side)
+    // Spesifik görevler vardiya bazlı değil — tamamlanma/oluşturma TR günü ile filter (client-side).
+    // gorevler_normal view: Oto Yıkama görevleri spesifik süre analizinin Excel çıktısına dahil olmaz.
     const SEL = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'
-    let q = admin.from('gorevler').select(SEL).eq('firma_id', firmaId)
+    let q = admin.from('gorevler_normal').select(SEL).eq('firma_id', firmaId)
     if (projeId) q = (q as any).eq('proje_id', projeId)
     const { data } = await q
     gorevler = (data ?? []).filter(g =>

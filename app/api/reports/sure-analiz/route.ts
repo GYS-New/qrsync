@@ -319,8 +319,9 @@ export async function GET(req: Request) {
     const freqTum = Array.from(freqMap.values())
 
     // ── Spesifik görevler ───────────────────────────────────────────────────
-    // Spesifik görevler vardiya bazlı değil — tamamlanma/olusturma TR günü ile filtre
-    let qSpec = admin.from('gorevler').select(SEL_SPEC).eq('firma_id', firmaId)
+    // Spesifik görevler vardiya bazlı değil — tamamlanma/olusturma TR günü ile filtre.
+    // gorevler_normal view: Oto Yıkama görevleri spesifik süre analizine dahil olmaz.
+    let qSpec = admin.from('gorevler_normal').select(SEL_SPEC).eq('firma_id', firmaId)
     if (projeId) qSpec = (qSpec as any).eq('proje_id', projeId)
     if (yetkiliLokIds) qSpec = qSpec.in('lokasyon_id', yetkiliLokIds)
     if (gizliFilterArg) qSpec = (qSpec as any).not('lokasyon_id', 'in', gizliFilterArg)

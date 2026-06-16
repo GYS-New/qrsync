@@ -61,7 +61,8 @@ export async function GET(req: Request) {
     const lokMap  = new Map((lokasyonlar ?? []).map((l: any) => [l.id, l.tanim]))
     const userMap = new Map((kullanicilar ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
 
-    let q = admin.from('gorevler')
+    // gorevler_normal view: Oto Yıkama görevleri spesifik rapora dahil olmaz
+    let q = admin.from('gorevler_normal')
       .select('id,tanim,durum,lokasyon_id,atanan_kullanici_id,olusturan_id,islemi_yapan_id,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi')
       .eq('firma_id', firmaId)
     if (projeId) q = (q as any).eq('proje_id', projeId)

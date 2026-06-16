@@ -34,7 +34,8 @@ export async function GET(request: Request) {
 
   // Base query'ler
   const usersBase = supabase.from('users').select('id', { count: 'exact', head: true })
-  const tasksBase = supabase.from('gorevler').select('id', { count: 'exact', head: true })
+  // gorevler_normal view: sidebar "Spesifik Görevler" badge'inde Oto Yıkama sayılmaz
+  const tasksBase = supabase.from('gorevler_normal').select('id', { count: 'exact', head: true })
   const locationsBase = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true })
 
   // GorevlerClient default filter ile aynı: ACIK + ISLEMDE + son 24h TAMAMLANDI
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
     }
 
     if (effectiveProjeId) {
-      let tQ = supabase.from('gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+      let tQ = supabase.from('gorevler_normal').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
       let lQ = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
       if (yetkiliLokIds) { tQ = tQ.in('lokasyon_id', yetkiliLokIds); lQ = lQ.in('lokasyon_id', yetkiliLokIds) }
       tasksQuery = applyAcik(tQ); liveQuery = lQ

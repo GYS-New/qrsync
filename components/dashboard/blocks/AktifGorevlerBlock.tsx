@@ -27,7 +27,7 @@ export default async function AktifGorevlerBlock({ firmaId, projeId, yetkiliLokI
   const supabase = createClient()
 
   let q = supabase
-    .from('gorevler')
+    .from('gorevler_normal')
     .select('id,tanim,durum,olusturma_tarihi,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)')
     .order('olusturma_tarihi', { ascending: false })
     .limit(limit)

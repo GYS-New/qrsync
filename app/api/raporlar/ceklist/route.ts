@@ -166,8 +166,9 @@ async function kayitlarGetir(
   }
 
   if (projeId) {
+    // gorevler_normal view: Oto Yıkama görevlerinin çeklist verisi GYS çeklist raporuna girmesin
     const { data: specLokRows } = await admin
-      .from('gorevler')
+      .from('gorevler_normal')
       .select('lokasyon_id')
       .eq('firma_id', firmaId)
       .eq('proje_id', projeId)
@@ -307,8 +308,9 @@ async function kayitlarGetir(
 
   // 4b. Spesifik: gorevler (both main and archive)
   if (specGorevIds.length) {
-    // gorevler tablosu sadece 'TAMAMLANDI' durumunu destekler; ZAMANINDA_YAPILAMAYAN enum'da yok
-    const { data: specGorevler, error: specErr } = await admin.from('gorevler')
+    // gorevler tablosu sadece 'TAMAMLANDI' durumunu destekler; ZAMANINDA_YAPILAMAYAN enum'da yok.
+    // gorevler_normal view: Oto Yıkama görevleri raporda gösterilmez.
+    const { data: specGorevler, error: specErr } = await admin.from('gorevler_normal')
       .select('id,tanim,durum,tamamlanma_tarihi,lokasyon_id,durum_degisim_tarihi')
       .in('id', specGorevIds)
       .eq('durum', 'TAMAMLANDI')

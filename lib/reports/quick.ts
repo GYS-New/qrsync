@@ -208,9 +208,10 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     const [liveTasks, { data: manualTasks, error: manualError }] = await Promise.all([
       fetchCanliGorevlerMerged(admin, 'id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id', filters),
       (() => {
+        // gorevler_normal view: Oto Yıkama görevleri spesifik raporlara dahil olmaz
         let q = filters.firmaId
-          ? admin.from('gorevler').select('id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id').eq('firma_id', filters.firmaId)
-          : admin.from('gorevler').select('id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id')
+          ? admin.from('gorevler_normal').select('id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id').eq('firma_id', filters.firmaId)
+          : admin.from('gorevler_normal').select('id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id')
         if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
         return q
       })(),
@@ -296,11 +297,11 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     const [liveTasks, gorevlerAktif, gorevlerArsiv, yoneticiIds] = await Promise.all([
       // Frekansiyel: helper canli + arsiv'i merge ediyor
       fetchCanliGorevlerMerged(admin, 'id,durum,olusturma_tarihi,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,atanan_kullanici_id,iptal_eden_id,firma_id', filters),
-      // Spesifik aktif: gorevler tablosu (iptal_eden_id yok, islemi_yapan_id manuel iptal yapanı temsil eder)
+      // Spesifik aktif: gorevler_normal view (Oto Yıkama görevleri hariç)
       (() => {
         let q = filters.firmaId
-          ? admin.from('gorevler').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id').eq('firma_id', filters.firmaId)
-          : admin.from('gorevler').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id')
+          ? admin.from('gorevler_normal').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id').eq('firma_id', filters.firmaId)
+          : admin.from('gorevler_normal').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id')
         if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
         return q
       })(),
@@ -431,7 +432,8 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     // Aktif + arşiv birleşimi
     tasks = await fetchCanliGorevlerMerged(admin, 'id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,lokasyon_id,firma_id', filters)
   } else {
-    let taskQuery = admin.from('gorevler').select('id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,lokasyon_id,firma_id')
+    // gorevler_normal view: Oto Yıkama görevleri spesifik manuel rapora dahil olmaz
+    let taskQuery = admin.from('gorevler_normal').select('id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,lokasyon_id,firma_id')
     if (filters.firmaId) taskQuery = taskQuery.eq('firma_id', filters.firmaId)
     if (filters.projeId) taskQuery = (taskQuery as any).eq('proje_id', filters.projeId)
     const { data: t, error: taskError } = await taskQuery

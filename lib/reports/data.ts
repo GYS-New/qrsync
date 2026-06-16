@@ -216,8 +216,9 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
   }
 
   if (reportKey === 'manual_tasks') {
+    // gorevler_normal view: Oto Yıkama görevleri spesifik raporlara dahil olmaz
     let query = admin
-      .from('gorevler')
+      .from('gorevler_normal')
       .select('id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,olusturan_id,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,islemi_yapan_id')
       .order('olusturma_tarihi', { ascending: false })
     if (filters.firmaId) query = query.eq('firma_id', filters.firmaId)
