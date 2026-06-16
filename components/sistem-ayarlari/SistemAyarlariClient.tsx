@@ -12,11 +12,12 @@ const GenelAyarlarClient = dynamic(() => import('./GenelAyarlarClient'), { ssr: 
 const GorevKurallariClient = dynamic(() => import('@/components/gorev-kurallari/GorevKurallariClient'), { ssr: false })
 const LokasyonYetkileriPanel = dynamic(() => import('@/components/ayarlar/LokasyonYetkileriPanel'), { ssr: false })
 const GrupYetkileriClient = dynamic(() => import('@/components/ayarlar/GrupYetkileriClient'), { ssr: false })
+const ModulYetkileriClient = dynamic(() => import('@/components/ayarlar/ModulYetkileriClient'), { ssr: false })
 const PersonelDestekPanel = dynamic(() => import('./PersonelDestekPanel'), { ssr: false })
 const CronYonetimiPanel = dynamic(() => import('./CronYonetimiPanel'), { ssr: false })
 const YedeklerPanel = dynamic(() => import('./YedeklerPanel'), { ssr: false })
 
-type Tab = 'genel' | 'proje-ayarlari' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'simulasyon' | 'personel-destek' | 'uygulama' | 'mobil' | 'smtp' | 'konfigurasyon' | 'cron' | 'yedekler' | 'dashboard'
+type Tab = 'genel' | 'proje-ayarlari' | 'frekans' | 'gorev-kurallari' | 'gorev-sureleri' | 'yetkiler' | 'modul-yetkileri' | 'simulasyon' | 'personel-destek' | 'uygulama' | 'mobil' | 'smtp' | 'konfigurasyon' | 'cron' | 'yedekler' | 'dashboard'
 
 const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'genel',          label: 'Genel Ayarlar'   },
@@ -25,6 +26,7 @@ const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'gorev-kurallari',label: 'Görev Kuralları'  },
   { key: 'gorev-sureleri', label: 'Görev Süreleri'   },
   { key: 'yetkiler',       label: 'Kullanıcı Yetkileri' },
+  { key: 'modul-yetkileri', label: 'Modül Yetkileri' },
   { key: 'simulasyon',     label: 'Simülasyon Modu'  },
   { key: 'personel-destek', label: 'Personel Görev Desteği' },
   { key: 'uygulama',       label: 'Uygulama Ayarları', saOnly: true },
@@ -142,6 +144,13 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
       )}
       {aktifTab === 'yetkiler' && firmaId && (
         <LokasyonYetkileriPanel firmaId={firmaId} lokasyonlar={lokasyonlar as any} kullanicilar={kullanicilar as any} />
+      )}
+      {aktifTab === 'modul-yetkileri' && (
+        <ModulYetkileriClient
+          isSA={isSA}
+          firmaId={firmaId}
+          firmalar={isSA ? firmalar : []}
+        />
       )}
       {aktifTab === 'simulasyon' && firmaId && <SimulasyonPanel firmaId={firmaId} projeId={projeId ?? null} lokasyonlar={lokasyonlar as any} />}
       {aktifTab === 'personel-destek' && firmaId && <PersonelDestekPanel firmaId={firmaId} projeId={projeId ?? null} lokasyonlar={lokasyonlar as any} />}
