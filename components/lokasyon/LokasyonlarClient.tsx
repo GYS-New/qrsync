@@ -22,6 +22,7 @@ export default function LokasyonlarClient({
   projeId,
   qrSablonAktif = true,
   yetkiliLokIds,
+  gizliLokIds,
   showReadOnlyActions = false,
 }: {
   base: '/sa' | '/ta' | '/u'
@@ -31,6 +32,9 @@ export default function LokasyonlarClient({
   projeId?: string | null
   qrSablonAktif?: boolean
   yetkiliLokIds?: string[] | null
+  /** Refresh sonrası bu ID'ler client tarafında filtrelenir (örn. GYS sayfasının
+   *  Oto Yıkama lokasyonlarını gizlemesi). BFS ile alt soylar da otomatik gizlenir. */
+  gizliLokIds?: string[] | null
   /** Readonly kullanıcılar için QR/↓QR/↓Kart butonlarını göster (örn. tenant_user) */
   showReadOnlyActions?: boolean
 }) {
@@ -231,15 +235,24 @@ export default function LokasyonlarClient({
     if (tplRes.error) showError(tplRes.error.message)
     if (locRes.data) {
       let data = locRes.data as any[]
-      // Oto Yıkama modülü şu an SA-only — TA/U/M için bu lokasyonları gizle
-      // (BFS: işaretli üst lokasyon + tüm alt soyları)
-      if (base !== '/sa') {
-        const otoUstIds = new Set<string>(
-          data.filter(l => !l.parent_id && (l as any).oto_yikama_lokasyon === true).map(l => l.id)
-        )
-        if (otoUstIds.size > 0) {
-          const gizli = new Set<string>(otoUstIds)
-          const queue = [...otoUstIds]
+      // Modül izolasyonu: GYS UI Oto Yıkama lokasyonlarını gösterme. Server tarafı
+      // initialLokasyonlar'da bunları zaten filtreliyor; refresh sonrası DB'den
+      // ham veri geldiği için burada da BFS ile aynı filtre uygulanır.
+      //
+      // - gizliLokIds verilmişse: o ID'ler (+ BFS ile alt soyları) gizlenir
+      // - Verilmemişse: ROOT'ta `oto_yikama_lokasyon=true` olan üst lokasyonlar
+      //   ve tüm alt soyları gizlenir (default GYS davranışı)
+      // - Oto Yıkama modülü kendi sayfasında `yetkiliLokIds` ile kapsamı zaten
+      //   daraltıyor, ek filtre uygulanmaz.
+      if (!yetkiliLokIds) {
+        const baslangic: Set<string> = gizliLokIds
+          ? new Set(gizliLokIds)
+          : new Set<string>(
+              data.filter(l => !l.parent_id && (l as any).oto_yikama_lokasyon === true).map(l => l.id)
+            )
+        if (baslangic.size > 0) {
+          const gizli = new Set<string>(baslangic)
+          const queue = [...baslangic]
           while (queue.length) {
             const cur = queue.shift()!
             for (const l of data) {

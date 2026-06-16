@@ -267,10 +267,16 @@ export async function GET(req: Request) {
       if (proje?.gorev_suresi_hedef_orani != null) hedefTolerans = proje.gorev_suresi_hedef_orani
     }
 
+    // Modül izolasyonu: Oto Yıkama lokasyonları + görevleri GYS UI'da gizli
+    const { getOtoYikamaLokasyonIds } = await import('@/lib/yetki/getOtoYikamaLokasyonIds')
+    const gizliOtoIds = await getOtoYikamaLokasyonIds(admin as any, firmaId)
+    const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
     // Lokasyon ve kullanıcı map'leri
     let loksQ = admin.from('lokasyonlar').select('id,tanim,parent_id,hedef_sure_dakika').eq('firma_id', firmaId)
     if (projeId) loksQ = (loksQ as any).eq('proje_id', projeId)
     if (yetkiliLokIds) loksQ = loksQ.in('id', yetkiliLokIds)
+    if (gizliFilterArg) loksQ = (loksQ as any).not('id', 'in', gizliFilterArg)
     const { data: loks } = await loksQ
     const { data: users } = await admin.from('users').select('id,isim_soyisim').eq('firma_id', firmaId)
 
@@ -302,6 +308,7 @@ export async function GET(req: Request) {
     let qFreqB = admin.from('canli_gorevler_arsiv').select(SEL_FREQ).eq('firma_id', firmaId)
     if (projeId) { qFreqA = (qFreqA as any).eq('proje_id', projeId); qFreqB = (qFreqB as any).eq('proje_id', projeId) }
     if (yetkiliLokIds) { qFreqA = qFreqA.in('lokasyon_id', yetkiliLokIds); qFreqB = qFreqB.in('lokasyon_id', yetkiliLokIds) }
+    if (gizliFilterArg) { qFreqA = (qFreqA as any).not('lokasyon_id', 'in', gizliFilterArg); qFreqB = (qFreqB as any).not('lokasyon_id', 'in', gizliFilterArg) }
     if (baslangic) { qFreqA = qFreqA.gte('vardiya_gunu', baslangic); qFreqB = qFreqB.gte('vardiya_gunu', baslangic) }
     if (bitis)     { qFreqA = qFreqA.lte('vardiya_gunu', bitis);     qFreqB = qFreqB.lte('vardiya_gunu', bitis)     }
 
@@ -316,6 +323,7 @@ export async function GET(req: Request) {
     let qSpec = admin.from('gorevler').select(SEL_SPEC).eq('firma_id', firmaId)
     if (projeId) qSpec = (qSpec as any).eq('proje_id', projeId)
     if (yetkiliLokIds) qSpec = qSpec.in('lokasyon_id', yetkiliLokIds)
+    if (gizliFilterArg) qSpec = (qSpec as any).not('lokasyon_id', 'in', gizliFilterArg)
     const { data: specRaw } = await qSpec
     const specTum = (specRaw ?? []).filter((g: any) =>
       !baslangic && !bitis ? true : withinRange(g.tamamlanma_tarihi ?? g.olusturma_tarihi, baslangic, bitis)

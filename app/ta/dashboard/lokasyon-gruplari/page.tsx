@@ -28,11 +28,26 @@ export default async function TALokasyonGruplariPage() {
     </div>
   )
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları + ust_lokasyon_id'si yıkama olan
+  // gruplar GYS UI'da gizli.
+  const otoIds = firmaId ? await getOtoYikamaLokasyonIds(admin, firmaId) : new Set<string>()
+  const gizliFilterArg = otoIds.size > 0 ? `(${[...otoIds].join(',')})` : null
+
+  let gruplariQ = admin.from('lokasyon_gruplari')
+    .select('id,firma_id,ad,aciklama,aktif,kayit_tarihi,guncelleme_tarihi,kayit_yapan_id,ust_lokasyon_id')
+    .eq('firma_id', firmaId).eq('proje_id', aktifProje.id).order('ad')
+  if (gizliFilterArg) gruplariQ = (gruplariQ as any).not('ust_lokasyon_id', 'in', gizliFilterArg)
+
+  let lokQ = admin.from('lokasyonlar')
+    .select('id,firma_id,parent_id,tanim,aktif,kayit_tarihi')
+    .eq('firma_id', firmaId).eq('proje_id', aktifProje.id).order('kayit_tarihi', { ascending: true })
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
+
   const [groupsRes, membersRes, locationsRes] = firmaId
     ? await Promise.all([
-        admin.from('lokasyon_gruplari').select('id,firma_id,ad,aciklama,aktif,kayit_tarihi,guncelleme_tarihi,kayit_yapan_id,ust_lokasyon_id').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).order('ad'),
+        gruplariQ,
         admin.from('lokasyon_grup_uyeleri').select('grup_id,lokasyon_id'),
-        admin.from('lokasyonlar').select('id,firma_id,parent_id,tanim,aktif,kayit_tarihi').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).order('kayit_tarihi', { ascending: true }),
+        lokQ,
       ])
     : [{ data: [] as any[] }, { data: [] as any[] }, { data: [] as any[] }]
 
@@ -41,12 +56,7 @@ export default async function TALokasyonGruplariPage() {
     lokasyonIds: (membersRes.data ?? []).filter((m: any) => m.grup_id === g.id).map((m: any) => m.lokasyon_id),
   }))
 
-  // Oto Yıkama modülü şu an SA-only — TA için bu lokasyonları gizle
-  let filteredLocations = (locationsRes.data ?? []) as any[]
-  if (firmaId) {
-    const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
-    if (otoIds.size > 0) filteredLocations = filteredLocations.filter(l => !otoIds.has(l.id))
-  }
+  const filteredLocations = (locationsRes.data ?? []) as any[]
 
   return (
     <div>

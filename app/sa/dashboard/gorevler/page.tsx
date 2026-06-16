@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,10 +27,15 @@ export default async function SAGorevlerPage() {
     : null
   if (gorevQ && projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları GYS UI'da gizli
+  const gizliOtoIds = firmaId ? await getOtoYikamaLokasyonIds(supabase as any, firmaId) : new Set<string>()
+  const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
   let lokQ = firmaId
     ? supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id').eq('firma_id', firmaId).eq('aktif', true).order('tanim')
     : null
   if (lokQ && projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+  if (lokQ && gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
 
   const [gorevlerRes, lokasyonlarRes, kullanicilarRes, ayarlar] = await Promise.all([
     gorevQ ?? Promise.resolve({ data: [] as any[] }),

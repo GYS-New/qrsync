@@ -314,7 +314,7 @@ const getLocUstAlt = (lokasyonId: string | null | undefined, fallbackName?: stri
     if (!firmaId) return
     let q = supabase
       .from('lokasyonlar')
-      .select('id,tanim,parent_id')
+      .select('id,tanim,parent_id,oto_yikama_lokasyon')
       .eq('firma_id', firmaId)
       .eq('aktif', true)
     // Proje seçiliyse sadece o projenin lokasyonlarını göster
@@ -327,8 +327,11 @@ const getLocUstAlt = (lokasyonId: string | null | undefined, fallbackName?: stri
       return
     }
     if (!alive) return
+    // Modül izolasyonu: Oto Yıkama lokasyonlarını çıkar
+    const { filterOutOtoYikama } = await import('@/lib/yetki/clientOtoYikamaFilter')
+    const filtreliLok = filterOutOtoYikama((data ?? []) as any)
     const map: Record<string, { tanim: string; parent_id: string | null }> = {}
-    ;(data ?? []).forEach((l: any) => {
+    filtreliLok.forEach((l: any) => {
       map[l.id] = { tanim: l.tanim, parent_id: l.parent_id }
     })
     setLocMap(map)

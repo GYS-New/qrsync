@@ -99,8 +99,8 @@ export async function GET(req: NextRequest) {
   const { data: rows, error } = await q
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
-  // Oto Yıkama modülü şu an SA-only — TA/U/M için bu lokasyonların kurallarını gizle
-  const otoIds = !isSA ? await getOtoYikamaLokasyonIds(admin, firmaId) : new Set<string>()
+  // Modül izolasyonu: Oto Yıkama lokasyonları + kuralları GYS UI'da gizli (tüm roller)
+  const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
 
   const kurallar = (rows ?? [])
     .filter((r: any) => !otoIds.has(r.lokasyon_id))

@@ -7,6 +7,7 @@ import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 import { createAdminClient } from '@/lib/supabase/server'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,10 +43,19 @@ export default async function TASistemAyarlariPage() {
   }
 
   const admin = createAdminClient()
+
+  // Modül izolasyonu: Oto Yıkama lokasyonları sistem ayarlarında (görev süresi,
+  // frekans ayarları gibi) gözükmez
+  const gizliOtoIds = await getOtoYikamaLokasyonIds(supabase as any, firmaId)
+  const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
+  let lokQ = supabase.from('lokasyonlar')
+    .select('id, tanim, parent_id, aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika, gunluk_frekans_sayisi, haftalik_frekans_sayisi')
+    .eq('firma_id', firmaId).eq('proje_id', aktifProje.id).order('tanim', { ascending: true })
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
+
   const [{ data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
-    supabase.from('lokasyonlar')
-      .select('id, tanim, parent_id, aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika, gunluk_frekans_sayisi, haftalik_frekans_sayisi')
-      .eq('firma_id', firmaId).eq('proje_id', aktifProje.id).order('tanim', { ascending: true }),
+    lokQ,
     supabase.from('users')
       .select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true)
       .eq('proje_id', aktifProje.id).order('isim_soyisim'),

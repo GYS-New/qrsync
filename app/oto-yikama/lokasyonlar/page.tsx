@@ -70,6 +70,7 @@ export default async function OtoYikamaLokasyonlarPage() {
         initialLokasyonlar={lokasyonlar}
         readonly={false}
         qrSablonAktif={qrSablonAktif}
+        yetkiliLokIds={[...otoYikamaIds]}
       />
     </div>
   )

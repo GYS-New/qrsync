@@ -112,8 +112,8 @@ export async function GET(req: NextRequest) {
   if (projeId) q = (q as any).eq('proje_id', projeId)
   const { data: gorevler } = await q
 
-  // Oto Yıkama modülü şu an SA-only — TA/U/M için bu lokasyonların özetini gizle
-  const otoIds = !isSA ? await getOtoYikamaLokasyonIds(admin, firmaId) : new Set<string>()
+  // Modül izolasyonu: Oto Yıkama lokasyon özetleri GYS UI'da gizli (tüm roller)
+  const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
 
   type Bucket = { tamamlandi: number; islemde: number; acik: number }
   const ozet: Record<string, Record<number, Bucket>> = {}

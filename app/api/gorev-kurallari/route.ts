@@ -113,8 +113,8 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Oto Yıkama modülü şu an SA-only — TA/U/M Oto Yıkama lokasyonuna kural açamaz
-  if (me.rol !== 'super_admin' && me.rol !== 'alt_super_admin') {
+  // Modül izolasyonu: Oto Yıkama lokasyonlarına kural GYS UI'dan açılamaz (tüm roller)
+  {
     const { getOtoYikamaLokasyonIds } = await import('@/lib/yetki/getOtoYikamaLokasyonIds')
     const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
     if (otoIds.has(lokasyon_id)) {

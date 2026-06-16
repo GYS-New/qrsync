@@ -44,6 +44,8 @@ type Filters = {
   groupId?: string | null
   parentLocationId?: string | null
   yetkiliLokIds?: string[] | null
+  /** Modül izolasyonu: Oto Yıkama lokasyon ID'leri rapor çıktısından dışlanır. */
+  gizliLokIds?: string[] | null
 }
 
 type ChartDatum = Record<string, string | number>
@@ -189,9 +191,13 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
   if (userError) throw new Error(userError.message)
 
   const locsRaw = locations ?? []
+  // Modül izolasyonu: Oto Yıkama lokasyonları rapor sonuçlarından dışlanır.
+  const gizliSet = filters.gizliLokIds ? new Set(filters.gizliLokIds) : null
   const locs = filters.yetkiliLokIds
-    ? locsRaw.filter((x: any) => filters.yetkiliLokIds!.includes(x.id))
-    : locsRaw
+    ? locsRaw.filter((x: any) => filters.yetkiliLokIds!.includes(x.id) && !gizliSet?.has(x.id))
+    : gizliSet
+      ? locsRaw.filter((x: any) => !gizliSet.has(x.id))
+      : locsRaw
   const userList = users ?? []
   const locMap = new Map<string, any>(locs.map((x: any) => [x.id, x]))
   const userMap = new Map<string, string>(userList.map((x: any) => [x.id, x.isim_soyisim ?? '-']))

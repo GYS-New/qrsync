@@ -7,6 +7,7 @@ import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,12 +36,17 @@ export default async function SASistemAyarlariPage() {
   let lokasyonlar: any[] = []
   let kullanicilar: any[] = []
   if (firmaId) {
+    // Modül izolasyonu: Oto Yıkama lokasyonları sistem ayarlarında gözükmez
+    const gizliOtoIds = await getOtoYikamaLokasyonIds(supabase as any, firmaId)
+    const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
     let q = supabase
       .from('lokasyonlar')
       .select('id, tanim, parent_id, aktif, hedef_sure_dakika, min_sure_dakika, max_sure_dakika, gunluk_frekans_sayisi, haftalik_frekans_sayisi')
       .eq('firma_id', firmaId)
       .order('tanim', { ascending: true })
     if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (gizliFilterArg) q = (q as any).not('id', 'in', gizliFilterArg)
     const { data } = await q
     lokasyonlar = data ?? []
 

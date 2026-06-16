@@ -4,6 +4,7 @@ import LokasyonlarClient from '@/components/lokasyon/LokasyonlarClient'
 import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,11 @@ export default async function ULokasyonlarPage() {
   // Yetkili lokasyon kısıtlaması
   const yetkiliLokIds = firmaId ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları GYS UI'da gizli (yıkama personeli
+  // olan U kullanıcısı için bile — yıkama akışı /oto-yikama modülünde)
+  const gizliOtoIds = firmaId ? await getOtoYikamaLokasyonIds(supabase as any, firmaId) : new Set<string>()
+  const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
   let q = supabase
     .from('lokasyonlar')
     .select('*')
@@ -31,6 +37,7 @@ export default async function ULokasyonlarPage() {
 
   if (projeId) q = (q as any).eq('proje_id', projeId)
   if (yetkiliLokIds) q = q.in('id', yetkiliLokIds)
+  if (gizliFilterArg) q = (q as any).not('id', 'in', gizliFilterArg)
 
   const { data: lokasyonlar } = await q
 
