@@ -16,6 +16,9 @@ interface TopbarProps {
   /** Optional: if provided, Topbar uses it; otherwise fetches unread count client-side */
   notifCount?: number
   base: string
+  /** Firma + Proje seçicilerini gizle (örn. Oto Yıkama modülünde modül-bağımsız
+   *  scope yok, kullanıcı kendi firmasında/lokasyonunda çalışır) */
+  hideScopeControls?: boolean
 }
 
 // Breadcrumb label → href mapping
@@ -42,7 +45,7 @@ const BREADCRUMB_HREF_MAP: Record<string, string> = {
   'Birim Fiyatlar': '/dashboard/birim-fiyatlar',
 }
 
-export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCount, base }: TopbarProps) {
+export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCount, base, hideScopeControls }: TopbarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [navigating, setNavigating] = useState(false)
@@ -161,7 +164,7 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
 
       {/* Right */}
       <div style={{ marginLeft:'auto', display:'flex',  alignItems:'center', gap:10 }}>
-        <DashboardScopeControls base={base} />
+        {!hideScopeControls && <DashboardScopeControls base={base} />}
         {actions}
 
         {/* Notifications (moved from sidebar) */}

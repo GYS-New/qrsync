@@ -11,7 +11,7 @@ export default async function OtoYikamaGunlukPage() {
 
   return (
     <div>
-      <Topbar title="Günlük Tablo" base={rolBase}
+      <Topbar title="Günlük Tablo" base={rolBase} hideScopeControls
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Günlük Tablo' }]} />
       <GunlukClient />
     </div>

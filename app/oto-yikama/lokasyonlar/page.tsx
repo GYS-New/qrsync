@@ -32,7 +32,7 @@ export default async function OtoYikamaLokasyonlarPage() {
   if (!firmaId) {
     return (
       <div>
-        <Topbar title="Lokasyonlar" base={rolBase} breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Lokasyonlar' }]} />
+        <Topbar title="Lokasyonlar" base={rolBase} breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Lokasyonlar' }]} hideScopeControls />
         <div style={{ padding: '24px 28px' }}>
           <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
             Görüntülemek için üstten bir firma seçin.
@@ -62,6 +62,7 @@ export default async function OtoYikamaLokasyonlarPage() {
         title="Lokasyonlar"
         base={rolBase}
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Lokasyonlar' }]}
+        hideScopeControls
       />
       <LokasyonlarClient
         base={rolBase as any}
