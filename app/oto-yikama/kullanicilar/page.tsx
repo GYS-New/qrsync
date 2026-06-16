@@ -45,15 +45,41 @@ export default async function OtoYikamaKullanicilarPage() {
   const otoUstIds = (otoLoklar ?? []).map((l: any) => l.id)
   const otoLokAdMap = new Map((otoLoklar ?? []).map((l: any) => [l.id as string, l.tanim as string]))
 
-  // 2) Bu üst lokasyonlara atanmış kullanıcı yetki kayıtları
+  // 2) İki kaynak: yetki kaynağı tutarlılığı için her ikisi de dahil edilir
+  //    (lib/modul/yetkiliModuller.ts ve /api/app/me ile aynı mantık)
+  //    A) kullanici_lokasyon_yetkileri'nde Oto Yıkama lokasyonuna atanmış
+  //    B) users.ust_lokasyon_id'si Oto Yıkama lokasyonuna işaret eden
   let kullaniciAtamalari: { user_id: string; ust_lokasyon_id: string }[] = []
   if (otoUstIds.length > 0) {
-    const { data } = await supabase
-      .from('kullanici_lokasyon_yetkileri')
-      .select('user_id, ust_lokasyon_id')
-      .eq('firma_id', firmaId)
-      .in('ust_lokasyon_id', otoUstIds)
-    kullaniciAtamalari = data ?? []
+    const [yetkiRes, userByUstRes] = await Promise.all([
+      supabase
+        .from('kullanici_lokasyon_yetkileri')
+        .select('user_id, ust_lokasyon_id')
+        .eq('firma_id', firmaId)
+        .in('ust_lokasyon_id', otoUstIds),
+      supabase
+        .from('users')
+        .select('id, ust_lokasyon_id')
+        .eq('firma_id', firmaId)
+        .in('ust_lokasyon_id', otoUstIds),
+    ])
+    const birlesim = new Map<string, Set<string>>()
+    for (const r of (yetkiRes.data ?? [])) {
+      const set = birlesim.get(r.user_id) ?? new Set<string>()
+      set.add(r.ust_lokasyon_id)
+      birlesim.set(r.user_id, set)
+    }
+    for (const u of (userByUstRes.data ?? [])) {
+      if (!u.ust_lokasyon_id) continue
+      const set = birlesim.get(u.id) ?? new Set<string>()
+      set.add(u.ust_lokasyon_id)
+      birlesim.set(u.id, set)
+    }
+    for (const [user_id, ustSet] of birlesim) {
+      for (const ust_lokasyon_id of ustSet) {
+        kullaniciAtamalari.push({ user_id, ust_lokasyon_id })
+      }
+    }
   }
 
   // 3) Kullanıcı detayları
