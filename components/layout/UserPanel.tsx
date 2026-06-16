@@ -37,12 +37,13 @@ export default function UserPanel({ base }: { base: string }) {
 
   async function logout() {
     // Scope cookie'leri ve localStorage'ı temizle — başka kullanıcı/rol ile
-    // giriş yapıldığında önceki seçim (firma, proje, üst lokasyon) sızmasın
+    // giriş yapıldığında önceki seçim (firma, proje, üst lokasyon, modül) sızmasın
     try {
       const cookieNames = [
         'qrsync_sa_firma_id',
         'qrsync_aktif_proje_id',
         'qrsync_aktif_ust_lokasyon_id',
+        'iogys_aktif_modul',
       ]
       for (const n of cookieNames) {
         document.cookie = `${n}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
@@ -51,6 +52,16 @@ export default function UserPanel({ base }: { base: string }) {
     } catch {}
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  async function modulDegistir() {
+    // Server tarafında cookie sil + /modul-sec'e dön
+    await fetch('/api/modul/sec', { method: 'DELETE' }).catch(() => {})
+    // Client tarafı cookie temizleme (httpOnly olmadığı için her ikisi de gerekir)
+    try {
+      document.cookie = 'iogys_aktif_modul=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'
+    } catch {}
+    router.push('/modul-sec')
   }
 
   const displayName = me?.isim_soyisim ?? 'Kullanıcı'
@@ -118,6 +129,18 @@ export default function UserPanel({ base }: { base: string }) {
               </button>
             ))}
             <div style={{ height:1, background:'#f3f4f6', margin:'6px 6px' }} />
+            <button
+              type="button"
+              onClick={() => { setOpen(false); modulDegistir() }}
+              style={{
+                width:'100%', textAlign:'left', padding:'8px 10px',
+                border:'none', background:'transparent', cursor:'pointer',
+                borderRadius:8, fontSize:14.5, color:'#374151'
+              }}
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              Modül Değiştir
+            </button>
             <button
               type="button"
               onClick={() => { setOpen(false); logout() }}

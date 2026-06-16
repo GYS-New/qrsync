@@ -53,9 +53,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Oto Yıkama modülü şu an SA-only — TA/U/M Oto Yıkama lokasyonu için QR kart üretemez
-  const otoIds = !isSA ? await getOtoYikamaLokasyonIds(admin, effectiveFirmaId) : new Set<string>()
-  if (!isSA && ustLokasyonId && otoIds.has(ustLokasyonId)) {
+  // Modül izolasyonu: Oto Yıkama lokasyonları için QR kart GYS UI'dan üretilmez
+  // (tüm roller). Oto Yıkama modülünün kendi QR yönetimi var.
+  const otoIds = await getOtoYikamaLokasyonIds(admin, effectiveFirmaId)
+  if (ustLokasyonId && otoIds.has(ustLokasyonId)) {
     return NextResponse.json({ error: 'Bu lokasyon için yetkiniz yok' }, { status: 403 })
   }
 
@@ -90,8 +91,8 @@ export async function POST(req: NextRequest) {
     altIds.delete(ustLokasyonId)
     lokasyonlar = lokasyonlar.filter((l: any) => altIds.has(l.id))
   }
-  // SA değilse Oto Yıkama lokasyonlarını hariç tut
-  if (!isSA && otoIds.size > 0) {
+  // Modül izolasyonu: Oto Yıkama lokasyonları çıktıya eklenmez (tüm roller)
+  if (otoIds.size > 0) {
     lokasyonlar = lokasyonlar.filter((l: any) => !otoIds.has(l.id))
   }
   if (!lokasyonlar.length) return NextResponse.json({ error: 'QR kodu olan aktif lokasyon bulunamadı' }, { status: 404 })

@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,12 +35,17 @@ export default async function SATumGorevlerPage() {
 
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları + bunlara ait görevler GYS UI'da gizlenir.
+  const gizliOtoYikamaIds = await getOtoYikamaLokasyonIds(supabase as any, firmaId)
+  const gizliFilterArg = gizliOtoYikamaIds.size > 0 ? `(${[...gizliOtoYikamaIds].join(',')})` : null
+
   // Aktif tablodaki tüm görevleri çek (arşivlenmemiş olanlar)
   const gorevler = await fetchAll(() => {
     let q = supabase.from('canli_gorevler').select(sel)
       .eq('firma_id', firmaId)
       .order('aktif_olma_tarihi', { ascending: false })
     if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+    if (gizliFilterArg) q = (q as any).not('lokasyon_id', 'in', gizliFilterArg)
     return q
   })
 
@@ -50,6 +56,7 @@ export default async function SATumGorevlerPage() {
     .eq('aktif', true)
     .order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
 
   const [{ data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
     lokQ,

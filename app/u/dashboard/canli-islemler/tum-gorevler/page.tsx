@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,10 @@ export default async function UTumGorevlerPage() {
   // Yetkili lokasyon kısıtlaması
   const yetkiliLokIds = await getYetkiliLokasyonIds(supabase, firmaId, projeId)
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları + görevleri GYS UI'da gizli
+  const gizliOtoIds = await getOtoYikamaLokasyonIds(supabase as any, firmaId)
+  const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
   const gorevler = await fetchAll(() => {
@@ -43,6 +48,7 @@ export default async function UTumGorevlerPage() {
       .order('aktif_olma_tarihi', { ascending: false })
     if (projeId) q = (q as any).eq('proje_id', projeId)
     if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
+    if (gizliFilterArg) q = (q as any).not('lokasyon_id', 'in', gizliFilterArg)
     return q
   })
 
@@ -51,6 +57,7 @@ export default async function UTumGorevlerPage() {
     .eq('firma_id', firmaId).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
   if (yetkiliLokIds) lokQ = lokQ.in('id', yetkiliLokIds)
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
 
   const { data: lokasyonlar } = await lokQ
   let kulQ = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true)

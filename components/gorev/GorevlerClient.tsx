@@ -12,6 +12,7 @@ import { createGorevAtamaNotification, notifyTenantAdminsOnGorevStatusChange, ty
 import { useFirma } from '@/components/layout/FirmaContext'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { useYetki } from '@/lib/yetki/useYetki'
+import { filterOutOtoYikama, getOtoYikamaIdSet } from '@/lib/yetki/clientOtoYikamaFilter'
 
 const DURUM_RENK: Record<string, string> = {
   ACIK: 'status-acik',
@@ -199,7 +200,8 @@ export default function GorevlerClient({
       .order('olusturma_tarihi', { ascending: false }).limit(200)
     if (projeId) gorevQuery = (gorevQuery as any).eq('proje_id', projeId)
     if (yetkiliLokIds) gorevQuery = gorevQuery.in('lokasyon_id', yetkiliLokIds)
-    let lokQuery = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id')
+    // Modül izolasyonu: oto_yikama_lokasyon kolonunu da çek, sonuçta filtrele
+    let lokQuery = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id,oto_yikama_lokasyon')
       .eq('firma_id', fid).eq('aktif', true).order('tanim')
     if (projeId) lokQuery = (lokQuery as any).eq('proje_id', projeId)
     if (yetkiliLokIds) lokQuery = lokQuery.in('id', yetkiliLokIds)
@@ -210,8 +212,19 @@ export default function GorevlerClient({
     if (gRes.error) showError(gRes.error.message)
     if (lRes.error) showError(lRes.error.message)
     if (uRes.error) showError(uRes.error.message)
-    if (gRes.data) setGorevler(gRes.data)
-    if (lRes.data) setLokasyonlar(lRes.data as any)
+    // Modül izolasyonu: lokasyonları filtrele + ilgili görevleri de dışla
+    if (lRes.data) {
+      const filtreliLok = filterOutOtoYikama(lRes.data as any)
+      setLokasyonlar(filtreliLok as any)
+      if (gRes.data) {
+        const gizliSet = getOtoYikamaIdSet(lRes.data as any)
+        setGorevler(gizliSet.size > 0
+          ? (gRes.data as any[]).filter(g => !gizliSet.has(g.lokasyon_id))
+          : gRes.data)
+      }
+    } else if (gRes.data) {
+      setGorevler(gRes.data)
+    }
     if (uRes.data) setKullanicilar(uRes.data as any)
     setLoading(false)
   }

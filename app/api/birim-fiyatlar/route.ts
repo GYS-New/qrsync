@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 // GET /api/birim-fiyatlar?proje_id=xxx
 export async function GET(req: NextRequest) {
@@ -21,17 +22,27 @@ export async function GET(req: NextRequest) {
   if (!proje) return NextResponse.json({ error: 'Proje bulunamadı' }, { status: 404 })
   if (!isSA && proje.firma_id !== me.firma_id) return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 })
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları/grupları GYS UI'da gizli (tüm roller)
+  const gizliOtoIds = await getOtoYikamaLokasyonIds(admin as any, proje.firma_id)
+  const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
+  let gruplarQ = admin.from('lokasyon_gruplari')
+    .select('id,ad,ust_lokasyon_id,aktif')
+    .eq('proje_id', projeId)
+    .eq('firma_id', proje.firma_id)
+    .order('ad')
+  if (gizliFilterArg) gruplarQ = (gruplarQ as any).not('ust_lokasyon_id', 'in', gizliFilterArg)
+
+  let lokQ = admin.from('lokasyonlar')
+    .select('id,tanim,parent_id,aktif')
+    .eq('proje_id', projeId)
+    .eq('firma_id', proje.firma_id)
+    .order('tanim')
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
+
   const [gruplarRes, lokasyonlarRes, grupUyeleriRes, fiyatlarRes] = await Promise.all([
-    admin.from('lokasyon_gruplari')
-      .select('id,ad,ust_lokasyon_id,aktif')
-      .eq('proje_id', projeId)
-      .eq('firma_id', proje.firma_id)
-      .order('ad'),
-    admin.from('lokasyonlar')
-      .select('id,tanim,parent_id,aktif')
-      .eq('proje_id', projeId)
-      .eq('firma_id', proje.firma_id)
-      .order('tanim'),
+    gruplarQ,
+    lokQ,
     admin.from('lokasyon_grup_uyeleri')
       .select('grup_id,lokasyon_id'),
     admin.from('birim_fiyatlar')

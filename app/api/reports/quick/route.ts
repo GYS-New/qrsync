@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { buildQuickReport, type QuickReportType } from '@/lib/reports/quick'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -40,6 +41,10 @@ export async function GET(req: NextRequest) {
     const isUM = me.rol === 'tenant_user' || me.rol === 'musteri'
     const yetkiliLokIds = isUM ? await getYetkiliLokasyonIds(supabase, firmaId!, projeId) : null
 
+    // Modül izolasyonu: Oto Yıkama lokasyonları GYS raporlarında gizli (tüm roller)
+    const adminForOto = createAdminClient()
+    const gizliOtoIds = firmaId ? await getOtoYikamaLokasyonIds(adminForOto as any, firmaId) : new Set<string>()
+
     const payload = await buildQuickReport(type, {
       firmaId,
       projeId,
@@ -51,6 +56,7 @@ export async function GET(req: NextRequest) {
       groupId: searchParams.get('groupId'),
       parentLocationId: searchParams.get('parentLocationId'),
       yetkiliLokIds,
+      gizliLokIds: gizliOtoIds.size > 0 ? [...gizliOtoIds] : null,
     })
 
     return NextResponse.json(payload)

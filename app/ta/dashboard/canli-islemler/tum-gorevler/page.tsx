@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,21 +29,30 @@ export default async function TATumGorevlerPage() {
 
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  const gorevler = await fetchAll(() =>
-    supabase.from('canli_gorevler').select(sel)
+  // Modül izolasyonu: Oto Yıkama lokasyonları + bunlara ait görevler GYS UI'da gizlenir.
+  const gizliOtoYikamaIds = await getOtoYikamaLokasyonIds(supabase as any, firmaId)
+  const gizliFilterArg = gizliOtoYikamaIds.size > 0 ? `(${[...gizliOtoYikamaIds].join(',')})` : null
+
+  const gorevler = await fetchAll(() => {
+    let q = supabase.from('canli_gorevler').select(sel)
       .eq('firma_id', firmaId)
       .or(`proje_id.eq.${aktifProje.id},proje_id.is.null`)
       .order('aktif_olma_tarihi', { ascending: false })
-  )
+    if (gizliFilterArg) q = (q as any).not('lokasyon_id', 'in', gizliFilterArg)
+    return q
+  })
+
+  let lokQ = supabase
+    .from('lokasyonlar')
+    .select('id,tanim,parent_id,checklist_sablon_id')
+    .eq('firma_id', firmaId)
+    .eq('proje_id', aktifProje.id)
+    .eq('aktif', true)
+    .order('tanim')
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
 
   const [{ data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
-    supabase
-      .from('lokasyonlar')
-      .select('id,tanim,parent_id,checklist_sablon_id')
-      .eq('firma_id', firmaId)
-      .eq('proje_id', aktifProje.id)
-      .eq('aktif', true)
-      .order('tanim'),
+    lokQ,
     (() => { let q = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true); q = (q as any).eq('proje_id', aktifProje.id); return q.order('isim_soyisim') })(),
     getEfektifAyar(firmaId, aktifProje.id),
   ])

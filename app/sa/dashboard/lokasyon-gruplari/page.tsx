@@ -4,6 +4,7 @@ import LokasyonGruplariClient from '@/components/lokasyon-grup/LokasyonGruplariC
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -32,15 +33,22 @@ export default async function SALokasyonGruplariPage() {
     )
   }
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları + ust_lokasyon_id'si yıkama
+  // olan grupları gizle.
+  const gizliOtoIds = await getOtoYikamaLokasyonIds(admin as any, firmaId)
+  const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
   let groupQ = admin.from('lokasyon_gruplari')
     .select('id,firma_id,ad,aciklama,aktif,kayit_tarihi,guncelleme_tarihi,kayit_yapan_id,ust_lokasyon_id')
     .eq('firma_id', firmaId).order('ad')
   if (projeId) groupQ = (groupQ as any).eq('proje_id', projeId)
+  if (gizliFilterArg) groupQ = (groupQ as any).not('ust_lokasyon_id', 'in', gizliFilterArg)
 
   let locQ = admin.from('lokasyonlar')
     .select('id,firma_id,parent_id,tanim,aktif,kayit_tarihi')
     .eq('firma_id', firmaId).order('kayit_tarihi', { ascending: true })
   if (projeId) locQ = (locQ as any).eq('proje_id', projeId)
+  if (gizliFilterArg) locQ = (locQ as any).not('id', 'in', gizliFilterArg)
 
   const [groupsRes, membersRes, locationsRes] = await Promise.all([
     groupQ,

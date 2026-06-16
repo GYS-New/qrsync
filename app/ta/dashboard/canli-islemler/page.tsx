@@ -7,6 +7,7 @@ import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 import { getDescendantIds } from '@/lib/lokasyon/getDescendantIds'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,10 +31,19 @@ export default async function CanliIslemlerPage() {
     </div>
   )
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları + görevleri GYS UI'da gizli
+  const gizliOtoIds = firmaId ? await getOtoYikamaLokasyonIds(supabase as any, firmaId) : new Set<string>()
+  const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
+  let lokQ = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).eq('aktif', true).order('tanim')
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
+  let canliQ = supabase.from('canli_gorevler').select('*,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)').eq('firma_id', firmaId).or(`proje_id.eq.${aktifProje.id},proje_id.is.null`).order('olusturma_tarihi', { ascending: false }).limit(50)
+  if (gizliFilterArg) canliQ = (canliQ as any).not('lokasyon_id', 'in', gizliFilterArg)
+
   const [{ data: lokasyonlar }, { data: kullanicilar }, { data: canliGorevler }] = await Promise.all([
-    supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).eq('aktif', true).order('tanim'),
+    lokQ,
     supabase.from('users').select('id,isim_soyisim,profil_foto').eq('firma_id', firmaId).eq('aktif', true).eq('proje_id', aktifProje.id),
-    supabase.from('canli_gorevler').select('*,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)').eq('firma_id', firmaId).or(`proje_id.eq.${aktifProje.id},proje_id.is.null`).order('olusturma_tarihi', { ascending: false }).limit(50),
+    canliQ,
   ])
 
   const efektifAyar = await getEfektifAyar(firmaId, aktifProje.id)

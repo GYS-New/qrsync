@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,10 +34,15 @@ export default async function UserCanliIslemler() {
   // Yetkili lokasyon kısıtlaması
   const yetkiliLokIds = firmaId ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları + görevleri GYS UI'da gizli
+  const gizliOtoIds = firmaId ? await getOtoYikamaLokasyonIds(supabase as any, firmaId) : new Set<string>()
+  const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
   let lokQ = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id')
     .eq('firma_id', firmaId).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
   if (yetkiliLokIds) lokQ = lokQ.in('id', yetkiliLokIds)
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
 
   let kulQ2 = supabase.from('users').select('id,isim_soyisim,profil_foto').eq('firma_id', firmaId).eq('aktif', true)
   if (projeId) kulQ2 = (kulQ2 as any).eq('proje_id', projeId)
@@ -47,6 +53,7 @@ export default async function UserCanliIslemler() {
     .eq('firma_id', firmaId).order('olusturma_tarihi', { ascending: false }).limit(50)
   if (projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
   if (yetkiliLokIds) gorevQ = gorevQ.in('lokasyon_id', yetkiliLokIds)
+  if (gizliFilterArg) gorevQ = (gorevQ as any).not('lokasyon_id', 'in', gizliFilterArg)
 
   const [{ data: lokasyonlar }, { data: canliGorevler }] = await Promise.all([lokQ, gorevQ])
 

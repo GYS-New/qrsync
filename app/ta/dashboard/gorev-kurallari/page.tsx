@@ -4,6 +4,7 @@ import GorevKurallariClient from '@/components/gorev-kurallari/GorevKurallariCli
 import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { redirect } from 'next/navigation'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,20 +27,30 @@ export default async function TAGorevKurallariPage() {
     </div>
   )
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları + bunlara ait kurallar GYS UI'da gizlenir.
+  const gizliOtoYikamaIds = await getOtoYikamaLokasyonIds(supabase as any, firmaId)
+  const gizliFilterArg = gizliOtoYikamaIds.size > 0 ? `(${[...gizliOtoYikamaIds].join(',')})` : null
+
+  let kuralQ = supabase
+    .from('gorev_kurallari')
+    .select('*,lokasyonlar(id,tanim,parent_id),atanan_kullanici:users!gorev_kurallari_atanan_kullanici_id_fkey(id,isim_soyisim)')
+    .eq('firma_id', firmaId)
+    .eq('proje_id', aktifProje.id)
+    .order('kayit_tarihi', { ascending: false })
+  if (gizliFilterArg) kuralQ = (kuralQ as any).not('lokasyon_id', 'in', gizliFilterArg)
+
+  let lokQ = supabase
+    .from('lokasyonlar')
+    .select('id,tanim,parent_id,aktif')
+    .eq('firma_id', firmaId)
+    .eq('proje_id', aktifProje.id)
+    .eq('aktif', true)
+    .order('tanim')
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
+
   const [{ data: kuralar }, { data: lokasyonlar }, { data: kullanicilar }] = await Promise.all([
-    supabase
-      .from('gorev_kurallari')
-      .select('*,lokasyonlar(id,tanim,parent_id),atanan_kullanici:users!gorev_kurallari_atanan_kullanici_id_fkey(id,isim_soyisim)')
-      .eq('firma_id', firmaId)
-      .eq('proje_id', aktifProje.id)
-      .order('kayit_tarihi', { ascending: false }),
-    supabase
-      .from('lokasyonlar')
-      .select('id,tanim,parent_id,aktif')
-      .eq('firma_id', firmaId)
-      .eq('proje_id', aktifProje.id)
-      .eq('aktif', true)
-      .order('tanim'),
+    kuralQ,
+    lokQ,
     supabase
       .from('users')
       .select('id,isim_soyisim')

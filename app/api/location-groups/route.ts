@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 async function resolveScope(req: NextRequest) {
   const supabase = createClient()
@@ -53,12 +54,19 @@ export async function GET(req: NextRequest) {
 
   const projeId = req.nextUrl.searchParams.get('projeId') ?? null
 
-  const gruplariQ = admin.from('lokasyon_gruplari')
+  // Modül izolasyonu: Oto Yıkama lokasyonları + grupları GYS UI'da gizli (tüm roller)
+  const gizliOtoIds = await getOtoYikamaLokasyonIds(admin as any, firmaId)
+  const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
+  let gruplariQ = admin.from('lokasyon_gruplari')
     .select('id,firma_id,ad,aciklama,aktif,kayit_tarihi,guncelleme_tarihi,kayit_yapan_id,ust_lokasyon_id')
     .eq('firma_id', firmaId).order('ad')
-  const lokasyonlarQ = admin.from('lokasyonlar')
+  if (gizliFilterArg) gruplariQ = (gruplariQ as any).not('ust_lokasyon_id', 'in', gizliFilterArg)
+
+  let lokasyonlarQ = admin.from('lokasyonlar')
     .select('id,firma_id,parent_id,tanim,aktif,kayit_tarihi')
     .eq('firma_id', firmaId).order('kayit_tarihi', { ascending: true })
+  if (gizliFilterArg) lokasyonlarQ = (lokasyonlarQ as any).not('id', 'in', gizliFilterArg)
 
   const [groupsRes, membersRes, locationsRes] = await Promise.all([
     projeId ? (gruplariQ as any).eq('proje_id', projeId) : gruplariQ,

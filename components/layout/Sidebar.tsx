@@ -10,12 +10,12 @@ import { useFirma } from '@/components/layout/FirmaContext'
 import IoAsistan from './IoAsistan'
 import IoMascot from './IoMascot'
 
-interface NavItem {
+export interface NavItem {
   label: string
   href: string
   icon: string
 }
-interface NavGroup {
+export interface NavGroup {
   label: string
   items: NavItem[]
 }
@@ -92,25 +92,13 @@ function getNav(base: string, rol: UserRole, otoYikamaAktif: boolean): NavGroup[
           { label: 'Push Bildirim Geçmişi', href: `${base}/dashboard/push-log`, icon: '🔔' },
         ]
 
-  // Oto Yıkama modülü — opt-in. SA dahil herkes seçili firmanın
-  // `oto_yikama_aktif` flag'i true ise görür. Modül firma detay sayfasından
-  // açılır/kapatılır. Mobil app değişmez; yıkama görevleri mevcut spesifik
-  // görev sistemi üzerinden akar.
-  const otoYikamaGroup = (isSA && otoYikamaAktif) ? [{
-    label: 'Oto Yıkama',
-    items: [
-      { label: 'Genel Bakış',    href: `${base}/dashboard/oto-yikama`,                icon: '🚿' },
-      { label: 'Araç Kayıtları',  href: `${base}/dashboard/oto-yikama/araclar`,        icon: '🚗' },
-      { label: 'Görev Oluştur',  href: `${base}/dashboard/oto-yikama/gorev-olustur`,  icon: '➕' },
-      { label: 'Günlük Tablo',   href: `${base}/dashboard/oto-yikama/gunluk`,         icon: '📋' },
-      { label: 'Raporlar',       href: `${base}/dashboard/oto-yikama/raporlar`,        icon: '📊' },
-    ],
-  }] : []
+  // Oto Yıkama modülü artık ayrı bir route grubu (/oto-yikama/*) altında.
+  // GYS sidebar'ında listelenmez; Modül Seçim ekranı veya UserPanel >
+  // "Modül Değiştir" üzerinden erişilir.
 
   return [
     { label: 'Ana Menü', items: [{ label: 'Gösterge Paneli', href: `${base}/dashboard`, icon: '⊞' }] },
     { label: 'Yönetim', items: mgmt },
-    ...otoYikamaGroup,
     {
       label: 'Sistem',
       items: [
@@ -296,7 +284,7 @@ function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' |
   )
 }
 
-export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, birimFiyatAktifProp, personelTakibiAktifProp, otoYikamaAktifProp }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; birimFiyatAktifProp?: boolean; personelTakibiAktifProp?: boolean; otoYikamaAktifProp?: boolean }) {
+export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, birimFiyatAktifProp, personelTakibiAktifProp, otoYikamaAktifProp, customNavGroups }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; birimFiyatAktifProp?: boolean; personelTakibiAktifProp?: boolean; otoYikamaAktifProp?: boolean; customNavGroups?: NavGroup[] }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeLoading = useRouteLoading()
@@ -328,7 +316,9 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
     ? firmalar.find(f => f.id === saFirmaId)?.oto_yikama_aktif === true
     : otoYikamaAktifProp === true
 
-  const groups = getNav(base, user.rol, otoYikamaAktif)
+  // customNavGroups verilirse onu kullan (modül layout'ları için: Oto Yıkama, FMS).
+  // Yoksa default GYS menüsü hesaplanır.
+  const groups = customNavGroups ?? getNav(base, user.rol, otoYikamaAktif)
 
   // U ve M için sayfa yetkileri çek
   useEffect(() => {

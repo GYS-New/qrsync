@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +33,11 @@ export default async function UGorevlerPage() {
   // Yetkili lokasyon kısıtlaması
   const yetkiliLokIds = firmaId ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
 
+  // Modül izolasyonu: Oto Yıkama lokasyonları GYS UI'da gizli (yıkama personeli
+  // dahil — yıkama akışı /oto-yikama modülünde)
+  const gizliOtoIds = firmaId ? await getOtoYikamaLokasyonIds(supabase as any, firmaId) : new Set<string>()
+  const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
+
   // gorevler_normal view: yıkama görevleri hariç (Oto Yıkama için ayrı sayfa)
   let gorevQ = supabase
     .from('gorevler_normal')
@@ -41,6 +47,7 @@ export default async function UGorevlerPage() {
     .limit(500)
   if (projeId) gorevQ = (gorevQ as any).eq('proje_id', projeId)
   if (yetkiliLokIds) gorevQ = gorevQ.in('lokasyon_id', yetkiliLokIds)
+  if (gizliFilterArg) gorevQ = (gorevQ as any).not('lokasyon_id', 'in', gizliFilterArg)
   const { data: gorevler } = await gorevQ
 
   let lokQ = supabase
@@ -51,6 +58,7 @@ export default async function UGorevlerPage() {
     .order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
   if (yetkiliLokIds) lokQ = lokQ.in('id', yetkiliLokIds)
+  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
   const { data: lokasyonlar } = await lokQ
 
   const { data: kullanicilar } = await supabase

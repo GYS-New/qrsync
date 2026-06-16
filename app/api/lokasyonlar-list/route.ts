@@ -42,9 +42,11 @@ export async function GET(request: Request) {
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // Oto Yıkama modülü şu an SA-only — TA/U/M için bu lokasyonları JS'de filtrele
+    // Modül izolasyonu: Oto Yıkama lokasyonları GYS UI'da hiçbir rol için
+    // gösterilmez (üst lokasyon dropdown'u dahil). Oto Yıkama modülünün kendi
+    // sayfaları bu lokasyonları kendi endpoint'lerinden çeker.
     let result = data ?? []
-    if (!isSA && firmaId) {
+    if (firmaId) {
       const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)
       if (otoIds.size > 0) result = result.filter((l: any) => !otoIds.has(l.id))
     }
