@@ -52,12 +52,24 @@ const MODUL_GIRIS_SAYFA_KODU = '_modul_giris'
 /**
  * Kullanıcı için yetkili modülleri hesaplar.
  *
+ * **Yetki kaynağı — modüle göre:**
+ * - **GYS**: her zaman yetkili (default modül)
+ * - **Oto Yıkama**: kullanıcının `users.ust_lokasyon_id` VEYA
+ *   `kullanici_lokasyon_yetkileri.ust_lokasyon_id` aracılığıyla bağlı olduğu
+ *   üst lokasyonlardan en az birinin `lokasyonlar.oto_yikama_lokasyon=true`
+ *   olması yeterli. Mobil yıkama akışıyla aynı kaynak — tek source of truth.
+ * - **FMS**: henüz implementasyon hazır değil, hiç kimse için yetkili değil.
+ *
+ * SA (super_admin / alt_super_admin) her modülde otomatik yetkilidir.
+ *
  * @param rol      users.rol değeri
- * @param firmaId  Kullanıcının firma_id'si (SA için null gelebilir → tüm modüller aktif sayılır)
+ * @param firmaId  Kullanıcının firma_id'si (SA için null gelebilir)
+ * @param userId   users.id — Oto Yıkama yetki hesabı için zorunlu (SA hariç)
  */
 export async function getYetkiliModuller(
   rol: string,
   firmaId: string | null,
+  userId: string | null = null,
 ): Promise<YetkiliModullerResponse> {
   const isSA = rol === 'super_admin' || rol === 'alt_super_admin'
   const admin = createAdminClient()
@@ -73,33 +85,34 @@ export async function getYetkiliModuller(
     firmaFlags = data ?? {}
   }
 
-  // 2. Bu rol için modül giriş yetkilerini topla (SA için skip)
-  let yetkiliModulKodlari = new Set<string>()
-  if (!isSA && firmaId) {
-    // Firma bazlı + global kayıtları paralel çek, modul_kodu set'i oluştur
-    const [firmaRows, globalRows] = await Promise.all([
-      admin
-        .from('kullanici_grubu_yetkileri')
-        .select('modul_kodu, gorebilir')
-        .eq('firma_id', firmaId)
-        .eq('rol', rol)
-        .eq('sayfa_kodu', MODUL_GIRIS_SAYFA_KODU),
-      admin
-        .from('kullanici_grubu_yetkileri')
-        .select('modul_kodu, gorebilir')
-        .is('firma_id', null)
-        .eq('rol', rol)
-        .eq('sayfa_kodu', MODUL_GIRIS_SAYFA_KODU),
-    ])
-
-    // Firma bazlı kayıt global'i ezer; iki listeyi modul_kodu → gorebilir map'ine indir
-    const yetkiMap = new Map<string, boolean>()
-    for (const r of globalRows.data ?? []) yetkiMap.set(r.modul_kodu, r.gorebilir === true)
-    for (const r of firmaRows.data ?? [])  yetkiMap.set(r.modul_kodu, r.gorebilir === true)
-
-    yetkiliModulKodlari = new Set([...yetkiMap.entries()]
-      .filter(([, gor]) => gor === true)
-      .map(([k]) => k))
+  // 2. Oto Yıkama yetkisi: lokasyon ataması bazlı (mobil ile tek source of truth)
+  //    users.ust_lokasyon_id VEYA kullanici_lokasyon_yetkileri → bunlardan biri
+  //    oto_yikama_lokasyon=true bir üst lokasyona işaret etmeli.
+  let otoYikamaYetkili = false
+  if (!isSA && userId) {
+    const { data: u } = await admin
+      .from('users')
+      .select('ust_lokasyon_id')
+      .eq('id', userId)
+      .maybeSingle()
+    const adayUstIds = new Set<string>()
+    if (u?.ust_lokasyon_id) adayUstIds.add(u.ust_lokasyon_id)
+    const { data: yetkiler } = await admin
+      .from('kullanici_lokasyon_yetkileri')
+      .select('ust_lokasyon_id')
+      .eq('user_id', userId)
+    for (const y of (yetkiler ?? [])) {
+      if (y.ust_lokasyon_id) adayUstIds.add(y.ust_lokasyon_id)
+    }
+    if (adayUstIds.size > 0) {
+      const { data: loks } = await admin
+        .from('lokasyonlar')
+        .select('id')
+        .in('id', [...adayUstIds])
+        .eq('oto_yikama_lokasyon', true)
+        .eq('aktif', true)
+      otoYikamaYetkili = (loks ?? []).length > 0
+    }
   }
 
   // 3. Katalog üzerinden modül listesini üret
@@ -111,9 +124,11 @@ export async function getYetkiliModuller(
         ? true
         : (m.flagKolon === null ? true : (firmaFlags as any)[m.flagKolon] === true)
 
-    const yetkili = isSA
-      ? true
-      : (m.kod === 'gys' ? true : yetkiliModulKodlari.has(m.kod))
+    let yetkili: boolean
+    if (isSA) yetkili = true
+    else if (m.kod === 'gys') yetkili = true
+    else if (m.kod === 'oto_yikama') yetkili = otoYikamaYetkili
+    else yetkili = false // fms vs.
 
     return { kod: m.kod, ad: m.ad, ikon: m.ikon, aktif, yetkili }
   })

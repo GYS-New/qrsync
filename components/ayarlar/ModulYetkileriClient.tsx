@@ -12,8 +12,12 @@ interface Props {
 }
 
 const MODULLER: { kod: string; ad: string; ikon: string; aciklama: string }[] = [
-  { kod: 'oto_yikama', ad: 'Oto Yıkama', ikon: '🚿', aciklama: 'Araç yıkama planlama, plaka eşleştirme, raporlar.' },
-  { kod: 'fms',        ad: 'FMS',         ikon: '🏢', aciklama: 'Facility Management System — bakım, varlık, talep.' },
+  // GYS: her zaman açık (default), bu sekmede yer almaz.
+  // Oto Yıkama: yetki manuel atanmaz — "Oto Yıkama" üst lokasyonuna atanmış
+  //   personel otomatik yetkilidir (lib/modul/yetkiliModuller.ts). Bu sekmede
+  //   gösterilmez; atama Sistem Ayarları > Lokasyon Yetkileri'nden yapılır.
+  // FMS: henüz implementasyon yok; hazır olunca buraya eklenir.
+  { kod: 'fms', ad: 'FMS', ikon: '🏢', aciklama: 'Facility Management System — bakım, varlık, talep.' },
 ]
 
 const ROLLER: { rol: string; etiket: string; renk: string }[] = [
@@ -90,9 +94,12 @@ export default function ModulYetkileriClient({ isSA, firmaId: initialFirmaId, fi
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Modül Yetkileri</h2>
         <p style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.5 }}>
-          Hangi rolün hangi modüllere erişebileceğini buradan yönetin. GYS modülü
-          her zaman aktiftir ve listede gösterilmez. Modül firma için "aktif değil"
-          olsa bile yetki verebilirsiniz; modül aktif edilince yetki otomatik geçerli olur.
+          Hangi rolün hangi modüllere erişebileceğini buradan yönetin. <strong>GYS</strong>
+          her zaman aktiftir ve listede gösterilmez. <strong>Oto Yıkama</strong> yetkisi
+          burada değil, <em>Sistem Ayarları → Lokasyon Yetkileri</em> sekmesinden yönetilir
+          (kullanıcı "Oto Yıkama" üst lokasyonuna atanırsa modüle otomatik erişir).
+          Modül firma için "aktif değil" olsa bile yetki verebilirsiniz; modül aktif edilince
+          yetki otomatik geçerli olur.
         </p>
       </div>
 

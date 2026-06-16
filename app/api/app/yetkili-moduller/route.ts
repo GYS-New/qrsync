@@ -64,7 +64,7 @@ export async function GET(req: Request) {
       )
     }
 
-    const yetkili = await getYetkiliModuller(userData.rol, tokenData.firma_id)
+    const yetkili = await getYetkiliModuller(userData.rol, tokenData.firma_id, tokenData.user_id)
 
     return NextResponse.json(
       {

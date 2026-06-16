@@ -17,10 +17,10 @@ export async function GET() {
   if (!authUser) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
 
   const { data: me } = await supabase
-    .from('users').select('rol, firma_id').eq('id', authUser.id).single()
+    .from('users').select('id, rol, firma_id').eq('id', authUser.id).single()
   if (!me) return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 403 })
 
-  const yetkili = await getYetkiliModuller(me.rol, me.firma_id ?? null)
+  const yetkili = await getYetkiliModuller(me.rol, me.firma_id ?? null, me.id)
   const aktifSayi = yetkili.moduller.filter(m => m.aktif).length
 
   return NextResponse.json({

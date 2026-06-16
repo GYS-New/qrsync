@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (!authUser) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
 
   const { data: me } = await supabase
-    .from('users').select('rol, firma_id').eq('id', authUser.id).single()
+    .from('users').select('id, rol, firma_id').eq('id', authUser.id).single()
   if (!me) return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 403 })
 
   const body = await req.json().catch(() => ({} as any))
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Yetki doğrulama: client tarafından gelen seçimi backend tarafında tekrar doğrula
-  const yetkili = await getYetkiliModuller(me.rol, me.firma_id)
+  const yetkili = await getYetkiliModuller(me.rol, me.firma_id, me.id)
   const secilenModul = yetkili.moduller.find(m => m.kod === modul)
   if (!secilenModul || !secilenModul.aktif || !secilenModul.yetkili) {
     return NextResponse.json({ error: 'Bu modüle yetkiniz yok veya modül aktif değil' }, { status: 403 })

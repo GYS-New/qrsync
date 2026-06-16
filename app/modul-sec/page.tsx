@@ -34,7 +34,7 @@ export default async function ModulSecPage({ searchParams }: { searchParams: { f
   // yeni bir modül seçince POST /api/modul/sec cookie'yi üzerine yazar.)
   const force = searchParams.force === '1'
 
-  const yetkili = await getYetkiliModuller(me.rol, me.firma_id ?? null)
+  const yetkili = await getYetkiliModuller(me.rol, me.firma_id ?? null, me.id)
   const aktifYetkili = yetkili.moduller.filter(m => m.aktif)
 
   // 1. Cookie'deki aktif modül hala yetkili+aktif mi? (force=1 ise atlanır)

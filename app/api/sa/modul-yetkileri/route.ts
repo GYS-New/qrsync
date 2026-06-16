@@ -16,7 +16,10 @@ import { auditLog } from '@/lib/audit/log'
 export const dynamic = 'force-dynamic'
 
 const MODUL_GIRIS_SAYFA_KODU = '_modul_giris'
-const YONETILEN_MODULLER = ['oto_yikama', 'fms']  // GYS hariç
+// GYS hariç. Oto Yıkama da artık burada yönetilmiyor — lokasyon ataması
+// (kullanici_lokasyon_yetkileri / users.ust_lokasyon_id) tek source of truth.
+// FMS implementasyonu geldiğinde burada listelenir.
+const YONETILEN_MODULLER: string[] = ['fms']
 
 async function yetkiKontrol(req: NextRequest) {
   const supabase = createClient()

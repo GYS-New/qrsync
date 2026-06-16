@@ -31,7 +31,7 @@ export async function assertModulYetkisi(modul: ModulKodu) {
     return { authUser, me }
   }
 
-  const yetkili = await getYetkiliModuller(me.rol, me.firma_id ?? null)
+  const yetkili = await getYetkiliModuller(me.rol, me.firma_id ?? null, me.id)
   const secilen = yetkili.moduller.find(m => m.kod === modul)
   if (!secilen || !secilen.aktif || !secilen.yetkili) {
     redirect('/modul-sec')

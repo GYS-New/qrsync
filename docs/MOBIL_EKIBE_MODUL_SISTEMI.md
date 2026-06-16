@@ -49,9 +49,16 @@
 | `moduller[].ad` | string | UI başlığı (TR) |
 | `moduller[].ikon` | string | İkon adı (mobil tarafta MaterialIcon/SF Symbol'a map edilir) |
 | `moduller[].aktif` | bool | Firma için modül aktif mi (`firmalar.modul_aktif` flag'leri) |
-| `moduller[].yetkili` | bool | Bu kullanıcı modüle erişim yetkisine sahip mi (`kullanici_grubu_yetkileri.modul_kodu`) |
+| `moduller[].yetkili` | bool | Bu kullanıcı modüle erişim yetkisine sahip mi (modüle göre farklı kaynak, aşağı bkz.) |
 | `tek_modul` | bool | Kullanıcı sadece bir modülde hem `aktif` hem `yetkili` ise true |
 | `tek_modul_kodu` | string\|null | `tek_modul=true` ise o modülün kodu, değilse null |
+
+**"yetkili" alanı modüle göre nasıl hesaplanır?**
+
+- **`gys`**: her zaman `true` (default modül).
+- **`oto_yikama`** *(2026-06-16 sadeleştirildi)*: Mobil yıkama akışıyla **tek source of truth**. Kullanıcının `users.ust_lokasyon_id` VEYA `kullanici_lokasyon_yetkileri.ust_lokasyon_id` aracılığıyla bağlı olduğu üst lokasyonlardan en az birinin `lokasyonlar.oto_yikama_lokasyon=true` olması yeterli. **Bu mantık `/api/app/me` endpoint'inin döndüğü `oto_yikama_personeli` flag'iyle birebir aynı**.
+- **`fms`**: henüz implementasyon yok, hep `false`.
+- **SA / alt_super_admin**: tüm modüllerde otomatik `yetkili=true`.
 
 **Davranış kuralları:**
 
@@ -61,6 +68,7 @@
 
 **Yanıt (geriye uyumlu eski sürümler için):**
 - Eski mobil sürümler bu endpoint'i çağırmaz → mevcut GYS akışı aynen çalışır.
+- Mevcut mobil 1.0.27+ sürümleri `/api/app/me`'nin `oto_yikama_personeli` flag'ine bakıyor; bu spec onunla aynı kaynaktan beslenir.
 
 ---
 
