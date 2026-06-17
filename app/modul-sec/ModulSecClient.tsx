@@ -134,21 +134,21 @@ export default function ModulSecClient({ moduller, kullaniciAdi }: Props) {
         {/* ─── ÜST BAR: logo + kullanıcı + çıkış ─── */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          gap: 16, marginBottom: 32, flexWrap: 'wrap',
+          gap: 18, marginBottom: 40, flexWrap: 'wrap',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {appLogo === undefined ? null : appLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={appLogo} alt={appName} style={{ height: 'auto', maxHeight: 56, maxWidth: 200, objectFit: 'contain' }} />
+              <img src={appLogo} alt={appName} style={{ height: 'auto', maxHeight: 90, maxWidth: 320, objectFit: 'contain' }} />
             ) : (
-              <ProataLogo variant="full" scale={0.9} />
+              <ProataLogo variant="full" scale={1.35} />
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
             <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-400)', fontWeight: 600 }}>Hoş geldin</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--text-900)' }}>
+              <div style={{ fontSize: 15, color: 'var(--text-400)', fontWeight: 600, marginBottom: 2 }}>Hoş geldin</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--text-900)', letterSpacing: '-0.5px' }}>
                 {kullaniciAdi || 'Kullanıcı'}
               </div>
             </div>
@@ -157,18 +157,18 @@ export default function ModulSecClient({ moduller, kullaniciAdi }: Props) {
               onClick={cikisYap}
               className="inline-flex items-center gap-2"
               style={{
-                padding: '9px 16px',
+                padding: '12px 20px',
                 background: 'rgba(255,255,255,0.85)',
                 border: '1px solid rgba(214,228,214,.95)',
-                borderRadius: 10,
-                fontSize: 13, fontWeight: 700,
+                borderRadius: 12,
+                fontSize: 15, fontWeight: 700,
                 color: 'var(--text-500)',
                 cursor: 'pointer',
                 backdropFilter: 'blur(8px)',
                 boxShadow: '0 1px 3px rgba(15,40,15,0.06)',
               }}
             >
-              <LogOut size={15} /> Çıkış
+              <LogOut size={17} /> Çıkış
             </button>
           </div>
         </div>
