@@ -353,7 +353,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
           {kayitlar.length === 0 ? 'Henüz görev kaydı yok.' : 'Filtre koşullarına uyan kayıt yok.'}
         </div>
       ) : (
-        <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 420px)', overflowY: 'auto' }}>
+        <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 1200 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
               <tr>
