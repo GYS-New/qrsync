@@ -281,15 +281,15 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
                         {DURUM_LABEL[gd]}
                       </span>
                     </Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 13 }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 13 }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 14 }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 14 }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>
                     <Td align="center" muted>
-                      <span style={{ fontFamily: 'monospace', fontSize: 13, color: gd === 'TAMAMLANDI' ? T.green : T.textSoft, fontWeight: gd === 'TAMAMLANDI' ? 700 : 400 }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 14, color: gd === 'TAMAMLANDI' ? T.green : T.textSoft, fontWeight: gd === 'TAMAMLANDI' ? 700 : 400 }}>
                         {fmtSure(k.tamamlanma_suresi_saniye)}
                       </span>
                     </Td>
                     <Td muted>{k.tamamlayan ?? '—'}</Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 12.5 }}>{fmtDateTime(k.arsivleme_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 14 }}>{fmtDateTime(k.arsivleme_tarihi)}</span></Td>
                   </tr>
                 )
               })}

@@ -121,9 +121,6 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
   const [istasyonId, setIstasyonId] = useState('')
   // Tamamlayan filtresi (user_id)
   const [tamamlayanId, setTamamlayanId] = useState('')
-  // İşlem süresi (dakika) aralığı
-  const [sureMin, setSureMin] = useState('')
-  const [sureMax, setSureMax] = useState('')
   // Düzenleme modal state'i
   const [editKaydi, setEditKaydi] = useState<GorevKaydi | null>(null)
   const [editLoading, setEditLoading] = useState(false)
@@ -150,8 +147,6 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
 
   const filtrelenmis = useMemo(() => {
     const ara = arama.trim().toUpperCase()
-    const sureMinSec = sureMin ? Math.max(0, parseInt(sureMin, 10) * 60) : null
-    const sureMaxSec = sureMax ? Math.max(0, parseInt(sureMax, 10) * 60) : null
 
     return kayitlarTuretilmis.filter(({ k, gd }) => {
       if (filtre === 'EKSTRA' && !k.ekstra) return false
@@ -166,22 +161,19 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
         if (tamamBas && t < tamamBas) return false
         if (tamamBit && t > tamamBit) return false
       }
-      if (sureMinSec != null && (k.tamamlanma_suresi_saniye ?? 0) < sureMinSec) return false
-      if (sureMaxSec != null && (k.tamamlanma_suresi_saniye ?? 0) > sureMaxSec) return false
       if (ara) {
         const hay = `${k.plaka ?? ''} ${k.istasyon ?? ''} ${k.olusturan ?? ''} ${k.tamamlayan ?? ''}`.toUpperCase()
         if (!hay.includes(ara)) return false
       }
       return true
     }).map(({ k }) => k)
-  }, [kayitlarTuretilmis, arama, filtre, istasyonId, tamamlayanId, hedefBas, hedefBit, tamamBas, tamamBit, sureMin, sureMax])
+  }, [kayitlarTuretilmis, arama, filtre, istasyonId, tamamlayanId, hedefBas, hedefBit, tamamBas, tamamBit])
 
-  const filtreAktif = filtre !== 'TUMU' || !!arama || !!istasyonId || !!tamamlayanId || !!hedefBas || !!hedefBit || !!tamamBas || !!tamamBit || !!sureMin || !!sureMax
+  const filtreAktif = filtre !== 'TUMU' || !!arama || !!istasyonId || !!tamamlayanId || !!hedefBas || !!hedefBit || !!tamamBas || !!tamamBit
 
   function temizleFiltre() {
     setFiltre('TUMU'); setArama(''); setIstasyonId(''); setTamamlayanId('')
     setHedefBas(''); setHedefBit(''); setTamamBas(''); setTamamBit('')
-    setSureMin(''); setSureMax('')
   }
 
   function exportCsv() {
@@ -324,14 +316,17 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
               style={{ flex: 1, padding: '4px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
           </div>
         </FilterField>
-        <FilterField label="İşlem Süresi (dk)">
-          <div style={{ display: 'flex', gap: 4 }}>
-            <input type="number" min={0} value={sureMin} onChange={e => setSureMin(e.target.value)} placeholder="Min"
-              style={{ flex: 1, padding: '4px 8px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
-            <span style={{ alignSelf: 'center', fontSize: 11, color: T.textSoft }}>→</span>
-            <input type="number" min={0} value={sureMax} onChange={e => setSureMax(e.target.value)} placeholder="Maks"
-              style={{ flex: 1, padding: '4px 8px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
-          </div>
+        <FilterField label="Durum">
+          <select value={filtre} onChange={e => setFiltre(e.target.value as DurumFilter)}
+            style={{ width: '100%', padding: '5px 8px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+            <option value="TUMU">Tümü</option>
+            <option value="HAZIR">Hazır</option>
+            <option value="ACIK">Açık</option>
+            <option value="ISLEMDE">İşlemde</option>
+            <option value="TAMAMLANDI">Tamamlandı</option>
+            <option value="IPTAL">İptal</option>
+            <option value="EKSTRA">Ekstra</option>
+          </select>
         </FilterField>
       </div>
 
@@ -391,10 +386,10 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
                         {DURUM_LABEL[gd]}
                       </span>
                     </Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 13 }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 13 }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 14 }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 14 }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>
                     <Td align="center" muted>
-                      <span style={{ fontFamily: 'monospace', fontSize: 13, color: gd === 'TAMAMLANDI' ? T.green : T.textSoft, fontWeight: gd === 'TAMAMLANDI' ? 700 : 400 }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 14, color: gd === 'TAMAMLANDI' ? T.green : T.textSoft, fontWeight: gd === 'TAMAMLANDI' ? 700 : 400 }}>
                         {fmtSure(k.tamamlanma_suresi_saniye)}
                       </span>
                     </Td>
