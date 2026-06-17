@@ -18,6 +18,11 @@
         "name": "mesai-arsiv",
         "schedule": "59 20 * * *",
         "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/mesai-arsiv"
+      },
+      {
+        "name": "oto-yikama-arsiv",
+        "schedule": "30 21 * * *",
+        "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/oto-yikama-arsiv?secret=$CRON_SECRET"
       }
     ]
   }

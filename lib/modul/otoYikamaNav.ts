@@ -29,6 +29,7 @@ export function getOtoYikamaNav(): NavGroup[] {
         { label: 'Araç Kayıtları',  href: '/oto-yikama/araclar',         icon: '🚗' },
         { label: 'Görev Oluştur',   href: '/oto-yikama/gorev-olustur',   icon: '➕' },
         { label: 'Görev Kayıtları', href: '/oto-yikama/gorev-kayitlari', icon: '🗂️' },
+        { label: 'Arşiv',           href: '/oto-yikama/arsiv',           icon: '📦' },
         { label: 'Raporlar',        href: '/oto-yikama/raporlar',         icon: '📊' },
       ],
     },
