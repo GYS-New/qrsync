@@ -55,7 +55,9 @@ function bugunTRDate(): string {
 
 function turetilenDurum(k: GorevKaydi, bugun: string): GoruntuDurum {
   const d = k.durum ?? ''
+  if (d === 'HAZIR') return 'HAZIR'
   if (d === 'ACIK') {
+    // Backward-compat: cron çalışmadıysa veya eski kayıtlar için
     return k.hedef_tarih && k.hedef_tarih > bugun ? 'HAZIR' : 'ACIK'
   }
   if (d === 'ISLEMDE')    return 'ISLEMDE'

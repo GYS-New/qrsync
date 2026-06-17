@@ -36,10 +36,11 @@ const T = {
   purple: '#7c3aed', purpleLight: '#f3e8ff',
 }
 
-type ArsivDurum = 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'DIGER'
+type ArsivDurum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'DIGER'
 type DurumFilter = 'TUMU' | ArsivDurum | 'EKSTRA'
 
 function normalizeDurum(d: string | null): ArsivDurum {
+  if (d === 'HAZIR')       return 'HAZIR'
   if (d === 'ACIK')        return 'ACIK'
   if (d === 'ISLEMDE')     return 'ISLEMDE'
   if (d === 'TAMAMLANDI')  return 'TAMAMLANDI'
@@ -48,15 +49,15 @@ function normalizeDurum(d: string | null): ArsivDurum {
 }
 
 const DURUM_BG: Record<ArsivDurum, string> = {
-  ACIK: T.amberLight, ISLEMDE: T.blueLight,
+  HAZIR: '#f1f5f9', ACIK: T.amberLight, ISLEMDE: T.blueLight,
   TAMAMLANDI: T.greenLight, IPTAL: T.redLight, DIGER: '#f1f5f9',
 }
 const DURUM_FG: Record<ArsivDurum, string> = {
-  ACIK: T.amber, ISLEMDE: T.blue,
+  HAZIR: '#475569', ACIK: T.amber, ISLEMDE: T.blue,
   TAMAMLANDI: T.green, IPTAL: T.red, DIGER: T.textSoft,
 }
 const DURUM_LABEL: Record<ArsivDurum, string> = {
-  ACIK: 'Açık', ISLEMDE: 'İşlemde',
+  HAZIR: 'Hazır', ACIK: 'Açık', ISLEMDE: 'İşlemde',
   TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal', DIGER: '—',
 }
 

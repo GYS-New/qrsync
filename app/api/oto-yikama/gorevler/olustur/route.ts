@@ -17,7 +17,8 @@
  * Davranış:
  *   - Görev tanımı: "Oto Yıkama - PLAKA"
  *   - atanan_kullanici_id = NULL (açık görev — atama yok)
- *   - durum = 'ACIK'
+ *   - durum = hedef_tarih > bugün ise 'HAZIR', değilse 'ACIK'
+ *     (HAZIR görevleri her gece 00:01 TR'de cron ACIK'a alır)
  *   - Aynı (arac, lokasyon, hedef_tarih) için duplicate engelleme:
  *     metadata UNIQUE constraint + ön sorgu ile API'de elenir.
  *   - Hata olursa best-effort cleanup: metadata INSERT fail ederse oluşan
@@ -136,6 +137,8 @@ export async function POST(req: NextRequest) {
 
   // Batch — her satır için gorevler INSERT + metadata INSERT
   // (Supabase JS'te transaction yok; metadata fail olursa gorev rollback.)
+  // Durum: hedef_tarih > bugün → HAZIR (cron 00:01'de ACIK'a alır), bugün/geçmiş → direkt ACIK.
+  const bugunTR = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
   const BATCH = 100
   for (let i = 0; i < planlanan.length; i += BATCH) {
     const chunk = planlanan.slice(i, i + BATCH)
@@ -146,7 +149,7 @@ export async function POST(req: NextRequest) {
       tanim: `Oto Yıkama - ${c.plaka}`,
       lokasyon_id: c.lokasyon_id,
       atanan_kullanici_id: null,
-      durum: 'ACIK',
+      durum: c.hedef_tarih > bugunTR ? 'HAZIR' : 'ACIK',
       olusturan_id: me.id,
     }))
     const { data: insertedGorevler, error: gorevErr } = await admin

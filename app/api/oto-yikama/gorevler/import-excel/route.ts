@@ -183,6 +183,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Insert — batch
+  // Durum: hedef_tarih > bugün → HAZIR (cron 00:01 TR'de ACIK'a alır), bugün/geçmiş → direkt ACIK
+  const bugunTR = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
   let eklenen = 0
   const insertHatalari: string[] = []
   const BATCH = 100
@@ -194,7 +196,7 @@ export async function POST(req: NextRequest) {
       tanim: `Oto Yıkama - ${c.plaka}`,
       lokasyon_id: c.lokasyon_id,
       atanan_kullanici_id: null,
-      durum: 'ACIK',
+      durum: c.tarih > bugunTR ? 'HAZIR' : 'ACIK',
       olusturan_id: me.id,
     }))
     const { data: inserted, error: gErr } = await admin.from('gorevler').insert(gorevRows).select('id')
