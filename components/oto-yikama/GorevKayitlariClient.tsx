@@ -354,7 +354,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
         </div>
       ) : (
         <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 420px)', overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 1200 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 1200 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
               <tr>
                 <Th>Plaka</Th>
@@ -376,23 +376,23 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
                   <tr key={k.gorev_id}>
                     <Td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 800, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 15, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
                         {k.ekstra && (
-                          <span style={{ padding: '1px 6px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 10, fontWeight: 800, letterSpacing: '0.04em' }}>EKSTRA</span>
+                          <span style={{ padding: '2px 7px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 11, fontWeight: 800, letterSpacing: '0.04em' }}>EKSTRA</span>
                         )}
                       </div>
                     </Td>
                     <Td muted>{k.istasyon}</Td>
                     <Td align="center">{fmtTarih(k.hedef_tarih)}</Td>
                     <Td align="center">
-                      <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 999, background: DURUM_BG[gd], color: DURUM_FG[gd], fontSize: 11, fontWeight: 700 }}>
+                      <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, background: DURUM_BG[gd], color: DURUM_FG[gd], fontSize: 12, fontWeight: 700 }}>
                         {DURUM_LABEL[gd]}
                       </span>
                     </Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 11.5 }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 11.5 }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 13 }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 13 }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>
                     <Td align="center" muted>
-                      <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: gd === 'TAMAMLANDI' ? T.green : T.textSoft, fontWeight: gd === 'TAMAMLANDI' ? 700 : 400 }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 13, color: gd === 'TAMAMLANDI' ? T.green : T.textSoft, fontWeight: gd === 'TAMAMLANDI' ? 700 : 400 }}>
                         {fmtSure(k.tamamlanma_suresi_saniye)}
                       </span>
                     </Td>
@@ -539,16 +539,16 @@ function KpiPil({ etiket, sayi, renk, active, onClick }: {
         display: 'inline-flex', alignItems: 'baseline', gap: 5,
         transition: 'all 0.15s',
       }}>
-      <span style={{ fontSize: 15, fontWeight: 900, color: renk, lineHeight: 1 }}>{sayi}</span>
-      <span style={{ fontSize: 10, fontWeight: 700, color: renk, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{etiket}</span>
+      <span style={{ fontSize: 18, fontWeight: 900, color: renk, lineHeight: 1 }}>{sayi}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: renk, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{etiket}</span>
     </button>
   )
 }
 
 function Th({ children, align }: { children: React.ReactNode; align?: 'right' | 'left' | 'center' }) {
-  return <th style={{ textAlign: align ?? 'left', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700, background: '#fafafa' }}>{children}</th>
+  return <th style={{ textAlign: align ?? 'left', padding: '11px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700, background: '#fafafa' }}>{children}</th>
 }
 
 function Td({ children, muted, align }: { children: React.ReactNode; muted?: boolean; align?: 'right' | 'left' | 'center' }) {
-  return <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', textAlign: align ?? 'left', color: muted ? '#64748b' : '#0f172a' }}>{children}</td>
+  return <td style={{ padding: '11px 12px', borderBottom: '1px solid #f1f5f9', textAlign: align ?? 'left', color: muted ? '#64748b' : '#0f172a' }}>{children}</td>
 }

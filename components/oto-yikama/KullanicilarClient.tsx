@@ -191,7 +191,7 @@ export default function OtoYikamaKullanicilarClient({ firmaId, kullanicilar }: P
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 920 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 920 }}>
             <thead>
               <tr style={{ background: '#fafafa' }}>
                 <Th>Personel</Th>
@@ -216,46 +216,46 @@ export default function OtoYikamaKullanicilarClient({ firmaId, kullanicilar }: P
                           background: online
                             ? 'linear-gradient(145deg, #16a34a, #15803d)'
                             : 'linear-gradient(145deg, #6366f1, #4f46e5)',
-                          color: '#fff', fontSize: 12, fontWeight: 800,
+                          color: '#fff', fontSize: 13, fontWeight: 800,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
                         }}>{bashar(u.isim_soyisim ?? '')}</div>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {u.isim_soyisim ?? '—'}
                           </div>
                           {!u.aktif && (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: T.red, background: T.redLight, padding: '1px 6px', borderRadius: 999 }}>Pasif</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: T.red, background: T.redLight, padding: '2px 7px', borderRadius: 999 }}>Pasif</span>
                           )}
                         </div>
                       </div>
                     </Td>
                     <Td muted>{u.email ?? '—'}</Td>
                     <Td align="center">
-                      <span style={{ background: '#f3f4f6', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#374151' }}>{rolEtiket(u.rol)}</span>
+                      <span style={{ background: '#f3f4f6', padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700, color: '#374151' }}>{rolEtiket(u.rol)}</span>
                     </Td>
                     <Td>
                       {u.atanmis_istasyonlar.length === 0 ? <span style={{ color: T.textSoft }}>—</span> : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                           {u.atanmis_istasyonlar.slice(0, 3).map(ad => (
-                            <span key={ad} style={{ fontSize: 11, fontWeight: 600, color: '#4f46e5', background: '#eef2ff', padding: '2px 8px', borderRadius: 999, border: '1px solid #c7d2fe' }}>
+                            <span key={ad} style={{ fontSize: 12, fontWeight: 600, color: '#4f46e5', background: '#eef2ff', padding: '3px 9px', borderRadius: 999, border: '1px solid #c7d2fe' }}>
                               {ad}
                             </span>
                           ))}
                           {u.atanmis_istasyonlar.length > 3 && (
-                            <span style={{ fontSize: 11, fontWeight: 600, color: T.textSoft }}>+{u.atanmis_istasyonlar.length - 3}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: T.textSoft }}>+{u.atanmis_istasyonlar.length - 3}</span>
                           )}
                         </div>
                       )}
                     </Td>
                     <Td align="center">
                       {eslesmis ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: T.blueLight, color: T.blue, fontSize: 11, fontWeight: 700 }}>
-                          <SmartphoneNfc size={12} /> Eşleşmiş
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: T.blueLight, color: T.blue, fontSize: 12, fontWeight: 700 }}>
+                          <SmartphoneNfc size={13} /> Eşleşmiş
                         </span>
                       ) : (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: '#f1f5f9', color: T.textSoft, fontSize: 11, fontWeight: 700 }}>
-                          <Smartphone size={12} /> Eşleşmemiş
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: '#f1f5f9', color: T.textSoft, fontSize: 12, fontWeight: 700 }}>
+                          <Smartphone size={13} /> Eşleşmemiş
                         </span>
                       )}
                     </Td>
@@ -263,18 +263,18 @@ export default function OtoYikamaKullanicilarClient({ firmaId, kullanicilar }: P
                       {online ? (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.green, animation: 'modulPulseDot 1.4s ease-in-out infinite' }} />
-                          <span style={{ fontSize: 11, fontWeight: 800, color: T.green }}>Online</span>
-                          <span style={{ fontSize: 10.5, color: T.textSoft, marginLeft: 3 }}>{relTime(dev?.son_kullanim)}</span>
+                          <span style={{ fontSize: 12, fontWeight: 800, color: T.green }}>Online</span>
+                          <span style={{ fontSize: 11.5, color: T.textSoft, marginLeft: 3 }}>{relTime(dev?.son_kullanim)}</span>
                         </div>
                       ) : dev?.son_kullanim ? (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.gray }} />
-                          <span style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 600 }}>
+                          <span style={{ fontSize: 12.5, color: T.textSoft, fontWeight: 600 }}>
                             {relTime(dev.son_kullanim)} aktifti
                           </span>
                         </div>
                       ) : (
-                        <span style={{ fontSize: 11, color: T.textSoft }}>Hiç giriş yapmadı</span>
+                        <span style={{ fontSize: 12, color: T.textSoft }}>Hiç giriş yapmadı</span>
                       )}
                     </Td>
                   </tr>
@@ -327,10 +327,10 @@ function Th({ children, align }: { children: React.ReactNode; align?: 'right' | 
   return (
     <th style={{
       textAlign: align ?? 'left',
-      padding: '10px 12px',
+      padding: '11px 12px',
       borderBottom: '2px solid #e5e7eb',
       color: '#374151',
-      fontSize: 11,
+      fontSize: 12,
       textTransform: 'uppercase',
       letterSpacing: '0.04em',
       fontWeight: 700,

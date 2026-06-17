@@ -354,31 +354,31 @@ export default function GunlukClient() {
                 {sorted.map(r => (
                   <tr key={r.gorev_id}
                     style={{ background: r.durum === 'ISLEMDE' ? DURUM_BG.ISLEMDE : undefined }}>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 800, color: T.text }}>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 15, color: T.text }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         {r.plaka}
                         {r.ekstra && (
-                          <span style={{ padding: '1px 6px', borderRadius: 999, background: '#fde68a', color: '#92400e', fontSize: 10, fontWeight: 800, letterSpacing: '0.04em' }}>
+                          <span style={{ padding: '2px 7px', borderRadius: 999, background: '#fde68a', color: '#92400e', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em' }}>
                             EKSTRA
                           </span>
                         )}
                       </span>
                     </td>
-                    <td style={{ color: T.textSoft, fontSize: 12 }}>{r.kullanici ?? '—'}</td>
-                    <td style={{ color: T.textSoft, fontSize: 12 }}>{r.departman ?? '—'}</td>
-                    <td style={{ color: T.textSoft, fontSize: 12 }}>{r.lokasyon}</td>
+                    <td style={{ color: T.textSoft, fontSize: 14 }}>{r.kullanici ?? '—'}</td>
+                    <td style={{ color: T.textSoft, fontSize: 14 }}>{r.departman ?? '—'}</td>
+                    <td style={{ color: T.textSoft, fontSize: 14 }}>{r.lokasyon}</td>
                     <td style={{ paddingLeft: 2 }}>
                       <span className={r.durum === 'ISLEMDE' ? 'islemde-flash' : undefined}
-                        style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 999, background: DURUM_BG[r.durum], color: DURUM_FG[r.durum], fontSize: 11, fontWeight: 700 }}>
+                        style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, background: DURUM_BG[r.durum], color: DURUM_FG[r.durum], fontSize: 12, fontWeight: 700 }}>
                         {DURUM_LABEL[r.durum]}
                       </span>
                     </td>
-                    <td style={{ color: T.textSoft, fontSize: 12, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
-                    <td style={{ color: T.textSoft, fontSize: 12, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
-                    <td style={{ color: r.durum === 'TAMAMLANDI' ? T.green : T.textSoft, fontSize: 12, fontFamily: 'monospace', fontWeight: 700 }}>
+                    <td style={{ color: T.textSoft, fontSize: 13, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
+                    <td style={{ color: T.textSoft, fontSize: 13, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
+                    <td style={{ color: r.durum === 'TAMAMLANDI' ? T.green : T.textSoft, fontSize: 13, fontFamily: 'monospace', fontWeight: 700 }}>
                       {r.durum === 'TAMAMLANDI' ? fmtSure(gorevSuresiSaniye(r)) : '—'}
                     </td>
-                    <td style={{ color: T.textSoft, fontSize: 12 }}>{r.tamamlayan ?? '—'}</td>
+                    <td style={{ color: T.textSoft, fontSize: 14 }}>{r.tamamlayan ?? '—'}</td>
                     <td style={{ textAlign: 'right', paddingRight: 16, whiteSpace: 'nowrap' }}>
                       <button onClick={() => durumToggle(r)}
                         disabled={islemLoading === r.gorev_id || (r.durum !== 'ACIK' && r.durum !== 'TAMAMLANDI')}

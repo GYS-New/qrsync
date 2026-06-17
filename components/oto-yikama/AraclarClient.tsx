@@ -432,24 +432,24 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
                 ) : null
                 return (
                   <tr key={a.id} style={{ opacity: a.aktif ? 1 : 0.55 }}>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 700, color: T.text }}>{a.plaka}</td>
-                    <td style={{ color: T.text }}>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 15, color: T.text }}>{a.plaka}</td>
+                    <td style={{ color: T.text, fontSize: 14 }}>
                       <div>{a.kullanici_adi_soyadi ?? <span style={{ color: T.textSoft }}>—</span>}</div>
                       {(a.kullanici_telefon || a.kullanici_email) && (
-                        <div style={{ fontSize: 11, color: T.textSoft, marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: T.textSoft, marginTop: 2 }}>
                           {a.kullanici_telefon}{a.kullanici_telefon && a.kullanici_email ? ' · ' : ''}{a.kullanici_email}
                         </div>
                       )}
                     </td>
-                    <td style={{ color: T.textSoft }}>{a.departman ?? '—'}</td>
-                    <td style={{ color: T.text }}>{[a.marka, a.model].filter(Boolean).join(' ') || '—'}</td>
-                    <td style={{ color: T.textSoft }}>{a.renk ?? '—'}</td>
-                    <td style={{ color: T.textSoft }}>
+                    <td style={{ color: T.textSoft, fontSize: 14 }}>{a.departman ?? '—'}</td>
+                    <td style={{ color: T.text, fontSize: 14 }}>{[a.marka, a.model].filter(Boolean).join(' ') || '—'}</td>
+                    <td style={{ color: T.textSoft, fontSize: 14 }}>{a.renk ?? '—'}</td>
+                    <td style={{ color: T.textSoft, fontSize: 14 }}>
                       {Array.isArray(a.yikama_gunleri) && a.yikama_gunleri.length > 0
                         ? [...a.yikama_gunleri].sort((x, y) => x - y).map(g => GUN_KISA[g] ?? g).join(', ')
                         : <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
-                    <td style={{ color: T.textSoft, fontSize: 12 }}>
+                    <td style={{ color: T.textSoft, fontSize: 13 }}>
                       {a.son_yikama_tarihi
                         ? <>
                             {new Date(a.son_yikama_tarihi).toLocaleDateString('tr-TR')}
@@ -459,8 +459,8 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
                     </td>
                     <td>
                       {a.aktif
-                        ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: T.greenLight, color: T.green }}>AKTİF</span>
-                        : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#f1f5f9', color: T.textSoft }}>PASİF</span>}
+                        ? <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 9px', borderRadius: 999, background: T.greenLight, color: T.green }}>AKTİF</span>
+                        : <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 9px', borderRadius: 999, background: '#f1f5f9', color: T.textSoft }}>PASİF</span>}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <button onClick={() => openEdit(a)} title="Düzenle"

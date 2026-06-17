@@ -439,27 +439,27 @@ export default function RaporlarClient() {
                 <tbody>
                   {aramaList.map((r, i) => (
                     <tr key={r.gorev_id}>
-                      <td style={{ fontSize: 12, color: T.textSoft }}>{i + 1}</td>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 800 }}>
+                      <td style={{ fontSize: 13, color: T.textSoft }}>{i + 1}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 15 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {r.plaka}
-                          {r.marka && <span style={{ fontSize: 10, color: T.textSoft, fontWeight: 400 }}>({r.marka})</span>}
+                          {r.marka && <span style={{ fontSize: 12, color: T.textSoft, fontWeight: 400 }}>({r.marka})</span>}
                         </span>
                       </td>
                       <td>
                         {r.ekstra ? (
-                          <span style={{ padding: '2px 8px', borderRadius: 999, background: T.amberLight, color: T.amber, fontSize: 11, fontWeight: 700 }}>Ekstra</span>
+                          <span style={{ padding: '3px 9px', borderRadius: 999, background: T.amberLight, color: T.amber, fontSize: 12, fontWeight: 700 }}>Ekstra</span>
                         ) : (
-                          <span style={{ padding: '2px 8px', borderRadius: 999, background: T.greenLight, color: T.green, fontSize: 11, fontWeight: 700 }}>Planlı</span>
+                          <span style={{ padding: '3px 9px', borderRadius: 999, background: T.greenLight, color: T.green, fontSize: 12, fontWeight: 700 }}>Planlı</span>
                         )}
                       </td>
-                      <td style={{ fontSize: 12, color: T.text }}>{r.personel}</td>
-                      <td style={{ fontSize: 12, color: T.textSoft }}>{r.lokasyon}</td>
-                      <td style={{ fontSize: 12, color: T.textSoft }}>{r.departman ?? '—'}</td>
-                      <td style={{ fontSize: 12, color: T.textSoft }}>{fmtTarih(r.tamamlanma_tarihi ?? r.hedef_tarih)}</td>
-                      <td style={{ fontSize: 12, color: T.textSoft, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
-                      <td style={{ fontSize: 12, color: T.textSoft, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
-                      <td style={{ fontSize: 12, color: T.text, fontFamily: 'monospace', fontWeight: 700 }}>{fmtSure(r.tamamlanma_suresi_saniye)}</td>
+                      <td style={{ fontSize: 14, color: T.text }}>{r.personel}</td>
+                      <td style={{ fontSize: 14, color: T.textSoft }}>{r.lokasyon}</td>
+                      <td style={{ fontSize: 14, color: T.textSoft }}>{r.departman ?? '—'}</td>
+                      <td style={{ fontSize: 13, color: T.textSoft }}>{fmtTarih(r.tamamlanma_tarihi ?? r.hedef_tarih)}</td>
+                      <td style={{ fontSize: 13, color: T.textSoft, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
+                      <td style={{ fontSize: 13, color: T.textSoft, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
+                      <td style={{ fontSize: 13, color: T.text, fontFamily: 'monospace', fontWeight: 700 }}>{fmtSure(r.tamamlanma_suresi_saniye)}</td>
                     </tr>
                   ))}
                 </tbody>
