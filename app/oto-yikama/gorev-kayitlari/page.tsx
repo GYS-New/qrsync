@@ -19,7 +19,6 @@ export default async function OtoYikamaGorevKayitlariPage() {
   let istasyonlar: IstasyonOpt[] = []
   let tamamlayanlar: KullaniciOpt[] = []
   let canEdit = false
-  const debug: Record<string, any> = {}
 
   if (firmaId) {
     // Düzenleme/silme yetkisi: SA + TA
@@ -40,45 +39,40 @@ export default async function OtoYikamaGorevKayitlariPage() {
 
     // İki ayrı sorgu + client-side join — PostgREST nested embed'i bu tabloda
     // (FK relationship cache nedeniyle) güvenilir değil.
+    // İki ayrı sorgu + client-side join
     // 1) Tüm metadata kayıtlarını çek
-    const metaRes = await admin
+    const { data: metaAll } = await admin
       .from('oto_yikama_gorev_metadata')
       .select('gorev_id, plaka_snapshot, hedef_tarih, ekstra')
       .order('hedef_tarih', { ascending: false })
       .limit(2000)
-    const metaArr = (metaRes.data ?? []) as any[]
-    debug.firmaId = firmaId
-    debug.metaCount = metaArr.length
-    debug.metaError = metaRes.error ? String(metaRes.error.message ?? metaRes.error) : null
+    const metaArr = (metaAll ?? []) as any[]
     const allGorevIds = metaArr.map(m => m.gorev_id).filter(Boolean)
-    debug.gorevIdsCount = allGorevIds.length
 
     // 2) Firma scope'lu gorevler — yalnız metadata'lı olanlar
-    let gorevlerData: any[] = []
-    if (allGorevIds.length > 0) {
-      const gorevRes = await admin
-        .from('gorevler')
-        .select(`
-          id, tanim, durum, firma_id, lokasyon_id,
-          olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
-          tamamlanma_suresi_saniye,
-          olusturan_id, tamamlayan_kullanici_id, iptal_eden_id, iptal_sebep
-        `)
-        .eq('firma_id', firmaId)
-        .in('id', allGorevIds)
-      gorevlerData = (gorevRes.data ?? []) as any[]
-      debug.gorevCount = gorevlerData.length
-      debug.gorevError = gorevRes.error ? String(gorevRes.error.message ?? gorevRes.error) : null
-    }
-    const gorevMap = new Map(gorevlerData.map((g: any) => [g.id, g]))
+    // NOT: gorevler tablosunda tamamlayan/iptal_eden için ayrı kolon yok;
+    //      durum değişimini yapan kişi islemi_yapan_id'de tutuluyor.
+    //      TAMAMLANDI → tamamlayan, IPTAL → iptal eden olarak yorumlanır.
+    const { data: gorevlerData } = allGorevIds.length > 0
+      ? await admin
+          .from('gorevler')
+          .select(`
+            id, tanim, durum, firma_id, lokasyon_id,
+            olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
+            tamamlanma_suresi_saniye,
+            olusturan_id, islemi_yapan_id, iptal_sebep
+          `)
+          .eq('firma_id', firmaId)
+          .in('id', allGorevIds)
+      : { data: [] as any[] }
+    const gorevMap = new Map(((gorevlerData ?? []) as any[]).map((g: any) => [g.id, g]))
 
     // 3) Sadece bu firma'ya ait metadata'ları al
     const arr = metaArr.filter(m => gorevMap.has(m.gorev_id))
-    debug.joinedCount = arr.length
 
     const userIds = [...new Set(arr.flatMap(m => {
       const g = gorevMap.get(m.gorev_id)
-      return [g?.olusturan_id, g?.tamamlayan_kullanici_id, g?.iptal_eden_id]
+      return [g?.olusturan_id, g?.islemi_yapan_id]
     }).filter(Boolean))] as string[]
     const lokIds = [...new Set(arr.map(m => gorevMap.get(m.gorev_id)?.lokasyon_id).filter(Boolean))] as string[]
 
@@ -95,6 +89,10 @@ export default async function OtoYikamaGorevKayitlariPage() {
 
     kayitlar = arr.map(m => {
       const g = gorevMap.get(m.gorev_id) ?? {} as any
+      // islemi_yapan_id durum bağlamına göre yorumlanır
+      const isTamamlandi = g.durum === 'TAMAMLANDI'
+      const isIptal      = g.durum === 'IPTAL'
+      const islemKisiId  = g.islemi_yapan_id ?? null
       return {
         gorev_id:        m.gorev_id,
         plaka:           m.plaka_snapshot ?? '—',
@@ -108,12 +106,14 @@ export default async function OtoYikamaGorevKayitlariPage() {
         tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
         tamamlanma_suresi_saniye: g.tamamlanma_suresi_saniye ?? null,
         olusturan:       userMap.get(g.olusturan_id) ?? '—',
-        tamamlayan:      userMap.get(g.tamamlayan_kullanici_id) ?? null,
-        tamamlayan_id:   g.tamamlayan_kullanici_id ?? null,
-        iptal_eden:      userMap.get(g.iptal_eden_id) ?? null,
+        tamamlayan:      isTamamlandi && islemKisiId ? (userMap.get(islemKisiId) ?? null) : null,
+        tamamlayan_id:   isTamamlandi ? islemKisiId : null,
+        iptal_eden:      isIptal && islemKisiId ? (userMap.get(islemKisiId) ?? null) : null,
         iptal_sebep:     g.iptal_sebep ?? null,
       }
     })
+    // Hedef tarihe göre desc sırala
+    kayitlar.sort((a, b) => (b.hedef_tarih ?? '').localeCompare(a.hedef_tarih ?? ''))
 
     // Tamamlayan dropdown'u (sadece tamamlanmışlarda görünen kişiler)
     const tamamlayanSet = new Map<string, string>()
@@ -134,9 +134,6 @@ export default async function OtoYikamaGorevKayitlariPage() {
         hideScopeControls hideNotifBar
       />
       <div style={{ padding: '24px 28px' }}>
-        <pre style={{ background: '#fff7ed', border: '1px solid #fed7aa', padding: 8, fontSize: 12, marginBottom: 12, overflow: 'auto' }}>
-          DEBUG (geçici): {JSON.stringify(debug, null, 2)}
-        </pre>
         {!firmaId ? (
           <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
             Görüntülemek için üstten bir firma seçin.
