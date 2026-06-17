@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { ChevronLeft, ChevronRight, Search, X, Calendar, Car, MapPin, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, X, Calendar, Car, MapPin, Loader2, ChevronDown, ChevronUp, Check } from 'lucide-react'
 
 type Arac = {
   id: string
@@ -71,6 +71,10 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
   const [tarihler, setTarihler] = useState<Set<string>>(new Set())
   const [ayBaslangic, setAyBaslangic] = useState(() => startOfMonth(new Date()))
   const [olusturLoading, setOlusturLoading] = useState(false)
+  // "Plakalara özel istasyon" paneli (collapse)
+  const [detayAcik, setDetayAcik] = useState(false)
+  // Aktif "toplu istasyon" seçimi (üst kart radio). Plaka eklendikçe yenilere bu uygulanır.
+  const [topluLokasyon, setTopluLokasyon] = useState<string>('')
 
   async function yukle() {
     setYukleniyor(true)
@@ -115,12 +119,16 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
   // Varsayılan lokasyon — sadece alt lokasyonlar (parent_id NOT NULL) tercih edilir
   const altLokasyonlar = useMemo(() => lokasyonlar.filter(l => l.parent_id != null), [lokasyonlar])
   const varsayilanLokasyon = altLokasyonlar[0]?.id ?? lokasyonlar[0]?.id ?? ''
+  // Toplu lokasyon başlangıçta varsayılan (ilk altLokasyon) olur
+  useEffect(() => {
+    if (!topluLokasyon && varsayilanLokasyon) setTopluLokasyon(varsayilanLokasyon)
+  }, [varsayilanLokasyon, topluLokasyon])
 
   function toggleArac(a: Arac) {
     setSecimMap(prev => {
       const m = new Map(prev)
       if (m.has(a.id)) m.delete(a.id)
-      else m.set(a.id, varsayilanLokasyon)
+      else m.set(a.id, topluLokasyon || varsayilanLokasyon)
       return m
     })
   }
@@ -136,13 +144,14 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
   function tumunuSec() {
     setSecimMap(prev => {
       const m = new Map(prev)
-      for (const a of filtered) if (!m.has(a.id)) m.set(a.id, varsayilanLokasyon)
+      for (const a of filtered) if (!m.has(a.id)) m.set(a.id, topluLokasyon || varsayilanLokasyon)
       return m
     })
   }
   function temizleSecim() { setSecimMap(new Map()) }
 
   function tumLokasyon(lokId: string) {
+    setTopluLokasyon(lokId)
     setSecimMap(prev => {
       const m = new Map<string, string>()
       for (const [k] of prev) m.set(k, lokId)
@@ -274,212 +283,317 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
     )
   }
 
+  // İstasyona göre kaç plaka atanmış (toplu/özel ayrımı için)
+  const istasyonDagilim = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const [, lokId] of secimMap) m.set(lokId, (m.get(lokId) ?? 0) + 1)
+    return m
+  }, [secimMap])
+  const farkliIstasyonSayisi = istasyonDagilim.size
+
   return (
-    <div style={{ padding: '24px 28px', display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, alignItems: 'start' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div className="verde-card" style={{ padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Search size={14} color={T.textSoft} />
-          <input className="verde-input" placeholder="Plaka, kullanıcı, departman ara…"
-            value={q} onChange={e => setQ(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
-          <select className="verde-select" value={filterDepartman} onChange={e => setFilterDepartman(e.target.value)} style={{ width: 160 }}>
-            <option value="">Departman (Tümü)</option>
-            {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <button onClick={tumunuSec}
-            style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-            Tümünü Seç ({filtered.length})
-          </button>
-          <button onClick={temizleSecim}
-            style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-            Temizle
-          </button>
+    <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* ── STICKY ÖZET BAR + Oluştur ── */}
+      <div className="verde-card" style={{
+        padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+        position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 2px 8px rgba(15,23,42,0.06)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+          <OzetPil ikon={<Car size={14} />} sayi={atamaListesi.length} etiket="plaka" renk={T.blue} />
+          <span style={{ color: T.textSoft, fontSize: 14 }}>×</span>
+          <OzetPil ikon={<Calendar size={14} />} sayi={tarihler.size} etiket="tarih" renk={T.amber} />
+          <span style={{ color: T.textSoft, fontSize: 14 }}>=</span>
+          <OzetPil sayi={beklenenGorev} etiket="görev" renk={beklenenGorev > 0 ? T.green : T.textSoft} buyuk />
         </div>
-
-        <div className="verde-card" style={{ overflow: 'hidden' }}>
-          <div style={{ maxHeight: 460, overflowY: 'auto' }}>
-            <table className="verde-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 30 }}></th>
-                  <th>Plaka</th>
-                  <th>Kullanıcı</th>
-                  <th>Departman</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={4} style={{ padding: 20, textAlign: 'center', color: T.textSoft }}>Sonuç yok</td></tr>
-                ) : filtered.map(a => {
-                  const selected = secimMap.has(a.id)
-                  return (
-                    <tr key={a.id}
-                      onClick={() => toggleArac(a)}
-                      style={{ cursor: 'pointer', background: selected ? T.blueLight : undefined }}>
-                      <td><input type="checkbox" checked={selected} readOnly /></td>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{a.plaka}</td>
-                      <td style={{ color: T.textSoft }}>{a.kullanici_adi_soyadi ?? '—'}</td>
-                      <td style={{ color: T.textSoft }}>{a.departman ?? '—'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {atamaListesi.length > 0 && (
-          <div className="verde-card" style={{ padding: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: T.text }}>
-                <Car size={14} /> Atamalar ({atamaListesi.length})
-              </div>
-              {altLokasyonlar.length > 1 && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {altLokasyonlar.slice(0, 4).map(l => (
-                    <button key={l.id} onClick={() => tumLokasyon(l.id)}
-                      style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 11 }}>
-                      Tümünü → {l.tanim}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-              <table className="verde-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 110 }}>Plaka</th>
-                    <th style={{ width: 160 }}>Kullanıcı</th>
-                    <th style={{ minWidth: 340, width: '60%' }}>İstasyon</th>
-                    <th style={{ width: 32 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {atamaListesi.map(a => (
-                    <tr key={a.id}>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{a.plaka}</td>
-                      <td style={{ color: T.textSoft, fontSize: 12 }}>{a.kullanici_adi_soyadi ?? '—'}</td>
-                      <td>
-                        <select className="verde-select" value={secimMap.get(a.id) ?? ''}
-                          onChange={e => setLokasyon(a.id, e.target.value)}
-                          style={{ width: '100%', minWidth: 320, padding: '4px 8px', fontSize: 12 }}>
-                          {altLokasyonlar.map(l => (
-                            <option key={l.id} value={l.id}>{lokasyonDisplay(l)}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <button onClick={() => toggleArac(a)} title="Kaldır"
-                          style={{ padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: T.red }}>
-                          <X size={13} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        <button onClick={olustur} disabled={beklenenGorev === 0 || olusturLoading}
+          style={{
+            padding: '10px 22px', borderRadius: 8, border: 'none',
+            background: beklenenGorev > 0 && !olusturLoading
+              ? 'linear-gradient(145deg, #16a34a, #15803d)'
+              : '#cbd5e1',
+            color: '#fff',
+            cursor: beklenenGorev > 0 && !olusturLoading ? 'pointer' : 'not-allowed',
+            fontSize: 14, fontWeight: 800,
+            boxShadow: beklenenGorev > 0 ? '0 4px 12px rgba(22,163,74,0.25)' : 'none',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+          {olusturLoading
+            ? <><Loader2 size={14} style={{ animation: 'spin 0.9s linear infinite' }} /> Oluşturuluyor…</>
+            : <><Check size={14} /> {beklenenGorev > 0 ? `${beklenenGorev} Görev Oluştur` : 'Görev Oluştur'}</>}
+        </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, position: 'sticky', top: 16 }}>
-        <div className="verde-card" style={{ padding: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 13, fontWeight: 700 }}>
-            <Calendar size={14} /> Tarihler
-            <span style={{ marginLeft: 'auto', color: T.textSoft, fontWeight: 500 }}>{tarihler.size} gün seçili</span>
-          </div>
+      {/* ── 3 ANA KART: Plakalar | İstasyon | Tarihler ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(280px,1fr) minmax(290px,1fr)', gap: 14, alignItems: 'start' }}>
 
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
-            <button onClick={() => hizliSec(1, 'bugun')} style={hizliBtn}>Bugün</button>
-            <button onClick={() => hizliSec(1, 'yarin')} style={hizliBtn}>Yarın</button>
-            <button onClick={() => hizliSec(7)} style={hizliBtn}>7 gün</button>
-            <button onClick={() => hizliSec(30)} style={hizliBtn}>30 gün</button>
-            <button onClick={buAyHaftaIciSec} style={hizliBtn}>Hafta içi</button>
-            <button onClick={() => setTarihler(new Set())} style={{ ...hizliBtn, color: T.red }}>Temizle</button>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <button onClick={() => setAyBaslangic(new Date(ayBaslangic.getFullYear(), ayBaslangic.getMonth() - 1, 1))}
-              style={{ padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: T.text }}>
-              <ChevronLeft size={18} />
-            </button>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>
-              {AY_ADLARI[ayBaslangic.getMonth()]} {ayBaslangic.getFullYear()}
+        {/* KART 1: PLAKALAR */}
+        <div className="verde-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 6, background: T.blue + '14', color: T.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13 }}>1</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: T.text }}>Plakalar</div>
+              <div style={{ marginLeft: 'auto', fontSize: 11, color: T.textSoft }}>{atamaListesi.length} / {araclar.length} seçili</div>
             </div>
-            <button onClick={() => setAyBaslangic(new Date(ayBaslangic.getFullYear(), ayBaslangic.getMonth() + 1, 1))}
-              style={{ padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: T.text }}>
-              <ChevronRight size={18} />
-            </button>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 180, background: T.grayLight, border: `1px solid ${T.border}`, borderRadius: 6, padding: '5px 10px' }}>
+                <Search size={13} color={T.textSoft} />
+                <input placeholder="Plaka, kullanıcı, departman…"
+                  value={q} onChange={e => setQ(e.target.value)}
+                  style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12.5, color: T.text }} />
+              </div>
+              <select className="verde-select" value={filterDepartman} onChange={e => setFilterDepartman(e.target.value)}
+                style={{ width: 130, padding: '5px 8px', fontSize: 12 }}>
+                <option value="">Tüm Dept.</option>
+                {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <button onClick={tumunuSec}
+                style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, color: T.text }}>
+                Tümü ({filtered.length})
+              </button>
+              {atamaListesi.length > 0 && (
+                <button onClick={temizleSecim}
+                  style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${T.redLight}`, background: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, color: T.red }}>
+                  Temizle
+                </button>
+              )}
+            </div>
           </div>
+          {/* Plaka chip grid */}
+          <div style={{ maxHeight: 440, overflowY: 'auto', padding: 12 }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: 32, textAlign: 'center', color: T.textSoft, fontSize: 13 }}>Sonuç yok.</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6 }}>
+                {filtered.map(a => {
+                  const selected = secimMap.has(a.id)
+                  return (
+                    <button key={a.id} type="button" onClick={() => toggleArac(a)}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 7,
+                        border: `1.5px solid ${selected ? T.blue : T.border}`,
+                        background: selected ? T.blueLight : '#fff',
+                        cursor: 'pointer', textAlign: 'left',
+                        transition: 'all 0.1s',
+                      }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <span style={{
+                          width: 14, height: 14, borderRadius: 4,
+                          border: `1.5px solid ${selected ? T.blue : '#cbd5e1'}`,
+                          background: selected ? T.blue : '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        }}>
+                          {selected && <Check size={9} color="#fff" strokeWidth={3.5} />}
+                        </span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 13, color: T.text, letterSpacing: '0.03em' }}>{a.plaka}</span>
+                      </div>
+                      <div style={{ fontSize: 10.5, color: T.textSoft, paddingLeft: 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {a.kullanici_adi_soyadi ?? '—'} {a.departman ? `· ${a.departman}` : ''}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
-            {GUN_ADLARI.map(g => (
-              <div key={g} style={{ padding: 4, textAlign: 'center', fontSize: 11, fontWeight: 700, color: T.textSoft }}>{g}</div>
-            ))}
-            {takvimHucreler.map((h, i) => {
-              const k = fmtDate(h.date)
-              const selected = tarihler.has(k)
-              const bugun = fmtDate(new Date()) === k
-              const dow = h.date.getDay()
-              const haftasonu = dow === 0 || dow === 6
+        {/* KART 2: İSTASYON */}
+        <div className="verde-card" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 6, background: T.amber + '14', color: T.amber, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13 }}>2</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: T.text }}>İstasyon</div>
+              {farkliIstasyonSayisi > 1 && (
+                <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 700, color: T.amber, background: T.amberLight, padding: '2px 8px', borderRadius: 999 }}>
+                  {farkliIstasyonSayisi} farklı
+                </span>
+              )}
+            </div>
+            <p style={{ margin: '6px 0 0', fontSize: 11.5, color: T.textSoft }}>
+              Tüm seçili plakalar için ortak istasyon. Plaka-özel istasyon için aşağıyı aç.
+            </p>
+          </div>
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {altLokasyonlar.length === 0 ? (
+              <div style={{ padding: 16, textAlign: 'center', color: T.textSoft, fontSize: 12.5 }}>İstasyon tanımlı değil.</div>
+            ) : altLokasyonlar.map(l => {
+              const active = topluLokasyon === l.id
+              const adetBuLok = istasyonDagilim.get(l.id) ?? 0
               return (
-                <button key={i} onClick={() => toggleTarih(h.date)}
+                <button key={l.id} type="button" onClick={() => tumLokasyon(l.id)}
                   style={{
-                    padding: '6px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
-                    background: selected ? T.blue : 'transparent',
-                    color: selected ? '#fff' : (h.ayDisi ? '#cbd5e1' : haftasonu ? '#94a3b8' : T.text),
-                    fontWeight: bugun ? 800 : 500,
-                    fontSize: 12,
-                    outline: bugun && !selected ? `2px solid ${T.blue}` : undefined,
-                    outlineOffset: -2,
+                    padding: '10px 12px', borderRadius: 7,
+                    border: `1.5px solid ${active ? T.blue : T.border}`,
+                    background: active ? T.blueLight : '#fff',
+                    cursor: 'pointer', textAlign: 'left',
+                    display: 'flex', alignItems: 'center', gap: 10,
                   }}>
-                  {h.date.getDate()}
+                  <span style={{
+                    width: 16, height: 16, borderRadius: '50%',
+                    border: `2px solid ${active ? T.blue : '#cbd5e1'}`,
+                    background: '#fff', position: 'relative', flexShrink: 0,
+                  }}>
+                    {active && (
+                      <span style={{
+                        position: 'absolute', inset: 3, borderRadius: '50%', background: T.blue,
+                      }} />
+                    )}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {l.tanim}
+                    </div>
+                    {l.ust?.tanim && (
+                      <div style={{ fontSize: 10.5, color: T.textSoft, marginTop: 1 }}>{l.ust.tanim}</div>
+                    )}
+                  </div>
+                  {adetBuLok > 0 && (
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: T.blue, background: '#fff', border: `1px solid ${T.blue}33`, padding: '2px 7px', borderRadius: 999 }}>
+                      {adetBuLok}
+                    </span>
+                  )}
                 </button>
               )
             })}
-          </div>
 
-          {tarihler.size > 0 && (
-            <div style={{ marginTop: 10, display: 'flex', gap: 4, flexWrap: 'wrap', maxHeight: 80, overflowY: 'auto' }}>
-              {[...tarihler].sort().map(t => (
-                <span key={t} style={{ padding: '2px 6px', borderRadius: 999, background: T.blueLight, color: T.blue, fontSize: 11, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                  {t}
-                  <X size={10} onClick={() => setTarihler(prev => { const s = new Set(prev); s.delete(t); return s })} style={{ cursor: 'pointer' }} />
-                </span>
-              ))}
-            </div>
-          )}
+            {/* Plakalara özel istasyon paneli */}
+            {atamaListesi.length > 0 && (
+              <button type="button" onClick={() => setDetayAcik(v => !v)}
+                style={{
+                  marginTop: 4,
+                  padding: '7px 12px', borderRadius: 7,
+                  border: `1px dashed ${T.border}`, background: T.grayLight,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 12, fontWeight: 600, color: T.textSoft,
+                }}>
+                {detayAcik ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                Plaka-özel istasyon ({atamaListesi.length})
+              </button>
+            )}
+
+            {detayAcik && atamaListesi.length > 0 && (
+              <div style={{ maxHeight: 240, overflowY: 'auto', border: `1px solid ${T.border}`, borderRadius: 7 }}>
+                {atamaListesi.map(a => (
+                  <div key={a.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 8px', borderBottom: `1px solid ${T.border}`,
+                  }}>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 12, color: T.text, width: 80, flexShrink: 0 }}>{a.plaka}</span>
+                    <select value={secimMap.get(a.id) ?? ''}
+                      onChange={e => setLokasyon(a.id, e.target.value)}
+                      style={{ flex: 1, minWidth: 0, padding: '3px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5, background: '#fff' }}>
+                      {altLokasyonlar.map(l => (
+                        <option key={l.id} value={l.id}>{lokasyonDisplay(l)}</option>
+                      ))}
+                    </select>
+                    <button onClick={() => toggleArac(a)} title="Kaldır"
+                      style={{ padding: 3, background: 'transparent', border: 'none', cursor: 'pointer', color: T.red, display: 'flex' }}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="verde-card" style={{ padding: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
-            <div style={{ padding: 10, background: T.grayLight, borderRadius: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: T.text }}>{atamaListesi.length}</div>
-              <div style={{ fontSize: 10, color: T.textSoft, marginTop: 2 }}>Plaka</div>
-            </div>
-            <div style={{ padding: 10, background: T.grayLight, borderRadius: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: T.text }}>{tarihler.size}</div>
-              <div style={{ fontSize: 10, color: T.textSoft, marginTop: 2 }}>Tarih</div>
-            </div>
-            <div style={{ padding: 10, background: beklenenGorev > 0 ? T.blueLight : T.grayLight, borderRadius: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: beklenenGorev > 0 ? T.blue : T.textSoft }}>{beklenenGorev}</div>
-              <div style={{ fontSize: 10, color: T.textSoft, marginTop: 2 }}>Görev</div>
+        {/* KART 3: TARİHLER */}
+        <div className="verde-card" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 6, background: T.green + '14', color: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13 }}>3</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: T.text }}>Tarihler</div>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: T.textSoft }}>{tarihler.size} gün</span>
             </div>
           </div>
-          <button onClick={olustur} disabled={beklenenGorev === 0 || olusturLoading}
-            style={{
-              width: '100%', padding: '12px', borderRadius: 8, border: 'none',
-              background: beklenenGorev > 0 && !olusturLoading ? T.text : '#cbd5e1',
-              color: '#fff', cursor: beklenenGorev > 0 && !olusturLoading ? 'pointer' : 'not-allowed',
-              fontSize: 14, fontWeight: 800,
-            }}>
-            {olusturLoading ? 'Oluşturuluyor…' : `${beklenenGorev} Görev Oluştur`}
-          </button>
+
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              <button onClick={() => hizliSec(1, 'bugun')} style={hizliBtn}>Bugün</button>
+              <button onClick={() => hizliSec(1, 'yarin')} style={hizliBtn}>Yarın</button>
+              <button onClick={() => hizliSec(7)} style={hizliBtn}>7 gün</button>
+              <button onClick={() => hizliSec(30)} style={hizliBtn}>30 gün</button>
+              <button onClick={buAyHaftaIciSec} style={hizliBtn}>Hafta içi</button>
+              {tarihler.size > 0 && (
+                <button onClick={() => setTarihler(new Set())} style={{ ...hizliBtn, color: T.red }}>Temizle</button>
+              )}
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <button onClick={() => setAyBaslangic(new Date(ayBaslangic.getFullYear(), ayBaslangic.getMonth() - 1, 1))}
+                  style={{ padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: T.text }}>
+                  <ChevronLeft size={18} />
+                </button>
+                <div style={{ fontSize: 13, fontWeight: 800 }}>
+                  {AY_ADLARI[ayBaslangic.getMonth()]} {ayBaslangic.getFullYear()}
+                </div>
+                <button onClick={() => setAyBaslangic(new Date(ayBaslangic.getFullYear(), ayBaslangic.getMonth() + 1, 1))}
+                  style={{ padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: T.text }}>
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+                {GUN_ADLARI.map(g => (
+                  <div key={g} style={{ padding: 4, textAlign: 'center', fontSize: 10.5, fontWeight: 700, color: T.textSoft }}>{g}</div>
+                ))}
+                {takvimHucreler.map((h, i) => {
+                  const k = fmtDate(h.date)
+                  const selected = tarihler.has(k)
+                  const bugun = fmtDate(new Date()) === k
+                  const dow = h.date.getDay()
+                  const haftasonu = dow === 0 || dow === 6
+                  return (
+                    <button key={i} onClick={() => toggleTarih(h.date)}
+                      style={{
+                        padding: '6px 0', borderRadius: 5, border: 'none', cursor: 'pointer',
+                        background: selected ? T.green : 'transparent',
+                        color: selected ? '#fff' : (h.ayDisi ? '#cbd5e1' : haftasonu ? '#94a3b8' : T.text),
+                        fontWeight: bugun ? 800 : 500,
+                        fontSize: 12,
+                        outline: bugun && !selected ? `2px solid ${T.green}` : undefined,
+                        outlineOffset: -2,
+                      }}>
+                      {h.date.getDate()}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {tarihler.size > 0 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', maxHeight: 80, overflowY: 'auto', borderTop: `1px solid ${T.border}`, paddingTop: 8 }}>
+                {[...tarihler].sort().map(t => (
+                  <span key={t} style={{ padding: '2px 8px', borderRadius: 999, background: T.greenLight, color: T.green, fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {t.slice(8)}.{t.slice(5, 7)}
+                    <X size={10} onClick={() => setTarihler(prev => { const s = new Set(prev); s.delete(t); return s })} style={{ cursor: 'pointer' }} />
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  )
+}
+
+function OzetPil({ ikon, sayi, etiket, renk, buyuk }: { ikon?: React.ReactNode; sayi: number; etiket: string; renk: string; buyuk?: boolean }) {
+  return (
+    <div style={{
+      padding: buyuk ? '4px 14px' : '4px 12px',
+      borderRadius: 8,
+      background: renk + '0F',
+      color: renk,
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+    }}>
+      {ikon}
+      <span style={{ fontSize: buyuk ? 20 : 16, fontWeight: 900, lineHeight: 1 }}>{sayi}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{etiket}</span>
     </div>
   )
 }

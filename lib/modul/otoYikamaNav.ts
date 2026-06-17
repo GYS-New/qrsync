@@ -25,9 +25,9 @@ export function getOtoYikamaNav(): NavGroup[] {
     {
       label: 'Operasyon',
       items: [
+        { label: 'Canlı İşlemler',  href: '/oto-yikama/gunluk',         icon: '📋', live: true },
         { label: 'Araç Kayıtları',  href: '/oto-yikama/araclar',        icon: '🚗' },
         { label: 'Görev Oluştur',   href: '/oto-yikama/gorev-olustur',  icon: '➕' },
-        { label: 'Canlı İşlemler',  href: '/oto-yikama/gunluk',          icon: '📋' },
         { label: 'Raporlar',        href: '/oto-yikama/raporlar',        icon: '📊' },
       ],
     },

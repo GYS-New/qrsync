@@ -18,7 +18,7 @@ export default async function OtoYikamaAraclarPage() {
 
   return (
     <div>
-      <Topbar title="Araç Kayıtları" base={rolBase} hideScopeControls
+      <Topbar title="Araç Kayıtları" base={rolBase} hideScopeControls hideNotifBar
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Araç Kayıtları' }]} />
       {!firmaId ? (
         <div style={{ padding: '24px 28px' }}>

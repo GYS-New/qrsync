@@ -11,7 +11,7 @@ export default async function OtoYikamaGunlukPage() {
 
   return (
     <div>
-      <Topbar title="Canlı İşlemler" base={rolBase} hideScopeControls
+      <Topbar title="Canlı İşlemler" base={rolBase} hideScopeControls hideNotifBar
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Canlı İşlemler' }]} />
       <GunlukClient />
     </div>

@@ -11,7 +11,7 @@ export default async function OtoYikamaRaporlarPage() {
 
   return (
     <div>
-      <Topbar title="Raporlar" base={rolBase} hideScopeControls
+      <Topbar title="Raporlar" base={rolBase} hideScopeControls hideNotifBar
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Raporlar' }]} />
       <RaporlarClient />
     </div>

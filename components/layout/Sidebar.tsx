@@ -14,6 +14,8 @@ export interface NavItem {
   label: string
   href: string
   icon: string
+  /** "Canlı" satırların başında yanıp sönen yeşil nokta gösterilir. */
+  live?: boolean
 }
 export interface NavGroup {
   label: string
@@ -655,7 +657,9 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                   if (!isActive(item.href)) e.currentTarget.style.background = 'transparent'
                 }}
               >
-                {item.href.endsWith('/canli-islemler') && !item.href.includes('tum-gorevler') ? (
+                {/* "Canlı" satırlar — yeşil yanıp sönen nokta. NavItem.live true ise
+                    (Oto Yıkama gibi) veya GYS canli-islemler URL'ine eşitse. */}
+                {((item as any).live || (item.href.endsWith('/canli-islemler') && !item.href.includes('tum-gorevler'))) ? (
                   <span style={{ width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{
                       width: 8, height: 8, borderRadius: '50%', background: '#22c55e',

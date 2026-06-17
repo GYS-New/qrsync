@@ -19,6 +19,8 @@ interface TopbarProps {
   /** Firma + Proje seçicilerini gizle (örn. Oto Yıkama modülünde modül-bağımsız
    *  scope yok, kullanıcı kendi firmasında/lokasyonunda çalışır) */
   hideScopeControls?: boolean
+  /** Topbar altındaki cron/aktivite bildirim çubuğunu gizle (modül-içi UI'lar için) */
+  hideNotifBar?: boolean
 }
 
 // Breadcrumb label → href mapping
@@ -45,7 +47,7 @@ const BREADCRUMB_HREF_MAP: Record<string, string> = {
   'Birim Fiyatlar': '/dashboard/birim-fiyatlar',
 }
 
-export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCount, base, hideScopeControls }: TopbarProps) {
+export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCount, base, hideScopeControls, hideNotifBar }: TopbarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [navigating, setNavigating] = useState(false)
@@ -201,7 +203,7 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
         <UserPanel base={base} />
       </div>
     </header>
-    {showBar && <BildirimBar rol={base === '/sa' ? 'super_admin' : base === '/ta' ? 'tenant_admin' : 'tenant_user'} />}
+    {showBar && !hideNotifBar && <BildirimBar rol={base === '/sa' ? 'super_admin' : base === '/ta' ? 'tenant_admin' : 'tenant_user'} />}
     </>
   )
 }
