@@ -143,7 +143,7 @@ export default async function OtoYikamaKullanicilarPage() {
                     <th style={{ textAlign: 'left', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>İsim Soyisim</th>
                     <th style={{ textAlign: 'left', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>E-posta</th>
                     <th style={{ textAlign: 'center', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>Rol</th>
-                    <th style={{ textAlign: 'left', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>Atanmış Lokasyonlar</th>
+                    <th style={{ textAlign: 'left', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>Atanmış İstasyonlar</th>
                     <th style={{ textAlign: 'center', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>Durum</th>
                   </tr>
                 </thead>

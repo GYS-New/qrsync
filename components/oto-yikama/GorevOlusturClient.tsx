@@ -260,14 +260,14 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
       <div style={{ padding: '24px 28px' }}>
         <div className="verde-card" style={{ padding: 32, textAlign: 'center' }}>
           <MapPin size={32} color={T.amber} style={{ marginBottom: 8 }} />
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Önce Yıkama Lokasyonları Oluşturun</h3>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Önce Yıkama İstasyonları Oluşturun</h3>
           <p style={{ marginTop: 8, color: T.textSoft, fontSize: 13 }}>
-            Görev oluşturmak için Lokasyonlar sayfasından bir üst lokasyon (örn. "OTO YIKAMA")
-            ve altına en az bir alt lokasyon (örn. "İSTASYON-1") tanımlamış olmalısınız.
+            Görev oluşturmak için Yıkama İstasyonları sayfasından bir üst istasyon (örn. "ARAÇ YIKAMA")
+            ve altına en az bir alt istasyon (örn. "İSTASYON-1") tanımlamış olmalısınız.
           </p>
-          <a href="/sa/dashboard/lokasyonlar"
+          <a href="/oto-yikama/lokasyonlar"
             style={{ display: 'inline-block', marginTop: 14, padding: '8px 18px', borderRadius: 8, background: T.text, color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 700 }}>
-            Lokasyonlara Git
+            Yıkama İstasyonlarına Git
           </a>
         </div>
       </div>
@@ -350,7 +350,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                   <tr>
                     <th style={{ width: 110 }}>Plaka</th>
                     <th style={{ width: 160 }}>Kullanıcı</th>
-                    <th style={{ minWidth: 340, width: '60%' }}>Lokasyon</th>
+                    <th style={{ minWidth: 340, width: '60%' }}>İstasyon</th>
                     <th style={{ width: 32 }}></th>
                   </tr>
                 </thead>

@@ -260,7 +260,7 @@ function SatirTablo({ baslik, satirlar, renk, icon }: { baslik: string; satirlar
             <tr>
               <th style={{ width: 50 }}>Sat.</th>
               <th style={{ width: 110 }}>Plaka</th>
-              <th>Lokasyon</th>
+              <th>İstasyon</th>
               <th style={{ width: 100 }}>Tarih</th>
               <th>Not</th>
             </tr>

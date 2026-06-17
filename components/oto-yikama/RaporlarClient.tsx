@@ -390,9 +390,9 @@ export default function RaporlarClient() {
               </div>
             </div>
 
-            {/* Lokasyon dağılım */}
+            {/* İstasyon dağılımı */}
             <div className="verde-card" style={{ padding: 12 }}>
-              <Baslik>Lokasyon (İstasyon) Dağılımı</Baslik>
+              <Baslik>İstasyon Dağılımı</Baslik>
               <div style={{ height: 240 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -428,7 +428,7 @@ export default function RaporlarClient() {
                     <th style={{ width: 110 }}>Plaka</th>
                     <th style={{ width: 90 }}>Tip</th>
                     <th>Personel</th>
-                    <th>Lokasyon</th>
+                    <th>İstasyon</th>
                     <th>Departman</th>
                     <th style={{ width: 100 }}>Tarih</th>
                     <th style={{ width: 90 }}>Başlatma</th>

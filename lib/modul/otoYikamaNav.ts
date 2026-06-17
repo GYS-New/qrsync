@@ -18,7 +18,7 @@ export function getOtoYikamaNav(): NavGroup[] {
     {
       label: 'Yönetim',
       items: [
-        { label: 'Lokasyonlar',     href: '/oto-yikama/lokasyonlar', icon: '📍' },
+        { label: 'Yıkama İstasyonları', href: '/oto-yikama/lokasyonlar', icon: '📍' },
         { label: 'Kullanıcılar',    href: '/oto-yikama/kullanicilar', icon: '👥' },
       ],
     },
@@ -27,7 +27,7 @@ export function getOtoYikamaNav(): NavGroup[] {
       items: [
         { label: 'Araç Kayıtları',  href: '/oto-yikama/araclar',        icon: '🚗' },
         { label: 'Görev Oluştur',   href: '/oto-yikama/gorev-olustur',  icon: '➕' },
-        { label: 'Günlük Tablo',    href: '/oto-yikama/gunluk',          icon: '📋' },
+        { label: 'Canlı İşlemler',  href: '/oto-yikama/gunluk',          icon: '📋' },
         { label: 'Raporlar',        href: '/oto-yikama/raporlar',        icon: '📊' },
       ],
     },

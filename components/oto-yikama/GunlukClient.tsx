@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { Loader2, RefreshCw, RotateCcw, Trash2 } from 'lucide-react'
+import { Loader2, RotateCcw, Trash2, Search } from 'lucide-react'
 
 type Durum = 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL'
 
@@ -66,6 +66,8 @@ function gorevSuresiSaniye(r: Row): number {
   return 0
 }
 
+type DurumFilter = 'TUMU' | Durum
+
 export default function GunlukClient() {
   const { firmaId } = useFirma()
   const { toast } = useToast()
@@ -76,6 +78,9 @@ export default function GunlukClient() {
   const [yukleniyor, setYukleniyor] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
   const [sonGuncelleme, setSonGuncelleme] = useState<Date | null>(null)
+  const [streamState, setStreamState] = useState<'running' | 'paused' | 'stopped'>('running')
+  const [durumFilter, setDurumFilter] = useState<DurumFilter>('TUMU')
+  const [arama, setArama] = useState('')
   const inflightRef = useRef(false)
 
   async function fetchData(showSpin = false) {
@@ -99,29 +104,40 @@ export default function GunlukClient() {
     }
   }
 
-  // İlk yükleme + 5sn polling
+  // İlk yükleme + 5sn polling (sadece streamState='running' iken)
   useEffect(() => {
     setRows([])
     if (!firmaId) { setYukleniyor(false); return }
     fetchData(true)
+    if (streamState !== 'running') return
     const tid = setInterval(() => fetchData(false), 5000)
     return () => clearInterval(tid)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmaId])
+  }, [firmaId, streamState])
 
-  // Sıralama: hareket eden (ACIK olmayan) üstte, durum_degisim_tarihi DESC.
+  // Sıralama + filtre: hareket eden (ACIK olmayan) üstte, durum_degisim_tarihi DESC.
   // ACIK satırlar altta (henüz işlem görmedi). Son tamamlanan/iptal/işleme alınan
   // her zaman tepeye taşınır — canlı akış mantığı.
   const sorted = useMemo(() => {
-    return [...rows].sort((a, b) => {
-      const aHar = a.durum === 'ACIK' ? 1 : 0
-      const bHar = b.durum === 'ACIK' ? 1 : 0
-      if (aHar !== bHar) return aHar - bHar
-      const ta = a.durum_degisim_tarihi ? new Date(a.durum_degisim_tarihi).getTime() : 0
-      const tb = b.durum_degisim_tarihi ? new Date(b.durum_degisim_tarihi).getTime() : 0
-      return tb - ta
-    })
-  }, [rows])
+    const ara = arama.trim().toUpperCase()
+    return [...rows]
+      .filter(r => durumFilter === 'TUMU' ? true : r.durum === durumFilter)
+      .filter(r => {
+        if (!ara) return true
+        return (r.plaka ?? '').toUpperCase().includes(ara)
+          || (r.kullanici ?? '').toUpperCase().includes(ara)
+          || (r.lokasyon ?? '').toUpperCase().includes(ara)
+          || (r.tamamlayan ?? '').toUpperCase().includes(ara)
+      })
+      .sort((a, b) => {
+        const aHar = a.durum === 'ACIK' ? 1 : 0
+        const bHar = b.durum === 'ACIK' ? 1 : 0
+        if (aHar !== bHar) return aHar - bHar
+        const ta = a.durum_degisim_tarihi ? new Date(a.durum_degisim_tarihi).getTime() : 0
+        const tb = b.durum_degisim_tarihi ? new Date(b.durum_degisim_tarihi).getTime() : 0
+        return tb - ta
+      })
+  }, [rows, durumFilter, arama])
 
   const sayilar = useMemo(() => {
     const c = { toplam: rows.length, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0 }
@@ -193,30 +209,109 @@ export default function GunlukClient() {
     )
   }
 
+  const dotColor = streamState === 'running' ? '#374151' : streamState === 'paused' ? '#d97706' : '#9ca3af'
+
+  const kpiKartlari: { key: DurumFilter; label: string; val: number; bg: string; vColor: string; lColor: string }[] = [
+    { key: 'TUMU',       label: 'Tümü',       val: sayilar.toplam,     bg: 'transparent', vColor: '#111827', lColor: '#6b7280' },
+    { key: 'ISLEMDE',    label: 'İşlemde',    val: sayilar.ISLEMDE,    bg: '#eff6ff',     vColor: '#1d4ed8', lColor: '#185FA5' },
+    { key: 'ACIK',       label: 'Açık',       val: sayilar.ACIK,       bg: '#fffbeb',     vColor: '#92400e', lColor: '#854F0B' },
+    { key: 'TAMAMLANDI', label: 'Tamamlandı', val: sayilar.TAMAMLANDI, bg: '#f0fdf4',     vColor: '#166534', lColor: '#3B6D11' },
+    { key: 'IPTAL',      label: 'İptal',      val: sayilar.IPTAL,      bg: '#fef2f2',     vColor: '#991b1b', lColor: '#A32D2D' },
+  ]
+
   return (
     <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Üst bar: özet + son güncelleme */}
-      <div className="verde-card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Pil label="Toplam" sayi={sayilar.toplam} bg={T.grayLight} fg={T.text} />
-          <Pil label="İşlemde" sayi={sayilar.ISLEMDE} bg={DURUM_BG.ISLEMDE} fg={DURUM_FG.ISLEMDE} blink={sayilar.ISLEMDE > 0} />
-          <Pil label="Açık" sayi={sayilar.ACIK} bg={DURUM_BG.ACIK} fg={DURUM_FG.ACIK} />
-          <Pil label="Tamamlandı" sayi={sayilar.TAMAMLANDI} bg={DURUM_BG.TAMAMLANDI} fg={DURUM_FG.TAMAMLANDI} />
-          <Pil label="İptal" sayi={sayilar.IPTAL} bg={DURUM_BG.IPTAL} fg={DURUM_FG.IPTAL} />
-          <div style={{ padding: '6px 12px', borderRadius: 8, background: T.greenLight, color: T.green, display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 16, fontWeight: 900 }}>{fmtSure(toplamSureSaniye)}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Toplam Süre</span>
+      {/* ── ÜST PANEL: Canlı Akış başlığı + KPI filtre kartları + arama ── */}
+      <div className="verde-card" style={{ overflow: 'hidden' }}>
+        {/* Başlık satırı */}
+        <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+            <div style={{ width: 20, height: 20, border: '1.5px solid #374151', borderRadius: 5, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+              <div style={{
+                position: 'absolute', left: 0, right: 0, height: 2,
+                background: 'rgba(46,139,46,0.5)',
+                animation: streamState === 'running' ? 'canliScan 1.8s linear infinite' : 'none',
+              }} />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#111827', letterSpacing: '-0.2px' }}>
+              Yıkama Akışı
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', padding: '2px 8px', borderRadius: 4 }}>
+              {today || 'Bugün'}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 9px', borderRadius: 20, background: streamState === 'running' ? '#f9fafb' : '#f5f5f5', border: `1px solid ${streamState === 'running' ? '#d1d5db' : '#e0e0e0'}` }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0,
+                animation: streamState === 'running' ? 'canliPulse 1.4s ease-in-out infinite' : 'none' }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: dotColor }}>
+                {streamState === 'running' ? 'Canlı' : streamState === 'paused' ? 'Duraklatıldı' : 'Durduruldu'}
+              </span>
+            </div>
+            <div style={{ padding: '4px 10px', borderRadius: 8, background: T.greenLight, color: T.green, display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ fontSize: 14, fontWeight: 900 }}>{fmtSure(toplamSureSaniye)}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Toplam Süre</span>
+            </div>
+          </div>
+
+          {/* Stream kontrolleri */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {[
+              { s: 'running' as const, icon: '▶', title: 'Başlat' },
+              { s: 'paused'  as const, icon: '⏸', title: 'Duraklat' },
+              { s: 'stopped' as const, icon: '⏹', title: 'Durdur' },
+            ].map(({ s, icon, title }) => (
+              <button key={s} type="button" title={title}
+                onClick={() => setStreamState(s)}
+                style={{ width: 30, height: 30, borderRadius: 6, border: `1px solid ${streamState === s ? '#374151' : '#e5e7eb'}`, background: streamState === s ? '#e5e7eb' : '#fff', cursor: 'pointer', fontSize: 11, color: streamState === s ? '#1f2937' : '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {icon}
+              </button>
+            ))}
           </div>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: T.textSoft }}>
-          <span>Tarih: <strong style={{ color: T.text }}>{today || '—'}</strong></span>
-          <span>•</span>
-          <span>Son güncelleme: {sonGuncelleme ? fmtTime(sonGuncelleme.toISOString()) : '—'}</span>
-          <button onClick={() => fetchData(true)} disabled={yukleniyor}
-            style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: yukleniyor ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600 }}>
-            <RefreshCw size={12} style={{ animation: yukleniyor ? 'spin 0.9s linear infinite' : undefined }} />
-            Yenile
-          </button>
+
+        {/* KPI filtre kartları */}
+        <div style={{ padding: '8px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, alignItems: 'stretch' }}>
+          {kpiKartlari.map(({ key, label, val, bg, vColor, lColor }) => {
+            const active = durumFilter === key
+            const onClick = () => {
+              if (active && key !== 'TUMU') setDurumFilter('TUMU')
+              else setDurumFilter(key)
+            }
+            return (
+              <button key={key} type="button" onClick={onClick}
+                title={active && key !== 'TUMU' ? 'Filtreyi kaldır' : label}
+                style={{
+                  background: active ? vColor + '0F' : bg === 'transparent' ? '#fafafa' : bg,
+                  borderRadius: 8, padding: '8px 8px', textAlign: 'left', cursor: 'pointer',
+                  border: active ? `2px solid ${vColor}` : '1px solid #e5e7eb',
+                  transition: 'all 0.15s',
+                  outline: 'none',
+                }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: vColor, lineHeight: 1 }}>{val}</div>
+                <div style={{ fontSize: 10, color: lColor, marginTop: 2, fontWeight: active ? 700 : 500 }}>{label}</div>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Arama + son güncelleme */}
+        <div style={{ padding: '8px 18px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 200, maxWidth: 360, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 7, padding: '5px 10px' }}>
+            <Search size={14} color={T.textSoft} />
+            <input
+              type="text"
+              value={arama}
+              onChange={(e) => setArama(e.target.value)}
+              placeholder="Plaka, kullanıcı, istasyon veya tamamlayan ara…"
+              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12.5, color: T.text }}
+            />
+            {arama && (
+              <button type="button" onClick={() => setArama('')}
+                style={{ border: 'none', background: 'transparent', color: T.textSoft, cursor: 'pointer', fontSize: 14 }}>×</button>
+            )}
+          </div>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: T.textSoft, fontVariantNumeric: 'tabular-nums' }}>
+            Son güncelleme: {sonGuncelleme ? fmtTime(sonGuncelleme.toISOString()) : '—'}
+          </span>
         </div>
       </div>
 
@@ -233,7 +328,9 @@ export default function GunlukClient() {
         </div>
       ) : sorted.length === 0 ? (
         <div className="verde-card" style={{ padding: 60, textAlign: 'center', color: T.textSoft }}>
-          Bugün için Oto Yıkama görevi yok.
+          {durumFilter !== 'TUMU' || arama
+            ? 'Filtre koşullarına uyan kayıt yok.'
+            : 'Bugün için Oto Yıkama görevi yok.'}
         </div>
       ) : (
         <div className="verde-card" style={{ overflow: 'hidden' }}>
@@ -244,7 +341,7 @@ export default function GunlukClient() {
                   <th style={{ width: 110 }}>Plaka</th>
                   <th style={{ minWidth: 140 }}>Kullanıcı</th>
                   <th style={{ minWidth: 130 }}>Departman</th>
-                  <th style={{ minWidth: 180 }}>Lokasyon</th>
+                  <th style={{ minWidth: 180 }}>İstasyon</th>
                   <th style={{ width: 120, paddingLeft: 2 }}>Durum</th>
                   <th style={{ width: 110, whiteSpace: 'nowrap' }}>Başlatma</th>
                   <th style={{ width: 110, whiteSpace: 'nowrap' }}>Bitirme</th>
@@ -317,28 +414,21 @@ export default function GunlukClient() {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes islemde-pulse {
-          0%, 100% { opacity: 1; transform: scale(1) }
-          50%      { opacity: 0.55; transform: scale(0.96) }
-        }
         @keyframes islemde-flash {
           0%, 49% { opacity: 1 }
           50%, 99% { opacity: 0 }
           100%   { opacity: 1 }
         }
-        .islemde-blink { animation: islemde-pulse 1.1s ease-in-out infinite; }
+        @keyframes canliScan {
+          0%   { transform: translateY(-2px) }
+          100% { transform: translateY(22px) }
+        }
+        @keyframes canliPulse {
+          0%,100% { opacity: 1; transform: scale(1) }
+          50%     { opacity: 0.4; transform: scale(0.65) }
+        }
         .islemde-flash { animation: islemde-flash 1s steps(1, end) infinite; }
       `}</style>
-    </div>
-  )
-}
-
-function Pil({ label, sayi, bg, fg, blink }: { label: string; sayi: number; bg: string; fg: string; blink?: boolean }) {
-  return (
-    <div className={blink ? 'islemde-blink' : undefined}
-      style={{ padding: '6px 12px', borderRadius: 8, background: bg, color: fg, display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
-      <span style={{ fontSize: 18, fontWeight: 900 }}>{sayi}</span>
-      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
     </div>
   )
 }
