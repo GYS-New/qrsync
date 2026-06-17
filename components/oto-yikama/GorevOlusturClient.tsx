@@ -254,6 +254,15 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
     }
   }
 
+  // İstasyona göre kaç plaka atanmış (toplu/özel ayrımı için)
+  // NOT: useMemo erken return'lardan ÖNCE çağrılmalı (React Hooks kuralı).
+  const istasyonDagilim = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const [, lokId] of secimMap) m.set(lokId, (m.get(lokId) ?? 0) + 1)
+    return m
+  }, [secimMap])
+  const farkliIstasyonSayisi = istasyonDagilim.size
+
   if (yukleniyor) {
     return (
       <div style={{ padding: '60px 28px', textAlign: 'center', color: T.textSoft }}>
@@ -282,14 +291,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
       </div>
     )
   }
-
-  // İstasyona göre kaç plaka atanmış (toplu/özel ayrımı için)
-  const istasyonDagilim = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const [, lokId] of secimMap) m.set(lokId, (m.get(lokId) ?? 0) + 1)
-    return m
-  }, [secimMap])
-  const farkliIstasyonSayisi = istasyonDagilim.size
 
   return (
     <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
