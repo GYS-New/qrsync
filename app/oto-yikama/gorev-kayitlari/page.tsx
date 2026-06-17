@@ -3,7 +3,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getRolBase } from '@/lib/modul/cookie'
-import GorevKayitlariClient, { type GorevKaydi } from '@/components/oto-yikama/GorevKayitlariClient'
+import GorevKayitlariClient, { type GorevKaydi, type IstasyonOpt, type KullaniciOpt } from '@/components/oto-yikama/GorevKayitlariClient'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,8 +16,27 @@ export default async function OtoYikamaGorevKayitlariPage() {
   const admin = createAdminClient()
 
   let kayitlar: GorevKaydi[] = []
+  let istasyonlar: IstasyonOpt[] = []
+  let tamamlayanlar: KullaniciOpt[] = []
+  let canEdit = false
 
   if (firmaId) {
+    // Düzenleme/silme yetkisi: SA + TA
+    canEdit = ['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)
+
+    // Oto Yıkama istasyonları (lokasyon edit modal'ı için dropdown — alt lokasyonlar)
+    const otoUstIds = await getOtoYikamaLokasyonIds(admin as any, firmaId)
+    if (otoUstIds.size > 0) {
+      const { data: istLoks } = await admin
+        .from('lokasyonlar')
+        .select('id, tanim, parent_id')
+        .eq('firma_id', firmaId)
+        .eq('aktif', true)
+        .in('parent_id', [...otoUstIds])
+        .order('tanim')
+      istasyonlar = (istLoks ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim }))
+    }
+
     const { data: rows } = await admin
       .from('oto_yikama_gorev_metadata')
       .select(`
@@ -57,6 +77,7 @@ export default async function OtoYikamaGorevKayitlariPage() {
       hedef_tarih:     r.hedef_tarih,
       ekstra:          r.ekstra === true,
       durum:           r.gorev?.durum ?? null,
+      lokasyon_id:     r.gorev?.lokasyon_id ?? null,
       istasyon:        lokMap.get(r.gorev?.lokasyon_id) ?? '—',
       olusturma_tarihi: r.gorev?.olusturma_tarihi ?? null,
       baslatilma_tarihi: r.gorev?.baslatilma_tarihi ?? null,
@@ -64,9 +85,19 @@ export default async function OtoYikamaGorevKayitlariPage() {
       tamamlanma_suresi_saniye: r.gorev?.tamamlanma_suresi_saniye ?? null,
       olusturan:       userMap.get(r.gorev?.olusturan_id) ?? '—',
       tamamlayan:      userMap.get(r.gorev?.tamamlayan_kullanici_id) ?? null,
+      tamamlayan_id:   r.gorev?.tamamlayan_kullanici_id ?? null,
       iptal_eden:      userMap.get(r.gorev?.iptal_eden_id) ?? null,
       iptal_sebep:     r.gorev?.iptal_sebep ?? null,
     }))
+
+    // Tamamlayan dropdown'u (sadece tamamlanmışlarda görünen kişiler)
+    const tamamlayanSet = new Map<string, string>()
+    for (const k of kayitlar) {
+      if (k.tamamlayan_id && k.tamamlayan) tamamlayanSet.set(k.tamamlayan_id, k.tamamlayan)
+    }
+    tamamlayanlar = [...tamamlayanSet.entries()]
+      .map(([id, isim]) => ({ id, isim_soyisim: isim }))
+      .sort((a, b) => a.isim_soyisim.localeCompare(b.isim_soyisim, 'tr'))
   }
 
   return (
@@ -83,7 +114,12 @@ export default async function OtoYikamaGorevKayitlariPage() {
             Görüntülemek için üstten bir firma seçin.
           </div>
         ) : (
-          <GorevKayitlariClient kayitlar={kayitlar} />
+          <GorevKayitlariClient
+            kayitlar={kayitlar}
+            istasyonlar={istasyonlar}
+            tamamlayanlar={tamamlayanlar}
+            canEdit={canEdit}
+          />
         )}
       </div>
     </div>
