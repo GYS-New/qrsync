@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getRolBase } from '@/lib/modul/cookie'
+import OtoYikamaKullanicilarClient, { type YikamaKullanici } from '@/components/oto-yikama/KullanicilarClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,10 +102,15 @@ export default async function OtoYikamaKullanicilarPage() {
     userLokMap.set(a.user_id, arr)
   }
 
-  const rolEtiket = (r: string) => ({
-    super_admin: 'SA', alt_super_admin: '2.SA',
-    tenant_admin: 'TA', tenant_user: 'U', musteri: 'M',
-  } as any)[r] ?? r
+  // Server datası → client'ın beklediği YikamaKullanici[] formatı
+  const kullanicilarPayload: YikamaKullanici[] = (userlar ?? []).map((u: any) => ({
+    id: u.id,
+    isim_soyisim: u.isim_soyisim ?? null,
+    email: u.email ?? null,
+    rol: u.rol,
+    aktif: u.aktif !== false,
+    atanmis_istasyonlar: userLokMap.get(u.id) ?? [],
+  }))
 
   return (
     <div>
@@ -115,63 +121,7 @@ export default async function OtoYikamaKullanicilarPage() {
         hideScopeControls hideNotifBar
       />
       <div style={{ padding: '24px 28px' }}>
-        <div className="verde-card" style={{ padding: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Oto Yıkama Kullanıcıları</h2>
-              <p style={{ marginTop: 6, fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
-                Oto Yıkama üst lokasyonuna atanmış personeller bu modüle erişim yetkisine sahiptir.
-                Atama, GYS → Sistem Ayarları → Kullanıcı Yetkileri → Lokasyon Yetkileri'nden yapılır.
-              </p>
-            </div>
-            <div style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: 13, fontWeight: 700, padding: '6px 14px', borderRadius: 999 }}>
-              {userlar?.length ?? 0} kullanıcı
-            </div>
-          </div>
-
-          {(userlar?.length ?? 0) === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>
-              {otoUstIds.length === 0
-                ? 'Bu firmada Oto Yıkama olarak işaretlenmiş üst lokasyon yok.'
-                : 'Oto Yıkama lokasyonuna atanmış personel yok.'}
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>İsim Soyisim</th>
-                    <th style={{ textAlign: 'left', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>E-posta</th>
-                    <th style={{ textAlign: 'center', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>Rol</th>
-                    <th style={{ textAlign: 'left', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>Atanmış İstasyonlar</th>
-                    <th style={{ textAlign: 'center', padding: '10px 12px', borderBottom: '2px solid #e5e7eb', color: '#374151' }}>Durum</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {userlar?.map((u: any) => (
-                    <tr key={u.id}>
-                      <td style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', fontWeight: 600, color: '#0f172a' }}>{u.isim_soyisim ?? '—'}</td>
-                      <td style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', color: '#64748b' }}>{u.email ?? '—'}</td>
-                      <td style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
-                        <span style={{ background: '#f3f4f6', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#374151' }}>{rolEtiket(u.rol)}</span>
-                      </td>
-                      <td style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', color: '#374151' }}>
-                        {(userLokMap.get(u.id) ?? []).join(', ')}
-                      </td>
-                      <td style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
-                        {u.aktif ? (
-                          <span style={{ color: '#16a34a', fontWeight: 700 }}>✓ Aktif</span>
-                        ) : (
-                          <span style={{ color: '#b91c1c', fontWeight: 700 }}>Pasif</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <OtoYikamaKullanicilarClient firmaId={firmaId} kullanicilar={kullanicilarPayload} />
       </div>
     </div>
   )
