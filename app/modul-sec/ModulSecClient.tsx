@@ -139,9 +139,9 @@ export default function ModulSecClient({ moduller, kullaniciAdi }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {appLogo === undefined ? null : appLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={appLogo} alt={appName} style={{ height: 'auto', maxHeight: 90, maxWidth: 320, objectFit: 'contain' }} />
+              <img src={appLogo} alt={appName} style={{ height: 'auto', maxHeight: 130, maxWidth: 480, objectFit: 'contain' }} />
             ) : (
-              <ProataLogo variant="full" scale={1.35} />
+              <ProataLogo variant="full" scale={1.8} />
             )}
           </div>
 
