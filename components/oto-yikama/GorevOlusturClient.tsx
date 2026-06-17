@@ -324,11 +324,21 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
         </button>
       </div>
 
-      {/* ── 3 ANA KART: Plakalar | İstasyon | Tarihler ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(280px,1fr) minmax(290px,1fr)', gap: 14, alignItems: 'start' }}>
+      {/* ── ANA KARTLAR: Sol geniş PLAKA | Sağ stack (İSTASYON üst + TARİH alt) ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) 340px',
+        gap: 14,
+        alignItems: 'start',
+        // sayfa dolacak şekilde minimum yükseklik (sticky bar + container padding düşülmüş)
+        minHeight: 'calc(100vh - 200px)',
+      }}>
 
-        {/* KART 1: PLAKALAR */}
-        <div className="verde-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* KART 1: PLAKALAR — sayfa altına kadar uzar */}
+        <div className="verde-card" style={{
+          overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          height: 'calc(100vh - 200px)',
+        }}>
           <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <div style={{ width: 26, height: 26, borderRadius: 6, background: T.blue + '14', color: T.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13 }}>1</div>
@@ -360,7 +370,8 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
             </div>
           </div>
           {/* Plaka chip grid */}
-          <div style={{ maxHeight: 440, overflowY: 'auto', padding: 12 }}>
+          {/* Plaka chip grid — parent yüksekliğini doldurur, kendi içinde scroll */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 12 }}>
             {filtered.length === 0 ? (
               <div style={{ padding: 32, textAlign: 'center', color: T.textSoft, fontSize: 13 }}>Sonuç yok.</div>
             ) : (
@@ -398,6 +409,9 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
             )}
           </div>
         </div>
+
+        {/* SAĞ SÜTUN: İstasyon + Tarihler alt alta — sayfa altına kadar uzar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {/* KART 2: İSTASYON */}
         <div className="verde-card" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -575,6 +589,9 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
               </div>
             )}
           </div>
+        </div>
+
+        {/* /SAĞ SÜTUN */}
         </div>
       </div>
 
