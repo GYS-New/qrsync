@@ -37,28 +37,28 @@ export default async function OtoYikamaGorevKayitlariPage() {
       istasyonlar = (istLoks ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim }))
     }
 
+    // Önce firma'nın TÜM görevlerini metadata INNER JOIN ile çek (parent=gorevler,
+    // firma_id orada — Supabase'in nested .eq quirk'inden etkilenmez).
     const { data: rows } = await admin
-      .from('oto_yikama_gorev_metadata')
+      .from('gorevler')
       .select(`
-        gorev_id, plaka_snapshot, hedef_tarih, ekstra,
-        gorev:gorevler!inner(
-          id, tanim, durum, firma_id, lokasyon_id,
-          olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
-          tamamlanma_suresi_saniye,
-          olusturan_id, tamamlayan_kullanici_id, iptal_eden_id, iptal_sebep
-        )
+        id, tanim, durum, firma_id, lokasyon_id,
+        olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
+        tamamlanma_suresi_saniye,
+        olusturan_id, tamamlayan_kullanici_id, iptal_eden_id, iptal_sebep,
+        metadata:oto_yikama_gorev_metadata!inner(plaka_snapshot, hedef_tarih, ekstra)
       `)
-      .eq('gorev.firma_id', firmaId)
-      .order('hedef_tarih', { ascending: false })
+      .eq('firma_id', firmaId)
+      .order('olusturma_tarihi', { ascending: false })
       .limit(1000)
     const arr = (rows ?? []) as any[]
 
     const userIds = [...new Set(arr.flatMap(r => [
-      r.gorev?.olusturan_id,
-      r.gorev?.tamamlayan_kullanici_id,
-      r.gorev?.iptal_eden_id,
+      r.olusturan_id,
+      r.tamamlayan_kullanici_id,
+      r.iptal_eden_id,
     ]).filter(Boolean))] as string[]
-    const lokIds = [...new Set(arr.map(r => r.gorev?.lokasyon_id).filter(Boolean))] as string[]
+    const lokIds = [...new Set(arr.map(r => r.lokasyon_id).filter(Boolean))] as string[]
 
     const [usersRes, loksRes] = await Promise.all([
       userIds.length > 0
@@ -71,24 +71,34 @@ export default async function OtoYikamaGorevKayitlariPage() {
     const userMap = new Map(((usersRes.data ?? []) as any[]).map(u => [u.id, u.isim_soyisim ?? '—']))
     const lokMap  = new Map(((loksRes.data ?? []) as any[]).map(l => [l.id, l.tanim ?? '—']))
 
-    kayitlar = arr.map(r => ({
-      gorev_id:        r.gorev_id,
-      plaka:           r.plaka_snapshot ?? '—',
-      hedef_tarih:     r.hedef_tarih,
-      ekstra:          r.ekstra === true,
-      durum:           r.gorev?.durum ?? null,
-      lokasyon_id:     r.gorev?.lokasyon_id ?? null,
-      istasyon:        lokMap.get(r.gorev?.lokasyon_id) ?? '—',
-      olusturma_tarihi: r.gorev?.olusturma_tarihi ?? null,
-      baslatilma_tarihi: r.gorev?.baslatilma_tarihi ?? null,
-      tamamlanma_tarihi: r.gorev?.tamamlanma_tarihi ?? null,
-      tamamlanma_suresi_saniye: r.gorev?.tamamlanma_suresi_saniye ?? null,
-      olusturan:       userMap.get(r.gorev?.olusturan_id) ?? '—',
-      tamamlayan:      userMap.get(r.gorev?.tamamlayan_kullanici_id) ?? null,
-      tamamlayan_id:   r.gorev?.tamamlayan_kullanici_id ?? null,
-      iptal_eden:      userMap.get(r.gorev?.iptal_eden_id) ?? null,
-      iptal_sebep:     r.gorev?.iptal_sebep ?? null,
-    }))
+    kayitlar = arr.map(r => {
+      // metadata embed: Supabase 1:1 select'i tekil obje veya tek elemanlı array dönebilir
+      const m = Array.isArray(r.metadata) ? r.metadata[0] : r.metadata
+      return {
+        gorev_id:        r.id,
+        plaka:           m?.plaka_snapshot ?? '—',
+        hedef_tarih:     m?.hedef_tarih ?? null,
+        ekstra:          m?.ekstra === true,
+        durum:           r.durum ?? null,
+        lokasyon_id:     r.lokasyon_id ?? null,
+        istasyon:        lokMap.get(r.lokasyon_id) ?? '—',
+        olusturma_tarihi: r.olusturma_tarihi ?? null,
+        baslatilma_tarihi: r.baslatilma_tarihi ?? null,
+        tamamlanma_tarihi: r.tamamlanma_tarihi ?? null,
+        tamamlanma_suresi_saniye: r.tamamlanma_suresi_saniye ?? null,
+        olusturan:       userMap.get(r.olusturan_id) ?? '—',
+        tamamlayan:      userMap.get(r.tamamlayan_kullanici_id) ?? null,
+        tamamlayan_id:   r.tamamlayan_kullanici_id ?? null,
+        iptal_eden:      userMap.get(r.iptal_eden_id) ?? null,
+        iptal_sebep:     r.iptal_sebep ?? null,
+      }
+    })
+    // Hedef tarihe göre desc sırala (sorgu olusturma_tarihi'ne göre geldi)
+    kayitlar.sort((a, b) => {
+      const ta = a.hedef_tarih ?? ''
+      const tb = b.hedef_tarih ?? ''
+      return tb.localeCompare(ta)
+    })
 
     // Tamamlayan dropdown'u (sadece tamamlanmışlarda görünen kişiler)
     const tamamlayanSet = new Map<string, string>()
