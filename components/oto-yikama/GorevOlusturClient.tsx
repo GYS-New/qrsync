@@ -42,6 +42,12 @@ function fmtDate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+// 'YYYY-MM-DD' → 'DD.MM.YYYY'
+function fmtTRDate(s: string): string {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  return `${s.slice(8)}.${s.slice(5, 7)}.${s.slice(0, 4)}`
+}
+
 function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1) }
 function startOfWeek(d: Date) {
   const x = new Date(d)
@@ -220,14 +226,69 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
     if (eksikLok) { toast({ type: 'error', title: 'Hata', message: `${eksikLok.plaka} için lokasyon seçilmedi` }); return }
 
     const sortedTarihler = [...tarihler].sort()
-    const ok = await confirm({
-      title: 'Görev Oluştur',
-      message: `${atamaListesi.length} plaka × ${tarihler.size} tarih = ${beklenenGorev} görev oluşturulacak.\n\nTarihler: ${sortedTarihler.slice(0, 5).join(', ')}${sortedTarihler.length > 5 ? ` ve ${sortedTarihler.length - 5} tarih daha` : ''}\n\nDevam edilsin mi?`,
-      confirmText: 'Oluştur',
-      cancelText: 'İptal',
-    })
-    if (!ok) return
 
+    // 1) Ön kontrol — bu kombinasyonlardan hangileri zaten kayıtlı?
+    setOlusturLoading(true)
+    let mevcutCakisanlar: { arac_id: string; plaka: string; hedef_tarih: string; durum: string | null }[] = []
+    try {
+      const checkRes = await fetch('/api/oto-yikama/gorevler/check-duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firma_id: firmaId,
+          arac_ids: atamaListesi.map(a => a.id),
+          tarihler: sortedTarihler,
+        }),
+      })
+      const checkJ = await checkRes.json()
+      if (checkJ.ok) mevcutCakisanlar = checkJ.mevcut ?? []
+    } catch {
+      // Ön kontrol başarısız olursa devam ederiz — duplicate'i backend yine
+      // yakalar (metadata UNIQUE constraint), sessizce atlanır.
+    }
+    setOlusturLoading(false)
+
+    // 2) Çakışma analizine göre kullanıcıya farklı mesaj
+    const yeniGorevSayisi = beklenenGorev - mevcutCakisanlar.length
+
+    if (mevcutCakisanlar.length > 0 && yeniGorevSayisi <= 0) {
+      // Hepsi duplicate — ekstra görev oluşturulamaz
+      const tekSecim = atamaListesi.length === 1 && tarihler.size === 1
+      const detay = tekSecim
+        ? `${mevcutCakisanlar[0].plaka} plakalı araç için ${fmtTRDate(mevcutCakisanlar[0].hedef_tarih)} tarihinde planlı yıkama mevcut.`
+        : `Seçilen ${beklenenGorev} kombinasyonun tamamı için bu tarihlerde planlı yıkama mevcut.`
+      toast({
+        type: 'error',
+        title: 'Ekstra görev oluşturulamadı',
+        message: `${detay}\n\nMevcut görevler tamamlandıktan sonra ekstra oluşturabilirsiniz.`,
+      })
+      return
+    }
+
+    if (mevcutCakisanlar.length > 0) {
+      // Kısmi duplicate — kullanıcıya sor
+      const ornek = mevcutCakisanlar.slice(0, 5).map(c => `• ${c.plaka} → ${fmtTRDate(c.hedef_tarih)} (${c.durum ?? '—'})`).join('\n')
+      const fazla = mevcutCakisanlar.length > 5 ? `\n… ve ${mevcutCakisanlar.length - 5} tane daha` : ''
+      const ok = await confirm({
+        title: 'Bazı görevler zaten planlı',
+        message: `${mevcutCakisanlar.length} kombinasyon için bu tarihte zaten yıkama görevi mevcut, bunlar atlanacak:\n\n${ornek}${fazla}\n\n${yeniGorevSayisi} yeni ekstra görev oluşturulacak. Devam edilsin mi?`,
+        confirmText: `${yeniGorevSayisi} Görev Oluştur`,
+        cancelText: 'İptal',
+        variant: 'warning' as any,
+      })
+      if (!ok) return
+    } else {
+      // Çakışma yok — standart onay
+      const ok = await confirm({
+        title: 'Ekstra Görev Oluştur',
+        message: `${atamaListesi.length} plaka × ${tarihler.size} tarih = ${beklenenGorev} ekstra görev oluşturulacak.\n\nTarihler: ${sortedTarihler.slice(0, 5).join(', ')}${sortedTarihler.length > 5 ? ` ve ${sortedTarihler.length - 5} tarih daha` : ''}\n\nDevam edilsin mi?`,
+        confirmText: 'Oluştur',
+        cancelText: 'İptal',
+      })
+      if (!ok) return
+    }
+
+    // 3) Oluşturma
     setOlusturLoading(true)
     try {
       const res = await fetch('/api/oto-yikama/gorevler/olustur', {
@@ -237,6 +298,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
           firma_id: firmaId,
           atamalar: atamaListesi.map(a => ({ arac_id: a.id, lokasyon_id: secimMap.get(a.id) })),
           tarihler: sortedTarihler,
+          ekstra: true,  // bu sayfa "Ekstra Görev Oluştur" rolünde
         }),
       })
       const j = await res.json()
@@ -244,7 +306,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
       toast({
         type: j.eklenen > 0 ? 'success' : 'error',
         title: 'Sonuç',
-        message: `+${j.eklenen} görev eklendi${j.duplicate ? `, ${j.duplicate} duplicate atlandı` : ''}${j.hatalar?.length ? `, ${j.hatalar.length} hata` : ''}`,
+        message: `+${j.eklenen} ekstra görev eklendi${j.duplicate ? `, ${j.duplicate} atlandı` : ''}${j.hatalar?.length ? `, ${j.hatalar.length} hata` : ''}`,
       })
       if (j.eklenen > 0) {
         setSecimMap(new Map())
@@ -297,6 +359,20 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
 
   return (
     <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* ── BİLGİ NOTU — sayfanın rolü ── */}
+      <div style={{
+        padding: '10px 14px', borderRadius: 8,
+        background: T.amberLight, border: `1px solid #fde68a`,
+        display: 'flex', alignItems: 'flex-start', gap: 10,
+      }}>
+        <span style={{ fontSize: 18, lineHeight: 1 }}>ℹ️</span>
+        <div style={{ flex: 1, fontSize: 12.5, color: '#78350f', lineHeight: 1.5 }}>
+          <strong>Ekstra Görev Oluşturma</strong> — Planlı yıkamalar her gece otomatik üretilir (araç yıkama kuralına göre).
+          Bu sayfa <strong>kural dışı, ek yıkama</strong> ihtiyaçları içindir (örn: bayram öncesi, denetim, özel istek).
+          Plaka için aynı tarihte zaten görev varsa sistem ekstra oluşturmaz.
+        </div>
+      </div>
+
       {/* ── STICKY ÖZET BAR + Oluştur ── */}
       <div className="verde-card" style={{
         padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
@@ -323,7 +399,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
           }}>
           {olusturLoading
             ? <><Loader2 size={14} style={{ animation: 'spin 0.9s linear infinite' }} /> Oluşturuluyor…</>
-            : <><Check size={14} /> {beklenenGorev > 0 ? `${beklenenGorev} Görev Oluştur` : 'Görev Oluştur'}</>}
+            : <><Check size={14} /> {beklenenGorev > 0 ? `${beklenenGorev} Ekstra Görev Oluştur` : 'Ekstra Görev Oluştur'}</>}
         </button>
       </div>
 

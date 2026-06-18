@@ -17,11 +17,11 @@ export default async function OtoYikamaGorevOlusturPage() {
   return (
     <div>
       <Topbar
-        title="Görev Oluştur"
+        title="Ekstra Görev Oluştur"
         base={rolBase}
         breadcrumbs={[
           { label: 'Oto Yıkama', href: '/oto-yikama/dashboard' },
-          { label: 'Görev Oluştur' },
+          { label: 'Ekstra Görev' },
         ]}
         hideScopeControls hideNotifBar
       />

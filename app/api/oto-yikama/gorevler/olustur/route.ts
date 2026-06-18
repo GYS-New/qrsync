@@ -163,11 +163,16 @@ export async function POST(req: NextRequest) {
     }
 
     // 2) metadata INSERT — gorev_id'lerle eşle
+    // ekstra=true: bu sayfa "Ekstra Görev Oluştur" rolünde olduğu için
+    // buradan kaydedilen tüm görevler kuraldışı ekstra olarak işaretlenir.
+    // Otomatik cron (oto_yikama_gorev_uret_ertesi_gun) ekstra=false yazıyor.
+    const ekstraFlag = body.ekstra === true
     const metaRows = insertedGorevler.map((g, idx) => ({
       gorev_id: g.id,
       arac_id: chunk[idx].arac_id,
       plaka_snapshot: chunk[idx].plaka,
       hedef_tarih: chunk[idx].hedef_tarih,
+      ekstra: ekstraFlag,
     }))
     const { error: metaErr } = await admin.from('oto_yikama_gorev_metadata').insert(metaRows)
 
