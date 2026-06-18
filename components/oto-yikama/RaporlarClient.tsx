@@ -440,7 +440,7 @@ export default function RaporlarClient() {
                   {aramaList.map((r, i) => (
                     <tr key={r.gorev_id}>
                       <td style={{ fontSize: 13, color: T.textSoft }}>{i + 1}</td>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 15 }}>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {r.plaka}
                           {r.marka && <span style={{ fontSize: 12, color: T.textSoft, fontWeight: 400 }}>({r.marka})</span>}
@@ -457,9 +457,9 @@ export default function RaporlarClient() {
                       <td style={{ fontSize: 14, color: T.textSoft }}>{r.lokasyon}</td>
                       <td style={{ fontSize: 14, color: T.textSoft }}>{r.departman ?? '—'}</td>
                       <td style={{ fontSize: 13, color: T.textSoft }}>{fmtTarih(r.tamamlanma_tarihi ?? r.hedef_tarih)}</td>
-                      <td style={{ fontSize: 13, color: T.textSoft, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
-                      <td style={{ fontSize: 13, color: T.textSoft, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
-                      <td style={{ fontSize: 13, color: T.text, fontFamily: 'monospace', fontWeight: 700 }}>{fmtSure(r.tamamlanma_suresi_saniye)}</td>
+                      <td style={{ fontSize: 15, color: T.textSoft, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
+                      <td style={{ fontSize: 15, color: T.textSoft, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
+                      <td style={{ fontSize: 15, color: T.text, fontFamily: 'monospace', fontWeight: 700 }}>{fmtSure(r.tamamlanma_suresi_saniye)}</td>
                     </tr>
                   ))}
                 </tbody>

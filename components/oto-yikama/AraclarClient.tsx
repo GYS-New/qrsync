@@ -432,7 +432,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
                 ) : null
                 return (
                   <tr key={a.id} style={{ opacity: a.aktif ? 1 : 0.55 }}>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 15, color: T.text }}>{a.plaka}</td>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: T.text }}>{a.plaka}</td>
                     <td style={{ color: T.text, fontSize: 14 }}>
                       <div>{a.kullanici_adi_soyadi ?? <span style={{ color: T.textSoft }}>—</span>}</div>
                       {(a.kullanici_telefon || a.kullanici_email) && (

@@ -354,7 +354,7 @@ export default function GunlukClient() {
                 {sorted.map(r => (
                   <tr key={r.gorev_id}
                     style={{ background: r.durum === 'ISLEMDE' ? DURUM_BG.ISLEMDE : undefined }}>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 15, color: T.text }}>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16, color: T.text }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         {r.plaka}
                         {r.ekstra && (
@@ -373,9 +373,9 @@ export default function GunlukClient() {
                         {DURUM_LABEL[r.durum]}
                       </span>
                     </td>
-                    <td style={{ color: T.textSoft, fontSize: 13, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
-                    <td style={{ color: T.textSoft, fontSize: 13, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
-                    <td style={{ color: r.durum === 'TAMAMLANDI' ? T.green : T.textSoft, fontSize: 13, fontFamily: 'monospace', fontWeight: 700 }}>
+                    <td style={{ color: T.textSoft, fontSize: 15, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
+                    <td style={{ color: T.textSoft, fontSize: 15, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
+                    <td style={{ color: r.durum === 'TAMAMLANDI' ? T.green : T.textSoft, fontSize: 15, fontFamily: 'monospace', fontWeight: 700 }}>
                       {r.durum === 'TAMAMLANDI' ? fmtSure(gorevSuresiSaniye(r)) : '—'}
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.tamamlayan ?? '—'}</td>
