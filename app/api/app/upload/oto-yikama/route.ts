@@ -21,6 +21,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getUserOtoYikamaUstIds } from '@/lib/oto-yikama/getUserOtoYikamaUstIds'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -51,22 +52,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Geçersiz cihaz token' }, { status: 401, headers: CORS })
   }
 
-  // Yıkama personeli kontrolü
-  const { data: yetkiler } = await admin
-    .from('kullanici_lokasyon_yetkileri')
-    .select('ust_lokasyon_id')
-    .eq('user_id', tok.user_id)
-  const ustIds = (yetkiler ?? []).map((y: any) => y.ust_lokasyon_id).filter(Boolean)
-  if (ustIds.length === 0) {
-    return NextResponse.json({ ok: false, error: 'Lokasyon yetkiniz yok' }, { status: 403, headers: CORS })
-  }
-  const { data: otoLoks } = await admin
-    .from('lokasyonlar')
-    .select('id')
-    .in('id', ustIds)
-    .eq('oto_yikama_lokasyon', true)
-    .eq('aktif', true)
-  if ((otoLoks ?? []).length === 0) {
+  // Yıkama personeli kontrolü — users.ust_lokasyon_id OR kullanici_lokasyon_yetkileri
+  const yetkiliUstIds = await getUserOtoYikamaUstIds(admin, tok.user_id, tok.firma_id)
+  if (yetkiliUstIds.length === 0) {
     return NextResponse.json(
       { ok: false, error: 'Oto Yıkama lokasyonuna yetkili değilsiniz', code: 'OTO_YIKAMA_YETKISI_YOK' },
       { status: 403, headers: CORS },
@@ -87,6 +75,19 @@ export async function POST(req: Request) {
   }
   if (tip !== 'oncesi' && tip !== 'sonrasi') {
     return NextResponse.json({ ok: false, error: 'tip "oncesi" veya "sonrasi" olmalı' }, { status: 400, headers: CORS })
+  }
+
+  // Lokasyon yetki kapsamı — verilen istasyon, yetkili üst lokasyonun altında mı?
+  const { data: hedefLok } = await admin
+    .from('lokasyonlar')
+    .select('parent_id, firma_id, aktif')
+    .eq('id', lokasyonId)
+    .maybeSingle()
+  if (!hedefLok || (hedefLok as any).firma_id !== tok.firma_id || (hedefLok as any).aktif === false) {
+    return NextResponse.json({ ok: false, error: 'Lokasyon bulunamadı veya pasif' }, { status: 400, headers: CORS })
+  }
+  if (!(hedefLok as any).parent_id || !yetkiliUstIds.includes((hedefLok as any).parent_id)) {
+    return NextResponse.json({ ok: false, error: 'Bu istasyona yetkiniz yok' }, { status: 403, headers: CORS })
   }
   const plaka = plakaRaw.toUpperCase().replace(/[^A-Z0-9]/g, '')
 

@@ -27,6 +27,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getUserOtoYikamaUstIds } from '@/lib/oto-yikama/getUserOtoYikamaUstIds'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -77,22 +78,9 @@ export async function GET(req: Request) {
       )
     }
 
-    // Yıkama personeli kontrolü
-    const { data: yetkiler } = await admin
-      .from('kullanici_lokasyon_yetkileri')
-      .select('ust_lokasyon_id')
-      .eq('user_id', tok.user_id)
-    const ustIds = (yetkiler ?? []).map((y: any) => y.ust_lokasyon_id).filter(Boolean)
-    if (ustIds.length === 0) {
-      return NextResponse.json({ ok: false, error: 'Lokasyon yetkiniz yok' }, { status: 403, headers: CORS })
-    }
-    const { data: otoLoks } = await admin
-      .from('lokasyonlar')
-      .select('id')
-      .in('id', ustIds)
-      .eq('oto_yikama_lokasyon', true)
-      .eq('aktif', true)
-    if ((otoLoks ?? []).length === 0) {
+    // Yıkama personeli kontrolü — users.ust_lokasyon_id OR kullanici_lokasyon_yetkileri
+    const yetkiliUstIds = await getUserOtoYikamaUstIds(admin, tok.user_id, tok.firma_id)
+    if (yetkiliUstIds.length === 0) {
       return NextResponse.json(
         { ok: false, error: 'Oto Yıkama lokasyonuna yetkili değilsiniz', code: 'OTO_YIKAMA_YETKISI_YOK' },
         { status: 403, headers: CORS },
