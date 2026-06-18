@@ -1,8 +1,9 @@
 import Topbar from '@/components/layout/Topbar'
 import GorevOlusturPageClient from '@/components/oto-yikama/GorevOlusturPageClient'
-import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
+import { createAdminClient } from '@/lib/supabase/server'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getRolBase } from '@/lib/modul/cookie'
+import { getOtoYikamaFirmaId } from '@/lib/oto-yikama/getOtoYikamaFirmaId'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -10,9 +11,7 @@ export const dynamic = 'force-dynamic'
 export default async function OtoYikamaGorevOlusturPage() {
   const { me } = await assertModulYetkisi('oto_yikama')
   const rolBase = getRolBase(me.rol)
-  const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
-
-  const firmaId = isSA ? getAktifFirmaId() : me.firma_id
+  const firmaId = await getOtoYikamaFirmaId(createAdminClient() as any, me)
   if (!firmaId) redirect('/oto-yikama/dashboard')
 
   return (

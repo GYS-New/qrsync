@@ -1,11 +1,11 @@
 import Topbar from '@/components/layout/Topbar'
 import LokasyonlarClient from '@/components/lokasyon/LokasyonlarClient'
-import { createClient } from '@/lib/supabase/server'
-import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getRolBase } from '@/lib/modul/cookie'
 import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
+import { getOtoYikamaFirmaId } from '@/lib/oto-yikama/getOtoYikamaFirmaId'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,10 +19,9 @@ export const dynamic = 'force-dynamic'
 export default async function OtoYikamaLokasyonlarPage() {
   const { me } = await assertModulYetkisi('oto_yikama')
   const rolBase = getRolBase(me.rol)
-  const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
 
   const supabase = createClient()
-  const firmaId = isSA ? getAktifFirmaId() : me.firma_id
+  const firmaId = await getOtoYikamaFirmaId(createAdminClient() as any, me)
   const aktifProje = firmaId ? await getAktifProje(firmaId) : null
   const { data: firmaData } = firmaId
     ? await supabase.from('firmalar').select('qr_sablon_aktif').eq('id', firmaId).single()

@@ -1,9 +1,9 @@
 import Topbar from '@/components/layout/Topbar'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getRolBase } from '@/lib/modul/cookie'
 import { getYikamaYetkiliUserIds } from '@/lib/oto-yikama/yetkililer'
+import { getOtoYikamaFirmaId } from '@/lib/oto-yikama/getOtoYikamaFirmaId'
 
 import SonYikamalarBlock from '@/components/oto-yikama/blocks/SonYikamalarBlock'
 import OnlinePersonelBlock from '@/components/oto-yikama/blocks/OnlinePersonelBlock'
@@ -20,9 +20,8 @@ function bugunTRDate(): string {
 export default async function OtoYikamaDashboardPage() {
   const { me } = await assertModulYetkisi('oto_yikama')
   const rolBase = getRolBase(me.rol)
-  const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
-  const firmaId = isSA ? getAktifFirmaId() : me.firma_id
   const admin = createAdminClient()
+  const firmaId = await getOtoYikamaFirmaId(admin, me)
   const bugun = bugunTRDate()
 
   // Üst sıra KPI'ları — sayfa-bazlı, blok değil (hızlı yükleme için)

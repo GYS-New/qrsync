@@ -1,8 +1,8 @@
 import Topbar from '@/components/layout/Topbar'
-import { createClient } from '@/lib/supabase/server'
-import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getRolBase } from '@/lib/modul/cookie'
+import { getOtoYikamaFirmaId } from '@/lib/oto-yikama/getOtoYikamaFirmaId'
 import OtoYikamaKullanicilarClient, { type YikamaKullanici } from '@/components/oto-yikama/KullanicilarClient'
 
 export const dynamic = 'force-dynamic'
@@ -20,9 +20,8 @@ export const dynamic = 'force-dynamic'
 export default async function OtoYikamaKullanicilarPage() {
   const { me } = await assertModulYetkisi('oto_yikama')
   const rolBase = getRolBase(me.rol)
-  const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
   const supabase = createClient()
-  const firmaId = isSA ? getAktifFirmaId() : me.firma_id
+  const firmaId = await getOtoYikamaFirmaId(createAdminClient() as any, me)
 
   if (!firmaId) {
     return (

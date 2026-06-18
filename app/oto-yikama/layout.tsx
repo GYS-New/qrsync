@@ -1,11 +1,10 @@
-import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
 import SAProviders from '@/components/layout/SAProviders'
-import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getOtoYikamaNav } from '@/lib/modul/otoYikamaNav'
+import { getOtoYikamaFirmaId } from '@/lib/oto-yikama/getOtoYikamaFirmaId'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +13,8 @@ export const dynamic = 'force-dynamic'
  *
  * Erişim hiyerarşisi:
  *  1. Auth + modül yetki kontrolü (lib/modul/serverYetki.ts)
- *  2. Firma seçimi: SA için cookie'den, diğerleri user.firma_id
+ *  2. Firma seçimi: getOtoYikamaFirmaId (SA için cookie → cookie yoksa
+ *     oto_yikama_aktif olan ilk firma; diğerleri user.firma_id)
  *  3. firmalar.oto_yikama_aktif true olmalı (SA hariç — SA kapalı firmayı da görebilir)
  *
  * Sidebar mevcut Sidebar component'inin customNavGroups prop'u ile beslenir
@@ -22,11 +22,8 @@ export const dynamic = 'force-dynamic'
  */
 export default async function OtoYikamaLayout({ children }: { children: React.ReactNode }) {
   const { me } = await assertModulYetkisi('oto_yikama')
-  const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
-
   const admin = createAdminClient()
-  const cookieFirmaId = getAktifFirmaId()
-  const firmaId = isSA ? cookieFirmaId : me.firma_id
+  const firmaId = await getOtoYikamaFirmaId(admin as any, me)
 
   // Modül flag kontrolü (SA hariç) — assertModulYetkisi zaten yetki+aktif baktı ama
   // SA için cookie firma değişiminde flag kontrolü yapılmadı.
