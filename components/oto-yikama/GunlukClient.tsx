@@ -140,7 +140,7 @@ export default function GunlukClient() {
   }, [rows, durumFilter, arama])
 
   const sayilar = useMemo(() => {
-    const c = { toplam: rows.length, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0 }
+    const c = { toplam: rows.length, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
     for (const r of rows) c[r.durum]++
     return c
   }, [rows])
