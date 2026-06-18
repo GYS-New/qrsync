@@ -149,6 +149,35 @@ export async function POST(req: Request) {
         )
       }
 
+      // TR saatine göre bugün — server UTC olsa bile Europe/Istanbul takvim günü
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
+
+      // YENİ KURAL: Bugün için planlı/aktif (tamamlanmamış) yıkama varsa
+      // ekstra başlatılamaz. Önce planlı görevi tamamlamalı.
+      const { data: bugunMevcut } = await admin
+        .from('oto_yikama_gorev_metadata')
+        .select('gorev_id')
+        .eq('arac_id', arac.id)
+        .eq('hedef_tarih', today)
+      if (bugunMevcut && bugunMevcut.length > 0) {
+        const gorevIds = bugunMevcut.map((m: any) => m.gorev_id)
+        const { data: gorevlerData } = await admin
+          .from('gorevler')
+          .select('id, durum')
+          .in('id', gorevIds)
+          .eq('firma_id', firmaId)
+        const aktifVar = (gorevlerData ?? []).some((g: any) =>
+          ['HAZIR', 'ACIK', 'ISLEMDE'].includes(g.durum),
+        )
+        if (aktifVar) {
+          return NextResponse.json({
+            ok: false,
+            error: `${arac.plaka} plakalı araç için bugün planlı/aktif yıkama görevi mevcut. Önce o görevi tamamlayın, sonra ekstra başlatabilirsiniz.`,
+            code: 'PLANLI_AKTIF_VAR',
+          }, { status: 409, headers: CORS })
+        }
+      }
+
       // Ardışık başlatma + devam eden görev
       const ardisikHata = await ardisikBaslatmaKontrol(
         admin, userId, firmaId, lok.proje_id ?? personelProjeId ?? null,
@@ -170,10 +199,10 @@ export async function POST(req: Request) {
       }
 
       const nowIso = new Date().toISOString()
-      // TR saatine göre tarih — server UTC olsa bile Europe/Istanbul takvim günü
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
 
-      // gorevler INSERT: direkt TAMAMLANDI (ekstra = tek tıkla kayıt akışı)
+      // gorevler INSERT: ISLEMDE — personel "tamamla" çağrısına kadar bu durumda
+      // kalır. Görev kayıtlarında ve Canlı İşlemler'de anında görünür (Canlı
+      // İşlemler ISLEMDE'yi flash badge ile gösterir).
       const { data: insertedGorev, error: gorevErr } = await admin
         .from('gorevler')
         .insert({
@@ -182,10 +211,11 @@ export async function POST(req: Request) {
           tanim: `Oto Yıkama - ${arac.plaka} (Ekstra)`,
           lokasyon_id: lokasyonId,
           atanan_kullanici_id: null,
-          durum: 'TAMAMLANDI',
+          durum: 'ISLEMDE',
           olusturan_id: userId,
+          baslatan_kullanici_id: userId,
           islemi_yapan_id: userId,
-          tamamlanma_tarihi: nowIso,
+          baslatilma_tarihi: nowIso,
           durum_degisim_tarihi: nowIso,
         })
         .select('id')
@@ -199,29 +229,7 @@ export async function POST(req: Request) {
       }
       const yeniGorevId = insertedGorev.id
 
-      // Opsiyonel km/foto/notlar — mobil yıkama akışı için
-      const km = Number.isFinite(Number(body?.km)) ? Math.floor(Number(body.km)) : null
-      const fotoOnce = typeof body?.foto_oncesi_url === 'string' ? body.foto_oncesi_url.trim() : null
-      const fotoSonra = typeof body?.foto_sonrasi_url === 'string' ? body.foto_sonrasi_url.trim() : null
-      const notlar = typeof body?.notlar === 'string' ? body.notlar.trim() : null
-
-      // KM gerileme uyarısı
-      let kmUyarisi: string | null = null
-      if (km != null) {
-        const { data: maxRow } = await admin
-          .from('oto_yikama_gorev_metadata')
-          .select('km')
-          .eq('arac_id', arac.id)
-          .not('km', 'is', null)
-          .order('km', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        const oncekiMax = (maxRow as any)?.km ?? null
-        if (oncekiMax != null && km < oncekiMax) {
-          kmUyarisi = `KM girilen (${km}) önceki yıkamadaki KM'den (${oncekiMax}) düşük — kayıt yine de yapıldı.`
-        }
-      }
-
+      // Metadata — KM/foto/notlar TAMAMLA aşamasında /api/app/gorev-tamamla'dan gelir.
       const { error: metaErr } = await admin
         .from('oto_yikama_gorev_metadata')
         .insert({
@@ -230,10 +238,6 @@ export async function POST(req: Request) {
           plaka_snapshot: arac.plaka,
           hedef_tarih: today,
           ekstra: true,
-          km,
-          foto_oncesi_url: fotoOnce,
-          foto_sonrasi_url: fotoSonra,
-          notlar,
         })
       if (metaErr) {
         await admin.from('gorevler').delete().eq('id', yeniGorevId)
@@ -246,7 +250,7 @@ export async function POST(req: Request) {
       await admin.from('device_tokens').update({ son_kullanim: nowIso }).eq('device_token', deviceToken)
 
       void auditLog({
-        tip: 'oto_yikama_ekstra',
+        tip: 'oto_yikama_ekstra_baslat',
         tablo: 'gorevler',
         firma_id: firmaId,
         kullanici_id: userId,
@@ -258,12 +262,11 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         ok: true,
-        mesaj: 'Ekstra yıkama kaydedildi',
+        mesaj: 'Ekstra yıkama başlatıldı',
         gorev_id: yeniGorevId,
         plaka: arac.plaka,
         lokasyon_id: lokasyonId,
-        tamamlanma_tarihi: nowIso,
-        uyari: kmUyarisi,
+        baslatilma_tarihi: nowIso,
       }, { headers: CORS })
     }
 
