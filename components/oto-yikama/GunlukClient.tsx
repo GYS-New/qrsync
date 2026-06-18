@@ -6,7 +6,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Loader2, RotateCcw, Trash2, Search } from 'lucide-react'
 
-type Durum = 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI'
+type Durum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI'
 
 type Row = {
   gorev_id: string
@@ -36,9 +36,9 @@ const T = {
   grayLight: '#f8fafc',
 }
 
-const DURUM_LABEL: Record<Durum, string> = { ISLEMDE: 'İşlemde', ACIK: 'Açık', TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal', YAPILAMADI: 'Yapılamadı' }
-const DURUM_BG: Record<Durum, string> = { ISLEMDE: T.blueLight, ACIK: T.amberLight, TAMAMLANDI: T.greenLight, IPTAL: T.redLight, YAPILAMADI: '#fee2e2' }
-const DURUM_FG: Record<Durum, string> = { ISLEMDE: T.blue, ACIK: T.amber, TAMAMLANDI: T.green, IPTAL: T.red, YAPILAMADI: '#991b1b' }
+const DURUM_LABEL: Record<Durum, string> = { HAZIR: 'Hazır', ISLEMDE: 'İşlemde', ACIK: 'Açık', TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal', YAPILAMADI: 'Yapılamadı' }
+const DURUM_BG: Record<Durum, string> = { HAZIR: '#f1f5f9', ISLEMDE: T.blueLight, ACIK: T.amberLight, TAMAMLANDI: T.greenLight, IPTAL: T.redLight, YAPILAMADI: '#fee2e2' }
+const DURUM_FG: Record<Durum, string> = { HAZIR: '#475569', ISLEMDE: T.blue, ACIK: T.amber, TAMAMLANDI: T.green, IPTAL: T.red, YAPILAMADI: '#991b1b' }
 
 function fmtTime(iso: string | null): string {
   if (!iso) return '—'
@@ -140,7 +140,7 @@ export default function GunlukClient() {
   }, [rows, durumFilter, arama])
 
   const sayilar = useMemo(() => {
-    const c = { toplam: rows.length, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
+    const c = { toplam: rows.length, HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
     for (const r of rows) c[r.durum]++
     return c
   }, [rows])
