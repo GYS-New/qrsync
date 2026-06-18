@@ -87,7 +87,7 @@ export default function KullanicilarClient({
   canDelete?: boolean
   enableBulkImport?: boolean
   projeId?: string | null
-  ustLokasyonlar?: { id: string; tanim: string }[]
+  ustLokasyonlar?: { id: string; tanim: string; oto_yikama_lokasyon?: boolean }[]
   /** SA Firma Adminleri sayfasında, web heartbeat'e göre online/offline rozeti gösterir */
   showSistemdeStatus?: boolean
 }) {
@@ -265,18 +265,22 @@ export default function KullanicilarClient({
   // Üst lokasyon bazında istatistikler — tüm kullanıcı listesi (filtrelerden bağımsız).
   // U/M rolleri için ustLokasyonlar SSR'da zaten yetkiyle filtrelenmiş halde geliyor,
   // dolayısıyla "sadece yetkili olduğu üst lokasyonun toplamlarını görür" otomatik sağlanır.
+  // Oto Yıkama üst lokasyonları KPI listesinden çıkarılır (modül izolasyonu) — atama
+  // için lokasyon dropdown'unda görünmeye devam eder.
   const ustLokStats = useMemo(() => {
-    return ustLokasyonlar.map(ustLok => {
-      const ustUsers = users.filter(u => (u as any).ust_lokasyon_id === ustLok.id)
-      let online = 0
-      let paired = 0
-      for (const u of ustUsers) {
-        const sg = getSonGorulme(u)
-        if (sg.online) online++
-        if (deviceTokenMap[u.id]) paired++
-      }
-      return { id: ustLok.id, tanim: ustLok.tanim, total: ustUsers.length, online, paired }
-    })
+    return ustLokasyonlar
+      .filter(ustLok => !ustLok.oto_yikama_lokasyon)
+      .map(ustLok => {
+        const ustUsers = users.filter(u => (u as any).ust_lokasyon_id === ustLok.id)
+        let online = 0
+        let paired = 0
+        for (const u of ustUsers) {
+          const sg = getSonGorulme(u)
+          if (sg.online) online++
+          if (deviceTokenMap[u.id]) paired++
+        }
+        return { id: ustLok.id, tanim: ustLok.tanim, total: ustUsers.length, online, paired }
+      })
   // getSonGorulme deviceTokenMap'i kullanıyor; stable reference değil ama deps'te zaten var
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [users, ustLokasyonlar, deviceTokenMap])

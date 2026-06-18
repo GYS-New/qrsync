@@ -25,7 +25,7 @@ export default function FirmaKullanicilariClient({
   const projeId = aktifProje?.id ?? null
 
   const [users, setUsers] = useState<User[]>(initialUsers)
-  const [ustLokasyonlar, setUstLokasyonlar] = useState<{ id: string; tanim: string }[]>([])
+  const [ustLokasyonlar, setUstLokasyonlar] = useState<{ id: string; tanim: string; oto_yikama_lokasyon?: boolean }[]>([])
   useEffect(() => { setUsers(initialUsers) }, [initialUsers])
 
   // Üst lokasyonları çek — Kullanıcı atama UI'ı olduğu için Oto Yıkama dahil edilir
