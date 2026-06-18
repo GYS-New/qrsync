@@ -25,6 +25,7 @@ COPY app.py ocr.py ./
 ENV PORT=5000
 EXPOSE 5000
 
-# Gunicorn: tek worker yeterli (EasyOCR model RAM'i shared değil),
-# 2 thread paralel istek için. Timeout 30s — OCR ortalama 1s.
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "30", "app:app"]
+# Gunicorn: shell form — $PORT expansion gerekir (Railway dinamik atar).
+# Tek worker (EasyOCR model RAM'i shared değil), 2 thread paralel istek.
+# Timeout 60sn — ilk /oku isteğinde lazy model load yapılır.
+CMD gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 2 --timeout 60 app:app
