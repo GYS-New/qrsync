@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ ok: false, error: 'Güncellenecek alan yok (hedef_tarih veya lokasyon_id)' }, { status: 400 })
   }
 
-  if (['TAMAMLANDI', 'IPTAL', 'SILINDI'].includes(rec.gorev.durum)) {
+  if (['TAMAMLANDI', 'IPTAL', 'SILINDI', 'YAPILAMADI'].includes(rec.gorev.durum)) {
     return NextResponse.json({
       ok: false,
       error: `'${rec.gorev.durum}' durumundaki görev düzenlenemez. Düzenleme yalnız HAZIR/AÇIK/İŞLEMDE durumları için geçerli.`,

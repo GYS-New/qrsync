@@ -46,7 +46,7 @@ const T = {
 }
 
 // Türetilmiş durum: ACIK + hedef_tarih > bugün → HAZIR
-type GoruntuDurum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'DIGER'
+type GoruntuDurum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI' | 'DIGER'
 type DurumFilter = 'TUMU' | GoruntuDurum | 'EKSTRA'
 
 function bugunTRDate(): string {
@@ -56,6 +56,7 @@ function bugunTRDate(): string {
 function turetilenDurum(k: GorevKaydi, bugun: string): GoruntuDurum {
   const d = k.durum ?? ''
   if (d === 'HAZIR') return 'HAZIR'
+  if (d === 'YAPILAMADI') return 'YAPILAMADI'
   if (d === 'ACIK') {
     // Backward-compat: cron çalışmadıysa veya eski kayıtlar için
     return k.hedef_tarih && k.hedef_tarih > bugun ? 'HAZIR' : 'ACIK'
@@ -68,15 +69,18 @@ function turetilenDurum(k: GorevKaydi, bugun: string): GoruntuDurum {
 
 const DURUM_BG: Record<GoruntuDurum, string> = {
   HAZIR: '#f1f5f9', ACIK: T.amberLight, ISLEMDE: T.blueLight,
-  TAMAMLANDI: T.greenLight, IPTAL: T.redLight, DIGER: '#f1f5f9',
+  TAMAMLANDI: T.greenLight, IPTAL: T.redLight,
+  YAPILAMADI: '#fee2e2', DIGER: '#f1f5f9',
 }
 const DURUM_FG: Record<GoruntuDurum, string> = {
   HAZIR: '#475569', ACIK: T.amber, ISLEMDE: T.blue,
-  TAMAMLANDI: T.green, IPTAL: T.red, DIGER: T.textSoft,
+  TAMAMLANDI: T.green, IPTAL: T.red,
+  YAPILAMADI: '#991b1b', DIGER: T.textSoft,
 }
 const DURUM_LABEL: Record<GoruntuDurum, string> = {
   HAZIR: 'Hazır', ACIK: 'Açık', ISLEMDE: 'İşlemde',
-  TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal', DIGER: '—',
+  TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal',
+  YAPILAMADI: 'Yapılamadı', DIGER: '—',
 }
 
 function fmtTarih(d: string | null): string {
@@ -133,16 +137,17 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
 
   // KPI sayıları
   const sayilar = useMemo(() => {
-    let hazir = 0, acik = 0, islemde = 0, tamam = 0, iptal = 0, ekstra = 0
+    let hazir = 0, acik = 0, islemde = 0, tamam = 0, iptal = 0, yapilamadi = 0, ekstra = 0
     for (const { k, gd } of kayitlarTuretilmis) {
       if (gd === 'HAZIR')      hazir++
       if (gd === 'ACIK')       acik++
       if (gd === 'ISLEMDE')    islemde++
       if (gd === 'TAMAMLANDI') tamam++
       if (gd === 'IPTAL')      iptal++
+      if (gd === 'YAPILAMADI') yapilamadi++
       if (k.ekstra)            ekstra++
     }
-    return { toplam: kayitlar.length, hazir, acik, islemde, tamam, iptal, ekstra }
+    return { toplam: kayitlar.length, hazir, acik, islemde, tamam, iptal, yapilamadi, ekstra }
   }, [kayitlarTuretilmis, kayitlar.length])
 
   const filtrelenmis = useMemo(() => {
@@ -269,6 +274,8 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
                 onClick={() => setFiltre(filtre === 'TAMAMLANDI' ? 'TUMU' : 'TAMAMLANDI')} />
         <KpiPil renk={T.red}       etiket="iptal"      sayi={sayilar.iptal}    active={filtre === 'IPTAL'}
                 onClick={() => setFiltre(filtre === 'IPTAL' ? 'TUMU' : 'IPTAL')} />
+        <KpiPil renk={'#991b1b'}   etiket="yapılamadı" sayi={sayilar.yapilamadi} active={filtre === 'YAPILAMADI'}
+                onClick={() => setFiltre(filtre === 'YAPILAMADI' ? 'TUMU' : 'YAPILAMADI')} />
         <KpiPil renk={T.purple}    etiket="ekstra"     sayi={sayilar.ekstra}   active={filtre === 'EKSTRA'}
                 onClick={() => setFiltre(filtre === 'EKSTRA' ? 'TUMU' : 'EKSTRA')} />
       </div>
@@ -325,6 +332,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
             <option value="ISLEMDE">İşlemde</option>
             <option value="TAMAMLANDI">Tamamlandı</option>
             <option value="IPTAL">İptal</option>
+            <option value="YAPILAMADI">Yapılamadı</option>
             <option value="EKSTRA">Ekstra</option>
           </select>
         </FilterField>

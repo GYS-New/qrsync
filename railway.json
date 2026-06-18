@@ -28,6 +28,11 @@
         "name": "oto-yikama-hazir-acik",
         "schedule": "1 21 * * *",
         "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/oto-yikama-hazir-acik?secret=$CRON_SECRET"
+      },
+      {
+        "name": "oto-yikama-yapilamadi",
+        "schedule": "0 21 * * *",
+        "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/oto-yikama-yapilamadi?secret=$CRON_SECRET"
       }
     ]
   }

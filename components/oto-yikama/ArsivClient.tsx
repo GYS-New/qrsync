@@ -36,7 +36,7 @@ const T = {
   purple: '#7c3aed', purpleLight: '#f3e8ff',
 }
 
-type ArsivDurum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'DIGER'
+type ArsivDurum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI' | 'DIGER'
 type DurumFilter = 'TUMU' | ArsivDurum | 'EKSTRA'
 
 function normalizeDurum(d: string | null): ArsivDurum {
@@ -44,21 +44,25 @@ function normalizeDurum(d: string | null): ArsivDurum {
   if (d === 'ACIK')        return 'ACIK'
   if (d === 'ISLEMDE')     return 'ISLEMDE'
   if (d === 'TAMAMLANDI')  return 'TAMAMLANDI'
+  if (d === 'YAPILAMADI')  return 'YAPILAMADI'
   if (d && ['IPTAL', 'SILINDI', 'KAPATILDI'].includes(d)) return 'IPTAL'
   return 'DIGER'
 }
 
 const DURUM_BG: Record<ArsivDurum, string> = {
   HAZIR: '#f1f5f9', ACIK: T.amberLight, ISLEMDE: T.blueLight,
-  TAMAMLANDI: T.greenLight, IPTAL: T.redLight, DIGER: '#f1f5f9',
+  TAMAMLANDI: T.greenLight, IPTAL: T.redLight,
+  YAPILAMADI: '#fee2e2', DIGER: '#f1f5f9',
 }
 const DURUM_FG: Record<ArsivDurum, string> = {
   HAZIR: '#475569', ACIK: T.amber, ISLEMDE: T.blue,
-  TAMAMLANDI: T.green, IPTAL: T.red, DIGER: T.textSoft,
+  TAMAMLANDI: T.green, IPTAL: T.red,
+  YAPILAMADI: '#991b1b', DIGER: T.textSoft,
 }
 const DURUM_LABEL: Record<ArsivDurum, string> = {
   HAZIR: 'Hazır', ACIK: 'Açık', ISLEMDE: 'İşlemde',
-  TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal', DIGER: '—',
+  TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal',
+  YAPILAMADI: 'Yapılamadı', DIGER: '—',
 }
 
 function fmtTarih(d: string | null): string {
@@ -94,13 +98,14 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
 
   // Sayaçlar (filtre öncesi)
   const sayilar = useMemo(() => {
-    const s = { TOPLAM: kayitlar.length, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, EKSTRA: 0 }
+    const s = { TOPLAM: kayitlar.length, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0, EKSTRA: 0 }
     for (const k of kayitlar) {
       const d = normalizeDurum(k.durum)
       if (d === 'ACIK')       s.ACIK++
       if (d === 'ISLEMDE')    s.ISLEMDE++
       if (d === 'TAMAMLANDI') s.TAMAMLANDI++
       if (d === 'IPTAL')      s.IPTAL++
+      if (d === 'YAPILAMADI') s.YAPILAMADI++
       if (k.ekstra)           s.EKSTRA++
     }
     return s
@@ -180,6 +185,7 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
           <Pill label="İşlemde"    sayi={sayilar.ISLEMDE}    renk={T.blue}    aktif={durumFilter === 'ISLEMDE'}    onClick={() => setDurumFilter('ISLEMDE')} />
           <Pill label="Tamamlandı" sayi={sayilar.TAMAMLANDI} renk={T.green}   aktif={durumFilter === 'TAMAMLANDI'} onClick={() => setDurumFilter('TAMAMLANDI')} />
           <Pill label="İptal"      sayi={sayilar.IPTAL}      renk={T.red}     aktif={durumFilter === 'IPTAL'}      onClick={() => setDurumFilter('IPTAL')} />
+          <Pill label="Yapılamadı" sayi={sayilar.YAPILAMADI} renk={'#991b1b'} aktif={durumFilter === 'YAPILAMADI'} onClick={() => setDurumFilter('YAPILAMADI')} />
           <Pill label="Ekstra"     sayi={sayilar.EKSTRA}     renk={T.purple}  aktif={durumFilter === 'EKSTRA'}     onClick={() => setDurumFilter('EKSTRA')} />
         </div>
       </div>

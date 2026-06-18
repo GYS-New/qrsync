@@ -6,7 +6,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Loader2, RotateCcw, Trash2, Search } from 'lucide-react'
 
-type Durum = 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL'
+type Durum = 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI'
 
 type Row = {
   gorev_id: string
@@ -36,9 +36,9 @@ const T = {
   grayLight: '#f8fafc',
 }
 
-const DURUM_LABEL: Record<Durum, string> = { ISLEMDE: 'İşlemde', ACIK: 'Açık', TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal' }
-const DURUM_BG: Record<Durum, string> = { ISLEMDE: T.blueLight, ACIK: T.amberLight, TAMAMLANDI: T.greenLight, IPTAL: T.redLight }
-const DURUM_FG: Record<Durum, string> = { ISLEMDE: T.blue, ACIK: T.amber, TAMAMLANDI: T.green, IPTAL: T.red }
+const DURUM_LABEL: Record<Durum, string> = { ISLEMDE: 'İşlemde', ACIK: 'Açık', TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal', YAPILAMADI: 'Yapılamadı' }
+const DURUM_BG: Record<Durum, string> = { ISLEMDE: T.blueLight, ACIK: T.amberLight, TAMAMLANDI: T.greenLight, IPTAL: T.redLight, YAPILAMADI: '#fee2e2' }
+const DURUM_FG: Record<Durum, string> = { ISLEMDE: T.blue, ACIK: T.amber, TAMAMLANDI: T.green, IPTAL: T.red, YAPILAMADI: '#991b1b' }
 
 function fmtTime(iso: string | null): string {
   if (!iso) return '—'
