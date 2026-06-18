@@ -18,7 +18,7 @@
         "name": "mesai-arsiv",
         "schedule": "59 20 * * *",
         "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/mesai-arsiv"
-      },
+      }
     ]
   }
 }
