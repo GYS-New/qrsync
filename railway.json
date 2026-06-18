@@ -19,26 +19,6 @@
         "schedule": "59 20 * * *",
         "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/mesai-arsiv"
       },
-      {
-        "name": "oto-yikama-arsiv",
-        "schedule": "30 21 * * *",
-        "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/oto-yikama-arsiv?secret=$CRON_SECRET"
-      },
-      {
-        "name": "oto-yikama-hazir-acik",
-        "schedule": "1 21 * * *",
-        "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/oto-yikama-hazir-acik?secret=$CRON_SECRET"
-      },
-      {
-        "name": "oto-yikama-yapilamadi",
-        "schedule": "0 21 * * *",
-        "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/oto-yikama-yapilamadi?secret=$CRON_SECRET"
-      },
-      {
-        "name": "oto-yikama-gorev-uret",
-        "schedule": "55 20 * * *",
-        "command": "curl -s -H 'x-cron-secret: $CRON_SECRET' $RAILWAY_PUBLIC_DOMAIN/api/cron/oto-yikama-gorev-uret?secret=$CRON_SECRET"
-      }
     ]
   }
 }
