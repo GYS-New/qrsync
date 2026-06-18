@@ -15,15 +15,16 @@ import os
 
 from flask import Flask, jsonify, request
 
-from ocr import get_reader, plaka_oku
+from ocr import plaka_oku
 
 MAX_DOSYA_BYTES = 5 * 1024 * 1024
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_DOSYA_BYTES + 1024  # küçük tampon
 
-# Boot'ta modeli ısıt — ilk gerçek istek hızlı olsun
-get_reader()
+# NOT: EasyOCR modeli boot'ta YÜKLENMİYOR — Railway healthcheck'inin
+# /health endpoint'ine hızlıca cevap alabilmesi için lazy load. İlk gerçek
+# /oku isteği ~3-5sn sürer (model RAM'e yüklenir), sonrakiler ~700-1200ms.
 
 
 @app.get("/health")
