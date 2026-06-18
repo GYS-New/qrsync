@@ -71,6 +71,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ? [...new Set(body.yikama_gunleri.filter((g: any) => Number.isInteger(g) && g >= 1 && g <= 7))]
       : []
   }
+  if ('varsayilan_lokasyon_id' in body) {
+    update.varsayilan_lokasyon_id = typeof body.varsayilan_lokasyon_id === 'string' && body.varsayilan_lokasyon_id
+      ? body.varsayilan_lokasyon_id : null
+  }
+  if ('yikama_frekans_tip' in body) {
+    const FREKANS_VALID = new Set(['HAFTALIK', 'BIHAFTA', 'AYLIK'])
+    update.yikama_frekans_tip = FREKANS_VALID.has(body.yikama_frekans_tip) ? body.yikama_frekans_tip : 'HAFTALIK'
+  }
+  if ('yikama_frekans_aralik' in body) {
+    update.yikama_frekans_aralik = Number.isInteger(body.yikama_frekans_aralik) && body.yikama_frekans_aralik >= 1
+      ? body.yikama_frekans_aralik : 1
+  }
+  if ('yikama_referans_tarih' in body) {
+    update.yikama_referans_tarih = typeof body.yikama_referans_tarih === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.yikama_referans_tarih)
+      ? body.yikama_referans_tarih : null
+  }
   if ('notlar' in body) update.notlar = body.notlar
   if ('aktif' in body) update.aktif = !!body.aktif
 

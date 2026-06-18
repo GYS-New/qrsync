@@ -16,6 +16,10 @@ type Arac = {
   departman: string | null
   periyot_gun: number
   yikama_gunleri: number[]
+  varsayilan_lokasyon_id: string | null
+  yikama_frekans_tip: 'HAFTALIK' | 'BIHAFTA' | 'AYLIK' | null
+  yikama_frekans_aralik: number | null
+  yikama_referans_tarih: string | null
   son_yikama_tarihi: string | null
   aktif: boolean
   notlar: string | null
@@ -25,6 +29,8 @@ type Arac = {
   olusturma_tarihi: string
   guncelleme_tarihi: string
 }
+
+type LokasyonOpt = { id: string; tanim: string }
 
 const T = {
   text: '#0f172a', textSoft: '#64748b', border: '#e2e8f0',
@@ -39,6 +45,10 @@ const BOS_FORM = {
   plaka: '', marka: '', model: '', renk: '', departman: '', periyot_gun: 7,
   yikama_gunleri: [] as number[], notlar: '',
   kullanici_adi_soyadi: '', kullanici_telefon: '', kullanici_email: '',
+  varsayilan_lokasyon_id: '' as string,
+  yikama_frekans_tip: 'HAFTALIK' as 'HAFTALIK' | 'BIHAFTA' | 'AYLIK',
+  yikama_frekans_aralik: 1 as number,
+  yikama_referans_tarih: '' as string,
 }
 
 const GUN_KISA = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
@@ -48,6 +58,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
   const { toast } = useToast()
   const { confirm } = useConfirm()
   const [araclar, setAraclar] = useState<Arac[]>([])
+  const [istasyonlar, setIstasyonlar] = useState<LokasyonOpt[]>([])
   const [yukleniyor, setYukleniyor] = useState(true)
   const [q, setQ] = useState('')
   const [filterDepartman, setFilterDepartman] = useState('')
@@ -79,6 +90,22 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
   }
 
   useEffect(() => { yukle() }, [firmaId, projeId, filterAktif])
+
+  // Yıkama istasyonları (alt lokasyonlar) — Araç formundaki varsayılan istasyon dropdown'u
+  useEffect(() => {
+    if (!firmaId) return
+    fetch(`/api/oto-yikama/lokasyonlar?firma_id=${firmaId}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(j => {
+        if (!j.ok) return
+        // Sadece alt istasyonlar (parent_id dolu)
+        const list = (j.data ?? [])
+          .filter((l: any) => l.parent_id != null && l.aktif !== false)
+          .map((l: any) => ({ id: l.id as string, tanim: l.tanim as string }))
+        setIstasyonlar(list)
+      })
+      .catch(() => {})
+  }, [firmaId])
 
   const departmanlar = useMemo(() => {
     const set = new Set<string>()
@@ -114,6 +141,10 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       kullanici_adi_soyadi: a.kullanici_adi_soyadi ?? '',
       kullanici_telefon: a.kullanici_telefon ?? '',
       kullanici_email: a.kullanici_email ?? '',
+      varsayilan_lokasyon_id: a.varsayilan_lokasyon_id ?? '',
+      yikama_frekans_tip: a.yikama_frekans_tip ?? 'HAFTALIK',
+      yikama_frekans_aralik: a.yikama_frekans_aralik ?? 1,
+      yikama_referans_tarih: a.yikama_referans_tarih ?? '',
     })
     setModalOpen(true)
   }
@@ -550,12 +581,85 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
                     )
                   })}
                 </div>
-                {form.yikama_gunleri.length === 0 && (
+                {form.yikama_gunleri.length === 0 && form.yikama_frekans_tip !== 'AYLIK' && (
                   <div style={{ fontSize: 11, color: T.textSoft, marginTop: 4, fontStyle: 'italic' }}>
-                    Gün seçilmezse araç için periyodik görev oluşturulmaz, sadece manuel oluşturulabilir.
+                    Gün seçilmezse araç için otomatik görev oluşturulmaz, sadece manuel oluşturulabilir.
                   </div>
                 )}
               </div>
+
+              {/* Yıkama kuralı: frekans tipi + aralık + referans tarih */}
+              <div style={{ gridColumn: 'span 2', padding: '12px 14px', background: T.grayLight, border: `1px solid ${T.border}`, borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>
+                  📅 Yıkama Kuralı (otomatik görev üretimi)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                  {(['HAFTALIK', 'BIHAFTA', 'AYLIK'] as const).map(tip => {
+                    const aktif = form.yikama_frekans_tip === tip
+                    return (
+                      <button key={tip} type="button"
+                        onClick={() => setForm(f => ({ ...f, yikama_frekans_tip: tip }))}
+                        style={{
+                          padding: '8px 6px', borderRadius: 6,
+                          border: `1.5px solid ${aktif ? T.blue : T.border}`,
+                          background: aktif ? T.blueLight : '#fff',
+                          color: aktif ? T.blue : T.text,
+                          cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                        }}>
+                        {tip === 'HAFTALIK' ? 'Her Hafta' : tip === 'BIHAFTA' ? 'N Haftada Bir' : 'Ayda Bir'}
+                      </button>
+                    )
+                  })}
+                </div>
+                {form.yikama_frekans_tip === 'BIHAFTA' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: T.textSoft, fontWeight: 600 }}>Hafta aralığı</label>
+                      <input type="number" min={2} max={12}
+                        className="verde-input"
+                        value={form.yikama_frekans_aralik}
+                        onChange={e => setForm({ ...form, yikama_frekans_aralik: Math.max(2, parseInt(e.target.value || '2', 10)) })}
+                        style={{ width: '100%', marginTop: 4 }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: T.textSoft, fontWeight: 600 }}>Referans tarih (modulo başlangıcı)</label>
+                      <input type="date"
+                        className="verde-input"
+                        value={form.yikama_referans_tarih}
+                        onChange={e => setForm({ ...form, yikama_referans_tarih: e.target.value })}
+                        style={{ width: '100%', marginTop: 4 }} />
+                    </div>
+                  </div>
+                )}
+                {form.yikama_frekans_tip === 'AYLIK' && (
+                  <div>
+                    <label style={{ fontSize: 11, color: T.textSoft, fontWeight: 600 }}>Referans tarih (ayın bu gününde yıkanır)</label>
+                    <input type="date"
+                      className="verde-input"
+                      value={form.yikama_referans_tarih}
+                      onChange={e => setForm({ ...form, yikama_referans_tarih: e.target.value })}
+                      style={{ width: '100%', marginTop: 4 }} />
+                    <div style={{ fontSize: 10.5, color: T.textSoft, marginTop: 4, fontStyle: 'italic' }}>
+                      Yukarıdaki "Yıkama Günleri" aylık tipte kullanılmaz, sadece referans tarihin günü tetikler.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Varsayılan istasyon */}
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>
+                  Varsayılan İstasyon <span style={{ color: T.red }}>(otomatik üretim için gerekli)</span>
+                </label>
+                <select className="verde-input"
+                  value={form.varsayilan_lokasyon_id}
+                  onChange={e => setForm({ ...form, varsayilan_lokasyon_id: e.target.value })}
+                  style={{ width: '100%', marginTop: 4 }}>
+                  <option value="">— Atanmadı (otomatik görev üretilmez) —</option>
+                  {istasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                </select>
+              </div>
+
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Notlar</label>
                 <textarea className="verde-input" value={form.notlar} onChange={e => setForm({ ...form, notlar: e.target.value })} style={{ width: '100%', marginTop: 4, minHeight: 60 }} />

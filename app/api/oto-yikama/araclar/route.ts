@@ -67,6 +67,9 @@ export async function POST(req: NextRequest) {
   if (!body.firma_id) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
   const modulErr = await assertOtoYikamaAktif(admin, body.firma_id); if (modulErr) return modulErr
 
+  const FREKANS_VALID = new Set(['HAFTALIK', 'BIHAFTA', 'AYLIK'])
+  const frekansTip = FREKANS_VALID.has(body.yikama_frekans_tip) ? body.yikama_frekans_tip : 'HAFTALIK'
+
   const payload = {
     firma_id: body.firma_id,
     proje_id: body.proje_id ?? null,
@@ -79,6 +82,13 @@ export async function POST(req: NextRequest) {
     yikama_gunleri: Array.isArray(body.yikama_gunleri)
       ? [...new Set(body.yikama_gunleri.filter((g: any) => Number.isInteger(g) && g >= 1 && g <= 7))]
       : [],
+    varsayilan_lokasyon_id: typeof body.varsayilan_lokasyon_id === 'string' && body.varsayilan_lokasyon_id
+      ? body.varsayilan_lokasyon_id : null,
+    yikama_frekans_tip: frekansTip,
+    yikama_frekans_aralik: Number.isInteger(body.yikama_frekans_aralik) && body.yikama_frekans_aralik >= 1
+      ? body.yikama_frekans_aralik : 1,
+    yikama_referans_tarih: typeof body.yikama_referans_tarih === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.yikama_referans_tarih)
+      ? body.yikama_referans_tarih : null,
     kullanici_adi_soyadi: kullaniciAd,
     kullanici_telefon: body.kullanici_telefon?.toString().trim() || null,
     kullanici_email: body.kullanici_email?.toString().trim() || null,
