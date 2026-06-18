@@ -12,8 +12,11 @@ type Arac = {
   model: string | null
   departman: string | null
   kullanici_adi_soyadi: string | null
+  yikama_gunleri: number[] | null
   aktif: boolean
 }
+
+const GUN_KISA = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
 
 type Lokasyon = {
   id: string
@@ -369,38 +372,76 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
               )}
             </div>
           </div>
-          {/* Plaka chip grid */}
-          {/* Plaka chip grid — parent yüksekliğini doldurur, kendi içinde scroll */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 12 }}>
+          {/* Plaka listesi — satır satır, plaka detayları + yıkama günleri.
+              Çoklu seçim: her satıra tıklamak toggle eder. */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 0 }}>
             {filtered.length === 0 ? (
               <div style={{ padding: 32, textAlign: 'center', color: T.textSoft, fontSize: 13 }}>Sonuç yok.</div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6 }}>
-                {filtered.map(a => {
+              <div>
+                {filtered.map((a, idx) => {
                   const selected = secimMap.has(a.id)
+                  const gunler = Array.isArray(a.yikama_gunleri) ? a.yikama_gunleri : []
+                  const markaModel = [a.marka, a.model].filter(Boolean).join(' ')
                   return (
                     <button key={a.id} type="button" onClick={() => toggleArac(a)}
                       style={{
-                        padding: '8px 10px',
-                        borderRadius: 7,
-                        border: `1.5px solid ${selected ? T.blue : T.border}`,
+                        width: '100%',
+                        padding: '10px 14px',
+                        border: 'none',
+                        borderBottom: idx === filtered.length - 1 ? 'none' : `1px solid ${T.border}`,
+                        borderLeft: `3px solid ${selected ? T.blue : 'transparent'}`,
                         background: selected ? T.blueLight : '#fff',
                         cursor: 'pointer', textAlign: 'left',
-                        transition: 'all 0.1s',
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        transition: 'background 0.1s',
                       }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                        <span style={{
-                          width: 14, height: 14, borderRadius: 4,
-                          border: `1.5px solid ${selected ? T.blue : '#cbd5e1'}`,
-                          background: selected ? T.blue : '#fff',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                        }}>
-                          {selected && <Check size={9} color="#fff" strokeWidth={3.5} />}
-                        </span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 13, color: T.text, letterSpacing: '0.03em' }}>{a.plaka}</span>
+                      {/* Checkbox */}
+                      <span style={{
+                        width: 18, height: 18, borderRadius: 5,
+                        border: `1.5px solid ${selected ? T.blue : '#cbd5e1'}`,
+                        background: selected ? T.blue : '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        {selected && <Check size={11} color="#fff" strokeWidth={3.5} />}
+                      </span>
+
+                      {/* Plaka + kullanıcı/departman/araç */}
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16, color: T.text, letterSpacing: '0.03em' }}>{a.plaka}</span>
+                          {a.departman && (
+                            <span style={{ fontSize: 11, fontWeight: 700, color: T.blue, background: T.blueLight, padding: '1px 7px', borderRadius: 999 }}>
+                              {a.departman}
+                            </span>
+                          )}
+                          {markaModel && (
+                            <span style={{ fontSize: 12, color: T.textSoft }}>{markaModel}</span>
+                          )}
+                        </div>
+                        {a.kullanici_adi_soyadi && (
+                          <div style={{ fontSize: 12, color: T.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {a.kullanici_adi_soyadi}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: 10.5, color: T.textSoft, paddingLeft: 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {a.kullanici_adi_soyadi ?? '—'} {a.departman ? `· ${a.departman}` : ''}
+
+                      {/* Yıkama günleri — Pzt/Çar/Cum vb. */}
+                      <div style={{ display: 'flex', gap: 3, flexShrink: 0, alignItems: 'center' }}>
+                        {gunler.length === 0 ? (
+                          <span style={{ fontSize: 11, color: T.textSoft, fontStyle: 'italic' }}>günsüz</span>
+                        ) : (
+                          [...gunler].sort((x, y) => x - y).map(g => (
+                            <span key={g} style={{
+                              fontSize: 11, fontWeight: 700,
+                              padding: '2px 7px', borderRadius: 5,
+                              background: T.amberLight, color: T.amber,
+                              fontFamily: 'sans-serif',
+                            }}>
+                              {GUN_KISA[g - 1] ?? g}
+                            </span>
+                          ))
+                        )}
                       </div>
                     </button>
                   )
