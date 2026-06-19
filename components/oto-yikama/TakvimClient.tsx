@@ -61,6 +61,10 @@ const T = {
 const GUN_KISA = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
 const AY_AD = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 
+// Oto Yıkama operasyonel başlangıç tarihi. Bu tarihten önceki günler için
+// ne tahmin ne gerçek görev (varsa) gösterilir; navigasyon da öncesine gitmez.
+const CUTOFF_ISO = '2026-06-22'
+
 // ── Tarih helper'ları (UTC tabanlı — TZ kayması olmasın) ───────────────────
 function isoToDate(iso: string): Date { return new Date(iso + 'T12:00:00Z') }
 function dateToIso(d: Date): string { return d.toISOString().slice(0, 10) }
@@ -112,7 +116,10 @@ type PlakaKart = {
 export default function TakvimClient({ firmaId }: { firmaId: string }) {
   const { toast } = useToast()
   const [sekme, setSekme] = useState<Sekme>('haftalik')
-  const [anchor, setAnchor] = useState<Date>(() => isoToDate(bugunIso()))
+  const [anchor, setAnchor] = useState<Date>(() => {
+    const b = bugunIso()
+    return isoToDate(b < CUTOFF_ISO ? CUTOFF_ISO : b)
+  })
   const [data, setData] = useState<TakvimResponse | null>(null)
   const [yukleniyor, setYukleniyor] = useState(true)
   const [detayKart, setDetayKart] = useState<PlakaKart | null>(null)
@@ -151,6 +158,7 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
     // 1) Gerçek görevler
     for (const k of data.gercek) {
       if (!k.durum) continue
+      if (k.hedef_tarih < CUTOFF_ISO) continue
       const dep = k.arac_id ? (data.araclar.find(a => a.id === k.arac_id)?.departman ?? null) : null
       const kart: PlakaKart = {
         tarih: k.hedef_tarih,
@@ -171,6 +179,7 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
     const tahminAraclar: TahminArac[] = data.araclar as TahminArac[]
     const tahminler = aralikPlanTahmin(tahminAraclar, dateToIso(baslangic), dateToIso(bitis))
     for (const t of tahminler) {
+      if (t.tarih < CUTOFF_ISO) continue
       const key = `${t.tarih}|${t.arac_id}`
       if (gercekSet.has(key)) continue
       const kart: PlakaKart = {
@@ -198,14 +207,37 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
     return harita
   }, [data, baslangic, bitis])
 
+  // Önceki yön için yeni anchor, takvim aralığı cut-off'tan önceye gidiyorsa engellenir
+  function yeniAnchor(yon: -1 | 1, mevcut: Date): Date {
+    if (sekme === 'gunluk') return addDays(mevcut, yon)
+    if (sekme === 'haftalik') return addDays(mevcut, yon * 7)
+    if (sekme === 'aylik') return new Date(Date.UTC(mevcut.getUTCFullYear(), mevcut.getUTCMonth() + yon, 15, 12, 0, 0))
+    return new Date(Date.UTC(mevcut.getUTCFullYear() + yon, mevcut.getUTCMonth(), 15, 12, 0, 0))
+  }
+
+  // Geri navigasyon için sınır — yeni anchor'ın gösterdiği aralık cut-off'tan
+  // tamamen önceye düşüyorsa engelleriz.
+  function geriGidilebilirMi(yeni: Date): boolean {
+    const { bitis: yeniBitis } = aralikHesapla(sekme, yeni)
+    return dateToIso(yeniBitis) >= CUTOFF_ISO
+  }
+
   // ── Nav ─────────────────────────────────────────────────────
   function navigasyon(yon: -1 | 0 | 1) {
-    if (yon === 0) { setAnchor(isoToDate(bugunIso())); return }
-    if (sekme === 'gunluk') setAnchor(d => addDays(d, yon))
-    else if (sekme === 'haftalik') setAnchor(d => addDays(d, yon * 7))
-    else if (sekme === 'aylik') setAnchor(d => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + yon, 15, 12, 0, 0)))
-    else setAnchor(d => new Date(Date.UTC(d.getUTCFullYear() + yon, d.getUTCMonth(), 15, 12, 0, 0)))
+    if (yon === 0) {
+      const b = bugunIso()
+      setAnchor(isoToDate(b < CUTOFF_ISO ? CUTOFF_ISO : b))
+      return
+    }
+    const yeni = yeniAnchor(yon, anchor)
+    if (yon === -1 && !geriGidilebilirMi(yeni)) return
+    setAnchor(yeni)
   }
+
+  const geriDisabled = useMemo(() => {
+    const yeni = yeniAnchor(-1, anchor)
+    return !geriGidilebilirMi(yeni)
+  }, [sekme, anchor])
 
   function anchorEtiketi(): string {
     if (sekme === 'gunluk') {
@@ -243,8 +275,11 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
         </div>
 
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginLeft: 8 }}>
-          <button onClick={() => navigasyon(-1)} title="Önceki"
-            style={navBtnStyle}><ChevronLeft size={16} /></button>
+          <button onClick={() => navigasyon(-1)} title={geriDisabled ? 'Sistem 22.06.2026 sonrası verileri göstermektedir' : 'Önceki'}
+            disabled={geriDisabled}
+            style={{ ...navBtnStyle, opacity: geriDisabled ? 0.4 : 1, cursor: geriDisabled ? 'not-allowed' : 'pointer' }}>
+            <ChevronLeft size={16} />
+          </button>
           <button onClick={() => navigasyon(0)} title="Bugün"
             style={{ ...navBtnStyle, fontWeight: 700, padding: '6px 12px', fontSize: 12 }}>Bugün</button>
           <button onClick={() => navigasyon(1)} title="Sonraki"
@@ -442,6 +477,7 @@ function AylikView({ anchor, baslangic, harita, setDetay, setAnchor, setSekme }:
           const kartlar = harita.get(iso) ?? []
           const isBugun = iso === today
           const inMonth = g.getUTCMonth() === ay
+          const onceCut = iso < CUTOFF_ISO
           const display = kartlar.slice(0, 3)
           const overflow = kartlar.length - display.length
           return (
@@ -450,7 +486,7 @@ function AylikView({ anchor, baslangic, harita, setDetay, setAnchor, setSekme }:
                 border: `1.5px solid ${isBugun ? T.blue : T.border}`,
                 borderRadius: 6, padding: 6,
                 background: !inMonth ? '#fafbfc' : (isBugun ? T.blueLight : '#fff'),
-                opacity: inMonth ? 1 : 0.55,
+                opacity: !inMonth ? 0.55 : (onceCut ? 0.45 : 1),
                 display: 'flex', flexDirection: 'column', gap: 4,
                 overflow: 'hidden',
               }}>
@@ -536,16 +572,19 @@ function MiniAy({ yil, ay, harita, today, onAyTik, onGunTik }: {
             fg = DURUM_FG[enKritik]
             bd = DURUM_BORDER[enKritik]
           }
+          const onceCut = iso < CUTOFF_ISO
           return (
-            <button key={iso} onClick={() => onGunTik(g)}
-              title={kartlar.length > 0 ? `${iso} — ${kartlar.length} plaka` : iso}
+            <button key={iso} onClick={() => !onceCut && onGunTik(g)}
+              disabled={onceCut}
+              title={onceCut ? 'Sistem öncesi — gösterim yok' : (kartlar.length > 0 ? `${iso} — ${kartlar.length} plaka` : iso)}
               style={{
                 aspectRatio: '1',
                 fontSize: 9, fontWeight: isBugun ? 800 : 600,
                 color: fg, background: bg,
                 border: `1px solid ${isBugun ? T.blue : bd}`,
-                borderRadius: 3, cursor: 'pointer', padding: 0,
+                borderRadius: 3, cursor: onceCut ? 'not-allowed' : 'pointer', padding: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: onceCut ? 0.35 : 1,
               }}>{g.getUTCDate()}</button>
           )
         })}
