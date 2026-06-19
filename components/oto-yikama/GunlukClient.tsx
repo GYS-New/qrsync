@@ -12,8 +12,6 @@ type Row = {
   gorev_id: string
   ekstra: boolean
   plaka: string
-  marka: string | null
-  model: string | null
   departman: string | null
   kullanici: string | null
   lokasyon: string

@@ -10,9 +10,6 @@ type Arac = {
   firma_id: string
   proje_id: string | null
   plaka: string
-  marka: string | null
-  model: string | null
-  renk: string | null
   departman: string | null
   periyot_gun: number
   yikama_gunleri: number[]
@@ -42,7 +39,7 @@ const T = {
 }
 
 const BOS_FORM = {
-  plaka: '', marka: '', model: '', renk: '', departman: '', periyot_gun: 7,
+  plaka: '', departman: '', periyot_gun: 7,
   yikama_gunleri: [] as number[], notlar: '',
   kullanici_adi_soyadi: '', kullanici_telefon: '', kullanici_email: '',
   varsayilan_lokasyon_id: '' as string,
@@ -131,7 +128,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
     return araclar.filter(a => {
       if (filterDepartman && a.departman !== filterDepartman) return false
       if (s) {
-        const hay = `${a.plaka} ${a.marka ?? ''} ${a.model ?? ''} ${a.departman ?? ''} ${a.kullanici_adi_soyadi ?? ''}`.toLowerCase()
+        const hay = `${a.plaka} ${a.departman ?? ''} ${a.kullanici_adi_soyadi ?? ''}`.toLowerCase()
         if (!hay.includes(s)) return false
       }
       return true
@@ -147,7 +144,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
   function openEdit(a: Arac) {
     setEditing(a)
     setForm({
-      plaka: a.plaka, marka: a.marka ?? '', model: a.model ?? '', renk: a.renk ?? '',
+      plaka: a.plaka,
       departman: a.departman ?? '', periyot_gun: a.periyot_gun,
       yikama_gunleri: Array.isArray(a.yikama_gunleri) ? [...a.yikama_gunleri].sort((x, y) => x - y) : [],
       notlar: a.notlar ?? '',
@@ -225,9 +222,6 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       { sutun: 'plaka',                  zorunlu: 'EVET', aciklama: 'Aracın plakası. Boşluk olmadan, BÜYÜK harf. Sistem otomatik normalize eder.', ornek: '06ABC123' },
       { sutun: 'kullanici_adi_soyadi',   zorunlu: 'EVET', aciklama: 'Aracı kullanan kişinin adı soyadı.', ornek: 'Ahmet Yılmaz' },
       { sutun: 'departman',              zorunlu: 'EVET', aciklama: 'Aracın departmanı (POOL, YÖNETİCİ, Üretim Hattı 3 vb.). Sistemde gruplama için kullanılır.', ornek: 'POOL' },
-      { sutun: 'marka',                  zorunlu: 'hayır', aciklama: 'Aracın markası (TOYOTA, FORD, OPEL vb.). Boş bırakılabilir.', ornek: 'FORD' },
-      { sutun: 'model',                  zorunlu: 'hayır', aciklama: 'Aracın modeli (Corolla, Focus, Astra vb.). Boş bırakılabilir.', ornek: 'Focus' },
-      { sutun: 'renk',                   zorunlu: 'hayır', aciklama: 'Aracın rengi (Beyaz, Gri, Siyah vb.). Boş bırakılabilir.', ornek: 'Gri' },
       { sutun: 'yikama_gunleri',         zorunlu: 'HAFTALIK/BIHAFTA için EVET', aciklama: 'Hangi günler yıkanacak. 1=Pzt, 2=Sal, 3=Çar, 4=Per, 5=Cum, 6=Cmt, 7=Paz. Virgülle ayır.', ornek: '1,3,5' },
       { sutun: 'yikama_frekans_tip',     zorunlu: 'hayır (default: HAFTALIK)', aciklama: 'HAFTALIK = her hafta yıkama_gunleri\'nde. BIHAFTA = N haftada bir, yıkama_gunleri\'nde. AYLIK = ayda bir, referans tarihin günü.', ornek: 'HAFTALIK' },
       { sutun: 'yikama_frekans_aralik',  zorunlu: 'BIHAFTA için EVET (default 1)', aciklama: 'BIHAFTA tipinde "kaç haftada bir" sayısı. 2 = her 2 haftada bir, 3 = her 3 haftada bir.', ornek: '2' },
@@ -288,9 +282,6 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       { header: 'plaka',                  key: 'plaka',                  width: 14 },
       { header: 'kullanici_adi_soyadi',   key: 'kullanici_adi_soyadi',   width: 24 },
       { header: 'departman',              key: 'departman',              width: 22 },
-      { header: 'marka',                  key: 'marka',                  width: 14 },
-      { header: 'model',                  key: 'model',                  width: 14 },
-      { header: 'renk',                   key: 'renk',                   width: 12 },
       { header: 'yikama_gunleri',         key: 'yikama_gunleri',         width: 16 },
       { header: 'yikama_frekans_tip',     key: 'yikama_frekans_tip',     width: 18 },
       { header: 'yikama_frekans_aralik',  key: 'yikama_frekans_aralik',  width: 20 },
@@ -299,9 +290,9 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       { header: 'kullanici_telefon',      key: 'kullanici_telefon',      width: 18 },
       { header: 'kullanici_email',        key: 'kullanici_email',        width: 24 },
     ]
-    ws.addRow({ plaka: '06ABC123', kullanici_adi_soyadi: 'Ahmet Yılmaz', departman: 'Üretim Hattı 3', marka: 'TOYOTA', model: 'Corolla', renk: 'Beyaz', yikama_gunleri: '1,3',  yikama_frekans_tip: 'HAFTALIK', yikama_frekans_aralik: 1, yikama_referans_tarih: '', varsayilan_istasyon: 'İSTASYON - 1', kullanici_telefon: '5551234567', kullanici_email: 'ahmet@firma.com' })
-    ws.addRow({ plaka: '34XYZ789', kullanici_adi_soyadi: 'Mehmet Demir',  departman: 'Yönetim',         marka: 'FORD',   model: 'Focus',   renk: 'Gri',   yikama_gunleri: '2,4',  yikama_frekans_tip: 'BIHAFTA',  yikama_frekans_aralik: 2, yikama_referans_tarih: '2026-06-23', varsayilan_istasyon: 'İSTASYON - 2', kullanici_telefon: '',          kullanici_email: '' })
-    ws.addRow({ plaka: '16BGB710', kullanici_adi_soyadi: 'Ayşe Kaya',    departman: 'POOL',             marka: 'OPEL',   model: 'Astra',   renk: 'Siyah', yikama_gunleri: '',     yikama_frekans_tip: 'AYLIK',    yikama_frekans_aralik: 1, yikama_referans_tarih: '2026-06-15', varsayilan_istasyon: 'İSTASYON - 1', kullanici_telefon: '',          kullanici_email: '' })
+    ws.addRow({ plaka: '06ABC123', kullanici_adi_soyadi: 'Ahmet Yılmaz', departman: 'Üretim Hattı 3', yikama_gunleri: '1,3',  yikama_frekans_tip: 'HAFTALIK', yikama_frekans_aralik: 1, yikama_referans_tarih: '', varsayilan_istasyon: 'İSTASYON - 1', kullanici_telefon: '5551234567', kullanici_email: 'ahmet@firma.com' })
+    ws.addRow({ plaka: '34XYZ789', kullanici_adi_soyadi: 'Mehmet Demir',  departman: 'Yönetim',         yikama_gunleri: '2,4',  yikama_frekans_tip: 'BIHAFTA',  yikama_frekans_aralik: 2, yikama_referans_tarih: '2026-06-23', varsayilan_istasyon: 'İSTASYON - 2', kullanici_telefon: '',          kullanici_email: '' })
+    ws.addRow({ plaka: '16BGB710', kullanici_adi_soyadi: 'Ayşe Kaya',    departman: 'POOL',             yikama_gunleri: '',     yikama_frekans_tip: 'AYLIK',    yikama_frekans_aralik: 1, yikama_referans_tarih: '2026-06-15', varsayilan_istasyon: 'İSTASYON - 1', kullanici_telefon: '',          kullanici_email: '' })
     // Başlık satırı: bold + zorunlu sütunlar kırmızı vurgulu
     const header = ws.getRow(1)
     header.font = { bold: true }
@@ -314,7 +305,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
     // Not satırı ekle (5. satır — örnek satırlardan sonra)
     ws.insertRow(5, { plaka: '* Zorunlu: plaka, kullanici_adi_soyadi, departman   |   yikama_gunleri: 1=Pzt..7=Paz virgülle (örn "1,3")   |   yikama_frekans_tip: HAFTALIK/BIHAFTA/AYLIK (default HAFTALIK)   |   BIHAFTA/AYLIK için yikama_referans_tarih (YYYY-MM-DD) zorunlu   |   varsayilan_istasyon: alt istasyon TANIMI (yıkama kuralı için)' })
     ws.getRow(5).font = { italic: true, color: { argb: 'FF991B1B' } }
-    ws.mergeCells('A5:M5')
+    ws.mergeCells('A5:J5')
     const buf = await wb.xlsx.writeBuffer()
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const a = document.createElement('a')
@@ -348,9 +339,6 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       if (idxKulAd < 0) throw new Error('Excel\'de "kullanici_adi_soyadi" sütunu bulunamadı.')
       const idxDep = headers.indexOf('departman')
       if (idxDep < 0) throw new Error('Excel\'de "departman" sütunu bulunamadı.')
-      const idxMarka = headers.indexOf('marka')
-      const idxModel = headers.indexOf('model')
-      const idxRenk = headers.indexOf('renk')
       const idxPer = headers.indexOf('periyot_gun')
       const idxGun = headers.indexOf('yikama_gunleri')
       const idxFrekTip = headers.indexOf('yikama_frekans_tip')
@@ -399,9 +387,6 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
           plaka,
           kullanici_adi_soyadi: kulAd || null,
           departman: dep || null,
-          marka: idxMarka >= 0 ? cellStr(row.getCell(idxMarka + 1).value) || null : null,
-          model: idxModel >= 0 ? cellStr(row.getCell(idxModel + 1).value) || null : null,
-          renk:  idxRenk >= 0 ? cellStr(row.getCell(idxRenk + 1).value) || null : null,
           periyot_gun: idxPer >= 0 ? Number(row.getCell(idxPer + 1).value) || 7 : 7,
           yikama_gunleri: yikamaGunleri,
           yikama_frekans_tip: idxFrekTip >= 0 ? cellStr(row.getCell(idxFrekTip + 1).value).toUpperCase() || null : null,
@@ -493,7 +478,7 @@ Devam etmek istiyor musunuz?`,
       {/* Üst bar — filter + actions */}
       <div className="verde-card" style={{ padding: '12px 16px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
         <input
-          className="verde-input" placeholder="Plaka, marka, departman, kullanıcı..." value={q}
+          className="verde-input" placeholder="Plaka, departman, kullanıcı..." value={q}
           onChange={e => setQ(e.target.value)} style={{ maxWidth: 240 }}
         />
         <select className="verde-select" value={filterDepartman} onChange={e => setFilterDepartman(e.target.value)} style={{ width: 180 }}>
@@ -585,8 +570,6 @@ Devam etmek istiyor musunuz?`,
               <th>Plaka</th>
               <th>Kullanıcı</th>
               <th>Departman</th>
-              <th>Marka / Model</th>
-              <th>Renk</th>
               <th>Yıkama Günü</th>
               <th>Son Yıkama</th>
               <th>Durum</th>
@@ -595,9 +578,9 @@ Devam etmek istiyor musunuz?`,
           </thead>
             <tbody>
               {yukleniyor ? (
-                <tr><td colSpan={9} style={{ padding: 30, textAlign: 'center', color: T.textSoft }}>Yükleniyor…</td></tr>
+                <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: T.textSoft }}>Yükleniyor…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={9} style={{ padding: 30, textAlign: 'center', color: T.textSoft }}>Kayıt bulunamadı.</td></tr>
+                <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: T.textSoft }}>Kayıt bulunamadı.</td></tr>
               ) : filtered.map(a => {
                 const gecikme = a.son_yikama_tarihi ? (
                   Math.floor((Date.now() - new Date(a.son_yikama_tarihi).getTime()) / 86400000) - a.periyot_gun
@@ -614,8 +597,6 @@ Devam etmek istiyor musunuz?`,
                       )}
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{a.departman ?? '—'}</td>
-                    <td style={{ color: T.text, fontSize: 14 }}>{[a.marka, a.model].filter(Boolean).join(' ') || '—'}</td>
-                    <td style={{ color: T.textSoft, fontSize: 14 }}>{a.renk ?? '—'}</td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>
                       {Array.isArray(a.yikama_gunleri) && a.yikama_gunleri.length > 0
                         ? [...a.yikama_gunleri].sort((x, y) => x - y).map(g => GUN_KISA[g] ?? g).join(', ')
@@ -772,18 +753,6 @@ Devam etmek istiyor musunuz?`,
               <div>
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>E-posta</label>
                 <input className="verde-input" type="email" value={form.kullanici_email} onChange={e => setForm({ ...form, kullanici_email: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Marka</label>
-                <input className="verde-input" value={form.marka} onChange={e => setForm({ ...form, marka: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Model</label>
-                <input className="verde-input" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Renk</label>
-                <input className="verde-input" value={form.renk} onChange={e => setForm({ ...form, renk: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>

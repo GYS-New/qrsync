@@ -12,8 +12,6 @@ import {
 type Row = {
   gorev_id: string
   plaka: string
-  marka: string | null
-  model: string | null
   departman: string | null
   arac_sahibi: string | null
   personel: string
@@ -443,7 +441,6 @@ export default function RaporlarClient() {
                       <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {r.plaka}
-                          {r.marka && <span style={{ fontSize: 12, color: T.textSoft, fontWeight: 400 }}>({r.marka})</span>}
                         </span>
                       </td>
                       <td>

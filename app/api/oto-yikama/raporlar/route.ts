@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
 
   const [aracRes, userRes] = await Promise.all([
     aracIds.length > 0
-      ? admin.from('araclar').select('id, plaka, marka, model, departman, kullanici_adi_soyadi').in('id', aracIds)
+      ? admin.from('araclar').select('id, plaka, departman, kullanici_adi_soyadi').in('id', aracIds)
       : Promise.resolve({ data: [] as any[] }),
     kullaniciIds.length > 0
       ? admin.from('users').select('id, isim_soyisim').in('id', kullaniciIds)
@@ -122,8 +122,6 @@ export async function GET(req: NextRequest) {
       return {
         gorev_id: m.gorev_id,
         plaka: m.plaka_snapshot,
-        marka: a?.marka ?? null,
-        model: a?.model ?? null,
         departman: a?.departman ?? null,
         arac_sahibi: a?.kullanici_adi_soyadi ?? null,
         personel: personelAd,

@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   const aracIds = [...new Set(metaRows.map(m => m.arac_id))]
   const { data: araclar } = await admin
     .from('araclar')
-    .select('id, plaka, marka, model, departman, kullanici_adi_soyadi')
+    .select('id, plaka, departman, kullanici_adi_soyadi')
     .in('id', aracIds)
 
   const aracMap = new Map((araclar ?? []).map((a: any) => [a.id, a]))
@@ -83,8 +83,6 @@ export async function GET(req: NextRequest) {
         gorev_id: m.gorev_id,
         ekstra: !!(m as any).ekstra,
         plaka: m.plaka_snapshot,
-        marka: a?.marka ?? null,
-        model: a?.model ?? null,
         departman: a?.departman ?? null,
         kullanici: a?.kullanici_adi_soyadi ?? null,
         lokasyon,

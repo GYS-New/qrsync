@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
     const aracIds = [...new Set((metaRows ?? []).map(m => m.arac_id))]
     const userIds = [...new Set((gorevler ?? []).map((g: any) => g.islemi_yapan_id).filter(Boolean))]
     const [aRes, uRes] = await Promise.all([
-      aracIds.length > 0 ? admin.from('araclar').select('id, plaka, marka, model, departman, kullanici_adi_soyadi').in('id', aracIds) : Promise.resolve({ data: [] as any[] }),
+      aracIds.length > 0 ? admin.from('araclar').select('id, plaka, departman, kullanici_adi_soyadi').in('id', aracIds) : Promise.resolve({ data: [] as any[] }),
       userIds.length > 0 ? admin.from('users').select('id, isim_soyisim').in('id', userIds) : Promise.resolve({ data: [] as any[] }),
     ])
     const aMap = new Map((aRes.data ?? []).map((a: any) => [a.id, a]))
@@ -104,8 +104,6 @@ export async function GET(req: NextRequest) {
             : 0)
         return {
           plaka: m.plaka_snapshot,
-          marka: a?.marka ?? '',
-          model: a?.model ?? '',
           departman: a?.departman ?? '',
           arac_sahibi: a?.kullanici_adi_soyadi ?? '',
           personel_id: g.islemi_yapan_id,
@@ -225,8 +223,8 @@ export async function GET(req: NextRequest) {
 
   // ── Sayfa 2: Detay ──────────────────────────────────────────────────────
   const ws2 = wb.addWorksheet('Detay', { properties: { tabColor: { argb: 'FF7C3AED' } } })
-  const detayHeaders = ['SN', 'Plaka', 'Marka/Model', 'Tip', 'Personel', 'Lokasyon', 'Departman', 'Tarih', 'Başlatma', 'Tamamlama', 'Süre']
-  const detayWidths = [6, 13, 22, 10, 24, 30, 18, 12, 11, 11, 14]
+  const detayHeaders = ['SN', 'Plaka', 'Tip', 'Personel', 'Lokasyon', 'Departman', 'Tarih', 'Başlatma', 'Tamamlama', 'Süre']
+  const detayWidths = [6, 13, 10, 24, 30, 18, 12, 11, 11, 14]
   detayWidths.forEach((w, i) => { ws2.getColumn(i + 1).width = w })
   setHdrRow(ws2, 1, detayHeaders)
   ws2.views = [{ state: 'frozen', ySplit: 1 }]
@@ -237,7 +235,6 @@ export async function GET(req: NextRequest) {
     setDataRow(ws2, rowNum, [
       i + 1,
       r.plaka,
-      `${r.marka ?? ''} ${r.model ?? ''}`.trim(),
       r.tip,
       r.personel,
       r.lokasyon,
@@ -247,9 +244,9 @@ export async function GET(req: NextRequest) {
       fmtSaatTR(r.tamamlanma_tarihi),
       fmtSure(r.tamamlanma_suresi_saniye),
     ], i)
-    // Ekstra satırı sarı vurgula (Tip kolonu)
+    // Ekstra satırı sarı vurgula (Tip kolonu — yeni indeks 3)
     if (r.ekstra) {
-      const c = ws2.getRow(rowNum).getCell(4)
+      const c = ws2.getRow(rowNum).getCell(3)
       c.style = { ...c.style, fill: EKSTRA_FILL, font: { bold: true, size: 10, color: { argb: 'FF92400E' } } }
     }
   })

@@ -50,9 +50,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!p) return NextResponse.json({ ok: false, error: 'Plaka boş olamaz' }, { status: 400 })
     update.plaka = p
   }
-  if ('marka' in body) update.marka = body.marka
-  if ('model' in body) update.model = body.model
-  if ('renk' in body) update.renk = body.renk
   if ('departman' in body) {
     const d = String(body.departman ?? '').trim()
     if (!d) return NextResponse.json({ ok: false, error: 'Departman boş olamaz' }, { status: 400 })

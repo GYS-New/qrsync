@@ -8,8 +8,6 @@ import { Search, Loader2, Check, MapPin, Car, AlertTriangle } from 'lucide-react
 type Arac = {
   id: string
   plaka: string
-  marka: string | null
-  model: string | null
   departman: string | null
   kullanici_adi_soyadi: string | null
   yikama_gunleri: number[] | null
@@ -103,7 +101,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
     return araclar.filter(a => {
       if (filterDepartman && a.departman !== filterDepartman) return false
       if (s) {
-        const hay = `${a.plaka} ${a.marka ?? ''} ${a.model ?? ''} ${a.departman ?? ''} ${a.kullanici_adi_soyadi ?? ''}`.toLowerCase()
+        const hay = `${a.plaka} ${a.departman ?? ''} ${a.kullanici_adi_soyadi ?? ''}`.toLowerCase()
         if (!hay.includes(s)) return false
       }
       return true
@@ -281,7 +279,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                 {filtered.map((a, idx) => {
                   const selected = secilenArac?.id === a.id
                   const gunler = Array.isArray(a.yikama_gunleri) ? a.yikama_gunleri : []
-                  const markaModel = [a.marka, a.model].filter(Boolean).join(' ')
                   return (
                     <button key={a.id} type="button" onClick={() => setSecilenArac(selected ? null : a)}
                       style={{
@@ -312,9 +309,6 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                             <span style={{ fontSize: 11, fontWeight: 700, color: T.blue, background: T.blueLight, padding: '1px 7px', borderRadius: 999 }}>
                               {a.departman}
                             </span>
-                          )}
-                          {markaModel && (
-                            <span style={{ fontSize: 12, color: T.textSoft }}>{markaModel}</span>
                           )}
                         </div>
                         {a.kullanici_adi_soyadi && (

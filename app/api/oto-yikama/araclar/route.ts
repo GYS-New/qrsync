@@ -74,9 +74,6 @@ export async function POST(req: NextRequest) {
     firma_id: body.firma_id,
     proje_id: body.proje_id ?? null,
     plaka,
-    marka: body.marka ?? null,
-    model: body.model ?? null,
-    renk: body.renk ?? null,
     departman,
     periyot_gun: body.periyot_gun ?? 7,
     yikama_gunleri: Array.isArray(body.yikama_gunleri)

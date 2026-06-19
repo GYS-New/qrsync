@@ -16,7 +16,7 @@
  * kalmaya devam eder").
  *
  * Update kapsamındaki alanlar (Excel'den gelirse hepsi senkronize edilir):
- *   marka, model, renk, departman, periyot_gun, yikama_gunleri,
+ *   departman, periyot_gun, yikama_gunleri,
  *   kullanici_adi_soyadi, kullanici_telefon, kullanici_email,
  *   yikama_frekans_tip, yikama_frekans_aralik, yikama_referans_tarih,
  *   varsayilan_lokasyon_id
@@ -44,9 +44,6 @@ type FrekansTip = 'HAFTALIK' | 'BIHAFTA' | 'AYLIK'
 
 type ImportRow = {
   plaka: string
-  marka?: string | null
-  model?: string | null
-  renk?: string | null
   departman?: string | null
   periyot_gun?: number | null
   yikama_gunleri?: number[] | null
@@ -61,9 +58,6 @@ type ImportRow = {
 
 type Normalized = {
   plaka: string
-  marka: string | null
-  model: string | null
-  renk: string | null
   departman: string
   periyot_gun: number
   yikama_gunleri: number[]
@@ -90,9 +84,6 @@ function farkVarMi(db: Normalized, excel: Normalized): boolean {
     return false
   }
   return (
-    cmpStr(db.marka, excel.marka) ||
-    cmpStr(db.model, excel.model) ||
-    cmpStr(db.renk, excel.renk) ||
     db.departman !== excel.departman ||
     db.periyot_gun !== excel.periyot_gun ||
     cmpArr(db.yikama_gunleri, excel.yikama_gunleri) ||
@@ -199,9 +190,6 @@ export async function POST(req: NextRequest) {
 
     excelMap.set(plaka, {
       plaka,
-      marka: r.marka?.toString().trim() || null,
-      model: r.model?.toString().trim() || null,
-      renk: r.renk?.toString().trim() || null,
       departman,
       periyot_gun: r.periyot_gun != null ? Number(r.periyot_gun) || 7 : 7,
       yikama_gunleri: gunler,
@@ -247,9 +235,6 @@ export async function POST(req: NextRequest) {
     }
     const dbNorm: Normalized = {
       plaka: db.plaka,
-      marka: db.marka,
-      model: db.model,
-      renk: db.renk,
       departman: db.departman ?? '',
       periyot_gun: db.periyot_gun ?? 7,
       yikama_gunleri: Array.isArray(db.yikama_gunleri) ? db.yikama_gunleri : [],
@@ -307,7 +292,7 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < eklenecek.length; i += BATCH) {
       const batch = eklenecek.slice(i, i + BATCH).map(r => ({
         firma_id: firmaId, proje_id: projeId,
-        plaka: r.plaka, marka: r.marka, model: r.model, renk: r.renk,
+        plaka: r.plaka,
         departman: r.departman, periyot_gun: r.periyot_gun,
         yikama_gunleri: r.yikama_gunleri,
         kullanici_adi_soyadi: r.kullanici_adi_soyadi,
@@ -328,9 +313,6 @@ export async function POST(req: NextRequest) {
   // 2. GÜNCELLE (tek tek — alan değişikliği ve aktif reset için)
   for (const g of guncellenecek) {
     const update: any = {
-      marka: g.yeni.marka,
-      model: g.yeni.model,
-      renk: g.yeni.renk,
       departman: g.yeni.departman,
       periyot_gun: g.yeni.periyot_gun,
       yikama_gunleri: g.yeni.yikama_gunleri,

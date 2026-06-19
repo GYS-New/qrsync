@@ -16,7 +16,7 @@
  *   {
  *     ok: true,
  *     araclar: [{
- *       id, plaka, marka, model, renk, departman, kullanici_adi_soyadi,
+ *       id, plaka, departman, kullanici_adi_soyadi,
  *       yikama_gunleri: [1,3,5],          // 1=Pzt..7=Paz
  *       son_yikama_tarihi: "YYYY-MM-DD" | null,
  *       son_yikama_km: int | null,
@@ -90,7 +90,7 @@ export async function GET(req: Request) {
     // Firma araçları (aktif)
     const { data: araclar } = await admin
       .from('araclar')
-      .select('id, plaka, marka, model, renk, departman, kullanici_adi_soyadi, yikama_gunleri, son_yikama_tarihi')
+      .select('id, plaka, departman, kullanici_adi_soyadi, yikama_gunleri, son_yikama_tarihi')
       .eq('firma_id', tok.firma_id)
       .eq('aktif', true)
       .order('plaka')
@@ -139,9 +139,6 @@ export async function GET(req: Request) {
       return {
         id: a.id,
         plaka: a.plaka,
-        marka: a.marka ?? null,
-        model: a.model ?? null,
-        renk: a.renk ?? null,
         departman: a.departman ?? null,
         kullanici_adi_soyadi: a.kullanici_adi_soyadi ?? null,
         yikama_gunleri: yikamaGunleri,

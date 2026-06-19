@@ -14,7 +14,7 @@
  *     ok: true,
  *     today: "YYYY-MM-DD",
  *     gorevler: [{
- *       gorev_id, arac_id, plaka, marka, model, departman, kullanici_adi_soyadi,
+ *       gorev_id, arac_id, plaka, departman, kullanici_adi_soyadi,
  *       lokasyon_id, lokasyon_tanim, ust_lokasyon,
  *       durum,                     // ACIK | ISLEMDE | TAMAMLANDI
  *       tamamlanma_tarihi,         // null veya ISO
@@ -118,7 +118,7 @@ export async function GET(req: Request) {
     // Araçlar
     const aracIds = [...new Set(metaRows.map(m => m.arac_id))]
     const { data: araclar } = aracIds.length > 0
-      ? await admin.from('araclar').select('id, plaka, marka, model, departman, kullanici_adi_soyadi').in('id', aracIds)
+      ? await admin.from('araclar').select('id, plaka, departman, kullanici_adi_soyadi').in('id', aracIds)
       : { data: [] as any[] }
     const aracMap = new Map((araclar ?? []).map((a: any) => [a.id, a]))
 
@@ -139,8 +139,6 @@ export async function GET(req: Request) {
           gorev_id: m.gorev_id,
           arac_id: m.arac_id,
           plaka: m.plaka_snapshot,
-          marka: a?.marka ?? null,
-          model: a?.model ?? null,
           departman: a?.departman ?? null,
           kullanici_adi_soyadi: a?.kullanici_adi_soyadi ?? null,
           lokasyon_id: g.lokasyon_id,

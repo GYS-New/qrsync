@@ -14,8 +14,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export type PlakaAday = {
   id: string
   plaka: string
-  marka: string | null
-  model: string | null
   departman: string | null
   kullanici_adi_soyadi: string | null
   fark: number
@@ -67,7 +65,7 @@ export async function plakaFuzzyMatch(
 
   let query = admin
     .from('araclar')
-    .select('id, plaka, marka, model, departman, kullanici_adi_soyadi')
+    .select('id, plaka, departman, kullanici_adi_soyadi')
     .eq('firma_id', firma_id)
     .eq('aktif', true)
 
@@ -94,7 +92,6 @@ export async function plakaFuzzyMatch(
     return {
       kesin: {
         id: kesinAday.id, plaka: kesinAday.plaka,
-        marka: kesinAday.marka, model: kesinAday.model,
         departman: kesinAday.departman,
         kullanici_adi_soyadi: kesinAday.kullanici_adi_soyadi,
         fark: 0,
@@ -105,7 +102,7 @@ export async function plakaFuzzyMatch(
 
   const adaylar = (araclar as any[])
     .map(a => ({
-      id: a.id, plaka: a.plaka, marka: a.marka, model: a.model,
+      id: a.id, plaka: a.plaka,
       departman: a.departman, kullanici_adi_soyadi: a.kullanici_adi_soyadi,
       fark: levenshtein(okunanNorm, normalizePlaka(a.plaka)),
     }))
