@@ -47,7 +47,7 @@ export async function GET(req: Request) {
     // kapsar; iki atama yolundan biri yeterli)
     const { data: userData } = await admin
       .from('users')
-      .select('id, isim_soyisim, rol, firma_id, proje_id, email, ust_lokasyon_id')
+      .select('id, isim_soyisim, rol, firma_id, proje_id, email, ust_lokasyon_id, varsayilan_yikama_istasyon_id')
       .eq('id', tokenData.user_id)
       .single()
 
@@ -78,6 +78,24 @@ export async function GET(req: Request) {
       }
     }
 
+    // Varsayılan yıkama istasyonu — mobile "Yıkamayı Başlat" tek-tıkla
+    // kullanır. SET NULL FK sayesinde istasyon silinirse otomatik null'lanır.
+    // Aktif değilse mobile'a vermeyiz — eski/silinmiş istasyona yıkama
+    // başlatma denemesi engellenmeli.
+    let varsayilanYikamaIstasyonId: string | null = null
+    let varsayilanYikamaIstasyonTanim: string | null = null
+    if (userData?.varsayilan_yikama_istasyon_id) {
+      const { data: ist } = await admin
+        .from('lokasyonlar')
+        .select('id, tanim, aktif')
+        .eq('id', userData.varsayilan_yikama_istasyon_id)
+        .maybeSingle()
+      if (ist && (ist as any).aktif !== false) {
+        varsayilanYikamaIstasyonId = (ist as any).id
+        varsayilanYikamaIstasyonTanim = (ist as any).tanim ?? null
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       user: {
@@ -88,6 +106,8 @@ export async function GET(req: Request) {
         rol: userData?.rol ?? 'tenant_user',
         email: userData?.email ?? null,
         oto_yikama_personeli: otoYikamaPersoneli,
+        varsayilan_yikama_istasyon_id: varsayilanYikamaIstasyonId,
+        varsayilan_yikama_istasyon_tanim: varsayilanYikamaIstasyonTanim,
       },
     }, { headers: CORS_HEADERS })
 
