@@ -38,15 +38,15 @@ export default async function OtoYikamaGorevKayitlariPage() {
 
     // İki ayrı sorgu + client-side join — PostgREST nested embed'i bu tabloda
     // (FK relationship cache nedeniyle) güvenilir değil.
-    // İki ayrı sorgu + client-side join
-    // 1) Tüm metadata kayıtlarını çek
+    // 1) Tüm metadata kayıtlarını çek (arac_id de — departman/yikama_gunleri için)
     const { data: metaAll } = await admin
       .from('oto_yikama_gorev_metadata')
-      .select('gorev_id, plaka_snapshot, hedef_tarih, ekstra')
+      .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra')
       .order('hedef_tarih', { ascending: false })
       .limit(2000)
     const metaArr = (metaAll ?? []) as any[]
     const allGorevIds = metaArr.map(m => m.gorev_id).filter(Boolean)
+    const allAracIds = [...new Set(metaArr.map(m => m.arac_id).filter(Boolean))] as string[]
 
     // 2) Firma scope'lu gorevler — yalnız metadata'lı olanlar
     // NOT: gorevler tablosunda tamamlayan/iptal_eden için ayrı kolon yok;
@@ -75,19 +75,24 @@ export default async function OtoYikamaGorevKayitlariPage() {
     }).filter(Boolean))] as string[]
     const lokIds = [...new Set(arr.map(m => gorevMap.get(m.gorev_id)?.lokasyon_id).filter(Boolean))] as string[]
 
-    const [usersRes, loksRes] = await Promise.all([
+    const [usersRes, loksRes, araclarRes] = await Promise.all([
       userIds.length > 0
         ? admin.from('users').select('id, isim_soyisim').in('id', userIds)
         : Promise.resolve({ data: [] as any[] }),
       lokIds.length > 0
         ? admin.from('lokasyonlar').select('id, tanim, parent_id').in('id', lokIds)
         : Promise.resolve({ data: [] as any[] }),
+      allAracIds.length > 0
+        ? admin.from('araclar').select('id, departman, yikama_gunleri').in('id', allAracIds)
+        : Promise.resolve({ data: [] as any[] }),
     ])
     const userMap = new Map(((usersRes.data ?? []) as any[]).map(u => [u.id, u.isim_soyisim ?? '—']))
     const lokMap  = new Map(((loksRes.data ?? []) as any[]).map(l => [l.id, l.tanim ?? '—']))
+    const aracMap = new Map(((araclarRes.data ?? []) as any[]).map(a => [a.id, a]))
 
     kayitlar = arr.map(m => {
       const g = gorevMap.get(m.gorev_id) ?? {} as any
+      const a = aracMap.get(m.arac_id) ?? {} as any
       // islemi_yapan_id durum bağlamına göre yorumlanır
       const isTamamlandi = g.durum === 'TAMAMLANDI'
       const isIptal      = g.durum === 'IPTAL'
@@ -100,6 +105,8 @@ export default async function OtoYikamaGorevKayitlariPage() {
         durum:           g.durum ?? null,
         lokasyon_id:     g.lokasyon_id ?? null,
         istasyon:        lokMap.get(g.lokasyon_id) ?? '—',
+        departman:       a.departman ?? null,
+        yikama_gunleri:  Array.isArray(a.yikama_gunleri) ? a.yikama_gunleri : [],
         olusturma_tarihi: g.olusturma_tarihi ?? null,
         baslatilma_tarihi: g.baslatilma_tarihi ?? null,
         tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,

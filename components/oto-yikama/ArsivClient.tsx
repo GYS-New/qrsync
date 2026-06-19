@@ -10,6 +10,8 @@ export interface ArsivKaydi {
   ekstra: boolean
   durum: string | null
   istasyon: string
+  departman: string | null
+  yikama_gunleri: number[]
   olusturma_tarihi: string | null
   baslatilma_tarihi: string | null
   tamamlanma_tarihi: string | null
@@ -92,6 +94,8 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
   const [arama, setArama] = useState('')
   const [istasyonFilter, setIstasyonFilter] = useState<string>('')
   const [tamamlayanFilter, setTamamlayanFilter] = useState<string>('')
+  const [departmanFilter, setDepartmanFilter] = useState<string>('')
+  const [yikamaGunuFilter, setYikamaGunuFilter] = useState<string>('')
   const [hedefBas, setHedefBas] = useState<string>('')
   const [hedefSon, setHedefSon] = useState<string>('')
   const [durumFilter, setDurumFilter] = useState<DurumFilter>('TUMU')
@@ -111,12 +115,20 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
     return s
   }, [kayitlar])
 
+  // Filtre dropdown'ları için unique departman listesi
+  const departmanlar = useMemo(() => {
+    const s = new Set<string>()
+    for (const k of kayitlar) if (k.departman) s.add(k.departman)
+    return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
+  }, [kayitlar])
+
   // Filtreleme
   const filtrelenmis = useMemo(() => {
     const q = arama.trim().toLocaleLowerCase('tr')
+    const ygFiltre = yikamaGunuFilter === '' ? null : Number(yikamaGunuFilter)
     return kayitlar.filter(k => {
       if (q) {
-        const blob = `${k.plaka} ${k.istasyon} ${k.olusturan ?? ''} ${k.tamamlayan ?? ''}`.toLocaleLowerCase('tr')
+        const blob = `${k.plaka} ${k.istasyon} ${k.departman ?? ''} ${k.olusturan ?? ''} ${k.tamamlayan ?? ''}`.toLocaleLowerCase('tr')
         if (!blob.includes(q)) return false
       }
       if (istasyonFilter) {
@@ -124,6 +136,15 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
         if (!istLabel || istLabel !== k.istasyon) return false
       }
       if (tamamlayanFilter && k.tamamlayan_id !== tamamlayanFilter) return false
+      if (departmanFilter && k.departman !== departmanFilter) return false
+      if (ygFiltre !== null) {
+        const yg = k.yikama_gunleri ?? []
+        if (ygFiltre === 0) {
+          if (yg.length > 0) return false
+        } else {
+          if (!yg.includes(ygFiltre)) return false
+        }
+      }
       if (hedefBas && (!k.hedef_tarih || k.hedef_tarih < hedefBas)) return false
       if (hedefSon && (!k.hedef_tarih || k.hedef_tarih > hedefSon)) return false
       if (durumFilter !== 'TUMU') {
@@ -135,13 +156,14 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
       }
       return true
     })
-  }, [kayitlar, arama, istasyonFilter, tamamlayanFilter, hedefBas, hedefSon, durumFilter, istasyonlar])
+  }, [kayitlar, arama, istasyonFilter, tamamlayanFilter, departmanFilter, yikamaGunuFilter, hedefBas, hedefSon, durumFilter, istasyonlar])
 
   const filtreVar =
-    !!arama || !!istasyonFilter || !!tamamlayanFilter || !!hedefBas || !!hedefSon || durumFilter !== 'TUMU'
+    !!arama || !!istasyonFilter || !!tamamlayanFilter || !!departmanFilter || yikamaGunuFilter !== '' || !!hedefBas || !!hedefSon || durumFilter !== 'TUMU'
 
   function temizle() {
     setArama(''); setIstasyonFilter(''); setTamamlayanFilter('')
+    setDepartmanFilter(''); setYikamaGunuFilter('')
     setHedefBas(''); setHedefSon(''); setDurumFilter('TUMU')
   }
 
@@ -191,7 +213,7 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
       </div>
 
       {/* Filtre satırı */}
-      <div style={{ padding: '12px 18px', borderBottom: `1px solid ${T.border}`, display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1.3fr', gap: 10 }}>
+      <div style={{ padding: '12px 18px', borderBottom: `1px solid ${T.border}`, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
         <div>
           <Label>Arama</Label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 9px', border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
@@ -214,6 +236,29 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
             style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
             <option value="">Tümü</option>
             {tamamlayanlar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
+          </select>
+        </div>
+        <div>
+          <Label>Departman</Label>
+          <select value={departmanFilter} onChange={e => setDepartmanFilter(e.target.value)}
+            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+            <option value="">Tümü</option>
+            {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+        <div>
+          <Label>Yıkama Günü</Label>
+          <select value={yikamaGunuFilter} onChange={e => setYikamaGunuFilter(e.target.value)}
+            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+            <option value="">Tümü</option>
+            <option value="1">Pazartesi</option>
+            <option value="2">Salı</option>
+            <option value="3">Çarşamba</option>
+            <option value="4">Perşembe</option>
+            <option value="5">Cuma</option>
+            <option value="6">Cumartesi</option>
+            <option value="7">Pazar</option>
+            <option value="0">Yıkama günü yok</option>
           </select>
         </div>
         <div>

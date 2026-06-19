@@ -79,6 +79,7 @@ export default function GunlukClient() {
   const [streamState, setStreamState] = useState<'running' | 'paused' | 'stopped'>('running')
   const [durumFilter, setDurumFilter] = useState<DurumFilter>('TUMU')
   const [arama, setArama] = useState('')
+  const [departmanFilter, setDepartmanFilter] = useState('')
   const inflightRef = useRef(false)
 
   async function fetchData(showSpin = false) {
@@ -120,10 +121,12 @@ export default function GunlukClient() {
     const ara = arama.trim().toUpperCase()
     return [...rows]
       .filter(r => durumFilter === 'TUMU' ? true : r.durum === durumFilter)
+      .filter(r => departmanFilter ? r.departman === departmanFilter : true)
       .filter(r => {
         if (!ara) return true
         return (r.plaka ?? '').toUpperCase().includes(ara)
           || (r.kullanici ?? '').toUpperCase().includes(ara)
+          || (r.departman ?? '').toUpperCase().includes(ara)
           || (r.lokasyon ?? '').toUpperCase().includes(ara)
           || (r.tamamlayan ?? '').toUpperCase().includes(ara)
       })
@@ -135,7 +138,14 @@ export default function GunlukClient() {
         const tb = b.durum_degisim_tarihi ? new Date(b.durum_degisim_tarihi).getTime() : 0
         return tb - ta
       })
-  }, [rows, durumFilter, arama])
+  }, [rows, durumFilter, arama, departmanFilter])
+
+  // Departman dropdown listesi (rows'tan toplanır)
+  const departmanlar = useMemo(() => {
+    const s = new Set<string>()
+    for (const r of rows) if (r.departman) s.add(r.departman)
+    return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
+  }, [rows])
 
   const sayilar = useMemo(() => {
     const c = { toplam: rows.length, HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
@@ -307,6 +317,11 @@ export default function GunlukClient() {
                 style={{ border: 'none', background: 'transparent', color: T.textSoft, cursor: 'pointer', fontSize: 14 }}>×</button>
             )}
           </div>
+          <select value={departmanFilter} onChange={e => setDepartmanFilter(e.target.value)}
+            style={{ padding: '5px 10px', fontSize: 12.5, border: '1px solid #e5e7eb', borderRadius: 7, background: '#fff', color: T.text, minWidth: 140 }}>
+            <option value="">Tüm Departmanlar</option>
+            {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
           <span style={{ marginLeft: 'auto', fontSize: 11, color: T.textSoft, fontVariantNumeric: 'tabular-nums' }}>
             Son güncelleme: {sonGuncelleme ? fmtTime(sonGuncelleme.toISOString()) : '—'}
           </span>

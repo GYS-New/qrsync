@@ -22,7 +22,7 @@ export default async function OtoYikamaArsivPage() {
     const { data: rows } = await admin
       .from('oto_yikama_arsiv')
       .select(`
-        gorev_id, plaka_snapshot, hedef_tarih, ekstra, durum, lokasyon_id,
+        gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, durum, lokasyon_id,
         olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
         tamamlanma_suresi_saniye, olusturan_id, islemi_yapan_id, iptal_sebep,
         arsivleme_tarihi
@@ -34,22 +34,28 @@ export default async function OtoYikamaArsivPage() {
 
     const userIds = [...new Set(arr.flatMap(r => [r.olusturan_id, r.islemi_yapan_id]).filter(Boolean))] as string[]
     const lokIds = [...new Set(arr.map(r => r.lokasyon_id).filter(Boolean))] as string[]
+    const aracIds = [...new Set(arr.map(r => r.arac_id).filter(Boolean))] as string[]
 
-    const [usersRes, loksRes] = await Promise.all([
+    const [usersRes, loksRes, araclarRes] = await Promise.all([
       userIds.length > 0
         ? admin.from('users').select('id, isim_soyisim').in('id', userIds)
         : Promise.resolve({ data: [] as any[] }),
       lokIds.length > 0
         ? admin.from('lokasyonlar').select('id, tanim').in('id', lokIds)
         : Promise.resolve({ data: [] as any[] }),
+      aracIds.length > 0
+        ? admin.from('araclar').select('id, departman, yikama_gunleri').in('id', aracIds)
+        : Promise.resolve({ data: [] as any[] }),
     ])
     const userMap = new Map(((usersRes.data ?? []) as any[]).map(u => [u.id, u.isim_soyisim ?? '—']))
     const lokMap  = new Map(((loksRes.data ?? []) as any[]).map(l => [l.id, l.tanim ?? '—']))
+    const aracMap = new Map(((araclarRes.data ?? []) as any[]).map(a => [a.id, a]))
 
     kayitlar = arr.map(r => {
       const isTamamlandi = r.durum === 'TAMAMLANDI'
       const isIptal      = r.durum === 'IPTAL'
       const islemKisiId  = r.islemi_yapan_id ?? null
+      const a = aracMap.get(r.arac_id) ?? {} as any
       return {
         gorev_id:        r.gorev_id,
         plaka:           r.plaka_snapshot ?? '—',
@@ -57,6 +63,8 @@ export default async function OtoYikamaArsivPage() {
         ekstra:          r.ekstra === true,
         durum:           r.durum ?? null,
         istasyon:        lokMap.get(r.lokasyon_id) ?? '—',
+        departman:       a.departman ?? null,
+        yikama_gunleri:  Array.isArray(a.yikama_gunleri) ? a.yikama_gunleri : [],
         olusturma_tarihi: r.olusturma_tarihi ?? null,
         baslatilma_tarihi: r.baslatilma_tarihi ?? null,
         tamamlanma_tarihi: r.tamamlanma_tarihi ?? null,

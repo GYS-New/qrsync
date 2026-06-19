@@ -14,6 +14,8 @@ export interface GorevKaydi {
   durum: string | null
   lokasyon_id: string | null
   istasyon: string
+  departman: string | null
+  yikama_gunleri: number[]
   olusturma_tarihi: string | null
   baslatilma_tarihi: string | null
   tamamlanma_tarihi: string | null
@@ -125,6 +127,10 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
   const [istasyonId, setIstasyonId] = useState('')
   // Tamamlayan filtresi (user_id)
   const [tamamlayanId, setTamamlayanId] = useState('')
+  // Departman filtresi
+  const [departmanFilter, setDepartmanFilter] = useState('')
+  // Yıkama günü filtresi (1=Pzt..7=Paz, 0=günsüz, '' = tümü)
+  const [yikamaGunuFilter, setYikamaGunuFilter] = useState<string>('')
   // Düzenleme modal state'i
   const [editKaydi, setEditKaydi] = useState<GorevKaydi | null>(null)
   const [editLoading, setEditLoading] = useState(false)
@@ -150,14 +156,32 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
     return { toplam: kayitlar.length, hazir, acik, islemde, tamam, iptal, yapilamadi, ekstra }
   }, [kayitlarTuretilmis, kayitlar.length])
 
+  // Filtre dropdown'ları için unique departman listesi (kayıtlardan toplanır)
+  const departmanlar = useMemo(() => {
+    const s = new Set<string>()
+    for (const k of kayitlar) if (k.departman) s.add(k.departman)
+    return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
+  }, [kayitlar])
+
   const filtrelenmis = useMemo(() => {
     const ara = arama.trim().toUpperCase()
+    const ygFiltre = yikamaGunuFilter === '' ? null : Number(yikamaGunuFilter)
 
     return kayitlarTuretilmis.filter(({ k, gd }) => {
       if (filtre === 'EKSTRA' && !k.ekstra) return false
       if (filtre !== 'TUMU' && filtre !== 'EKSTRA' && filtre !== gd) return false
       if (istasyonId && k.lokasyon_id !== istasyonId) return false
       if (tamamlayanId && k.tamamlayan_id !== tamamlayanId) return false
+      if (departmanFilter && k.departman !== departmanFilter) return false
+      if (ygFiltre !== null) {
+        const yg = k.yikama_gunleri ?? []
+        if (ygFiltre === 0) {
+          // 0 = "günsüz"
+          if (yg.length > 0) return false
+        } else {
+          if (!yg.includes(ygFiltre)) return false
+        }
+      }
       if (hedefBas && (!k.hedef_tarih || k.hedef_tarih < hedefBas)) return false
       if (hedefBit && (!k.hedef_tarih || k.hedef_tarih > hedefBit)) return false
       if (tamamBas || tamamBit) {
@@ -167,17 +191,18 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
         if (tamamBit && t > tamamBit) return false
       }
       if (ara) {
-        const hay = `${k.plaka ?? ''} ${k.istasyon ?? ''} ${k.olusturan ?? ''} ${k.tamamlayan ?? ''}`.toUpperCase()
+        const hay = `${k.plaka ?? ''} ${k.istasyon ?? ''} ${k.departman ?? ''} ${k.olusturan ?? ''} ${k.tamamlayan ?? ''}`.toUpperCase()
         if (!hay.includes(ara)) return false
       }
       return true
     }).map(({ k }) => k)
-  }, [kayitlarTuretilmis, arama, filtre, istasyonId, tamamlayanId, hedefBas, hedefBit, tamamBas, tamamBit])
+  }, [kayitlarTuretilmis, arama, filtre, istasyonId, tamamlayanId, departmanFilter, yikamaGunuFilter, hedefBas, hedefBit, tamamBas, tamamBit])
 
-  const filtreAktif = filtre !== 'TUMU' || !!arama || !!istasyonId || !!tamamlayanId || !!hedefBas || !!hedefBit || !!tamamBas || !!tamamBit
+  const filtreAktif = filtre !== 'TUMU' || !!arama || !!istasyonId || !!tamamlayanId || !!departmanFilter || yikamaGunuFilter !== '' || !!hedefBas || !!hedefBit || !!tamamBas || !!tamamBit
 
   function temizleFiltre() {
     setFiltre('TUMU'); setArama(''); setIstasyonId(''); setTamamlayanId('')
+    setDepartmanFilter(''); setYikamaGunuFilter('')
     setHedefBas(''); setHedefBit(''); setTamamBas(''); setTamamBit('')
   }
 
@@ -303,6 +328,27 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
             style={{ width: '100%', padding: '5px 8px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
             <option value="">Tümü</option>
             {tamamlayanlar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
+          </select>
+        </FilterField>
+        <FilterField label="Departman">
+          <select value={departmanFilter} onChange={e => setDepartmanFilter(e.target.value)}
+            style={{ width: '100%', padding: '5px 8px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+            <option value="">Tümü</option>
+            {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </FilterField>
+        <FilterField label="Yıkama Günü">
+          <select value={yikamaGunuFilter} onChange={e => setYikamaGunuFilter(e.target.value)}
+            style={{ width: '100%', padding: '5px 8px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+            <option value="">Tümü</option>
+            <option value="1">Pazartesi</option>
+            <option value="2">Salı</option>
+            <option value="3">Çarşamba</option>
+            <option value="4">Perşembe</option>
+            <option value="5">Cuma</option>
+            <option value="6">Cumartesi</option>
+            <option value="7">Pazar</option>
+            <option value="0">Yıkama günü yok</option>
           </select>
         </FilterField>
         <FilterField label="Hedef Tarih">

@@ -60,6 +60,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
   const [q, setQ] = useState('')
   const [filterDepartman, setFilterDepartman] = useState('')
   const [filterAktif, setFilterAktif] = useState<'all' | 'aktif' | 'pasif'>('aktif')
+  const [filterYikamaGunu, setFilterYikamaGunu] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Arac | null>(null)
   const [form, setForm] = useState(BOS_FORM)
@@ -125,15 +126,24 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
+    const ygFiltre = filterYikamaGunu === '' ? null : Number(filterYikamaGunu)
     return araclar.filter(a => {
       if (filterDepartman && a.departman !== filterDepartman) return false
+      if (ygFiltre !== null) {
+        const yg = Array.isArray(a.yikama_gunleri) ? a.yikama_gunleri : []
+        if (ygFiltre === 0) {
+          if (yg.length > 0) return false
+        } else {
+          if (!yg.includes(ygFiltre)) return false
+        }
+      }
       if (s) {
         const hay = `${a.plaka} ${a.departman ?? ''} ${a.kullanici_adi_soyadi ?? ''}`.toLowerCase()
         if (!hay.includes(s)) return false
       }
       return true
     })
-  }, [araclar, q, filterDepartman])
+  }, [araclar, q, filterDepartman, filterYikamaGunu])
 
   function openCreate() {
     setEditing(null)
@@ -506,6 +516,17 @@ Devam etmek istiyor musunuz?`,
         <select className="verde-select" value={filterDepartman} onChange={e => setFilterDepartman(e.target.value)} style={{ width: 180 }}>
           <option value="">Departman (Tümü)</option>
           {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <select className="verde-select" value={filterYikamaGunu} onChange={e => setFilterYikamaGunu(e.target.value)} style={{ width: 170 }}>
+          <option value="">Yıkama Günü (Tümü)</option>
+          <option value="1">Pazartesi</option>
+          <option value="2">Salı</option>
+          <option value="3">Çarşamba</option>
+          <option value="4">Perşembe</option>
+          <option value="5">Cuma</option>
+          <option value="6">Cumartesi</option>
+          <option value="7">Pazar</option>
+          <option value="0">Yıkama günü yok</option>
         </select>
         <select className="verde-select" value={filterAktif} onChange={e => setFilterAktif(e.target.value as any)} style={{ width: 120 }}>
           <option value="aktif">Aktif</option>
