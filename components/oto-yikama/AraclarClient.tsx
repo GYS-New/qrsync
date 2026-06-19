@@ -225,7 +225,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       { sutun: 'yikama_gunleri',         zorunlu: 'HAFTALIK/BIHAFTA için EVET', aciklama: 'Hangi günler yıkanacak. 1=Pzt, 2=Sal, 3=Çar, 4=Per, 5=Cum, 6=Cmt, 7=Paz. Virgülle ayır.', ornek: '1,3,5' },
       { sutun: 'yikama_frekans_tip',     zorunlu: 'hayır (default: HAFTALIK)', aciklama: 'HAFTALIK = her hafta yıkama_gunleri\'nde. BIHAFTA = N haftada bir, yıkama_gunleri\'nde. AYLIK = ayda bir, referans tarihin günü.', ornek: 'HAFTALIK' },
       { sutun: 'yikama_frekans_aralik',  zorunlu: 'BIHAFTA için EVET (default 1)', aciklama: 'BIHAFTA tipinde "kaç haftada bir" sayısı. 2 = her 2 haftada bir, 3 = her 3 haftada bir.', ornek: '2' },
-      { sutun: 'yikama_referans_tarih',  zorunlu: 'BIHAFTA/AYLIK için EVET', aciklama: 'BIHAFTA: modulo başlangıç tarihi (bu tarihten sonraki her N haftada). AYLIK: bu tarihin gün sayısı her ay tetikler. Format: YYYY-MM-DD.', ornek: '2026-06-15' },
+      { sutun: 'yikama_referans_tarih',  zorunlu: 'BIHAFTA/AYLIK için EVET', aciklama: 'BIHAFTA: modulo başlangıç tarihi (bu tarihten sonraki her N haftada). AYLIK: bu tarihin gün sayısı her ay tetikler. Format: gg/aa/yyyy veya Excel tarih hücresi.', ornek: '15/06/2026' },
       { sutun: 'varsayilan_istasyon',    zorunlu: 'EVET (otomatik üretim için)', aciklama: 'Yıkamanın yapılacağı istasyonun TANIMI (alt lokasyon adı). Sistemde Yıkama İstasyonları sayfasındaki tanımla birebir aynı olmalı.', ornek: 'İSTASYON - 1' },
       { sutun: 'kullanici_telefon',      zorunlu: 'hayır', aciklama: 'Kullanıcının telefon numarası. Boş bırakılabilir.', ornek: '5551234567' },
       { sutun: 'kullanici_email',        zorunlu: 'hayır', aciklama: 'Kullanıcının e-posta adresi. Boş bırakılabilir.', ornek: 'ahmet@firma.com' },
@@ -290,9 +290,11 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       { header: 'kullanici_telefon',      key: 'kullanici_telefon',      width: 18 },
       { header: 'kullanici_email',        key: 'kullanici_email',        width: 24 },
     ]
-    ws.addRow({ plaka: '06ABC123', kullanici_adi_soyadi: 'Ahmet Yılmaz', departman: 'Üretim Hattı 3', yikama_gunleri: '1,3',  yikama_frekans_tip: 'HAFTALIK', yikama_frekans_aralik: 1, yikama_referans_tarih: '', varsayilan_istasyon: 'İSTASYON - 1', kullanici_telefon: '5551234567', kullanici_email: 'ahmet@firma.com' })
-    ws.addRow({ plaka: '34XYZ789', kullanici_adi_soyadi: 'Mehmet Demir',  departman: 'Yönetim',         yikama_gunleri: '2,4',  yikama_frekans_tip: 'BIHAFTA',  yikama_frekans_aralik: 2, yikama_referans_tarih: '2026-06-23', varsayilan_istasyon: 'İSTASYON - 2', kullanici_telefon: '',          kullanici_email: '' })
-    ws.addRow({ plaka: '16BGB710', kullanici_adi_soyadi: 'Ayşe Kaya',    departman: 'POOL',             yikama_gunleri: '',     yikama_frekans_tip: 'AYLIK',    yikama_frekans_aralik: 1, yikama_referans_tarih: '2026-06-15', varsayilan_istasyon: 'İSTASYON - 1', kullanici_telefon: '',          kullanici_email: '' })
+    ws.addRow({ plaka: '06ABC123', kullanici_adi_soyadi: 'Ahmet Yılmaz', departman: 'Üretim Hattı 3', yikama_gunleri: '1,3',  yikama_frekans_tip: 'HAFTALIK', yikama_frekans_aralik: 1, yikama_referans_tarih: null,                  varsayilan_istasyon: 'İSTASYON - 1', kullanici_telefon: '5551234567', kullanici_email: 'ahmet@firma.com' })
+    ws.addRow({ plaka: '34XYZ789', kullanici_adi_soyadi: 'Mehmet Demir',  departman: 'Yönetim',         yikama_gunleri: '2,4',  yikama_frekans_tip: 'BIHAFTA',  yikama_frekans_aralik: 2, yikama_referans_tarih: new Date(2026, 5, 23), varsayilan_istasyon: 'İSTASYON - 2', kullanici_telefon: '',          kullanici_email: '' })
+    ws.addRow({ plaka: '16BGB710', kullanici_adi_soyadi: 'Ayşe Kaya',    departman: 'POOL',             yikama_gunleri: '',     yikama_frekans_tip: 'AYLIK',    yikama_frekans_aralik: 1, yikama_referans_tarih: new Date(2026, 5, 15), varsayilan_istasyon: 'İSTASYON - 1', kullanici_telefon: '',          kullanici_email: '' })
+    // Tarih sütunu (G = 7) Türk formatında görünsün
+    ws.getColumn(7).numFmt = 'dd/mm/yyyy'
     // Başlık satırı: bold + zorunlu sütunlar kırmızı vurgulu
     const header = ws.getRow(1)
     header.font = { bold: true }
@@ -374,14 +376,33 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
         const yikamaGunleri = gunStr
           ? [...new Set(gunStr.split(/[,;\s]+/).map(s => Number(s)).filter(n => Number.isInteger(n) && n >= 1 && n <= 7))].sort((a, b) => a - b)
           : []
-        // Tarih hücresi: Excel'den Date objesi veya string gelebilir
+        // Tarih hücresi: Excel'den Date objesi veya string gelebilir.
+        // Desteklenen string formatları: 'gg/aa/yyyy', 'gg.aa.yyyy', 'gg-aa-yyyy'
+        // ve ISO 'yyyy-aa-gg'. Hepsi ISO 'YYYY-MM-DD' formatına normalize edilir.
         const refTarRaw = idxRefTar >= 0 ? row.getCell(idxRefTar + 1).value : null
         let refTar: string | null = null
         if (refTarRaw instanceof Date) {
-          refTar = refTarRaw.toISOString().slice(0, 10)
+          // Excel Date saat dilimi karışıklığı yapmasın diye lokal saat alıyoruz
+          const y = refTarRaw.getFullYear()
+          const m = String(refTarRaw.getMonth() + 1).padStart(2, '0')
+          const d = String(refTarRaw.getDate()).padStart(2, '0')
+          refTar = `${y}-${m}-${d}`
         } else if (refTarRaw) {
           const s = cellStr(refTarRaw)
-          if (/^\d{4}-\d{2}-\d{2}$/.test(s)) refTar = s
+          // ISO: 2026-06-23
+          let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+          if (m) {
+            refTar = `${m[1]}-${m[2]}-${m[3]}`
+          } else {
+            // TR: 23/06/2026 veya 23.06.2026 veya 23-06-2026
+            m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/)
+            if (m) {
+              const dd = m[1].padStart(2, '0')
+              const mm = m[2].padStart(2, '0')
+              const yyyy = m[3]
+              refTar = `${yyyy}-${mm}-${dd}`
+            }
+          }
         }
         satirlar.push({
           plaka,
