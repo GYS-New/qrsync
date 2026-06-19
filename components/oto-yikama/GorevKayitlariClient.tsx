@@ -16,6 +16,8 @@ export interface GorevKaydi {
   istasyon: string
   departman: string | null
   yikama_gunleri: number[]
+  km: number | null
+  notlar: string | null
   olusturma_tarihi: string | null
   baslatilma_tarihi: string | null
   tamamlanma_tarihi: string | null
@@ -250,14 +252,29 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
     }
   }
 
-  async function editKaydet(yeniHedef: string, yeniLok: string, yeniDurum: string, iptalSebep: string) {
+  async function editKaydet(
+    yeniHedef: string, yeniLok: string, yeniDurum: string,
+    iptalSebep: string, km: string, notlar: string,
+  ) {
     if (!editKaydi) return
-    const body: Record<string, string> = {}
+    const body: Record<string, any> = {}
     if (yeniHedef && yeniHedef !== editKaydi.hedef_tarih) body.hedef_tarih = yeniHedef
     if (yeniLok && yeniLok !== editKaydi.lokasyon_id) body.lokasyon_id = yeniLok
     if (yeniDurum && yeniDurum !== editKaydi.durum) {
       body.durum = yeniDurum
       if (yeniDurum === 'IPTAL') body.iptal_sebep = iptalSebep
+    }
+    // KM değişti veya TAMAMLANDI'ya yeni geçiş ise gönder
+    const kmNum = km.trim() ? Number(km) : null
+    if (kmNum != null && Number.isFinite(kmNum) && kmNum > 0 && kmNum !== editKaydi.km) {
+      body.km = kmNum
+    } else if (yeniDurum === 'TAMAMLANDI' && editKaydi.durum !== 'TAMAMLANDI' && kmNum != null) {
+      body.km = kmNum
+    }
+    // Notlar değiştiyse gönder (boş string de kabul — silme)
+    const notlarTrim = notlar.trim()
+    if (notlarTrim !== (editKaydi.notlar ?? '')) {
+      body.notlar = notlarTrim
     }
     if (Object.keys(body).length === 0) {
       setEditKaydi(null); return
@@ -505,16 +522,22 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
   istasyonlar: IstasyonOpt[]
   loading: boolean
   onClose: () => void
-  onSave: (hedef: string, lok: string, durum: string, iptalSebep: string) => void
+  onSave: (hedef: string, lok: string, durum: string, iptalSebep: string, km: string, notlar: string) => void
 }) {
   const [hedef, setHedef] = useState(kaydi.hedef_tarih ?? '')
   const [lok, setLok] = useState(kaydi.lokasyon_id ?? '')
   const [durum, setDurum] = useState<string>(kaydi.durum ?? 'ACIK')
   const [iptalSebep, setIptalSebep] = useState<string>(kaydi.iptal_sebep ?? '')
+  const [km, setKm] = useState<string>(kaydi.km != null ? String(kaydi.km) : '')
+  const [notlar, setNotlar] = useState<string>(kaydi.notlar ?? '')
 
   const isClosedDurum = ['TAMAMLANDI', 'IPTAL', 'YAPILAMADI', 'SILINDI'].includes(kaydi.durum ?? '')
   const durumDegisti = durum !== kaydi.durum
   const iptalEksik = durum === 'IPTAL' && iptalSebep.trim().length < 5
+  // KM TAMAMLANDI'ya YENİ geçişte zorunlu
+  const tamamlanmayaYeniGecis = durum === 'TAMAMLANDI' && kaydi.durum !== 'TAMAMLANDI'
+  const kmGecerliMi = km.trim() ? Number(km) > 0 && Number.isFinite(Number(km)) : false
+  const kmEksik = tamamlanmayaYeniGecis && !kmGecerliMi
 
   return (
     <div onClick={onClose}
@@ -597,6 +620,39 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
               {istasyonlar.map(i => <option key={i.id} value={i.id}>{i.tanim}</option>)}
             </select>
           </div>
+
+          {/* KM — TAMAMLANDI'ya geçerken zorunlu */}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: tamamlanmayaYeniGecis ? T.red : T.text, marginBottom: 6 }}>
+              Araç KM
+              {tamamlanmayaYeniGecis && <span style={{ fontWeight: 400, marginLeft: 6 }}>(zorunlu)</span>}
+            </label>
+            <input type="number" min={1} value={km} onChange={e => setKm(e.target.value)}
+              placeholder="Aracın güncel kilometresi"
+              style={{
+                width: '100%', padding: '8px 10px', fontSize: 13,
+                border: `1px solid ${kmEksik ? T.red : T.border}`, borderRadius: 7,
+              }} />
+            {kmEksik && (
+              <div style={{ fontSize: 11, color: T.red, marginTop: 4 }}>
+                Tamamlamak için aracın güncel KM değeri zorunludur (pozitif sayı).
+              </div>
+            )}
+          </div>
+
+          {/* Açıklama (notlar) — opsiyonel */}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 6 }}>
+              Açıklama <span style={{ fontWeight: 400, color: T.textSoft }}>(opsiyonel)</span>
+            </label>
+            <textarea value={notlar} onChange={e => setNotlar(e.target.value)}
+              rows={2} placeholder="Yıkamayla ilgili not, gözlem veya uyarı…"
+              style={{
+                width: '100%', padding: '8px 10px', fontSize: 13, lineHeight: 1.4,
+                border: `1px solid ${T.border}`, borderRadius: 7,
+                fontFamily: 'inherit', resize: 'vertical',
+              }} />
+          </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
@@ -604,12 +660,12 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
             style={{ padding: '8px 16px', borderRadius: 7, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: T.text }}>
             Vazgeç
           </button>
-          <button onClick={() => onSave(hedef, lok, durum, iptalSebep.trim())}
-            disabled={loading || iptalEksik || (!hedef && !lok && !durumDegisti)}
+          <button onClick={() => onSave(hedef, lok, durum, iptalSebep.trim(), km, notlar)}
+            disabled={loading || iptalEksik || kmEksik}
             style={{
               padding: '8px 18px', borderRadius: 7, border: 'none',
-              background: loading || iptalEksik ? '#cbd5e1' : 'linear-gradient(145deg, #1d4ed8, #1e40af)',
-              color: '#fff', cursor: loading || iptalEksik ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
+              background: loading || iptalEksik || kmEksik ? '#cbd5e1' : 'linear-gradient(145deg, #1d4ed8, #1e40af)',
+              color: '#fff', cursor: loading || iptalEksik || kmEksik ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
               display: 'inline-flex', alignItems: 'center', gap: 6,
             }}>
             {loading ? <><Loader2 size={13} style={{ animation: 'spin 0.9s linear infinite' }} /> Kaydediliyor…</> : 'Kaydet'}

@@ -89,6 +89,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Geçersiz gorev_tipi' }, { status: 400, headers: CORS })
     }
 
+    // ── Oto Yıkama görevi için KM zorunluluğu ──
+    // gorevler tablosundaysa ve metadata varsa = Oto Yıkama. KM girilmesi zorunlu.
+    // Eski APK'lar KM göndermeden tamamlama yapamaz; 1.0.30+ KM input ekrana eklendi.
+    if (gorevTipi === 'gorevler') {
+      const { data: otoYikamaMeta } = await admin
+        .from('oto_yikama_gorev_metadata')
+        .select('gorev_id')
+        .eq('gorev_id', gorevId)
+        .maybeSingle()
+      if (otoYikamaMeta) {
+        const kmNum = Number(body?.km)
+        if (!Number.isFinite(kmNum) || kmNum <= 0) {
+          return NextResponse.json({
+            ok: false,
+            error: 'Yıkamayı tamamlamak için aracın güncel KM değeri zorunludur.',
+            code: 'KM_GEREKLI',
+          }, { status: 400, headers: CORS })
+        }
+      }
+    }
+
     // ── QR/NFC TAMAMLAMA ZORUNLULUĞU (SİM bypass'tan önce çalışmalı) ──
     {
       console.log('[gorev-tamamla] QR/NFC kontrol başlıyor', { gorevId, gorevTipi, scanToken: scanToken ?? 'YOK' })

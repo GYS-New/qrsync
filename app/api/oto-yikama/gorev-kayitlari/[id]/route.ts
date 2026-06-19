@@ -73,8 +73,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const yeniDurum = typeof body.durum === 'string' && ALLOWED_DURUM.has(body.durum)
     ? (body.durum as 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL') : null
   const iptalSebep = typeof body.iptal_sebep === 'string' ? body.iptal_sebep.trim() : ''
+  // KM ve açıklama (notlar) — TAMAMLANDI'ya geçişte KM zorunlu, notlar opsiyonel
+  const kmNum = body.km != null && body.km !== '' ? Number(body.km) : null
+  const km = Number.isFinite(kmNum) && (kmNum as number) > 0 ? Math.floor(kmNum as number) : null
+  const notlar = typeof body.notlar === 'string' ? body.notlar.trim() : null
 
-  if (!yeniHedef && !yeniLok && !yeniDurum) {
+  if (!yeniHedef && !yeniLok && !yeniDurum && km == null && notlar == null) {
     return NextResponse.json({ ok: false, error: 'Güncellenecek alan yok' }, { status: 400 })
   }
 
@@ -84,6 +88,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ok: false,
       error: 'İptal sebebi zorunlu (en az 5 karakter)',
       code: 'IPTAL_SEBEP_GEREKLI',
+    }, { status: 400 })
+  }
+
+  // TAMAMLANDI için KM zorunlu (sadece bu duruma yeni geçişte)
+  if (yeniDurum === 'TAMAMLANDI' && rec.gorev.durum !== 'TAMAMLANDI' && km == null) {
+    return NextResponse.json({
+      ok: false,
+      error: 'Yıkamayı tamamlamak için aracın güncel KM değeri zorunludur.',
+      code: 'KM_GEREKLI',
     }, { status: 400 })
   }
 
@@ -118,6 +131,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const metaUpdate: Record<string, any> = {}
   if (yeniLok)   gorevUpdate.lokasyon_id = yeniLok
   if (yeniHedef) metaUpdate.hedef_tarih  = yeniHedef
+  if (km != null) metaUpdate.km = km
+  if (notlar != null) metaUpdate.notlar = notlar || null
 
   // Durum geçişi — yan etkiler
   if (yeniDurum) {

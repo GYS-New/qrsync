@@ -41,7 +41,7 @@ export default async function OtoYikamaGorevKayitlariPage() {
     // 1) Tüm metadata kayıtlarını çek (arac_id de — departman/yikama_gunleri için)
     const { data: metaAll } = await admin
       .from('oto_yikama_gorev_metadata')
-      .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra')
+      .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar')
       .order('hedef_tarih', { ascending: false })
       .limit(2000)
     const metaArr = (metaAll ?? []) as any[]
@@ -102,6 +102,8 @@ export default async function OtoYikamaGorevKayitlariPage() {
         plaka:           m.plaka_snapshot ?? '—',
         hedef_tarih:     m.hedef_tarih ?? null,
         ekstra:          m.ekstra === true,
+        km:              m.km ?? null,
+        notlar:          m.notlar ?? null,
         durum:           g.durum ?? null,
         lokasyon_id:     g.lokasyon_id ?? null,
         istasyon:        lokMap.get(g.lokasyon_id) ?? '—',
