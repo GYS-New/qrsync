@@ -222,11 +222,11 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       { sutun: 'plaka',                  zorunlu: 'EVET', aciklama: 'Aracın plakası. Boşluk olmadan, BÜYÜK harf. Sistem otomatik normalize eder.', ornek: '06ABC123' },
       { sutun: 'kullanici_adi_soyadi',   zorunlu: 'EVET', aciklama: 'Aracı kullanan kişinin adı soyadı.', ornek: 'Ahmet Yılmaz' },
       { sutun: 'departman',              zorunlu: 'EVET', aciklama: 'Aracın departmanı (POOL, YÖNETİCİ, Üretim Hattı 3 vb.). Sistemde gruplama için kullanılır.', ornek: 'POOL' },
-      { sutun: 'yikama_gunleri',         zorunlu: 'HAFTALIK/BIHAFTA için EVET', aciklama: 'Hangi günler yıkanacak. 1=Pzt, 2=Sal, 3=Çar, 4=Per, 5=Cum, 6=Cmt, 7=Paz. Virgülle ayır.', ornek: '1,3,5' },
+      { sutun: 'yikama_gunleri',         zorunlu: 'hayır (boşsa otomatik üretim olmaz)', aciklama: 'Hangi günler yıkanacak. 1=Pzt, 2=Sal, 3=Çar, 4=Per, 5=Cum, 6=Cmt, 7=Paz. Virgülle ayır. BOŞ bırakılırsa cron otomatik görev üretmez; plaka sistemde durur, mobil personel ekstra olarak yıkayabilir.', ornek: '1,3,5' },
       { sutun: 'yikama_frekans_tip',     zorunlu: 'hayır (default: HAFTALIK)', aciklama: 'HAFTALIK = her hafta yıkama_gunleri\'nde. BIHAFTA = N haftada bir, yıkama_gunleri\'nde. AYLIK = ayda bir, referans tarihin günü.', ornek: 'HAFTALIK' },
       { sutun: 'yikama_frekans_aralik',  zorunlu: 'BIHAFTA için EVET (default 1)', aciklama: 'BIHAFTA tipinde "kaç haftada bir" sayısı. 2 = her 2 haftada bir, 3 = her 3 haftada bir.', ornek: '2' },
       { sutun: 'yikama_referans_tarih',  zorunlu: 'BIHAFTA/AYLIK için EVET', aciklama: 'BIHAFTA: modulo başlangıç tarihi (bu tarihten sonraki her N haftada). AYLIK: bu tarihin gün sayısı her ay tetikler. Format: gg/aa/yyyy veya Excel tarih hücresi.', ornek: '15/06/2026' },
-      { sutun: 'varsayilan_istasyon',    zorunlu: 'EVET (otomatik üretim için)', aciklama: 'Yıkamanın yapılacağı istasyonun TANIMI (alt lokasyon adı). Sistemde Yıkama İstasyonları sayfasındaki tanımla birebir aynı olmalı.', ornek: 'İSTASYON - 1' },
+      { sutun: 'varsayilan_istasyon',    zorunlu: 'sadece otomatik üretim için', aciklama: 'Cron tarafından oluşturulacak görevin hangi istasyona düşeceği. Alt lokasyon TANIMI ile birebir aynı olmalı. Yıkama günü boş plakalar için bu da boş kalabilir — mobil ekstra yıkamada istasyon zaten personelin QR okuduğu yerden gelir.', ornek: 'İSTASYON - 1' },
       { sutun: 'kullanici_telefon',      zorunlu: 'hayır', aciklama: 'Kullanıcının telefon numarası. Boş bırakılabilir.', ornek: '5551234567' },
       { sutun: 'kullanici_email',        zorunlu: 'hayır', aciklama: 'Kullanıcının e-posta adresi. Boş bırakılabilir.', ornek: 'ahmet@firma.com' },
     ]
@@ -273,7 +273,8 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
     wsHelp.addRow(['• Excel\'de OLAN ve sistemde de OLAN plakalarda fark varsa GÜNCELLENİR (yıkama kuralı yenilenir).'])
     wsHelp.addRow(['• Excel\'de OLAN ama sistemde PASİF olan plakalar tekrar AKTİVE EDİLİR.'])
     wsHelp.addRow(['• Pasifleşen araçların geçmiş görev kayıtları DB\'de tutulmaya devam eder.'])
-    for (let i = sb2.number + 1; i <= sb2.number + 5; i++) wsHelp.mergeCells(`A${i}:D${i}`)
+    wsHelp.addRow(['• Yıkama günü BOŞ plakalar: sistemde durur, cron otomatik görev üretmez, mobil personel ekstra olarak yıkayabilir.'])
+    for (let i = sb2.number + 1; i <= sb2.number + 6; i++) wsHelp.mergeCells(`A${i}:D${i}`)
 
     // ── SHEET 2: Araç Listesi (ana data) ─────────────────────
     const ws = wb.addWorksheet('Araç Listesi')
