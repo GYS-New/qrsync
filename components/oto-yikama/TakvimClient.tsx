@@ -1,12 +1,10 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useToast } from '@/components/ui/ToastProvider'
 import { aralikPlanTahmin, type TahminArac } from '@/lib/oto-yikama/yikamaPlanTahmin'
 import type { TakvimGercekKayit, TakvimResponse } from '@/app/api/oto-yikama/takvim/route'
-
-type Sekme = 'gunluk' | 'haftalik' | 'aylik' | 'yillik'
 
 type Durum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI'
 
@@ -35,14 +33,14 @@ const DURUM_BORDER: Record<Durum, string> = {
   YAPILAMADI: '#dc2626',
 }
 const DURUM_LABEL: Record<Durum, string> = {
-  HAZIR: 'Hazır (Planlı)',
+  HAZIR: 'Planlı',
   ACIK: 'Açık',
   ISLEMDE: 'İşlemde',
   TAMAMLANDI: 'Tamamlandı',
   IPTAL: 'İptal',
   YAPILAMADI: 'Yapılamadı',
 }
-// Heatmap önceliği (büyük = daha kritik) — yıllık görünümde hücre rengi için
+// Hücre arka plan rengi için kritiklik sırası (büyük = baskın)
 const DURUM_PRIO: Record<Durum, number> = {
   IPTAL: 6,
   YAPILAMADI: 5,
@@ -58,14 +56,13 @@ const T = {
   grayLight: '#f8fafc',
 }
 
+// Oto Yıkama operasyonel başlangıç. Bu tarihten önceki günler tıklanamaz.
+const CUTOFF_ISO = '2026-06-22'
+
 const GUN_KISA = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
 const AY_AD = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 
-// Oto Yıkama operasyonel başlangıç tarihi. Bu tarihten önceki günler için
-// ne tahmin ne gerçek görev (varsa) gösterilir; navigasyon da öncesine gitmez.
-const CUTOFF_ISO = '2026-06-22'
-
-// ── Tarih helper'ları (UTC tabanlı — TZ kayması olmasın) ───────────────────
+// ── Tarih helper'ları (UTC tabanlı — TZ kayması olmasın) ──
 function isoToDate(iso: string): Date { return new Date(iso + 'T12:00:00Z') }
 function dateToIso(d: Date): string { return d.toISOString().slice(0, 10) }
 function isoDow(d: Date): number { const g = d.getUTCDay(); return g === 0 ? 7 : g }
@@ -73,66 +70,58 @@ function addDays(d: Date, n: number): Date { return new Date(d.getTime() + n * 8
 function bugunIso(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
 }
-function ayBasi(d: Date): Date { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1, 12, 0, 0)) }
-function ayBitisi(d: Date): Date { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 12, 0, 0)) }
-function haftaBasi(d: Date): Date {
-  const dow = isoDow(d)
-  return addDays(d, -(dow - 1))
+function haftaBasi(d: Date): Date { return addDays(d, -(isoDow(d) - 1)) }
+
+// ISO 8601 hafta numarası (Pzt başlangıç, 4 Ocak'ı içeren hafta 1. haftadır)
+function isoHaftaNo(d: Date): { yil: number; hafta: number } {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+  const dow = (t.getUTCDay() + 6) % 7
+  t.setUTCDate(t.getUTCDate() - dow + 3)
+  const yil = t.getUTCFullYear()
+  const ocak4 = new Date(Date.UTC(yil, 0, 4))
+  const hafta = 1 + Math.round(
+    (((t.getTime() - ocak4.getTime()) / 86400000) - 3 + ((ocak4.getUTCDay() + 6) % 7)) / 7,
+  )
+  return { yil, hafta }
 }
 
-// Sekmeye göre aralık [baslangic, bitis]
-function aralikHesapla(sekme: Sekme, anchor: Date): { baslangic: Date; bitis: Date } {
-  if (sekme === 'gunluk') return { baslangic: anchor, bitis: anchor }
-  if (sekme === 'haftalik') {
-    const b = haftaBasi(anchor)
-    return { baslangic: b, bitis: addDays(b, 6) }
-  }
-  if (sekme === 'aylik') {
-    // Grid ilk Pzt → son Paz (max 6 hafta)
-    const ilk = ayBasi(anchor)
-    const son = ayBitisi(anchor)
-    return { baslangic: haftaBasi(ilk), bitis: addDays(haftaBasi(son), 6) }
-  }
-  // yillik
-  const y = anchor.getUTCFullYear()
-  return {
-    baslangic: new Date(Date.UTC(y, 0, 1, 12, 0, 0)),
-    bitis: new Date(Date.UTC(y, 11, 31, 12, 0, 0)),
-  }
+function yilinKacinciGunu(d: Date): number {
+  const ilk = new Date(Date.UTC(d.getUTCFullYear(), 0, 1, 12, 0, 0))
+  return Math.floor((d.getTime() - ilk.getTime()) / 86400000) + 1
 }
 
-// ── Plaka kart birleşmiş tipi ─────────────────────────────────────────────
 type PlakaKart = {
   tarih: string
   arac_id: string | null
   plaka: string
   durum: Durum
-  // Eğer gerçek bir görev varsa onun referansı:
   gercek: TakvimGercekKayit | null
   departman: string | null
   lokasyon_id: string | null
 }
 
+// ── Ana bileşen ─────────────────────────────────────────────
 export default function TakvimClient({ firmaId }: { firmaId: string }) {
   const { toast } = useToast()
-  const [sekme, setSekme] = useState<Sekme>('haftalik')
-  const [anchor, setAnchor] = useState<Date>(() => {
-    const b = bugunIso()
-    return isoToDate(b < CUTOFF_ISO ? CUTOFF_ISO : b)
-  })
+
+  // Sabit yıl — yıl atlama yok. Cut-off yılı veya bugünün yılı (hangisi büyükse).
+  const yil = useMemo(() => {
+    const cutoffYil = isoToDate(CUTOFF_ISO).getUTCFullYear()
+    const bugunYil = isoToDate(bugunIso()).getUTCFullYear()
+    return Math.max(cutoffYil, bugunYil)
+  }, [])
+
   const [data, setData] = useState<TakvimResponse | null>(null)
   const [yukleniyor, setYukleniyor] = useState(true)
-  const [detayKart, setDetayKart] = useState<PlakaKart | null>(null)
-
-  const { baslangic, bitis } = useMemo(() => aralikHesapla(sekme, anchor), [sekme, anchor])
+  const [seciliGun, setSeciliGun] = useState<string | null>(null)
 
   async function yukle() {
     setYukleniyor(true)
     try {
       const qp = new URLSearchParams({
         firma_id: firmaId,
-        baslangic: dateToIso(baslangic),
-        bitis: dateToIso(bitis),
+        baslangic: `${yil}-01-01`,
+        bitis: `${yil}-12-31`,
       })
       const res = await fetch(`/api/oto-yikama/takvim?${qp}`, { cache: 'no-store' })
       const j = await res.json()
@@ -144,8 +133,7 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
       setYukleniyor(false)
     }
   }
-
-  useEffect(() => { yukle() }, [firmaId, sekme, dateToIso(baslangic), dateToIso(bitis)])
+  useEffect(() => { yukle() }, [firmaId, yil])
 
   // Gercek + Tahmin birleştir: tarih → PlakaKart[]
   const gunKartlari: Map<string, PlakaKart[]> = useMemo(() => {
@@ -155,7 +143,6 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
     const gercekKey = (k: TakvimGercekKayit) => `${k.hedef_tarih}|${k.arac_id ?? `__noarac_${k.gorev_id}`}`
     const gercekSet = new Set<string>()
 
-    // 1) Gerçek görevler
     for (const k of data.gercek) {
       if (!k.durum) continue
       if (k.hedef_tarih < CUTOFF_ISO) continue
@@ -175,9 +162,8 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
       gercekSet.add(gercekKey(k))
     }
 
-    // 2) Tahmini görevler (aralıktaki tüm günler için)
     const tahminAraclar: TahminArac[] = data.araclar as TahminArac[]
-    const tahminler = aralikPlanTahmin(tahminAraclar, dateToIso(baslangic), dateToIso(bitis))
+    const tahminler = aralikPlanTahmin(tahminAraclar, `${yil}-01-01`, `${yil}-12-31`)
     for (const t of tahminler) {
       if (t.tarih < CUTOFF_ISO) continue
       const key = `${t.tarih}|${t.arac_id}`
@@ -196,7 +182,6 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
       harita.set(t.tarih, liste)
     }
 
-    // 3) Sıra: durum prio desc, sonra plaka alfabetik
     for (const liste of harita.values()) {
       liste.sort((a, b) => {
         const p = DURUM_PRIO[b.durum] - DURUM_PRIO[a.durum]
@@ -205,93 +190,19 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
       })
     }
     return harita
-  }, [data, baslangic, bitis])
+  }, [data, yil])
 
-  // Önceki yön için yeni anchor, takvim aralığı cut-off'tan önceye gidiyorsa engellenir
-  function yeniAnchor(yon: -1 | 1, mevcut: Date): Date {
-    if (sekme === 'gunluk') return addDays(mevcut, yon)
-    if (sekme === 'haftalik') return addDays(mevcut, yon * 7)
-    if (sekme === 'aylik') return new Date(Date.UTC(mevcut.getUTCFullYear(), mevcut.getUTCMonth() + yon, 15, 12, 0, 0))
-    return new Date(Date.UTC(mevcut.getUTCFullYear() + yon, mevcut.getUTCMonth(), 15, 12, 0, 0))
-  }
-
-  // Geri navigasyon için sınır — yeni anchor'ın gösterdiği aralık cut-off'tan
-  // tamamen önceye düşüyorsa engelleriz.
-  function geriGidilebilirMi(yeni: Date): boolean {
-    const { bitis: yeniBitis } = aralikHesapla(sekme, yeni)
-    return dateToIso(yeniBitis) >= CUTOFF_ISO
-  }
-
-  // ── Nav ─────────────────────────────────────────────────────
-  function navigasyon(yon: -1 | 0 | 1) {
-    if (yon === 0) {
-      const b = bugunIso()
-      setAnchor(isoToDate(b < CUTOFF_ISO ? CUTOFF_ISO : b))
-      return
-    }
-    const yeni = yeniAnchor(yon, anchor)
-    if (yon === -1 && !geriGidilebilirMi(yeni)) return
-    setAnchor(yeni)
-  }
-
-  const geriDisabled = useMemo(() => {
-    const yeni = yeniAnchor(-1, anchor)
-    return !geriGidilebilirMi(yeni)
-  }, [sekme, anchor])
-
-  function anchorEtiketi(): string {
-    if (sekme === 'gunluk') {
-      return new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', weekday: 'long' }).format(anchor)
-    }
-    if (sekme === 'haftalik') {
-      const b = haftaBasi(anchor)
-      const s = addDays(b, 6)
-      const ay1 = b.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })
-      const ay2 = s.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })
-      return `${ay1} — ${ay2}`
-    }
-    if (sekme === 'aylik') return `${AY_AD[anchor.getUTCMonth()]} ${anchor.getUTCFullYear()}`
-    return String(anchor.getUTCFullYear())
-  }
-
-  // ── Render ──────────────────────────────────────────────────
   return (
     <div>
-      {/* Sekme + nav */}
-      <div className="verde-card" style={{ padding: '12px 16px', marginBottom: 12, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', background: T.grayLight, borderRadius: 8, padding: 3 }}>
-          {(['gunluk', 'haftalik', 'aylik', 'yillik'] as Sekme[]).map(s => (
-            <button key={s} onClick={() => setSekme(s)}
-              style={{
-                padding: '6px 14px', borderRadius: 6, border: 'none',
-                background: sekme === s ? '#fff' : 'transparent',
-                color: sekme === s ? T.text : T.textSoft,
-                cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                boxShadow: sekme === s ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-              }}>
-              {s === 'gunluk' ? 'Günlük' : s === 'haftalik' ? 'Haftalık' : s === 'aylik' ? 'Aylık' : 'Yıllık'}
-            </button>
-          ))}
+      {/* Üst bar — yıl + lejant */}
+      <div className="verde-card" style={{ padding: '12px 16px', marginBottom: 12, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 18, fontWeight: 800, color: T.text }}>
+          {yil} Yıkama Takvimi
         </div>
-
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginLeft: 8 }}>
-          <button onClick={() => navigasyon(-1)} title={geriDisabled ? 'Sistem 22.06.2026 sonrası verileri göstermektedir' : 'Önceki'}
-            disabled={geriDisabled}
-            style={{ ...navBtnStyle, opacity: geriDisabled ? 0.4 : 1, cursor: geriDisabled ? 'not-allowed' : 'pointer' }}>
-            <ChevronLeft size={16} />
-          </button>
-          <button onClick={() => navigasyon(0)} title="Bugün"
-            style={{ ...navBtnStyle, fontWeight: 700, padding: '6px 12px', fontSize: 12 }}>Bugün</button>
-          <button onClick={() => navigasyon(1)} title="Sonraki"
-            style={navBtnStyle}><ChevronRight size={16} /></button>
+        <div style={{ fontSize: 12, color: T.textSoft }}>
+          Bir güne tıklayarak yıkama detaylarını görüntüleyin
         </div>
-
-        <div style={{ fontSize: 14, fontWeight: 700, color: T.text, marginLeft: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Calendar size={15} color={T.textSoft} />
-          {anchorEtiketi()}
-        </div>
-
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, fontSize: 11, color: T.textSoft, alignItems: 'center' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, fontSize: 11, color: T.textSoft, alignItems: 'center', flexWrap: 'wrap' }}>
           {(Object.keys(DURUM_LABEL) as Durum[]).map(d => (
             <span key={d} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               <span style={{
@@ -304,288 +215,120 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
         </div>
       </div>
 
-      {/* İçerik */}
+      {/* 4 ay × 3 satır grid */}
       <div style={{ position: 'relative' }}>
         {yukleniyor && (
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12, color: T.textSoft, fontSize: 13, fontWeight: 600 }}>
             Yükleniyor…
           </div>
         )}
-
-        {sekme === 'gunluk' && <GunlukView tarih={anchor} kartlar={gunKartlari.get(dateToIso(anchor)) ?? []} setDetay={setDetayKart} lokAd={data?.lokasyonAdMap ?? {}} />}
-        {sekme === 'haftalik' && <HaftalikView baslangic={baslangic} harita={gunKartlari} setDetay={setDetayKart} />}
-        {sekme === 'aylik' && <AylikView anchor={anchor} baslangic={baslangic} harita={gunKartlari} setDetay={setDetayKart} setAnchor={setAnchor} setSekme={setSekme} />}
-        {sekme === 'yillik' && <YillikView yil={anchor.getUTCFullYear()} harita={gunKartlari} setAnchor={setAnchor} setSekme={setSekme} />}
-      </div>
-
-      {detayKart && (
-        <DetayModal kart={detayKart} onClose={() => setDetayKart(null)}
-          lokAd={data?.lokasyonAdMap ?? {}} kullaniciAd={data?.kullaniciAdMap ?? {}} />
-      )}
-    </div>
-  )
-}
-
-const navBtnStyle: React.CSSProperties = {
-  padding: '6px 8px', borderRadius: 6, border: `1px solid ${T.border}`,
-  background: '#fff', cursor: 'pointer', color: T.text,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-}
-
-// ── Chip bileşeni ────────────────────────────────────────────
-function Chip({ kart, onClick, size = 'sm' }: { kart: PlakaKart; onClick: () => void; size?: 'xs' | 'sm' | 'md' }) {
-  const padX = size === 'xs' ? 6 : size === 'sm' ? 8 : 12
-  const padY = size === 'xs' ? 1 : size === 'sm' ? 2 : 4
-  const fs = size === 'xs' ? 10 : size === 'sm' ? 11 : 13
-  return (
-    <button onClick={onClick} title={`${kart.plaka} — ${DURUM_LABEL[kart.durum]}${kart.departman ? ' — ' + kart.departman : ''}`}
-      style={{
-        padding: `${padY}px ${padX}px`,
-        borderRadius: 4,
-        border: `1px solid ${DURUM_BORDER[kart.durum]}`,
-        background: DURUM_BG[kart.durum],
-        color: DURUM_FG[kart.durum],
-        fontFamily: 'monospace',
-        fontWeight: 700,
-        fontSize: fs,
-        cursor: 'pointer',
-        lineHeight: 1.2,
-        whiteSpace: 'nowrap',
-      }}>
-      {kart.plaka}
-    </button>
-  )
-}
-
-// ── GünLük ──────────────────────────────────────────────────
-function GunlukView({ tarih, kartlar, setDetay, lokAd }: { tarih: Date; kartlar: PlakaKart[]; setDetay: (k: PlakaKart) => void; lokAd: Record<string, string> }) {
-  const sayilar = sayar(kartlar)
-  const bugun = dateToIso(tarih) === bugunIso()
-  return (
-    <div className="verde-card" style={{ padding: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, color: T.text }}>
-          {new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }).format(tarih)}
-        </div>
-        <div style={{ fontSize: 13, color: T.textSoft }}>{GUN_KISA[isoDow(tarih) - 1]}</div>
-        {bugun && <span style={{ padding: '2px 8px', borderRadius: 999, background: T.blueLight, color: T.blue, fontSize: 11, fontWeight: 700 }}>BUGÜN</span>}
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: T.textSoft }}>Toplam: <strong style={{ color: T.text }}>{kartlar.length}</strong></div>
-      </div>
-
-      {/* Özet sayıları */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-        {(Object.keys(DURUM_LABEL) as Durum[]).map(d => (
-          sayilar[d] > 0 && (
-            <div key={d} style={{
-              padding: '4px 10px', borderRadius: 6,
-              background: DURUM_BG[d], color: DURUM_FG[d], border: `1px solid ${DURUM_BORDER[d]}`,
-              fontSize: 12, fontWeight: 700,
-            }}>{DURUM_LABEL[d]}: {sayilar[d]}</div>
-          )
-        ))}
-      </div>
-
-      {kartlar.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: T.textSoft, fontSize: 13 }}>
-          Bu gün için planlanmış yıkama yok.
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-          {kartlar.map((k, i) => (
-            <button key={`${k.arac_id ?? 'x'}-${i}`} onClick={() => setDetay(k)}
-              style={{
-                padding: '10px 12px', borderRadius: 8,
-                border: `1px solid ${DURUM_BORDER[k.durum]}`,
-                background: DURUM_BG[k.durum],
-                cursor: 'pointer', textAlign: 'left',
-                display: 'flex', flexDirection: 'column', gap: 4,
-              }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16, color: DURUM_FG[k.durum] }}>{k.plaka}</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: DURUM_FG[k.durum] }}>{DURUM_LABEL[k.durum]}</span>
-              </div>
-              <div style={{ fontSize: 11, color: T.textSoft }}>
-                {k.departman ?? '—'}
-                {k.lokasyon_id ? <> · {lokAd[k.lokasyon_id] ?? '—'}</> : null}
-              </div>
-            </button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
+          {Array.from({ length: 12 }, (_, m) => (
+            <AyBlock key={m} yil={yil} ay={m} harita={gunKartlari} onGunTik={iso => setSeciliGun(iso)} />
           ))}
         </div>
+      </div>
+
+      {seciliGun && (
+        <GunPopup
+          tarih={seciliGun}
+          kartlar={gunKartlari.get(seciliGun) ?? []}
+          lokAd={data?.lokasyonAdMap ?? {}}
+          onClose={() => setSeciliGun(null)}
+        />
       )}
     </div>
   )
 }
 
-// ── Haftalık ────────────────────────────────────────────────
-function HaftalikView({ baslangic, harita, setDetay }: { baslangic: Date; harita: Map<string, PlakaKart[]>; setDetay: (k: PlakaKart) => void }) {
-  const today = bugunIso()
-  const gunler = Array.from({ length: 7 }, (_, i) => addDays(baslangic, i))
-  return (
-    <div className="verde-card" style={{ padding: 12 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
-        {gunler.map(g => {
-          const iso = dateToIso(g)
-          const kartlar = harita.get(iso) ?? []
-          const isBugun = iso === today
-          return (
-            <div key={iso} style={{
-              border: `1.5px solid ${isBugun ? T.blue : T.border}`,
-              borderRadius: 8, padding: 8, minHeight: 280,
-              background: isBugun ? T.blueLight : '#fff',
-              display: 'flex', flexDirection: 'column', gap: 6,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: isBugun ? T.blue : T.textSoft, textTransform: 'uppercase' }}>{GUN_KISA[isoDow(g) - 1]}</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: isBugun ? T.blue : T.text }}>{g.getUTCDate()}</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto', maxHeight: 320 }}>
-                {kartlar.length === 0 ? (
-                  <span style={{ fontSize: 11, color: T.textSoft, fontStyle: 'italic' }}>—</span>
-                ) : kartlar.map((k, i) => (
-                  <Chip key={`${k.arac_id ?? 'x'}-${i}`} kart={k} onClick={() => setDetay(k)} size="sm" />
-                ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ── Aylık ───────────────────────────────────────────────────
-function AylikView({ anchor, baslangic, harita, setDetay, setAnchor, setSekme }: {
-  anchor: Date; baslangic: Date; harita: Map<string, PlakaKart[]>;
-  setDetay: (k: PlakaKart) => void;
-  setAnchor: (d: Date) => void; setSekme: (s: Sekme) => void;
+// ── Ay bloğu ───────────────────────────────────────────────
+function AyBlock({ yil, ay, harita, onGunTik }: {
+  yil: number; ay: number;
+  harita: Map<string, PlakaKart[]>;
+  onGunTik: (iso: string) => void;
 }) {
   const today = bugunIso()
-  const ay = anchor.getUTCMonth()
-  // 42 gün — 6 hafta
-  const gunler = Array.from({ length: 42 }, (_, i) => addDays(baslangic, i))
-  return (
-    <div className="verde-card" style={{ padding: 12 }}>
-      {/* Başlık satırı */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 8 }}>
-        {GUN_KISA.map(g => (
-          <div key={g} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', padding: '4px 0' }}>{g}</div>
-        ))}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridAutoRows: 'minmax(96px, 1fr)', gap: 6 }}>
-        {gunler.map(g => {
-          const iso = dateToIso(g)
-          const kartlar = harita.get(iso) ?? []
-          const isBugun = iso === today
-          const inMonth = g.getUTCMonth() === ay
-          const onceCut = iso < CUTOFF_ISO
-          const display = kartlar.slice(0, 3)
-          const overflow = kartlar.length - display.length
-          return (
-            <div key={iso}
-              style={{
-                border: `1.5px solid ${isBugun ? T.blue : T.border}`,
-                borderRadius: 6, padding: 6,
-                background: !inMonth ? '#fafbfc' : (isBugun ? T.blueLight : '#fff'),
-                opacity: !inMonth ? 0.55 : (onceCut ? 0.45 : 1),
-                display: 'flex', flexDirection: 'column', gap: 4,
-                overflow: 'hidden',
-              }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 12, fontWeight: isBugun ? 800 : 600, color: isBugun ? T.blue : T.text }}>{g.getUTCDate()}</div>
-                {kartlar.length > 0 && (
-                  <div style={{ fontSize: 10, fontWeight: 700, color: T.textSoft }}>{kartlar.length}</div>
-                )}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {display.map((k, i) => (
-                  <Chip key={`${k.arac_id ?? 'x'}-${i}`} kart={k} onClick={() => setDetay(k)} size="xs" />
-                ))}
-                {overflow > 0 && (
-                  <button onClick={() => { setAnchor(g); setSekme('gunluk') }}
-                    style={{
-                      padding: '1px 6px', borderRadius: 4, border: `1px dashed ${T.border}`,
-                      background: '#fff', color: T.textSoft, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-                    }}>+{overflow} daha</button>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ── Yıllık ──────────────────────────────────────────────────
-function YillikView({ yil, harita, setAnchor, setSekme }: {
-  yil: number; harita: Map<string, PlakaKart[]>;
-  setAnchor: (d: Date) => void; setSekme: (s: Sekme) => void;
-}) {
-  const today = bugunIso()
-  return (
-    <div className="verde-card" style={{ padding: 14 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
-        {Array.from({ length: 12 }, (_, m) => (
-          <MiniAy key={m} yil={yil} ay={m} harita={harita} today={today}
-            onAyTik={() => { setAnchor(new Date(Date.UTC(yil, m, 15, 12, 0, 0))); setSekme('aylik') }}
-            onGunTik={(d) => { setAnchor(d); setSekme('gunluk') }}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function MiniAy({ yil, ay, harita, today, onAyTik, onGunTik }: {
-  yil: number; ay: number; harita: Map<string, PlakaKart[]>; today: string;
-  onAyTik: () => void; onGunTik: (d: Date) => void;
-}) {
   const ilk = new Date(Date.UTC(yil, ay, 1, 12, 0, 0))
   const baslangic = haftaBasi(ilk)
   const gunler = Array.from({ length: 42 }, (_, i) => addDays(baslangic, i))
+
   return (
-    <div style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8, background: '#fff' }}>
-      <button onClick={onAyTik} style={{
-        width: '100%', textAlign: 'left', padding: '2px 4px', marginBottom: 6,
-        background: 'transparent', border: 'none', cursor: 'pointer',
-        fontSize: 13, fontWeight: 800, color: T.text,
-      }}>{AY_AD[ay]}</button>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, marginBottom: 2 }}>
+    <div style={{
+      border: `1px solid ${T.border}`,
+      borderRadius: 10,
+      padding: 12,
+      background: '#fff',
+      boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 800, color: T.text, marginBottom: 10, letterSpacing: 0.2 }}>
+        {AY_AD[ay].toLocaleUpperCase('tr')}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
         {GUN_KISA.map(g => (
-          <div key={g} style={{ fontSize: 9, color: T.textSoft, textAlign: 'center', fontWeight: 600 }}>{g[0]}</div>
+          <div key={g} style={{ fontSize: 10, color: T.textSoft, textAlign: 'center', fontWeight: 700, padding: '2px 0' }}>{g}</div>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
         {gunler.map(g => {
           const iso = dateToIso(g)
           const kartlar = harita.get(iso) ?? []
           const inMonth = g.getUTCMonth() === ay
           const isBugun = iso === today
-          // Hücre rengi: en kritik durumun rengi
-          let bg = inMonth ? '#fff' : '#f8fafc'
-          let fg = inMonth ? T.text : '#cbd5e1'
+          const onceCut = iso < CUTOFF_ISO
+
+          // Hücre rengi: en kritik durumun rengi (varsa)
+          let bg = '#fff'
+          let fg = T.text
           let bd = T.border
-          if (inMonth && kartlar.length > 0) {
+          if (kartlar.length > 0) {
             const enKritik = kartlar.reduce<Durum>((acc, k) =>
               DURUM_PRIO[k.durum] > DURUM_PRIO[acc] ? k.durum : acc, kartlar[0].durum)
             bg = DURUM_BG[enKritik]
             fg = DURUM_FG[enKritik]
             bd = DURUM_BORDER[enKritik]
           }
-          const onceCut = iso < CUTOFF_ISO
+          if (!inMonth) { bg = '#fafbfc'; fg = '#cbd5e1'; bd = '#eef2f6' }
+          if (onceCut) { bg = '#f1f5f9'; fg = '#cbd5e1'; bd = '#e5e7eb' }
+
+          const tiklanabilir = inMonth && !onceCut
+
           return (
-            <button key={iso} onClick={() => !onceCut && onGunTik(g)}
-              disabled={onceCut}
-              title={onceCut ? 'Sistem öncesi — gösterim yok' : (kartlar.length > 0 ? `${iso} — ${kartlar.length} plaka` : iso)}
+            <button key={iso}
+              onClick={() => tiklanabilir && onGunTik(iso)}
+              disabled={!tiklanabilir}
+              title={
+                onceCut ? 'Sistem öncesi — gösterim yok'
+                : !inMonth ? ''
+                : kartlar.length > 0 ? `${kartlar.length} araç` : 'Plan yok'
+              }
               style={{
                 aspectRatio: '1',
-                fontSize: 9, fontWeight: isBugun ? 800 : 600,
-                color: fg, background: bg,
-                border: `1px solid ${isBugun ? T.blue : bd}`,
-                borderRadius: 3, cursor: onceCut ? 'not-allowed' : 'pointer', padding: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                opacity: onceCut ? 0.35 : 1,
-              }}>{g.getUTCDate()}</button>
+                background: bg,
+                color: fg,
+                border: `1.5px solid ${isBugun ? T.blue : bd}`,
+                borderRadius: 5,
+                padding: 0,
+                cursor: tiklanabilir ? 'pointer' : 'not-allowed',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: 1,
+                fontFamily: 'inherit',
+                position: 'relative',
+                overflow: 'hidden',
+              }}>
+              <span style={{
+                fontSize: 12,
+                fontWeight: isBugun ? 800 : 600,
+                color: isBugun && tiklanabilir ? T.blue : fg,
+                lineHeight: 1,
+              }}>{g.getUTCDate()}</span>
+              {kartlar.length > 0 && inMonth && !onceCut && (
+                <span style={{
+                  fontSize: 9, fontWeight: 700, color: fg,
+                  background: 'rgba(255,255,255,0.7)',
+                  padding: '0 4px', borderRadius: 4, lineHeight: 1.3,
+                }}>{kartlar.length}</span>
+              )}
+            </button>
           )
         })}
       </div>
@@ -593,92 +336,115 @@ function MiniAy({ yil, ay, harita, today, onAyTik, onGunTik }: {
   )
 }
 
-// ── Detay Modal ─────────────────────────────────────────────
-function DetayModal({ kart, onClose, lokAd, kullaniciAd }: {
-  kart: PlakaKart; onClose: () => void;
-  lokAd: Record<string, string>; kullaniciAd: Record<string, string>;
+// ── Gün Popup ──────────────────────────────────────────────
+function GunPopup({ tarih, kartlar, lokAd, onClose }: {
+  tarih: string;
+  kartlar: PlakaKart[];
+  lokAd: Record<string, string>;
+  onClose: () => void;
 }) {
-  const g = kart.gercek
+  const d = isoToDate(tarih)
+  const dowAdi = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'][isoDow(d) - 1]
+  const tarihEt = new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }).format(d)
+  const isoHafta = isoHaftaNo(d)
+  const gunNo = yilinKacinciGunu(d)
+  const isBugun = tarih === bugunIso()
+
+  const sayilar: Record<Durum, number> = { HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
+  for (const k of kartlar) sayilar[k.durum]++
+
   return (
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 80,
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
     }}>
       <div onClick={e => e.stopPropagation()} className="verde-card"
-        style={{ width: 'min(480px, 96vw)', padding: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+        style={{ width: 'min(720px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px', borderBottom: `1px solid ${T.border}`,
+          display: 'flex', alignItems: 'flex-start', gap: 14,
+        }}>
           <div style={{
-            padding: '6px 12px', borderRadius: 6,
-            background: DURUM_BG[kart.durum], color: DURUM_FG[kart.durum],
-            border: `1px solid ${DURUM_BORDER[kart.durum]}`,
-            fontFamily: 'monospace', fontWeight: 800, fontSize: 18,
-          }}>{kart.plaka}</div>
+            width: 56, height: 56, borderRadius: 10,
+            background: isBugun ? T.blueLight : T.grayLight,
+            border: `1px solid ${isBugun ? T.blue : T.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexDirection: 'column', flexShrink: 0,
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: isBugun ? T.blue : T.textSoft, textTransform: 'uppercase' }}>
+              {dowAdi.slice(0, 3)}
+            </span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: isBugun ? T.blue : T.text, lineHeight: 1 }}>
+              {d.getUTCDate()}
+            </span>
+          </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: DURUM_FG[kart.durum] }}>{DURUM_LABEL[kart.durum]}</div>
-            <div style={{ fontSize: 12, color: T.textSoft }}>
-              {new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', weekday: 'long' }).format(isoToDate(kart.tarih))}
+            <div style={{ fontSize: 18, fontWeight: 800, color: T.text }}>
+              {tarihEt}
+              {isBugun && <span style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 999, background: T.blueLight, color: T.blue, fontSize: 11, fontWeight: 700, verticalAlign: 'middle' }}>BUGÜN</span>}
+            </div>
+            <div style={{ fontSize: 13, color: T.textSoft, marginTop: 2 }}>{dowAdi}</div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: T.textSoft, flexWrap: 'wrap' }}>
+              <span><strong style={{ color: T.text }}>{isoHafta.hafta}.</strong> hafta ({isoHafta.yil})</span>
+              <span>Yılın <strong style={{ color: T.text }}>{gunNo}.</strong> günü</span>
+              <span>Toplam <strong style={{ color: T.text }}>{kartlar.length}</strong> araç</span>
             </div>
           </div>
           <button onClick={onClose} style={{
-            padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: T.textSoft,
-          }}><X size={18} /></button>
+            padding: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: T.textSoft,
+          }}><X size={20} /></button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
-          <Satir label="Departman" deger={kart.departman ?? '—'} />
-          <Satir label="İstasyon" deger={kart.lokasyon_id ? (lokAd[kart.lokasyon_id] ?? '—') : '—'} />
-          {!g && (
-            <div style={{
-              marginTop: 8, padding: 10, background: T.grayLight, borderRadius: 6,
-              fontSize: 12, color: T.textSoft, fontStyle: 'italic',
-            }}>
-              Bu yıkama için henüz görev kaydı oluşturulmamış. Cron sistemi hedef tarihten 1 gün önce
-              otomatik olarak görevi oluşturur — sonra mobil personel HAZIR'dan AÇIK'a alıp yıkamayı başlatır.
+        {/* Durum dağılımı */}
+        {kartlar.length > 0 && (
+          <div style={{ padding: '12px 20px', borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {(Object.keys(DURUM_LABEL) as Durum[]).map(durum => (
+              sayilar[durum] > 0 && (
+                <div key={durum} style={{
+                  padding: '4px 10px', borderRadius: 6,
+                  background: DURUM_BG[durum], color: DURUM_FG[durum],
+                  border: `1px solid ${DURUM_BORDER[durum]}`,
+                  fontSize: 12, fontWeight: 700,
+                }}>{DURUM_LABEL[durum]}: {sayilar[durum]}</div>
+              )
+            ))}
+          </div>
+        )}
+
+        {/* Plaka grid */}
+        <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
+          {kartlar.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 36, color: T.textSoft, fontSize: 13 }}>
+              Bu gün için planlanmış yıkama yok.
             </div>
-          )}
-          {g && (
-            <>
-              <Satir label="Görev Türü" deger={g.ekstra ? 'Ekstra' : 'Planlı'} />
-              {g.baslatilma_tarihi && <Satir label="Başlatma" deger={fmtDT(g.baslatilma_tarihi)} />}
-              {g.tamamlanma_tarihi && <Satir label="Tamamlanma" deger={fmtDT(g.tamamlanma_tarihi)} />}
-              {g.tamamlanma_suresi_saniye != null && g.tamamlanma_suresi_saniye > 0 &&
-                <Satir label="Süre" deger={fmtSure(g.tamamlanma_suresi_saniye)} />}
-              {g.km != null && <Satir label="KM" deger={g.km.toLocaleString('tr-TR')} />}
-              {g.islemi_yapan_id && (g.durum === 'TAMAMLANDI' || g.durum === 'IPTAL' || g.durum === 'YAPILAMADI') &&
-                <Satir label={g.durum === 'IPTAL' ? 'İptal Eden' : g.durum === 'YAPILAMADI' ? 'Bırakan' : 'Tamamlayan'}
-                  deger={kullaniciAd[g.islemi_yapan_id] ?? '—'} />}
-              {g.iptal_sebep && <Satir label="İptal Sebebi" deger={g.iptal_sebep} />}
-              {g.notlar && <Satir label="Açıklama" deger={g.notlar} />}
-            </>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+              {kartlar.map((k, i) => (
+                <div key={`${k.arac_id ?? 'x'}-${i}`}
+                  style={{
+                    padding: '8px 10px', borderRadius: 7,
+                    border: `1px solid ${DURUM_BORDER[k.durum]}`,
+                    background: DURUM_BG[k.durum],
+                    display: 'flex', flexDirection: 'column', gap: 3,
+                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{
+                      fontFamily: 'monospace', fontWeight: 800, fontSize: 15,
+                      color: DURUM_FG[k.durum],
+                    }}>{k.plaka}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: DURUM_FG[k.durum] }}>{DURUM_LABEL[k.durum]}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: T.textSoft, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span>{k.departman ?? '—'}</span>
+                    {k.lokasyon_id && <><span>·</span><span>{lokAd[k.lokasyon_id] ?? '—'}</span></>}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
     </div>
   )
-}
-
-function Satir({ label, deger }: { label: string; deger: string }) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 8, padding: '4px 0', borderBottom: '1px dashed #f1f5f9' }}>
-      <span style={{ color: T.textSoft, fontWeight: 600 }}>{label}</span>
-      <span style={{ color: T.text }}>{deger}</span>
-    </div>
-  )
-}
-
-function fmtDT(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
-         d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-}
-function fmtSure(saniye: number): string {
-  const h = Math.floor(saniye / 3600), m = Math.floor((saniye % 3600) / 60)
-  if (h > 0) return `${h}sa ${m}dk`
-  if (m > 0) return `${m}dk`
-  return `${saniye}sn`
-}
-function sayar(kartlar: PlakaKart[]): Record<Durum, number> {
-  const x: Record<Durum, number> = { HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
-  for (const k of kartlar) x[k.durum]++
-  return x
 }
