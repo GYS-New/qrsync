@@ -222,7 +222,7 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
             Yükleniyor…
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 10 }}>
           {Array.from({ length: 12 }, (_, m) => (
             <AyBlock key={m} yil={yil} ay={m} harita={gunKartlari} onGunTik={iso => setSeciliGun(iso)} />
           ))}
@@ -255,20 +255,20 @@ function AyBlock({ yil, ay, harita, onGunTik }: {
   return (
     <div style={{
       border: `1px solid ${T.border}`,
-      borderRadius: 10,
-      padding: 12,
+      borderRadius: 8,
+      padding: 8,
       background: '#fff',
       boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
     }}>
-      <div style={{ fontSize: 15, fontWeight: 800, color: T.text, marginBottom: 10, letterSpacing: 0.2 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: T.text, marginBottom: 6, letterSpacing: 0.2 }}>
         {AY_AD[ay].toLocaleUpperCase('tr')}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 2 }}>
         {GUN_KISA.map(g => (
-          <div key={g} style={{ fontSize: 10, color: T.textSoft, textAlign: 'center', fontWeight: 700, padding: '2px 0' }}>{g}</div>
+          <div key={g} style={{ fontSize: 9, color: T.textSoft, textAlign: 'center', fontWeight: 700, padding: '1px 0' }}>{g}</div>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
         {gunler.map(g => {
           const iso = dateToIso(g)
           const kartlar = harita.get(iso) ?? []
@@ -305,27 +305,29 @@ function AyBlock({ yil, ay, harita, onGunTik }: {
                 aspectRatio: '1',
                 background: bg,
                 color: fg,
-                border: `1.5px solid ${isBugun ? T.blue : bd}`,
-                borderRadius: 5,
+                border: `1px solid ${isBugun ? T.blue : bd}`,
+                borderRadius: 4,
                 padding: 0,
                 cursor: tiklanabilir ? 'pointer' : 'not-allowed',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: 1,
+                gap: 0,
                 fontFamily: 'inherit',
                 position: 'relative',
                 overflow: 'hidden',
+                minHeight: 26,
               }}>
               <span style={{
-                fontSize: 12,
+                fontSize: 10,
                 fontWeight: isBugun ? 800 : 600,
                 color: isBugun && tiklanabilir ? T.blue : fg,
                 lineHeight: 1,
               }}>{g.getUTCDate()}</span>
               {kartlar.length > 0 && inMonth && !onceCut && (
                 <span style={{
-                  fontSize: 9, fontWeight: 700, color: fg,
+                  fontSize: 8, fontWeight: 700, color: fg,
                   background: 'rgba(255,255,255,0.7)',
-                  padding: '0 4px', borderRadius: 4, lineHeight: 1.3,
+                  padding: '0 3px', borderRadius: 3, lineHeight: 1.3,
+                  marginTop: 1,
                 }}>{kartlar.length}</span>
               )}
             </button>
