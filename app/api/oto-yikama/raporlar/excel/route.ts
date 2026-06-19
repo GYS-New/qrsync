@@ -70,13 +70,13 @@ export async function GET(req: NextRequest) {
 
   let rows: any[] = []
   if (gorevIds.length > 0) {
+    // Rapor tüm durumları içerir (TAMAMLANDI/ACIK/ISLEMDE/IPTAL/YAPILAMADI/HAZIR)
     let gQ = admin
       .from('gorevler')
-      .select(`id, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, lokasyon_id, islemi_yapan_id,
+      .select(`id, durum, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, lokasyon_id, islemi_yapan_id,
         lokasyon:lokasyon_id (tanim, parent_id, ust:parent_id (tanim))`)
       .in('id', gorevIds)
       .eq('firma_id', firmaId)
-      .eq('durum', 'TAMAMLANDI')
     if (personelId) gQ = gQ.eq('islemi_yapan_id', personelId)
     const { data: gorevler } = await gQ
     const gMap = new Map((gorevler ?? []).map((g: any) => [g.id, g]))
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
     const aracIds = [...new Set((metaRows ?? []).map(m => m.arac_id))]
     const userIds = [...new Set((gorevler ?? []).map((g: any) => g.islemi_yapan_id).filter(Boolean))]
     const [aRes, uRes] = await Promise.all([
-      aracIds.length > 0 ? admin.from('araclar').select('id, plaka, departman, kullanici_adi_soyadi').in('id', aracIds) : Promise.resolve({ data: [] as any[] }),
+      aracIds.length > 0 ? admin.from('araclar').select('id, plaka, departman, kullanici_adi_soyadi, yikama_gunleri').in('id', aracIds) : Promise.resolve({ data: [] as any[] }),
       userIds.length > 0 ? admin.from('users').select('id, isim_soyisim').in('id', userIds) : Promise.resolve({ data: [] as any[] }),
     ])
     const aMap = new Map((aRes.data ?? []).map((a: any) => [a.id, a]))
@@ -105,6 +105,7 @@ export async function GET(req: NextRequest) {
         return {
           plaka: m.plaka_snapshot,
           departman: a?.departman ?? '',
+          yikama_gunleri: Array.isArray(a?.yikama_gunleri) ? a.yikama_gunleri : [],
           arac_sahibi: a?.kullanici_adi_soyadi ?? '',
           personel_id: g.islemi_yapan_id,
           personel: g.islemi_yapan_id ? (uMap.get(g.islemi_yapan_id) ?? '—') : '—',
@@ -115,6 +116,8 @@ export async function GET(req: NextRequest) {
           tamamlanma_suresi_saniye: sure,
           ekstra: !!(m as any).ekstra,
           tip: (m as any).ekstra ? 'Ekstra' : 'Planlı',
+          durum: g.durum as string,
+          km: (m as any).km ?? null,
         }
       })
       .sort((a, b) => (b.tamamlanma_tarihi ?? '').localeCompare(a.tamamlanma_tarihi ?? ''))
@@ -221,32 +224,49 @@ export async function GET(req: NextRequest) {
   ]
   kpis.forEach(([k, v], i) => setDataRow(ws1, 12 + i, [k, v], i))
 
-  // ── Sayfa 2: Detay ──────────────────────────────────────────────────────
+  // ── Sayfa 2: Detay (Atalian format) ─────────────────────────────────────
+  // Sütunlar: Plaka | Kullanıcı (departman) | Yıkama Günü (haftalık plan) |
+  //           Durum | Kabul Tarihi (baslatilma) | Yıkama Personel | KM
   const ws2 = wb.addWorksheet('Detay', { properties: { tabColor: { argb: 'FF7C3AED' } } })
-  const detayHeaders = ['SN', 'Plaka', 'Tip', 'Personel', 'Lokasyon', 'Departman', 'Tarih', 'Başlatma', 'Tamamlama', 'Süre']
-  const detayWidths = [6, 13, 10, 24, 30, 18, 12, 11, 11, 14]
+  const detayHeaders = ['Plaka', 'Kullanıcı', 'Yıkama Günü', 'Durum', 'Kabul Tarihi', 'Yıkama Personel', 'KM']
+  const detayWidths  = [14,      18,           24,            14,       20,              22,                 10]
   detayWidths.forEach((w, i) => { ws2.getColumn(i + 1).width = w })
   setHdrRow(ws2, 1, detayHeaders)
   ws2.views = [{ state: 'frozen', ySplit: 1 }]
   ws2.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: detayHeaders.length } }
 
+  const GUN_KISA_TR = ['', 'PZT', 'SAL', 'ÇAR', 'PER', 'CUM', 'CMT', 'PAZ']
+  const DURUM_LABEL_TR: Record<string, string> = {
+    HAZIR: 'Hazır',
+    ACIK: 'Açık',
+    ISLEMDE: 'İşlemde',
+    TAMAMLANDI: 'Teslim Edildi',
+    IPTAL: 'İptal',
+    YAPILAMADI: 'Yapılamadı',
+  }
+
   rows.forEach((r, i) => {
     const rowNum = i + 2
+    const yikamaGunStr = Array.isArray(r.yikama_gunleri) && r.yikama_gunleri.length > 0
+      ? [...r.yikama_gunleri].sort((a, b) => a - b).map((g: number) => GUN_KISA_TR[g] ?? g).join(', ')
+      : '—'
+    const durumStr = DURUM_LABEL_TR[r.durum] ?? r.durum ?? '—'
+    // Kabul Tarihi = personel görevi başlattığı an (yoksa hedef tarih)
+    const kabulTarihi = r.baslatilma_tarihi
+      ? `${fmtTarihTR(r.baslatilma_tarihi)} ${fmtSaatTR(r.baslatilma_tarihi)}`
+      : fmtTarihTR(r.hedef_tarih)
     setDataRow(ws2, rowNum, [
-      i + 1,
       r.plaka,
-      r.tip,
+      r.departman || '—',
+      yikamaGunStr,
+      durumStr,
+      kabulTarihi,
       r.personel,
-      r.lokasyon,
-      r.departman,
-      fmtTarihTR(r.tamamlanma_tarihi ?? r.hedef_tarih),
-      fmtSaatTR(r.baslatilma_tarihi),
-      fmtSaatTR(r.tamamlanma_tarihi),
-      fmtSure(r.tamamlanma_suresi_saniye),
+      r.km != null ? r.km : '',
     ], i)
-    // Ekstra satırı sarı vurgula (Tip kolonu — yeni indeks 3)
+    // Ekstra satırı: Plaka kolonunu mor vurgula (görseldeki gibi ek bilgi)
     if (r.ekstra) {
-      const c = ws2.getRow(rowNum).getCell(3)
+      const c = ws2.getRow(rowNum).getCell(1)
       c.style = { ...c.style, fill: EKSTRA_FILL, font: { bold: true, size: 10, color: { argb: 'FF92400E' } } }
     }
   })
