@@ -138,17 +138,41 @@ export async function POST(req: NextRequest) {
       .replace(/İ/g, 'I')
       .replace(/ı/g, 'i')
       .toUpperCase()
+  // Fallback: sadece A-Z + 0-9 (tire, em-dash, boşluk, nokta hepsi atılır).
+  // 'İSTASYON - 1', 'istasyon1', 'İstasyon—1' → 'ISTASYON1' hepsi eşleşir.
+  const sadeNorm = (s: string): string =>
+    String(s ?? '')
+      .normalize('NFC')
+      .replace(/İ/g, 'I')
+      .replace(/ı/g, 'i')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
 
-  const { data: lokRows } = await admin
+  // İki ayrı sorgu + client-side join — Supabase nested embed
+  // (parent:lokasyonlar!parent_id(...)) bu kombinasyonda null dönüyor,
+  // her satır filtreden eleniyor ve lokMap boş kalıyordu (saha bug 2026-06-19).
+  // Önce Oto Yıkama üst lokasyonlarını çek, sonra onların alt istasyonlarını.
+  const { data: ustLokRows } = await admin
     .from('lokasyonlar')
-    .select('id, tanim, parent_id, aktif, parent:lokasyonlar!parent_id(oto_yikama_lokasyon)')
+    .select('id')
     .eq('firma_id', firmaId)
     .eq('aktif', true)
+    .eq('oto_yikama_lokasyon', true)
+  const ustIds = ((ustLokRows ?? []) as any[]).map(u => u.id)
+
   const lokMap = new Map<string, string>()
-  for (const l of (lokRows ?? []) as any[]) {
-    if (!l.parent_id) continue
-    if (!l.parent?.oto_yikama_lokasyon) continue
-    lokMap.set(tanimNorm(l.tanim), l.id)
+  const lokSadeMap = new Map<string, string>()
+  if (ustIds.length > 0) {
+    const { data: altLokRows } = await admin
+      .from('lokasyonlar')
+      .select('id, tanim')
+      .eq('firma_id', firmaId)
+      .eq('aktif', true)
+      .in('parent_id', ustIds)
+    for (const l of ((altLokRows ?? []) as any[])) {
+      lokMap.set(tanimNorm(l.tanim), l.id)
+      lokSadeMap.set(sadeNorm(l.tanim), l.id)
+    }
   }
 
   // Excel satırlarını normalize et + sınıflandır
@@ -182,13 +206,15 @@ export async function POST(req: NextRequest) {
       eksik.push(`yikama_referans_tarih (${frekansTip} için zorunlu)`)
     }
 
-    // Lokasyon adı → ID resolve (aynı tanimNorm fonksiyonu DB tarafıyla eşleşir)
+    // Lokasyon adı → ID resolve. Önce strict normalize, eşleşmezse sade
+    // (alphanumeric-only) fallback — em-dash/NBSP/farklı tire varyantları için.
     const istasyonAdRaw = String(r.varsayilan_istasyon ?? '').trim()
     let varsayilanLokId: string | null = null
     if (istasyonAdRaw) {
-      varsayilanLokId = lokMap.get(tanimNorm(istasyonAdRaw)) ?? null
+      varsayilanLokId = lokMap.get(tanimNorm(istasyonAdRaw))
+                     ?? lokSadeMap.get(sadeNorm(istasyonAdRaw))
+                     ?? null
       if (!varsayilanLokId) {
-        // Hata mesajına mevcut istasyon listesini de ekle → kullanıcı doğru yazımı görsün
         const mevcutListe = [...lokMap.keys()].map(k => `'${k}'`).join(', ')
         eksik.push(`varsayilan_istasyon ('${istasyonAdRaw}' bulunamadı; geçerli: ${mevcutListe || '—'})`)
       }
