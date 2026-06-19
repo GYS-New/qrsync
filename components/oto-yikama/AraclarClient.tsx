@@ -51,6 +51,20 @@ const BOS_FORM = {
 const GUN_KISA = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
 const GUN_UZUN = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar']
 
+// Araç listesi default sıralaması — departman önceliği
+// CEO > Genel Müdür > Direktör > Navette > Pool > İç Plaka > diğerleri (alfabetik)
+function departmanRank(dep: string | null | undefined): number {
+  if (!dep) return 99
+  const n = dep.trim().toLocaleUpperCase('tr').replace(/\s+/g, ' ')
+  if (n === 'CEO') return 0
+  if (n === 'GENEL MÜDÜR' || n === 'GENEL MUDUR') return 1
+  if (n === 'DİREKTÖR' || n === 'DIREKTOR') return 2
+  if (n === 'NAVETTE') return 3
+  if (n === 'POOL') return 4
+  if (n === 'İÇ PLAKA' || n === 'IC PLAKA') return 5
+  return 99
+}
+
 export default function AraclarClient({ firmaId, projeId }: { firmaId: string; projeId: string | null }) {
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -127,7 +141,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
     const ygFiltre = filterYikamaGunu === '' ? null : Number(filterYikamaGunu)
-    return araclar.filter(a => {
+    const list = araclar.filter(a => {
       if (filterDepartman && a.departman !== filterDepartman) return false
       if (ygFiltre !== null) {
         const yg = Array.isArray(a.yikama_gunleri) ? a.yikama_gunleri : []
@@ -143,6 +157,20 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       }
       return true
     })
+    // Default sıralama: CEO > Genel Müdür > Direktör > Navette > Pool > İç Plaka > diğer.
+    // Aynı kategori içinde plakaya göre alfabetik (TR).
+    list.sort((a, b) => {
+      const ra = departmanRank(a.departman)
+      const rb = departmanRank(b.departman)
+      if (ra !== rb) return ra - rb
+      // Aynı rank — eğer ikisi de "diğer" (99) ise departman alfabetik
+      if (ra === 99) {
+        const da = (a.departman ?? '').localeCompare(b.departman ?? '', 'tr')
+        if (da !== 0) return da
+      }
+      return a.plaka.localeCompare(b.plaka, 'tr')
+    })
+    return list
   }, [araclar, q, filterDepartman, filterYikamaGunu])
 
   function openCreate() {
