@@ -77,6 +77,12 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
     satirlar: any[]
   } | null>(null)
   const [importLoading, setImportLoading] = useState(false)
+  const [importHata, setImportHata] = useState<{
+    baslik: string
+    aciklama: string
+    hatali_satirlar?: { satir: number; plaka: string; eksik: string[] }[]
+    toplam_hatali?: number
+  } | null>(null)
 
   async function yukle() {
     setYukleniyor(true)
@@ -202,6 +208,80 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
   async function sablonIndir() {
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
+
+    // ── SHEET 1: TALİMATLAR ──────────────────────────────────
+    const wsHelp = wb.addWorksheet('TALİMATLAR')
+    wsHelp.columns = [
+      { header: 'SÜTUN', key: 'sutun', width: 26 },
+      { header: 'ZORUNLU', key: 'zorunlu', width: 12 },
+      { header: 'AÇIKLAMA', key: 'aciklama', width: 70 },
+      { header: 'ÖRNEK', key: 'ornek', width: 22 },
+    ]
+    wsHelp.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    wsHelp.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }
+    wsHelp.getRow(1).alignment = { vertical: 'middle', horizontal: 'left' }
+
+    const helpRows: { sutun: string; zorunlu: string; aciklama: string; ornek: string }[] = [
+      { sutun: 'plaka',                  zorunlu: 'EVET', aciklama: 'Aracın plakası. Boşluk olmadan, BÜYÜK harf. Sistem otomatik normalize eder.', ornek: '06ABC123' },
+      { sutun: 'kullanici_adi_soyadi',   zorunlu: 'EVET', aciklama: 'Aracı kullanan kişinin adı soyadı.', ornek: 'Ahmet Yılmaz' },
+      { sutun: 'departman',              zorunlu: 'EVET', aciklama: 'Aracın departmanı (POOL, YÖNETİCİ, Üretim Hattı 3 vb.). Sistemde gruplama için kullanılır.', ornek: 'POOL' },
+      { sutun: 'marka',                  zorunlu: 'hayır', aciklama: 'Aracın markası (TOYOTA, FORD, OPEL vb.). Boş bırakılabilir.', ornek: 'FORD' },
+      { sutun: 'model',                  zorunlu: 'hayır', aciklama: 'Aracın modeli (Corolla, Focus, Astra vb.). Boş bırakılabilir.', ornek: 'Focus' },
+      { sutun: 'renk',                   zorunlu: 'hayır', aciklama: 'Aracın rengi (Beyaz, Gri, Siyah vb.). Boş bırakılabilir.', ornek: 'Gri' },
+      { sutun: 'yikama_gunleri',         zorunlu: 'HAFTALIK/BIHAFTA için EVET', aciklama: 'Hangi günler yıkanacak. 1=Pzt, 2=Sal, 3=Çar, 4=Per, 5=Cum, 6=Cmt, 7=Paz. Virgülle ayır.', ornek: '1,3,5' },
+      { sutun: 'yikama_frekans_tip',     zorunlu: 'hayır (default: HAFTALIK)', aciklama: 'HAFTALIK = her hafta yıkama_gunleri\'nde. BIHAFTA = N haftada bir, yıkama_gunleri\'nde. AYLIK = ayda bir, referans tarihin günü.', ornek: 'HAFTALIK' },
+      { sutun: 'yikama_frekans_aralik',  zorunlu: 'BIHAFTA için EVET (default 1)', aciklama: 'BIHAFTA tipinde "kaç haftada bir" sayısı. 2 = her 2 haftada bir, 3 = her 3 haftada bir.', ornek: '2' },
+      { sutun: 'yikama_referans_tarih',  zorunlu: 'BIHAFTA/AYLIK için EVET', aciklama: 'BIHAFTA: modulo başlangıç tarihi (bu tarihten sonraki her N haftada). AYLIK: bu tarihin gün sayısı her ay tetikler. Format: YYYY-MM-DD.', ornek: '2026-06-15' },
+      { sutun: 'varsayilan_istasyon',    zorunlu: 'EVET (otomatik üretim için)', aciklama: 'Yıkamanın yapılacağı istasyonun TANIMI (alt lokasyon adı). Sistemde Yıkama İstasyonları sayfasındaki tanımla birebir aynı olmalı.', ornek: 'İSTASYON - 1' },
+      { sutun: 'kullanici_telefon',      zorunlu: 'hayır', aciklama: 'Kullanıcının telefon numarası. Boş bırakılabilir.', ornek: '5551234567' },
+      { sutun: 'kullanici_email',        zorunlu: 'hayır', aciklama: 'Kullanıcının e-posta adresi. Boş bırakılabilir.', ornek: 'ahmet@firma.com' },
+    ]
+    for (const r of helpRows) wsHelp.addRow(r)
+    // Zorunlu sütun satırlarını kırmızımsı vurgula
+    helpRows.forEach((r, i) => {
+      const rowIdx = i + 2
+      if (/EVET/i.test(r.zorunlu)) {
+        wsHelp.getRow(rowIdx).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF2F2' } }
+      }
+      wsHelp.getCell(`B${rowIdx}`).font = { bold: true, color: { argb: /EVET/i.test(r.zorunlu) ? 'FF991B1B' : 'FF64748B' } }
+    })
+
+    // Frekans tipi tablosu ek bölüm
+    wsHelp.addRow([])
+    wsHelp.addRow([])
+    const ft1 = wsHelp.addRow(['FREKANS TİPİ', '', 'AÇIKLAMA', ''])
+    ft1.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    ft1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7C3AED' } }
+    wsHelp.addRow(['HAFTALIK', '', 'yikama_gunleri listesinin her hafta tekrarlanması. Referans tarih gerekmez.', ''])
+    wsHelp.addRow(['BIHAFTA',  '', 'yikama_gunleri + yikama_frekans_aralik (örn 2). Referans tarihten itibaren her N haftada bir tetiklenir.', ''])
+    wsHelp.addRow(['AYLIK',    '', 'Ayda bir kez referans tarihin gününde tetiklenir (yikama_gunleri kullanılmaz).', ''])
+
+    // Gün numarası tablosu
+    wsHelp.addRow([])
+    wsHelp.addRow([])
+    const gn1 = wsHelp.addRow(['YIKAMA GÜNLERİ TABLOSU', '', '', ''])
+    gn1.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    gn1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16A34A' } }
+    wsHelp.addRow(['1 = Pazartesi', '2 = Salı', '3 = Çarşamba', '4 = Perşembe'])
+    wsHelp.addRow(['5 = Cuma',      '6 = Cumartesi', '7 = Pazar', ''])
+
+    // Sync davranışı uyarısı
+    wsHelp.addRow([])
+    wsHelp.addRow([])
+    const sb = wsHelp.addRow(['⚠️ IMPORT DAVRANIŞI', '', '', ''])
+    sb.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    sb.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC2626' } }
+    wsHelp.mergeCells(`A${sb.number}:D${sb.number}`)
+    const sb2 = wsHelp.addRow(['Bu Excel TÜM araç listesinin geçerli halidir. Import sonrası:'])
+    sb2.font = { italic: true }; wsHelp.mergeCells(`A${sb2.number}:D${sb2.number}`)
+    wsHelp.addRow(['• Excel\'de OLMAYAN aktif araçlar PASİFLEŞTİRİLİR (görev kayıtları korunur — silinmez).'])
+    wsHelp.addRow(['• Excel\'de OLAN ama sistemde olmayan plakalar EKLENİR.'])
+    wsHelp.addRow(['• Excel\'de OLAN ve sistemde de OLAN plakalarda fark varsa GÜNCELLENİR (yıkama kuralı yenilenir).'])
+    wsHelp.addRow(['• Excel\'de OLAN ama sistemde PASİF olan plakalar tekrar AKTİVE EDİLİR.'])
+    wsHelp.addRow(['• Pasifleşen araçların geçmiş görev kayıtları DB\'de tutulmaya devam eder.'])
+    for (let i = sb2.number + 1; i <= sb2.number + 5; i++) wsHelp.mergeCells(`A${i}:D${i}`)
+
+    // ── SHEET 2: Araç Listesi (ana data) ─────────────────────
     const ws = wb.addWorksheet('Araç Listesi')
     // Zorunlu sütunlar: plaka, kullanici_adi_soyadi, departman
     ws.columns = [
@@ -254,7 +334,12 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       const ExcelJS = (await import('exceljs')).default
       const wb = new ExcelJS.Workbook()
       await wb.xlsx.load(await file.arrayBuffer())
-      const ws = wb.worksheets[0]
+      // Önce "Araç Listesi" sheet'ini ara, yoksa "TALİMATLAR" değilse ilk sheet
+      let ws = wb.getWorksheet('Araç Listesi')
+      if (!ws) {
+        ws = wb.worksheets.find(s => s.name !== 'TALİMATLAR') ?? wb.worksheets[0]
+      }
+      if (!ws) throw new Error('Excel\'de okunabilir sheet bulunamadı.')
       const headers: string[] = []
       ws.getRow(1).eachCell((c) => headers.push(String(c.value ?? '').toLowerCase().trim()))
       const idxPlaka = headers.indexOf('plaka')
@@ -336,15 +421,29 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       })
       const j = await res.json()
       if (!j.ok) {
-        if (j.hatali_satirlar?.length) {
-          const ornek = j.hatali_satirlar.slice(0, 5).map((h: any) => `Satır ${h.satir} (${h.plaka}): ${h.eksik.join(', ')}`).join('\n')
-          throw new Error(`${j.error}\n\nİlk hatalı satırlar:\n${ornek}${j.toplam_hatali > 5 ? `\n…ve ${j.toplam_hatali - 5} satır daha` : ''}`)
+        if (Array.isArray(j.hatali_satirlar) && j.hatali_satirlar.length > 0) {
+          // Detaylı doldurma hatası — modal'da satır satır göster
+          setImportHata({
+            baslik: 'Excel\'de Hatalı Doldurma',
+            aciklama: j.error ?? 'Bazı satırlarda zorunlu alanlar eksik veya formatı yanlış.',
+            hatali_satirlar: j.hatali_satirlar,
+            toplam_hatali: j.toplam_hatali ?? j.hatali_satirlar.length,
+          })
+          return
         }
-        throw new Error(j.error)
+        // Genel hata (modül kapalı, yetki vs.)
+        setImportHata({
+          baslik: 'Excel İmport Edilemedi',
+          aciklama: j.error ?? 'Bilinmeyen hata.',
+        })
+        return
       }
       setImportPreview({ ...j, satirlar })
     } catch (err: any) {
-      toast({ type: 'error', title: 'Excel hatası', message: err.message })
+      setImportHata({
+        baslik: 'Excel Okunamadı',
+        aciklama: err.message ?? 'Excel dosyası okunurken hata oluştu. Şablonu yeniden indirip aynı format ile doldurun.',
+      })
     } finally {
       setImportLoading(false)
       if (importInputRef.current) importInputRef.current.value = ''
@@ -555,6 +654,97 @@ Devam etmek istiyor musunuz?`,
       </div>
 
       {/* Ekle/Düzenle modal */}
+      {/* IMPORT HATA MODAL'I — detaylı satır bazlı hata listesi */}
+      {importHata && (
+        <div
+          onClick={() => setImportHata(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+            padding: 20,
+          }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 12, maxWidth: 720, width: '100%',
+              maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+              boxShadow: '0 20px 60px rgba(15,23,42,0.35)', overflow: 'hidden',
+            }}>
+            {/* Başlık */}
+            <div style={{
+              padding: '16px 20px', borderBottom: `1px solid ${T.border}`,
+              display: 'flex', alignItems: 'center', gap: 12,
+              background: T.redLight,
+            }}>
+              <AlertTriangle size={22} color={T.red} />
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: T.red }}>{importHata.baslik}</div>
+                <div style={{ fontSize: 13, color: '#7f1d1d', marginTop: 2 }}>{importHata.aciklama}</div>
+              </div>
+            </div>
+
+            {/* Hatalı satırlar tablosu */}
+            {importHata.hatali_satirlar && importHata.hatali_satirlar.length > 0 && (
+              <div style={{ padding: '12px 20px', overflowY: 'auto', flex: 1 }}>
+                <div style={{ fontSize: 12, color: T.textSoft, marginBottom: 8 }}>
+                  <strong style={{ color: T.text }}>{importHata.toplam_hatali}</strong> satırda hata var
+                  {importHata.toplam_hatali! > importHata.hatali_satirlar.length && (
+                    <span> — ilk {importHata.hatali_satirlar.length} tanesi gösteriliyor</span>
+                  )}
+                  :
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: T.grayLight }}>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: T.text, border: `1px solid ${T.border}`, width: 70 }}>Satır</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: T.text, border: `1px solid ${T.border}`, width: 130 }}>Plaka</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: T.text, border: `1px solid ${T.border}` }}>Eksik / Hatalı Alanlar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importHata.hatali_satirlar.map((h, i) => (
+                      <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                        <td style={{ padding: '6px 10px', border: `1px solid ${T.border}`, fontFamily: 'monospace', fontWeight: 700 }}>#{h.satir}</td>
+                        <td style={{ padding: '6px 10px', border: `1px solid ${T.border}`, fontFamily: 'monospace', fontWeight: 700, color: T.text }}>{h.plaka}</td>
+                        <td style={{ padding: '6px 10px', border: `1px solid ${T.border}`, color: T.red }}>
+                          {h.eksik.map((e, idx) => (
+                            <span key={idx} style={{
+                              display: 'inline-block', marginRight: 6, marginBottom: 3,
+                              padding: '2px 8px', borderRadius: 4,
+                              background: T.redLight, color: T.red, fontSize: 12, fontWeight: 600,
+                            }}>{e}</span>
+                          ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{
+                  marginTop: 12, padding: 10, background: '#fffbeb', border: '1px solid #fde68a',
+                  borderRadius: 6, fontSize: 12, color: '#78350f', lineHeight: 1.5,
+                }}>
+                  <strong>İpucu:</strong> Şablonu indirin (sağ üstte "Şablon İndir") — içindeki <strong>TALİMATLAR</strong> sheet'inde her sütunun nasıl doldurulacağı, zorunlu alanlar ve örnekler bulunur.
+                </div>
+              </div>
+            )}
+
+            {/* Tek buton: Anladım */}
+            <div style={{
+              padding: '12px 20px', borderTop: `1px solid ${T.border}`,
+              display: 'flex', justifyContent: 'flex-end',
+            }}>
+              <button onClick={() => setImportHata(null)}
+                style={{
+                  padding: '8px 22px', borderRadius: 7, border: 'none',
+                  background: T.text, color: '#fff', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 700,
+                }}>
+                Anladım
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalOpen && (
         <div onClick={() => !kaydetLoading && setModalOpen(false)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
