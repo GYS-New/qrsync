@@ -126,7 +126,19 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Lokasyon tanım → ID haritası (case-insensitive, trim'li)
+  // Lokasyon tanım → ID haritası (TR karakter + NBSP + çoklu boşluk normalize).
+  // Excel'den NBSP ( ) veya farklı kasalı/aksanlı varyantlar gelebilir.
+  // Türkçe i/İ/ı/I varyantlarını da ASCII'ye fold ederek karşılaştırırız.
+  const tanimNorm = (s: string): string =>
+    String(s ?? '')
+      .normalize('NFC')
+      .replace(/ /g, ' ')   // non-breaking space → normal
+      .replace(/\s+/g, ' ')      // çoklu boşluk → tek
+      .trim()
+      .replace(/İ/g, 'I')
+      .replace(/ı/g, 'i')
+      .toUpperCase()
+
   const { data: lokRows } = await admin
     .from('lokasyonlar')
     .select('id, tanim, parent_id, aktif, parent:lokasyonlar!parent_id(oto_yikama_lokasyon)')
@@ -136,7 +148,7 @@ export async function POST(req: NextRequest) {
   for (const l of (lokRows ?? []) as any[]) {
     if (!l.parent_id) continue
     if (!l.parent?.oto_yikama_lokasyon) continue
-    lokMap.set(String(l.tanim).trim().toLocaleLowerCase('tr'), l.id)
+    lokMap.set(tanimNorm(l.tanim), l.id)
   }
 
   // Excel satırlarını normalize et + sınıflandır
@@ -170,13 +182,16 @@ export async function POST(req: NextRequest) {
       eksik.push(`yikama_referans_tarih (${frekansTip} için zorunlu)`)
     }
 
-    // Lokasyon adı → ID resolve
+    // Lokasyon adı → ID resolve (aynı tanimNorm fonksiyonu DB tarafıyla eşleşir)
     const istasyonAdRaw = String(r.varsayilan_istasyon ?? '').trim()
     let varsayilanLokId: string | null = null
     if (istasyonAdRaw) {
-      const key = istasyonAdRaw.toLocaleLowerCase('tr')
-      varsayilanLokId = lokMap.get(key) ?? null
-      if (!varsayilanLokId) eksik.push(`varsayilan_istasyon ('${istasyonAdRaw}' bulunamadı)`)
+      varsayilanLokId = lokMap.get(tanimNorm(istasyonAdRaw)) ?? null
+      if (!varsayilanLokId) {
+        // Hata mesajına mevcut istasyon listesini de ekle → kullanıcı doğru yazımı görsün
+        const mevcutListe = [...lokMap.keys()].map(k => `'${k}'`).join(', ')
+        eksik.push(`varsayilan_istasyon ('${istasyonAdRaw}' bulunamadı; geçerli: ${mevcutListe || '—'})`)
+      }
     }
 
     if (eksik.length > 0) {
