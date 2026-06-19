@@ -231,9 +231,9 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
 
   async function gorevSil(k: GorevKaydi) {
     const ok = await confirm({
-      title: 'Görevi sil',
-      message: `${k.plaka} (${fmtTarih(k.hedef_tarih)}) görev kaydı kalıcı olarak silinecek. Devam edilsin mi?`,
-      confirmText: 'Sil', cancelText: 'Vazgeç', variant: 'danger',
+      title: '⚠️ Görevi Kalıcı Olarak Sil',
+      message: `${k.plaka} — ${fmtTarih(k.hedef_tarih)} tarihli görev kaydı veritabanından KALICI olarak silinecek.\n\nBu işlem GERİ ALINAMAZ. Görev kayıtlarından, raporlardan ve arşivden tamamen kaybolur.\n\nGerçekten silmek istiyor musunuz?`,
+      confirmText: 'Evet, Kalıcı Olarak Sil', cancelText: 'Vazgeç', variant: 'danger',
     })
     if (!ok) return
     setSilLoading(k.gorev_id)
@@ -241,7 +241,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
       const res = await fetch(`/api/oto-yikama/gorev-kayitlari/${k.gorev_id}`, { method: 'DELETE' })
       const j = await res.json()
       if (!j.ok) throw new Error(j.error ?? 'Silinemedi')
-      toast({ type: 'success', title: 'Silindi', message: k.plaka })
+      toast({ type: 'success', title: 'Kalıcı olarak silindi', message: k.plaka })
       router.refresh()
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
@@ -250,11 +250,15 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
     }
   }
 
-  async function editKaydet(yeniHedef: string, yeniLok: string) {
+  async function editKaydet(yeniHedef: string, yeniLok: string, yeniDurum: string, iptalSebep: string) {
     if (!editKaydi) return
     const body: Record<string, string> = {}
     if (yeniHedef && yeniHedef !== editKaydi.hedef_tarih) body.hedef_tarih = yeniHedef
     if (yeniLok && yeniLok !== editKaydi.lokasyon_id) body.lokasyon_id = yeniLok
+    if (yeniDurum && yeniDurum !== editKaydi.durum) {
+      body.durum = yeniDurum
+      if (yeniDurum === 'IPTAL') body.iptal_sebep = iptalSebep
+    }
     if (Object.keys(body).length === 0) {
       setEditKaydi(null); return
     }
@@ -422,7 +426,6 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
             <tbody>
               {filtrelenmis.map(k => {
                 const gd = turetilenDurum(k, bugun)
-                const duzenlenebilir = ['HAZIR', 'ACIK', 'ISLEMDE'].includes(gd)
                 return (
                   <tr key={k.gorev_id}>
                     <Td>
@@ -451,14 +454,11 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
                     {canEdit && (
                       <Td align="right">
                         <button onClick={() => setEditKaydi(k)}
-                          disabled={!duzenlenebilir}
-                          title={duzenlenebilir ? 'Düzenle' : 'Bu durumdaki görev düzenlenemez'}
+                          title="Düzenle (durum, tarih, istasyon)"
                           style={{
                             padding: 5, marginRight: 5, borderRadius: 5,
                             border: `1px solid ${T.border}`, background: '#fff',
-                            cursor: duzenlenebilir ? 'pointer' : 'not-allowed',
-                            color: duzenlenebilir ? T.text : T.gray,
-                            opacity: duzenlenebilir ? 1 : 0.5,
+                            cursor: 'pointer', color: T.text,
                             display: 'inline-flex', alignItems: 'center',
                           }}>
                           <Edit3 size={13} />
@@ -505,10 +505,17 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
   istasyonlar: IstasyonOpt[]
   loading: boolean
   onClose: () => void
-  onSave: (hedef: string, lok: string) => void
+  onSave: (hedef: string, lok: string, durum: string, iptalSebep: string) => void
 }) {
   const [hedef, setHedef] = useState(kaydi.hedef_tarih ?? '')
   const [lok, setLok] = useState(kaydi.lokasyon_id ?? '')
+  const [durum, setDurum] = useState<string>(kaydi.durum ?? 'ACIK')
+  const [iptalSebep, setIptalSebep] = useState<string>(kaydi.iptal_sebep ?? '')
+
+  const isClosedDurum = ['TAMAMLANDI', 'IPTAL', 'YAPILAMADI', 'SILINDI'].includes(kaydi.durum ?? '')
+  const durumDegisti = durum !== kaydi.durum
+  const iptalEksik = durum === 'IPTAL' && iptalSebep.trim().length < 5
+
   return (
     <div onClick={onClose}
       style={{
@@ -519,7 +526,7 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
       <div onClick={e => e.stopPropagation()}
         style={{
           background: '#fff', borderRadius: 12, padding: 24,
-          width: '100%', maxWidth: 460,
+          width: '100%', maxWidth: 500,
           boxShadow: '0 20px 60px rgba(15,23,42,0.25)',
         }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -533,15 +540,59 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Durum dropdown */}
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 6 }}>Hedef Tarih</label>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 6 }}>Durum</label>
+            <select value={durum} onChange={e => setDurum(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 7, background: '#fff' }}>
+              <option value="ACIK">Açık</option>
+              <option value="ISLEMDE">İşlemde</option>
+              <option value="TAMAMLANDI">Tamamlandı</option>
+              <option value="IPTAL">İptal</option>
+            </select>
+          </div>
+
+          {/* İptal sebebi — sadece IPTAL seçildiyse */}
+          {durum === 'IPTAL' && (
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.red, marginBottom: 6 }}>
+                İptal Sebebi <span style={{ fontWeight: 400 }}>(zorunlu, en az 5 karakter)</span>
+              </label>
+              <textarea value={iptalSebep} onChange={e => setIptalSebep(e.target.value)}
+                rows={3} placeholder="Görevin neden iptal edildiğini yazın…"
+                style={{
+                  width: '100%', padding: '8px 10px', fontSize: 13, lineHeight: 1.4,
+                  border: `1px solid ${iptalEksik ? T.red : T.border}`, borderRadius: 7,
+                  fontFamily: 'inherit', resize: 'vertical',
+                }} />
+              {iptalEksik && (
+                <div style={{ fontSize: 11, color: T.red, marginTop: 4 }}>
+                  En az 5 karakter girmelisiniz.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Hedef tarih + İstasyon — sadece düzenlenebilir durumlarda */}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 6 }}>
+              Hedef Tarih
+              {isClosedDurum && <span style={{ fontWeight: 400, color: T.textSoft, marginLeft: 6 }}>(kapalı görevde değiştirilemez)</span>}
+            </label>
             <input type="date" value={hedef} onChange={e => setHedef(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 7 }} />
+              disabled={isClosedDurum && !durumDegisti}
+              style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 7,
+                       opacity: isClosedDurum && !durumDegisti ? 0.5 : 1 }} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 6 }}>İstasyon</label>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 6 }}>
+              İstasyon
+              {isClosedDurum && <span style={{ fontWeight: 400, color: T.textSoft, marginLeft: 6 }}>(kapalı görevde değiştirilemez)</span>}
+            </label>
             <select value={lok} onChange={e => setLok(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 7, background: '#fff' }}>
+              disabled={isClosedDurum && !durumDegisti}
+              style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 7,
+                       background: '#fff', opacity: isClosedDurum && !durumDegisti ? 0.5 : 1 }}>
               <option value="">— Seçin —</option>
               {istasyonlar.map(i => <option key={i.id} value={i.id}>{i.tanim}</option>)}
             </select>
@@ -553,11 +604,12 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
             style={{ padding: '8px 16px', borderRadius: 7, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: T.text }}>
             Vazgeç
           </button>
-          <button onClick={() => onSave(hedef, lok)} disabled={loading || (!hedef && !lok)}
+          <button onClick={() => onSave(hedef, lok, durum, iptalSebep.trim())}
+            disabled={loading || iptalEksik || (!hedef && !lok && !durumDegisti)}
             style={{
               padding: '8px 18px', borderRadius: 7, border: 'none',
-              background: loading ? '#cbd5e1' : 'linear-gradient(145deg, #1d4ed8, #1e40af)',
-              color: '#fff', cursor: loading ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700,
+              background: loading || iptalEksik ? '#cbd5e1' : 'linear-gradient(145deg, #1d4ed8, #1e40af)',
+              color: '#fff', cursor: loading || iptalEksik ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
               display: 'inline-flex', alignItems: 'center', gap: 6,
             }}>
             {loading ? <><Loader2 size={13} style={{ animation: 'spin 0.9s linear infinite' }} /> Kaydediliyor…</> : 'Kaydet'}

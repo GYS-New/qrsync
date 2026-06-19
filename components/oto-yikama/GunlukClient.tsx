@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
-import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { Loader2, RotateCcw, Trash2, Search } from 'lucide-react'
+import { Loader2, Search } from 'lucide-react'
 
 type Durum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI'
 
@@ -69,8 +68,6 @@ type DurumFilter = 'TUMU' | Durum
 export default function GunlukClient() {
   const { firmaId } = useFirma()
   const { toast } = useToast()
-  const { confirm } = useConfirm()
-  const [islemLoading, setIslemLoading] = useState<string | null>(null) // gorev_id
   const [rows, setRows] = useState<Row[]>([])
   const [today, setToday] = useState<string>('')
   const [yukleniyor, setYukleniyor] = useState(true)
@@ -152,56 +149,6 @@ export default function GunlukClient() {
     for (const r of rows) c[r.durum]++
     return c
   }, [rows])
-
-  async function durumToggle(row: Row) {
-    if (row.durum !== 'ACIK' && row.durum !== 'TAMAMLANDI') {
-      toast({ type: 'error', title: 'Geçersiz işlem', message: `'${DURUM_LABEL[row.durum]}' durumu toggle edilemez.` })
-      return
-    }
-    const hedef = row.durum === 'ACIK' ? 'TAMAMLANDI' : 'ACIK'
-    const ok = await confirm({
-      title: 'Durum değişikliği',
-      message: `${row.plaka} → ${DURUM_LABEL[hedef]} olarak güncellensin mi?`,
-      confirmText: 'Evet',
-      cancelText: 'Vazgeç',
-    })
-    if (!ok) return
-    setIslemLoading(row.gorev_id)
-    try {
-      const res = await fetch(`/api/oto-yikama/gunluk/${row.gorev_id}`, { method: 'PATCH' })
-      const j = await res.json()
-      if (!j.ok) throw new Error(j.error ?? 'Güncellenemedi')
-      toast({ type: 'success', title: 'Güncellendi', message: `${row.plaka} → ${DURUM_LABEL[hedef]}` })
-      fetchData(false)
-    } catch (e: any) {
-      toast({ type: 'error', title: 'Hata', message: e.message })
-    } finally {
-      setIslemLoading(null)
-    }
-  }
-
-  async function gorevSil(row: Row) {
-    const ok = await confirm({
-      title: 'Görevi sil',
-      message: `${row.plaka} için ${row.ekstra ? 'ekstra ' : ''}yıkama kaydı kalıcı olarak silinecek. Devam edilsin mi?`,
-      confirmText: 'Sil',
-      cancelText: 'Vazgeç',
-      variant: 'danger',
-    })
-    if (!ok) return
-    setIslemLoading(row.gorev_id)
-    try {
-      const res = await fetch(`/api/oto-yikama/gunluk/${row.gorev_id}`, { method: 'DELETE' })
-      const j = await res.json()
-      if (!j.ok) throw new Error(j.error ?? 'Silinemedi')
-      toast({ type: 'success', title: 'Silindi', message: row.plaka })
-      fetchData(false)
-    } catch (e: any) {
-      toast({ type: 'error', title: 'Hata', message: e.message })
-    } finally {
-      setIslemLoading(null)
-    }
-  }
 
   const toplamSureSaniye = useMemo(() => {
     return rows.reduce((acc, r) => acc + (r.durum === 'TAMAMLANDI' ? gorevSuresiSaniye(r) : 0), 0)
@@ -360,7 +307,6 @@ export default function GunlukClient() {
                   <th style={{ width: 110, whiteSpace: 'nowrap' }}>Bitirme</th>
                   <th style={{ width: 90 }}>Süre</th>
                   <th style={{ minWidth: 160 }}>Tamamlayan</th>
-                  <th style={{ width: 110, textAlign: 'right', paddingRight: 16 }}>İşlemler</th>
                 </tr>
               </thead>
               <tbody>
@@ -392,31 +338,6 @@ export default function GunlukClient() {
                       {r.durum === 'TAMAMLANDI' ? fmtSure(gorevSuresiSaniye(r)) : '—'}
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.tamamlayan ?? '—'}</td>
-                    <td style={{ textAlign: 'right', paddingRight: 16, whiteSpace: 'nowrap' }}>
-                      <button onClick={() => durumToggle(r)}
-                        disabled={islemLoading === r.gorev_id || (r.durum !== 'ACIK' && r.durum !== 'TAMAMLANDI')}
-                        title={r.durum === 'ACIK' ? 'Tamamlandı olarak işaretle' : r.durum === 'TAMAMLANDI' ? 'Tekrar açık yap' : 'Sadece ACIK/TAMAMLANDI toggle edilebilir'}
-                        style={{
-                          padding: 5, marginRight: 6, borderRadius: 6,
-                          border: `1px solid ${T.border}`, background: '#fff',
-                          cursor: (r.durum === 'ACIK' || r.durum === 'TAMAMLANDI') ? 'pointer' : 'not-allowed',
-                          color: T.text, opacity: (r.durum === 'ACIK' || r.durum === 'TAMAMLANDI') ? 1 : 0.4,
-                          display: 'inline-flex', alignItems: 'center',
-                        }}>
-                        <RotateCcw size={13} />
-                      </button>
-                      <button onClick={() => gorevSil(r)}
-                        disabled={islemLoading === r.gorev_id}
-                        title="Sil"
-                        style={{
-                          padding: 5, borderRadius: 6,
-                          border: `1px solid ${T.redLight}`, background: '#fff',
-                          cursor: 'pointer', color: T.red,
-                          display: 'inline-flex', alignItems: 'center',
-                        }}>
-                        <Trash2 size={13} />
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,10 +1,22 @@
 /**
  * PATCH  /api/oto-yikama/gorev-kayitlari/[id]
- *   Body: { hedef_tarih?: 'YYYY-MM-DD', lokasyon_id?: string }
+ *   Body: { hedef_tarih?: 'YYYY-MM-DD', lokasyon_id?: string,
+ *           durum?: 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL',
+ *           iptal_sebep?: string (IPTAL durumu için zorunlu, min 5 karakter) }
  *   Görev kaydını günceller. Sadece SA/TA — TA kendi firmasındaki kayıtlarla sınırlı.
  *
+ *   Durum geçiş etkileri (otomatik alanlar):
+ *     - ACIK       → tamamlanma_tarihi=null, iptal_sebep=null
+ *     - ISLEMDE    → baslatilma_tarihi=now (varsa korunur)
+ *     - TAMAMLANDI → tamamlanma_tarihi=now, tamamlanma_suresi_saniye hesaplanır
+ *     - IPTAL      → iptal_sebep zorunlu, islemi_yapan_id=current user
+ *
+ *   Hedef tarih / lokasyon değişimi sadece düzenlenebilir durumlarda
+ *   (HAZIR/ACIK/ISLEMDE) izinlidir; kapanmış durumlarda (TAMAMLANDI/IPTAL/
+ *   YAPILAMADI/SILINDI) sadece durum değişikliği yapılabilir.
+ *
  * DELETE /api/oto-yikama/gorev-kayitlari/[id]
- *   Görevi (+ metadata cascade) siler.
+ *   Görevi (+ metadata cascade) siler. Geri alınamaz.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
@@ -27,7 +39,7 @@ async function loadGorev(id: string) {
   const admin = createAdminClient()
   const { data: gorev } = await admin
     .from('gorevler')
-    .select('id, durum, firma_id, lokasyon_id, tanim')
+    .select('id, durum, firma_id, lokasyon_id, tanim, baslatilma_tarihi, tamamlanma_tarihi, iptal_sebep')
     .eq('id', id)
     .single()
   if (!gorev) return null
@@ -39,6 +51,9 @@ async function loadGorev(id: string) {
   if (!meta) return null // Oto Yıkama görevi değil
   return { gorev, meta }
 }
+
+const ALLOWED_DURUM = new Set(['ACIK', 'ISLEMDE', 'TAMAMLANDI', 'IPTAL'])
+const DUZENLENEBILIR = new Set(['HAZIR', 'ACIK', 'ISLEMDE'])
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await authorize()
@@ -55,15 +70,28 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     ? body.hedef_tarih : null
   const yeniLok   = typeof body.lokasyon_id === 'string' && body.lokasyon_id.length > 0
     ? body.lokasyon_id : null
+  const yeniDurum = typeof body.durum === 'string' && ALLOWED_DURUM.has(body.durum)
+    ? (body.durum as 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL') : null
+  const iptalSebep = typeof body.iptal_sebep === 'string' ? body.iptal_sebep.trim() : ''
 
-  if (!yeniHedef && !yeniLok) {
-    return NextResponse.json({ ok: false, error: 'Güncellenecek alan yok (hedef_tarih veya lokasyon_id)' }, { status: 400 })
+  if (!yeniHedef && !yeniLok && !yeniDurum) {
+    return NextResponse.json({ ok: false, error: 'Güncellenecek alan yok' }, { status: 400 })
   }
 
-  if (['TAMAMLANDI', 'IPTAL', 'SILINDI', 'YAPILAMADI'].includes(rec.gorev.durum)) {
+  // İPTAL için sebep zorunlu (5 karakter min)
+  if (yeniDurum === 'IPTAL' && iptalSebep.length < 5) {
     return NextResponse.json({
       ok: false,
-      error: `'${rec.gorev.durum}' durumundaki görev düzenlenemez. Düzenleme yalnız HAZIR/AÇIK/İŞLEMDE durumları için geçerli.`,
+      error: 'İptal sebebi zorunlu (en az 5 karakter)',
+      code: 'IPTAL_SEBEP_GEREKLI',
+    }, { status: 400 })
+  }
+
+  // Hedef/lokasyon değişimi sadece düzenlenebilir durumlarda
+  if ((yeniHedef || yeniLok) && !DUZENLENEBILIR.has(rec.gorev.durum)) {
+    return NextResponse.json({
+      ok: false,
+      error: `'${rec.gorev.durum}' durumundaki görevde tarih/lokasyon değiştirilemez. Önce durumu açıp güncelleyin.`,
     }, { status: 409 })
   }
 
@@ -91,6 +119,42 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (yeniLok)   gorevUpdate.lokasyon_id = yeniLok
   if (yeniHedef) metaUpdate.hedef_tarih  = yeniHedef
 
+  // Durum geçişi — yan etkiler
+  if (yeniDurum) {
+    const nowIso = new Date().toISOString()
+    gorevUpdate.durum = yeniDurum
+    gorevUpdate.durum_degisim_tarihi = nowIso
+    if (yeniDurum === 'ACIK') {
+      gorevUpdate.tamamlanma_tarihi = null
+      gorevUpdate.tamamlanma_suresi_saniye = null
+      gorevUpdate.iptal_sebep = null
+    } else if (yeniDurum === 'ISLEMDE') {
+      // Başlatma yoksa ata (varsa korunur)
+      if (!rec.gorev.baslatilma_tarihi) gorevUpdate.baslatilma_tarihi = nowIso
+      gorevUpdate.islemi_yapan_id = auth.user.id
+      gorevUpdate.tamamlanma_tarihi = null
+      gorevUpdate.tamamlanma_suresi_saniye = null
+      gorevUpdate.iptal_sebep = null
+    } else if (yeniDurum === 'TAMAMLANDI') {
+      gorevUpdate.tamamlanma_tarihi = nowIso
+      gorevUpdate.islemi_yapan_id = auth.user.id
+      gorevUpdate.iptal_sebep = null
+      // Süre hesabı: baslatilma_tarihi varsa, yoksa 0
+      if (rec.gorev.baslatilma_tarihi) {
+        const baslMs = new Date(rec.gorev.baslatilma_tarihi).getTime()
+        const bitMs  = new Date(nowIso).getTime()
+        gorevUpdate.tamamlanma_suresi_saniye = Math.max(0, Math.floor((bitMs - baslMs) / 1000))
+      } else {
+        gorevUpdate.tamamlanma_suresi_saniye = 0
+      }
+    } else if (yeniDurum === 'IPTAL') {
+      gorevUpdate.iptal_sebep = iptalSebep
+      gorevUpdate.islemi_yapan_id = auth.user.id
+      gorevUpdate.tamamlanma_tarihi = null
+      gorevUpdate.tamamlanma_suresi_saniye = null
+    }
+  }
+
   if (Object.keys(gorevUpdate).length > 0) {
     const { error } = await admin.from('gorevler').update(gorevUpdate).eq('id', params.id)
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
@@ -108,10 +172,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     detay: {
       gorev_id: params.id,
       plaka: rec.meta.plaka_snapshot,
+      eski_durum: rec.gorev.durum,
+      yeni_durum: yeniDurum,
       eski_hedef: rec.meta.hedef_tarih,
       eski_lokasyon: rec.gorev.lokasyon_id,
       yeni_hedef: yeniHedef,
       yeni_lokasyon: yeniLok,
+      iptal_sebep: yeniDurum === 'IPTAL' ? iptalSebep : null,
     },
   })
 
