@@ -25,7 +25,7 @@ export default async function OtoYikamaArsivPage() {
         gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, durum, lokasyon_id,
         olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
         tamamlanma_suresi_saniye, olusturan_id, islemi_yapan_id, iptal_sebep,
-        arsivleme_tarihi
+        km, notlar, arsivleme_tarihi
       `)
       .eq('firma_id', firmaId)
       .order('hedef_tarih', { ascending: false })
@@ -69,6 +69,8 @@ export default async function OtoYikamaArsivPage() {
         baslatilma_tarihi: r.baslatilma_tarihi ?? null,
         tamamlanma_tarihi: r.tamamlanma_tarihi ?? null,
         tamamlanma_suresi_saniye: r.tamamlanma_suresi_saniye ?? null,
+        km:              r.km ?? null,
+        notlar:          r.notlar ?? null,
         arsivleme_tarihi: r.arsivleme_tarihi ?? null,
         olusturan:       userMap.get(r.olusturan_id) ?? '—',
         tamamlayan:      isTamamlandi && islemKisiId ? (userMap.get(islemKisiId) ?? null) : null,

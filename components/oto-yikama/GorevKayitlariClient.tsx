@@ -209,7 +209,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
   }
 
   function exportCsv() {
-    const headers = ['Plaka', 'İstasyon', 'Hedef Tarih', 'Durum', 'Ekstra', 'Oluşturma', 'Başlatma', 'Tamamlanma', 'Süre (sn)', 'Oluşturan', 'Tamamlayan']
+    const headers = ['Plaka', 'İstasyon', 'Hedef Tarih', 'Durum', 'Ekstra', 'Oluşturma', 'Başlatma', 'Tamamlanma', 'Süre (sn)', 'KM', 'Oluşturan', 'Tamamlayan', 'Açıklama']
     const rows = filtrelenmis.map(k => {
       const gd = turetilenDurum(k, bugun)
       return [
@@ -217,7 +217,9 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
         k.ekstra ? 'Evet' : 'Hayır',
         k.olusturma_tarihi ?? '', k.baslatilma_tarihi ?? '', k.tamamlanma_tarihi ?? '',
         k.tamamlanma_suresi_saniye ?? '',
+        k.km ?? '',
         k.olusturan ?? '', k.tamamlayan ?? '',
+        k.notlar ?? '',
       ]
     })
     const csv = [headers, ...rows]
@@ -436,7 +438,9 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
                 <Th align="center">Başlatma</Th>
                 <Th align="center">Tamamlanma</Th>
                 <Th align="center">Süre</Th>
+                <Th align="right">KM</Th>
                 <Th>Tamamlayan</Th>
+                <Th>Açıklama</Th>
                 {canEdit && <Th align="right">İşlem</Th>}
               </tr>
             </thead>
@@ -467,7 +471,19 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
                         {fmtSure(k.tamamlanma_suresi_saniye)}
                       </span>
                     </Td>
+                    <Td align="right" muted>
+                      <span style={{ fontFamily: 'monospace', fontSize: 14 }}>
+                        {k.km != null ? k.km.toLocaleString('tr-TR') : '—'}
+                      </span>
+                    </Td>
                     <Td muted>{k.tamamlayan ?? '—'}</Td>
+                    <Td muted>
+                      {k.notlar ? (
+                        <span title={k.notlar} style={{ cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          📝 {k.notlar.length > 30 ? k.notlar.slice(0, 30) + '…' : k.notlar}
+                        </span>
+                      ) : '—'}
+                    </Td>
                     {canEdit && (
                       <Td align="right">
                         <button onClick={() => setEditKaydi(k)}

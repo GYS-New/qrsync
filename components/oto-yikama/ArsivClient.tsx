@@ -16,6 +16,8 @@ export interface ArsivKaydi {
   baslatilma_tarihi: string | null
   tamamlanma_tarihi: string | null
   tamamlanma_suresi_saniye: number | null
+  km: number | null
+  notlar: string | null
   arsivleme_tarihi: string | null
   olusturan: string | null
   tamamlayan: string | null
@@ -171,14 +173,17 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
     if (filtrelenmis.length === 0) return
     const rows: string[][] = [[
       'Plaka', 'İstasyon', 'Hedef Tarih', 'Durum', 'Ekstra',
-      'Başlatma', 'Tamamlanma', 'Süre', 'Tamamlayan', 'Arşivleme Tarihi',
+      'Başlatma', 'Tamamlanma', 'Süre', 'KM', 'Tamamlayan', 'Açıklama', 'Arşivleme Tarihi',
     ]]
     for (const k of filtrelenmis) {
       const d = normalizeDurum(k.durum)
       rows.push([
         k.plaka, k.istasyon, fmtTarih(k.hedef_tarih), DURUM_LABEL[d], k.ekstra ? 'EKSTRA' : '',
         fmtDateTime(k.baslatilma_tarihi), fmtDateTime(k.tamamlanma_tarihi),
-        fmtSure(k.tamamlanma_suresi_saniye), k.tamamlayan ?? '',
+        fmtSure(k.tamamlanma_suresi_saniye),
+        k.km != null ? String(k.km) : '',
+        k.tamamlayan ?? '',
+        k.notlar ?? '',
         fmtDateTime(k.arsivleme_tarihi),
       ])
     }
@@ -308,7 +313,9 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
                 <Th align="center">Başlatma</Th>
                 <Th align="center">Tamamlanma</Th>
                 <Th align="center">Süre</Th>
+                <Th align="right">KM</Th>
                 <Th>Tamamlayan</Th>
+                <Th>Açıklama</Th>
                 <Th align="center">Arşiv Tarihi</Th>
               </tr>
             </thead>
@@ -339,7 +346,19 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
                         {fmtSure(k.tamamlanma_suresi_saniye)}
                       </span>
                     </Td>
+                    <Td align="right" muted>
+                      <span style={{ fontFamily: 'monospace', fontSize: 14 }}>
+                        {k.km != null ? k.km.toLocaleString('tr-TR') : '—'}
+                      </span>
+                    </Td>
                     <Td muted>{k.tamamlayan ?? '—'}</Td>
+                    <Td muted>
+                      {k.notlar ? (
+                        <span title={k.notlar} style={{ cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          📝 {k.notlar.length > 30 ? k.notlar.slice(0, 30) + '…' : k.notlar}
+                        </span>
+                      ) : '—'}
+                    </Td>
                     <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 15 }}>{fmtDateTime(k.arsivleme_tarihi)}</span></Td>
                   </tr>
                 )

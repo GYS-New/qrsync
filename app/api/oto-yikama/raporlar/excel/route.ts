@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
   // Veriyi raporlar API'sındaki mantığa benzer şekilde topla
   let metaQ = admin
     .from('oto_yikama_gorev_metadata')
-    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra')
+    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar')
     .gte('hedef_tarih', baslangic)
     .lte('hedef_tarih', bitis)
   if (plaka) metaQ = metaQ.eq('plaka_snapshot', plaka)
@@ -118,6 +118,7 @@ export async function GET(req: NextRequest) {
           tip: (m as any).ekstra ? 'Ekstra' : 'Planlı',
           durum: g.durum as string,
           km: (m as any).km ?? null,
+          notlar: (m as any).notlar ?? null,
         }
       })
       .sort((a, b) => (b.tamamlanma_tarihi ?? '').localeCompare(a.tamamlanma_tarihi ?? ''))
@@ -226,10 +227,10 @@ export async function GET(req: NextRequest) {
 
   // ── Sayfa 2: Detay (Atalian format) ─────────────────────────────────────
   // Sütunlar: Plaka | Kullanıcı (departman) | Yıkama Günü (haftalık plan) |
-  //           Durum | Kabul Tarihi (baslatilma) | Yıkama Personel | KM
+  //           Durum | Kabul Tarihi (baslatilma) | Yıkama Personel | KM | Açıklama
   const ws2 = wb.addWorksheet('Detay', { properties: { tabColor: { argb: 'FF7C3AED' } } })
-  const detayHeaders = ['Plaka', 'Kullanıcı', 'Yıkama Günü', 'Durum', 'Kabul Tarihi', 'Yıkama Personel', 'KM']
-  const detayWidths  = [14,      18,           24,            14,       20,              22,                 10]
+  const detayHeaders = ['Plaka', 'Kullanıcı', 'Yıkama Günü', 'Durum', 'Kabul Tarihi', 'Yıkama Personel', 'KM', 'Açıklama']
+  const detayWidths  = [14,      18,           24,            14,       20,              22,                 10,    36]
   detayWidths.forEach((w, i) => { ws2.getColumn(i + 1).width = w })
   setHdrRow(ws2, 1, detayHeaders)
   ws2.views = [{ state: 'frozen', ySplit: 1 }]
@@ -263,6 +264,7 @@ export async function GET(req: NextRequest) {
       kabulTarihi,
       r.personel,
       r.km != null ? r.km : '',
+      r.notlar ?? '',
     ], i)
     // Ekstra satırı: Plaka kolonunu mor vurgula (görseldeki gibi ek bilgi)
     if (r.ekstra) {
