@@ -48,10 +48,13 @@ export type TakvimArac = {
   aktif: boolean
 }
 
+export type TakvimSkip = { tarih: string; arac_id: string }
+
 export type TakvimResponse = {
   ok: true
   gercek: TakvimGercekKayit[]
   araclar: TakvimArac[]
+  skipler: TakvimSkip[]
   lokasyonAdMap: Record<string, string>
   kullaniciAdMap: Record<string, string>
 }
@@ -140,6 +143,17 @@ export async function GET(req: NextRequest) {
     .eq('firma_id', firmaId)
     .eq('aktif', true)
   if (aracErr) return NextResponse.json({ ok: false, error: aracErr.message }, { status: 500 })
+
+  // 4) Skip kayıtları — tahmin merge'de bu (arac_id|tarih) çiftleri atlanır.
+  // Migration 089/090 ile takvim popup'tan tahmin iptal edilince buraya yazılır.
+  const { data: skipRows } = await admin
+    .from('oto_yikama_gorev_skip')
+    .select('arac_id, tarih')
+    .eq('firma_id', firmaId)
+    .gte('tarih', baslangic)
+    .lte('tarih', bitis)
+  const skipler: { arac_id: string; tarih: string }[] = ((skipRows ?? []) as any[])
+    .map(s => ({ arac_id: s.arac_id, tarih: s.tarih }))
   const araclar: TakvimArac[] = (aracRows ?? []).map((a: any) => ({
     id: a.id,
     plaka: a.plaka,
@@ -227,6 +241,6 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  const payload: TakvimResponse = { ok: true, gercek, araclar, lokasyonAdMap, kullaniciAdMap }
+  const payload: TakvimResponse = { ok: true, gercek, araclar, skipler, lokasyonAdMap, kullaniciAdMap }
   return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } })
 }

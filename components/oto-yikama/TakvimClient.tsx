@@ -166,12 +166,20 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
       gercekSet.add(gercekKey(k))
     }
 
+    // Skip set'i — kullanıcı tahmini iptal etmişse o (arac, tarih) çifti
+    // tahminden de gizlenir (cron da skip yapar; UI ile DB sync)
+    const skipSet = new Set<string>()
+    for (const s of (data.skipler ?? [])) {
+      skipSet.add(`${s.tarih}|${s.arac_id}`)
+    }
+
     const tahminAraclar: TahminArac[] = data.araclar as TahminArac[]
     const tahminler = aralikPlanTahmin(tahminAraclar, `${yil}-01-01`, `${yil}-12-31`)
     for (const t of tahminler) {
       if (t.tarih < CUTOFF_ISO) continue
       const key = `${t.tarih}|${t.arac_id}`
       if (gercekSet.has(key)) continue
+      if (skipSet.has(key)) continue  // kullanıcı iptal etmiş — gösterme
       const kart: PlakaKart = {
         tarih: t.tarih,
         arac_id: t.arac_id,

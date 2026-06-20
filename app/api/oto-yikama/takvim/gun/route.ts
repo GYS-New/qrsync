@@ -57,10 +57,9 @@ export async function POST(req: NextRequest) {
   const aracId = String(body?.arac_id ?? '')
   const tarih = String(body?.tarih ?? '')
   let lokasyonId = body?.lokasyon_id ? String(body.lokasyon_id) : null
-  // iptal=true → görev IPTAL durumlu oluşturulur ("planı iptal et" anlamı).
-  // Cron daha sonra üretmek istediğinde mevcut metadata gördüğü için
-  // atlar — bu yüzden takvimde tahmini görev için "sil" işlemi olarak
-  // kullanılır.
+  // iptal=true → skip tablosuna kayıt yazılır (Migration 089 + 090).
+  // Cron skip kaydını görür, görev üretmez. Görev/metadata tablolarına
+  // dokunulmaz — DB temiz kalır, "hiç planlanmamış" gibi davranır.
   const iptalMi = body?.iptal === true
 
   if (!firmaId) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
@@ -84,6 +83,22 @@ export async function POST(req: NextRequest) {
   if (arac.firma_id !== firmaId) return NextResponse.json({ ok: false, error: 'Araç bu firmaya ait değil' }, { status: 400 })
   if (arac.aktif === false) return NextResponse.json({ ok: false, error: 'Araç pasif' }, { status: 400 })
 
+  // ── IPTAL/SKİP yolu — tahmini planı atla, görev oluşturma yok
+  if (iptalMi) {
+    const { error: skipErr } = await admin
+      .from('oto_yikama_gorev_skip')
+      .upsert({ firma_id: firmaId, arac_id: aracId, tarih, olusturan_id: me.id },
+              { onConflict: 'arac_id,tarih' })
+    if (skipErr) {
+      return NextResponse.json({ ok: false, error: 'Skip yazılamadı: ' + skipErr.message }, { status: 500 })
+    }
+    return NextResponse.json({
+      ok: true, plaka: arac.plaka, tarih,
+      skip: true, mesaj: `${arac.plaka} için ${tarih} planı iptal edildi (cron üretmeyecek)`,
+    })
+  }
+
+  // ── EKLEME yolu — gerçek görev oluştur
   // Lokasyon: param yoksa aracın varsayılanını kullan
   if (!lokasyonId) lokasyonId = arac.varsayilan_lokasyon_id
   if (!lokasyonId) {
@@ -109,13 +124,13 @@ export async function POST(req: NextRequest) {
     }, { status: 409 })
   }
 
-  // Görev + metadata insert
-  // - iptal=true → IPTAL durumlu (planı atla; cron mevcut metadata gördüğü
-  //   için tekrar üretmez)
-  // - Normal → bugün için ACIK, gelecek için HAZIR
+  // Manuel ekleme yaparken eski skip varsa kaldır (kullanıcı tekrar plan
+  // ekliyor — niyetini onayla)
+  await admin.from('oto_yikama_gorev_skip')
+    .delete().eq('arac_id', aracId).eq('tarih', tarih)
+
   const isBugun = tarih === bugunTR()
-  const yeniDurum = iptalMi ? 'IPTAL' : (isBugun ? 'ACIK' : 'HAZIR')
-  const nowIso = new Date().toISOString()
+  const yeniDurum = isBugun ? 'ACIK' : 'HAZIR'
   const { data: yeniGorev, error: gorevErr } = await admin
     .from('gorevler')
     .insert({
@@ -124,9 +139,6 @@ export async function POST(req: NextRequest) {
       lokasyon_id: lokasyonId,
       durum: yeniDurum,
       olusturan_id: me.id,
-      islemi_yapan_id: iptalMi ? me.id : null,
-      tamamlanma_tarihi: iptalMi ? nowIso : null,
-      iptal_sebep: iptalMi ? 'Plan kullanıcı tarafından iptal edildi' : null,
     })
     .select('id').single()
   if (gorevErr || !yeniGorev) {
