@@ -250,7 +250,7 @@ export async function GET(req: NextRequest) {
     const rowNum = i + 2
     const yikamaGunStr = Array.isArray(r.yikama_gunleri) && r.yikama_gunleri.length > 0
       ? [...r.yikama_gunleri].sort((a, b) => a - b).map((g: number) => GUN_KISA_TR[g] ?? g).join(', ')
-      : '—'
+      : 'Plansız'
     const durumStr = DURUM_LABEL_TR[r.durum] ?? r.durum ?? '—'
     // Kabul Tarihi = personel görevi başlattığı an (yoksa hedef tarih)
     const kabulTarihi = r.baslatilma_tarihi

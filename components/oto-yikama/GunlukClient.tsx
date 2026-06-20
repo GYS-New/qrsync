@@ -13,6 +13,7 @@ type Row = {
   plaka: string
   departman: string | null
   kullanici: string | null
+  yikama_gunleri: number[]
   lokasyon: string
   durum: Durum
   baslatilma_tarihi: string | null
@@ -23,6 +24,9 @@ type Row = {
   iptal_sebep: string | null
   hedef_tarih: string
 }
+
+// ISO weekday 1=Pzt..7=Paz
+const GUN_KISA = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
 
 const T = {
   text: '#0f172a', textSoft: '#64748b', border: '#e2e8f0',
@@ -301,6 +305,7 @@ export default function GunlukClient() {
                   <th style={{ width: 110 }}>Plaka</th>
                   <th style={{ minWidth: 140 }}>Kullanıcı</th>
                   <th style={{ minWidth: 130 }}>Departman</th>
+                  <th style={{ minWidth: 130 }}>Yıkama Günü</th>
                   <th style={{ minWidth: 180 }}>İstasyon</th>
                   <th style={{ width: 120, paddingLeft: 2 }}>Durum</th>
                   <th style={{ width: 110, whiteSpace: 'nowrap' }}>Başlatma</th>
@@ -325,6 +330,11 @@ export default function GunlukClient() {
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.kullanici ?? '—'}</td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.departman ?? '—'}</td>
+                    <td style={{ color: T.textSoft, fontSize: 13 }}>
+                      {Array.isArray(r.yikama_gunleri) && r.yikama_gunleri.length > 0
+                        ? [...r.yikama_gunleri].sort((x, y) => x - y).map(g => GUN_KISA[g] ?? g).join(', ')
+                        : <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Plansız</span>}
+                    </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.lokasyon}</td>
                     <td style={{ paddingLeft: 2 }}>
                       <span className={r.durum === 'ISLEMDE' ? 'islemde-flash' : undefined}

@@ -263,7 +263,7 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
             <option value="5">Cuma</option>
             <option value="6">Cumartesi</option>
             <option value="7">Pazar</option>
-            <option value="0">Yıkama günü yok</option>
+            <option value="0">Plansız</option>
           </select>
         </div>
         <div>

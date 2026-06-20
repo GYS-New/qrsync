@@ -319,7 +319,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                       </div>
                       <div style={{ display: 'flex', gap: 3, flexShrink: 0, alignItems: 'center' }}>
                         {gunler.length === 0 ? (
-                          <span style={{ fontSize: 11, color: T.textSoft, fontStyle: 'italic' }}>günsüz</span>
+                          <span style={{ fontSize: 11, color: T.textSoft, fontStyle: 'italic' }}>Plansız</span>
                         ) : (
                           [...gunler].sort((x, y) => x - y).map(g => (
                             <span key={g} style={{

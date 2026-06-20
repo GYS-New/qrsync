@@ -61,11 +61,11 @@ export async function GET(req: NextRequest) {
 
   if (gorevErr) return NextResponse.json({ ok: false, error: gorevErr.message }, { status: 500 })
 
-  // 3) Araçlar
+  // 3) Araçlar — yikama_gunleri tablo görünümünde "Yıkama Günü" kolonu için.
   const aracIds = [...new Set(metaRows.map(m => m.arac_id))]
   const { data: araclar } = await admin
     .from('araclar')
-    .select('id, plaka, departman, kullanici_adi_soyadi')
+    .select('id, plaka, departman, kullanici_adi_soyadi, yikama_gunleri')
     .in('id', aracIds)
 
   const aracMap = new Map((araclar ?? []).map((a: any) => [a.id, a]))
@@ -85,6 +85,7 @@ export async function GET(req: NextRequest) {
         plaka: m.plaka_snapshot,
         departman: a?.departman ?? null,
         kullanici: a?.kullanici_adi_soyadi ?? null,
+        yikama_gunleri: Array.isArray(a?.yikama_gunleri) ? a.yikama_gunleri : [],
         lokasyon,
         durum: g.durum as 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL',
         baslatilma_tarihi: g.baslatilma_tarihi,

@@ -554,7 +554,7 @@ Devam etmek istiyor musunuz?`,
           <option value="5">Cuma</option>
           <option value="6">Cumartesi</option>
           <option value="7">Pazar</option>
-          <option value="0">Yıkama günü yok</option>
+          <option value="0">Plansız</option>
         </select>
         <select className="verde-select" value={filterAktif} onChange={e => setFilterAktif(e.target.value as any)} style={{ width: 120 }}>
           <option value="aktif">Aktif</option>
@@ -671,7 +671,7 @@ Devam etmek istiyor musunuz?`,
                     <td style={{ color: T.textSoft, fontSize: 14 }}>
                       {Array.isArray(a.yikama_gunleri) && a.yikama_gunleri.length > 0
                         ? [...a.yikama_gunleri].sort((x, y) => x - y).map(g => GUN_KISA[g] ?? g).join(', ')
-                        : <span style={{ color: '#cbd5e1' }}>—</span>}
+                        : <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Plansız</span>}
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 13 }}>
                       {a.son_yikama_tarihi
