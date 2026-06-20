@@ -1,104 +1,213 @@
-import { createAdminClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 
 /**
- * Yıkama Aktivitesi — günlük/haftalık/aylık tamamlanan yıkama özeti.
- * 3 KPI kartı (Bugün, Bu Hafta, Bu Ay) + son 30 günün günlük bar chart'ı.
+ * Yıkama Aktivitesi — GYS AktiviteGrafigi pattern'i ile uyumlu.
  *
- * Veri: oto_yikama_gorev_metadata + gorevler.durum='TAMAMLANDI'.
- * Tarih: gorevler.tamamlanma_tarihi (TR günü). Fallback: hedef_tarih.
+ * 3 mode tab (GÜNLÜK saatlik / HAFTALIK gün / AYLIK hafta) + Recharts
+ * AreaChart. KPI üçlüsü (Bugün/Bu Hafta/Bu Ay) chart üstünde.
+ *
+ * Veri: oto_yikama_gorev_metadata + gorevler!inner (durum=TAMAMLANDI).
+ * PostgREST nested embed güvenilir değil → 2-step query.
  */
-export default async function AktiviteBlock({ firmaId }: { firmaId: string }) {
-  const admin = createAdminClient()
-  const trDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(d)
-  const bugun = trDate(new Date())
-  const son30Baslangic = trDate(new Date(Date.now() - 29 * 86400000))
+type Mode = 'gunluk' | 'haftalik' | 'aylik'
 
-  // Son 30 günün tamamlanan yıkamaları
-  const { data: rows } = await admin
-    .from('oto_yikama_gorev_metadata')
-    .select('hedef_tarih, gorev:gorevler!inner(durum, tamamlanma_tarihi, firma_id)')
-    .eq('gorev.firma_id', firmaId)
-    .eq('gorev.durum', 'TAMAMLANDI')
-    .gte('hedef_tarih', son30Baslangic)
-    .lte('hedef_tarih', bugun)
+const T = {
+  text: '#0f172a', textSoft: '#64748b', border: '#e5e7eb',
+  blue: '#1d4ed8', green: '#16a34a', purple: '#7c3aed',
+}
 
-  const arr = (rows ?? []) as any[]
+function trDateStr(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(d)
+}
 
-  // Tarih → sayı
-  const gunSayac = new Map<string, number>()
-  for (const r of arr) {
-    const gun = r.gorev?.tamamlanma_tarihi
-      ? trDate(new Date(r.gorev.tamamlanma_tarihi))
-      : r.hedef_tarih
-    if (!gun) continue
-    gunSayac.set(gun, (gunSayac.get(gun) ?? 0) + 1)
+export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
+  const supabase = createClient()
+  const [mode, setMode] = useState<Mode>('haftalik')
+  const [chartData, setChartData] = useState<{ label: string; value: number }[]>([])
+  const [kpi, setKpi] = useState({ bugun: 0, hafta: 0, ay: 0 })
+  const [yukleniyor, setYukleniyor] = useState(true)
+
+  const chartWrapRef = useRef<HTMLDivElement | null>(null)
+  const [chartSize, setChartSize] = useState({ w: 0, h: 280 })
+
+  useLayoutEffect(() => {
+    const el = chartWrapRef.current
+    if (!el) return
+    const measure = () => {
+      const rect = el.getBoundingClientRect()
+      const w = Math.floor(rect.width)
+      if (w > 0) setChartSize({ w, h: 280 })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  async function yukle() {
+    setYukleniyor(true)
+    try {
+      // 30 günlük metadata + tamamlanan gorevler (2-step query, embed güvenilir değil)
+      const son30 = trDateStr(new Date(Date.now() - 30 * 86400000))
+      const { data: metaRows } = await supabase
+        .from('oto_yikama_gorev_metadata')
+        .select('gorev_id')
+        .gte('hedef_tarih', son30)
+      const gorevIds = (metaRows ?? []).map(m => m.gorev_id)
+      if (gorevIds.length === 0) {
+        setChartData([])
+        setKpi({ bugun: 0, hafta: 0, ay: 0 })
+        return
+      }
+      const { data: gorevRows } = await supabase
+        .from('gorevler')
+        .select('id, tamamlanma_tarihi')
+        .in('id', gorevIds)
+        .eq('firma_id', firmaId)
+        .eq('durum', 'TAMAMLANDI')
+        .not('tamamlanma_tarihi', 'is', null)
+      const tamamlanmaList: Date[] = (gorevRows ?? []).map((g: any) => new Date(g.tamamlanma_tarihi))
+
+      // KPI
+      const bugun = trDateStr(new Date())
+      const haftaCutMs = Date.now() - 6 * 86400000
+      const ayCutMs    = Date.now() - 29 * 86400000
+      let bugunSay = 0, haftaSay = 0, aySay = 0
+      for (const t of tamamlanmaList) {
+        const tIso = trDateStr(t)
+        if (tIso === bugun) bugunSay++
+        if (t.getTime() >= haftaCutMs) haftaSay++
+        if (t.getTime() >= ayCutMs)    aySay++
+      }
+      setKpi({ bugun: bugunSay, hafta: haftaSay, ay: aySay })
+
+      // Chart bucket'ları mode'a göre
+      if (mode === 'gunluk') {
+        // Son 24 saat — saatlik
+        const labels: string[] = []
+        const grouped: Record<string, number> = {}
+        for (let i = 23; i >= 0; i--) {
+          const d = new Date(Date.now() - i * 3600000)
+          const label = d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false })
+          labels.push(label)
+          grouped[label] = 0
+        }
+        for (const t of tamamlanmaList) {
+          if (Date.now() - t.getTime() > 24 * 3600000) continue
+          const label = t.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false })
+          if (label in grouped) grouped[label]++
+        }
+        setChartData(labels.map(l => ({ label: l, value: grouped[l] || 0 })))
+      } else if (mode === 'haftalik') {
+        // Son 7 gün — gün kısa adı (Pzt/Sal/...)
+        const labels: string[] = []
+        const grouped: Record<string, number> = {}
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(Date.now() - i * 86400000)
+          const label = d.toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', weekday: 'short' })
+          labels.push(label)
+          grouped[label] = 0
+        }
+        for (const t of tamamlanmaList) {
+          if (Date.now() - t.getTime() > 7 * 86400000) continue
+          const label = t.toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', weekday: 'short' })
+          if (label in grouped) grouped[label]++
+        }
+        setChartData(labels.map(l => ({ label: l, value: grouped[l] || 0 })))
+      } else {
+        // Son 30 gün — 4 hafta + bu hafta bucket
+        const labels = ['4 hf önce', '3 hf önce', '2 hf önce', 'Geçen hafta', 'Bu hafta']
+        const grouped: Record<string, number> = {}
+        labels.forEach(l => { grouped[l] = 0 })
+        for (const t of tamamlanmaList) {
+          const diffGun = Math.floor((Date.now() - t.getTime()) / 86400000)
+          const bucket = Math.min(4, Math.max(0, 4 - Math.floor(diffGun / 7)))
+          grouped[labels[bucket]]++
+        }
+        setChartData(labels.map(l => ({ label: l, value: grouped[l] || 0 })))
+      }
+    } catch (e) {
+      console.error('[AktiviteBlock] yükleme hatası:', e)
+    } finally {
+      setYukleniyor(false)
+    }
   }
 
-  // KPI hesabı
-  const haftaBaslangic = trDate(new Date(Date.now() - 6 * 86400000))   // son 7 gün
-  const ayBaslangic    = trDate(new Date(Date.now() - 29 * 86400000))  // son 30 gün
-  let bugunSay = 0, haftaSay = 0, aySay = 0
-  for (const [gun, n] of gunSayac) {
-    if (gun >= ayBaslangic)    aySay += n
-    if (gun >= haftaBaslangic) haftaSay += n
-    if (gun === bugun)         bugunSay = n
-  }
+  useEffect(() => { yukle() /* eslint-disable-next-line */ }, [firmaId, mode])
 
-  // 30 günlük dizi
-  const gunler: { gun: string; sayi: number; etiket: string }[] = []
-  for (let i = 29; i >= 0; i--) {
-    const d = trDate(new Date(Date.now() - i * 86400000))
-    gunler.push({
-      gun: d,
-      sayi: gunSayac.get(d) ?? 0,
-      etiket: d.slice(8, 10) + '.' + d.slice(5, 7),
-    })
-  }
-  const maxSay = Math.max(1, ...gunler.map(g => g.sayi))
-  const barH = 70
+  // Real-time subscription — yıkama tamamlanınca chart anlık yenilensin
+  useEffect(() => {
+    const channel = supabase
+      .channel('oto-yikama-aktivite')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gorevler' }, () => yukle())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line
+  }, [firmaId])
 
   return (
     <div className="verde-card" style={{ padding: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           Yıkama Aktivitesi
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {([
+            { k: 'gunluk',   l: 'GÜNLÜK' },
+            { k: 'haftalik', l: 'HAFTALIK' },
+            { k: 'aylik',    l: 'AYLIK' },
+          ] as { k: Mode; l: string }[]).map(m => (
+            <button key={m.k} onClick={() => setMode(m.k)}
+              style={{
+                padding: '5px 12px', borderRadius: 6, fontSize: 11.5, fontWeight: 700,
+                cursor: 'pointer', letterSpacing: '0.04em',
+                background: mode === m.k ? T.text : '#fff',
+                color: mode === m.k ? '#fff' : T.text,
+                border: `1px solid ${mode === m.k ? T.text : T.border}`,
+              }}>
+              {m.l}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* KPI üçlüsü */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
-        <KpiMini etiket="Bugün"   sayi={bugunSay} renk="#1d4ed8" />
-        <KpiMini etiket="Bu Hafta" sayi={haftaSay} renk="#16a34a" />
-        <KpiMini etiket="Bu Ay"   sayi={aySay}   renk="#7c3aed" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+        <KpiMini etiket="Bugün"    sayi={kpi.bugun} renk={T.blue} />
+        <KpiMini etiket="Bu Hafta" sayi={kpi.hafta} renk={T.green} />
+        <KpiMini etiket="Bu Ay"    sayi={kpi.ay}    renk={T.purple} />
       </div>
 
-      {/* 30 günlük bar chart */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>
-          Son 30 Gün — Günlük Tamamlanan Yıkama
-        </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: barH, padding: '0 2px' }}>
-          {gunler.map(g => {
-            const h = g.sayi > 0 ? Math.max(3, (g.sayi / maxSay) * barH) : 2
-            const isToday = g.gun === bugun
-            return (
-              <div key={g.gun}
-                title={`${g.etiket}: ${g.sayi} yıkama`}
-                style={{
-                  flex: 1, minWidth: 0,
-                  height: h,
-                  background: g.sayi === 0 ? '#e5e7eb' : (isToday ? '#1d4ed8' : '#60a5fa'),
-                  borderRadius: 2,
-                }}
-              />
-            )
-          })}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: '#94a3b8' }}>
-          <span>{gunler[0]?.etiket}</span>
-          <span>{gunler[Math.floor(gunler.length / 2)]?.etiket}</span>
-          <span>{gunler[gunler.length - 1]?.etiket}</span>
-        </div>
+      {/* Area chart */}
+      <div ref={chartWrapRef} style={{ width: '100%', height: 280, position: 'relative' }}>
+        {yukleniyor && (
+          <div style={{
+            position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', zIndex: 5,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: T.textSoft, fontSize: 13,
+          }}>Yükleniyor…</div>
+        )}
+        {chartSize.w > 0 && (
+          <AreaChart width={chartSize.w} height={chartSize.h} data={chartData}
+            margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
+            <defs>
+              <linearGradient id="aktiviteFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={T.green} stopOpacity={0.32} />
+                <stop offset="100%" stopColor={T.green} stopOpacity={0.04} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11, fontWeight: 600 }} />
+            <Tooltip formatter={(v: any) => [`${v} yıkama`, 'Tamamlanan']} />
+            <Area type="monotone" dataKey="value" stroke={T.green} strokeWidth={2}
+              fill="url(#aktiviteFill)" name="Tamamlanan Yıkama" />
+          </AreaChart>
+        )}
       </div>
     </div>
   )

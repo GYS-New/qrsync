@@ -1,8 +1,13 @@
 import { createAdminClient } from '@/lib/supabase/server'
 
 /**
- * Son N tamamlanan yıkama görevi (plaka, tamamlanma zamanı, tamamlayan personel).
- * Veri: oto_yikama_gorev_metadata + gorevler (durum=TAMAMLANDI) + users JOIN.
+ * Son N tamamlanan yıkama görevi.
+ *
+ * NOT: PostgREST nested embed (gorev:gorevler!inner) bu tabloda güvenilir
+ * değil — bazen .order('gorev.tamamlanma_tarihi') filtre uygulamayıp tüm
+ * metadata'ları "hedef_tarih"e göre sıralıyor (bug). 2-step query +
+ * client-side join kullanıyoruz: önce TAMAMLANDI görevleri tamamlanma'ya
+ * göre çek, sonra metadata'larını çek.
  */
 export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
   firmaId: string
@@ -10,19 +15,50 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
 }) {
   const admin = createAdminClient()
 
-  const { data: rows } = await admin
+  // 1) En son tamamlanan görevleri çek (Oto Yıkama olmayanlar da olabilir, sonra filtreleriz)
+  const { data: gorevRows } = await admin
+    .from('gorevler')
+    .select('id, lokasyon_id, tamamlanma_tarihi, tamamlayan_kullanici_id')
+    .eq('firma_id', firmaId)
+    .eq('durum', 'TAMAMLANDI')
+    .not('tamamlanma_tarihi', 'is', null)
+    .order('tamamlanma_tarihi', { ascending: false })
+    .limit(limit * 4) // Oto Yıkama olmayanları sonra eler — biraz fazlasını çek
+
+  const gorevArr = (gorevRows ?? []) as any[]
+  if (gorevArr.length === 0) {
+    return <Bos />
+  }
+
+  // 2) Bu görevlerin metadata'sını çek (sadece Oto Yıkama olanlar dönecek)
+  const gorevIds = gorevArr.map(g => g.id)
+  const { data: metaRows } = await admin
     .from('oto_yikama_gorev_metadata')
-    .select('plaka_snapshot, hedef_tarih, gorev:gorevler!inner(id, durum, tamamlanma_tarihi, tamamlayan_kullanici_id, firma_id, lokasyon_id)')
-    .eq('gorev.firma_id', firmaId)
-    .eq('gorev.durum', 'TAMAMLANDI')
-    .order('hedef_tarih', { ascending: false })
-    .limit(limit)
+    .select('gorev_id, plaka_snapshot, hedef_tarih, ekstra')
+    .in('gorev_id', gorevIds)
 
-  const arr = (rows ?? []) as any[]
+  const metaMap = new Map(((metaRows ?? []) as any[]).map(m => [m.gorev_id, m]))
 
-  // Personel + lokasyon adlarını çek
-  const userIds = [...new Set(arr.map(r => r.gorev?.tamamlayan_kullanici_id).filter(Boolean))]
-  const lokIds  = [...new Set(arr.map(r => r.gorev?.lokasyon_id).filter(Boolean))]
+  // 3) Oto Yıkama'ya filtreleyip tamamlanma sırasını koru, limit kadar al
+  const otoYikama = gorevArr
+    .filter(g => metaMap.has(g.id))
+    .slice(0, limit)
+    .map(g => ({
+      gorev_id:           g.id,
+      lokasyon_id:        g.lokasyon_id,
+      tamamlanma_tarihi:  g.tamamlanma_tarihi,
+      tamamlayan_id:      g.tamamlayan_kullanici_id,
+      plaka:              metaMap.get(g.id)?.plaka_snapshot ?? '—',
+      ekstra:             metaMap.get(g.id)?.ekstra === true,
+    }))
+
+  if (otoYikama.length === 0) {
+    return <Bos />
+  }
+
+  // 4) Lookup map'leri (kullanıcı + lokasyon)
+  const userIds = [...new Set(otoYikama.map(o => o.tamamlayan_id).filter(Boolean))]
+  const lokIds  = [...new Set(otoYikama.map(o => o.lokasyon_id).filter(Boolean))]
   const [usersRes, loksRes] = await Promise.all([
     userIds.length > 0
       ? admin.from('users').select('id, isim_soyisim').in('id', userIds)
@@ -43,38 +79,53 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
         <a href="/oto-yikama/raporlar" style={{ fontSize: 12, fontWeight: 600, color: '#4F6AFF', textDecoration: 'none' }}>Tümünü Gör →</a>
       </div>
 
-      {arr.length === 0 ? (
-        <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 13 }}>
-          Henüz tamamlanmış yıkama yok.
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr>
-                <Th>Plaka</Th>
-                <Th>İstasyon</Th>
-                <Th>Tamamlayan</Th>
-                <Th align="right">Tamamlanma</Th>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr>
+              <Th>Plaka</Th>
+              <Th>İstasyon</Th>
+              <Th>Tamamlayan</Th>
+              <Th align="right">Tamamlanma</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {otoYikama.map((r, i) => (
+              <tr key={i}>
+                <Td bold mono>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    {r.plaka}
+                    {r.ekstra && (
+                      <span style={{ padding: '1px 6px', borderRadius: 999, background: '#fef3c7', color: '#92400e', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>EKSTRA</span>
+                    )}
+                  </span>
+                </Td>
+                <Td>{lokMap.get(r.lokasyon_id) ?? '—'}</Td>
+                <Td>{r.tamamlayan_id ? (userMap.get(r.tamamlayan_id) ?? '—') : '—'}</Td>
+                <Td align="right" muted>
+                  {new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Istanbul' }).format(new Date(r.tamamlanma_tarihi))}
+                </Td>
               </tr>
-            </thead>
-            <tbody>
-              {arr.map((r, i) => (
-                <tr key={i}>
-                  <Td bold mono>{r.plaka_snapshot ?? '—'}</Td>
-                  <Td>{lokMap.get(r.gorev?.lokasyon_id) ?? '—'}</Td>
-                  <Td>{userMap.get(r.gorev?.tamamlayan_kullanici_id) ?? '—'}</Td>
-                  <Td align="right" muted>
-                    {r.gorev?.tamamlanma_tarihi
-                      ? new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Istanbul' }).format(new Date(r.gorev.tamamlanma_tarihi))
-                      : '—'}
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function Bos() {
+  return (
+    <div className="verde-card" style={{ padding: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Son Yıkanan Araçlar
         </div>
-      )}
+        <a href="/oto-yikama/raporlar" style={{ fontSize: 12, fontWeight: 600, color: '#4F6AFF', textDecoration: 'none' }}>Tümünü Gör →</a>
+      </div>
+      <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 13 }}>
+        Henüz tamamlanmış yıkama yok.
+      </div>
     </div>
   )
 }

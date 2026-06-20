@@ -25,13 +25,14 @@ export default async function OtoYikamaDashboardPage() {
   const bugun = bugunTRDate()
 
   // Üst sıra KPI'ları — sayfa-bazlı, blok değil (hızlı yükleme için)
-  let kpiBugunPlanli = 0, kpiBugunTamamlanan = 0, kpiGeciken = 0, kpiAktifArac = 0, kpiYikamaPersonel = 0
+  let kpiBugunPlanli = 0, kpiBugunEkstra = 0, kpiBugunTamamlanan = 0,
+      kpiGeciken = 0, kpiAktifArac = 0, kpiYikamaPersonel = 0
 
   if (firmaId) {
     const [bugunRes, gecikenRes, aracRes, yikamaIds] = await Promise.all([
       admin
         .from('oto_yikama_gorev_metadata')
-        .select('gorev_id, gorev:gorevler!inner(durum, firma_id)')
+        .select('gorev_id, ekstra, gorev:gorevler!inner(durum, firma_id)')
         .eq('gorev.firma_id', firmaId)
         .eq('hedef_tarih', bugun),
       admin
@@ -44,13 +45,16 @@ export default async function OtoYikamaDashboardPage() {
       getYikamaYetkiliUserIds(admin, firmaId),
     ])
     const bugunArr = (bugunRes.data ?? []) as any[]
-    kpiBugunPlanli = bugunArr.length
+    // Planlı = ekstra olmayanlar (cron'un ürettikleri); Ekstra = ekstra=true
+    kpiBugunPlanli     = bugunArr.filter(r => !r.ekstra).length
+    kpiBugunEkstra     = bugunArr.filter(r => r.ekstra === true).length
     kpiBugunTamamlanan = bugunArr.filter(r => r.gorev?.durum === 'TAMAMLANDI').length
     kpiGeciken = gecikenRes.count ?? 0
     kpiAktifArac = aracRes.count ?? 0
     kpiYikamaPersonel = yikamaIds.length
   }
 
+  // İlerleme: hedef = planlı (ekstra hariç). Ekstralar bonus sayılır, oranı şişirmez.
   const tamamlanmaPct = kpiBugunPlanli > 0 ? Math.round((kpiBugunTamamlanan / kpiBugunPlanli) * 100) : 0
 
   return (
@@ -66,12 +70,13 @@ export default async function OtoYikamaDashboardPage() {
         {firmaId && (
           <>
             {/* SIRA 1: KPI kartları */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
-              <KpiCard label="Bugün Planlı"      value={kpiBugunPlanli}     ikon="🗓️" renk="#1d4ed8" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+              <KpiCard label="Bugün Planlı"     value={kpiBugunPlanli}     ikon="🗓️" renk="#1d4ed8" />
+              <KpiCard label="Bugün Ekstra"     value={kpiBugunEkstra}     ikon="➕" renk="#d97706" />
               <KpiCard label="Bugün Tamamlanan" value={kpiBugunTamamlanan} suffix={`(%${tamamlanmaPct})`} ikon="✓"  renk="#16a34a" />
-              <KpiCard label="Geciken"           value={kpiGeciken}         ikon="⏰" renk={kpiGeciken > 0 ? '#dc2626' : '#6b7280'} />
-              <KpiCard label="Aktif Araç"        value={kpiAktifArac}       ikon="🚗" renk="#0f172a" />
-              <KpiCard label="Yıkama Personeli"  value={kpiYikamaPersonel}  ikon="👥" renk="#7c3aed" />
+              <KpiCard label="Geciken"          value={kpiGeciken}         ikon="⏰" renk={kpiGeciken > 0 ? '#dc2626' : '#6b7280'} />
+              <KpiCard label="Aktif Araç"       value={kpiAktifArac}       ikon="🚗" renk="#0f172a" />
+              <KpiCard label="Yıkama Personeli" value={kpiYikamaPersonel}  ikon="👥" renk="#7c3aed" />
             </div>
 
             {/* SIRA 2: Bugün İlerleme + Hedef/Tamamlanan/İptal Donut + Online Personel */}
