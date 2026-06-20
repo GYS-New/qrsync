@@ -194,13 +194,12 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
       const mod: any = await import('html2pdf.js')
       const html2pdf = mod.default || mod
       await html2pdf().set({
-        margin: [6, 6, 8, 6],
+        margin: [8, 8, 10, 8],
         filename: `oto-yikama-raporu-${baslangic}_${bitis}.pdf`,
         html2canvas: {
           scale: 2, useCORS: true, backgroundColor: '#f8fafc',
           // PDF capture sırasında detay tablonun max-height/scroll sınırını
           // kaldır — tüm satırlar tek bir uzun blok halinde render olsun
-          // (sonra pagebreak 'css' modu ile sayfalara bölünür).
           onclone: (doc: Document) => {
             doc.querySelectorAll<HTMLElement>('.detay-tablo-scroll').forEach(el => {
               el.style.maxHeight = 'none'
@@ -209,9 +208,14 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
           },
         },
         jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4' },
-        // 'css' modu inline pageBreakInside:auto'yu da dinler → detay tablo
-        // gibi uzun kartlar bölünebilir. 'avoid-all' chart kartlarını korur.
-        pagebreak: { mode: ['css', 'legacy', 'avoid-all'] },
+        // Selector-tabanlı kontrol — global 'avoid-all' yerine net hedefleme:
+        //   before: bu selector'lara sahip elementler yeni sayfada başlar
+        //   avoid:  bu selector'lar sayfa içinde bölünmez
+        pagebreak: {
+          mode: ['css', 'legacy'],
+          before: ['.pdf-pagebreak-before'],
+          avoid:  ['.pdf-card'],
+        },
       }).from(printRef.current).save()
     } catch (e: any) {
       toast({ type: 'error', title: 'PDF hatası', message: e?.message ?? 'Bilinmeyen hata' })
@@ -352,10 +356,10 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
           {/* GRAFİKLER GRID */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {/* Saatlik trend — sol Planlı, sağ Plansız (08:00-18:00 TR) */}
-            <div className="verde-card" style={{ padding: 12, gridColumn: '1 / -1' }}>
+            <div className="verde-card pdf-card" style={{ padding: 12, gridColumn: '1 / -1' }}>
               <Baslik>Saatlik Yıkama Trendi — 08:00 – 18:00 (Planlı / Plansız)</Baslik>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div style={{ height: 180 }}>
+                <div style={{ height: 220 }}>
                   <div style={{ fontSize: 11.5, fontWeight: 700, color: T.green, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     🟢 Planlı (Cron)
                   </div>
@@ -369,7 +373,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <div style={{ height: 180 }}>
+                <div style={{ height: 220 }}>
                   <div style={{ fontSize: 11.5, fontWeight: 700, color: T.amber, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     🟡 Plansız (Ekstra)
                   </div>
@@ -386,9 +390,8 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
               </div>
             </div>
 
-            {/* Personel + Plaka top — tek kart içinde 2 kolon (PDF'te yan yana
-                ve tek parça olarak basılır, ortadan bölünmez) */}
-            <div className="verde-card" style={{ padding: 12, gridColumn: '1 / -1' }}>
+            {/* Personel + Plaka top — tek kart içinde 2 kolon, PDF'te yeni sayfa */}
+            <div className="verde-card pdf-card pdf-pagebreak-before" style={{ padding: 12, gridColumn: '1 / -1' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
                   <Baslik>Personel Bazlı Yıkama (Top 10)</Baslik>
@@ -422,12 +425,12 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
               </div>
             </div>
 
-            {/* Donutlar tek kart — Planlı/Ekstra + İstasyon (yan yana, PDF tek parça) */}
-            <div className="verde-card" style={{ padding: 12, gridColumn: '1 / -1' }}>
+            {/* Donutlar tek kart — Planlı/Ekstra + İstasyon (yan yana), PDF'te yeni sayfa */}
+            <div className="verde-card pdf-card pdf-pagebreak-before" style={{ padding: 12, gridColumn: '1 / -1' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
                   <Baslik>Planlı / Ekstra Dağılımı</Baslik>
-                  <div style={{ height: 180 }}>
+                  <div style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Tooltip />
@@ -446,7 +449,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                 </div>
                 <div>
                   <Baslik>İstasyon Dağılımı</Baslik>
-                  <div style={{ height: 180 }}>
+                  <div style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Tooltip />
@@ -466,9 +469,10 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
             </div>
           </div>
 
-          {/* DETAY TABLO — uzun olduğu için sayfalar arası bölünebilir
-              (default break-inside:avoid CSS'ini override) */}
-          <div className="verde-card" style={{ overflow: 'hidden', pageBreakInside: 'auto', breakInside: 'auto' }}>
+          {/* DETAY TABLO — yeni sayfada başlasın, uzun olduğu için sayfalar
+              arası bölünebilir (break-inside:auto chart kartlarındaki avoid
+              kuralını override eder) */}
+          <div className="verde-card pdf-pagebreak-before" style={{ overflow: 'hidden', pageBreakInside: 'auto', breakInside: 'auto' }}>
             <div style={{ padding: '10px 16px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Filter size={14} color={T.textSoft} />
               <strong style={{ fontSize: 13 }}>Detay Liste</strong>
@@ -536,15 +540,10 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
         @keyframes spin { to { transform: rotate(360deg) } }
         /* html2pdf çalışırken pdf-only blok görünür olsun (capture sırasında) */
         .pdf-only { display: none; }
-        /* PDF çıktısında chart kartları sayfa ortasından bölünmesin (html2pdf
-           pagebreak için global CSS — web sayfasında zararsız). Detay tablo
-           kartı inline pageBreakInside:auto ile bu kuralı override eder. */
-        .verde-card { page-break-inside: avoid; break-inside: avoid; }
-        /* Print modunda detay tablonun scroll container'ı tam yüksekliğe
-           açılsın — html2canvas tüm satırları capture etsin. */
-        @media print {
-          .detay-tablo-scroll { max-height: none !important; overflow-y: visible !important; }
-        }
+        /* PDF chart kartları — bütün halinde tek sayfada kalsın */
+        .pdf-card { page-break-inside: avoid !important; break-inside: avoid !important; }
+        /* Bu class'a sahip kartlar PDF'te yeni sayfada başlar */
+        .pdf-pagebreak-before { page-break-before: always !important; break-before: page !important; }
       `}</style>
     </div>
   )
