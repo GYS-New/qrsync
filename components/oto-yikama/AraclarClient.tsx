@@ -356,6 +356,102 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
     URL.revokeObjectURL(a.href)
   }
 
+  // ── Mevcut araç listesini Excel olarak indir ───────────────
+  // Üst bardaki aktif filtreler (arama/departman/yıkama günü/aktif) uygulanır.
+  // Çıktı, "Excel ile Sync" için kullanılan şablonla aynı kolonlardadır →
+  // istenirse aynı dosya geri import edilebilir.
+  async function mevcutListeIndir() {
+    if (filtered.length === 0) {
+      toast({ type: 'info', title: 'Bilgi', message: 'İndirilecek kayıt yok (filtreyi kontrol edin).' })
+      return
+    }
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook()
+    wb.creator = 'İO-GYS'
+    wb.created = new Date()
+
+    const ws = wb.addWorksheet('Araç Listesi')
+    ws.columns = [
+      { header: 'plaka',                  key: 'plaka',                  width: 14 },
+      { header: 'kullanici_adi_soyadi',   key: 'kullanici_adi_soyadi',   width: 24 },
+      { header: 'departman',              key: 'departman',              width: 22 },
+      { header: 'yikama_gunleri',         key: 'yikama_gunleri',         width: 16 },
+      { header: 'yikama_frekans_tip',     key: 'yikama_frekans_tip',     width: 18 },
+      { header: 'yikama_frekans_aralik',  key: 'yikama_frekans_aralik',  width: 20 },
+      { header: 'yikama_referans_tarih',  key: 'yikama_referans_tarih',  width: 20 },
+      { header: 'varsayilan_istasyon',    key: 'varsayilan_istasyon',    width: 22 },
+      { header: 'kullanici_telefon',      key: 'kullanici_telefon',      width: 18 },
+      { header: 'kullanici_email',        key: 'kullanici_email',        width: 26 },
+      { header: 'aktif',                  key: 'aktif',                  width: 8  },
+      { header: 'son_yikama_tarihi',      key: 'son_yikama_tarihi',      width: 18 },
+      { header: 'notlar',                 key: 'notlar',                 width: 30 },
+    ]
+    // Başlık satırı
+    const header = ws.getRow(1)
+    header.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }
+    header.alignment = { vertical: 'middle' }
+    header.height = 22
+
+    // İstasyon id → tanım map
+    const istasyonMap = new Map(istasyonlar.map(i => [i.id, i.tanim]))
+
+    for (const a of filtered) {
+      const yikamaGunStr = Array.isArray(a.yikama_gunleri) && a.yikama_gunleri.length > 0
+        ? [...a.yikama_gunleri].sort((x, y) => x - y).join(',')
+        : ''
+      const refTarRaw = a.yikama_referans_tarih
+      let refTarDate: Date | null = null
+      if (refTarRaw) {
+        const m = refTarRaw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+        if (m) refTarDate = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]))
+      }
+      const sonYikRaw = a.son_yikama_tarihi
+      let sonYikDate: Date | null = null
+      if (sonYikRaw) {
+        const d = new Date(sonYikRaw)
+        if (!isNaN(d.getTime())) sonYikDate = d
+      }
+
+      ws.addRow({
+        plaka:                  a.plaka,
+        kullanici_adi_soyadi:   a.kullanici_adi_soyadi ?? '',
+        departman:              a.departman ?? '',
+        yikama_gunleri:         yikamaGunStr,
+        yikama_frekans_tip:     a.yikama_frekans_tip ?? 'HAFTALIK',
+        yikama_frekans_aralik:  a.yikama_frekans_aralik ?? 1,
+        yikama_referans_tarih:  refTarDate,
+        varsayilan_istasyon:    a.varsayilan_lokasyon_id ? (istasyonMap.get(a.varsayilan_lokasyon_id) ?? '') : '',
+        kullanici_telefon:      a.kullanici_telefon ?? '',
+        kullanici_email:        a.kullanici_email ?? '',
+        aktif:                  a.aktif ? 'EVET' : 'HAYIR',
+        son_yikama_tarihi:      sonYikDate,
+        notlar:                 a.notlar ?? '',
+      })
+    }
+    // Tarih sütunları: yikama_referans_tarih (G=7), son_yikama_tarihi (L=12)
+    ws.getColumn(7).numFmt = 'dd/mm/yyyy'
+    ws.getColumn(12).numFmt = 'dd/mm/yyyy hh:mm'
+    // Pasif satırlar gri arka plan
+    for (let i = 0; i < filtered.length; i++) {
+      if (!filtered[i].aktif) {
+        ws.getRow(i + 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }
+      }
+    }
+    // Freeze header
+    ws.views = [{ state: 'frozen', ySplit: 1 }]
+
+    const buf = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    const tarih = new Date().toISOString().slice(0, 10)
+    a.download = `arac-listesi-${tarih}.xlsx`
+    a.click()
+    URL.revokeObjectURL(a.href)
+    toast({ type: 'success', title: 'İndirildi', message: `${filtered.length} araç Excel'e aktarıldı` })
+  }
+
   // ── Excel parse + sync önizleme ──────────────────────────────
   async function importDosyaSec(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -569,6 +665,11 @@ Devam etmek istiyor musunuz?`,
             style={{ padding: '8px 14px', borderRadius: 8, border: `1.5px solid #16a34a`, background: '#dcfce7', color: '#15803d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, fontWeight: 700, boxShadow: '0 1px 2px rgba(22,163,74,0.15)' }}>
             {importLoading ? <RefreshCw size={15} style={{ animation: 'spin 0.9s linear infinite' }} /> : <Upload size={15} />}
             Excel ile Sync
+          </button>
+          <button onClick={mevcutListeIndir}
+            title={`Filtrelenmiş ${filtered.length} aracı Excel olarak indir`}
+            style={{ padding: '8px 14px', borderRadius: 8, border: `1.5px solid #d97706`, background: '#fef3c7', color: '#92400e', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, fontWeight: 700, boxShadow: '0 1px 2px rgba(217,119,6,0.15)' }}>
+            <FileSpreadsheet size={15} /> Excel İndir
           </button>
           <button onClick={sablonIndir}
             style={{ padding: '8px 14px', borderRadius: 8, border: `1.5px solid #2563eb`, background: '#dbeafe', color: '#1d4ed8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, fontWeight: 700, boxShadow: '0 1px 2px rgba(37,99,235,0.15)' }}>
