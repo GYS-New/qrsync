@@ -210,7 +210,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
   }
 
   function exportCsv() {
-    const headers = ['Plaka', 'İstasyon', 'Hedef Tarih', 'Durum', 'Ekstra', 'Oluşturma', 'Başlatma', 'Tamamlanma', 'Süre (sn)', 'KM', 'Oluşturan', 'İşlem Yapan', 'Açıklama / Sebep']
+    const headers = ['Plaka', 'İstasyon', 'Yıkama Günü', 'Durum', 'Ekstra', 'Oluşturma', 'Başlatma', 'Tamamlanma', 'Süre (sn)', 'KM', 'Oluşturan', 'İşlem Yapan', 'Açıklama / Sebep']
     const rows = filtrelenmis.map(k => {
       const gd = turetilenDurum(k, bugun)
       const islemYapan =
@@ -381,7 +381,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
             <option value="0">Plansız</option>
           </select>
         </FilterField>
-        <FilterField label="Hedef Tarih">
+        <FilterField label="Yıkama Günü">
           <div style={{ display: 'flex', gap: 4 }}>
             <input type="date" value={hedefBas} onChange={e => setHedefBas(e.target.value)}
               style={{ flex: 1, padding: '4px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
@@ -440,7 +440,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
               <tr>
                 <Th>Plaka</Th>
                 <Th>İstasyon</Th>
-                <Th align="center">Hedef Tarih</Th>
+                <Th align="center">Yıkama Günü</Th>
                 <Th align="center">Durum</Th>
                 <Th align="center">Başlatma</Th>
                 <Th align="center">Tamamlanma</Th>
@@ -636,7 +636,7 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
           {/* Hedef tarih + İstasyon — sadece düzenlenebilir durumlarda */}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 6 }}>
-              Hedef Tarih
+              Yıkama Günü
               {isClosedDurum && <span style={{ fontWeight: 400, color: T.textSoft, marginLeft: 6 }}>(kapalı görevde değiştirilemez)</span>}
             </label>
             <input type="date" value={hedef} onChange={e => setHedef(e.target.value)}
