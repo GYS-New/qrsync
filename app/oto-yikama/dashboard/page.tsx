@@ -35,12 +35,14 @@ export default async function OtoYikamaDashboardPage() {
         .select('gorev_id, ekstra, gorev:gorevler!inner(durum, firma_id)')
         .eq('gorev.firma_id', firmaId)
         .eq('hedef_tarih', bugun),
+      // Geciken = hedef_tarih < bugün ve hâlâ AÇIK durumda (HAZIR/ACIK/ISLEMDE).
+      // IPTAL, YAPILAMADI ve TAMAMLANDI kapalı sayılır — geciken'e dahil edilmez.
       admin
         .from('oto_yikama_gorev_metadata')
         .select('gorev_id, gorev:gorevler!inner(durum, firma_id)', { count: 'exact', head: true })
         .eq('gorev.firma_id', firmaId)
         .lt('hedef_tarih', bugun)
-        .neq('gorev.durum', 'TAMAMLANDI'),
+        .in('gorev.durum', ['HAZIR', 'ACIK', 'ISLEMDE']),
       admin.from('araclar').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('aktif', true),
       getYikamaYetkiliUserIds(admin, firmaId),
     ])
