@@ -312,7 +312,6 @@ export default function RaporlarClient() {
           <Kpi label="Toplam Yıkama" deger={agg.toplam} renk={T.blue} />
           <Kpi label="Planlı" deger={agg.planli} renk={T.green} />
           <Kpi label="Ekstra" deger={agg.ekstra} renk={T.amber} />
-          <Kpi label="Farklı Plaka" deger={agg.plaka_sayisi} renk={T.purple} />
           <Kpi label="Personel" deger={agg.personel_sayisi} renk={T.text} />
           <Kpi label="Toplam Süre" deger={fmtSure(agg.toplam_sure_saniye)} renk={T.text} kucuk />
           <Kpi label="Ortalama Süre" deger={fmtSure(agg.ortalama_sure_saniye)} renk={T.text} kucuk />
