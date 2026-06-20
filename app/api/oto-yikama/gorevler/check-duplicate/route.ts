@@ -31,13 +31,18 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 })
 
-  const { data: me } = await supabase.from('users').select('id,rol').eq('id', user.id).single()
-  if (!me || !['super_admin', 'alt_super_admin'].includes(me.rol)) {
-    return NextResponse.json({ ok: false, error: 'Sadece SA' }, { status: 403 })
+  const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
+  if (!me || !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
+    return NextResponse.json({ ok: false, error: 'Bu işlem için yönetici yetkisi gerekli' }, { status: 403 })
   }
 
   const body = await req.json().catch(() => ({}))
   const firmaId = body.firma_id
+
+  const isSA = ['super_admin', 'alt_super_admin'].includes(me.rol)
+  if (firmaId && !isSA && firmaId !== me.firma_id) {
+    return NextResponse.json({ ok: false, error: 'Bu firmaya erişim yok' }, { status: 403 })
+  }
   const aracIds = (body.arac_ids ?? []) as string[]
   const tarihler = (body.tarihler ?? []) as string[]
 

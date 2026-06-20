@@ -10,12 +10,14 @@ import { getFirmaModulDurumu } from '@/lib/firmalar/modulDurumu'
 
 export const dynamic = 'force-dynamic'
 
-async function sa(supabase: any) {
+// mode='read' → tüm roller (görüntüleme), mode='write' → SA + alt_SA + TA
+async function yetki(supabase: any, mode: 'read' | 'write') {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { err: NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 }) }
   const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
-  if (!me || !['super_admin', 'alt_super_admin'].includes(me.rol)) {
-    return { err: NextResponse.json({ ok: false, error: 'Sadece SA' }, { status: 403 }) }
+  if (!me) return { err: NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 401 }) }
+  if (mode === 'write' && !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
+    return { err: NextResponse.json({ ok: false, error: 'Bu işlem için yönetici (SA veya TA) yetkisi gerekli' }, { status: 403 }) }
   }
   return { me }
 }
@@ -33,11 +35,16 @@ async function assertOtoYikamaAktif(admin: any, firmaId: string) {
 
 export async function GET(req: NextRequest) {
   const supabase = createClient()
-  const auth = await sa(supabase); if ('err' in auth) return auth.err
+  const auth = await yetki(supabase, 'read'); if ('err' in auth) return auth.err
   const admin = createAdminClient()
   const sp = req.nextUrl.searchParams
   const firmaId = sp.get('firma_id')
   if (!firmaId) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
+  // SA dışı roller kendi firmasına bağlı
+  const isSA = ['super_admin', 'alt_super_admin'].includes(auth.me.rol)
+  if (!isSA && firmaId !== auth.me.firma_id) {
+    return NextResponse.json({ ok: false, error: 'Bu firmaya erişim yok' }, { status: 403 })
+  }
   const modulErr = await assertOtoYikamaAktif(admin, firmaId); if (modulErr) return modulErr
   const projeId = sp.get('proje_id')
   const aktif = sp.get('aktif')
@@ -54,7 +61,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const supabase = createClient()
-  const auth = await sa(supabase); if ('err' in auth) return auth.err
+  const auth = await yetki(supabase, 'write'); if ('err' in auth) return auth.err
   const admin = createAdminClient()
   const body = await req.json().catch(() => ({}))
 
@@ -65,6 +72,10 @@ export async function POST(req: NextRequest) {
   if (!kullaniciAd) return NextResponse.json({ ok: false, error: 'Kullanıcı adı soyadı gerekli' }, { status: 400 })
   if (!departman) return NextResponse.json({ ok: false, error: 'Departman gerekli' }, { status: 400 })
   if (!body.firma_id) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
+  const isSA = ['super_admin', 'alt_super_admin'].includes(auth.me.rol)
+  if (!isSA && body.firma_id !== auth.me.firma_id) {
+    return NextResponse.json({ ok: false, error: 'Bu firmaya erişim yok' }, { status: 403 })
+  }
   const modulErr = await assertOtoYikamaAktif(admin, body.firma_id); if (modulErr) return modulErr
 
   const FREKANS_VALID = new Set(['HAFTALIK', 'BIHAFTA', 'AYLIK'])

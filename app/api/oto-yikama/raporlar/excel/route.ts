@@ -40,20 +40,27 @@ export async function GET(req: NextRequest) {
   const isCron = !!cronExpected && cronToken === cronExpected
 
   let meAd: string = 'Otomatik Rapor'
+  let meFirmaId: string | null = null
+  let isSA = false
   if (!isCron) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
 
-    const { data: me } = await supabase.from('users').select('id,rol,isim_soyisim').eq('id', user.id).single()
-    if (!me || !['super_admin', 'alt_super_admin'].includes(me.rol)) {
-      return NextResponse.json({ error: 'Sadece SA' }, { status: 403 })
-    }
+    const { data: me } = await supabase.from('users').select('id,rol,firma_id,isim_soyisim').eq('id', user.id).single()
+    if (!me) return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 401 })
     meAd = me.isim_soyisim ?? '—'
+    meFirmaId = me.firma_id ?? null
+    isSA = ['super_admin', 'alt_super_admin'].includes(me.rol)
   }
 
   const firmaId = sp.get('firma_id')
   if (!firmaId) return NextResponse.json({ error: 'firma_id gerekli' }, { status: 400 })
+
+  // SA dışı roller kendi firmasına bağlı (cron bypass'ta zaten secret kontrolü yapıldı)
+  if (!isCron && !isSA && firmaId !== meFirmaId) {
+    return NextResponse.json({ error: 'Bu firmaya erişim yok' }, { status: 403 })
+  }
 
   const admin = createAdminClient()
   if (!(await getFirmaModulDurumu(admin, firmaId, 'oto_yikama_aktif'))) {

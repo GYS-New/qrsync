@@ -22,13 +22,18 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 })
 
-  const { data: me } = await supabase.from('users').select('id,rol').eq('id', user.id).single()
-  if (!me || !['super_admin', 'alt_super_admin'].includes(me.rol)) {
-    return NextResponse.json({ ok: false, error: 'Sadece SA' }, { status: 403 })
-  }
+  const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
+  if (!me) return NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 401 })
 
   const firmaId = req.nextUrl.searchParams.get('firma_id')
   if (!firmaId) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
+
+  // SA dışındaki tüm roller kendi firmasına bağlı (defense-in-depth — sayfa
+  // seviyesinde assertModulYetkisi zaten Oto Yıkama yetkisini kontrol eder)
+  const isSA = ['super_admin', 'alt_super_admin'].includes(me.rol)
+  if (!isSA && firmaId !== me.firma_id) {
+    return NextResponse.json({ ok: false, error: 'Bu firmaya erişim yok' }, { status: 403 })
+  }
 
   const admin = createAdminClient()
   const modul = await getFirmaModulDurumu(admin, firmaId, 'oto_yikama_aktif')

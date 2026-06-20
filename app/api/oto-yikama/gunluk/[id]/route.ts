@@ -16,11 +16,20 @@ async function authorize() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Yetkisiz', status: 401 as const }
-  const { data: me } = await supabase.from('users').select('id,rol').eq('id', user.id).single()
-  if (!me || !['super_admin', 'alt_super_admin'].includes(me.rol)) {
-    return { error: 'Sadece SA', status: 403 as const }
+  const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
+  if (!me || !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
+    return { error: 'Bu işlem için yönetici (SA veya TA) yetkisi gerekli', status: 403 as const }
   }
   return { user, me }
+}
+
+// TA için firma scope kontrolü
+function scopeKontrol(me: any, firmaId: string): NextResponse | null {
+  const isSA = ['super_admin', 'alt_super_admin'].includes(me.rol)
+  if (!isSA && firmaId !== me.firma_id) {
+    return NextResponse.json({ ok: false, error: 'Bu firmaya erişim yok' }, { status: 403 })
+  }
+  return null
 }
 
 export async function PATCH(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -36,6 +45,7 @@ export async function PATCH(_req: NextRequest, { params }: { params: { id: strin
     .eq('id', params.id)
     .single()
   if (!gorev) return NextResponse.json({ ok: false, error: 'Görev bulunamadı' }, { status: 404 })
+  const scopeErr = scopeKontrol(auth.me, gorev.firma_id); if (scopeErr) return scopeErr
 
   // Bu Oto Yıkama metadata kaydı var mı? (Sadece Oto Yıkama görevleri için)
   const { data: meta } = await admin
@@ -106,6 +116,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     .eq('id', params.id)
     .single()
   if (!gorev) return NextResponse.json({ ok: false, error: 'Görev bulunamadı' }, { status: 404 })
+  const scopeErr2 = scopeKontrol(auth.me, gorev.firma_id); if (scopeErr2) return scopeErr2
 
   const { data: meta } = await admin
     .from('oto_yikama_gorev_metadata')

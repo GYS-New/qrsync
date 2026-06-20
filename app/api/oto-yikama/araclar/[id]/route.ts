@@ -13,11 +13,20 @@ export const dynamic = 'force-dynamic'
 async function sa(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { err: NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 }) }
-  const { data: me } = await supabase.from('users').select('id,rol').eq('id', user.id).single()
-  if (!me || !['super_admin', 'alt_super_admin'].includes(me.rol)) {
-    return { err: NextResponse.json({ ok: false, error: 'Sadece SA' }, { status: 403 }) }
+  const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
+  if (!me || !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
+    return { err: NextResponse.json({ ok: false, error: 'Bu işlem için yönetici (SA veya TA) yetkisi gerekli' }, { status: 403 }) }
   }
   return { me }
+}
+
+// TA için firma scope kontrolü
+function scopeKontrol(me: any, firmaId: string): NextResponse | null {
+  const isSA = ['super_admin', 'alt_super_admin'].includes(me.rol)
+  if (!isSA && firmaId !== me.firma_id) {
+    return NextResponse.json({ ok: false, error: 'Bu firmaya erişim yok' }, { status: 403 })
+  }
+  return null
 }
 
 async function assertOtoYikamaAktifById(admin: any, aracId: string) {
@@ -39,6 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Mevcut kaydı al — plaka değişikliği audit için + firma modül flag kontrolü
   const { data: mevcut } = await admin.from('araclar').select('*').eq('id', params.id).single()
   if (!mevcut) return NextResponse.json({ ok: false, error: 'Araç bulunamadı' }, { status: 404 })
+  const scopeErr = scopeKontrol(auth.me, mevcut.firma_id); if (scopeErr) return scopeErr
   const modulAktif = await getFirmaModulDurumu(admin, mevcut.firma_id, 'oto_yikama_aktif')
   if (!modulAktif) {
     return NextResponse.json({ ok: false, error: 'Bu firma için Oto Yıkama modülü aktif değil.' }, { status: 403 })
@@ -115,6 +125,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   const modul = await assertOtoYikamaAktifById(admin, params.id)
   if ('err' in modul) return modul.err
+  const scopeErr = scopeKontrol(auth.me, modul.arac.firma_id); if (scopeErr) return scopeErr
 
   if (hard) {
     const { error } = await admin.from('araclar').delete().eq('id', params.id)

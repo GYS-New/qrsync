@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 })
 
-  const { data: me } = await supabase.from('users').select('id,rol').eq('id', user.id).single()
-  if (!me || !['super_admin', 'alt_super_admin'].includes(me.rol)) {
-    return NextResponse.json({ ok: false, error: 'Sadece SA' }, { status: 403 })
+  const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
+  if (!me || !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
+    return NextResponse.json({ ok: false, error: 'Bu işlem için yönetici (SA veya TA) yetkisi gerekli' }, { status: 403 })
   }
 
   const body = await req.json().catch(() => ({}))
@@ -52,6 +52,10 @@ export async function POST(req: NextRequest) {
   const tarihler = (body.tarihler ?? []) as string[]
 
   if (!firmaId) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
+  const isSA = ['super_admin', 'alt_super_admin'].includes(me.rol)
+  if (!isSA && firmaId !== me.firma_id) {
+    return NextResponse.json({ ok: false, error: 'Bu firmaya erişim yok' }, { status: 403 })
+  }
   if (!Array.isArray(atamalar) || atamalar.length === 0) {
     return NextResponse.json({ ok: false, error: 'En az bir plaka × lokasyon ataması gerekli' }, { status: 400 })
   }
