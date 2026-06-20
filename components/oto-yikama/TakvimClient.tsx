@@ -1,10 +1,11 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Loader2, Search } from 'lucide-react'
+import { X, Loader2, Search, Trash2, Plus } from 'lucide-react'
 import { useToast } from '@/components/ui/ToastProvider'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { aralikPlanTahmin, type TahminArac } from '@/lib/oto-yikama/yikamaPlanTahmin'
-import type { TakvimGercekKayit, TakvimResponse } from '@/app/api/oto-yikama/takvim/route'
+import type { TakvimGercekKayit, TakvimResponse, TakvimArac } from '@/app/api/oto-yikama/takvim/route'
 
 type Durum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI'
 
@@ -53,6 +54,8 @@ const DURUM_PRIO: Record<Durum, number> = {
 const T = {
   text: '#0f172a', textSoft: '#64748b', border: '#e2e8f0',
   blue: '#1d4ed8', blueLight: '#eff6ff',
+  red: '#dc2626', redLight: '#fee2e2',
+  amber: '#d97706', amberLight: '#fef3c7',
   grayLight: '#f8fafc',
 }
 
@@ -281,7 +284,10 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
           tarih={seciliGun}
           kartlar={gunKartlari.get(seciliGun) ?? []}
           lokAd={data?.lokasyonAdMap ?? {}}
+          araclar={data?.araclar ?? []}
+          firmaId={firmaId}
           onClose={() => setSeciliGun(null)}
+          onChange={() => { yukle(); /* popup açık kalsın, veriler yenilensin */ }}
         />
       )}
 
@@ -399,21 +405,95 @@ function AyBlock({ yil, ay, harita, onGunTik, vurguPlaka }: {
 }
 
 // ── Gün Popup ──────────────────────────────────────────────
-function GunPopup({ tarih, kartlar, lokAd, onClose }: {
+function GunPopup({ tarih, kartlar, lokAd, araclar, firmaId, onClose, onChange }: {
   tarih: string;
   kartlar: PlakaKart[];
   lokAd: Record<string, string>;
+  araclar: TakvimArac[];
+  firmaId: string;
   onClose: () => void;
+  onChange: () => void;
 }) {
+  const { toast } = useToast()
+  const { confirm } = useConfirm()
   const d = isoToDate(tarih)
   const dowAdi = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'][isoDow(d) - 1]
   const tarihEt = new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }).format(d)
   const isoHafta = isoHaftaNo(d)
   const gunNo = yilinKacinciGunu(d)
   const isBugun = tarih === bugunIso()
+  // Düzenleme yetkisi: bugün + gelecek tarih (geçmiş tarih read-only)
+  const duzenlenebilir = tarih >= bugunIso()
+
+  const [aktif, setAktif] = useState(false) // loading state
+  const [ekleAcik, setEkleAcik] = useState(false)
 
   const sayilar: Record<Durum, number> = { HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
   for (const k of kartlar) sayilar[k.durum]++
+
+  // Plaka silinebilir mi? Sadece HAZIR / ACIK (henüz başlatılmamış)
+  function silinebilir(k: PlakaKart): boolean {
+    return duzenlenebilir && (k.durum === 'HAZIR' || k.durum === 'ACIK')
+  }
+
+  async function bireyselSil(k: PlakaKart) {
+    if (!k.arac_id) return
+    const ok = await confirm({
+      title: 'Plakayı Sil',
+      message: `${k.plaka} için ${tarihEt} tarihindeki planlı görev silinecek. Onaylıyor musunuz?`,
+      confirmText: 'Sil', cancelText: 'İptal', variant: 'danger',
+    })
+    if (!ok) return
+    setAktif(true)
+    try {
+      const url = `/api/oto-yikama/takvim/gun?firma_id=${firmaId}&tarih=${tarih}&arac_id=${k.arac_id}`
+      const res = await fetch(url, { method: 'DELETE' })
+      const j = await res.json()
+      if (!j.ok) throw new Error(j.error)
+      toast({ type: 'success', title: 'Silindi', message: j.mesaj ?? `${k.plaka} silindi` })
+      onChange()
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    } finally {
+      setAktif(false)
+    }
+  }
+
+  async function tumunuSil() {
+    // Sadece silinebilir (HAZIR/ACIK) görev sayısı
+    const silinebilirAdet = kartlar.filter(k => silinebilir(k) && k.gercek).length
+    if (silinebilirAdet === 0) {
+      toast({ type: 'info', title: 'Bilgi', message: 'Silinebilir planlı görev yok' })
+      return
+    }
+    const ok = await confirm({
+      title: `${tarihEt} — Tümünü Sil`,
+      message: `Bu gün için ${silinebilirAdet} planlı görev silinecek. İşlemde/Tamamlanmış görevler korunur. Onaylıyor musunuz?`,
+      confirmText: 'Tümünü Sil', cancelText: 'İptal', variant: 'danger',
+    })
+    if (!ok) return
+    setAktif(true)
+    try {
+      const url = `/api/oto-yikama/takvim/gun?firma_id=${firmaId}&tarih=${tarih}`
+      const res = await fetch(url, { method: 'DELETE' })
+      const j = await res.json()
+      if (!j.ok) throw new Error(j.error)
+      toast({ type: 'success', title: 'Silindi', message: j.mesaj ?? `${j.silinen} görev silindi` })
+      onChange()
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    } finally {
+      setAktif(false)
+    }
+  }
+
+  // Eklenebilir araç listesi: bu gün için zaten görev olmayanlar
+  const eklenebilirAraclar = useMemo(() => {
+    const mevcutAracIds = new Set(kartlar.map(k => k.arac_id).filter(Boolean) as string[])
+    return araclar
+      .filter(a => a.aktif && !mevcutAracIds.has(a.id))
+      .sort((a, b) => a.plaka.localeCompare(b.plaka, 'tr'))
+  }, [araclar, kartlar])
 
   return (
     <div onClick={onClose} style={{
@@ -421,7 +501,7 @@ function GunPopup({ tarih, kartlar, lokAd, onClose }: {
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
     }}>
       <div onClick={e => e.stopPropagation()} className="verde-card"
-        style={{ width: 'min(720px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        style={{ width: 'min(760px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <div style={{
           padding: '16px 20px', borderBottom: `1px solid ${T.border}`,
@@ -458,9 +538,9 @@ function GunPopup({ tarih, kartlar, lokAd, onClose }: {
           }}><X size={20} /></button>
         </div>
 
-        {/* Durum dağılımı */}
-        {kartlar.length > 0 && (
-          <div style={{ padding: '12px 20px', borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {/* Durum dağılımı + Aksiyon butonları */}
+        {(kartlar.length > 0 || duzenlenebilir) && (
+          <div style={{ padding: '12px 20px', borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             {(Object.keys(DURUM_LABEL) as Durum[]).map(durum => (
               sayilar[durum] > 0 && (
                 <div key={durum} style={{
@@ -471,6 +551,30 @@ function GunPopup({ tarih, kartlar, lokAd, onClose }: {
                 }}>{DURUM_LABEL[durum]}: {sayilar[durum]}</div>
               )
             ))}
+            {duzenlenebilir && (
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                <button onClick={() => setEkleAcik(true)} disabled={aktif || eklenebilirAraclar.length === 0}
+                  title={eklenebilirAraclar.length === 0 ? 'Eklenebilir araç yok (hepsi planlı)' : 'Bu güne plaka ekle'}
+                  style={{
+                    padding: '6px 12px', borderRadius: 6, border: 'none',
+                    background: aktif || eklenebilirAraclar.length === 0 ? '#cbd5e1' : 'linear-gradient(145deg, #1d4ed8, #1e40af)',
+                    color: '#fff', cursor: aktif || eklenebilirAraclar.length === 0 ? 'not-allowed' : 'pointer',
+                    fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5,
+                  }}>
+                  <Plus size={13} /> Plaka Ekle
+                </button>
+                <button onClick={tumunuSil} disabled={aktif || kartlar.filter(k => silinebilir(k) && k.gercek).length === 0}
+                  style={{
+                    padding: '6px 12px', borderRadius: 6,
+                    border: `1.5px solid ${T.red}`, background: '#fff', color: T.red,
+                    cursor: aktif ? 'not-allowed' : 'pointer',
+                    fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5,
+                    opacity: kartlar.filter(k => silinebilir(k) && k.gercek).length === 0 ? 0.4 : 1,
+                  }}>
+                  <Trash2 size={13} /> Tümünü Sil
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -479,9 +583,12 @@ function GunPopup({ tarih, kartlar, lokAd, onClose }: {
           {kartlar.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 36, color: T.textSoft, fontSize: 13 }}>
               Bu gün için planlanmış yıkama yok.
+              {duzenlenebilir && eklenebilirAraclar.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 12 }}>Yukarıdan <strong>"Plaka Ekle"</strong> ile bir plaka ekleyebilirsiniz.</div>
+              )}
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 8 }}>
               {kartlar.map((k, i) => (
                 <div key={`${k.arac_id ?? 'x'}-${i}`}
                   style={{
@@ -489,22 +596,190 @@ function GunPopup({ tarih, kartlar, lokAd, onClose }: {
                     border: `1px solid ${DURUM_BORDER[k.durum]}`,
                     background: DURUM_BG[k.durum],
                     display: 'flex', flexDirection: 'column', gap: 3,
+                    position: 'relative',
                   }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <span style={{
                       fontFamily: 'monospace', fontWeight: 800, fontSize: 17,
                       color: DURUM_FG[k.durum],
                     }}>{k.plaka}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: DURUM_FG[k.durum] }}>{DURUM_LABEL[k.durum]}</span>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: DURUM_FG[k.durum] }}>{DURUM_LABEL[k.durum]}</span>
+                      {silinebilir(k) && k.gercek && (
+                        <button onClick={() => bireyselSil(k)} disabled={aktif}
+                          title="Bu plakayı bu günden sil"
+                          style={{
+                            padding: 3, borderRadius: 4, border: 'none',
+                            background: 'rgba(220,38,38,0.12)', color: T.red,
+                            cursor: aktif ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex', alignItems: 'center',
+                          }}>
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div style={{ fontSize: 11, color: T.textSoft, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span>{k.departman ?? '—'}</span>
                     {k.lokasyon_id && <><span>·</span><span>{lokAd[k.lokasyon_id] ?? '—'}</span></>}
+                    {!k.gercek && (
+                      <span style={{ marginLeft: 4, fontStyle: 'italic', color: '#94a3b8' }}>(tahmini)</span>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {ekleAcik && (
+        <PlakaEkleModal
+          tarih={tarih}
+          tarihEt={tarihEt}
+          firmaId={firmaId}
+          araclar={eklenebilirAraclar}
+          lokAd={lokAd}
+          onClose={() => setEkleAcik(false)}
+          onSaved={() => { setEkleAcik(false); onChange() }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Plaka Ekle Alt-Modal ───────────────────────────────────
+function PlakaEkleModal({ tarih, tarihEt, firmaId, araclar, lokAd, onClose, onSaved }: {
+  tarih: string; tarihEt: string; firmaId: string;
+  araclar: TakvimArac[]; lokAd: Record<string, string>;
+  onClose: () => void; onSaved: () => void;
+}) {
+  const { toast } = useToast()
+  const [seciliAracId, setSeciliAracId] = useState<string>('')
+  const [arama, setArama] = useState('')
+  const [kaydet, setKaydet] = useState(false)
+
+  const filtreli = useMemo(() => {
+    const q = arama.trim().toUpperCase()
+    if (!q) return araclar.slice(0, 50)
+    return araclar.filter(a =>
+      a.plaka.toUpperCase().includes(q) ||
+      (a.departman ?? '').toUpperCase().includes(q)
+    ).slice(0, 50)
+  }, [araclar, arama])
+
+  const seciliArac = araclar.find(a => a.id === seciliAracId)
+
+  async function ekle() {
+    if (!seciliAracId) {
+      toast({ type: 'error', title: 'Hata', message: 'Bir plaka seçin' })
+      return
+    }
+    setKaydet(true)
+    try {
+      const res = await fetch('/api/oto-yikama/takvim/gun', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firma_id: firmaId, arac_id: seciliAracId, tarih }),
+      })
+      const j = await res.json()
+      if (!j.ok) throw new Error(j.error)
+      toast({ type: 'success', title: 'Eklendi', message: `${j.plaka} → ${tarihEt}` })
+      onSaved()
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    } finally {
+      setKaydet(false)
+    }
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', zIndex: 90,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    }}>
+      <div onClick={e => e.stopPropagation()} className="verde-card"
+        style={{ width: 'min(520px, 96vw)', maxHeight: '85vh', padding: 18, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: T.text, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <Plus size={16} color={T.blue} /> Plaka Ekle — {tarihEt}
+          </div>
+          <button onClick={onClose} style={{ padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: T.textSoft }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <input type="text" autoFocus value={arama} onChange={e => setArama(e.target.value)}
+          placeholder="Plaka veya departman ara…"
+          style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, marginBottom: 10 }} />
+
+        <div style={{ flex: 1, overflowY: 'auto', border: `1px solid ${T.border}`, borderRadius: 6 }}>
+          {filtreli.length === 0 ? (
+            <div style={{ padding: 30, textAlign: 'center', color: T.textSoft, fontSize: 13 }}>
+              {araclar.length === 0 ? 'Eklenebilir araç yok — hepsi bu gün için planlı.' : 'Arama sonucu yok.'}
+            </div>
+          ) : (
+            filtreli.map(a => {
+              const selected = a.id === seciliAracId
+              return (
+                <button key={a.id} type="button" onClick={() => setSeciliAracId(a.id)}
+                  style={{
+                    width: '100%', padding: '8px 12px', textAlign: 'left',
+                    background: selected ? T.blueLight : '#fff',
+                    border: 'none', borderBottom: `1px solid ${T.border}`,
+                    borderLeft: `3px solid ${selected ? T.blue : 'transparent'}`,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                  <div style={{
+                    width: 16, height: 16, borderRadius: '50%',
+                    border: `1.5px solid ${selected ? T.blue : '#cbd5e1'}`,
+                    background: '#fff', flexShrink: 0, position: 'relative',
+                  }}>
+                    {selected && <div style={{ position: 'absolute', inset: 3, borderRadius: '50%', background: T.blue }} />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16, color: T.text }}>{a.plaka}</div>
+                    <div style={{ fontSize: 11, color: T.textSoft, display: 'flex', gap: 4 }}>
+                      {a.departman && <span>{a.departman}</span>}
+                      {a.varsayilan_lokasyon_id && lokAd[a.varsayilan_lokasyon_id] && (
+                        <><span>·</span><span>İstasyon: {lokAd[a.varsayilan_lokasyon_id]}</span></>
+                      )}
+                      {!a.varsayilan_lokasyon_id && (
+                        <span style={{ color: T.amber }}>· Varsayılan istasyon yok</span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              )
+            })
+          )}
+        </div>
+
+        {seciliArac && !seciliArac.varsayilan_lokasyon_id && (
+          <div style={{ marginTop: 10, padding: '8px 12px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, fontSize: 12, color: '#78350f' }}>
+            ⚠️ Bu aracın varsayılan istasyonu yok. Önce Araç Kayıtları'ndan istasyon atayın.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+          <button onClick={onClose} disabled={kaydet}
+            style={{ padding: '7px 14px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 13 }}>
+            İptal
+          </button>
+          <button onClick={ekle}
+            disabled={kaydet || !seciliAracId || (seciliArac ? !seciliArac.varsayilan_lokasyon_id : true)}
+            style={{
+              padding: '7px 16px', borderRadius: 6, border: 'none',
+              background: kaydet || !seciliAracId || (seciliArac && !seciliArac.varsayilan_lokasyon_id)
+                ? '#cbd5e1' : 'linear-gradient(145deg, #1d4ed8, #1e40af)',
+              color: '#fff',
+              cursor: kaydet || !seciliAracId ? 'not-allowed' : 'pointer',
+              fontSize: 13, fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+            {kaydet
+              ? <><Loader2 size={13} style={{ animation: 'spin 0.9s linear infinite' }} /> Ekleniyor…</>
+              : <><Plus size={13} /> Ekle</>}
+          </button>
         </div>
       </div>
     </div>
