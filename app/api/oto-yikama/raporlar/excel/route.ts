@@ -31,16 +31,27 @@ function fmtSure(saniye: number | null | undefined): string {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+  const sp = req.nextUrl.searchParams
 
-  const { data: me } = await supabase.from('users').select('id,rol,isim_soyisim').eq('id', user.id).single()
-  if (!me || !['super_admin', 'alt_super_admin'].includes(me.rol)) {
-    return NextResponse.json({ error: 'Sadece SA' }, { status: 403 })
+  // Cron bypass: rapor-gonder cron'u user session olmadan Excel üretmek için
+  // x-cron-token header veya ?secret= ile bu endpoint'i çağırır.
+  const cronToken = req.headers.get('x-cron-token') ?? sp.get('secret')
+  const cronExpected = process.env.CRON_SECRET
+  const isCron = !!cronExpected && cronToken === cronExpected
+
+  let meAd: string = 'Otomatik Rapor'
+  if (!isCron) {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+
+    const { data: me } = await supabase.from('users').select('id,rol,isim_soyisim').eq('id', user.id).single()
+    if (!me || !['super_admin', 'alt_super_admin'].includes(me.rol)) {
+      return NextResponse.json({ error: 'Sadece SA' }, { status: 403 })
+    }
+    meAd = me.isim_soyisim ?? '—'
   }
 
-  const sp = req.nextUrl.searchParams
   const firmaId = sp.get('firma_id')
   if (!firmaId) return NextResponse.json({ error: 'firma_id gerekli' }, { status: 400 })
 
@@ -205,7 +216,7 @@ export async function GET(req: NextRequest) {
   }
   setMeta(ws1, 2, 'Firma:', firmaAd)
   setMeta(ws1, 3, 'Dönem:', `${fmtTarihTR(baslangic)} → ${fmtTarihTR(bitis)}`)
-  setMeta(ws1, 4, 'Raporu Alan:', me.isim_soyisim ?? '—')
+  setMeta(ws1, 4, 'Raporu Alan:', meAd)
   setMeta(ws1, 5, 'Oluşturulma:', new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }))
   if (personelId) setMeta(ws1, 6, 'Personel Filtresi:', personelTop[0]?.ad ?? '—')
   if (plaka) setMeta(ws1, 7, 'Plaka Filtresi:', plaka)

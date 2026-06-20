@@ -32,6 +32,7 @@ export function getOtoYikamaNav(): NavGroup[] {
         { label: 'Görev Kayıtları', href: '/oto-yikama/gorev-kayitlari', icon: '🗂️' },
         { label: 'Arşiv',           href: '/oto-yikama/arsiv',           icon: '📦' },
         { label: 'Raporlar',        href: '/oto-yikama/raporlar',         icon: '📊' },
+        { label: 'Rapor Gönderimi', href: '/oto-yikama/rapor-gonderimi', icon: '📧' },
       ],
     },
   ]
