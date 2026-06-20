@@ -200,7 +200,9 @@ export default function RaporlarClient() {
         filename: `oto-yikama-raporu-${baslangic}_${bitis}.pdf`,
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#f8fafc' },
         jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4' },
-        pagebreak: { mode: ['css', 'legacy'] },
+        // 'avoid-all' — her .verde-card sayfa ortasında bölünmesin (CSS
+        // break-inside:avoid ile birlikte). Chart kartları artık tek parça.
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
       }).from(printRef.current).save()
     } catch (e: any) {
       toast({ type: 'error', title: 'PDF hatası', message: e?.message ?? 'Bilinmeyen hata' })
@@ -355,7 +357,7 @@ export default function RaporlarClient() {
                       <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                       <Tooltip />
-                      <Bar dataKey="planli" name="Planlı" fill={T.green} radius={[5, 5, 0, 0]} />
+                      <Bar dataKey="planli" name="Planlı" fill={T.green} radius={[5, 5, 0, 0]} maxBarSize={32} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -369,7 +371,7 @@ export default function RaporlarClient() {
                       <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                       <Tooltip />
-                      <Bar dataKey="plansiz" name="Plansız" fill={T.amber} radius={[5, 5, 0, 0]} />
+                      <Bar dataKey="plansiz" name="Plansız" fill={T.amber} radius={[5, 5, 0, 0]} maxBarSize={32} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -387,7 +389,7 @@ export default function RaporlarClient() {
                     <YAxis type="category" dataKey="personel" tick={{ fontSize: 13, fontWeight: 600 }} width={130}
                       tickFormatter={t => t.length > 20 ? `${t.slice(0, 20)}…` : t} />
                     <Tooltip />
-                    <Bar dataKey="adet" fill={T.blue} radius={[0, 6, 6, 0]} />
+                    <Bar dataKey="adet" fill={T.blue} radius={[0, 6, 6, 0]} maxBarSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -403,7 +405,7 @@ export default function RaporlarClient() {
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 13, fontWeight: 600 }} />
                     <YAxis type="category" dataKey="plaka" tick={{ fontSize: 14, fontFamily: 'monospace', fontWeight: 700 }} width={110} />
                     <Tooltip />
-                    <Bar dataKey="adet" fill={T.purple} radius={[0, 6, 6, 0]} />
+                    <Bar dataKey="adet" fill={T.purple} radius={[0, 6, 6, 0]} maxBarSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -520,6 +522,9 @@ export default function RaporlarClient() {
         @keyframes spin { to { transform: rotate(360deg) } }
         /* html2pdf çalışırken pdf-only blok görünür olsun (capture sırasında) */
         .pdf-only { display: none; }
+        /* PDF çıktısında kartlar sayfa ortasından bölünmesin (html2pdf pagebreak
+           için global CSS — web sayfasında zararsız, sadece print/PDF tetikler). */
+        .verde-card { page-break-inside: avoid; break-inside: avoid; }
       `}</style>
     </div>
   )
