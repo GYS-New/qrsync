@@ -209,17 +209,23 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
   }
 
   function exportCsv() {
-    const headers = ['Plaka', 'İstasyon', 'Hedef Tarih', 'Durum', 'Ekstra', 'Oluşturma', 'Başlatma', 'Tamamlanma', 'Süre (sn)', 'KM', 'Oluşturan', 'Tamamlayan', 'Açıklama']
+    const headers = ['Plaka', 'İstasyon', 'Hedef Tarih', 'Durum', 'Ekstra', 'Oluşturma', 'Başlatma', 'Tamamlanma', 'Süre (sn)', 'KM', 'Oluşturan', 'İşlem Yapan', 'Açıklama / Sebep']
     const rows = filtrelenmis.map(k => {
       const gd = turetilenDurum(k, bugun)
+      const islemYapan =
+        gd === 'TAMAMLANDI' ? (k.tamamlayan ?? '')
+        : gd === 'IPTAL' ? (k.iptal_eden ?? 'Sistem (otomatik)')
+        : gd === 'YAPILAMADI' ? 'Sistem (süre aşımı)'
+        : ''
+      const aciklama = gd === 'IPTAL' && k.iptal_sebep ? k.iptal_sebep : (k.notlar ?? '')
       return [
         k.plaka, k.istasyon, k.hedef_tarih ?? '', DURUM_LABEL[gd],
         k.ekstra ? 'Evet' : 'Hayır',
         k.olusturma_tarihi ?? '', k.baslatilma_tarihi ?? '', k.tamamlanma_tarihi ?? '',
         k.tamamlanma_suresi_saniye ?? '',
         k.km ?? '',
-        k.olusturan ?? '', k.tamamlayan ?? '',
-        k.notlar ?? '',
+        k.olusturan ?? '', islemYapan,
+        aciklama,
       ]
     })
     const csv = [headers, ...rows]
@@ -346,7 +352,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
             {istasyonlar.map(i => <option key={i.id} value={i.id}>{i.tanim}</option>)}
           </select>
         </FilterField>
-        <FilterField label="Tamamlayan">
+        <FilterField label="İşlem Yapan">
           <select value={tamamlayanId} onChange={e => setTamamlayanId(e.target.value)}
             style={{ width: '100%', padding: '5px 8px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
             <option value="">Tümü</option>
@@ -439,8 +445,8 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
                 <Th align="center">Tamamlanma</Th>
                 <Th align="center">Süre</Th>
                 <Th align="right">KM</Th>
-                <Th>Tamamlayan</Th>
-                <Th>Açıklama</Th>
+                <Th>İşlem Yapan</Th>
+                <Th>Açıklama / Sebep</Th>
                 {canEdit && <Th align="right">İşlem</Th>}
               </tr>
             </thead>
@@ -476,9 +482,23 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
                         {k.km != null ? k.km.toLocaleString('tr-TR') : '—'}
                       </span>
                     </Td>
-                    <Td muted>{k.tamamlayan ?? '—'}</Td>
                     <Td muted>
-                      {k.notlar ? (
+                      {gd === 'TAMAMLANDI' ? (k.tamamlayan ?? '—')
+                        : gd === 'IPTAL' ? (k.iptal_eden ?? (
+                            <span style={{ fontStyle: 'italic', color: T.textSoft }}>Sistem (otomatik)</span>
+                          ))
+                        : gd === 'YAPILAMADI' ? (
+                            <span style={{ fontStyle: 'italic', color: T.textSoft }}>Sistem (süre aşımı)</span>
+                          )
+                        : '—'}
+                    </Td>
+                    <Td muted>
+                      {gd === 'IPTAL' && k.iptal_sebep ? (
+                        <span title={k.iptal_sebep}
+                          style={{ cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 4, color: T.red }}>
+                          ❌ {k.iptal_sebep.length > 30 ? k.iptal_sebep.slice(0, 30) + '…' : k.iptal_sebep}
+                        </span>
+                      ) : k.notlar ? (
                         <span title={k.notlar} style={{ cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           📝 {k.notlar.length > 30 ? k.notlar.slice(0, 30) + '…' : k.notlar}
                         </span>

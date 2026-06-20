@@ -173,17 +173,23 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
     if (filtrelenmis.length === 0) return
     const rows: string[][] = [[
       'Plaka', 'İstasyon', 'Hedef Tarih', 'Durum', 'Ekstra',
-      'Başlatma', 'Tamamlanma', 'Süre', 'KM', 'Tamamlayan', 'Açıklama', 'Arşivleme Tarihi',
+      'Başlatma', 'Tamamlanma', 'Süre', 'KM', 'İşlem Yapan', 'Açıklama / Sebep', 'Arşivleme Tarihi',
     ]]
     for (const k of filtrelenmis) {
       const d = normalizeDurum(k.durum)
+      const islemYapan =
+        d === 'TAMAMLANDI' ? (k.tamamlayan ?? '')
+        : d === 'IPTAL' ? (k.iptal_eden ?? 'Sistem (otomatik)')
+        : d === 'YAPILAMADI' ? 'Sistem (süre aşımı)'
+        : ''
+      const aciklama = d === 'IPTAL' && k.iptal_sebep ? k.iptal_sebep : (k.notlar ?? '')
       rows.push([
         k.plaka, k.istasyon, fmtTarih(k.hedef_tarih), DURUM_LABEL[d], k.ekstra ? 'EKSTRA' : '',
         fmtDateTime(k.baslatilma_tarihi), fmtDateTime(k.tamamlanma_tarihi),
         fmtSure(k.tamamlanma_suresi_saniye),
         k.km != null ? String(k.km) : '',
-        k.tamamlayan ?? '',
-        k.notlar ?? '',
+        islemYapan,
+        aciklama,
         fmtDateTime(k.arsivleme_tarihi),
       ])
     }
@@ -236,7 +242,7 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
           </select>
         </div>
         <div>
-          <Label>Tamamlayan</Label>
+          <Label>İşlem Yapan</Label>
           <select value={tamamlayanFilter} onChange={e => setTamamlayanFilter(e.target.value)}
             style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
             <option value="">Tümü</option>
@@ -314,8 +320,8 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
                 <Th align="center">Tamamlanma</Th>
                 <Th align="center">Süre</Th>
                 <Th align="right">KM</Th>
-                <Th>Tamamlayan</Th>
-                <Th>Açıklama</Th>
+                <Th>İşlem Yapan</Th>
+                <Th>Açıklama / Sebep</Th>
                 <Th align="center">Arşiv Tarihi</Th>
               </tr>
             </thead>
@@ -351,9 +357,23 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
                         {k.km != null ? k.km.toLocaleString('tr-TR') : '—'}
                       </span>
                     </Td>
-                    <Td muted>{k.tamamlayan ?? '—'}</Td>
                     <Td muted>
-                      {k.notlar ? (
+                      {gd === 'TAMAMLANDI' ? (k.tamamlayan ?? '—')
+                        : gd === 'IPTAL' ? (k.iptal_eden ?? (
+                            <span style={{ fontStyle: 'italic', color: T.textSoft }}>Sistem (otomatik)</span>
+                          ))
+                        : gd === 'YAPILAMADI' ? (
+                            <span style={{ fontStyle: 'italic', color: T.textSoft }}>Sistem (süre aşımı)</span>
+                          )
+                        : '—'}
+                    </Td>
+                    <Td muted>
+                      {gd === 'IPTAL' && k.iptal_sebep ? (
+                        <span title={k.iptal_sebep}
+                          style={{ cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 4, color: T.red }}>
+                          ❌ {k.iptal_sebep.length > 30 ? k.iptal_sebep.slice(0, 30) + '…' : k.iptal_sebep}
+                        </span>
+                      ) : k.notlar ? (
                         <span title={k.notlar} style={{ cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           📝 {k.notlar.length > 30 ? k.notlar.slice(0, 30) + '…' : k.notlar}
                         </span>
