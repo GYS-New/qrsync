@@ -404,7 +404,8 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                       <BarChart data={agg.personel_top} layout="vertical" margin={{ top: 4, right: 18, left: 110, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fontWeight: 600 }} />
-                        <YAxis type="category" dataKey="personel" tick={{ fontSize: 12, fontWeight: 600 }} width={110}
+                        <YAxis type="category" dataKey="personel" interval={0}
+                          tick={{ fontSize: 12, fontWeight: 600 }} width={110}
                           tickFormatter={t => t.length > 16 ? `${t.slice(0, 16)}…` : t} />
                         <Tooltip />
                         <Bar dataKey="adet" fill={T.blue} radius={[0, 6, 6, 0]} maxBarSize={22} />
@@ -419,7 +420,8 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                       <BarChart data={agg.plaka_top} layout="vertical" margin={{ top: 4, right: 18, left: 90, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fontWeight: 600 }} />
-                        <YAxis type="category" dataKey="plaka" tick={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 700 }} width={90} />
+                        <YAxis type="category" dataKey="plaka" interval={0}
+                          tick={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 700 }} width={90} />
                         <Tooltip />
                         <Bar dataKey="adet" fill={T.purple} radius={[0, 6, 6, 0]} maxBarSize={22} />
                       </BarChart>
