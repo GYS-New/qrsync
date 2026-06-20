@@ -198,9 +198,13 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
         filename: `oto-yikama-raporu-${baslangic}_${bitis}.pdf`,
         html2canvas: {
           scale: 2, useCORS: true, backgroundColor: '#f8fafc',
-          // PDF capture sırasında detay tablonun max-height/scroll sınırını
-          // kaldır — tüm satırlar tek bir uzun blok halinde render olsun
           onclone: (doc: Document) => {
+            // PDF'ten grafik kartlarını gizle — sadece KPI + Detay Liste kalsın
+            doc.querySelectorAll<HTMLElement>('.pdf-hide').forEach(el => {
+              el.style.display = 'none'
+            })
+            // Detay tablonun max-height/scroll sınırını kaldır — tüm satırlar
+            // tek bir uzun blok halinde render olsun
             doc.querySelectorAll<HTMLElement>('.detay-tablo-scroll').forEach(el => {
               el.style.maxHeight = 'none'
               el.style.overflowY = 'visible'
@@ -356,7 +360,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
           {/* GRAFİKLER GRID */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {/* Saatlik trend — sol Planlı, sağ Plansız (08:00-18:00 TR) */}
-            <div className="verde-card pdf-card" style={{ padding: 12, gridColumn: '1 / -1' }}>
+            <div className="verde-card pdf-card pdf-hide" style={{ padding: 12, gridColumn: '1 / -1' }}>
               <Baslik>Saatlik Yıkama Trendi — 08:00 – 18:00 (Planlı / Plansız)</Baslik>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div style={{ height: 220 }}>
@@ -390,8 +394,8 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
               </div>
             </div>
 
-            {/* Personel + Plaka top — tek kart içinde 2 kolon, PDF'te yeni sayfa */}
-            <div className="verde-card pdf-card pdf-pagebreak-before" style={{ padding: 12, gridColumn: '1 / -1' }}>
+            {/* Personel + Plaka top — tek kart içinde 2 kolon, PDF'ten gizli */}
+            <div className="verde-card pdf-card pdf-hide" style={{ padding: 12, gridColumn: '1 / -1' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
                   <Baslik>Personel Bazlı Yıkama (Top 10)</Baslik>
@@ -425,8 +429,8 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
               </div>
             </div>
 
-            {/* Donutlar tek kart — Planlı/Ekstra + İstasyon (yan yana), PDF'te yeni sayfa */}
-            <div className="verde-card pdf-card pdf-pagebreak-before" style={{ padding: 12, gridColumn: '1 / -1' }}>
+            {/* Donutlar tek kart — Planlı/Ekstra + İstasyon (yan yana), PDF'ten gizli */}
+            <div className="verde-card pdf-card pdf-hide" style={{ padding: 12, gridColumn: '1 / -1' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
                   <Baslik>Planlı / Ekstra Dağılımı</Baslik>
@@ -469,10 +473,9 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
             </div>
           </div>
 
-          {/* DETAY TABLO — yeni sayfada başlasın, uzun olduğu için sayfalar
-              arası bölünebilir (break-inside:auto chart kartlarındaki avoid
-              kuralını override eder) */}
-          <div className="verde-card pdf-pagebreak-before" style={{ overflow: 'hidden', pageBreakInside: 'auto', breakInside: 'auto' }}>
+          {/* DETAY TABLO — PDF'te KPI'lardan hemen sonra başlar (chart'lar
+              kaldırıldı). Uzun olduğu için sayfalar arası bölünebilir. */}
+          <div className="verde-card" style={{ overflow: 'hidden', pageBreakInside: 'auto', breakInside: 'auto' }}>
             <div style={{ padding: '10px 16px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Filter size={14} color={T.textSoft} />
               <strong style={{ fontSize: 13 }}>Detay Liste</strong>
