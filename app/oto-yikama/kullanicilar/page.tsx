@@ -10,10 +10,15 @@ export const dynamic = 'force-dynamic'
 /**
  * Oto Yıkama → Kullanıcılar
  *
- * Bu modüle yetkili kullanıcılar: `kullanici_lokasyon_yetkileri` üzerinden
- * Oto Yıkama üst lokasyonlarına atanmış olan personeller. Atama GYS
- * Kullanıcı Yetkileri tarafında "Lokasyon Yetkileri" sekmesinden yönetilir
- * (mevcut LokasyonYetkileriPanel).
+ * SADECE birincil atama (users.ust_lokasyon_id) ile Oto Yıkama lokasyonuna
+ * atanmış personeller listelenir — yani GYS "Kullanıcılar" sayfasından
+ * "Üst Lokasyon" alanına ARAÇ YIKAMA seçilmiş olanlar.
+ *
+ * NOT: kullanici_lokasyon_yetkileri üzerinden ek yetki verilmiş kullanıcılar
+ * (TA, SA, M gibi yöneticiler veya cross-functional U'lar — örn. Mustafa
+ * Yıldız) bu listede GÖSTERİLMEZ. Çünkü onlar "yıkama personeli" değil,
+ * sadece görüntüleme/yönetim için ek yetki almış kişilerdir. Yıkama
+ * operasyon listesi temiz kalsın.
  *
  * Read-only liste; CRUD GYS tarafında kalır.
  */
@@ -45,40 +50,20 @@ export default async function OtoYikamaKullanicilarPage() {
   const otoUstIds = (otoLoklar ?? []).map((l: any) => l.id)
   const otoLokAdMap = new Map((otoLoklar ?? []).map((l: any) => [l.id as string, l.tanim as string]))
 
-  // 2) İki kaynak: yetki kaynağı tutarlılığı için her ikisi de dahil edilir
-  //    (lib/modul/yetkiliModuller.ts ve /api/app/me ile aynı mantık)
-  //    A) kullanici_lokasyon_yetkileri'nde Oto Yıkama lokasyonuna atanmış
-  //    B) users.ust_lokasyon_id'si Oto Yıkama lokasyonuna işaret eden
+  // 2) SADECE users.ust_lokasyon_id ile birincil atama yapılmış kullanıcılar.
+  //    kullanici_lokasyon_yetkileri (ek yetkiler) bu sayfaya dahil edilmez —
+  //    bkz. dosya başındaki açıklama (yöneticiler/cross-functional kullanıcılar
+  //    yıkama personeli listesini kirletmesin).
   let kullaniciAtamalari: { user_id: string; ust_lokasyon_id: string }[] = []
   if (otoUstIds.length > 0) {
-    const [yetkiRes, userByUstRes] = await Promise.all([
-      supabase
-        .from('kullanici_lokasyon_yetkileri')
-        .select('user_id, ust_lokasyon_id')
-        .eq('firma_id', firmaId)
-        .in('ust_lokasyon_id', otoUstIds),
-      supabase
-        .from('users')
-        .select('id, ust_lokasyon_id')
-        .eq('firma_id', firmaId)
-        .in('ust_lokasyon_id', otoUstIds),
-    ])
-    const birlesim = new Map<string, Set<string>>()
-    for (const r of (yetkiRes.data ?? [])) {
-      const set = birlesim.get(r.user_id) ?? new Set<string>()
-      set.add(r.ust_lokasyon_id)
-      birlesim.set(r.user_id, set)
-    }
-    for (const u of (userByUstRes.data ?? [])) {
+    const { data: userByUstRes } = await supabase
+      .from('users')
+      .select('id, ust_lokasyon_id')
+      .eq('firma_id', firmaId)
+      .in('ust_lokasyon_id', otoUstIds)
+    for (const u of (userByUstRes ?? [])) {
       if (!u.ust_lokasyon_id) continue
-      const set = birlesim.get(u.id) ?? new Set<string>()
-      set.add(u.ust_lokasyon_id)
-      birlesim.set(u.id, set)
-    }
-    for (const [user_id, ustSet] of birlesim) {
-      for (const ust_lokasyon_id of ustSet) {
-        kullaniciAtamalari.push({ user_id, ust_lokasyon_id })
-      }
+      kullaniciAtamalari.push({ user_id: u.id, ust_lokasyon_id: u.ust_lokasyon_id })
     }
   }
 
