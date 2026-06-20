@@ -80,10 +80,11 @@ function fmtDateTime(d: string | null): string {
 }
 function fmtSure(saniye: number | null): string {
   if (saniye == null || saniye <= 0) return '—'
-  const m = Math.floor(saniye / 60)
+  const h = Math.floor(saniye / 3600)
+  const m = Math.floor((saniye % 3600) / 60)
   const s = saniye % 60
-  if (m === 0) return `${s}sn`
-  return `${m}dk ${s}sn`
+  if (h > 0) return `${h} sa ${m} dk`
+  return `${m} dk ${s} sn`
 }
 
 interface Props {
@@ -332,7 +333,7 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
                   <tr key={k.gorev_id}>
                     <Td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
                         {k.ekstra && (
                           <span style={{ padding: '2px 7px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 11, fontWeight: 800, letterSpacing: '0.04em' }}>EKSTRA</span>
                         )}
@@ -345,15 +346,15 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
                         {DURUM_LABEL[gd]}
                       </span>
                     </Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 15 }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 15 }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 16, whiteSpace: 'nowrap' }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 16, whiteSpace: 'nowrap' }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>
                     <Td align="center" muted>
-                      <span style={{ fontFamily: 'monospace', fontSize: 15, color: gd === 'TAMAMLANDI' ? T.green : T.textSoft, fontWeight: gd === 'TAMAMLANDI' ? 700 : 400 }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 16, color: gd === 'TAMAMLANDI' ? T.green : T.textSoft, fontWeight: gd === 'TAMAMLANDI' ? 700 : 400, whiteSpace: 'nowrap' }}>
                         {fmtSure(k.tamamlanma_suresi_saniye)}
                       </span>
                     </Td>
                     <Td align="right" muted>
-                      <span style={{ fontFamily: 'monospace', fontSize: 14 }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 15, whiteSpace: 'nowrap' }}>
                         {k.km != null ? k.km.toLocaleString('tr-TR') : '—'}
                       </span>
                     </Td>

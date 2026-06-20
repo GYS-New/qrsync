@@ -566,13 +566,13 @@ Devam etmek istiyor musunuz?`,
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input ref={importInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={importDosyaSec} />
           <button onClick={() => importInputRef.current?.click()} disabled={importLoading}
-            style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
-            {importLoading ? <RefreshCw size={13} style={{ animation: 'spin 0.9s linear infinite' }} /> : <Upload size={13} />}
+            style={{ padding: '8px 14px', borderRadius: 8, border: `1.5px solid #16a34a`, background: '#dcfce7', color: '#15803d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, fontWeight: 700, boxShadow: '0 1px 2px rgba(22,163,74,0.15)' }}>
+            {importLoading ? <RefreshCw size={15} style={{ animation: 'spin 0.9s linear infinite' }} /> : <Upload size={15} />}
             Excel ile Sync
           </button>
           <button onClick={sablonIndir}
-            style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
-            <Download size={13} /> Şablon
+            style={{ padding: '8px 14px', borderRadius: 8, border: `1.5px solid #2563eb`, background: '#dbeafe', color: '#1d4ed8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, fontWeight: 700, boxShadow: '0 1px 2px rgba(37,99,235,0.15)' }}>
+            <Download size={15} /> Excel Şablonu
           </button>
           <button onClick={yukle}
             style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
@@ -658,7 +658,7 @@ Devam etmek istiyor musunuz?`,
                 ) : null
                 return (
                   <tr key={a.id} style={{ opacity: a.aktif ? 1 : 0.55 }}>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: T.text }}>{a.plaka}</td>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text }}>{a.plaka}</td>
                     <td style={{ color: T.text, fontSize: 14 }}>
                       <div>{a.kullanici_adi_soyadi ?? <span style={{ color: T.textSoft }}>—</span>}</div>
                       {(a.kullanici_telefon || a.kullanici_email) && (
@@ -668,10 +668,10 @@ Devam etmek istiyor musunuz?`,
                       )}
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{a.departman ?? '—'}</td>
-                    <td style={{ color: T.textSoft, fontSize: 14 }}>
+                    <td style={{ color: T.textSoft, fontSize: 14, whiteSpace: 'nowrap' }}>
                       {Array.isArray(a.yikama_gunleri) && a.yikama_gunleri.length > 0
                         ? [...a.yikama_gunleri].sort((x, y) => x - y).map(g => GUN_KISA[g] ?? g).join(', ')
-                        : <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Plansız</span>}
+                        : <span style={{ color: T.amber, fontStyle: 'italic', fontWeight: 600, fontSize: 15 }}>Plansız</span>}
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 13 }}>
                       {a.son_yikama_tarihi

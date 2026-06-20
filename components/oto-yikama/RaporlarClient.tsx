@@ -14,6 +14,7 @@ type Row = {
   plaka: string
   departman: string | null
   arac_sahibi: string | null
+  yikama_gunleri: number[]
   personel: string
   personel_id: string | null
   lokasyon: string
@@ -35,10 +36,13 @@ type Agg = {
   toplam_sure_saniye: number
   ortalama_sure_saniye: number
   gunluk_trend: { tarih: string; planli: number; ekstra: number; toplam: number }[]
+  saatlik_trend: { saat: string; planli: number; plansiz: number }[]
   personel_top: { personel_id: string; personel: string; adet: number }[]
   plaka_top: { plaka: string; adet: number }[]
   lokasyon_dagilim: { lokasyon: string; adet: number }[]
 }
+
+const GUN_KISA_TR = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
 
 type FilterMeta = {
   personeller: { id: string; ad: string }[]
@@ -69,9 +73,9 @@ function fmtSure(saniye: number | null | undefined): string {
   if (!saniye || saniye <= 0) return '—'
   const h = Math.floor(saniye / 3600)
   const m = Math.floor((saniye % 3600) / 60)
-  if (h > 0) return `${h}sa ${m}dk`
-  if (m > 0) return `${m}dk`
-  return `${saniye}sn`
+  const s = saniye % 60
+  if (h > 0) return `${h} sa ${m} dk`
+  return `${m} dk ${s} sn`
 }
 function dateMinus(d: number): string {
   const ms = Date.now() - d * 24 * 3600 * 1000
@@ -315,22 +319,38 @@ export default function RaporlarClient() {
         <>
           {/* GRAFİKLER GRID */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            {/* Günlük trend */}
+            {/* Saatlik trend — sol Planlı, sağ Plansız (08:00-18:00 TR) */}
             <div className="verde-card" style={{ padding: 12, gridColumn: '1 / -1' }}>
-              <Baslik>Günlük Yıkama Trendi</Baslik>
-              <div style={{ height: 220 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agg.gunluk_trend} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="tarih" tick={{ fontSize: 11 }}
-                      tickFormatter={t => t.slice(5)} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="planli" stackId="a" name="Planlı" fill={T.green} />
-                    <Bar dataKey="ekstra" stackId="a" name="Ekstra" fill={T.amber} radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <Baslik>Saatlik Yıkama Trendi — 08:00 – 18:00 (Planlı / Plansız)</Baslik>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div style={{ height: 220 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: T.green, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    🟢 Planlı (Cron)
+                  </div>
+                  <ResponsiveContainer width="100%" height="92%">
+                    <BarChart data={agg.saatlik_trend} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="planli" name="Planlı" fill={T.green} radius={[5, 5, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={{ height: 220 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: T.amber, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    🟡 Plansız (Ekstra)
+                  </div>
+                  <ResponsiveContainer width="100%" height="92%">
+                    <BarChart data={agg.saatlik_trend} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="plansiz" name="Plansız" fill={T.amber} radius={[5, 5, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
 
@@ -428,17 +448,18 @@ export default function RaporlarClient() {
                     <th>Personel</th>
                     <th>İstasyon</th>
                     <th>Departman</th>
+                    <th style={{ width: 130 }}>Yıkama Günü</th>
                     <th style={{ width: 100 }}>Tarih</th>
-                    <th style={{ width: 90 }}>Başlatma</th>
-                    <th style={{ width: 90 }}>Tamamlama</th>
-                    <th style={{ width: 90 }}>Süre</th>
+                    <th style={{ width: 110 }}>Başlatma</th>
+                    <th style={{ width: 110 }}>Tamamlama</th>
+                    <th style={{ width: 110 }}>Süre</th>
                   </tr>
                 </thead>
                 <tbody>
                   {aramaList.map((r, i) => (
                     <tr key={r.gorev_id}>
                       <td style={{ fontSize: 13, color: T.textSoft }}>{i + 1}</td>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16 }}>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {r.plaka}
                         </span>
@@ -453,10 +474,15 @@ export default function RaporlarClient() {
                       <td style={{ fontSize: 14, color: T.text }}>{r.personel}</td>
                       <td style={{ fontSize: 14, color: T.textSoft }}>{r.lokasyon}</td>
                       <td style={{ fontSize: 14, color: T.textSoft }}>{r.departman ?? '—'}</td>
-                      <td style={{ fontSize: 13, color: T.textSoft }}>{fmtTarih(r.tamamlanma_tarihi ?? r.hedef_tarih)}</td>
-                      <td style={{ fontSize: 15, color: T.textSoft, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
-                      <td style={{ fontSize: 15, color: T.textSoft, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
-                      <td style={{ fontSize: 15, color: T.text, fontFamily: 'monospace', fontWeight: 700 }}>{fmtSure(r.tamamlanma_suresi_saniye)}</td>
+                      <td style={{ fontSize: 14, color: T.textSoft, whiteSpace: 'nowrap' }}>
+                        {Array.isArray(r.yikama_gunleri) && r.yikama_gunleri.length > 0
+                          ? [...r.yikama_gunleri].sort((a, b) => a - b).map(g => GUN_KISA_TR[g] ?? g).join(', ')
+                          : <span style={{ color: T.amber, fontStyle: 'italic', fontWeight: 600, fontSize: 14 }}>Plansız</span>}
+                      </td>
+                      <td style={{ fontSize: 13, color: T.textSoft, whiteSpace: 'nowrap' }}>{fmtTarih(r.tamamlanma_tarihi ?? r.hedef_tarih)}</td>
+                      <td style={{ fontSize: 16, color: T.textSoft, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{fmtTime(r.baslatilma_tarihi)}</td>
+                      <td style={{ fontSize: 16, color: T.textSoft, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
+                      <td style={{ fontSize: 16, color: T.text, fontFamily: 'monospace', fontWeight: 700, whiteSpace: 'nowrap' }}>{fmtSure(r.tamamlanma_suresi_saniye)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -304,7 +304,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                       </span>
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16, color: T.text, letterSpacing: '0.03em' }}>{a.plaka}</span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: '0.03em' }}>{a.plaka}</span>
                           {a.departman && (
                             <span style={{ fontSize: 11, fontWeight: 700, color: T.blue, background: T.blueLight, padding: '1px 7px', borderRadius: 999 }}>
                               {a.departman}
@@ -319,7 +319,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
                       </div>
                       <div style={{ display: 'flex', gap: 3, flexShrink: 0, alignItems: 'center' }}>
                         {gunler.length === 0 ? (
-                          <span style={{ fontSize: 11, color: T.textSoft, fontStyle: 'italic' }}>Plansız</span>
+                          <span style={{ fontSize: 12, color: T.amber, fontStyle: 'italic', fontWeight: 600 }}>Plansız</span>
                         ) : (
                           [...gunler].sort((x, y) => x - y).map(g => (
                             <span key={g} style={{

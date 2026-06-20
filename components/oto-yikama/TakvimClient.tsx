@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, Loader2, Search } from 'lucide-react'
 import { useToast } from '@/components/ui/ToastProvider'
 import { aralikPlanTahmin, type TahminArac } from '@/lib/oto-yikama/yikamaPlanTahmin'
 import type { TakvimGercekKayit, TakvimResponse } from '@/app/api/oto-yikama/takvim/route'
@@ -114,6 +114,7 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
   const [data, setData] = useState<TakvimResponse | null>(null)
   const [yukleniyor, setYukleniyor] = useState(true)
   const [seciliGun, setSeciliGun] = useState<string | null>(null)
+  const [vurguPlaka, setVurguPlaka] = useState<string>('')
 
   async function yukle() {
     setYukleniyor(true)
@@ -192,16 +193,48 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
     return harita
   }, [data, yil])
 
+  // Plaka arama dropdown listesi — araclar listesinden unique + alfabetik
+  const plakaListesi = useMemo(() => {
+    if (!data?.araclar) return [] as string[]
+    const set = new Set<string>()
+    for (const a of data.araclar) if (a.plaka) set.add(a.plaka)
+    return [...set].sort((a, b) => a.localeCompare(b, 'tr'))
+  }, [data])
+
   return (
     <div>
-      {/* Üst bar — yıl + lejant */}
+      {/* Üst bar — yıl + plaka arama + lejant */}
       <div className="verde-card" style={{ padding: '12px 16px', marginBottom: 12, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ fontSize: 18, fontWeight: 800, color: T.text }}>
           {yil} Yıkama Takvimi
         </div>
         <div style={{ fontSize: 12, color: T.textSoft }}>
-          Bir güne tıklayarak yıkama detaylarını görüntüleyin
+          Bir güne tıklayarak detayı görün
         </div>
+
+        {/* Plaka arama — seçildiğinde o aracın yıkama günleri kırmızı vurgulu */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
+          <Search size={14} color={T.textSoft} />
+          <input list="takvim-plaka-listesi" value={vurguPlaka}
+            onChange={e => setVurguPlaka(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+            placeholder="Plaka ara…"
+            style={{
+              padding: '6px 10px', fontSize: 13, fontFamily: 'monospace', fontWeight: 700,
+              border: `1.5px solid ${vurguPlaka ? '#dc2626' : T.border}`,
+              borderRadius: 6, background: vurguPlaka ? '#fee2e2' : '#fff',
+              color: vurguPlaka ? '#991b1b' : T.text, width: 160,
+            }} />
+          <datalist id="takvim-plaka-listesi">
+            {plakaListesi.map(p => <option key={p} value={p} />)}
+          </datalist>
+          {vurguPlaka && (
+            <button onClick={() => setVurguPlaka('')} title="Vurguyu temizle"
+              style={{ padding: '4px 7px', fontSize: 11, border: `1px solid ${T.border}`, borderRadius: 5, background: '#fff', cursor: 'pointer', color: T.textSoft }}>
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, fontSize: 11, color: T.textSoft, alignItems: 'center', flexWrap: 'wrap' }}>
           {(Object.keys(DURUM_LABEL) as Durum[]).map(d => (
             <span key={d} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -212,19 +245,33 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
               {DURUM_LABEL[d]}
             </span>
           ))}
+          {vurguPlaka && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#991b1b', fontWeight: 700 }}>
+              <span style={{ width: 14, height: 14, borderRadius: 4, background: '#fee2e2', border: '2px solid #dc2626' }} />
+              {vurguPlaka} günleri
+            </span>
+          )}
         </div>
       </div>
 
-      {/* 4 ay × 3 satır grid */}
-      <div style={{ position: 'relative' }}>
+      {/* 6 ay × 2 satır grid */}
+      <div style={{ position: 'relative', minHeight: 400 }}>
         {yukleniyor && (
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12, color: T.textSoft, fontSize: 13, fontWeight: 600 }}>
-            Yükleniyor…
+          <div style={{
+            position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.85)', zIndex: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12,
+            flexDirection: 'column', gap: 12,
+          }}>
+            <Loader2 size={40} color={T.blue} style={{ animation: 'spin 0.9s linear infinite' }} />
+            <div style={{ color: T.text, fontSize: 14, fontWeight: 700 }}>Yıllık takvim hazırlanıyor…</div>
+            <div style={{ color: T.textSoft, fontSize: 12 }}>Plakalar ve yıkama planları yükleniyor</div>
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 10 }}>
           {Array.from({ length: 12 }, (_, m) => (
-            <AyBlock key={m} yil={yil} ay={m} harita={gunKartlari} onGunTik={iso => setSeciliGun(iso)} />
+            <AyBlock key={m} yil={yil} ay={m} harita={gunKartlari}
+              vurguPlaka={vurguPlaka}
+              onGunTik={iso => setSeciliGun(iso)} />
           ))}
         </div>
       </div>
@@ -237,15 +284,18 @@ export default function TakvimClient({ firmaId }: { firmaId: string }) {
           onClose={() => setSeciliGun(null)}
         />
       )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }
 
 // ── Ay bloğu ───────────────────────────────────────────────
-function AyBlock({ yil, ay, harita, onGunTik }: {
+function AyBlock({ yil, ay, harita, onGunTik, vurguPlaka }: {
   yil: number; ay: number;
   harita: Map<string, PlakaKart[]>;
   onGunTik: (iso: string) => void;
+  vurguPlaka?: string;
 }) {
   const today = bugunIso()
   const ilk = new Date(Date.UTC(yil, ay, 1, 12, 0, 0))
@@ -290,6 +340,15 @@ function AyBlock({ yil, ay, harita, onGunTik }: {
           if (!inMonth) { bg = '#fafbfc'; fg = '#cbd5e1'; bd = '#eef2f6' }
           if (onceCut) { bg = '#f1f5f9'; fg = '#cbd5e1'; bd = '#e5e7eb' }
 
+          // Plaka vurgusu: durum renklerinin üzerine kırmızı vurgu (en yüksek öncelik)
+          const vurgulu = !!vurguPlaka && inMonth && !onceCut &&
+            kartlar.some(k => k.plaka === vurguPlaka)
+          if (vurgulu) {
+            bg = '#fee2e2'
+            fg = '#991b1b'
+            bd = '#dc2626'
+          }
+
           const tiklanabilir = inMonth && !onceCut
 
           return (
@@ -299,13 +358,14 @@ function AyBlock({ yil, ay, harita, onGunTik }: {
               title={
                 onceCut ? 'Sistem öncesi — gösterim yok'
                 : !inMonth ? ''
+                : vurgulu ? `${vurguPlaka} bu gün yıkanacak — toplam ${kartlar.length} araç`
                 : kartlar.length > 0 ? `${kartlar.length} araç` : 'Plan yok'
               }
               style={{
                 aspectRatio: '1',
                 background: bg,
                 color: fg,
-                border: `1px solid ${isBugun ? T.blue : bd}`,
+                border: `${vurgulu ? 2 : 1}px solid ${isBugun ? T.blue : bd}`,
                 borderRadius: 4,
                 padding: 0,
                 cursor: tiklanabilir ? 'pointer' : 'not-allowed',
@@ -432,7 +492,7 @@ function GunPopup({ tarih, kartlar, lokAd, onClose }: {
                   }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <span style={{
-                      fontFamily: 'monospace', fontWeight: 800, fontSize: 15,
+                      fontFamily: 'monospace', fontWeight: 800, fontSize: 17,
                       color: DURUM_FG[k.durum],
                     }}>{k.plaka}</span>
                     <span style={{ fontSize: 10, fontWeight: 700, color: DURUM_FG[k.durum] }}>{DURUM_LABEL[k.durum]}</span>

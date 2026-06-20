@@ -98,10 +98,11 @@ function fmtDateTime(d: string | null): string {
 }
 function fmtSure(saniye: number | null): string {
   if (saniye == null || saniye <= 0) return '—'
-  const m = Math.floor(saniye / 60)
+  const h = Math.floor(saniye / 3600)
+  const m = Math.floor((saniye % 3600) / 60)
   const s = saniye % 60
-  if (m === 0) return `${s}sn`
-  return `${m}dk ${s}sn`
+  if (h > 0) return `${h} sa ${m} dk`
+  return `${m} dk ${s} sn`
 }
 
 interface Props {
@@ -347,28 +348,28 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
         </FilterField>
         <FilterField label="İstasyon">
           <select value={istasyonId} onChange={e => setIstasyonId(e.target.value)}
-            style={{ width: '100%', padding: '5px 8px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
             <option value="">Tümü</option>
             {istasyonlar.map(i => <option key={i.id} value={i.id}>{i.tanim}</option>)}
           </select>
         </FilterField>
         <FilterField label="İşlem Yapan">
           <select value={tamamlayanId} onChange={e => setTamamlayanId(e.target.value)}
-            style={{ width: '100%', padding: '5px 8px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
             <option value="">Tümü</option>
             {tamamlayanlar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
           </select>
         </FilterField>
         <FilterField label="Departman">
           <select value={departmanFilter} onChange={e => setDepartmanFilter(e.target.value)}
-            style={{ width: '100%', padding: '5px 8px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
             <option value="">Tümü</option>
             {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </FilterField>
         <FilterField label="Yıkama Günü">
           <select value={yikamaGunuFilter} onChange={e => setYikamaGunuFilter(e.target.value)}
-            style={{ width: '100%', padding: '5px 8px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
             <option value="">Tümü</option>
             <option value="1">Pazartesi</option>
             <option value="2">Salı</option>
@@ -400,7 +401,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
         </FilterField>
         <FilterField label="Durum">
           <select value={filtre} onChange={e => setFiltre(e.target.value as DurumFilter)}
-            style={{ width: '100%', padding: '5px 8px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
             <option value="TUMU">Tümü</option>
             <option value="HAZIR">Hazır</option>
             <option value="ACIK">Açık</option>
@@ -457,7 +458,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
                   <tr key={k.gorev_id}>
                     <Td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
                         {k.ekstra && (
                           <span style={{ padding: '2px 7px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 11, fontWeight: 800, letterSpacing: '0.04em' }}>EKSTRA</span>
                         )}
@@ -470,15 +471,15 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
                         {DURUM_LABEL[gd]}
                       </span>
                     </Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 15 }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
-                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 15 }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 16, whiteSpace: 'nowrap' }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
+                    <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 16, whiteSpace: 'nowrap' }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>
                     <Td align="center" muted>
-                      <span style={{ fontFamily: 'monospace', fontSize: 15, color: gd === 'TAMAMLANDI' ? T.green : T.textSoft, fontWeight: gd === 'TAMAMLANDI' ? 700 : 400 }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 16, color: gd === 'TAMAMLANDI' ? T.green : T.textSoft, fontWeight: gd === 'TAMAMLANDI' ? 700 : 400, whiteSpace: 'nowrap' }}>
                         {fmtSure(k.tamamlanma_suresi_saniye)}
                       </span>
                     </Td>
                     <Td align="right" muted>
-                      <span style={{ fontFamily: 'monospace', fontSize: 14 }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap' }}>
                         {k.km != null ? k.km.toLocaleString('tr-TR') : '—'}
                       </span>
                     </Td>
@@ -715,7 +716,7 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
 function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 10.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{label}</div>
       {children}
     </div>
   )

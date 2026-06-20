@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
 
   const [aracRes, userRes] = await Promise.all([
     aracIds.length > 0
-      ? admin.from('araclar').select('id, plaka, departman, kullanici_adi_soyadi').in('id', aracIds)
+      ? admin.from('araclar').select('id, plaka, departman, kullanici_adi_soyadi, yikama_gunleri').in('id', aracIds)
       : Promise.resolve({ data: [] as any[] }),
     kullaniciIds.length > 0
       ? admin.from('users').select('id, isim_soyisim').in('id', kullaniciIds)
@@ -124,6 +124,7 @@ export async function GET(req: NextRequest) {
         plaka: m.plaka_snapshot,
         departman: a?.departman ?? null,
         arac_sahibi: a?.kullanici_adi_soyadi ?? null,
+        yikama_gunleri: Array.isArray(a?.yikama_gunleri) ? a.yikama_gunleri : [],
         personel: personelAd,
         personel_id: g.islemi_yapan_id ?? null,
         lokasyon: lokasyonTam,
@@ -150,6 +151,7 @@ export async function GET(req: NextRequest) {
       ? Math.round(data.reduce((s, d) => s + (d.tamamlanma_suresi_saniye ?? 0), 0) / data.length)
       : 0,
     gunluk_trend: buildGunlukTrend(data),
+    saatlik_trend: buildSaatlikTrend(data),
     personel_top: buildKisiAgg(data),
     plaka_top: buildPlakaAgg(data),
     lokasyon_dagilim: buildLokasyonAgg(data),
@@ -172,13 +174,43 @@ function emptyAgg() {
     toplam: 0, planli: 0, ekstra: 0,
     personel_sayisi: 0, plaka_sayisi: 0,
     toplam_sure_saniye: 0, ortalama_sure_saniye: 0,
-    gunluk_trend: [], personel_top: [], plaka_top: [], lokasyon_dagilim: [],
+    gunluk_trend: [], saatlik_trend: [],
+    personel_top: [], plaka_top: [], lokasyon_dagilim: [],
   }
 }
 
 type Row = {
   hedef_tarih: string; ekstra: boolean; personel: string; personel_id: string | null
-  plaka: string; lokasyon: string
+  plaka: string; lokasyon: string; baslatilma_tarihi?: string | null
+}
+
+// 08:00-18:00 TR saatleri arası saatlik bucket (11 nokta).
+// "planli" = ekstra=false (cron'un ürettiği rutin), "plansiz" = ekstra=true.
+// baslatilma_tarihi'nin TR saati hesaba katılır; başlamamış görevler atlanır.
+function buildSaatlikTrend(rows: Row[]) {
+  const SAATLER = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+  const map = new Map<number, { planli: number; plansiz: number }>()
+  for (const s of SAATLER) map.set(s, { planli: 0, plansiz: 0 })
+
+  for (const r of rows) {
+    if (!r.baslatilma_tarihi) continue
+    // TR saatini hesapla — Intl.DateTimeFormat ile saati al
+    const trSaat = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false,
+    }).format(new Date(r.baslatilma_tarihi))
+    const saat = parseInt(trSaat, 10)
+    if (!Number.isFinite(saat)) continue
+    if (saat < 8 || saat > 18) continue
+    const bucket = map.get(saat)!
+    if (r.ekstra) bucket.plansiz++
+    else bucket.planli++
+  }
+
+  return SAATLER.map(s => ({
+    saat: `${String(s).padStart(2, '0')}:00`,
+    planli: map.get(s)!.planli,
+    plansiz: map.get(s)!.plansiz,
+  }))
 }
 
 function buildGunlukTrend(rows: Row[]) {

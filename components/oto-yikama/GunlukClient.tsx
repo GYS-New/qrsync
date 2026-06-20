@@ -47,14 +47,15 @@ function fmtTime(iso: string | null): string {
   return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+// "X sa Y dk" (saatler dahil) veya "X dk Y sn" — saniye 0 olsa bile "0 sn" yazılır,
+// böylece hücre içinde nowrap ile tek satırda kalır.
 function fmtSure(saniye: number | null | undefined): string {
   if (saniye == null || saniye <= 0) return '—'
   const h = Math.floor(saniye / 3600)
   const m = Math.floor((saniye % 3600) / 60)
   const s = saniye % 60
-  if (h > 0) return `${h}sa ${m}dk`
-  if (m > 0) return `${m}dk ${s}sn`
-  return `${s}sn`
+  if (h > 0) return `${h} sa ${m} dk`
+  return `${m} dk ${s} sn`
 }
 
 // Süre hesaplama: tamamlanma_suresi_saniye (snapshot) varsa onu kullan,
@@ -67,7 +68,7 @@ function gorevSuresiSaniye(r: Row): number {
   return 0
 }
 
-type DurumFilter = 'TUMU' | Durum
+type DurumFilter = 'TUMU' | 'PLANLI' | Durum
 
 export default function GunlukClient() {
   const { firmaId } = useFirma()
@@ -121,7 +122,11 @@ export default function GunlukClient() {
   const sorted = useMemo(() => {
     const ara = arama.trim().toUpperCase()
     return [...rows]
-      .filter(r => durumFilter === 'TUMU' ? true : r.durum === durumFilter)
+      .filter(r =>
+        durumFilter === 'TUMU' ? true
+        : durumFilter === 'PLANLI' ? !r.ekstra
+        : r.durum === durumFilter
+      )
       .filter(r => departmanFilter ? r.departman === departmanFilter : true)
       .filter(r => {
         if (!ara) return true
@@ -149,8 +154,11 @@ export default function GunlukClient() {
   }, [rows])
 
   const sayilar = useMemo(() => {
-    const c = { toplam: rows.length, HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
-    for (const r of rows) c[r.durum]++
+    const c = { toplam: rows.length, planli: 0, HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
+    for (const r of rows) {
+      c[r.durum]++
+      if (!r.ekstra) c.planli++
+    }
     return c
   }, [rows])
 
@@ -171,11 +179,12 @@ export default function GunlukClient() {
   const dotColor = streamState === 'running' ? '#374151' : streamState === 'paused' ? '#d97706' : '#9ca3af'
 
   const kpiKartlari: { key: DurumFilter; label: string; val: number; bg: string; vColor: string; lColor: string }[] = [
-    { key: 'TUMU',       label: 'Tümü',       val: sayilar.toplam,     bg: 'transparent', vColor: '#111827', lColor: '#6b7280' },
-    { key: 'ISLEMDE',    label: 'İşlemde',    val: sayilar.ISLEMDE,    bg: '#eff6ff',     vColor: '#1d4ed8', lColor: '#185FA5' },
-    { key: 'ACIK',       label: 'Açık',       val: sayilar.ACIK,       bg: '#fffbeb',     vColor: '#92400e', lColor: '#854F0B' },
-    { key: 'TAMAMLANDI', label: 'Tamamlandı', val: sayilar.TAMAMLANDI, bg: '#f0fdf4',     vColor: '#166534', lColor: '#3B6D11' },
-    { key: 'IPTAL',      label: 'İptal',      val: sayilar.IPTAL,      bg: '#fef2f2',     vColor: '#991b1b', lColor: '#A32D2D' },
+    { key: 'TUMU',       label: 'Tümü',           val: sayilar.toplam,     bg: 'transparent', vColor: '#111827', lColor: '#6b7280' },
+    { key: 'PLANLI',     label: 'Bugün Planlı',   val: sayilar.planli,     bg: '#f5f3ff',     vColor: '#6d28d9', lColor: '#5B21B6' },
+    { key: 'ISLEMDE',    label: 'İşlemde',        val: sayilar.ISLEMDE,    bg: '#eff6ff',     vColor: '#1d4ed8', lColor: '#185FA5' },
+    { key: 'ACIK',       label: 'Açık',           val: sayilar.ACIK,       bg: '#fffbeb',     vColor: '#92400e', lColor: '#854F0B' },
+    { key: 'TAMAMLANDI', label: 'Tamamlandı',     val: sayilar.TAMAMLANDI, bg: '#f0fdf4',     vColor: '#166534', lColor: '#3B6D11' },
+    { key: 'IPTAL',      label: 'İptal',          val: sayilar.IPTAL,      bg: '#fef2f2',     vColor: '#991b1b', lColor: '#A32D2D' },
   ]
 
   return (
@@ -228,7 +237,7 @@ export default function GunlukClient() {
         </div>
 
         {/* KPI filtre kartları */}
-        <div style={{ padding: '8px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, alignItems: 'stretch' }}>
+        <div style={{ padding: '8px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, alignItems: 'stretch' }}>
           {kpiKartlari.map(({ key, label, val, bg, vColor, lColor }) => {
             const active = durumFilter === key
             const onClick = () => {
@@ -318,7 +327,7 @@ export default function GunlukClient() {
                 {sorted.map(r => (
                   <tr key={r.gorev_id}
                     style={{ background: r.durum === 'ISLEMDE' ? DURUM_BG.ISLEMDE : undefined }}>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16, color: T.text }}>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         {r.plaka}
                         {r.ekstra && (
@@ -330,10 +339,10 @@ export default function GunlukClient() {
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.kullanici ?? '—'}</td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.departman ?? '—'}</td>
-                    <td style={{ color: T.textSoft, fontSize: 13 }}>
+                    <td style={{ color: T.textSoft, fontSize: 14, whiteSpace: 'nowrap' }}>
                       {Array.isArray(r.yikama_gunleri) && r.yikama_gunleri.length > 0
                         ? [...r.yikama_gunleri].sort((x, y) => x - y).map(g => GUN_KISA[g] ?? g).join(', ')
-                        : <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Plansız</span>}
+                        : <span style={{ color: T.amber, fontStyle: 'italic', fontWeight: 600 }}>Plansız</span>}
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.lokasyon}</td>
                     <td style={{ paddingLeft: 2 }}>
@@ -342,9 +351,9 @@ export default function GunlukClient() {
                         {DURUM_LABEL[r.durum]}
                       </span>
                     </td>
-                    <td style={{ color: T.textSoft, fontSize: 15, fontFamily: 'monospace' }}>{fmtTime(r.baslatilma_tarihi)}</td>
-                    <td style={{ color: T.textSoft, fontSize: 15, fontFamily: 'monospace' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
-                    <td style={{ color: r.durum === 'TAMAMLANDI' ? T.green : T.textSoft, fontSize: 15, fontFamily: 'monospace', fontWeight: 700 }}>
+                    <td style={{ color: T.textSoft, fontSize: 16, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{fmtTime(r.baslatilma_tarihi)}</td>
+                    <td style={{ color: T.textSoft, fontSize: 16, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
+                    <td style={{ color: r.durum === 'TAMAMLANDI' ? T.green : T.textSoft, fontSize: 16, fontFamily: 'monospace', fontWeight: 700, whiteSpace: 'nowrap' }}>
                       {r.durum === 'TAMAMLANDI' ? fmtSure(gorevSuresiSaniye(r)) : '—'}
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.tamamlayan ?? '—'}</td>
