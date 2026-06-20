@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
 import { Loader2, RefreshCw, Calendar, Filter, X, FileSpreadsheet, FileText } from 'lucide-react'
 import {
@@ -85,8 +84,7 @@ function today(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
 }
 
-export default function RaporlarClient() {
-  const { firmaId } = useFirma()
+export default function RaporlarClient({ firmaId }: { firmaId: string }) {
   const { toast } = useToast()
   const [data, setData] = useState<Row[]>([])
   const [agg, setAgg] = useState<Agg | null>(null)
