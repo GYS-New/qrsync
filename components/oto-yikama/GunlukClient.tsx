@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
 import { Loader2, Search } from 'lucide-react'
 
@@ -70,8 +69,7 @@ function gorevSuresiSaniye(r: Row): number {
 
 type DurumFilter = 'TUMU' | 'PLANLI' | Durum
 
-export default function GunlukClient() {
-  const { firmaId } = useFirma()
+export default function GunlukClient({ firmaId }: { firmaId: string }) {
   const { toast } = useToast()
   const [rows, setRows] = useState<Row[]>([])
   const [today, setToday] = useState<string>('')
