@@ -377,77 +377,82 @@ export default function RaporlarClient() {
               </div>
             </div>
 
-            {/* Personel top */}
-            <div className="verde-card" style={{ padding: 12 }}>
-              <Baslik>Personel Bazlı Yıkama (Top 10)</Baslik>
-              <div style={{ height: 320 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agg.personel_top} layout="vertical" margin={{ top: 4, right: 18, left: 130, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 13, fontWeight: 600 }} />
-                    <YAxis type="category" dataKey="personel" tick={{ fontSize: 13, fontWeight: 600 }} width={130}
-                      tickFormatter={t => t.length > 20 ? `${t.slice(0, 20)}…` : t} />
-                    <Tooltip />
-                    <Bar dataKey="adet" fill={T.blue} radius={[0, 6, 6, 0]} maxBarSize={28} />
-                  </BarChart>
-                </ResponsiveContainer>
+            {/* Personel + Plaka top — tek kart içinde 2 kolon (PDF'te yan yana
+                ve tek parça olarak basılır, ortadan bölünmez) */}
+            <div className="verde-card" style={{ padding: 12, gridColumn: '1 / -1' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <Baslik>Personel Bazlı Yıkama (Top 10)</Baslik>
+                  <div style={{ height: 240 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={agg.personel_top} layout="vertical" margin={{ top: 4, right: 18, left: 110, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fontWeight: 600 }} />
+                        <YAxis type="category" dataKey="personel" tick={{ fontSize: 12, fontWeight: 600 }} width={110}
+                          tickFormatter={t => t.length > 16 ? `${t.slice(0, 16)}…` : t} />
+                        <Tooltip />
+                        <Bar dataKey="adet" fill={T.blue} radius={[0, 6, 6, 0]} maxBarSize={22} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div>
+                  <Baslik>Plaka Bazlı Yıkama (Top 10)</Baslik>
+                  <div style={{ height: 240 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={agg.plaka_top} layout="vertical" margin={{ top: 4, right: 18, left: 90, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fontWeight: 600 }} />
+                        <YAxis type="category" dataKey="plaka" tick={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 700 }} width={90} />
+                        <Tooltip />
+                        <Bar dataKey="adet" fill={T.purple} radius={[0, 6, 6, 0]} maxBarSize={22} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Plaka top */}
-            <div className="verde-card" style={{ padding: 12 }}>
-              <Baslik>Plaka Bazlı Yıkama (Top 10)</Baslik>
-              <div style={{ height: 320 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agg.plaka_top} layout="vertical" margin={{ top: 4, right: 18, left: 110, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 13, fontWeight: 600 }} />
-                    <YAxis type="category" dataKey="plaka" tick={{ fontSize: 14, fontFamily: 'monospace', fontWeight: 700 }} width={110} />
-                    <Tooltip />
-                    <Bar dataKey="adet" fill={T.purple} radius={[0, 6, 6, 0]} maxBarSize={28} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Planlı vs Ekstra */}
-            <div className="verde-card" style={{ padding: 12 }}>
-              <Baslik>Planlı / Ekstra Dağılımı</Baslik>
-              <div style={{ height: 240 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Pie data={[
-                      { name: 'Planlı', value: agg.planli },
-                      { name: 'Ekstra', value: agg.ekstra },
-                    ]} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80} paddingAngle={2}
-                      label={(e: any) => `${e.name} (${e.value})`}>
-                      <Cell fill={T.green} />
-                      <Cell fill={T.amber} />
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* İstasyon dağılımı */}
-            <div className="verde-card" style={{ padding: 12 }}>
-              <Baslik>İstasyon Dağılımı</Baslik>
-              <div style={{ height: 240 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Pie data={agg.lokasyon_dagilim} dataKey="adet" nameKey="lokasyon"
-                      innerRadius={45} outerRadius={80} paddingAngle={2}
-                      label={(e: any) => `${e.adet}`}>
-                      {agg.lokasyon_dagilim.map((_, i) => (
-                        <Cell key={i} fill={RENKLER[i % RENKLER.length]} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+            {/* Donutlar tek kart — Planlı/Ekstra + İstasyon (yan yana, PDF tek parça) */}
+            <div className="verde-card" style={{ padding: 12, gridColumn: '1 / -1' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <Baslik>Planlı / Ekstra Dağılımı</Baslik>
+                  <div style={{ height: 220 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Tooltip />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Pie data={[
+                          { name: 'Planlı', value: agg.planli },
+                          { name: 'Ekstra', value: agg.ekstra },
+                        ]} dataKey="value" nameKey="name" innerRadius={42} outerRadius={75} paddingAngle={2}
+                          label={(e: any) => `${e.name} (${e.value})`}>
+                          <Cell fill={T.green} />
+                          <Cell fill={T.amber} />
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div>
+                  <Baslik>İstasyon Dağılımı</Baslik>
+                  <div style={{ height: 220 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Tooltip />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Pie data={agg.lokasyon_dagilim} dataKey="adet" nameKey="lokasyon"
+                          innerRadius={42} outerRadius={75} paddingAngle={2}
+                          label={(e: any) => `${e.adet}`}>
+                          {agg.lokasyon_dagilim.map((_, i) => (
+                            <Cell key={i} fill={RENKLER[i % RENKLER.length]} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
