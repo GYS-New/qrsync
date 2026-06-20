@@ -29,9 +29,7 @@ async function authorize() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Yetkisiz', status: 401 as const }
   const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
-  if (!me || !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
-    return { error: 'Bu işlem için SA veya TA yetkisi gerekli', status: 403 as const }
-  }
+  if (!me) return { error: 'Kullanıcı bulunamadı', status: 401 as const }
   return { user, me }
 }
 

@@ -14,9 +14,7 @@ async function sa(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { err: NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 }) }
   const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
-  if (!me || !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
-    return { err: NextResponse.json({ ok: false, error: 'Bu işlem için yönetici (SA veya TA) yetkisi gerekli' }, { status: 403 }) }
-  }
+  if (!me) return { err: NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 401 }) }
   return { me }
 }
 

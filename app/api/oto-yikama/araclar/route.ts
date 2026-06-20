@@ -10,15 +10,13 @@ import { getFirmaModulDurumu } from '@/lib/firmalar/modulDurumu'
 
 export const dynamic = 'force-dynamic'
 
-// mode='read' → tüm roller (görüntüleme), mode='write' → SA + alt_SA + TA
-async function yetki(supabase: any, mode: 'read' | 'write') {
+// Tüm yetkili roller (Oto Yıkama erişimi sayfa seviyesinde kontrol edilir).
+// mode parametresi şu an semantik amaçlı — kullanılmıyor.
+async function yetki(supabase: any, _mode: 'read' | 'write' = 'read') {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { err: NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 }) }
   const { data: me } = await supabase.from('users').select('id,rol,firma_id').eq('id', user.id).single()
   if (!me) return { err: NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 401 }) }
-  if (mode === 'write' && !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
-    return { err: NextResponse.json({ ok: false, error: 'Bu işlem için yönetici (SA veya TA) yetkisi gerekli' }, { status: 403 }) }
-  }
   return { me }
 }
 

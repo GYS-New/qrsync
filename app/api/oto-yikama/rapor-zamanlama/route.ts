@@ -18,9 +18,6 @@ async function yetki(): Promise<{ user: any; me: any } | NextResponse> {
   if (!user) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 })
   const { data: me } = await supabase.from('users').select('id, rol, firma_id').eq('id', user.id).single()
   if (!me) return NextResponse.json({ ok: false, error: 'Kullanıcı bulunamadı' }, { status: 401 })
-  if (!['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
-    return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 403 })
-  }
   return { user, me }
 }
 
