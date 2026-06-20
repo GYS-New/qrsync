@@ -142,6 +142,16 @@ export default function RaporlarClient() {
     setBitis(today())
   }
 
+  // Hangi quick-date preset aktif — buton stilini vurgulamak için
+  const aktifPreset = useMemo(() => {
+    if (bitis !== today()) return null
+    if (baslangic === dateMinus(0)) return 1
+    if (baslangic === dateMinus(6)) return 7
+    if (baslangic === dateMinus(29)) return 30
+    if (baslangic === dateMinus(89)) return 90
+    return null
+  }, [baslangic, bitis])
+
   function temizle() {
     setPersonelId('')
     setPlaka('')
@@ -228,7 +238,8 @@ export default function RaporlarClient() {
               { l: '30 gün', g: 30 },
               { l: '90 gün', g: 90 },
             ].map(b => (
-              <button key={b.l} onClick={() => hizliTarih(b.g)} style={chip}>{b.l}</button>
+              <button key={b.l} onClick={() => hizliTarih(b.g)}
+                style={aktifPreset === b.g ? chipActive : chip}>{b.l}</button>
             ))}
           </div>
 
@@ -306,12 +317,23 @@ export default function RaporlarClient() {
         </div>
       )}
 
-      {loading && data.length === 0 ? (
-        <div className="verde-card" style={{ padding: 60, textAlign: 'center', color: T.textSoft }}>
-          <Loader2 size={26} style={{ animation: 'spin 0.9s linear infinite' }} />
-          <div style={{ marginTop: 8 }}>Yükleniyor…</div>
+      {/* Loading overlay — veri varken filter değişikliğinde de görünür */}
+      {loading && (
+        <div className="verde-card" style={{
+          padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12,
+          background: '#eff6ff', border: `1.5px solid ${T.blue}`,
+        }}>
+          <Loader2 size={22} color={T.blue} style={{ animation: 'spin 0.9s linear infinite' }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.blue }}>Veri yükleniyor…</div>
+            <div style={{ fontSize: 12, color: T.textSoft, marginTop: 2 }}>
+              Seçili filtrelere göre yıkama kayıtları çekiliyor
+            </div>
+          </div>
         </div>
-      ) : !agg || agg.toplam === 0 ? (
+      )}
+
+      {loading && data.length === 0 ? null : !agg || agg.toplam === 0 ? (
         <div className="verde-card" style={{ padding: 60, textAlign: 'center', color: T.textSoft }}>
           Bu kriterlere uygun yıkama kaydı yok.
         </div>
@@ -357,13 +379,13 @@ export default function RaporlarClient() {
             {/* Personel top */}
             <div className="verde-card" style={{ padding: 12 }}>
               <Baslik>Personel Bazlı Yıkama (Top 10)</Baslik>
-              <div style={{ height: 280 }}>
+              <div style={{ height: 320 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agg.personel_top} layout="vertical" margin={{ top: 4, right: 18, left: 80, bottom: 4 }}>
+                  <BarChart data={agg.personel_top} layout="vertical" margin={{ top: 4, right: 18, left: 130, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="personel" tick={{ fontSize: 11 }} width={80}
-                      tickFormatter={t => t.length > 14 ? `${t.slice(0, 14)}…` : t} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 13, fontWeight: 600 }} />
+                    <YAxis type="category" dataKey="personel" tick={{ fontSize: 13, fontWeight: 600 }} width={130}
+                      tickFormatter={t => t.length > 20 ? `${t.slice(0, 20)}…` : t} />
                     <Tooltip />
                     <Bar dataKey="adet" fill={T.blue} radius={[0, 6, 6, 0]} />
                   </BarChart>
@@ -374,12 +396,12 @@ export default function RaporlarClient() {
             {/* Plaka top */}
             <div className="verde-card" style={{ padding: 12 }}>
               <Baslik>Plaka Bazlı Yıkama (Top 10)</Baslik>
-              <div style={{ height: 280 }}>
+              <div style={{ height: 320 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agg.plaka_top} layout="vertical" margin={{ top: 4, right: 18, left: 80, bottom: 4 }}>
+                  <BarChart data={agg.plaka_top} layout="vertical" margin={{ top: 4, right: 18, left: 110, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="plaka" tick={{ fontSize: 11, fontFamily: 'monospace' }} width={80} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 13, fontWeight: 600 }} />
+                    <YAxis type="category" dataKey="plaka" tick={{ fontSize: 14, fontFamily: 'monospace', fontWeight: 700 }} width={110} />
                     <Tooltip />
                     <Bar dataKey="adet" fill={T.purple} radius={[0, 6, 6, 0]} />
                   </BarChart>
@@ -521,11 +543,17 @@ function Baslik({ children }: { children: React.ReactNode }) {
 }
 
 const inp: React.CSSProperties = {
-  padding: '5px 8px', borderRadius: 6, border: `1px solid ${T.border}`,
-  background: '#fff', fontSize: 12, color: T.text,
+  padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.border}`,
+  background: '#fff', fontSize: 13, color: T.text,
 }
 
 const chip: React.CSSProperties = {
-  padding: '4px 8px', borderRadius: 6, border: `1px solid ${T.border}`,
-  background: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: T.text,
+  padding: '5px 10px', borderRadius: 6, border: `1px solid ${T.border}`,
+  background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: T.text,
+}
+
+const chipActive: React.CSSProperties = {
+  padding: '5px 10px', borderRadius: 6, border: `1.5px solid #1d4ed8`,
+  background: '#dbeafe', cursor: 'pointer', fontSize: 12, fontWeight: 800, color: '#1d4ed8',
+  boxShadow: '0 1px 2px rgba(29,78,216,0.2)',
 }
