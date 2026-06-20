@@ -50,12 +50,10 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
   const chartData = gunler.map(g => {
     const v = sayac.get(g.tarih) ?? { tamamlanan: 0, kalan: 0 }
     return {
-      etiket: `${g.gunAdi}\n${g.etiket}`,
       etiketKisa: g.gunAdi,
       tarih: g.etiket,
+      Planlanan:  v.tamamlanan + v.kalan,  // toplam = tamamlanan + henüz kalan
       Tamamlanan: v.tamamlanan,
-      Kalan: v.kalan,
-      Toplam: v.tamamlanan + v.kalan,
       isToday: g.isToday,
     }
   })

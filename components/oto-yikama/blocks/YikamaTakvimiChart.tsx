@@ -2,16 +2,14 @@
 
 import { useLayoutEffect, useRef, useState } from 'react'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, LabelList,
 } from 'recharts'
 
 type Veri = {
-  etiket: string
   etiketKisa: string
   tarih: string
+  Planlanan: number
   Tamamlanan: number
-  Kalan: number
-  Toplam: number
   isToday: boolean
 }
 
@@ -38,7 +36,7 @@ export default function YikamaTakvimiChart({ data }: { data: Veri[] }) {
     return () => ro.disconnect()
   }, [])
 
-  const toplamPlanli = data.reduce((s, d) => s + d.Toplam, 0)
+  const toplamPlanli = data.reduce((s, d) => s + d.Planlanan, 0)
   const toplamTamamlanan = data.reduce((s, d) => s + d.Tamamlanan, 0)
   const oran = toplamPlanli > 0 ? Math.round((toplamTamamlanan / toplamPlanli) * 100) : 0
 
@@ -49,7 +47,7 @@ export default function YikamaTakvimiChart({ data }: { data: Veri[] }) {
           Yıkama Takvimi — Önümüzdeki 7 Gün
         </div>
         <div style={{ display: 'flex', gap: 14, fontSize: 12, color: T.textSoft }}>
-          <span>Toplam: <strong style={{ color: T.text }}>{toplamPlanli}</strong></span>
+          <span>Planlanan: <strong style={{ color: T.blue }}>{toplamPlanli}</strong></span>
           <span>Tamamlanan: <strong style={{ color: T.green }}>{toplamTamamlanan}</strong></span>
           <span>Oran: <strong style={{ color: T.text }}>%{oran}</strong></span>
         </div>
@@ -58,7 +56,8 @@ export default function YikamaTakvimiChart({ data }: { data: Veri[] }) {
       <div ref={wrapRef} style={{ width: '100%', height: 260 }}>
         {size.w > 0 && (
           <BarChart width={size.w} height={size.h} data={data}
-            margin={{ top: 12, right: 16, left: 0, bottom: 4 }}>
+            margin={{ top: 16, right: 16, left: 0, bottom: 4 }}
+            barCategoryGap="22%" barGap={4}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis
               dataKey="etiketKisa"
@@ -99,17 +98,22 @@ export default function YikamaTakvimiChart({ data }: { data: Veri[] }) {
                 return `${item.etiketKisa} · ${item.tarih}${item.isToday ? ' (Bugün)' : ''}`
               }}
             />
-            <Legend wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
-            <Bar dataKey="Tamamlanan" stackId="a" fill={T.green} radius={[0, 0, 4, 4]}>
+            <Legend wrapperStyle={{ fontSize: 12, paddingTop: 4 }} iconType="square" />
+            <Bar dataKey="Planlanan" fill={T.blue} radius={[5, 5, 0, 0]}>
+              {data.map((d, i) => (
+                <Cell key={i} fill={d.isToday ? T.blue : '#60a5fa'} />
+              ))}
+              <LabelList dataKey="Planlanan" position="top"
+                style={{ fontSize: 11, fontWeight: 700, fill: T.blue }}
+                formatter={(v: any) => v > 0 ? v : ''} />
+            </Bar>
+            <Bar dataKey="Tamamlanan" fill={T.green} radius={[5, 5, 0, 0]}>
               {data.map((d, i) => (
                 <Cell key={i} fill={d.isToday ? T.green : '#4ade80'} />
               ))}
-            </Bar>
-            <Bar dataKey="Kalan" stackId="a" fill={T.blueLight} radius={[4, 4, 0, 0]}>
-              {data.map((d, i) => (
-                <Cell key={i} fill={d.isToday ? T.blue : T.blueLight}
-                  stroke={d.isToday ? T.blue : '#bfdbfe'} strokeWidth={d.isToday ? 1.5 : 1} />
-              ))}
+              <LabelList dataKey="Tamamlanan" position="top"
+                style={{ fontSize: 11, fontWeight: 700, fill: T.green }}
+                formatter={(v: any) => v > 0 ? v : ''} />
             </Bar>
           </BarChart>
         )}
