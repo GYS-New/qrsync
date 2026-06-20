@@ -431,26 +431,46 @@ function GunPopup({ tarih, kartlar, lokAd, araclar, firmaId, onClose, onChange }
   const sayilar: Record<Durum, number> = { HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
   for (const k of kartlar) sayilar[k.durum]++
 
-  // Plaka silinebilir mi? Sadece HAZIR / ACIK (henüz başlatılmamış)
+  // Silinebilir mi?
+  // - Gerçek HAZIR/ACIK görev → DELETE ile silinir
+  // - Tahmini görev (k.gercek=null) → POST {iptal:true} ile IPTAL kaydı
+  //   oluşturulup cron tekrar üretmeyecek hale getirilir
+  // - Diğer durumlar (ISLEMDE/TAMAMLANDI/IPTAL/YAPILAMADI) silinemez
   function silinebilir(k: PlakaKart): boolean {
-    return duzenlenebilir && (k.durum === 'HAZIR' || k.durum === 'ACIK')
+    if (!duzenlenebilir || !k.arac_id) return false
+    if (!k.gercek) return true // tahmini her zaman iptal edilebilir
+    return k.durum === 'HAZIR' || k.durum === 'ACIK'
   }
 
   async function bireyselSil(k: PlakaKart) {
     if (!k.arac_id) return
+    const tahminMi = !k.gercek
     const ok = await confirm({
-      title: 'Plakayı Sil',
-      message: `${k.plaka} için ${tarihEt} tarihindeki planlı görev silinecek. Onaylıyor musunuz?`,
-      confirmText: 'Sil', cancelText: 'İptal', variant: 'danger',
+      title: tahminMi ? 'Tahmini Plan İptal' : 'Plakayı Sil',
+      message: tahminMi
+        ? `${k.plaka} için ${tarihEt} tarihindeki tahmini yıkama planı iptal edilecek. Cron tekrar oluşturmayacak. Onaylıyor musunuz?`
+        : `${k.plaka} için ${tarihEt} tarihindeki planlı görev silinecek. Onaylıyor musunuz?`,
+      confirmText: tahminMi ? 'İptal Et' : 'Sil', cancelText: 'Vazgeç', variant: 'danger',
     })
     if (!ok) return
     setAktif(true)
     try {
-      const url = `/api/oto-yikama/takvim/gun?firma_id=${firmaId}&tarih=${tarih}&arac_id=${k.arac_id}`
-      const res = await fetch(url, { method: 'DELETE' })
+      let res: Response
+      if (tahminMi) {
+        // Tahmin için: IPTAL durumlu görev oluştur (cron mevcut metadata
+        // gördüğü için tekrar üretmez)
+        res = await fetch('/api/oto-yikama/takvim/gun', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firma_id: firmaId, arac_id: k.arac_id, tarih, iptal: true }),
+        })
+      } else {
+        // Gerçek HAZIR/ACIK görev: doğrudan sil
+        const url = `/api/oto-yikama/takvim/gun?firma_id=${firmaId}&tarih=${tarih}&arac_id=${k.arac_id}`
+        res = await fetch(url, { method: 'DELETE' })
+      }
       const j = await res.json()
       if (!j.ok) throw new Error(j.error)
-      toast({ type: 'success', title: 'Silindi', message: j.mesaj ?? `${k.plaka} silindi` })
+      toast({ type: 'success', title: tahminMi ? 'İptal edildi' : 'Silindi', message: `${k.plaka}` })
       onChange()
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
@@ -460,25 +480,48 @@ function GunPopup({ tarih, kartlar, lokAd, araclar, firmaId, onClose, onChange }
   }
 
   async function tumunuSil() {
-    // Sadece silinebilir (HAZIR/ACIK) görev sayısı
-    const silinebilirAdet = kartlar.filter(k => silinebilir(k) && k.gercek).length
-    if (silinebilirAdet === 0) {
-      toast({ type: 'info', title: 'Bilgi', message: 'Silinebilir planlı görev yok' })
+    const silinebilirler = kartlar.filter(k => silinebilir(k))
+    if (silinebilirler.length === 0) {
+      toast({ type: 'info', title: 'Bilgi', message: 'Silinebilir görev yok' })
       return
     }
+    const tahminAdet = silinebilirler.filter(k => !k.gercek).length
+    const gercekAdet = silinebilirler.filter(k => k.gercek).length
     const ok = await confirm({
       title: `${tarihEt} — Tümünü Sil`,
-      message: `Bu gün için ${silinebilirAdet} planlı görev silinecek. İşlemde/Tamamlanmış görevler korunur. Onaylıyor musunuz?`,
-      confirmText: 'Tümünü Sil', cancelText: 'İptal', variant: 'danger',
+      message:
+        `Bu gün için ${silinebilirler.length} plan iptal/silinecek:\n` +
+        (gercekAdet > 0 ? `  • ${gercekAdet} mevcut planlı görev silinecek\n` : '') +
+        (tahminAdet > 0 ? `  • ${tahminAdet} tahmini plan iptal edilecek (cron üretmeyecek)\n` : '') +
+        `\nİşlemde/Tamamlanmış görevler korunur. Onaylıyor musunuz?`,
+      confirmText: 'Tümünü Sil', cancelText: 'Vazgeç', variant: 'danger',
     })
     if (!ok) return
     setAktif(true)
     try {
-      const url = `/api/oto-yikama/takvim/gun?firma_id=${firmaId}&tarih=${tarih}`
-      const res = await fetch(url, { method: 'DELETE' })
-      const j = await res.json()
-      if (!j.ok) throw new Error(j.error)
-      toast({ type: 'success', title: 'Silindi', message: j.mesaj ?? `${j.silinen} görev silindi` })
+      // 1) Gerçek HAZIR/ACIK görevleri toplu sil (DELETE — arac_id yok = tümü)
+      if (gercekAdet > 0) {
+        const url = `/api/oto-yikama/takvim/gun?firma_id=${firmaId}&tarih=${tarih}`
+        const res = await fetch(url, { method: 'DELETE' })
+        const j = await res.json()
+        if (!j.ok) throw new Error(j.error)
+      }
+      // 2) Tahmini görevler için sırayla POST {iptal:true}
+      let tahminBasarili = 0
+      for (const k of silinebilirler.filter(k => !k.gercek)) {
+        try {
+          const res = await fetch('/api/oto-yikama/takvim/gun', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ firma_id: firmaId, arac_id: k.arac_id, tarih, iptal: true }),
+          })
+          const j = await res.json()
+          if (j.ok) tahminBasarili++
+        } catch {}
+      }
+      toast({
+        type: 'success', title: 'Temizlendi',
+        message: `${gercekAdet} silindi, ${tahminBasarili} tahmin iptal edildi`,
+      })
       onChange()
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
@@ -563,13 +606,13 @@ function GunPopup({ tarih, kartlar, lokAd, araclar, firmaId, onClose, onChange }
                   }}>
                   <Plus size={13} /> Plaka Ekle
                 </button>
-                <button onClick={tumunuSil} disabled={aktif || kartlar.filter(k => silinebilir(k) && k.gercek).length === 0}
+                <button onClick={tumunuSil} disabled={aktif || kartlar.filter(k => silinebilir(k)).length === 0}
                   style={{
                     padding: '6px 12px', borderRadius: 6,
                     border: `1.5px solid ${T.red}`, background: '#fff', color: T.red,
                     cursor: aktif ? 'not-allowed' : 'pointer',
                     fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5,
-                    opacity: kartlar.filter(k => silinebilir(k) && k.gercek).length === 0 ? 0.4 : 1,
+                    opacity: kartlar.filter(k => silinebilir(k)).length === 0 ? 0.4 : 1,
                   }}>
                   <Trash2 size={13} /> Tümünü Sil
                 </button>
@@ -605,9 +648,9 @@ function GunPopup({ tarih, kartlar, lokAd, araclar, firmaId, onClose, onChange }
                     }}>{k.plaka}</span>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 10, fontWeight: 700, color: DURUM_FG[k.durum] }}>{DURUM_LABEL[k.durum]}</span>
-                      {silinebilir(k) && k.gercek && (
+                      {silinebilir(k) && (
                         <button onClick={() => bireyselSil(k)} disabled={aktif}
-                          title="Bu plakayı bu günden sil"
+                          title={k.gercek ? 'Bu plakayı bu günden sil' : 'Tahmini planı iptal et (cron üretmez)'}
                           style={{
                             padding: 3, borderRadius: 4, border: 'none',
                             background: 'rgba(220,38,38,0.12)', color: T.red,
@@ -661,11 +704,11 @@ function PlakaEkleModal({ tarih, tarihEt, firmaId, araclar, lokAd, onClose, onSa
 
   const filtreli = useMemo(() => {
     const q = arama.trim().toUpperCase()
-    if (!q) return araclar.slice(0, 50)
+    if (!q) return araclar  // tüm aktif araçlar (limit yok)
     return araclar.filter(a =>
       a.plaka.toUpperCase().includes(q) ||
       (a.departman ?? '').toUpperCase().includes(q)
-    ).slice(0, 50)
+    )
   }, [araclar, arama])
 
   const seciliArac = araclar.find(a => a.id === seciliAracId)

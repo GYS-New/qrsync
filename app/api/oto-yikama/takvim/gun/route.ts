@@ -57,6 +57,11 @@ export async function POST(req: NextRequest) {
   const aracId = String(body?.arac_id ?? '')
   const tarih = String(body?.tarih ?? '')
   let lokasyonId = body?.lokasyon_id ? String(body.lokasyon_id) : null
+  // iptal=true → görev IPTAL durumlu oluşturulur ("planı iptal et" anlamı).
+  // Cron daha sonra üretmek istediğinde mevcut metadata gördüğü için
+  // atlar — bu yüzden takvimde tahmini görev için "sil" işlemi olarak
+  // kullanılır.
+  const iptalMi = body?.iptal === true
 
   if (!firmaId) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
   if (!aracId)  return NextResponse.json({ ok: false, error: 'arac_id gerekli' }, { status: 400 })
@@ -104,16 +109,24 @@ export async function POST(req: NextRequest) {
     }, { status: 409 })
   }
 
-  // Görev + metadata insert (HAZIR durumlu — bugün veya gelecek)
+  // Görev + metadata insert
+  // - iptal=true → IPTAL durumlu (planı atla; cron mevcut metadata gördüğü
+  //   için tekrar üretmez)
+  // - Normal → bugün için ACIK, gelecek için HAZIR
   const isBugun = tarih === bugunTR()
+  const yeniDurum = iptalMi ? 'IPTAL' : (isBugun ? 'ACIK' : 'HAZIR')
+  const nowIso = new Date().toISOString()
   const { data: yeniGorev, error: gorevErr } = await admin
     .from('gorevler')
     .insert({
       firma_id: firmaId,
       tanim: `Oto Yıkama - ${arac.plaka}`,
       lokasyon_id: lokasyonId,
-      durum: isBugun ? 'ACIK' : 'HAZIR',
+      durum: yeniDurum,
       olusturan_id: me.id,
+      islemi_yapan_id: iptalMi ? me.id : null,
+      tamamlanma_tarihi: iptalMi ? nowIso : null,
+      iptal_sebep: iptalMi ? 'Plan kullanıcı tarafından iptal edildi' : null,
     })
     .select('id').single()
   if (gorevErr || !yeniGorev) {
@@ -133,7 +146,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true, gorev_id: yeniGorev.id, plaka: arac.plaka, tarih,
-    lokasyon: lok.tanim, durum: isBugun ? 'ACIK' : 'HAZIR',
+    lokasyon: lok.tanim, durum: yeniDurum,
   })
 }
 
