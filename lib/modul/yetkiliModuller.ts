@@ -115,19 +115,18 @@ export async function getYetkiliModuller(
     }
   }
 
-  // 3. GYS + FMS yetkisi: kullanici_grubu_yetkileri tablosundan rol-bazlı.
-  //    sayfa_kodu='_modul_giris', modul_kodu='gys'|'fms'. Kayıt yoksa:
-  //      - GYS: default true (geriye uyumluluk — şimdiye dek GYS herkese açıktı)
-  //      - FMS: default false (yetki açıkça verilmeli)
+  // 3. GYS + FMS yetkisi: kullanici_modul_yetkileri tablosundan kullanıcı-bazlı.
+  //    Migration 091 ile rol-bazlı sistem yerini bu tabloya bıraktı.
+  //    Backfill ATALIAN OYAK Renault için yapıldı; kayıt yoksa fallback:
+  //      - GYS: default true   (yeni kullanıcı eklenirse açık)
+  //      - FMS: default false  (yetki açıkça verilmeli)
   let gysYetkili = true
   let fmsYetkili = false
-  if (!isSA && firmaId) {
+  if (!isSA && userId) {
     const { data: modulYetkileri } = await admin
-      .from('kullanici_grubu_yetkileri')
+      .from('kullanici_modul_yetkileri')
       .select('modul_kodu, gorebilir')
-      .eq('sayfa_kodu', MODUL_GIRIS_SAYFA_KODU)
-      .eq('rol', rol)
-      .eq('firma_id', firmaId)
+      .eq('user_id', userId)
       .in('modul_kodu', ['gys', 'fms'])
     for (const r of (modulYetkileri ?? [])) {
       if (r.modul_kodu === 'gys') gysYetkili = r.gorebilir === true

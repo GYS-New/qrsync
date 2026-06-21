@@ -1,12 +1,13 @@
 /**
- * Modül erişim yetkileri (kullanici_grubu_yetkileri tablosu üzerinden,
- * sayfa_kodu='_modul_giris' marker'ı ile).
+ * Kullanıcı-bazlı modül erişim yetkileri (kullanici_modul_yetkileri tablosu).
+ * Migration 091 ile rol-bazlı sistem yerini bu tabloya bıraktı.
  *
- * GET  → mevcut yetki kayıtlarını döner: { firma_id?, yetkiler: [{rol, modul_kodu}] }
- * POST → tam-replace: önceki kayıtlar silinir, yeni satırlar yazılır.
+ * GET  ?firma_id=… → o firmanın (ATALIAN OYAK Renault filtresi ile)
+ *      kullanıcı listesi + her birinin GYS/FMS yetkisi
+ * POST { firma_id, yetkiler: [{ user_id, modul_kodu, gorebilir }] } →
+ *      tek seferde batch upsert
  *
  * Yetki: SA ve TA. TA sadece kendi firmasının kayıtlarını değiştirebilir.
- * GYS modülü için kayıt tutulmaz (varsayılan herkes açık).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -15,12 +16,10 @@ import { auditLog } from '@/lib/audit/log'
 
 export const dynamic = 'force-dynamic'
 
-const MODUL_GIRIS_SAYFA_KODU = '_modul_giris'
-// GYS yetkisi de buradan yönetilir (default açık; kapatılırsa o rolün
-// kullanıcıları GYS'ye giremez — sadece diğer yetkili modüllere). Oto
-// Yıkama buradan yönetilmez — lokasyon ataması
-// (kullanici_lokasyon_yetkileri / users.ust_lokasyon_id) tek source of truth.
-const YONETILEN_MODULLER: string[] = ['gys', 'fms']
+const YONETILEN_MODULLER = ['gys', 'fms'] as const
+type ModulKodu = (typeof YONETILEN_MODULLER)[number]
+
+const VARSAYILAN: Record<ModulKodu, boolean> = { gys: true, fms: false }
 
 async function yetkiKontrol(req: NextRequest) {
   const supabase = createClient()
@@ -46,24 +45,60 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const firmaIdParam = url.searchParams.get('firma_id')
   const firmaId = isSA ? (firmaIdParam || null) : me!.firma_id
+  if (!firmaId) {
+    return NextResponse.json({ ok: true, firma_id: null, kullanicilar: [] })
+  }
 
   const admin = createAdminClient()
-  // GYS için "kayıt yok = AÇIK" semantiği var; bu yüzden gorebilir filtresi
-  // YOK — hem true hem false satırlar dönmeli ki client doğru tick state'i
-  // hesaplayabilsin. Client tarafında default'la birleştirilir.
-  let q = admin.from('kullanici_grubu_yetkileri')
-    .select('rol, modul_kodu, gorebilir')
-    .eq('sayfa_kodu', MODUL_GIRIS_SAYFA_KODU)
-    .in('modul_kodu', YONETILEN_MODULLER)
-  q = firmaId ? q.eq('firma_id', firmaId) : q.is('firma_id', null)
 
-  const { data, error } = await q
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // ATALIAN OYAK Renault filtresi: firma seçili + (proje yok veya OYAK Renault)
+  const { data: oyakProje } = await admin
+    .from('projeler')
+    .select('id')
+    .eq('firma_id', firmaId)
+    .eq('ad', 'OYAK RENAULT')
+    .maybeSingle()
+  const oyakProjeId = oyakProje?.id ?? null
+
+  let q = admin
+    .from('users')
+    .select('id, isim_soyisim, email, rol, proje_id')
+    .eq('firma_id', firmaId)
+    .eq('aktif', true)
+    .in('rol', ['tenant_admin', 'tenant_user', 'musteri'])
+    .order('isim_soyisim')
+  if (oyakProjeId) q = q.or(`proje_id.is.null,proje_id.eq.${oyakProjeId}`)
+
+  const { data: users, error: usersErr } = await q
+  if (usersErr) return NextResponse.json({ error: usersErr.message }, { status: 500 })
+
+  const userIds = (users ?? []).map(u => u.id)
+  const yetkiMap = new Map<string, Record<ModulKodu, boolean>>()
+  if (userIds.length > 0) {
+    const { data: yetkiler } = await admin
+      .from('kullanici_modul_yetkileri')
+      .select('user_id, modul_kodu, gorebilir')
+      .in('user_id', userIds)
+      .in('modul_kodu', YONETILEN_MODULLER as unknown as string[])
+    for (const r of (yetkiler ?? [])) {
+      const cur = yetkiMap.get(r.user_id) ?? { ...VARSAYILAN }
+      if ((YONETILEN_MODULLER as readonly string[]).includes(r.modul_kodu)) {
+        cur[r.modul_kodu as ModulKodu] = r.gorebilir === true
+      }
+      yetkiMap.set(r.user_id, cur)
+    }
+  }
 
   return NextResponse.json({
     ok: true,
     firma_id: firmaId,
-    yetkiler: (data ?? []).map(r => ({ rol: r.rol, modul_kodu: r.modul_kodu, gorebilir: r.gorebilir === true })),
+    kullanicilar: (users ?? []).map(u => ({
+      id: u.id,
+      isim_soyisim: u.isim_soyisim,
+      email: u.email,
+      rol: u.rol,
+      yetkiler: yetkiMap.get(u.id) ?? { ...VARSAYILAN },
+    })),
   })
 }
 
@@ -75,59 +110,56 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({} as any))
   const firmaIdRaw = body?.firma_id ?? null
   const firmaId: string | null = isSA ? (firmaIdRaw || null) : me!.firma_id
-  const yetkilerRaw = Array.isArray(body?.yetkiler) ? body.yetkiler : []
+  if (!firmaId) return NextResponse.json({ error: 'firma_id gerekli' }, { status: 400 })
 
-  // Yetkiler artık {rol, modul_kodu, gorebilir} formatında — gorebilir
-  // explicit olarak yazılır (true=AÇIK, false=KAPALI). Default ile aynı
-  // olan satırlar client tarafında filtrelenir, server burada gelmesini
-  // beklemez ama gelirse de kabul eder (zararı yok, sadece DB satır sayısı).
-  const ROL_LISTE = ['tenant_admin', 'tenant_user', 'musteri', 'alt_super_admin']
-  const yetkiler: { rol: string; modul_kodu: string; gorebilir: boolean }[] = []
+  const yetkilerRaw = Array.isArray(body?.yetkiler) ? body.yetkiler : []
+  // Format validasyonu
+  type Yetki = { user_id: string; modul_kodu: ModulKodu; gorebilir: boolean }
+  const yetkiler: Yetki[] = []
   for (const y of yetkilerRaw) {
     if (!y || typeof y !== 'object') continue
-    if (!ROL_LISTE.includes(y.rol)) continue
-    if (!YONETILEN_MODULLER.includes(y.modul_kodu)) continue
-    yetkiler.push({ rol: y.rol, modul_kodu: y.modul_kodu, gorebilir: y.gorebilir === true })
+    if (typeof y.user_id !== 'string') continue
+    if (!(YONETILEN_MODULLER as readonly string[]).includes(y.modul_kodu)) continue
+    yetkiler.push({ user_id: y.user_id, modul_kodu: y.modul_kodu, gorebilir: y.gorebilir === true })
   }
+  if (yetkiler.length === 0) return NextResponse.json({ ok: true, etkilenen: 0 })
 
   const admin = createAdminClient()
 
-  // 1) Mevcut modül giriş kayıtlarını sil (sadece yönetilen modüller, bu firma için)
-  let delQ = admin.from('kullanici_grubu_yetkileri')
-    .delete()
-    .eq('sayfa_kodu', MODUL_GIRIS_SAYFA_KODU)
-    .in('modul_kodu', YONETILEN_MODULLER)
-  delQ = firmaId ? delQ.eq('firma_id', firmaId) : delQ.is('firma_id', null)
-  const { error: delErr } = await delQ
-  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
-
-  // 2) Yeni satırları insert (varsa)
-  let insertedCount = 0
-  if (yetkiler.length > 0) {
-    const rows = yetkiler.map(y => ({
-      firma_id: firmaId,
-      rol: y.rol,
-      sayfa_kodu: MODUL_GIRIS_SAYFA_KODU,
-      modul_kodu: y.modul_kodu,
-      gorebilir: y.gorebilir,
-      ekleyebilir: y.gorebilir,
-      duzenleyebilir: y.gorebilir,
-      silebilir: y.gorebilir,
-    }))
-    const { error: insErr, data: insData } = await admin
-      .from('kullanici_grubu_yetkileri').insert(rows).select('id')
-    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
-    insertedCount = insData?.length ?? 0
+  // Firma scope kontrolü — gelen user_id'lerin hepsi belirtilen firmaya ait olmalı
+  const userIds = [...new Set(yetkiler.map(y => y.user_id))]
+  const { data: usersChk } = await admin
+    .from('users')
+    .select('id, firma_id')
+    .in('id', userIds)
+  const validIds = new Set((usersChk ?? []).filter(u => u.firma_id === firmaId).map(u => u.id))
+  const finalYetkiler = yetkiler.filter(y => validIds.has(y.user_id))
+  if (finalYetkiler.length === 0) {
+    return NextResponse.json({ error: 'Geçerli kullanıcı bulunamadı' }, { status: 400 })
   }
+
+  // Batch upsert
+  const rows = finalYetkiler.map(y => ({
+    user_id: y.user_id,
+    modul_kodu: y.modul_kodu,
+    gorebilir: y.gorebilir,
+    updated_at: new Date().toISOString(),
+    updated_by: me!.id,
+  }))
+  const { error: upErr, data: upData } = await admin
+    .from('kullanici_modul_yetkileri')
+    .upsert(rows, { onConflict: 'user_id,modul_kodu' })
+    .select('user_id')
+  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
 
   void auditLog({
     tip: 'modul_yetki_degisim',
-    tablo: 'kullanici_grubu_yetkileri',
+    tablo: 'kullanici_modul_yetkileri',
     firma_id: firmaId,
     kullanici_id: me!.id,
     basarili: true,
-    detay: { yeni_yetkiler: yetkiler, eklenen: insertedCount },
+    detay: { etkilenen: upData?.length ?? 0, batch_boyut: rows.length },
   })
 
-  return NextResponse.json({ ok: true, eklenen: insertedCount })
+  return NextResponse.json({ ok: true, etkilenen: upData?.length ?? 0 })
 }
