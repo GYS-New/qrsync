@@ -120,6 +120,16 @@ export default async function OtoYikamaGorevKayitlariPage() {
         iptal_sebep:     g.iptal_sebep ?? null,
       }
     })
+    // Geleceğe planlı henüz başlanmamış HAZIR kayıtları gizle — plan tarihi
+    // gelene kadar listeyi şişirmesin. ACIK/ISLEMDE/TAMAMLANDI/IPTAL/YAPILAMADI
+    // her zaman görünür; HAZIR yalnız bugün ve geçmiş tarihliler.
+    const bugunTR = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
+    kayitlar = kayitlar.filter(k => {
+      if (k.durum !== 'HAZIR') return true
+      if (!k.hedef_tarih) return true
+      return k.hedef_tarih <= bugunTR
+    })
+
     // Hedef tarihe göre desc sırala
     kayitlar.sort((a, b) => (b.hedef_tarih ?? '').localeCompare(a.hedef_tarih ?? ''))
 
