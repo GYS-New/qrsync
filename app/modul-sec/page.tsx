@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getYetkiliModuller } from '@/lib/modul/yetkiliModuller'
 import { getAktifModul, modulLandingUrl } from '@/lib/modul/cookie'
 import ModulSecClient from './ModulSecClient'
+import ErisimYokEkran from './ErisimYokEkran'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,29 +58,10 @@ export default async function ModulSecPage({ searchParams }: { searchParams: { f
     redirect(modulLandingUrl(tek, me.rol))
   }
 
-  // 3. Hiç yetkili modül yoksa (teorik olarak olmaz çünkü GYS default)
+  // 3. Hiç yetkili modül yoksa — kullanıcının tüm modül erişimleri kapatılmış.
+  //    (Migration 091 sonrası GYS de user-bazlı kapatılabilir; eskiden default açıktı.)
   if (aktifYetkili.length === 0) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg)',
-        padding: 20,
-      }}>
-        <div style={{
-          maxWidth: 480, textAlign: 'center',
-          background: '#fff', padding: 32, borderRadius: 14,
-          border: '1px solid rgba(79,106,255,.15)',
-          boxShadow: '0 14px 40px rgba(26,31,54,0.10)',
-        }}>
-          <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Erişim Yok</div>
-          <div style={{ fontSize: 14, color: 'var(--text-500)', lineHeight: 1.5 }}>
-            Hesabınıza tanımlı erişim yapılabilir bir modül bulunamadı.
-            Yöneticinize başvurun.
-          </div>
-        </div>
-      </div>
-    )
+    return <ErisimYokEkran isim={me.isim_soyisim ?? null} email={authUser.email ?? null} />
   }
 
   // 4. Çoklu modül → seçim ekranı
