@@ -38,9 +38,9 @@ export default async function FMSLandingPage() {
     email,
     isim_soyisim: (u as any)?.isim_soyisim ?? null,
     gys_user_id: me.id,
-    gys_firma_id: (u as any)?.firma_id ?? null,
   })
 
-  const ssoUrl = `${baseUrl.replace(/\/$/, '')}/sso?token=${encodeURIComponent(token)}`
+  // İO-TEKNİK SSO endpoint: app/api/sso/route.ts (GET)
+  const ssoUrl = `${baseUrl.replace(/\/$/, '')}/api/sso?token=${encodeURIComponent(token)}`
   redirect(ssoUrl)
 }
