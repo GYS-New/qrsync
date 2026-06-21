@@ -286,7 +286,7 @@ function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' |
   )
 }
 
-export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, birimFiyatAktifProp, personelTakibiAktifProp, otoYikamaAktifProp, customNavGroups }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; birimFiyatAktifProp?: boolean; personelTakibiAktifProp?: boolean; otoYikamaAktifProp?: boolean; customNavGroups?: NavGroup[] }) {
+export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo, sidebarLogo, birimFiyatAktifProp, personelTakibiAktifProp, otoYikamaAktifProp, ioAsistanAktifProp, customNavGroups }: { user: User; firma: any; projeAdi?: string | null; projeLogo?: string | null; sidebarLogo?: string | null; birimFiyatAktifProp?: boolean; personelTakibiAktifProp?: boolean; otoYikamaAktifProp?: boolean; ioAsistanAktifProp?: boolean; customNavGroups?: NavGroup[] }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeLoading = useRouteLoading()
@@ -341,8 +341,13 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
   const personelTakibiAktif = aktifProje
     ? aktifProje.personel_takibi_aktif !== false
     : personelTakibiAktifProp !== undefined ? personelTakibiAktifProp : true
-  // İO Asistan: aktifProje varsa o projenin ayarı, yoksa varsayılan açık (proje seçilmediyse gösterilmesin sorunu yaşanmasın)
-  const ioAsistanAktif = aktifProje ? aktifProje.io_asistan_aktif !== false : true
+  // İO Asistan: aktifProje varsa o projenin ayarı, yoksa SSR'den gelen prop
+  // (Oto Yıkama non-SA — FirmaContext non-SA'ya kapalı olduğundan ProjeContext
+  // boş kalır; orada server-side aktif projeden çözüp prop ile geçilir).
+  // Hiçbiri yoksa varsayılan açık.
+  const ioAsistanAktif = aktifProje
+    ? aktifProje.io_asistan_aktif !== false
+    : ioAsistanAktifProp !== undefined ? ioAsistanAktifProp : true
   // Manuel push: proje varsa proje, yoksa firma ayarından. Rol bazlı alt toggle.
   const manuelPushAktif = (() => {
     const baseAktif = aktifProje
