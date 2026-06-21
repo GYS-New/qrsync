@@ -79,17 +79,23 @@ export default function UserPanel({ base }: { base: string }) {
   const photoUrl = (me as any)?.profil_foto ?? undefined
 
   const isTA = base === '/ta'
+  // Modül-içi sayfada (Oto Yıkama vb.) ayar linklerini gizle — tıklama
+  // kullanıcıyı GYS'ye atmasın. Ayarlar GYS-spesifik; modül değişimi için
+  // alt taraftaki "Modül Değiştir" kullanılsın.
+  const inModule = pathname?.startsWith('/oto-yikama') ?? false
 
-  const items = isTA
-    ? [
-        { label: 'Profil Ayarları', href: `${base}/dashboard/ayarlar` },
-        { label: 'Firma Ayarları', href: `${base}/dashboard/firma-ayarlar` },
-        { label: 'Dashboard Ayarları', href: `${base}/dashboard/ayarlar/dashboard` },
-      ]
-    : [
-        { label: 'Ayarlar', href: `${base}/dashboard/ayarlar` },
-        { label: 'Dashboard Ayarları', href: `${base}/dashboard/ayarlar/dashboard` },
-      ]
+  const items = inModule
+    ? []
+    : isTA
+      ? [
+          { label: 'Profil Ayarları', href: `${base}/dashboard/ayarlar` },
+          { label: 'Firma Ayarları', href: `${base}/dashboard/firma-ayarlar` },
+          { label: 'Dashboard Ayarları', href: `${base}/dashboard/ayarlar/dashboard` },
+        ]
+      : [
+          { label: 'Ayarlar', href: `${base}/dashboard/ayarlar` },
+          { label: 'Dashboard Ayarları', href: `${base}/dashboard/ayarlar/dashboard` },
+        ]
 
   return (
     <div ref={panelRef} style={{ position:'relative', display:'flex', alignItems:'center' }}>
@@ -139,7 +145,9 @@ export default function UserPanel({ base }: { base: string }) {
                 {it.label}
               </button>
             ))}
-            <div style={{ height:1, background:'#f3f4f6', margin:'6px 6px' }} />
+            {items.length > 0 && (
+              <div style={{ height:1, background:'#f3f4f6', margin:'6px 6px' }} />
+            )}
             {cokModul && (
               <button
                 type="button"
