@@ -102,8 +102,7 @@ export default async function OtoYikamaKullanicilarPage() {
         title="Kullanıcılar"
         base={rolBase}
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Kullanıcılar' }]}
-        hideScopeControls hideNotifBar hideNotifBell
-      />
+        hideScopeControls hideNotifBar      />
       <div style={{ padding: '24px 28px' }}>
         <OtoYikamaKullanicilarClient firmaId={firmaId} kullanicilar={kullanicilarPayload} />
       </div>

@@ -14,8 +14,7 @@ export default async function OtoYikamaGunlukPage() {
 
   return (
     <div>
-      <Topbar title="Canlı İşlemler" base={rolBase} hideScopeControls hideNotifBar hideNotifBell
-        breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Canlı İşlemler' }]} />
+      <Topbar title="Canlı İşlemler" base={rolBase} hideScopeControls hideNotifBar        breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Canlı İşlemler' }]} />
       {!firmaId ? (
         <div style={{ padding: '24px 28px' }}>
           <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>

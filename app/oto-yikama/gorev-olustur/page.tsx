@@ -23,8 +23,7 @@ export default async function OtoYikamaGorevOlusturPage() {
           { label: 'Oto Yıkama', href: '/oto-yikama/dashboard' },
           { label: 'Ekstra Görev' },
         ]}
-        hideScopeControls hideNotifBar hideNotifBell
-      />
+        hideScopeControls hideNotifBar      />
       <GorevOlusturPageClient firmaId={firmaId} />
     </div>
   )

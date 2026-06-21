@@ -17,7 +17,7 @@ export default async function OtoYikamaDashboardAyarlarPage() {
         title="Dashboard Ayarları"
         base={rolBase}
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Dashboard Ayarları' }]}
-        hideScopeControls hideNotifBar hideNotifBell
+        hideScopeControls hideNotifBar
       />
       <div style={{ padding: '24px 28px' }}>
         <DashboardSettingsClient meId={me.id} initialBloklar={(bloklar as any) ?? []} />

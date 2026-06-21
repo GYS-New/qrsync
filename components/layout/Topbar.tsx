@@ -173,10 +173,11 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
         {!hideScopeControls && <DashboardScopeControls base={base} />}
         {actions}
 
-        {/* Notifications (moved from sidebar) — modül-içi sayfalarda gizlenebilir */}
+        {/* Notifications — modül-içi sayfalarda sarmal route'a git
+            (Oto Yıkama sidebar/modül korunur). hideNotifBell hâlâ saygılı. */}
         {!hideNotifBell && (
           <div
-            onClick={() => router.push(`${base}/dashboard/bildirimler`)}
+            onClick={() => router.push(pathname?.startsWith('/oto-yikama') ? '/oto-yikama/bildirimler' : `${base}/dashboard/bildirimler`)}
             style={{ width:34, height:34, border:'1px solid #e5e7eb', borderRadius:10, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', position:'relative', fontSize:20, color:'#4b5563' }}
             title="Bildirimler"
           >

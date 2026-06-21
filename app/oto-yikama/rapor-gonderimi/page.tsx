@@ -19,8 +19,7 @@ export default async function OtoYikamaRaporGonderimiPage() {
         title="Rapor Gönderimi"
         base={rolBase}
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Rapor Gönderimi' }]}
-        hideScopeControls hideNotifBar hideNotifBell
-      />
+        hideScopeControls hideNotifBar      />
       <div style={{ padding: '24px 28px' }}>
         {!firmaId ? (
           <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>

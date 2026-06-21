@@ -61,7 +61,7 @@ export default async function OtoYikamaDashboardPage() {
 
   return (
     <div>
-      <Topbar title="Oto Yıkama" base={rolBase} breadcrumbs={[{ label: 'Oto Yıkama' }]} hideScopeControls hideNotifBar hideNotifBell />
+      <Topbar title="Oto Yıkama" base={rolBase} breadcrumbs={[{ label: 'Oto Yıkama' }]} hideScopeControls hideNotifBar />
       <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
         {!firmaId && (
           <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>

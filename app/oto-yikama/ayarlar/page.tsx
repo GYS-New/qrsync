@@ -18,7 +18,7 @@ export default async function OtoYikamaAyarlarPage() {
         title="Profil Ayarları"
         base={rolBase}
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Profil Ayarları' }]}
-        hideScopeControls hideNotifBar hideNotifBell
+        hideScopeControls hideNotifBar
       />
       <div style={{ padding: '24px 28px' }}>
         <AyarlarClient meId={me.id} initialMe={(userRow as any)} />
