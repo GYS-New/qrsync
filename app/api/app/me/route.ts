@@ -51,13 +51,19 @@ export async function GET(req: Request) {
       .eq('id', tokenData.user_id)
       .single()
 
-    // Oto Yıkama personeli mi? İki kaynak OR'lanır:
-    //   A) users.ust_lokasyon_id → oto_yikama_lokasyon=true bir üst lokasyonu işaret ediyor
-    //   B) kullanici_lokasyon_yetkileri'nde oto_yikama_lokasyon=true bir kayıt var
-    // Saha gerçekliği: bazı kullanıcılar (A) ile, bazıları (B) ile atanıyor — UI/DB
-    // sync inconsistency'si nedeniyle ikisi de kontrol edilmeli.
+    // Oto Yıkama "personeli" — saha kullanıcısı tanımı (mobile bu flag'e
+    // bakıp doğrudan Oto Yıkama UI'ı açıyor). Sadece saha rolleri için true:
+    //   - tenant_user (U) ve musteri (M): yıkama personeli olabilir
+    //   - super_admin / alt_super_admin / tenant_admin: yönetimsel rol;
+    //     yıkama lokasyonu yetkisi olsa bile mobile'da GYS modülüyle açılmalı,
+    //     plaka eşleştirme/Oto Yıkama auto-routing yapılmamalı.
+    //
+    // Atama iki kaynaktan OR'lanır:
+    //   A) users.ust_lokasyon_id → oto_yikama_lokasyon=true
+    //   B) kullanici_lokasyon_yetkileri'nde oto_yikama_lokasyon=true kayıt
     let otoYikamaPersoneli = false
-    {
+    const sahaRolu = userData?.rol === 'tenant_user' || userData?.rol === 'musteri'
+    if (sahaRolu) {
       const adayUstIds = new Set<string>()
       if (userData?.ust_lokasyon_id) adayUstIds.add(userData.ust_lokasyon_id)
       const { data: yetkiler } = await admin
