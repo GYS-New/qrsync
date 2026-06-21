@@ -85,15 +85,17 @@ export default function UserPanel({ base }: { base: string }) {
   const inOtoYikama = pathname?.startsWith('/oto-yikama') ?? false
   const settingsBase = inOtoYikama ? '/oto-yikama' : `${base}/dashboard`
 
+  // Dashboard Ayarları GYS dashboard widget tercihleri için — Oto Yıkama'da
+  // anlamsız (Oto Yıkama dashboard'u sabit), gizle.
   const items = isTA
     ? [
         { label: 'Profil Ayarları', href: `${settingsBase}/ayarlar` },
         { label: 'Firma Ayarları', href: `${settingsBase}/firma-ayarlar` },
-        { label: 'Dashboard Ayarları', href: `${settingsBase}/ayarlar/dashboard` },
+        ...(inOtoYikama ? [] : [{ label: 'Dashboard Ayarları', href: `${settingsBase}/ayarlar/dashboard` }]),
       ]
     : [
         { label: 'Ayarlar', href: `${settingsBase}/ayarlar` },
-        { label: 'Dashboard Ayarları', href: `${settingsBase}/ayarlar/dashboard` },
+        ...(inOtoYikama ? [] : [{ label: 'Dashboard Ayarları', href: `${settingsBase}/ayarlar/dashboard` }]),
       ]
 
   return (
