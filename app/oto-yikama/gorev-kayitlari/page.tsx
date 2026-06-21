@@ -139,7 +139,7 @@ export default async function OtoYikamaGorevKayitlariPage() {
         title="Görev Kayıtları"
         base={rolBase}
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Görev Kayıtları' }]}
-        hideScopeControls hideNotifBar
+        hideScopeControls hideNotifBar hideNotifBell
       />
       <div style={{ padding: '24px 28px' }}>
         {!firmaId ? (

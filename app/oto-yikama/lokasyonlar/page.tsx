@@ -61,7 +61,7 @@ export default async function OtoYikamaLokasyonlarPage() {
         title="Yıkama İstasyonları"
         base={rolBase}
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Yıkama İstasyonları' }]}
-        hideScopeControls hideNotifBar
+        hideScopeControls hideNotifBar hideNotifBell
       />
       <LokasyonlarClient
         base={rolBase as any}

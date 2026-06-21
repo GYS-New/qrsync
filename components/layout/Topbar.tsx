@@ -21,6 +21,10 @@ interface TopbarProps {
   hideScopeControls?: boolean
   /** Topbar altındaki cron/aktivite bildirim çubuğunu gizle (modül-içi UI'lar için) */
   hideNotifBar?: boolean
+  /** Üst sağdaki 🔔 bildirim zilini gizle — modül-içi sayfalarda (Oto Yıkama
+   *  vs.) tıklama kullanıcıyı GYS'ye atmasın. Bildirim için modül değişimi
+   *  gerek; kullanıcı bilinçli olarak GYS'ye geçsin. */
+  hideNotifBell?: boolean
 }
 
 // Breadcrumb label → href mapping
@@ -47,7 +51,7 @@ const BREADCRUMB_HREF_MAP: Record<string, string> = {
   'Birim Fiyatlar': '/dashboard/birim-fiyatlar',
 }
 
-export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCount, base, hideScopeControls, hideNotifBar }: TopbarProps) {
+export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCount, base, hideScopeControls, hideNotifBar, hideNotifBell }: TopbarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [navigating, setNavigating] = useState(false)
@@ -169,26 +173,28 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
         {!hideScopeControls && <DashboardScopeControls base={base} />}
         {actions}
 
-        {/* Notifications (moved from sidebar) */}
-        <div
-          onClick={() => router.push(`${base}/dashboard/bildirimler`)}
-          style={{ width:34, height:34, border:'1px solid #e5e7eb', borderRadius:10, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', position:'relative', fontSize:20, color:'#4b5563' }}
-          title="Bildirimler"
-        >
-          🔔
-          {count > 0 && (
-            <span style={{
-              position:'absolute', top:-6, right:-6,
-              minWidth:18, height:18, padding:'0 5px',
-              background:'#b91c1c', color:'#fff', borderRadius:999,
-              border:'2px solid #fff',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize:12, fontWeight:700, lineHeight:'18px'
-            }}>
-              {badgeText}
-            </span>
-          )}
-        </div>
+        {/* Notifications (moved from sidebar) — modül-içi sayfalarda gizlenebilir */}
+        {!hideNotifBell && (
+          <div
+            onClick={() => router.push(`${base}/dashboard/bildirimler`)}
+            style={{ width:34, height:34, border:'1px solid #e5e7eb', borderRadius:10, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', position:'relative', fontSize:20, color:'#4b5563' }}
+            title="Bildirimler"
+          >
+            🔔
+            {count > 0 && (
+              <span style={{
+                position:'absolute', top:-6, right:-6,
+                minWidth:18, height:18, padding:'0 5px',
+                background:'#b91c1c', color:'#fff', borderRadius:999,
+                border:'2px solid #fff',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:12, fontWeight:700, lineHeight:'18px'
+              }}>
+                {badgeText}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Settings */}
         <div
