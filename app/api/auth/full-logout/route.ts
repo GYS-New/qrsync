@@ -14,8 +14,20 @@ export const dynamic = 'force-dynamic'
  * scope cookie'leri de siler. UserPanel'deki client-side logout ile aynı
  * davranış, server-side şekilde.
  */
+function getPublicOrigin(req: NextRequest): string {
+  // Railway/proxy arkasında req.url internal port (localhost:8080) döner;
+  // redirect'in public domain'e gitmesi için X-Forwarded-Host / Host
+  // header'larından origin türetiyoruz.
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL
+  if (fromEnv) return fromEnv.replace(/\/$/, '')
+  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? ''
+  return `${proto}://${host}`
+}
+
 export async function GET(req: NextRequest) {
-  const response = NextResponse.redirect(new URL('/login', req.url), { status: 302 })
+  const origin = getPublicOrigin(req)
+  const response = NextResponse.redirect(`${origin}/login`, { status: 302 })
 
   // 1) Supabase auth → signOut: cookie'leri yenile (Supabase setAll callback
   //    response'a expired cookie'ler yazar)
