@@ -196,18 +196,15 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
           </div>
         )}
 
-        {/* Settings — modül-içi sayfalarda (Oto Yıkama vb.) gizli: tıklama
-            kullanıcıyı GYS'ye atmasın. Modül değişimi UserPanel altındaki
-            "Modül Değiştir" üzerinden yapılır. */}
-        {!pathname?.startsWith('/oto-yikama') && (
-          <div
-            onClick={() => router.push(`${base}/dashboard/ayarlar`)}
-            style={{ width:34, height:34, border:'1px solid #e5e7eb', borderRadius:10, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', position:'relative', fontSize:20, color:'#4b5563' }}
-            title="Ayarlar"
-          >
-            ⚙️
-          </div>
-        )}
+        {/* Settings — modül-içi sayfalarda (Oto Yıkama vb.) sarmal route'a
+            git, sidebar/modül değişmesin. */}
+        <div
+          onClick={() => router.push(pathname?.startsWith('/oto-yikama') ? '/oto-yikama/ayarlar' : `${base}/dashboard/ayarlar`)}
+          style={{ width:34, height:34, border:'1px solid #e5e7eb', borderRadius:10, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', position:'relative', fontSize:20, color:'#4b5563' }}
+          title="Ayarlar"
+        >
+          ⚙️
+        </div>
 
         {/* User panel (standard for all roles) */}
         <UserPanel base={base} />

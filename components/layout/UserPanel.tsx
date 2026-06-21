@@ -79,23 +79,22 @@ export default function UserPanel({ base }: { base: string }) {
   const photoUrl = (me as any)?.profil_foto ?? undefined
 
   const isTA = base === '/ta'
-  // Modül-içi sayfada (Oto Yıkama vb.) ayar linklerini gizle — tıklama
-  // kullanıcıyı GYS'ye atmasın. Ayarlar GYS-spesifik; modül değişimi için
-  // alt taraftaki "Modül Değiştir" kullanılsın.
-  const inModule = pathname?.startsWith('/oto-yikama') ?? false
+  // Modül-içi sayfada (Oto Yıkama vb.) linkler GYS rotalarına gitmesin —
+  // aynı sayfaların /oto-yikama altındaki sarmal versiyonları kullanılır
+  // (Oto Yıkama sidebar'ı korunur, modül değişmez).
+  const inOtoYikama = pathname?.startsWith('/oto-yikama') ?? false
+  const settingsBase = inOtoYikama ? '/oto-yikama' : `${base}/dashboard`
 
-  const items = inModule
-    ? []
-    : isTA
-      ? [
-          { label: 'Profil Ayarları', href: `${base}/dashboard/ayarlar` },
-          { label: 'Firma Ayarları', href: `${base}/dashboard/firma-ayarlar` },
-          { label: 'Dashboard Ayarları', href: `${base}/dashboard/ayarlar/dashboard` },
-        ]
-      : [
-          { label: 'Ayarlar', href: `${base}/dashboard/ayarlar` },
-          { label: 'Dashboard Ayarları', href: `${base}/dashboard/ayarlar/dashboard` },
-        ]
+  const items = isTA
+    ? [
+        { label: 'Profil Ayarları', href: `${settingsBase}/ayarlar` },
+        { label: 'Firma Ayarları', href: `${settingsBase}/firma-ayarlar` },
+        { label: 'Dashboard Ayarları', href: `${settingsBase}/ayarlar/dashboard` },
+      ]
+    : [
+        { label: 'Ayarlar', href: `${settingsBase}/ayarlar` },
+        { label: 'Dashboard Ayarları', href: `${settingsBase}/ayarlar/dashboard` },
+      ]
 
   return (
     <div ref={panelRef} style={{ position:'relative', display:'flex', alignItems:'center' }}>
@@ -145,9 +144,7 @@ export default function UserPanel({ base }: { base: string }) {
                 {it.label}
               </button>
             ))}
-            {items.length > 0 && (
-              <div style={{ height:1, background:'#f3f4f6', margin:'6px 6px' }} />
-            )}
+            <div style={{ height:1, background:'#f3f4f6', margin:'6px 6px' }} />
             {cokModul && (
               <button
                 type="button"
