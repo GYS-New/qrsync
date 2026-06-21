@@ -11,13 +11,15 @@ interface Props {
   firmalar?: Firma[]                  // SA için firma listesi
 }
 
-const MODULLER: { kod: string; ad: string; ikon: string; aciklama: string }[] = [
-  // GYS: her zaman açık (default), bu sekmede yer almaz.
+const MODULLER: { kod: string; ad: string; ikon: string; aciklama: string; defaultAktif: boolean }[] = [
+  // GYS: default AÇIK — kapatılırsa o rol GYS modülüne giremez (sadece
+  //   diğer yetkili modüllere — örn. yalnızca FMS yetkili kullanıcı).
   // Oto Yıkama: yetki manuel atanmaz — "Oto Yıkama" üst lokasyonuna atanmış
-  //   personel otomatik yetkilidir (lib/modul/yetkiliModuller.ts). Bu sekmede
-  //   gösterilmez; atama Sistem Ayarları > Lokasyon Yetkileri'nden yapılır.
-  // FMS: henüz implementasyon yok; hazır olunca buraya eklenir.
-  { kod: 'fms', ad: 'FMS', ikon: '🏢', aciklama: 'Facility Management System — bakım, varlık, talep.' },
+  //   personel otomatik yetkilidir. Bu sekmede gösterilmez; atama
+  //   Sistem Ayarları > Lokasyon Yetkileri'nden yapılır.
+  // FMS: default KAPALI — yetki açıkça verilmeli (İO-TEKNİK SSO ile bağlı).
+  { kod: 'gys', ad: 'GYS', ikon: '🛡️', aciklama: 'Görev Yönetim Sistemi — varsayılan açık.', defaultAktif: true  },
+  { kod: 'fms', ad: 'FMS', ikon: '🏢', aciklama: 'Facility Management System — bakım, varlık, talep.', defaultAktif: false },
 ]
 
 const ROLLER: { rol: string; etiket: string; renk: string }[] = [
@@ -26,7 +28,7 @@ const ROLLER: { rol: string; etiket: string; renk: string }[] = [
   { rol: 'musteri',      etiket: 'M — Müşteri',          renk: '#1565c0' },
 ]
 
-type YetkiSet = Set<string>  // "rol__modul_kodu"
+type YetkiSet = Set<string>  // "rol__modul_kodu" — set'te varsa AÇIK
 const k = (rol: string, modul: string) => `${rol}__${modul}`
 
 export default function ModulYetkileriClient({ isSA, firmaId: initialFirmaId, firmalar = [] }: Props) {
@@ -44,8 +46,19 @@ export default function ModulYetkileriClient({ isSA, firmaId: initialFirmaId, fi
       const res = await fetch(`/api/sa/modul-yetkileri${qs}`)
       const data = await res.json()
       if (res.ok && data.ok) {
+        // Tick state'i hesapla: önce default değerleri yerleştir, sonra DB
+        // satırları üzerine yaz (explicit ayar default'ı ezer).
         const set: YetkiSet = new Set()
-        for (const y of data.yetkiler ?? []) set.add(k(y.rol, y.modul_kodu))
+        for (const r of ROLLER) {
+          for (const m of MODULLER) {
+            if (m.defaultAktif) set.add(k(r.rol, m.kod))
+          }
+        }
+        for (const y of data.yetkiler ?? []) {
+          const key = k(y.rol, y.modul_kodu)
+          if (y.gorebilir === true) set.add(key)
+          else set.delete(key)
+        }
         setYetkiSet(set)
         setDirty(false)
       } else {
@@ -70,10 +83,17 @@ export default function ModulYetkileriClient({ isSA, firmaId: initialFirmaId, fi
   async function kaydet() {
     setSaving(true)
     try {
-      const yetkiler = Array.from(yetkiSet).map(s => {
-        const [rol, modul_kodu] = s.split('__')
-        return { rol, modul_kodu }
-      })
+      // Sadece DEFAULT'tan FARKLI olan (rol, modul) çiftlerini DB'ye yaz.
+      // Default ile aynı olanlar için satır tutmuyoruz — temiz DB.
+      const yetkiler: { rol: string; modul_kodu: string; gorebilir: boolean }[] = []
+      for (const r of ROLLER) {
+        for (const m of MODULLER) {
+          const tick = yetkiSet.has(k(r.rol, m.kod))
+          if (tick !== m.defaultAktif) {
+            yetkiler.push({ rol: r.rol, modul_kodu: m.kod, gorebilir: tick })
+          }
+        }
+      }
       const res = await fetch('/api/sa/modul-yetkileri', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,11 +114,12 @@ export default function ModulYetkileriClient({ isSA, firmaId: initialFirmaId, fi
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Modül Yetkileri</h2>
         <p style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.5 }}>
-          Hangi rolün hangi modüllere erişebileceğini buradan yönetin. <strong>GYS</strong>
-          her zaman aktiftir ve listede gösterilmez. <strong>Oto Yıkama</strong> yetkisi
-          burada değil, <em>Sistem Ayarları → Lokasyon Yetkileri</em> sekmesinden yönetilir
-          (kullanıcı "Oto Yıkama" üst lokasyonuna atanırsa modüle otomatik erişir).
-          Modül firma için "aktif değil" olsa bile yetki verebilirsiniz; modül aktif edilince
+          Hangi rolün hangi modüllere erişebileceğini buradan yönetin.
+          <strong> GYS</strong> varsayılan açık — kapatırsanız o rol GYS'ye giremez,
+          sadece diğer yetkili modüllerine yönlenir (örn. sadece FMS yetkili bir
+          kullanıcı doğrudan FMS'ye giriş yapar). <strong>Oto Yıkama</strong> yetkisi
+          burada değil, <em>Sistem Ayarları → Lokasyon Yetkileri</em> sekmesinden yönetilir.
+          Modül firma için "aktif değil" olsa bile yetki verebilirsiniz; aktifleştirilince
           yetki otomatik geçerli olur.
         </p>
       </div>

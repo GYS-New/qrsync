@@ -44,7 +44,7 @@ export interface YetkiliModullerResponse {
 const KATALOG: Array<{ kod: ModulKodu; ad: string; ikon: string; flagKolon: string | null; implementasyonHazir: boolean }> = [
   { kod: 'gys',        ad: 'GYS',        ikon: 'shield',   flagKolon: null,               implementasyonHazir: true  },
   { kod: 'oto_yikama', ad: 'Oto Yıkama', ikon: 'car',      flagKolon: 'oto_yikama_aktif', implementasyonHazir: true  },
-  { kod: 'fms',        ad: 'FMS',        ikon: 'building', flagKolon: 'fms_aktif',        implementasyonHazir: false },
+  { kod: 'fms',        ad: 'FMS',        ikon: 'building', flagKolon: 'fms_aktif',        implementasyonHazir: true  },
 ]
 
 const MODUL_GIRIS_SAYFA_KODU = '_modul_giris'
@@ -115,7 +115,27 @@ export async function getYetkiliModuller(
     }
   }
 
-  // 3. Katalog üzerinden modül listesini üret
+  // 3. GYS + FMS yetkisi: kullanici_grubu_yetkileri tablosundan rol-bazlı.
+  //    sayfa_kodu='_modul_giris', modul_kodu='gys'|'fms'. Kayıt yoksa:
+  //      - GYS: default true (geriye uyumluluk — şimdiye dek GYS herkese açıktı)
+  //      - FMS: default false (yetki açıkça verilmeli)
+  let gysYetkili = true
+  let fmsYetkili = false
+  if (!isSA && firmaId) {
+    const { data: modulYetkileri } = await admin
+      .from('kullanici_grubu_yetkileri')
+      .select('modul_kodu, gorebilir')
+      .eq('sayfa_kodu', MODUL_GIRIS_SAYFA_KODU)
+      .eq('rol', rol)
+      .eq('firma_id', firmaId)
+      .in('modul_kodu', ['gys', 'fms'])
+    for (const r of (modulYetkileri ?? [])) {
+      if (r.modul_kodu === 'gys') gysYetkili = r.gorebilir === true
+      if (r.modul_kodu === 'fms') fmsYetkili = r.gorebilir === true
+    }
+  }
+
+  // 4. Katalog üzerinden modül listesini üret
   const moduller: ModulBilgisi[] = KATALOG.map(m => {
     // Implementasyon hazır değilse hiç kimse için (SA dahil) aktif değil → UI'da "Yakında"
     const aktif = !m.implementasyonHazir
@@ -126,9 +146,10 @@ export async function getYetkiliModuller(
 
     let yetkili: boolean
     if (isSA) yetkili = true
-    else if (m.kod === 'gys') yetkili = true
+    else if (m.kod === 'gys') yetkili = gysYetkili
     else if (m.kod === 'oto_yikama') yetkili = otoYikamaYetkili
-    else yetkili = false // fms vs.
+    else if (m.kod === 'fms') yetkili = fmsYetkili
+    else yetkili = false
 
     return { kod: m.kod, ad: m.ad, ikon: m.ikon, aktif, yetkili }
   })

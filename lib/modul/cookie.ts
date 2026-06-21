@@ -49,7 +49,7 @@ export function clearAktifModul(): void {
 export function modulLandingUrl(modul: ModulKodu, rol: string): string {
   if (modul === 'gys') return getRolBase(rol) + '/dashboard'
   if (modul === 'oto_yikama') return '/oto-yikama/dashboard'
-  if (modul === 'fms')        return '/fms/dashboard'
+  if (modul === 'fms')        return '/fms'
   return '/modul-sec'
 }
 

@@ -16,10 +16,11 @@ import { auditLog } from '@/lib/audit/log'
 export const dynamic = 'force-dynamic'
 
 const MODUL_GIRIS_SAYFA_KODU = '_modul_giris'
-// GYS hariç. Oto Yıkama da artık burada yönetilmiyor — lokasyon ataması
+// GYS yetkisi de buradan yönetilir (default açık; kapatılırsa o rolün
+// kullanıcıları GYS'ye giremez — sadece diğer yetkili modüllere). Oto
+// Yıkama buradan yönetilmez — lokasyon ataması
 // (kullanici_lokasyon_yetkileri / users.ust_lokasyon_id) tek source of truth.
-// FMS implementasyonu geldiğinde burada listelenir.
-const YONETILEN_MODULLER: string[] = ['fms']
+const YONETILEN_MODULLER: string[] = ['gys', 'fms']
 
 async function yetkiKontrol(req: NextRequest) {
   const supabase = createClient()
@@ -47,11 +48,13 @@ export async function GET(req: NextRequest) {
   const firmaId = isSA ? (firmaIdParam || null) : me!.firma_id
 
   const admin = createAdminClient()
+  // GYS için "kayıt yok = AÇIK" semantiği var; bu yüzden gorebilir filtresi
+  // YOK — hem true hem false satırlar dönmeli ki client doğru tick state'i
+  // hesaplayabilsin. Client tarafında default'la birleştirilir.
   let q = admin.from('kullanici_grubu_yetkileri')
     .select('rol, modul_kodu, gorebilir')
     .eq('sayfa_kodu', MODUL_GIRIS_SAYFA_KODU)
     .in('modul_kodu', YONETILEN_MODULLER)
-    .eq('gorebilir', true)
   q = firmaId ? q.eq('firma_id', firmaId) : q.is('firma_id', null)
 
   const { data, error } = await q
@@ -60,7 +63,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     firma_id: firmaId,
-    yetkiler: (data ?? []).map(r => ({ rol: r.rol, modul_kodu: r.modul_kodu })),
+    yetkiler: (data ?? []).map(r => ({ rol: r.rol, modul_kodu: r.modul_kodu, gorebilir: r.gorebilir === true })),
   })
 }
 
@@ -74,14 +77,17 @@ export async function POST(req: NextRequest) {
   const firmaId: string | null = isSA ? (firmaIdRaw || null) : me!.firma_id
   const yetkilerRaw = Array.isArray(body?.yetkiler) ? body.yetkiler : []
 
-  // Sadece geçerli (rol, modul_kodu) çiftlerini al
+  // Yetkiler artık {rol, modul_kodu, gorebilir} formatında — gorebilir
+  // explicit olarak yazılır (true=AÇIK, false=KAPALI). Default ile aynı
+  // olan satırlar client tarafında filtrelenir, server burada gelmesini
+  // beklemez ama gelirse de kabul eder (zararı yok, sadece DB satır sayısı).
   const ROL_LISTE = ['tenant_admin', 'tenant_user', 'musteri', 'alt_super_admin']
-  const yetkiler: { rol: string; modul_kodu: string }[] = []
+  const yetkiler: { rol: string; modul_kodu: string; gorebilir: boolean }[] = []
   for (const y of yetkilerRaw) {
     if (!y || typeof y !== 'object') continue
     if (!ROL_LISTE.includes(y.rol)) continue
     if (!YONETILEN_MODULLER.includes(y.modul_kodu)) continue
-    yetkiler.push({ rol: y.rol, modul_kodu: y.modul_kodu })
+    yetkiler.push({ rol: y.rol, modul_kodu: y.modul_kodu, gorebilir: y.gorebilir === true })
   }
 
   const admin = createAdminClient()
@@ -103,10 +109,10 @@ export async function POST(req: NextRequest) {
       rol: y.rol,
       sayfa_kodu: MODUL_GIRIS_SAYFA_KODU,
       modul_kodu: y.modul_kodu,
-      gorebilir: true,
-      ekleyebilir: true,
-      duzenleyebilir: true,
-      silebilir: true,
+      gorebilir: y.gorebilir,
+      ekleyebilir: y.gorebilir,
+      duzenleyebilir: y.gorebilir,
+      silebilir: y.gorebilir,
     }))
     const { error: insErr, data: insData } = await admin
       .from('kullanici_grubu_yetkileri').insert(rows).select('id')
