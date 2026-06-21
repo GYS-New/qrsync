@@ -335,7 +335,7 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
                         {k.ekstra && (
-                          <span style={{ padding: '2px 7px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 11, fontWeight: 800, letterSpacing: '0.04em' }}>EKSTRA</span>
+                          <span style={{ padding: '1px 5px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>EKSTRA</span>
                         )}
                       </div>
                     </Td>
