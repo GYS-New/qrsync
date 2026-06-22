@@ -35,7 +35,7 @@ export async function PUT(req: Request, ctx: { params: { id: string } }) {
 
   const admin = createAdminClient()
 
-  const { data: target } = await admin.from('users').select('id,rol,firma_id,ust_lokasyon_id,isim_soyisim,e_posta').eq('id', userId).single()
+  const { data: target } = await admin.from('users').select('id,rol,firma_id,ust_lokasyon_id,isim_soyisim,email').eq('id', userId).single()
   if (!target) return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 404 })
   if (ADMIN_ROLLERI.has((target as any).rol)) return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
   if ((target as any).firma_id !== me.firma_id) return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
@@ -60,7 +60,7 @@ export async function PUT(req: Request, ctx: { params: { id: string } }) {
     detay: {
       hedef_user_id: userId,
       hedef_isim: (target as any).isim_soyisim ?? null,
-      hedef_eposta: (target as any).e_posta ?? null,
+      hedef_eposta: (target as any).email ?? null,
       hedef_rol: (target as any).rol,
       yapan_rol: me.rol,
     },

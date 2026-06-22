@@ -24,7 +24,7 @@ export async function PUT(req: Request, ctx: { params: { id: string } }) {
 
   const admin = createAdminClient()
 
-  const { data: target } = await admin.from('users').select('id,rol,firma_id,isim_soyisim,e_posta').eq('id', userId).single()
+  const { data: target } = await admin.from('users').select('id,rol,firma_id,isim_soyisim,email').eq('id', userId).single()
   if (!target) return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 404 })
   if (target.rol === 'super_admin' || target.rol === 'alt_super_admin') return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
   if (target.firma_id !== me.firma_id) return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 })
@@ -40,7 +40,7 @@ export async function PUT(req: Request, ctx: { params: { id: string } }) {
     detay: {
       hedef_user_id: userId,
       hedef_isim: (target as any).isim_soyisim ?? null,
-      hedef_eposta: (target as any).e_posta ?? null,
+      hedef_eposta: (target as any).email ?? null,
       hedef_rol: target.rol,
       yapan_rol: 'tenant_admin',
     },

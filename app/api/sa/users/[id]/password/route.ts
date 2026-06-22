@@ -24,7 +24,7 @@ export async function PUT(req: Request, ctx: { params: { id: string } }) {
 
   const admin = createAdminClient()
   // Hedef kullanıcı bilgisi (audit log için isim/firma)
-  const { data: target } = await admin.from('users').select('isim_soyisim,rol,firma_id,e_posta').eq('id', userId).maybeSingle()
+  const { data: target } = await admin.from('users').select('isim_soyisim,rol,firma_id,email').eq('id', userId).maybeSingle()
 
   const { error } = await admin.auth.admin.updateUserById(userId, { password })
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
@@ -37,7 +37,7 @@ export async function PUT(req: Request, ctx: { params: { id: string } }) {
     detay: {
       hedef_user_id: userId,
       hedef_isim: (target as any)?.isim_soyisim ?? null,
-      hedef_eposta: (target as any)?.e_posta ?? null,
+      hedef_eposta: (target as any)?.email ?? null,
       hedef_rol: (target as any)?.rol ?? null,
       yapan_rol: 'sa',
     },
