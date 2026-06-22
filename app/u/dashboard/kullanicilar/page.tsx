@@ -45,7 +45,7 @@ export default async function UKullanicilarPage() {
     users = data ?? []
   }
 
-  let lokQ = supabase.from('lokasyonlar').select('id,tanim').eq('firma_id', firmaId).is('parent_id', null).eq('aktif', true).order('tanim')
+  let lokQ = supabase.from('lokasyonlar').select('id,tanim,oto_yikama_lokasyon').eq('firma_id', firmaId).is('parent_id', null).eq('aktif', true).order('tanim')
   if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
   if (yetkiliUstLokIds) lokQ = lokQ.in('id', yetkiliUstLokIds)
   const { data: lokasyonlarRaw } = await lokQ
@@ -54,6 +54,10 @@ export default async function UKullanicilarPage() {
   const admin2 = createAdminClient()
   const otoIds = await getOtoYikamaLokasyonIds(admin2, firmaId ?? '')
   const lokasyonlar = (lokasyonlarRaw ?? []).filter((l: any) => !otoIds.has(l.id))
+
+  // Alt lokasyonlar (istasyonlar) — conditional dropdown için. U/M'ye Oto Yıkama
+  // üst lokasyonu gizli olduğu için pratikte alt lokasyon da gerekmez, yine de prop'a boş geçeriz.
+  const altLoklarRaw: { id: string; tanim: string; parent_id: string }[] = []
 
   return (
     <div>
@@ -67,6 +71,7 @@ export default async function UKullanicilarPage() {
         canDelete={yetki.silebilir}
         projeId={projeId ?? undefined}
         ustLokasyonlar={(lokasyonlar as any) ?? []}
+        altLokasyonlar={altLoklarRaw}
       />
     </div>
   )

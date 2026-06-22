@@ -65,6 +65,10 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   const aktif        = body.aktif !== undefined ? Boolean(body.aktif) : undefined
   const email        = body.email !== undefined ? String(body.email).trim().toLowerCase() : undefined
   const cinsiyet     = body.cinsiyet !== undefined ? (body.cinsiyet === 'E' || body.cinsiyet === 'K' ? body.cinsiyet : null) : undefined
+  const ust_lokasyon_id = body.ust_lokasyon_id === undefined ? undefined
+    : (body.ust_lokasyon_id === null || body.ust_lokasyon_id === '' ? null : String(body.ust_lokasyon_id))
+  const varsayilan_yikama_istasyon_id = body.varsayilan_yikama_istasyon_id === undefined ? undefined
+    : (body.varsayilan_yikama_istasyon_id === null || body.varsayilan_yikama_istasyon_id === '' ? null : String(body.varsayilan_yikama_istasyon_id))
 
   const admin = createAdminClient()
 
@@ -85,6 +89,21 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   if (aktif !== undefined)        updatePayload.aktif = aktif
   if (email !== undefined)        updatePayload.email = email
   if (cinsiyet !== undefined)     updatePayload.cinsiyet = cinsiyet
+  if (ust_lokasyon_id !== undefined) updatePayload.ust_lokasyon_id = ust_lokasyon_id
+  if (varsayilan_yikama_istasyon_id !== undefined) {
+    if (varsayilan_yikama_istasyon_id) {
+      const { data: targetUser } = await admin.from('users').select('firma_id, ust_lokasyon_id').eq('id', userId).single()
+      const finalUst = ust_lokasyon_id !== undefined ? ust_lokasyon_id : targetUser?.ust_lokasyon_id
+      const { data: alt } = await admin.from('lokasyonlar')
+        .select('id, parent_id, firma_id, aktif')
+        .eq('id', varsayilan_yikama_istasyon_id)
+        .maybeSingle()
+      if (!alt || alt.firma_id !== targetUser?.firma_id || alt.aktif === false || (finalUst && alt.parent_id !== finalUst)) {
+        return NextResponse.json({ error: 'Geçersiz yıkama istasyonu (alt lokasyon)' }, { status: 400 })
+      }
+    }
+    updatePayload.varsayilan_yikama_istasyon_id = varsayilan_yikama_istasyon_id
+  }
 
   if (Object.keys(updatePayload).length) {
     const { error: upErr } = await admin.from('users').update(updatePayload).eq('id', userId)

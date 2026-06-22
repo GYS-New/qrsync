@@ -27,9 +27,13 @@ export default async function TAKullanicilarPage() {
   // atama UI'sıdır, TA buradan personeli "ARAÇ YIKAMA" üst lokasyonuna atayıp
   // Oto Yıkama yetkisini verebilir. (Modül izolasyonu sadece veri/görev
   // sayfalarında geçerli, yetkilendirme sayfalarında değil.)
-  const [{ data: users }, { data: lokasyonlar }] = await Promise.all([
+  const [{ data: users }, { data: lokasyonlar }, { data: altLoklarRaw }] = await Promise.all([
     supabase.from('users').select('*').eq('firma_id', firmaId).in('rol', ['tenant_user', 'musteri']).eq('proje_id', aktifProje.id).order('kayit_tarihi', { ascending: false }),
-    supabase.from('lokasyonlar').select('id,tanim').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).is('parent_id', null).eq('aktif', true).order('tanim'),
+    supabase.from('lokasyonlar').select('id,tanim,oto_yikama_lokasyon').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).is('parent_id', null).eq('aktif', true).order('tanim'),
+    // Tüm aktif alt lokasyonlar (parent_id dolu) — client conditional için
+    // sadece oto_yikama_lokasyon üst lokasyonlara bağlı olanlar lazım ama tüm
+    // alt lokasyonları getirip client'ta filtreleyelim (basit, az sorgu).
+    supabase.from('lokasyonlar').select('id,tanim,parent_id').eq('firma_id', firmaId).eq('proje_id', aktifProje.id).not('parent_id', 'is', null).eq('aktif', true).order('tanim'),
   ])
 
   return (
@@ -44,6 +48,7 @@ export default async function TAKullanicilarPage() {
         enableBulkImport={me?.rol === 'tenant_admin'}
         projeId={aktifProje.id}
         ustLokasyonlar={(lokasyonlar as any) ?? []}
+        altLokasyonlar={(altLoklarRaw as any) ?? []}
       />
     </div>
   )

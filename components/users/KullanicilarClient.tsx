@@ -77,6 +77,7 @@ export default function KullanicilarClient({
   enableBulkImport = false,
   projeId,
   ustLokasyonlar = [],
+  altLokasyonlar = [],
   showSistemdeStatus = false,
 }: {
   base: '/ta' | '/u' | '/sa'
@@ -88,6 +89,9 @@ export default function KullanicilarClient({
   enableBulkImport?: boolean
   projeId?: string | null
   ustLokasyonlar?: { id: string; tanim: string; oto_yikama_lokasyon?: boolean }[]
+  /** Alt lokasyonlar (istasyonlar) — Oto Yıkama üst lokasyonu seçilince
+   *  conditional dropdown'da kullanılır. parent_id ile filtrelenir. */
+  altLokasyonlar?: { id: string; tanim: string; parent_id: string }[]
   /** SA Firma Adminleri sayfasında, web heartbeat'e göre online/offline rozeti gösterir */
   showSistemdeStatus?: boolean
 }) {
@@ -202,11 +206,18 @@ export default function KullanicilarClient({
 
   // Modal state'leri
   const [openCreate, setOpenCreate] = useState(false)
-  const [createForm, setCreateForm] = useState({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user' as string, ust_lokasyon_id: '', cinsiyet: '', is_tester: false })
+  const [createForm, setCreateForm] = useState({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user' as string, ust_lokasyon_id: '', varsayilan_yikama_istasyon_id: '', cinsiyet: '', is_tester: false })
+
+  // Üst lokasyon Oto Yıkama mı? (alt lokasyon dropdown'u için)
+  const ustLokOtoYikamaMi = (ustId: string) =>
+    !!ustLokasyonlar.find(l => l.id === ustId)?.oto_yikama_lokasyon
+  // O üst lokasyona bağlı alt lokasyonlar (istasyonlar)
+  const altLoksFor = (ustId: string) =>
+    altLokasyonlar.filter(a => a.parent_id === ustId)
   const [openEdit, setOpenEdit] = useState(false)
   const [openPass, setOpenPass] = useState(false)
   const [target, setTarget] = useState<User | null>(null)
-  const [editForm, setEditForm] = useState({ isim_soyisim: '', email: '', telefon: '', cinsiyet: '' })
+  const [editForm, setEditForm] = useState({ isim_soyisim: '', email: '', telefon: '', cinsiyet: '', ust_lokasyon_id: '', varsayilan_yikama_istasyon_id: '' })
   const [newPass, setNewPass] = useState('')
 
   // SA için form içi proje seçici
@@ -365,12 +376,18 @@ export default function KullanicilarClient({
 
     setLoading(true)
     try {
+      // Alt lokasyon (istasyon) sadece üst lokasyon Oto Yıkama ise gönderilir;
+      // değişip de oto_yikama olmayan üst seçildiyse stale değer gitmesin.
+      const istasyonId = (ustLokId && ustLokOtoYikamaMi(ustLokId) && createForm.varsayilan_yikama_istasyon_id)
+        ? createForm.varsayilan_yikama_istasyon_id
+        : null
       const res = await fetch('/api/users/create', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           ...createForm,
           ust_lokasyon_id: ustLokId,
+          varsayilan_yikama_istasyon_id: istasyonId,
           firma_id: firmaId,
           ...(gonderilenProjeId ? { proje_id: gonderilenProjeId } : {}),
         }),
@@ -378,7 +395,7 @@ export default function KullanicilarClient({
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'Oluşturulamadı')
       showOk('Kullanıcı oluşturuldu.')
-      setCreateForm({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user', ust_lokasyon_id: '', cinsiyet: '', is_tester: false })
+      setCreateForm({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user', ust_lokasyon_id: '', varsayilan_yikama_istasyon_id: '', cinsiyet: '', is_tester: false })
       setFormProjeId('')
       setOpenCreate(false)
       await refresh()
@@ -390,9 +407,20 @@ export default function KullanicilarClient({
     if (!target) return
     setLoading(true)
     try {
+      // Alt lokasyon (istasyon) sadece üst lokasyon Oto Yıkama ise gönderilir
+      const editIstasyonId = (editForm.ust_lokasyon_id && ustLokOtoYikamaMi(editForm.ust_lokasyon_id) && editForm.varsayilan_yikama_istasyon_id)
+        ? editForm.varsayilan_yikama_istasyon_id
+        : null
       const res = await fetch(`${apiBase}/users/${target.id}`, {
         method: 'PATCH', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ isim_soyisim: editForm.isim_soyisim, email: editForm.email, telefon: editForm.telefon, cinsiyet: editForm.cinsiyet || null }),
+        body: JSON.stringify({
+          isim_soyisim: editForm.isim_soyisim,
+          email: editForm.email,
+          telefon: editForm.telefon,
+          cinsiyet: editForm.cinsiyet || null,
+          ust_lokasyon_id: editForm.ust_lokasyon_id || null,
+          varsayilan_yikama_istasyon_id: editIstasyonId,
+        }),
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'Güncelleme başarısız')
@@ -848,7 +876,18 @@ export default function KullanicilarClient({
                       <RowActionButton variant={u.aktif ? 'warning' : 'success'} onClick={() => toggleAktif(u)}>
                         {u.aktif ? 'Pasif Yap' : 'Aktif Yap'}
                       </RowActionButton>
-                      {yetki.duzenleyebilir && <RowActionButton variant="base" onClick={() => { setTarget(u); setEditForm({ isim_soyisim: u.isim_soyisim ?? '', email: u.email ?? '', telefon: u.telefon ?? '', cinsiyet: (u as any).cinsiyet ?? '' }); setOpenEdit(true) }}>Düzenle</RowActionButton>}
+                      {yetki.duzenleyebilir && <RowActionButton variant="base" onClick={() => {
+                        setTarget(u)
+                        setEditForm({
+                          isim_soyisim: u.isim_soyisim ?? '',
+                          email: u.email ?? '',
+                          telefon: u.telefon ?? '',
+                          cinsiyet: (u as any).cinsiyet ?? '',
+                          ust_lokasyon_id: (u as any).ust_lokasyon_id ?? '',
+                          varsayilan_yikama_istasyon_id: (u as any).varsayilan_yikama_istasyon_id ?? '',
+                        })
+                        setOpenEdit(true)
+                      }}>Düzenle</RowActionButton>}
                       <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
                       {pushYetki.benGonderebilirim && deviceTokenMap[u.id] && (
                         <RowActionButton variant="base" onClick={() => setPushModalAlicilar([{ id: u.id, isim_soyisim: u.isim_soyisim ?? '—', bildirim_izni: deviceTokenMap[u.id]?.bildirim_izni ?? null }])}>🔔 Bildirim</RowActionButton>
@@ -981,6 +1020,26 @@ export default function KullanicilarClient({
                     </div>
                   </div>
                 )}
+
+                {/* Oto Yıkama alt lokasyon (istasyon) — yalnızca üst lokasyon oto_yikama_lokasyon=true ise */}
+                {createForm.ust_lokasyon_id && ustLokOtoYikamaMi(createForm.ust_lokasyon_id) && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label className="verde-label">Yıkama İstasyonu</label>
+                    {altLoksFor(createForm.ust_lokasyon_id).length === 0 ? (
+                      <div style={{ fontSize: 13, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px' }}>
+                        ⚠️ Bu üst lokasyona bağlı aktif istasyon bulunamadı. Önce lokasyon ekleyin.
+                      </div>
+                    ) : (
+                      <select className="verde-input" value={createForm.varsayilan_yikama_istasyon_id} onChange={e => setCreateForm(f => ({ ...f, varsayilan_yikama_istasyon_id: e.target.value }))}>
+                        <option value="">— İstasyon seçin (opsiyonel) —</option>
+                        {altLoksFor(createForm.ust_lokasyon_id).map(a => <option key={a.id} value={a.id}>{a.tanim}</option>)}
+                      </select>
+                    )}
+                    <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 4 }}>
+                      Kullanıcının varsayılan yıkama istasyonu. Mobilde otomatik seçili gelir.
+                    </div>
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <Button variant="primary" onClick={createUser} disabled={loading}>{loading ? 'Kaydediliyor…' : '✓ Oluştur'}</Button>
@@ -1050,6 +1109,44 @@ export default function KullanicilarClient({
                 /></div>
                 <div><label className="verde-label">Email</label><input className="verde-input" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} autoComplete="off" /></div>
                 <div><label className="verde-label">Cinsiyet</label><select className="verde-input" value={editForm.cinsiyet} onChange={e => setEditForm(f => ({ ...f, cinsiyet: e.target.value }))}><option value="">Seçiniz</option><option value="E">Erkek</option><option value="K">Kadın</option></select></div>
+
+                {/* Üst Lokasyon */}
+                {ustLokasyonlar.length > 0 && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label className="verde-label">Üst Lokasyon</label>
+                    <select
+                      className="verde-input"
+                      value={editForm.ust_lokasyon_id}
+                      onChange={e => setEditForm(f => ({ ...f, ust_lokasyon_id: e.target.value, varsayilan_yikama_istasyon_id: '' }))}
+                    >
+                      <option value="">— Seçiniz —</option>
+                      {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                    </select>
+                    <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 4 }}>
+                      Bu kullanıcı hangi üst lokasyona bağlı çalışacak?
+                    </div>
+                  </div>
+                )}
+
+                {/* Oto Yıkama alt lokasyon (istasyon) — yalnızca üst lokasyon oto_yikama_lokasyon=true ise */}
+                {editForm.ust_lokasyon_id && ustLokOtoYikamaMi(editForm.ust_lokasyon_id) && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label className="verde-label">Yıkama İstasyonu</label>
+                    {altLoksFor(editForm.ust_lokasyon_id).length === 0 ? (
+                      <div style={{ fontSize: 13, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px' }}>
+                        ⚠️ Bu üst lokasyona bağlı aktif istasyon bulunamadı. Önce lokasyon ekleyin.
+                      </div>
+                    ) : (
+                      <select className="verde-input" value={editForm.varsayilan_yikama_istasyon_id} onChange={e => setEditForm(f => ({ ...f, varsayilan_yikama_istasyon_id: e.target.value }))}>
+                        <option value="">— İstasyon seçin (opsiyonel) —</option>
+                        {altLoksFor(editForm.ust_lokasyon_id).map(a => <option key={a.id} value={a.id}>{a.tanim}</option>)}
+                      </select>
+                    )}
+                    <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 4 }}>
+                      Kullanıcının varsayılan yıkama istasyonu. Mobilde otomatik seçili gelir.
+                    </div>
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <Button variant="primary" onClick={saveEdit} disabled={loading}>{loading ? 'Kaydediliyor…' : '✓ Kaydet'}</Button>
