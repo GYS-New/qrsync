@@ -55,9 +55,21 @@ export default async function UKullanicilarPage() {
   const otoIds = await getOtoYikamaLokasyonIds(admin2, firmaId ?? '')
   const lokasyonlar = (lokasyonlarRaw ?? []).filter((l: any) => !otoIds.has(l.id))
 
-  // Alt lokasyonlar (istasyonlar) — conditional dropdown için. U/M'ye Oto Yıkama
-  // üst lokasyonu gizli olduğu için pratikte alt lokasyon da gerekmez, yine de prop'a boş geçeriz.
-  const altLoklarRaw: { id: string; tanim: string; parent_id: string }[] = []
+  // Alt lokasyonlar (istasyonlar) — UI'da gözüken üst lokasyonların altları.
+  // ARAÇ YIKAMA filtresi (otoIds) etkin olsa bile, gözüken üst varsa altları lazım
+  // (Oto Yıkama üstüne hâlâ kullanıcı atayabilen U rolleri için varsayılan istasyon dropdown'u).
+  const ustIdsForAlt = (lokasyonsRaw => (lokasyonsRaw ?? []).map((l: any) => l.id))(lokasyonlarRaw)
+  let altLoklarRaw: { id: string; tanim: string; parent_id: string }[] = []
+  if (ustIdsForAlt.length > 0) {
+    const { data: alt } = await supabase
+      .from('lokasyonlar')
+      .select('id,tanim,parent_id')
+      .eq('firma_id', firmaId)
+      .in('parent_id', ustIdsForAlt)
+      .eq('aktif', true)
+      .order('tanim')
+    altLoklarRaw = (alt as any) ?? []
+  }
 
   return (
     <div>
