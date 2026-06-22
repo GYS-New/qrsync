@@ -26,10 +26,12 @@ export default function FirmaKullanicilariClient({
 
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [ustLokasyonlar, setUstLokasyonlar] = useState<{ id: string; tanim: string; oto_yikama_lokasyon?: boolean }[]>([])
+  const [altLokasyonlar, setAltLokasyonlar] = useState<{ id: string; tanim: string; parent_id: string }[]>([])
   useEffect(() => { setUsers(initialUsers) }, [initialUsers])
 
-  // Üst lokasyonları çek — Kullanıcı atama UI'ı olduğu için Oto Yıkama dahil edilir
-  // (includeOtoYikama=1). SA/TA buradan kullanıcıya "ARAÇ YIKAMA" üst lokasyonu atar.
+  // Üst + alt lokasyonları çek — Kullanıcı atama UI'ı olduğu için Oto Yıkama dahil
+  // edilir (includeOtoYikama=1). SA/TA buradan kullanıcıya "ARAÇ YIKAMA" üst
+  // lokasyonu + varsayılan istasyon (alt lokasyon) atar.
   useEffect(() => {
     if (!firmaId) return
     const q = new URLSearchParams({ firmaId, includeOtoYikama: '1' })
@@ -39,6 +41,11 @@ export default function FirmaKullanicilariClient({
       .then(j => {
         const loks = Array.isArray(j) ? j : (j.lokasyonlar ?? j.data ?? [])
         setUstLokasyonlar(loks.filter((l: any) => !l.parent_id))
+        setAltLokasyonlar(
+          loks
+            .filter((l: any) => !!l.parent_id)
+            .map((l: any) => ({ id: l.id, tanim: l.tanim, parent_id: l.parent_id }))
+        )
       })
       .catch(() => {})
   }, [firmaId, projeId])
@@ -64,6 +71,7 @@ export default function FirmaKullanicilariClient({
       canManage={true}
       enableBulkImport={true}
       ustLokasyonlar={ustLokasyonlar}
+      altLokasyonlar={altLokasyonlar}
     />
   )
 }
