@@ -163,17 +163,33 @@ export async function POST(req: Request) {
         const gorevIds = bugunMevcut.map((m: any) => m.gorev_id)
         const { data: gorevlerData } = await admin
           .from('gorevler')
-          .select('id, durum')
+          .select('id, durum, atanan_kullanici_id, lokasyon_id')
           .in('id', gorevIds)
           .eq('firma_id', firmaId)
-        const aktifVar = (gorevlerData ?? []).some((g: any) =>
+        // Blocking görevi bul (atanmamış olanları önce ver — UX için kullanıcıya
+        // "sen al" çağrısı yapması daha doğal)
+        const adaylar = (gorevlerData ?? []).filter((g: any) =>
           ['HAZIR', 'ACIK', 'ISLEMDE'].includes(g.durum),
         )
-        if (aktifVar) {
+        adaylar.sort((a: any, b: any) => {
+          // 1) Kendine atanmış öncelikli, 2) atanmamış, 3) başkasına atanmış
+          const score = (g: any) =>
+            g.atanan_kullanici_id === userId ? 0 :
+            g.atanan_kullanici_id == null ? 1 : 2
+          return score(a) - score(b)
+        })
+        const aktif = adaylar[0]
+        if (aktif) {
           return NextResponse.json({
             ok: false,
             error: `${arac.plaka} plakalı araç için bugün planlı/aktif yıkama görevi mevcut. Önce o görevi tamamlayın, sonra ekstra başlatabilirsiniz.`,
             code: 'PLANLI_AKTIF_VAR',
+            // Mobile için: bu alanlarla direkt o göreve gidip başlatabilir
+            // (atanan_kullanici_id NULL ise "size atanmamış, alabilirsiniz" UI).
+            gorev_id: aktif.id,
+            durum: aktif.durum,
+            atanan_kullanici_id: aktif.atanan_kullanici_id,
+            lokasyon_id: aktif.lokasyon_id,
           }, { status: 409, headers: CORS })
         }
       }
