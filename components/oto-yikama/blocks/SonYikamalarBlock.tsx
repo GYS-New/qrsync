@@ -20,7 +20,7 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
   // geçişi yapan kişi 'islemi_yapan_id' kolonunda (gorevDurumPayload helper).
   const { data: gorevRows } = await admin
     .from('gorevler')
-    .select('id, lokasyon_id, tamamlanma_tarihi, islemi_yapan_id')
+    .select('id, lokasyon_id, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, islemi_yapan_id')
     .eq('firma_id', firmaId)
     .eq('durum', 'TAMAMLANDI')
     .not('tamamlanma_tarihi', 'is', null)
@@ -48,7 +48,9 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
     .map(g => ({
       gorev_id:           g.id,
       lokasyon_id:        g.lokasyon_id,
+      baslatilma_tarihi:  g.baslatilma_tarihi,
       tamamlanma_tarihi:  g.tamamlanma_tarihi,
+      sure_saniye:        g.tamamlanma_suresi_saniye as number | null,
       tamamlayan_id:      g.islemi_yapan_id,
       plaka:              metaMap.get(g.id)?.plaka_snapshot ?? '—',
       ekstra:             metaMap.get(g.id)?.ekstra === true,
@@ -88,7 +90,10 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
               <Th>Plaka</Th>
               <Th>İstasyon</Th>
               <Th>Tamamlayan</Th>
-              <Th align="right">Tamamlanma</Th>
+              <Th>Tarih</Th>
+              <Th align="center">Başlama</Th>
+              <Th align="center">Bitiş</Th>
+              <Th align="right">Süre</Th>
             </tr>
           </thead>
           <tbody>
@@ -104,9 +109,10 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
                 </Td>
                 <Td>{lokMap.get(r.lokasyon_id) ?? '—'}</Td>
                 <Td>{r.tamamlayan_id ? (userMap.get(r.tamamlayan_id) ?? '—') : '—'}</Td>
-                <Td align="right" muted>
-                  {new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Istanbul' }).format(new Date(r.tamamlanma_tarihi))}
-                </Td>
+                <Td muted>{formatTarih(r.tamamlanma_tarihi)}</Td>
+                <Td align="center" mono muted>{formatSaat(r.baslatilma_tarihi)}</Td>
+                <Td align="center" mono muted>{formatSaat(r.tamamlanma_tarihi)}</Td>
+                <Td align="right" bold>{formatSure(r.sure_saniye, r.baslatilma_tarihi, r.tamamlanma_tarihi)}</Td>
               </tr>
             ))}
           </tbody>
@@ -132,7 +138,33 @@ function Bos() {
   )
 }
 
-function Th({ children, align }: { children: React.ReactNode; align?: 'right' | 'left' }) {
+const TR_TZ = 'Europe/Istanbul'
+
+function formatTarih(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  return new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeZone: TR_TZ }).format(new Date(iso))
+}
+
+function formatSaat(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  return new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: TR_TZ }).format(new Date(iso))
+}
+
+function formatSure(saniye: number | null | undefined, basla?: string | null, bitis?: string | null): string {
+  // DB'de tamamlanma_suresi_saniye yoksa baslatilma + tamamlanma'dan hesapla
+  let sn = (typeof saniye === 'number' && saniye > 0) ? saniye : null
+  if (sn == null && basla && bitis) {
+    sn = Math.max(0, Math.floor((new Date(bitis).getTime() - new Date(basla).getTime()) / 1000))
+  }
+  if (sn == null || sn <= 0) return '—'
+  if (sn < 60) return `${sn} sn`
+  const dk = Math.floor(sn / 60), ksn = sn % 60
+  if (dk < 60) return ksn > 0 ? `${dk} dk ${ksn} sn` : `${dk} dk`
+  const sa = Math.floor(dk / 60), kdk = dk % 60
+  return kdk > 0 ? `${sa} sa ${kdk} dk` : `${sa} sa`
+}
+
+function Th({ children, align }: { children: React.ReactNode; align?: 'right' | 'left' | 'center' }) {
   return (
     <th style={{
       textAlign: align ?? 'left',
@@ -146,7 +178,7 @@ function Th({ children, align }: { children: React.ReactNode; align?: 'right' | 
   )
 }
 
-function Td({ children, bold, mono, muted, align }: { children: React.ReactNode; bold?: boolean; mono?: boolean; muted?: boolean; align?: 'right' | 'left' }) {
+function Td({ children, bold, mono, muted, align }: { children: React.ReactNode; bold?: boolean; mono?: boolean; muted?: boolean; align?: 'right' | 'left' | 'center' }) {
   return (
     <td style={{
       padding: '10px',
