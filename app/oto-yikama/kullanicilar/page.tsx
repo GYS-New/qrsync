@@ -4,6 +4,7 @@ import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getRolBase } from '@/lib/modul/cookie'
 import { getOtoYikamaFirmaId } from '@/lib/oto-yikama/getOtoYikamaFirmaId'
 import { getYikamaSahaPersoneliUserIds } from '@/lib/oto-yikama/yetkililer'
+import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import KullanicilarClient from '@/components/users/KullanicilarClient'
 
 export const dynamic = 'force-dynamic'
@@ -77,6 +78,9 @@ export default async function OtoYikamaKullanicilarPage() {
     altLokRaw = (alt as any) ?? []
   }
 
+  // Aktif proje — push yetki ayarı proje override'a düşebilir (Sistem Ayarları > Genel)
+  const aktifProje = await getAktifProje(firmaId)
+
   // Yetkiler — SA/TA yönetir, U/M sadece görür
   const isYonetici = me.rol === 'super_admin' || me.rol === 'alt_super_admin' || me.rol === 'tenant_admin'
 
@@ -92,6 +96,7 @@ export default async function OtoYikamaKullanicilarPage() {
         <KullanicilarClient
           base={rolBase as '/sa' | '/ta' | '/u'}
           firmaId={firmaId}
+          projeId={aktifProje?.id ?? null}
           initialUsers={users as any}
           canCreate={isYonetici}
           canManage={isYonetici}
