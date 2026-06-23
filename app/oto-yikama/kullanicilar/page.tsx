@@ -3,35 +3,34 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getRolBase } from '@/lib/modul/cookie'
 import { getOtoYikamaFirmaId } from '@/lib/oto-yikama/getOtoYikamaFirmaId'
-import OtoYikamaKullanicilarClient, { type YikamaKullanici } from '@/components/oto-yikama/KullanicilarClient'
+import { getYikamaSahaPersoneliUserIds } from '@/lib/oto-yikama/yetkililer'
+import KullanicilarClient from '@/components/users/KullanicilarClient'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * Oto Yıkama → Kullanıcılar
  *
- * SADECE birincil atama (users.ust_lokasyon_id) ile Oto Yıkama lokasyonuna
- * atanmış personeller listelenir — yani GYS "Kullanıcılar" sayfasından
- * "Üst Lokasyon" alanına ARAÇ YIKAMA seçilmiş olanlar.
+ * Yıkama lokasyonuna birincil atanmış personel (users.ust_lokasyon_id →
+ * oto_yikama_lokasyon=true). kullanici_lokasyon_yetkileri'nden gelen
+ * ek yetkililer (TA, cross-functional U) bu listede gösterilmez —
+ * operasyon listesi yöneticilerle kirlenmesin.
  *
- * NOT: kullanici_lokasyon_yetkileri üzerinden ek yetki verilmiş kullanıcılar
- * (TA, SA, M gibi yöneticiler veya cross-functional U'lar — örn. Mustafa
- * Yıldız) bu listede GÖSTERİLMEZ. Çünkü onlar "yıkama personeli" değil,
- * sadece görüntüleme/yönetim için ek yetki almış kişilerdir. Yıkama
- * operasyon listesi temiz kalsın.
- *
- * Read-only liste; CRUD GYS tarafında kalır.
+ * GYS Kullanıcılar sayfasının KullanicilarClient'ını reuse eder: tüm CRUD
+ * butonları (Düzenle, Şifre, Bildirim, Cihaz Sil, Pasif Yap, Sil) otomatik
+ * gelir. Yetki rol bazlı (SA/TA yönetir, U sadece görür).
  */
 export default async function OtoYikamaKullanicilarPage() {
   const { me } = await assertModulYetkisi('oto_yikama')
   const rolBase = getRolBase(me.rol)
   const supabase = createClient()
-  const firmaId = await getOtoYikamaFirmaId(createAdminClient() as any, me)
+  const admin = createAdminClient()
+  const firmaId = await getOtoYikamaFirmaId(admin as any, me)
 
   if (!firmaId) {
     return (
       <div>
-        <Topbar title="Kullanıcılar" base={rolBase} breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Kullanıcılar' }]} hideScopeControls hideNotifBar hideNotifBell />
+        <Topbar title="Kullanıcılar" base={rolBase} breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Kullanıcılar' }]} hideScopeControls hideNotifBar />
         <div style={{ padding: '24px 28px' }}>
           <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
             Görüntülemek için üstten bir firma seçin.
@@ -41,60 +40,45 @@ export default async function OtoYikamaKullanicilarPage() {
     )
   }
 
-  // 1) Oto Yıkama üst lokasyonları
-  const { data: otoLoklar } = await supabase
+  // Yıkama personeli ID'leri (sadece birincil ataması olanlar)
+  const sahaUserIds = await getYikamaSahaPersoneliUserIds(admin as any, firmaId)
+
+  // Tam users.* row'ları (KullanicilarClient tam objeyi bekliyor)
+  let users: any[] = []
+  if (sahaUserIds.length > 0) {
+    const { data } = await admin
+      .from('users')
+      .select('*')
+      .in('id', sahaUserIds)
+      .order('isim_soyisim')
+    users = data ?? []
+  }
+
+  // Oto Yıkama üst lokasyonları (Create modal'daki üst lokasyon dropdown'u için)
+  const { data: ustLokRaw } = await admin
     .from('lokasyonlar')
-    .select('id, tanim')
+    .select('id,tanim,oto_yikama_lokasyon')
     .eq('firma_id', firmaId)
     .eq('oto_yikama_lokasyon', true)
-  const otoUstIds = (otoLoklar ?? []).map((l: any) => l.id)
-  const otoLokAdMap = new Map((otoLoklar ?? []).map((l: any) => [l.id as string, l.tanim as string]))
+    .is('parent_id', null)
+    .eq('aktif', true)
+    .order('tanim')
 
-  // 2) SADECE users.ust_lokasyon_id ile birincil atama yapılmış kullanıcılar.
-  //    kullanici_lokasyon_yetkileri (ek yetkiler) bu sayfaya dahil edilmez —
-  //    bkz. dosya başındaki açıklama (yöneticiler/cross-functional kullanıcılar
-  //    yıkama personeli listesini kirletmesin).
-  let kullaniciAtamalari: { user_id: string; ust_lokasyon_id: string }[] = []
-  if (otoUstIds.length > 0) {
-    const { data: userByUstRes } = await supabase
-      .from('users')
-      .select('id, ust_lokasyon_id')
-      .eq('firma_id', firmaId)
-      .in('ust_lokasyon_id', otoUstIds)
-    for (const u of (userByUstRes ?? [])) {
-      if (!u.ust_lokasyon_id) continue
-      kullaniciAtamalari.push({ user_id: u.id, ust_lokasyon_id: u.ust_lokasyon_id })
-    }
+  // Alt lokasyonlar (istasyonlar) — Oto Yıkama üstlerinin altındakiler
+  const ustIds = (ustLokRaw ?? []).map((l: any) => l.id)
+  let altLokRaw: { id: string; tanim: string; parent_id: string }[] = []
+  if (ustIds.length > 0) {
+    const { data: alt } = await admin
+      .from('lokasyonlar')
+      .select('id,tanim,parent_id')
+      .in('parent_id', ustIds)
+      .eq('aktif', true)
+      .order('tanim')
+    altLokRaw = (alt as any) ?? []
   }
 
-  // 3) Kullanıcı detayları
-  const userIds = Array.from(new Set(kullaniciAtamalari.map(a => a.user_id)))
-  const { data: userlar } = userIds.length > 0
-    ? await supabase
-        .from('users')
-        .select('id, isim_soyisim, email, rol, aktif')
-        .in('id', userIds)
-        .order('isim_soyisim')
-    : { data: [] as any[] }
-
-  // 4) user_id → atanmış lokasyon ad listesi
-  const userLokMap = new Map<string, string[]>()
-  for (const a of kullaniciAtamalari) {
-    const ad = otoLokAdMap.get(a.ust_lokasyon_id) ?? '—'
-    const arr = userLokMap.get(a.user_id) ?? []
-    arr.push(ad)
-    userLokMap.set(a.user_id, arr)
-  }
-
-  // Server datası → client'ın beklediği YikamaKullanici[] formatı
-  const kullanicilarPayload: YikamaKullanici[] = (userlar ?? []).map((u: any) => ({
-    id: u.id,
-    isim_soyisim: u.isim_soyisim ?? null,
-    email: u.email ?? null,
-    rol: u.rol,
-    aktif: u.aktif !== false,
-    atanmis_istasyonlar: userLokMap.get(u.id) ?? [],
-  }))
+  // Yetkiler — SA/TA yönetir, U/M sadece görür
+  const isYonetici = me.rol === 'super_admin' || me.rol === 'alt_super_admin' || me.rol === 'tenant_admin'
 
   return (
     <div>
@@ -102,9 +86,19 @@ export default async function OtoYikamaKullanicilarPage() {
         title="Kullanıcılar"
         base={rolBase}
         breadcrumbs={[{ label: 'Oto Yıkama', href: '/oto-yikama/dashboard' }, { label: 'Kullanıcılar' }]}
-        hideScopeControls hideNotifBar      />
+        hideScopeControls hideNotifBar
+      />
       <div style={{ padding: '24px 28px' }}>
-        <OtoYikamaKullanicilarClient firmaId={firmaId} kullanicilar={kullanicilarPayload} />
+        <KullanicilarClient
+          base={rolBase as '/sa' | '/ta' | '/u'}
+          firmaId={firmaId}
+          initialUsers={users as any}
+          canCreate={isYonetici}
+          canManage={isYonetici}
+          canDelete={isYonetici}
+          ustLokasyonlar={(ustLokRaw as any) ?? []}
+          altLokasyonlar={altLokRaw}
+        />
       </div>
     </div>
   )
