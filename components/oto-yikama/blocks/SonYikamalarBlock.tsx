@@ -16,9 +16,11 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
   const admin = createAdminClient()
 
   // 1) En son tamamlanan görevleri çek (Oto Yıkama olmayanlar da olabilir, sonra filtreleriz)
+  // NOT: gorevler tablosunda 'tamamlayan_kullanici_id' yok; terminal duruma
+  // geçişi yapan kişi 'islemi_yapan_id' kolonunda (gorevDurumPayload helper).
   const { data: gorevRows } = await admin
     .from('gorevler')
-    .select('id, lokasyon_id, tamamlanma_tarihi, tamamlayan_kullanici_id')
+    .select('id, lokasyon_id, tamamlanma_tarihi, islemi_yapan_id')
     .eq('firma_id', firmaId)
     .eq('durum', 'TAMAMLANDI')
     .not('tamamlanma_tarihi', 'is', null)
@@ -47,7 +49,7 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
       gorev_id:           g.id,
       lokasyon_id:        g.lokasyon_id,
       tamamlanma_tarihi:  g.tamamlanma_tarihi,
-      tamamlayan_id:      g.tamamlayan_kullanici_id,
+      tamamlayan_id:      g.islemi_yapan_id,
       plaka:              metaMap.get(g.id)?.plaka_snapshot ?? '—',
       ekstra:             metaMap.get(g.id)?.ekstra === true,
     }))
