@@ -79,6 +79,7 @@ export default function KullanicilarClient({
   ustLokasyonlar = [],
   altLokasyonlar = [],
   showSistemdeStatus = false,
+  lokasyonKolonModu = 'ust',
 }: {
   base: '/ta' | '/u' | '/sa'
   firmaId?: string | null
@@ -94,6 +95,10 @@ export default function KullanicilarClient({
   altLokasyonlar?: { id: string; tanim: string; parent_id: string }[]
   /** SA Firma Adminleri sayfasında, web heartbeat'e göre online/offline rozeti gösterir */
   showSistemdeStatus?: boolean
+  /** Tablo lokasyon sütunu modu: 'ust' = Üst Lokasyon (varsayılan, GYS),
+   *  'istasyon' = Yıkama İstasyonu (Oto Yıkama sayfası için —
+   *  varsayilan_yikama_istasyon_id'yi inline edit ile gösterir). */
+  lokasyonKolonModu?: 'ust' | 'istasyon'
 }) {
   const supabase = createClient()
   const { toast } = useToast()
@@ -101,6 +106,7 @@ export default function KullanicilarClient({
   const yetki = useYetki('kullanicilar')
   const isSA = base === '/sa'
   const lokMap = useMemo(() => new Map(ustLokasyonlar.map(l => [l.id, l.tanim])), [ustLokasyonlar])
+  const altLokMap = useMemo(() => new Map(altLokasyonlar.map(l => [l.id, l.tanim])), [altLokasyonlar])
 
   function relativeLabel(ms: number): string {
     const farkMs = Date.now() - ms
@@ -691,7 +697,7 @@ export default function KullanicilarClient({
               )}
               <th>Kullanıcı</th>
               <th>Rol</th>
-              <th>Üst Lokasyon</th>
+              <th>{lokasyonKolonModu === 'istasyon' ? 'İstasyon' : 'Üst Lokasyon'}</th>
               <th>Telefon</th>
               <th>Son Görülme</th>
               <th>Cihaz Eşleşmesi</th>
@@ -750,30 +756,58 @@ export default function KullanicilarClient({
                   </div>
                 </td>
                 <td>
-                  {canManage && ustLokasyonlar.length > 0 ? (
-                    <select
-                      value={(u as any).ust_lokasyon_id ?? ''}
-                      onChange={async (e) => {
-                        const val = e.target.value || null
-                        try {
-                          const res = await fetch(`/api/users/${u.id}/ust-lokasyon`, {
-                            method: 'PATCH',
-                            headers: { 'content-type': 'application/json' },
-                            body: JSON.stringify({ ust_lokasyon_id: val }),
-                          })
-                          const j = await res.json()
-                          if (!res.ok) throw new Error(j.error ?? 'Güncellenemedi')
-                          setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ust_lokasyon_id: val } as any : x))
-                          toast({ type: 'success', title: 'Güncellendi', message: `${u.isim_soyisim} üst lokasyonu değiştirildi.` })
-                        } catch (err: any) { toast({ type: 'error', title: 'Hata', message: err.message }) }
-                      }}
-                      style={{ height: 30, padding: '0 6px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 12.5, maxWidth: 140 }}
-                    >
-                      <option value="">—</option>
-                      {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
-                    </select>
+                  {lokasyonKolonModu === 'istasyon' ? (
+                    canManage && altLokasyonlar.length > 0 ? (
+                      <select
+                        value={(u as any).varsayilan_yikama_istasyon_id ?? ''}
+                        onChange={async (e) => {
+                          const val = e.target.value || null
+                          try {
+                            const res = await fetch(`${apiBase}/users/${u.id}`, {
+                              method: 'PATCH',
+                              headers: { 'content-type': 'application/json' },
+                              body: JSON.stringify({ varsayilan_yikama_istasyon_id: val }),
+                            })
+                            const j = await res.json().catch(() => ({}))
+                            if (!res.ok) throw new Error(j.error ?? 'Güncellenemedi')
+                            setUsers(prev => prev.map(x => x.id === u.id ? { ...x, varsayilan_yikama_istasyon_id: val } as any : x))
+                            toast({ type: 'success', title: 'Güncellendi', message: `${u.isim_soyisim} istasyonu değiştirildi.` })
+                          } catch (err: any) { toast({ type: 'error', title: 'Hata', message: err.message }) }
+                        }}
+                        style={{ height: 30, padding: '0 6px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 12.5, maxWidth: 160 }}
+                      >
+                        <option value="">—</option>
+                        {altLokasyonlar.map(a => <option key={a.id} value={a.id}>{a.tanim}</option>)}
+                      </select>
+                    ) : (
+                      <span style={{ fontSize: 12.5, color: '#4b5563' }}>{(u as any).varsayilan_yikama_istasyon_id ? altLokMap.get((u as any).varsayilan_yikama_istasyon_id) ?? '—' : '—'}</span>
+                    )
                   ) : (
-                    <span style={{ fontSize: 12.5, color: '#4b5563' }}>{(u as any).ust_lokasyon_id ? lokMap.get((u as any).ust_lokasyon_id) ?? '—' : '—'}</span>
+                    canManage && ustLokasyonlar.length > 0 ? (
+                      <select
+                        value={(u as any).ust_lokasyon_id ?? ''}
+                        onChange={async (e) => {
+                          const val = e.target.value || null
+                          try {
+                            const res = await fetch(`/api/users/${u.id}/ust-lokasyon`, {
+                              method: 'PATCH',
+                              headers: { 'content-type': 'application/json' },
+                              body: JSON.stringify({ ust_lokasyon_id: val }),
+                            })
+                            const j = await res.json()
+                            if (!res.ok) throw new Error(j.error ?? 'Güncellenemedi')
+                            setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ust_lokasyon_id: val } as any : x))
+                            toast({ type: 'success', title: 'Güncellendi', message: `${u.isim_soyisim} üst lokasyonu değiştirildi.` })
+                          } catch (err: any) { toast({ type: 'error', title: 'Hata', message: err.message }) }
+                        }}
+                        style={{ height: 30, padding: '0 6px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 12.5, maxWidth: 140 }}
+                      >
+                        <option value="">—</option>
+                        {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                      </select>
+                    ) : (
+                      <span style={{ fontSize: 12.5, color: '#4b5563' }}>{(u as any).ust_lokasyon_id ? lokMap.get((u as any).ust_lokasyon_id) ?? '—' : '—'}</span>
+                    )
                   )}
                 </td>
                 <td style={{ color: '#4b5563' }}>{u.telefon ?? '—'}</td>

@@ -98,6 +98,7 @@ export default async function OtoYikamaKullanicilarPage() {
           canDelete={isYonetici}
           ustLokasyonlar={(ustLokRaw as any) ?? []}
           altLokasyonlar={altLokRaw}
+          lokasyonKolonModu="istasyon"
         />
       </div>
     </div>
