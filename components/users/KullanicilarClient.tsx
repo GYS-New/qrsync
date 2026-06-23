@@ -936,7 +936,7 @@ export default function KullanicilarClient({
                         setOpenEdit(true)
                       }}>Düzenle</RowActionButton>}
                       <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
-                      {pushYetki.benGonderebilirim && deviceTokenMap[u.id] && (
+                      {pushYetki.benGonderebilirim && (deviceTokenMap[u.id] || lokasyonKolonModu === 'istasyon') && (
                         <RowActionButton variant="base" onClick={() => setPushModalAlicilar([{ id: u.id, isim_soyisim: u.isim_soyisim ?? '—', bildirim_izni: deviceTokenMap[u.id]?.bildirim_izni ?? null }])}>🔔 Bildirim</RowActionButton>
                       )}
                       {deviceTokenMap[u.id] && (
