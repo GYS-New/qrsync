@@ -80,9 +80,18 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
 
   const firmaAdi = aktifFirma?.firma_adi || aktifFirma?.ticari_unvan || myFirmaAdi || 'QRSync'
 
+  // Oto Yıkama modülü içindeyken GYS bildirim badge'i gizlenir — ATALIAN TA
+  // talebi: GYS bildirimleri Oto Yıkama'da görünmesin. Oto Yıkama'ya özel
+  // bildirim akışı ayrıştırıldığında bu guard kaldırılacak.
+  const isOtoYikama = pathname?.startsWith('/oto-yikama') ?? false
+
   useEffect(() => {
     if (typeof notifCount === 'number') {
       setCount(notifCount)
+      return
+    }
+    if (isOtoYikama) {
+      setCount(0)
       return
     }
     let active = true
@@ -115,7 +124,7 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
       active = false
       supabase.removeChannel(channel)
     }
-  }, [notifCount, supabase])
+  }, [notifCount, supabase, isOtoYikama])
 
   const badgeText = count > 99 ? '99+' : String(count)
 
