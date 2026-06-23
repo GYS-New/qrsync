@@ -2,7 +2,7 @@ import Topbar from '@/components/layout/Topbar'
 import { createAdminClient } from '@/lib/supabase/server'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getRolBase } from '@/lib/modul/cookie'
-import { getYikamaYetkiliUserIds } from '@/lib/oto-yikama/yetkililer'
+import { getYikamaSahaPersoneliUserIds } from '@/lib/oto-yikama/yetkililer'
 import { getOtoYikamaFirmaId } from '@/lib/oto-yikama/getOtoYikamaFirmaId'
 
 import SonYikamalarBlock from '@/components/oto-yikama/blocks/SonYikamalarBlock'
@@ -44,7 +44,7 @@ export default async function OtoYikamaDashboardPage() {
         .lt('hedef_tarih', bugun)
         .in('gorev.durum', ['HAZIR', 'ACIK', 'ISLEMDE']),
       admin.from('araclar').select('id', { count: 'exact', head: true }).eq('firma_id', firmaId).eq('aktif', true),
-      getYikamaYetkiliUserIds(admin, firmaId),
+      getYikamaSahaPersoneliUserIds(admin, firmaId),
     ])
     const bugunArr = (bugunRes.data ?? []) as any[]
     // Planlı = ekstra olmayanlar (cron'un ürettikleri); Ekstra = ekstra=true

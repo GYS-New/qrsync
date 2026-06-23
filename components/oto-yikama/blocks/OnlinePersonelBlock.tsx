@@ -1,17 +1,17 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { getYikamaYetkiliUserIds } from '@/lib/oto-yikama/yetkililer'
+import { getYikamaSahaPersoneliUserIds } from '@/lib/oto-yikama/yetkililer'
 
 /**
  * Şu anda online olan (son 10 dk içinde mobil aktivite olan) Oto Yıkama
- * personeli. Veri: device_tokens.son_kullanim + users JOIN.
- * Yetki kontrolü: getYikamaYetkiliUserIds (users.ust_lokasyon_id OR
- * kullanici_lokasyon_yetkileri).
+ * saha personeli. Veri: device_tokens.son_kullanim + users JOIN.
+ * Sadece birincil saha personeli sayılır (TA'lar / cross-functional U'lar
+ * hariç) — KPI'daki "Yıkama Personeli" sayısıyla tutarlı.
  */
 export default async function OnlinePersonelBlock({ firmaId }: { firmaId: string }) {
   const admin = createAdminClient()
   const onlineSince = new Date(Date.now() - 10 * 60 * 1000).toISOString()
 
-  const yikamaUserIds = await getYikamaYetkiliUserIds(admin, firmaId)
+  const yikamaUserIds = await getYikamaSahaPersoneliUserIds(admin, firmaId)
   let onlineUsers: { id: string; isim_soyisim: string; sonAktivite: string }[] = []
 
   if (yikamaUserIds.length > 0) {
