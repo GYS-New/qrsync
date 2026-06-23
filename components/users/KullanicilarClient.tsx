@@ -254,8 +254,9 @@ export default function KullanicilarClient({
       u.email?.toLowerCase().includes(s) ||
       (u.telefon ?? '').toLowerCase().includes(s)
     )
-    if (filtreLokasyon) list = list.filter(u => (u as any).ust_lokasyon_id === filtreLokasyon)
-    if (filtreLokasyon === '__bos') list = users.filter(u => !(u as any).ust_lokasyon_id)
+    const lokAlan = lokasyonKolonModu === 'istasyon' ? 'varsayilan_yikama_istasyon_id' : 'ust_lokasyon_id'
+    if (filtreLokasyon && filtreLokasyon !== '__bos') list = list.filter(u => (u as any)[lokAlan] === filtreLokasyon)
+    if (filtreLokasyon === '__bos') list = users.filter(u => !(u as any)[lokAlan])
     if (filtreDurum === 'aktif') list = list.filter(u => u.aktif)
     if (filtreDurum === 'pasif') list = list.filter(u => !u.aktif)
     if (filtreRol) list = list.filter(u => u.rol === filtreRol)
@@ -595,24 +596,36 @@ export default function KullanicilarClient({
             className="verde-input" placeholder="Ara…"
             value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 160 }} autoComplete="off"
           />
-          {ustLokasyonlar.length > 0 && (
-            <select className="verde-select" value={filtreLokasyon} onChange={e => setFiltreLokasyon(e.target.value)} style={{ width: 124 }}>
-              <option value="">Lokasyon</option>
-              <option value="__bos">— Atanmamış —</option>
-              {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
-            </select>
+          {lokasyonKolonModu === 'istasyon' ? (
+            altLokasyonlar.length > 0 && (
+              <select className="verde-select" value={filtreLokasyon} onChange={e => setFiltreLokasyon(e.target.value)} style={{ width: 140 }}>
+                <option value="">İstasyon</option>
+                <option value="__bos">— Atanmamış —</option>
+                {altLokasyonlar.map(a => <option key={a.id} value={a.id}>{a.tanim}</option>)}
+              </select>
+            )
+          ) : (
+            ustLokasyonlar.length > 0 && (
+              <select className="verde-select" value={filtreLokasyon} onChange={e => setFiltreLokasyon(e.target.value)} style={{ width: 124 }}>
+                <option value="">Lokasyon</option>
+                <option value="__bos">— Atanmamış —</option>
+                {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+              </select>
+            )
           )}
           <select className="verde-select" value={filtreDurum} onChange={e => setFiltreDurum(e.target.value as any)} style={{ width: 92 }}>
             <option value="">Durum</option>
             <option value="aktif">Aktif</option>
             <option value="pasif">Pasif</option>
           </select>
-          <select className="verde-select" value={filtreRol} onChange={e => setFiltreRol(e.target.value)} style={{ width: 100 }}>
-            <option value="">Rol</option>
-            <option value="tenant_admin">TA</option>
-            <option value="tenant_user">Kullanıcı</option>
-            <option value="musteri">Müşteri</option>
-          </select>
+          {lokasyonKolonModu !== 'istasyon' && (
+            <select className="verde-select" value={filtreRol} onChange={e => setFiltreRol(e.target.value)} style={{ width: 100 }}>
+              <option value="">Rol</option>
+              <option value="tenant_admin">TA</option>
+              <option value="tenant_user">Kullanıcı</option>
+              <option value="musteri">Müşteri</option>
+            </select>
+          )}
           <select className="verde-select" value={filtreCihaz} onChange={e => setFiltreCihaz(e.target.value as any)} style={{ width: 112 }}
             title="Mobil cihaz eşleşme durumu">
             <option value="all">Cihaz</option>
