@@ -1031,20 +1031,31 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                         { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamSapma),            color: '#e2e8f0' },
                       ]} />
                     </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Sapma (İlk 10)</div>
-                      {ozetData.sapmaLokBazli.length > 0
-                        ? <BarChart data={ozetData.sapmaLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.amber} />
-                        : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Sapma kayıt yok</div>
-                      }
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Sıralı Liste</div>
-                      {ozetData.sapmaLokBazli.length > 0
-                        ? <SiraliListe items={ozetData.sapmaLokBazli.map(x => ({ label: x.lokasyon, value: x.sayi }))} />
-                        : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
-                      }
-                    </div>
+                    {(() => {
+                      // Grup bazlı sapma — sapma>0 olan grupları sapma desc sırala
+                      const grupSapma = ozetData.grupBazli
+                        .filter(g => g.sapma > 0)
+                        .map(g => ({ grup: g.grup, sayi: g.sapma }))
+                        .sort((a, b) => b.sayi - a.sayi)
+                      return (
+                        <>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Grup Bazlı Sapma</div>
+                            {grupSapma.length > 0
+                              ? <BarChart data={grupSapma} valueKey="sayi" labelKey="grup" color={T.amber} />
+                              : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Sapma kayıt yok</div>
+                            }
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Sıralı Liste</div>
+                            {grupSapma.length > 0
+                              ? <SiraliListe items={grupSapma.map(x => ({ label: x.grup, value: x.sayi }))} />
+                              : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+                            }
+                          </div>
+                        </>
+                      )
+                    })()}
                   </div>
                 </div>
 
@@ -1062,20 +1073,31 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                         { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamKayip),            color: '#e2e8f0' },
                       ]} />
                     </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Lokasyon Bazlı Kayıp (İlk 10)</div>
-                      {ozetData.kayipLokBazli.length > 0
-                        ? <BarChart data={ozetData.kayipLokBazli} valueKey="sayi" labelKey="lokasyon" color={T.red} />
-                        : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Kayıp kayıt yok</div>
-                      }
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Sıralı Liste</div>
-                      {ozetData.kayipLokBazli.length > 0
-                        ? <SiraliListe items={ozetData.kayipLokBazli.map(x => ({ label: x.lokasyon, value: x.sayi }))} />
-                        : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
-                      }
-                    </div>
+                    {(() => {
+                      // Grup bazlı kayıp — kayip>0 olan grupları kayip desc sırala
+                      const grupKayip = ozetData.grupBazli
+                        .filter(g => g.kayip > 0)
+                        .map(g => ({ grup: g.grup, sayi: g.kayip }))
+                        .sort((a, b) => b.sayi - a.sayi)
+                      return (
+                        <>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Grup Bazlı Kayıp</div>
+                            {grupKayip.length > 0
+                              ? <BarChart data={grupKayip} valueKey="sayi" labelKey="grup" color={T.red} />
+                              : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Kayıp kayıt yok</div>
+                            }
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Sıralı Liste</div>
+                            {grupKayip.length > 0
+                              ? <SiraliListe items={grupKayip.map(x => ({ label: x.grup, value: x.sayi }))} />
+                              : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+                            }
+                          </div>
+                        </>
+                      )
+                    })()}
                   </div>
                 </div>
 
