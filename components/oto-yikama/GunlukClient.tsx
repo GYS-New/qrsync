@@ -17,7 +17,7 @@ type Row = {
   durum: Durum
   baslatilma_tarihi: string | null
   tamamlanma_suresi_saniye: number | null
-  tamamlayan: string | null
+  islemi_yapan: string | null
   tamamlanma_tarihi: string | null
   durum_degisim_tarihi: string | null
   iptal_sebep: string | null
@@ -132,7 +132,7 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
           || (r.kullanici ?? '').toUpperCase().includes(ara)
           || (r.departman ?? '').toUpperCase().includes(ara)
           || (r.lokasyon ?? '').toUpperCase().includes(ara)
-          || (r.tamamlayan ?? '').toUpperCase().includes(ara)
+          || (r.islemi_yapan ?? '').toUpperCase().includes(ara)
       })
       .sort((a, b) => {
         const aHar = a.durum === 'ACIK' ? 1 : 0
@@ -267,7 +267,7 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
               type="text"
               value={arama}
               onChange={(e) => setArama(e.target.value)}
-              placeholder="Plaka, kullanıcı, istasyon veya tamamlayan ara…"
+              placeholder="Plaka, kullanıcı, istasyon veya işlemi yapan ara…"
               style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12.5, color: T.text }}
             />
             {arama && (
@@ -318,7 +318,7 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
                   <th style={{ width: 110, whiteSpace: 'nowrap' }}>Başlatma</th>
                   <th style={{ width: 110, whiteSpace: 'nowrap' }}>Bitirme</th>
                   <th style={{ width: 90 }}>Süre</th>
-                  <th style={{ minWidth: 160 }}>Tamamlayan</th>
+                  <th style={{ minWidth: 160 }}>İşlemi Yapan</th>
                 </tr>
               </thead>
               <tbody>
@@ -354,7 +354,7 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
                     <td style={{ color: r.durum === 'TAMAMLANDI' ? T.green : T.textSoft, fontSize: 16, fontFamily: 'monospace', fontWeight: 700, whiteSpace: 'nowrap' }}>
                       {r.durum === 'TAMAMLANDI' ? fmtSure(gorevSuresiSaniye(r)) : '—'}
                     </td>
-                    <td style={{ color: T.textSoft, fontSize: 14 }}>{r.tamamlayan ?? '—'}</td>
+                    <td style={{ color: T.textSoft, fontSize: 14 }}>{r.islemi_yapan ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

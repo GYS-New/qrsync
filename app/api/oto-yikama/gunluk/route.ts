@@ -59,7 +59,8 @@ export async function GET(req: NextRequest) {
     .select(`
       id, durum, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, durum_degisim_tarihi, olusturma_tarihi, iptal_sebep,
       lokasyon:lokasyon_id (tanim, parent_id, ust:parent_id (tanim)),
-      tamamlayan:islemi_yapan_id (isim_soyisim)
+      tamamlayan:islemi_yapan_id (isim_soyisim),
+      baslatan:baslatan_kullanici_id (isim_soyisim)
     `)
     .in('id', gorevIds)
     .eq('firma_id', firmaId)
@@ -84,6 +85,12 @@ export async function GET(req: NextRequest) {
       const ustTanim = g.lokasyon?.ust?.tanim ?? null
       const lokTanim = g.lokasyon?.tanim ?? null
       const lokasyon = ustTanim && lokTanim ? `${ustTanim} > ${lokTanim}` : (lokTanim ?? '—')
+      // İşlemi Yapan: terminal durumda tamamlayan/iptal eden, ISLEMDE'de
+      // başlatan kullanıcı. HAZIR/ACIK'ta boş.
+      const terminal = ['TAMAMLANDI', 'IPTAL', 'YAPILAMADI'].includes(g.durum)
+      const islemiYapan = terminal
+        ? (g.tamamlayan?.isim_soyisim ?? null)
+        : (g.durum === 'ISLEMDE' ? (g.baslatan?.isim_soyisim ?? null) : null)
       return {
         gorev_id: m.gorev_id,
         ekstra: !!(m as any).ekstra,
@@ -95,7 +102,7 @@ export async function GET(req: NextRequest) {
         durum: g.durum as 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL',
         baslatilma_tarihi: g.baslatilma_tarihi,
         tamamlanma_suresi_saniye: g.tamamlanma_suresi_saniye,
-        tamamlayan: g.tamamlayan?.isim_soyisim ?? null,
+        islemi_yapan: islemiYapan,
         tamamlanma_tarihi: g.tamamlanma_tarihi,
         durum_degisim_tarihi: g.durum_degisim_tarihi,
         iptal_sebep: g.iptal_sebep,
