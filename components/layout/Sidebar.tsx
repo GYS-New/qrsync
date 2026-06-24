@@ -345,9 +345,12 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
   // (Oto Yıkama non-SA — FirmaContext non-SA'ya kapalı olduğundan ProjeContext
   // boş kalır; orada server-side aktif projeden çözüp prop ile geçilir).
   // Hiçbiri yoksa varsayılan açık.
-  const ioAsistanAktif = aktifProje
+  // KURAL: musteri rolü için her zaman kapalı (müşterilere AI asistan gösterilmez,
+  // proje ayarı 'aktif' olsa bile).
+  const ioAsistanAktifBase = aktifProje
     ? aktifProje.io_asistan_aktif !== false
     : ioAsistanAktifProp !== undefined ? ioAsistanAktifProp : true
+  const ioAsistanAktif = ioAsistanAktifBase && user.rol !== 'musteri'
   // Manuel push: proje varsa proje, yoksa firma ayarından. Rol bazlı alt toggle.
   const manuelPushAktif = (() => {
     const baseAktif = aktifProje
