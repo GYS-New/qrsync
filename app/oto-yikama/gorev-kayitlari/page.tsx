@@ -157,6 +157,7 @@ export default async function OtoYikamaGorevKayitlariPage() {
           </div>
         ) : (
           <GorevKayitlariClient
+            firmaId={firmaId}
             kayitlar={kayitlar}
             istasyonlar={istasyonlar}
             tamamlayanlar={tamamlayanlar}

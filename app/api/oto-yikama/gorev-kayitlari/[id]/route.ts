@@ -1,19 +1,28 @@
 /**
  * PATCH  /api/oto-yikama/gorev-kayitlari/[id]
- *   Body: { hedef_tarih?: 'YYYY-MM-DD', lokasyon_id?: string,
- *           durum?: 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL',
- *           iptal_sebep?: string (IPTAL durumu için zorunlu, min 5 karakter) }
+ *   Body: { hedef_tarih?, lokasyon_id?, durum?, iptal_sebep?, km?, notlar?,
+ *           personel_id? (durum değişiminde ZORUNLU — yıkama saha personeli) }
  *   Görev kaydını günceller. Sadece SA/TA — TA kendi firmasındaki kayıtlarla sınırlı.
  *
- *   Durum geçiş etkileri (otomatik alanlar):
- *     - ACIK       → tamamlanma_tarihi=null, iptal_sebep=null
- *     - ISLEMDE    → baslatilma_tarihi=now (varsa korunur)
- *     - TAMAMLANDI → tamamlanma_tarihi=now, tamamlanma_suresi_saniye hesaplanır
- *     - IPTAL      → iptal_sebep zorunlu, islemi_yapan_id=current user
+ *   Durum geçiş etkileri (otomatik alanlar) — yeni davranış:
+ *     - ACIK (geri al) →
+ *         baslatilma_tarihi=null, tamamlanma_tarihi=null, sure=null,
+ *         baslatan_kullanici_id=null, islemi_yapan_id=null, iptal_sebep=null
+ *     - ISLEMDE (ACIK'tan) →
+ *         baslatilma_tarihi=NOW (eski yoksa), tamamlanma_tarihi=null,
+ *         baslatan_kullanici_id=personel, islemi_yapan_id=null
+ *     - TAMAMLANDI →
+ *         Önceki ISLEMDE: tamamlanma=NOW, islemi_yapan=personel
+ *                         (baslatma korunur, sure hesaplanır)
+ *         Önceki ACIK (direkt): baslatma=NOW, tamamlanma=NOW, sure=0,
+ *                         baslatan=islemi_yapan=personel
+ *     - IPTAL →
+ *         baslatilma_tarihi=null, tamamlanma_tarihi=null, sure=null,
+ *         baslatan_kullanici_id=null, islemi_yapan_id=personel,
+ *         iptal_sebep=zorunlu (min 5 karakter)
  *
  *   Hedef tarih / lokasyon değişimi sadece düzenlenebilir durumlarda
- *   (HAZIR/ACIK/ISLEMDE) izinlidir; kapanmış durumlarda (TAMAMLANDI/IPTAL/
- *   YAPILAMADI/SILINDI) sadece durum değişikliği yapılabilir.
+ *   (HAZIR/ACIK/ISLEMDE) izinlidir.
  *
  * DELETE /api/oto-yikama/gorev-kayitlari/[id]
  *   Görevi (+ metadata cascade) siler. Geri alınamaz.
@@ -21,6 +30,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
+import { getYikamaSahaPersoneliUserIds } from '@/lib/oto-yikama/yetkililer'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,6 +81,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const yeniDurum = typeof body.durum === 'string' && ALLOWED_DURUM.has(body.durum)
     ? (body.durum as 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL') : null
   const iptalSebep = typeof body.iptal_sebep === 'string' ? body.iptal_sebep.trim() : ''
+  const personelId = typeof body.personel_id === 'string' && body.personel_id.length > 0
+    ? body.personel_id : null
   // KM ve açıklama (notlar) — TAMAMLANDI'ya geçişte KM zorunlu, notlar opsiyonel
   const kmNum = body.km != null && body.km !== '' ? Number(body.km) : null
   const km = Number.isFinite(kmNum) && (kmNum as number) > 0 ? Math.floor(kmNum as number) : null
@@ -78,6 +90,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   if (!yeniHedef && !yeniLok && !yeniDurum && km == null && notlar == null) {
     return NextResponse.json({ ok: false, error: 'Güncellenecek alan yok' }, { status: 400 })
+  }
+
+  // Durum değişimi varsa personel zorunlu (ACIK'a geri alma hariç — sıfırlama
+  // işlemi olduğu için personel atama anlamsız)
+  const durumDegisiyor = !!yeniDurum && yeniDurum !== rec.gorev.durum
+  if (durumDegisiyor && yeniDurum !== 'ACIK' && !personelId) {
+    return NextResponse.json({
+      ok: false,
+      error: 'Durum değişimi için işlemi yapan personel seçilmelidir.',
+      code: 'PERSONEL_GEREKLI',
+    }, { status: 400 })
+  }
+
+  // Personel doğrulama (firma + yıkama saha personeli)
+  if (personelId) {
+    const sahaIds = await getYikamaSahaPersoneliUserIds(createAdminClient() as any, rec.gorev.firma_id)
+    if (!sahaIds.includes(personelId)) {
+      return NextResponse.json({
+        ok: false,
+        error: 'Seçilen kullanıcı bu firmanın yıkama saha personeli değil.',
+        code: 'PERSONEL_GECERSIZ',
+      }, { status: 400 })
+    }
   }
 
   // İPTAL için sebep zorunlu (5 karakter min)
@@ -132,39 +167,52 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (km != null) metaUpdate.km = km
   if (notlar != null) metaUpdate.notlar = notlar || null
 
-  // Durum geçişi — yan etkiler
+  // Durum geçişi — yeni davranış (kullanıcının tanımladığı kurallar)
   if (yeniDurum) {
     const nowIso = new Date().toISOString()
     gorevUpdate.durum = yeniDurum
     gorevUpdate.durum_degisim_tarihi = nowIso
     if (yeniDurum === 'ACIK') {
+      // Geri al — tüm zaman/personel/sebep alanları sıfırlanır, görev yeniden çalışmaya hazır
+      gorevUpdate.baslatilma_tarihi = null
       gorevUpdate.tamamlanma_tarihi = null
       gorevUpdate.tamamlanma_suresi_saniye = null
+      gorevUpdate.baslatan_kullanici_id = null
+      gorevUpdate.islemi_yapan_id = null
       gorevUpdate.iptal_sebep = null
     } else if (yeniDurum === 'ISLEMDE') {
-      // Başlatma yoksa ata (varsa korunur)
-      if (!rec.gorev.baslatilma_tarihi) gorevUpdate.baslatilma_tarihi = nowIso
-      gorevUpdate.islemi_yapan_id = auth.user.id
+      // ACIK → ISLEMDE: başlatma şimdi, başlatan = seçilen personel
+      // (ISLEMDE'den ISLEMDE'ye olmaz; başka durumdan geçişte eski baslatma temizlenir)
+      gorevUpdate.baslatilma_tarihi = nowIso
+      gorevUpdate.baslatan_kullanici_id = personelId
       gorevUpdate.tamamlanma_tarihi = null
       gorevUpdate.tamamlanma_suresi_saniye = null
+      gorevUpdate.islemi_yapan_id = null
       gorevUpdate.iptal_sebep = null
     } else if (yeniDurum === 'TAMAMLANDI') {
+      // Tamamlanma şimdi, işlemi_yapan = seçilen personel
       gorevUpdate.tamamlanma_tarihi = nowIso
-      gorevUpdate.islemi_yapan_id = auth.user.id
+      gorevUpdate.islemi_yapan_id = personelId
       gorevUpdate.iptal_sebep = null
-      // Süre hesabı: baslatilma_tarihi varsa, yoksa 0
-      if (rec.gorev.baslatilma_tarihi) {
+      if (rec.gorev.durum === 'ISLEMDE' && rec.gorev.baslatilma_tarihi) {
+        // ISLEMDE'den geçiş: baslatma korunur, süre hesaplanır
         const baslMs = new Date(rec.gorev.baslatilma_tarihi).getTime()
         const bitMs  = new Date(nowIso).getTime()
         gorevUpdate.tamamlanma_suresi_saniye = Math.max(0, Math.floor((bitMs - baslMs) / 1000))
       } else {
+        // ACIK → TAMAMLANDI direkt: baslatma = bitiş, süre = 0
+        gorevUpdate.baslatilma_tarihi = nowIso
+        gorevUpdate.baslatan_kullanici_id = personelId
         gorevUpdate.tamamlanma_suresi_saniye = 0
       }
     } else if (yeniDurum === 'IPTAL') {
-      gorevUpdate.iptal_sebep = iptalSebep
-      gorevUpdate.islemi_yapan_id = auth.user.id
+      // İptal: zaman alanları boş, baslatan boş, işlemi_yapan = seçilen personel, sebep zorunlu
+      gorevUpdate.baslatilma_tarihi = null
       gorevUpdate.tamamlanma_tarihi = null
       gorevUpdate.tamamlanma_suresi_saniye = null
+      gorevUpdate.baslatan_kullanici_id = null
+      gorevUpdate.islemi_yapan_id = personelId
+      gorevUpdate.iptal_sebep = iptalSebep
     }
   }
 
@@ -192,6 +240,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       yeni_hedef: yeniHedef,
       yeni_lokasyon: yeniLok,
       iptal_sebep: yeniDurum === 'IPTAL' ? iptalSebep : null,
+      personel_id: personelId,
     },
   })
 

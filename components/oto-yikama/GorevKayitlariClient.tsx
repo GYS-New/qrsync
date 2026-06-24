@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, X, Calendar, Download, Edit3, Trash2, Loader2 } from 'lucide-react'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -106,13 +106,14 @@ function fmtSure(saniye: number | null): string {
 }
 
 interface Props {
+  firmaId: string
   kayitlar: GorevKaydi[]
   istasyonlar: IstasyonOpt[]
   tamamlayanlar: KullaniciOpt[]
   canEdit: boolean
 }
 
-export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayanlar, canEdit }: Props) {
+export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, tamamlayanlar, canEdit }: Props) {
   const router = useRouter()
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -263,7 +264,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
 
   async function editKaydet(
     yeniHedef: string, yeniLok: string, yeniDurum: string,
-    iptalSebep: string, km: string, notlar: string,
+    iptalSebep: string, km: string, notlar: string, personelId: string,
   ) {
     if (!editKaydi) return
     const body: Record<string, any> = {}
@@ -272,6 +273,8 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
     if (yeniDurum && yeniDurum !== editKaydi.durum) {
       body.durum = yeniDurum
       if (yeniDurum === 'IPTAL') body.iptal_sebep = iptalSebep
+      // ACIK'a geri alma hariç personel zorunlu
+      if (yeniDurum !== 'ACIK' && personelId) body.personel_id = personelId
     }
     // KM değişti veya TAMAMLANDI'ya yeni geçiş ise gönder
     const kmNum = km.trim() ? Number(km) : null
@@ -541,6 +544,7 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
       {/* EDIT MODAL */}
       {editKaydi && (
         <EditModal
+          firmaId={firmaId}
           kaydi={editKaydi}
           istasyonlar={istasyonlar}
           loading={editLoading}
@@ -554,12 +558,13 @@ export default function GorevKayitlariClient({ kayitlar, istasyonlar, tamamlayan
   )
 }
 
-function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
+function EditModal({ firmaId, kaydi, istasyonlar, loading, onClose, onSave }: {
+  firmaId: string
   kaydi: GorevKaydi
   istasyonlar: IstasyonOpt[]
   loading: boolean
   onClose: () => void
-  onSave: (hedef: string, lok: string, durum: string, iptalSebep: string, km: string, notlar: string) => void
+  onSave: (hedef: string, lok: string, durum: string, iptalSebep: string, km: string, notlar: string, personelId: string) => void
 }) {
   const [hedef, setHedef] = useState(kaydi.hedef_tarih ?? '')
   const [lok, setLok] = useState(kaydi.lokasyon_id ?? '')
@@ -567,6 +572,21 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
   const [iptalSebep, setIptalSebep] = useState<string>(kaydi.iptal_sebep ?? '')
   const [km, setKm] = useState<string>(kaydi.km != null ? String(kaydi.km) : '')
   const [notlar, setNotlar] = useState<string>(kaydi.notlar ?? '')
+  const [personelId, setPersonelId] = useState<string>('')
+  const [personeller, setPersoneller] = useState<{ id: string; isim_soyisim: string }[]>([])
+  const [personelYukleniyor, setPersonelYukleniyor] = useState(true)
+
+  // Personel listesini fetch et
+  useEffect(() => {
+    let iptal = false
+    setPersonelYukleniyor(true)
+    fetch(`/api/oto-yikama/personel?firma_id=${firmaId}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(j => { if (!iptal && j.ok) setPersoneller(j.data ?? []) })
+      .catch(() => {})
+      .finally(() => { if (!iptal) setPersonelYukleniyor(false) })
+    return () => { iptal = true }
+  }, [firmaId])
 
   const isClosedDurum = ['TAMAMLANDI', 'IPTAL', 'YAPILAMADI', 'SILINDI'].includes(kaydi.durum ?? '')
   const durumDegisti = durum !== kaydi.durum
@@ -575,6 +595,9 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
   const tamamlanmayaYeniGecis = durum === 'TAMAMLANDI' && kaydi.durum !== 'TAMAMLANDI'
   const kmGecerliMi = km.trim() ? Number(km) > 0 && Number.isFinite(Number(km)) : false
   const kmEksik = tamamlanmayaYeniGecis && !kmGecerliMi
+  // Personel: ACIK'a geri alma hariç durum değişiminde zorunlu
+  const personelGerekli = durumDegisti && durum !== 'ACIK'
+  const personelEksik = personelGerekli && !personelId
 
   return (
     <div onClick={onClose}
@@ -611,6 +634,35 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
               <option value="IPTAL">İptal</option>
             </select>
           </div>
+
+          {/* İşlemi Yapan Personel — durum değişimi varsa (ACIK'a geri alma hariç) zorunlu */}
+          {personelGerekli && (
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.red, marginBottom: 6 }}>
+                İşlemi Yapan Personel <span style={{ fontWeight: 400 }}>(zorunlu)</span>
+              </label>
+              <select value={personelId} onChange={e => setPersonelId(e.target.value)}
+                disabled={personelYukleniyor || personeller.length === 0}
+                style={{
+                  width: '100%', padding: '8px 10px', fontSize: 13,
+                  border: `1px solid ${personelEksik ? T.red : T.border}`, borderRadius: 7,
+                  background: '#fff',
+                }}>
+                <option value="">{personelYukleniyor ? 'Yükleniyor…' : (personeller.length === 0 ? 'Yıkama personeli yok' : '— Seçin —')}</option>
+                {personeller.map(p => <option key={p.id} value={p.id}>{p.isim_soyisim}</option>)}
+              </select>
+              <div style={{ fontSize: 11, color: T.textSoft, marginTop: 4 }}>
+                {durum === 'ISLEMDE' && 'Görevi şu an başlatan kişi. Başlatma saati otomatik atanır.'}
+                {durum === 'TAMAMLANDI' && (kaydi.durum === 'ISLEMDE' ? 'Görevi tamamlayan kişi. Bitiş saati otomatik atanır.' : 'Görevi yapan kişi. Başlama ve bitiş aynı saate yazılır (süre 0 sn).')}
+                {durum === 'IPTAL' && 'İptal işlemini yapan kişi. Başlama/bitiş saatleri sıfırlanır.'}
+              </div>
+            </div>
+          )}
+          {durum === 'ACIK' && durumDegisti && (
+            <div style={{ fontSize: 11.5, color: T.amber, padding: '8px 10px', background: T.amberLight, borderRadius: 6, fontWeight: 600 }}>
+              ⚠️ Açık'a geri alma — başlama/bitiş/personel/iptal sebep alanları sıfırlanır, görev tekrar yıkanmaya hazır beklemeye geçer.
+            </div>
+          )}
 
           {/* İptal sebebi — sadece IPTAL seçildiyse */}
           {durum === 'IPTAL' && (
@@ -697,12 +749,12 @@ function EditModal({ kaydi, istasyonlar, loading, onClose, onSave }: {
             style={{ padding: '8px 16px', borderRadius: 7, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: T.text }}>
             Vazgeç
           </button>
-          <button onClick={() => onSave(hedef, lok, durum, iptalSebep.trim(), km, notlar)}
-            disabled={loading || iptalEksik || kmEksik}
+          <button onClick={() => onSave(hedef, lok, durum, iptalSebep.trim(), km, notlar, personelId)}
+            disabled={loading || iptalEksik || kmEksik || personelEksik}
             style={{
               padding: '8px 18px', borderRadius: 7, border: 'none',
-              background: loading || iptalEksik || kmEksik ? '#cbd5e1' : 'linear-gradient(145deg, #1d4ed8, #1e40af)',
-              color: '#fff', cursor: loading || iptalEksik || kmEksik ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
+              background: loading || iptalEksik || kmEksik || personelEksik ? '#cbd5e1' : 'linear-gradient(145deg, #1d4ed8, #1e40af)',
+              color: '#fff', cursor: loading || iptalEksik || kmEksik || personelEksik ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
               display: 'inline-flex', alignItems: 'center', gap: 6,
             }}>
             {loading ? <><Loader2 size={13} style={{ animation: 'spin 0.9s linear infinite' }} /> Kaydediliyor…</> : 'Kaydet'}
