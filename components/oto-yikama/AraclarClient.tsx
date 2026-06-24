@@ -38,12 +38,16 @@ const T = {
   grayLight: '#f8fafc',
 }
 
+// 'PLANSIZ' UI-only bir flag — gönderirken null'a çevrilir (DB'de
+// araclar.yikama_frekans_tip nullable; null = cron otomatik görev üretmez).
+type FrekansTipUI = 'HAFTALIK' | 'BIHAFTA' | 'AYLIK' | 'PLANSIZ'
+
 const BOS_FORM = {
   plaka: '', departman: '', periyot_gun: 7,
   yikama_gunleri: [] as number[], notlar: '',
   kullanici_adi_soyadi: '', kullanici_telefon: '', kullanici_email: '',
   varsayilan_lokasyon_id: '' as string,
-  yikama_frekans_tip: 'HAFTALIK' as 'HAFTALIK' | 'BIHAFTA' | 'AYLIK',
+  yikama_frekans_tip: 'HAFTALIK' as FrekansTipUI,
   yikama_frekans_aralik: 1 as number,
   yikama_referans_tarih: '' as string,
 }
@@ -190,7 +194,7 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
       kullanici_telefon: a.kullanici_telefon ?? '',
       kullanici_email: a.kullanici_email ?? '',
       varsayilan_lokasyon_id: a.varsayilan_lokasyon_id ?? '',
-      yikama_frekans_tip: a.yikama_frekans_tip ?? 'HAFTALIK',
+      yikama_frekans_tip: (a.yikama_frekans_tip ?? 'PLANSIZ') as FrekansTipUI,
       yikama_frekans_aralik: a.yikama_frekans_aralik ?? 1,
       yikama_referans_tarih: a.yikama_referans_tarih ?? '',
     })
@@ -205,7 +209,16 @@ export default function AraclarClient({ firmaId, projeId }: { firmaId: string; p
     try {
       const url = editing ? `/api/oto-yikama/araclar/${editing.id}` : `/api/oto-yikama/araclar`
       const method = editing ? 'PATCH' : 'POST'
-      const body: any = { ...form, firma_id: firmaId, proje_id: projeId }
+      // PLANSIZ UI flag → DB için null (cron görev üretmez). Plansızda
+      // yıkama_gunleri/aralık/referans tarih anlamsız, boşa indir.
+      const plansiz = form.yikama_frekans_tip === 'PLANSIZ'
+      const body: any = {
+        ...form,
+        firma_id: firmaId,
+        proje_id: projeId,
+        yikama_frekans_tip: plansiz ? null : form.yikama_frekans_tip,
+        ...(plansiz ? { yikama_gunleri: [], yikama_referans_tarih: null, yikama_frekans_aralik: 1 } : {}),
+      }
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const j = await res.json()
       if (!j.ok) throw new Error(j.error)
@@ -926,6 +939,7 @@ Devam etmek istiyor musunuz?`,
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>E-posta</label>
                 <input className="verde-input" type="email" value={form.kullanici_email} onChange={e => setForm({ ...form, kullanici_email: e.target.value })} style={{ width: '100%', marginTop: 4 }} />
               </div>
+              {form.yikama_frekans_tip !== 'PLANSIZ' && (
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>
                   Yıkama Günleri <span style={{ color: T.textSoft, fontWeight: 400 }}>(haftada 1-3 gün önerilir)</span>
@@ -960,30 +974,37 @@ Devam etmek istiyor musunuz?`,
                   </div>
                 )}
               </div>
+              )}
 
               {/* Yıkama kuralı: frekans tipi + aralık + referans tarih */}
               <div style={{ gridColumn: 'span 2', padding: '12px 14px', background: T.grayLight, border: `1px solid ${T.border}`, borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>
                   📅 Yıkama Kuralı (otomatik görev üretimi)
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                  {(['HAFTALIK', 'BIHAFTA', 'AYLIK'] as const).map(tip => {
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                  {(['HAFTALIK', 'BIHAFTA', 'AYLIK', 'PLANSIZ'] as const).map(tip => {
                     const aktif = form.yikama_frekans_tip === tip
+                    const isPlansiz = tip === 'PLANSIZ'
                     return (
                       <button key={tip} type="button"
                         onClick={() => setForm(f => ({ ...f, yikama_frekans_tip: tip }))}
                         style={{
                           padding: '8px 6px', borderRadius: 6,
-                          border: `1.5px solid ${aktif ? T.blue : T.border}`,
-                          background: aktif ? T.blueLight : '#fff',
-                          color: aktif ? T.blue : T.text,
+                          border: `1.5px solid ${aktif ? (isPlansiz ? T.amber : T.blue) : T.border}`,
+                          background: aktif ? (isPlansiz ? T.amberLight : T.blueLight) : '#fff',
+                          color: aktif ? (isPlansiz ? T.amber : T.blue) : T.text,
                           cursor: 'pointer', fontSize: 12, fontWeight: 700,
                         }}>
-                        {tip === 'HAFTALIK' ? 'Her Hafta' : tip === 'BIHAFTA' ? 'N Haftada Bir' : 'Ayda Bir'}
+                        {tip === 'HAFTALIK' ? 'Her Hafta' : tip === 'BIHAFTA' ? 'N Haftada Bir' : tip === 'AYLIK' ? 'Ayda Bir' : 'Plansız'}
                       </button>
                     )
                   })}
                 </div>
+                {form.yikama_frekans_tip === 'PLANSIZ' && (
+                  <div style={{ fontSize: 11.5, color: T.amber, padding: '6px 10px', background: T.amberLight, borderRadius: 6, fontWeight: 600 }}>
+                    ⚠️ Otomatik görev oluşturulmaz. Bu plaka sistemde durur; sadece mobil personel "Ekstra Yıkama" ile yıkayabilir.
+                  </div>
+                )}
                 {form.yikama_frekans_tip === 'BIHAFTA' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
                     <div>
@@ -1019,19 +1040,21 @@ Devam etmek istiyor musunuz?`,
                 )}
               </div>
 
-              {/* Varsayılan istasyon */}
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>
-                  Varsayılan İstasyon <span style={{ color: T.red }}>(otomatik üretim için gerekli)</span>
-                </label>
-                <select className="verde-input"
-                  value={form.varsayilan_lokasyon_id}
-                  onChange={e => setForm({ ...form, varsayilan_lokasyon_id: e.target.value })}
-                  style={{ width: '100%', marginTop: 4 }}>
-                  <option value="">— Atanmadı (otomatik görev üretilmez) —</option>
-                  {istasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
-                </select>
-              </div>
+              {/* Varsayılan istasyon — Plansız'da gizli (otomatik üretim yok) */}
+              {form.yikama_frekans_tip !== 'PLANSIZ' && (
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>
+                    Varsayılan İstasyon <span style={{ color: T.red }}>(otomatik üretim için gerekli)</span>
+                  </label>
+                  <select className="verde-input"
+                    value={form.varsayilan_lokasyon_id}
+                    onChange={e => setForm({ ...form, varsayilan_lokasyon_id: e.target.value })}
+                    style={{ width: '100%', marginTop: 4 }}>
+                    <option value="">— Atanmadı (otomatik görev üretilmez) —</option>
+                    {istasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={{ fontSize: 12, color: T.textSoft, fontWeight: 600 }}>Notlar</label>

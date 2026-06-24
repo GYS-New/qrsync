@@ -77,7 +77,11 @@ export async function POST(req: NextRequest) {
   const modulErr = await assertOtoYikamaAktif(admin, body.firma_id); if (modulErr) return modulErr
 
   const FREKANS_VALID = new Set(['HAFTALIK', 'BIHAFTA', 'AYLIK'])
-  const frekansTip = FREKANS_VALID.has(body.yikama_frekans_tip) ? body.yikama_frekans_tip : 'HAFTALIK'
+  // null = plansız (cron otomatik görev üretmez); geçerli enum dışı bir
+  // string gelirse 'HAFTALIK' default. Açıkça null gönderildiyse null kalsın.
+  const frekansTip = body.yikama_frekans_tip === null
+    ? null
+    : FREKANS_VALID.has(body.yikama_frekans_tip) ? body.yikama_frekans_tip : 'HAFTALIK'
 
   const payload = {
     firma_id: body.firma_id,

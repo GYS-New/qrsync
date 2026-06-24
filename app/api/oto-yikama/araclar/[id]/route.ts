@@ -82,7 +82,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   if ('yikama_frekans_tip' in body) {
     const FREKANS_VALID = new Set(['HAFTALIK', 'BIHAFTA', 'AYLIK'])
-    update.yikama_frekans_tip = FREKANS_VALID.has(body.yikama_frekans_tip) ? body.yikama_frekans_tip : 'HAFTALIK'
+    // null = plansız (cron otomatik görev üretmez)
+    update.yikama_frekans_tip = body.yikama_frekans_tip === null
+      ? null
+      : FREKANS_VALID.has(body.yikama_frekans_tip) ? body.yikama_frekans_tip : 'HAFTALIK'
   }
   if ('yikama_frekans_aralik' in body) {
     update.yikama_frekans_aralik = Number.isInteger(body.yikama_frekans_aralik) && body.yikama_frekans_aralik >= 1
