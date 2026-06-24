@@ -138,8 +138,43 @@ export default async function OtoYikamaGorevKayitlariPage() {
       return k.hedef_tarih <= bugunTR
     })
 
-    // Hedef tarihe göre desc sırala
-    kayitlar.sort((a, b) => (b.hedef_tarih ?? '').localeCompare(a.hedef_tarih ?? ''))
+    // Sıralama:
+    //  1) Tarih önceliği: bugün → dün → önceki günler (desc); bugünden ileri
+    //     varsa (HAZIR planlı) en sona düşer.
+    //  2) Aynı tarih içinde durum sırası: ISLEMDE → TAMAMLANDI → IPTAL → ACIK
+    //     → diğer (HAZIR / YAPILAMADI / SILINDI).
+    //  3) Aynı tarih + durum için: ISLEMDE'de baslatilma desc, TAMAMLANDI/IPTAL'de
+    //     durum_degisim_tarihi desc, diğerleri olusturma_tarihi desc.
+    const DURUM_SIRA: Record<string, number> = {
+      ISLEMDE: 1, TAMAMLANDI: 2, IPTAL: 3, ACIK: 4, HAZIR: 5, YAPILAMADI: 6, SILINDI: 7,
+    }
+    function tarihRank(t: string | null): number {
+      // 0 = bugün, +N = bugünden N gün geçmiş, gelecek günler 1e6+N ile en sona
+      if (!t) return 1e9
+      const dayMs = 86400000
+      const diff = Math.round((Date.parse(bugunTR) - Date.parse(t)) / dayMs)
+      return diff >= 0 ? diff : 1e6 + Math.abs(diff)
+    }
+    kayitlar.sort((a, b) => {
+      // 1) Tarih önceliği
+      const ra = tarihRank(a.hedef_tarih)
+      const rb = tarihRank(b.hedef_tarih)
+      if (ra !== rb) return ra - rb
+      // 2) Durum sırası
+      const da = DURUM_SIRA[a.durum ?? ''] ?? 99
+      const db = DURUM_SIRA[b.durum ?? ''] ?? 99
+      if (da !== db) return da - db
+      // 3) Aynı tarih + durum: zaman sırası (yeniden eskiye)
+      const ta =
+        a.durum === 'ISLEMDE' ? (a.baslatilma_tarihi ?? '')
+        : (a.durum === 'TAMAMLANDI' || a.durum === 'IPTAL') ? (a.tamamlanma_tarihi ?? a.olusturma_tarihi ?? '')
+        : (a.olusturma_tarihi ?? '')
+      const tb =
+        b.durum === 'ISLEMDE' ? (b.baslatilma_tarihi ?? '')
+        : (b.durum === 'TAMAMLANDI' || b.durum === 'IPTAL') ? (b.tamamlanma_tarihi ?? b.olusturma_tarihi ?? '')
+        : (b.olusturma_tarihi ?? '')
+      return tb.localeCompare(ta)
+    })
 
     // 'İşlem Yapan' filtre dropdown'u — TAMAMLANDI/IPTAL/YAPILAMADI islemi
     // yapanı + ISLEMDE başlatanı kapsar (kolon mantığıyla aynı).

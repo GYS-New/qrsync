@@ -92,6 +92,13 @@ function fmtTarih(d: string | null): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d.slice(8) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4)
   return new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeZone: 'Europe/Istanbul' }).format(new Date(d))
 }
+const GUN_UZUN_TR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
+function gunAdi(d: string | null): string | null {
+  if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null
+  // 'YYYY-MM-DD' lokal Date (UTC interpret) — TR günü için noon ekleyip TZ etkisini kaldırıyoruz
+  const dt = new Date(d + 'T12:00:00')
+  return GUN_UZUN_TR[dt.getDay()] ?? null
+}
 function fmtDateTime(d: string | null): string {
   if (!d) return '—'
   return new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Istanbul' }).format(new Date(d))
@@ -469,7 +476,14 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                       </div>
                     </Td>
                     <Td muted>{k.istasyon}</Td>
-                    <Td align="center">{fmtTarih(k.hedef_tarih)}</Td>
+                    <Td align="center">
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
+                        <span>{fmtTarih(k.hedef_tarih)}</span>
+                        {gunAdi(k.hedef_tarih) && (
+                          <span style={{ fontSize: 11, color: T.textSoft, fontWeight: 500, marginTop: 1 }}>{gunAdi(k.hedef_tarih)}</span>
+                        )}
+                      </div>
+                    </Td>
                     <Td align="center">
                       <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, background: DURUM_BG[gd], color: DURUM_FG[gd], fontSize: 12, fontWeight: 700 }}>
                         {DURUM_LABEL[gd]}
