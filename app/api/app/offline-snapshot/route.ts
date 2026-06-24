@@ -192,15 +192,19 @@ export async function POST(req: Request) {
 
     if (yetkiliLokIds.length > 0) {
       const [spesifikRes, canliRes] = await Promise.all([
-        // Spesifik görevler — vardiya bağımsız
+        // Spesifik görevler — vardiya bağımsız.
+        // NOT: gorevler tablosunda 'aktif_olma_tarihi' kolonu yok (yalnız
+        // canli_gorevler'de var). Spesifikler vardiya filtresine girmediği
+        // için olusturma_tarihi'ne göre filtrelenir (uzak gelecek görev varsa
+        // mobile'a düşmesin diye + siradakiSinirIso üst limiti).
         (() => {
           let q = admin.from('gorevler').select(`
-            id, tanim, durum, olusturma_tarihi, aktif_olma_tarihi, baslatilma_tarihi, lokasyon_id,
+            id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, lokasyon_id,
             lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
           `)
             .eq('firma_id', firmaId)
             .in('durum', ['HAZIR', 'ACIK'])
-            .lte('aktif_olma_tarihi', siradakiSinirIso)
+            .lte('olusturma_tarihi', siradakiSinirIso)
             .order('olusturma_tarihi', { ascending: false })
           q = yetkiKaydiVar
             ? q.in('lokasyon_id', yetkiliLokIds)
