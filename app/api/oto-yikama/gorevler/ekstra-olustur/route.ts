@@ -5,16 +5,17 @@
  * Tek plaka, sadece BUGÜN için, direkt AÇIK durumda doğar.
  *
  * Davranış:
- *   - Sadece tek bir araç, tek bir istasyon.
+ *   - Sadece tek bir araç (veya manuel plaka), tek bir istasyon.
  *   - hedef_tarih = bugün (TR)
  *   - durum = 'ACIK' (HAZIR'a uğramaz — bugün için zaten "açık" anlamı)
  *   - tanim = 'Oto Yıkama - PLAKA (Ekstra)'
  *   - metadata.ekstra = true
- *   - Aynı plaka için bugün zaten görev (planlı veya ekstra, tamamlanmamış)
- *     varsa engellenir.
+ *   - arac_id varsa: aynı plaka için bugün zaten aktif görev varsa engellenir.
+ *   - manuel_plaka durumunda: metadata.arac_id=null, plaka_snapshot=manuel_plaka.
  *
  * Body:
- *   { firma_id, arac_id, lokasyon_id }
+ *   { firma_id, lokasyon_id, arac_id?, manuel_plaka? }
+ *   arac_id veya manuel_plaka'dan biri zorunlu (XOR).
  *
  * SA-only + oto_yikama_aktif=true firma zorunlu.
  */
@@ -38,12 +39,19 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const firmaId = String(body.firma_id ?? '')
-  const aracId = String(body.arac_id ?? '')
+  const aracIdRaw = body.arac_id ? String(body.arac_id) : ''
   const lokasyonId = String(body.lokasyon_id ?? '')
+  // Manuel plaka: ya elle yazılmış plaka ya da 'PLAKASIZ' string'i
+  const manuelPlakaRaw = body.manuel_plaka ? String(body.manuel_plaka).trim() : ''
 
   if (!firmaId) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
-  if (!aracId) return NextResponse.json({ ok: false, error: 'arac_id gerekli' }, { status: 400 })
   if (!lokasyonId) return NextResponse.json({ ok: false, error: 'lokasyon_id gerekli' }, { status: 400 })
+  if (!aracIdRaw && !manuelPlakaRaw) {
+    return NextResponse.json({ ok: false, error: 'arac_id veya manuel_plaka gerekli' }, { status: 400 })
+  }
+  if (aracIdRaw && manuelPlakaRaw) {
+    return NextResponse.json({ ok: false, error: 'Aynı anda hem arac_id hem manuel_plaka gönderilemez' }, { status: 400 })
+  }
 
   const isSA = ['super_admin', 'alt_super_admin'].includes(me.rol)
   if (!isSA && firmaId !== me.firma_id) {
@@ -57,13 +65,28 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Araç + lokasyon doğrulama
-  const { data: arac } = await admin
-    .from('araclar')
-    .select('id, plaka, firma_id, aktif')
-    .eq('id', aracId).maybeSingle()
-  if (!arac || arac.firma_id !== firmaId || arac.aktif === false) {
-    return NextResponse.json({ ok: false, error: 'Araç bulunamadı veya pasif' }, { status: 400 })
+  // Mod 1: Tanımlı araç (arac_id)
+  // Mod 2: Manuel plaka (arac_id=null, plaka_snapshot=manuel_plaka)
+  let aracIdFinal: string | null = null
+  let plakaFinal: string
+
+  if (aracIdRaw) {
+    const { data: arac } = await admin
+      .from('araclar')
+      .select('id, plaka, firma_id, aktif')
+      .eq('id', aracIdRaw).maybeSingle()
+    if (!arac || arac.firma_id !== firmaId || arac.aktif === false) {
+      return NextResponse.json({ ok: false, error: 'Araç bulunamadı veya pasif' }, { status: 400 })
+    }
+    aracIdFinal = arac.id
+    plakaFinal = arac.plaka
+  } else {
+    // Manuel plaka — normalize: boşlukları sil, büyük harf. 'PLAKASIZ' özel.
+    const normalize = manuelPlakaRaw.replace(/\s+/g, '').toLocaleUpperCase('tr')
+    if (normalize.length === 0 || normalize.length > 20) {
+      return NextResponse.json({ ok: false, error: 'Geçersiz plaka' }, { status: 400 })
+    }
+    plakaFinal = normalize
   }
 
   const { data: lok } = await admin
@@ -79,27 +102,49 @@ export async function POST(req: NextRequest) {
 
   const bugun = bugunTRDate()
 
-  // Çakışma: aynı arac_id + bugün için zaten görev var mı? (tamamlanmamış)
-  const { data: mevcutMeta } = await admin
-    .from('oto_yikama_gorev_metadata')
-    .select('gorev_id, ekstra')
-    .eq('arac_id', aracId)
-    .eq('hedef_tarih', bugun)
-  if (mevcutMeta && mevcutMeta.length > 0) {
-    // Görev durumlarını kontrol et — yalnız TAMAMLANDI/IPTAL/YAPILAMADI olanlar ekstraya engel değil
-    const gorevIds = mevcutMeta.map((m: any) => m.gorev_id)
-    const { data: gorevler } = await admin
-      .from('gorevler')
-      .select('id, durum')
-      .in('id', gorevIds)
-      .eq('firma_id', firmaId)
-    const acikVar = (gorevler ?? []).some((g: any) =>
-      ['HAZIR', 'ACIK', 'ISLEMDE'].includes(g.durum),
+  // Çakışma kontrolü
+  //  - Tanımlı araç: aynı arac_id + bugün için aktif görev varsa engellenir.
+  //  - Manuel plaka: plaka_snapshot bazlı kontrol — 'PLAKASIZ' her seferinde
+  //    yeni kayıt olduğu için çakışma kontrolünden muaftır.
+  if (aracIdFinal) {
+    const { data: mevcutMeta } = await admin
+      .from('oto_yikama_gorev_metadata')
+      .select('gorev_id')
+      .eq('arac_id', aracIdFinal)
+      .eq('hedef_tarih', bugun)
+    if (mevcutMeta && mevcutMeta.length > 0) {
+      const gorevIds = mevcutMeta.map((m: any) => m.gorev_id)
+      const { data: gorevler } = await admin
+        .from('gorevler')
+        .select('id, durum')
+        .in('id', gorevIds)
+        .eq('firma_id', firmaId)
+      const acikVar = (gorevler ?? []).some((g: any) =>
+        ['HAZIR', 'ACIK', 'ISLEMDE'].includes(g.durum),
+      )
+      if (acikVar) {
+        return NextResponse.json({
+          ok: false,
+          error: `${plakaFinal} plakalı araç için bugün planlı/aktif yıkama mevcut. Ekstra görev oluşturulamaz.`,
+          code: 'PLANLI_AKTIF_VAR',
+        }, { status: 409 })
+      }
+    }
+  } else if (plakaFinal !== 'PLAKASIZ') {
+    // Manuel plaka için aynı plaka_snapshot + bugün aktif var mı?
+    const { data: mevcutMeta } = await admin
+      .from('oto_yikama_gorev_metadata')
+      .select('gorev_id, gorev:gorevler!inner(durum, firma_id)')
+      .eq('plaka_snapshot', plakaFinal)
+      .eq('hedef_tarih', bugun)
+      .eq('gorev.firma_id', firmaId)
+    const acikVar = (mevcutMeta ?? []).some((m: any) =>
+      ['HAZIR', 'ACIK', 'ISLEMDE'].includes(m.gorev?.durum),
     )
     if (acikVar) {
       return NextResponse.json({
         ok: false,
-        error: `${arac.plaka} plakalı araç için bugün planlı/aktif yıkama mevcut. Ekstra görev oluşturulamaz.`,
+        error: `${plakaFinal} plakası için bugün zaten aktif bir yıkama görevi var.`,
         code: 'PLANLI_AKTIF_VAR',
       }, { status: 409 })
     }
@@ -110,7 +155,7 @@ export async function POST(req: NextRequest) {
     .from('gorevler')
     .insert({
       firma_id: firmaId,
-      tanim: `Oto Yıkama - ${arac.plaka} (Ekstra)`,
+      tanim: `Oto Yıkama - ${plakaFinal} (Ekstra)`,
       lokasyon_id: lokasyonId,
       atanan_kullanici_id: null,
       durum: 'ACIK',
@@ -126,13 +171,12 @@ export async function POST(req: NextRequest) {
     .from('oto_yikama_gorev_metadata')
     .insert({
       gorev_id: insertedGorev.id,
-      arac_id: arac.id,
-      plaka_snapshot: arac.plaka,
+      arac_id: aracIdFinal,
+      plaka_snapshot: plakaFinal,
       hedef_tarih: bugun,
       ekstra: true,
     })
   if (metaErr) {
-    // Rollback
     await admin.from('gorevler').delete().eq('id', insertedGorev.id)
     return NextResponse.json({ ok: false, error: `metadata: ${metaErr.message}` }, { status: 500 })
   }
@@ -142,8 +186,14 @@ export async function POST(req: NextRequest) {
     tablo: 'gorevler',
     firma_id: firmaId,
     kullanici_id: me.id,
-    detay: { gorev_id: insertedGorev.id, plaka: arac.plaka, lokasyon_id: lokasyonId, kanal: 'WEB' },
+    detay: {
+      gorev_id: insertedGorev.id,
+      plaka: plakaFinal,
+      lokasyon_id: lokasyonId,
+      kanal: 'WEB',
+      kaynak: aracIdFinal ? 'tanimli_arac' : (plakaFinal === 'PLAKASIZ' ? 'plakasiz' : 'manuel_plaka'),
+    },
   })
 
-  return NextResponse.json({ ok: true, gorev_id: insertedGorev.id, plaka: arac.plaka })
+  return NextResponse.json({ ok: true, gorev_id: insertedGorev.id, plaka: plakaFinal })
 }

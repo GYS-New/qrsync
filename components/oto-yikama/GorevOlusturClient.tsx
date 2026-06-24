@@ -56,6 +56,9 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
   const [secilenArac, setSecilenArac] = useState<Arac | null>(null)
   const [secilenLokasyon, setSecilenLokasyon] = useState<string>('')
   const [olusturLoading, setOlusturLoading] = useState(false)
+  // Mod: tanımlı plaka listesi, manuel plaka input, veya plakasız sabit
+  const [mod, setMod] = useState<'tanimli' | 'manuel' | 'plakasiz'>('tanimli')
+  const [manuelPlaka, setManuelPlaka] = useState('')
 
   const bugun = bugunTRDate()
 
@@ -108,14 +111,27 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
     })
   }, [araclar, q, filterDepartman])
 
+  // Aktif plaka değeri (UI özet için)
+  const aktifPlaka =
+    mod === 'tanimli' ? (secilenArac?.plaka ?? null)
+    : mod === 'plakasiz' ? 'PLAKASIZ'
+    : (manuelPlaka.replace(/\s+/g, '').toLocaleUpperCase('tr') || null)
+
   async function olustur() {
-    if (!secilenArac) {
-      toast({ type: 'error', title: 'Hata', message: 'Plaka seçin' })
-      return
-    }
     if (!secilenLokasyon) {
       toast({ type: 'error', title: 'Hata', message: 'İstasyon seçin' })
       return
+    }
+    const body: any = { firma_id: firmaId, lokasyon_id: secilenLokasyon }
+    if (mod === 'tanimli') {
+      if (!secilenArac) { toast({ type: 'error', title: 'Hata', message: 'Plaka seçin' }); return }
+      body.arac_id = secilenArac.id
+    } else if (mod === 'plakasiz') {
+      body.manuel_plaka = 'PLAKASIZ'
+    } else {
+      const p = manuelPlaka.replace(/\s+/g, '').toLocaleUpperCase('tr')
+      if (!p) { toast({ type: 'error', title: 'Hata', message: 'Plaka yazın' }); return }
+      body.manuel_plaka = p
     }
 
     setOlusturLoading(true)
@@ -123,15 +139,10 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
       const res = await fetch('/api/oto-yikama/gorevler/ekstra-olustur', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firma_id: firmaId,
-          arac_id: secilenArac.id,
-          lokasyon_id: secilenLokasyon,
-        }),
+        body: JSON.stringify(body),
       })
       const j = await res.json()
       if (!j.ok) {
-        // Sunucu çakışma mesajını birebir gösterir
         toast({
           type: 'error',
           title: j.code === 'PLANLI_AKTIF_VAR' ? 'Ekstra görev oluşturulamadı' : 'Hata',
@@ -145,6 +156,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
         message: `${j.plaka} bugün için AÇIK durumda yıkamaya hazır.`,
       })
       setSecilenArac(null)
+      setManuelPlaka('')
       router.refresh()
     } catch (e: any) {
       toast({ type: 'error', title: 'Hata', message: e.message })
@@ -212,8 +224,8 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: T.text }}>
             <span style={{ color: T.textSoft }}>Plaka:</span>
-            <strong style={{ fontFamily: 'monospace', fontSize: 16 }}>
-              {secilenArac?.plaka ?? '—'}
+            <strong style={{ fontFamily: 'monospace', fontSize: 16, color: aktifPlaka === 'PLAKASIZ' ? T.amber : T.text }}>
+              {aktifPlaka ?? '—'}
             </strong>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: T.text }}>
@@ -221,16 +233,16 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
             <strong>{fmtTRDate(bugun)} (bugün)</strong>
           </div>
         </div>
-        <button onClick={olustur} disabled={!secilenArac || !secilenLokasyon || olusturLoading}
+        <button onClick={olustur} disabled={!aktifPlaka || !secilenLokasyon || olusturLoading}
           style={{
             padding: '10px 22px', borderRadius: 8, border: 'none',
-            background: secilenArac && secilenLokasyon && !olusturLoading
+            background: aktifPlaka && secilenLokasyon && !olusturLoading
               ? 'linear-gradient(145deg, #16a34a, #15803d)'
               : '#cbd5e1',
             color: '#fff',
-            cursor: secilenArac && secilenLokasyon && !olusturLoading ? 'pointer' : 'not-allowed',
+            cursor: aktifPlaka && secilenLokasyon && !olusturLoading ? 'pointer' : 'not-allowed',
             fontSize: 14, fontWeight: 800,
-            boxShadow: secilenArac && secilenLokasyon ? '0 4px 12px rgba(22,163,74,0.25)' : 'none',
+            boxShadow: aktifPlaka && secilenLokasyon ? '0 4px 12px rgba(22,163,74,0.25)' : 'none',
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
           {olusturLoading
@@ -253,25 +265,81 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
           <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <div style={{ width: 26, height: 26, borderRadius: 6, background: T.blue + '14', color: T.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13 }}>1</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: T.text }}>Plaka Seç</div>
-              <div style={{ marginLeft: 'auto', fontSize: 11, color: T.textSoft }}>{filtered.length} araç</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: T.text }}>Plaka</div>
+              {mod === 'tanimli' && <div style={{ marginLeft: 'auto', fontSize: 11, color: T.textSoft }}>{filtered.length} araç</div>}
             </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 180, background: T.grayLight, border: `1px solid ${T.border}`, borderRadius: 6, padding: '5px 10px' }}>
-                <Search size={13} color={T.textSoft} />
-                <input placeholder="Plaka, kullanıcı, departman…"
-                  value={q} onChange={e => setQ(e.target.value)}
-                  style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12.5, color: T.text }} />
+
+            {/* Mod switch */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginBottom: 10 }}>
+              {([
+                { k: 'tanimli', label: 'Tanımlı Plaka', renk: T.blue },
+                { k: 'manuel', label: 'Yeni Plaka', renk: T.purple },
+                { k: 'plakasiz', label: 'PLAKASIZ', renk: T.amber },
+              ] as const).map(opt => {
+                const aktif = mod === opt.k
+                return (
+                  <button key={opt.k} type="button"
+                    onClick={() => { setMod(opt.k); setSecilenArac(null); setManuelPlaka('') }}
+                    style={{
+                      padding: '7px 6px', borderRadius: 6,
+                      border: `1.5px solid ${aktif ? opt.renk : T.border}`,
+                      background: aktif ? opt.renk + '14' : '#fff',
+                      color: aktif ? opt.renk : T.text,
+                      cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                    }}>
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {mod === 'tanimli' && (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 180, background: T.grayLight, border: `1px solid ${T.border}`, borderRadius: 6, padding: '5px 10px' }}>
+                  <Search size={13} color={T.textSoft} />
+                  <input placeholder="Plaka, kullanıcı, departman…"
+                    value={q} onChange={e => setQ(e.target.value)}
+                    style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12.5, color: T.text }} />
+                </div>
+                <select className="verde-select" value={filterDepartman} onChange={e => setFilterDepartman(e.target.value)}
+                  style={{ width: 130, padding: '5px 8px', fontSize: 12 }}>
+                  <option value="">Tüm Dept.</option>
+                  {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
               </div>
-              <select className="verde-select" value={filterDepartman} onChange={e => setFilterDepartman(e.target.value)}
-                style={{ width: 130, padding: '5px 8px', fontSize: 12 }}>
-                <option value="">Tüm Dept.</option>
-                {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
+            )}
+            {mod === 'manuel' && (
+              <div>
+                <label style={{ fontSize: 11.5, color: T.textSoft, fontWeight: 600 }}>Plaka (otomatik büyük harfe çevrilir)</label>
+                <input
+                  value={manuelPlaka}
+                  onChange={e => setManuelPlaka(e.target.value.replace(/\s+/g, '').toLocaleUpperCase('tr'))}
+                  placeholder="34ABC123"
+                  maxLength={15}
+                  autoFocus
+                  style={{
+                    width: '100%', marginTop: 4, padding: '10px 12px',
+                    border: `1.5px solid ${T.border}`, borderRadius: 7,
+                    fontFamily: 'monospace', fontWeight: 800, fontSize: 18, letterSpacing: '0.05em',
+                    textAlign: 'center', color: T.text, outline: 'none',
+                  }}
+                />
+                <div style={{ fontSize: 11, color: T.textSoft, marginTop: 4, fontStyle: 'italic' }}>
+                  Sistemde tanımlı olmayan, anlık yazılmış plaka için. Araç kartı oluşturulmaz, sadece bu görev kayıtlanır.
+                </div>
+              </div>
+            )}
+            {mod === 'plakasiz' && (
+              <div style={{ padding: '14px 12px', borderRadius: 7, background: T.amberLight, border: `1.5px solid ${T.amber}`, textAlign: 'center' }}>
+                <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 22, color: T.amber, letterSpacing: '0.1em' }}>PLAKASIZ</div>
+                <div style={{ fontSize: 11.5, color: '#78350f', marginTop: 4 }}>
+                  Plakası olmayan / okunamayan araç için. Görev "PLAKASIZ" etiketiyle kayıtlanır.
+                </div>
+              </div>
+            )}
           </div>
 
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 0 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 0, display: mod === 'tanimli' ? 'block' : 'none' }}>
             {filtered.length === 0 ? (
               <div style={{ padding: 32, textAlign: 'center', color: T.textSoft, fontSize: 13 }}>Sonuç yok.</div>
             ) : (
