@@ -972,10 +972,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 {/* ── 2. Frekans Dağılımı | Grup Bazlı Tamamlanan ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dağılımı &amp; Grup Bazlı Tamamlanan</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1.6fr) minmax(0, 1fr)', gap: 20, alignItems: 'flex-start', minWidth: 0 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Genel Dağılım</div>
-                      <PieChart size={240} slices={[
+                      <PieChart size={280} slices={[
                         { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
                         { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
                         { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
@@ -1043,10 +1043,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                     <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
                     <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.amberLight, color: T.amber, flexShrink: 0 }}>{data.toplamSapma} kayıt</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1.6fr) minmax(0, 1fr)', gap: 20, alignItems: 'flex-start', minWidth: 0 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Hedef / Sapma Oranı</div>
-                      <PieChart size={240} slices={[
+                      <PieChart size={280} slices={[
                         { label: 'Sapma',       value: data.toplamSapma,                                       color: T.amber },
                         { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamSapma),            color: '#e2e8f0' },
                       ]} />
@@ -1085,10 +1085,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                     <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Kayıp Frekanslar</div>
                     <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.redLight, color: T.red, flexShrink: 0 }}>{data.toplamKayip} kayıt</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1.6fr) minmax(0, 1fr)', gap: 20, alignItems: 'flex-start', minWidth: 0 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Hedef / Kayıp Oranı</div>
-                      <PieChart size={240} slices={[
+                      <PieChart size={280} slices={[
                         { label: 'Kayıp',       value: data.toplamKayip,                                       color: T.red },
                         { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamKayip),            color: '#e2e8f0' },
                       ]} />
