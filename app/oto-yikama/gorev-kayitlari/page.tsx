@@ -59,7 +59,7 @@ export default async function OtoYikamaGorevKayitlariPage() {
             id, tanim, durum, firma_id, lokasyon_id,
             olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
             tamamlanma_suresi_saniye,
-            olusturan_id, islemi_yapan_id, iptal_sebep
+            olusturan_id, islemi_yapan_id, baslatan_kullanici_id, iptal_sebep
           `)
           .eq('firma_id', firmaId)
           .in('id', allGorevIds)
@@ -71,7 +71,7 @@ export default async function OtoYikamaGorevKayitlariPage() {
 
     const userIds = [...new Set(arr.flatMap(m => {
       const g = gorevMap.get(m.gorev_id)
-      return [g?.olusturan_id, g?.islemi_yapan_id]
+      return [g?.olusturan_id, g?.islemi_yapan_id, g?.baslatan_kullanici_id]
     }).filter(Boolean))] as string[]
     const lokIds = [...new Set(arr.map(m => gorevMap.get(m.gorev_id)?.lokasyon_id).filter(Boolean))] as string[]
 
@@ -93,10 +93,17 @@ export default async function OtoYikamaGorevKayitlariPage() {
     kayitlar = arr.map(m => {
       const g = gorevMap.get(m.gorev_id) ?? {} as any
       const a = aracMap.get(m.arac_id) ?? {} as any
-      // islemi_yapan_id durum bağlamına göre yorumlanır
+      // İşlem yapan kişi — durum bağlamına göre:
+      //   TAMAMLANDI / IPTAL / YAPILAMADI → islemi_yapan_id (terminal yapan)
+      //   ISLEMDE                          → baslatan_kullanici_id (şu an çalışan)
+      //   HAZIR / ACIK                     → null
       const isTamamlandi = g.durum === 'TAMAMLANDI'
       const isIptal      = g.durum === 'IPTAL'
-      const islemKisiId  = g.islemi_yapan_id ?? null
+      const isYapilamadi = g.durum === 'YAPILAMADI'
+      const isIslemde    = g.durum === 'ISLEMDE'
+      const islemYapanId = (isTamamlandi || isIptal || isYapilamadi)
+        ? (g.islemi_yapan_id ?? null)
+        : isIslemde ? (g.baslatan_kullanici_id ?? null) : null
       return {
         gorev_id:        m.gorev_id,
         plaka:           m.plaka_snapshot ?? '—',
@@ -114,9 +121,10 @@ export default async function OtoYikamaGorevKayitlariPage() {
         tamamlanma_tarihi: g.tamamlanma_tarihi ?? null,
         tamamlanma_suresi_saniye: g.tamamlanma_suresi_saniye ?? null,
         olusturan:       userMap.get(g.olusturan_id) ?? '—',
-        tamamlayan:      isTamamlandi && islemKisiId ? (userMap.get(islemKisiId) ?? null) : null,
-        tamamlayan_id:   isTamamlandi ? islemKisiId : null,
-        iptal_eden:      isIptal && islemKisiId ? (userMap.get(islemKisiId) ?? null) : null,
+        // Geri uyum: 'tamamlayan' alanı = işlem yapan (TAMAMLANDI/IPTAL/YAPILAMADI/ISLEMDE)
+        tamamlayan:      islemYapanId ? (userMap.get(islemYapanId) ?? null) : null,
+        tamamlayan_id:   islemYapanId,
+        iptal_eden:      isIptal && islemYapanId ? (userMap.get(islemYapanId) ?? null) : null,
         iptal_sebep:     g.iptal_sebep ?? null,
       }
     })
@@ -133,12 +141,13 @@ export default async function OtoYikamaGorevKayitlariPage() {
     // Hedef tarihe göre desc sırala
     kayitlar.sort((a, b) => (b.hedef_tarih ?? '').localeCompare(a.hedef_tarih ?? ''))
 
-    // Tamamlayan dropdown'u (sadece tamamlanmışlarda görünen kişiler)
-    const tamamlayanSet = new Map<string, string>()
+    // 'İşlem Yapan' filtre dropdown'u — TAMAMLANDI/IPTAL/YAPILAMADI islemi
+    // yapanı + ISLEMDE başlatanı kapsar (kolon mantığıyla aynı).
+    const islemYapanSet = new Map<string, string>()
     for (const k of kayitlar) {
-      if (k.tamamlayan_id && k.tamamlayan) tamamlayanSet.set(k.tamamlayan_id, k.tamamlayan)
+      if (k.tamamlayan_id && k.tamamlayan) islemYapanSet.set(k.tamamlayan_id, k.tamamlayan)
     }
-    tamamlayanlar = [...tamamlayanSet.entries()]
+    tamamlayanlar = [...islemYapanSet.entries()]
       .map(([id, isim]) => ({ id, isim_soyisim: isim }))
       .sort((a, b) => a.isim_soyisim.localeCompare(b.isim_soyisim, 'tr'))
   }
