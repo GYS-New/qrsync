@@ -972,19 +972,39 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 {/* ── 2. Frekans Dağılımı | Grup Bazlı Tamamlanan ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: T.text, marginBottom: 16, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Frekans Dağılımı &amp; Grup Bazlı Tamamlanan</div>
-                  <div style={{ display: 'flex', gap: 56, alignItems: 'flex-start', minWidth: 0 }}>
-                    <div style={{ flexShrink: 0 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, alignItems: 'flex-start', minWidth: 0 }}>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Genel Dağılım</div>
-                      <PieChart size={280} slices={[
+                      <PieChart size={240} slices={[
                         { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
                         { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
                         { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
                       ]} />
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Grup Bazlı Tamamlanan</div>
-                      <BarChart data={ozetData.grupBazli} valueKey="tamamlanan" labelKey="grup" color={T.greenMid} />
-                    </div>
+                    {(() => {
+                      const grupTam = ozetData.grupBazli
+                        .filter(g => g.tamamlanan > 0)
+                        .map(g => ({ grup: g.grup, sayi: g.tamamlanan }))
+                        .sort((a, b) => b.sayi - a.sayi)
+                      return (
+                        <>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Grup Bazlı Tamamlanan</div>
+                            {grupTam.length > 0
+                              ? <BarChart data={grupTam} valueKey="sayi" labelKey="grup" color={T.greenMid} />
+                              : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Tamamlanan kayıt yok</div>
+                            }
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 6, textTransform: 'uppercase' as const }}>Sıralı Liste</div>
+                            {grupTam.length > 0
+                              ? <SiraliListe items={grupTam.map(x => ({ label: x.grup, value: x.sayi }))} />
+                              : <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
+                            }
+                          </div>
+                        </>
+                      )
+                    })()}
                   </div>
                 </div>
 
