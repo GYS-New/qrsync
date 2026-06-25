@@ -1,24 +1,31 @@
 /**
  * POST /api/personel-destek/calistir
- * Personel Görev Desteği motoru — vardiya bitişinden 30 dk SONRA çalışır
- * (Yeni OYAK vardiyaları: V1 23:30-07:30 / V2 07:30-15:30 / V3 15:30-23:30
- *  → tetik: 00:00 / 08:00 / 16:00 TRT — bkz lib/cron/job.js)
+ * Personel Görev Desteği motoru — her 15 dk tetiklenir, her aktif destek
+ * kaydı için o projenin efektif vardiya bitişi 30-45 dk önceyse çalışır.
+ *
+ * Pencere mantığı: cron 15 dk'da bir çalıştığı için bir vardiya bitişinin
+ * +30dk grace + 15dk pencere = [bitis+30, bitis+45] aralığında garantili
+ * bir kez tetiklenir. Pencerede olmayan kayıtlar skip (mesaj=penceredeDegil).
  *
  * Mantık:
  * 1. Aktif personel_gorev_destegi kayıtlarını çek
- * 2. Her üst lokasyonun alt lokasyonlarındaki BEKLEMEDE durumdaki görevleri bul
- *    (ACIK görevler 8 saat sonunda otomatik BEKLEMEDE'ye geçer — bitmiş vardiya)
- * 3. hedef_oran: BEKLEMEDE görev sayısının %X'i tamamlanır
- * 4. Tamamlanan görevler ZAMANINDA_YAPILAMAYAN durumuna geçer (BEKLEMEDE'den
- *    geç tamamlama semantiği — liveStatus.ts:78 ile tutarlı)
- * 5. Doğallık: rastgele süre, rastgele personel, %1 iptal
+ * 2. Her kayıt için projenin efektif vardiya bitişi penceredeyse devam et
+ * 3. Üst lokasyonun alt lokasyonlarındaki BEKLEMEDE durumdaki görevleri bul
+ *    (ACIK görevler acik_bekleme_saat sonunda otomatik BEKLEMEDE'ye geçer)
+ * 4. hedef_oran: BEKLEMEDE görev sayısının %X'i tamamlanır
+ * 5. Tamamlanan görevler ZAMANINDA_YAPILAMAYAN durumuna geçer (liveStatus.ts:78)
+ * 6. Doğallık: rastgele süre, rastgele personel
  *
  * Aktif vardiyaya dokunmaz: sadece BEKLEMEDE filtresi → ACIK/ISLEMDE görevler
  * (yeni başlayan vardiya) tamamen güvenli.
+ *
+ * Proje override: Mig 094-095 sonrası her proje kendi vardiyasına sahip; cron
+ * her destek için o projenin (yoksa firma fallback) vardiyasını dikkate alır.
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 const CORS = {} // Cron endpoint — CORS gereksiz
 
@@ -43,8 +50,24 @@ export async function POST(req: Request) {
     }
 
     for (const ayar of ayarlar) {
+      // Proje vardiya bitiş penceresi kontrolü — bitiş 30-45 dk önce mi?
+      // Pencerede değilse skip (mig 094: her proje kendi vardiya saatleriyle).
+      const pencereSonuc = await vardiyaBitisPenceresinde(admin, ayar.firma_id, ayar.proje_id)
+      if (!pencereSonuc.icerideMi) {
+        sonuclar.push({
+          ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id,
+          ust_lokasyon_id: ayar.ust_lokasyon_id,
+          tamamlanan: 0, mesaj: 'penceredeDegil',
+          ...pencereSonuc.debug,
+        })
+        continue
+      }
       const result = await destekCalistir(admin, ayar)
-      sonuclar.push({ ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id, ust_lokasyon_id: ayar.ust_lokasyon_id, ...result })
+      sonuclar.push({
+        ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id,
+        ust_lokasyon_id: ayar.ust_lokasyon_id,
+        vardiya_bitis_dk: pencereSonuc.bitisDkOnce, ...result,
+      })
     }
 
     // Audit — tamamlanan görev varsa logla
@@ -69,6 +92,76 @@ export async function POST(req: Request) {
     } catch {}
     return NextResponse.json({ ok: false, error: e.message }, { status: 500, headers: CORS })
   }
+}
+
+// ── Vardiya bitiş penceresi kontrolü ─────────────────────────────────────
+// Cron 15 dk'da bir çalıştığı için her vardiya bitişi tam bir kez yakalanır:
+// pencere [bitis+30dk, bitis+45dk]. 30dk grace = gun_ici_durum_guncelle'nin
+// ACIK→BEKLEMEDE geçişlerini bitirmesi için süre.
+const PENCERE_BAS_DK = 30
+const PENCERE_BIT_DK = 45
+
+function parseHHMM(s: string | null | undefined): number | null {
+  if (typeof s !== 'string' || !s) return null
+  const [hh, mm] = s.split(':').map(Number)
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null
+  return hh * 60 + mm
+}
+
+/** TR günü içindeki şu anki dakika (00:00 = 0, 23:59 = 1439) */
+function trSimdiDakika(): number {
+  const nowTrStr = new Date().toLocaleTimeString('en-GB', {
+    timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
+  })
+  const [h, m] = nowTrStr.split(':').map(Number)
+  return h * 60 + m
+}
+
+/**
+ * Projenin efektif vardiyalarından herhangi birinin bitişi şu an pencerede mi?
+ * Pencere: [bitis + PENCERE_BAS_DK, bitis + PENCERE_BIT_DK]
+ *
+ * Sarkan vardiya (örn V1 23:30-07:30) bitiş 07:30 → 08:00-08:15 penceresi
+ * sabah TR günü içinde. 00:00 bitiş özel: 24:00 olarak normalize edilir.
+ */
+async function vardiyaBitisPenceresinde(
+  admin: any,
+  firmaId: string,
+  projeId: string | null,
+): Promise<{ icerideMi: boolean; bitisDkOnce?: number; debug?: any }> {
+  const ev = await getEffectiveVardiya(admin, firmaId, projeId)
+  const sayisi = ev.vardiya_sayisi
+  if (!sayisi) return { icerideMi: false, debug: { sebep: 'vardiya_sayisi_yok' } }
+  const ayarlar = ((ev.tum_vardiya_ayarlari ?? {})[String(sayisi)] ?? []) as any[]
+  if (!Array.isArray(ayarlar) || ayarlar.length === 0) {
+    return { icerideMi: false, debug: { sebep: 'ayar_yok' } }
+  }
+  const simdiDk = trSimdiDakika()
+
+  for (const v of ayarlar) {
+    const basMin = parseHHMM(v?.baslangic)
+    const bitMin0 = parseHHMM(v?.bitis)
+    if (basMin == null || bitMin0 == null) continue
+    // "00:00" bitiş = gün sonu (24:00); sarkan değil
+    let bitMin = bitMin0
+    if (bitMin === 0 && basMin !== 0) bitMin = 24 * 60
+    // İki olası bitiş saati: bugünün ve dünün (sarkan vardiya gece geçer)
+    const adaylar: number[] = [bitMin]
+    if (bitMin <= basMin && bitMin !== 24 * 60) {
+      // Sarkan: dün başlamış, bugün sabah biten → bitis dakikası "bugünün sabahı"
+      adaylar.push(bitMin)
+      // Aynı zamanda bugün başlayacak sarkan vardiya için yarına bitiş — pencerede olamaz
+    }
+    for (const bit of adaylar) {
+      const gecenDk = simdiDk - bit
+      // Eğer geçen dakika negatifse (bitiş henüz olmamış) veya 24h üzerinde,
+      // pratikte pencerede değil
+      if (gecenDk >= PENCERE_BAS_DK && gecenDk <= PENCERE_BIT_DK) {
+        return { icerideMi: true, bitisDkOnce: gecenDk, debug: { vardiya_no: v.no, bitis: v.bitis } }
+      }
+    }
+  }
+  return { icerideMi: false, debug: { simdiDk, sebep: 'hicVardiyaPenceredeDegil' } }
 }
 
 // ── Cinsiyet eşleştirmesi ────────────────────────────────────────────────

@@ -59,25 +59,57 @@ export default function PersonelDestekPanel({ firmaId, projeId, lokasyonlar }: {
   }
 
   async function personelYukle() {
-    // Tüm personelleri ust_lokasyon_id ile çek
-    const { data } = await supabase
-      .from('users')
-      .select('id, isim_soyisim, cinsiyet, ust_lokasyon_id')
-      .eq('firma_id', firmaId)
-      .eq('aktif', true)
-      .in('rol', ['tenant_user'])
-      .order('isim_soyisim')
+    // İki kaynak OR'lanır: users.ust_lokasyon_id (bağlanma) +
+    // kullanici_lokasyon_yetkileri (atanma). Çanakkale gibi sadece atanma ile
+    // çalışan projelerde bağlanma boş olabilir; her iki kaynaktaki personel
+    // o üst lokasyon için PD'nin görev tamamlayıcısı olmaya uygundur.
+    const [usersRes, yetkiRes] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id, isim_soyisim, cinsiyet, ust_lokasyon_id')
+        .eq('firma_id', firmaId)
+        .eq('aktif', true)
+        .in('rol', ['tenant_user'])
+        .order('isim_soyisim'),
+      supabase
+        .from('kullanici_lokasyon_yetkileri')
+        .select('user_id, ust_lokasyon_id, users!inner(id, isim_soyisim, cinsiyet, aktif, rol, firma_id)')
+        .eq('firma_id', firmaId)
+        .eq('users.aktif', true)
+        .eq('users.firma_id', firmaId)
+        .in('users.rol', ['tenant_user']),
+    ])
 
-    // Üst lokasyon bazında grupla
-    const map = new Map<string, Personel[]>()
-    for (const u of (data ?? [])) {
-      if (!u.ust_lokasyon_id) continue
-      const arr = map.get(u.ust_lokasyon_id) ?? []
-      arr.push({ id: u.id, isim_soyisim: u.isim_soyisim, cinsiyet: u.cinsiyet })
-      map.set(u.ust_lokasyon_id, arr)
+    // Üst lokasyon bazında map; aynı user iki kaynaktan gelirse tek listele
+    const map = new Map<string, Map<string, Personel>>()
+    const tumPersoneller = new Map<string, Personel>()
+
+    const ensure = (ustLokId: string) => {
+      if (!map.has(ustLokId)) map.set(ustLokId, new Map())
+      return map.get(ustLokId)!
     }
-    setPersonelMap(map)
-    setPersoneller((data ?? []).map((u: any) => ({ id: u.id, isim_soyisim: u.isim_soyisim, cinsiyet: u.cinsiyet })))
+
+    // Kaynak A: ust_lokasyon_id (bağlanma)
+    for (const u of ((usersRes.data ?? []) as any[])) {
+      const p: Personel = { id: u.id, isim_soyisim: u.isim_soyisim, cinsiyet: u.cinsiyet }
+      tumPersoneller.set(u.id, p)
+      if (u.ust_lokasyon_id) ensure(u.ust_lokasyon_id).set(u.id, p)
+    }
+    // Kaynak B: kullanici_lokasyon_yetkileri (atanma)
+    for (const y of ((yetkiRes.data ?? []) as any[])) {
+      const u = y.users
+      if (!u) continue
+      const p: Personel = { id: u.id, isim_soyisim: u.isim_soyisim, cinsiyet: u.cinsiyet }
+      tumPersoneller.set(u.id, p)
+      if (y.ust_lokasyon_id) ensure(y.ust_lokasyon_id).set(u.id, p)
+    }
+
+    const flatMap = new Map<string, Personel[]>()
+    for (const [k, v] of map) {
+      flatMap.set(k, Array.from(v.values()).sort((a, b) => a.isim_soyisim.localeCompare(b.isim_soyisim, 'tr')))
+    }
+    setPersonelMap(flatMap)
+    setPersoneller(Array.from(tumPersoneller.values()))
   }
 
   function getAyar(ustLokId: string): Ayar | undefined {
