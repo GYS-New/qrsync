@@ -83,7 +83,7 @@ export default async function OtoYikamaGorevKayitlariPage() {
         ? admin.from('lokasyonlar').select('id, tanim, parent_id').in('id', lokIds)
         : Promise.resolve({ data: [] as any[] }),
       allAracIds.length > 0
-        ? admin.from('araclar').select('id, departman, yikama_gunleri').in('id', allAracIds)
+        ? admin.from('araclar').select('id, departman, yikama_gunleri, kullanici_adi_soyadi').in('id', allAracIds)
         : Promise.resolve({ data: [] as any[] }),
     ])
     const userMap = new Map(((usersRes.data ?? []) as any[]).map(u => [u.id, u.isim_soyisim ?? '—']))
@@ -115,6 +115,7 @@ export default async function OtoYikamaGorevKayitlariPage() {
         lokasyon_id:     g.lokasyon_id ?? null,
         istasyon:        lokMap.get(g.lokasyon_id) ?? '—',
         departman:       a.departman ?? null,
+        arac_kullanici:  a.kullanici_adi_soyadi ?? null,
         yikama_gunleri:  Array.isArray(a.yikama_gunleri) ? a.yikama_gunleri : [],
         olusturma_tarihi: g.olusturma_tarihi ?? null,
         baslatilma_tarihi: g.baslatilma_tarihi ?? null,

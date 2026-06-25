@@ -502,6 +502,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                     <th style={{ width: 110 }}>Plaka</th>
                     <th>Kullanıcı</th>
                     <th style={{ width: 90 }}>Tip</th>
+                    <th>Personel</th>
                     <th>İstasyon</th>
                     <th>Departman</th>
                     <th style={{ width: 130 }}>Yıkama Günü</th>
@@ -520,7 +521,11 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                           {r.plaka}
                         </span>
                       </td>
-                      <td style={{ fontSize: 14, color: T.text, fontWeight: 600 }}>{r.personel}</td>
+                      <td style={{ fontSize: 14, color: T.text, fontWeight: 600 }}>
+                        {r.arac_sahibi
+                          ? r.arac_sahibi
+                          : <span style={{ color: T.textSoft, fontStyle: 'italic', fontWeight: 400 }}>—</span>}
+                      </td>
                       <td>
                         {r.ekstra ? (
                           <span style={{ padding: '3px 9px', borderRadius: 999, background: T.amberLight, color: T.amber, fontSize: 12, fontWeight: 700 }}>Ekstra</span>
@@ -528,6 +533,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                           <span style={{ padding: '3px 9px', borderRadius: 999, background: T.greenLight, color: T.green, fontSize: 12, fontWeight: 700 }}>Planlı</span>
                         )}
                       </td>
+                      <td style={{ fontSize: 14, color: T.text }}>{r.personel}</td>
                       <td style={{ fontSize: 14, color: T.textSoft }}>{r.lokasyon}</td>
                       <td style={{ fontSize: 14, color: T.textSoft }}>{r.departman ?? '—'}</td>
                       <td style={{ fontSize: 14, color: T.textSoft, whiteSpace: 'nowrap' }}>
