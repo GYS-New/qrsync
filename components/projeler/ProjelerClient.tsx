@@ -5,7 +5,8 @@ import { useToast } from '@/components/ui/ToastProvider'
 import DynamicLogo from '@/components/ui/DynamicLogo'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useYetki } from '@/lib/yetki/useYetki'
-import { Pencil, Trash2, Plus, Layers } from 'lucide-react'
+import { Pencil, Trash2, Plus, Layers, Clock, X } from 'lucide-react'
+import VardiyaAyarlariPanel from '@/components/sistem-ayarlari/VardiyaAyarlariPanel'
 
 type Proje = {
   id: string
@@ -55,6 +56,8 @@ export default function ProjelerClient({
   const [silSifre, setSilSifre] = useState('')
   const [silLoading, setSilLoading] = useState(false)
   const [silHata, setSilHata] = useState('')
+  // Vardiya ayarları modal (proje bazlı)
+  const [vardiyaModal, setVardiyaModal] = useState<Proje | null>(null)
 
   const fetchProjeler = useCallback(async () => {
     if (!firmaId) { setLoading(false); return }
@@ -481,6 +484,11 @@ export default function ProjelerClient({
                     </>
                   )}
                   {yetki.duzenleyebilir && (
+                    <button onClick={() => setVardiyaModal(p)} title="Vardiya Ayarları" style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #c7d2fe', background: '#eef2ff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, color: '#4338ca' }}>
+                      <Clock size={13} /> Vardiya
+                    </button>
+                  )}
+                  {yetki.duzenleyebilir && (
                     <button onClick={() => openEdit(p)} style={{ padding: '6px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                       <Pencil size={14} style={{ color: '#4b5563' }} />
                     </button>
@@ -494,6 +502,34 @@ export default function ProjelerClient({
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Vardiya Ayarları Modalı (proje bazlı) */}
+      {vardiyaModal && (
+        <div onClick={() => setVardiyaModal(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} className="verde-card"
+            style={{ width: 'min(720px, 96vw)', maxHeight: '90vh', overflowY: 'auto', padding: 24, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Clock size={20} style={{ color: '#4338ca' }} />
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: '#0f172a' }}>Vardiya Ayarları</div>
+                  <div style={{ fontSize: 12.5, color: '#6b7280', marginTop: 2 }}>{vardiyaModal.ad}</div>
+                </div>
+              </div>
+              <button onClick={() => setVardiyaModal(null)}
+                style={{ padding: 6, borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <VardiyaAyarlariPanel
+              firmaId={vardiyaModal.firma_id}
+              projeId={vardiyaModal.id}
+              projeAdi={vardiyaModal.ad}
+            />
+          </div>
         </div>
       )}
 

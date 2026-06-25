@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
-import VardiyaAyarlariPanel from './VardiyaAyarlariPanel'
+// VardiyaAyarlariPanel artık proje seviyesinde — SA Projeler sayfasından
+// import edilir, sistem ayarlarında değil.
 
 const T = {
   green: '#111827', border: '#e2e8f0', text: '#0f172a', textSoft: '#64748b', grayLight: '#f8fafc',
@@ -383,8 +384,11 @@ export default function GenelAyarlarClient({ isSA, firmaId: propFirmaId, projeId
         <OverrideBadge ayarKey="canli_akis_sure_saat" />
       </div>
 
-      {/* Vardiya Tanımları */}
-      <VardiyaAyarlariPanel firmaId={currentFirmaId} />
+      {/* Vardiya Tanımları — bu panel kaldırıldı.
+          Vardiya ayarları artık proje bazlı: SA Projeler sayfasından her
+          projenin yanındaki "⏰ Vardiya" butonu ile düzenlenir.
+          (Migration 094 ile firma değerleri proje snapshot olarak kopyalandı,
+          mevcut projeler aynı vardiyayla devam eder.) */}
 
       {/* Personel Takip Bildirim Süresi */}
       <div style={{ background: '#fff', border: `1px solid ${overrides.personel_takip_bildirim_dk ? '#c4b5fd' : T.border}`, borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
