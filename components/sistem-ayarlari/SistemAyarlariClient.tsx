@@ -71,6 +71,17 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
   const { aktifProje } = useProje()
   const sureliGorevAktif = aktifProje?.sureli_gorev_aktif === true
 
+  // Modül Yetkileri sekmesi sadece OYAK Renault projesi için gösterilir.
+  // Diğer projeler (Çanakkale, ilerideki yeni projeler) bu sayfayı kullanmaz.
+  // SA proje seçmemişse de gizli (kafa karışıklığı önlenir).
+  const renaultAktif = (aktifProje?.ad ?? '').toUpperCase().includes('RENAULT')
+
+  // Proje değişip Renault'tan başkasına geçilirse, modul-yetkileri sekmesinde
+  // takılı kalmasın → genele dön
+  useEffect(() => {
+    if (aktifTab === 'modul-yetkileri' && !renaultAktif) setAktifTab('genel')
+  }, [renaultAktif, aktifTab])
+
   return (
     <div style={{ padding: '24px 28px' }}>
       {/* Tab bar */}
@@ -83,7 +94,10 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
           overflowX: 'auto',
         }}
       >
-        {BASE_TABS.filter(tab => !tab.saOnly || isSA).map(tab => (
+        {BASE_TABS
+          .filter(tab => !tab.saOnly || isSA)
+          .filter(tab => tab.key !== 'modul-yetkileri' || renaultAktif)
+          .map(tab => (
           <button
             key={tab.key}
             onClick={() => setAktifTab(tab.key)}
@@ -145,7 +159,7 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
       {aktifTab === 'yetkiler' && firmaId && (
         <LokasyonYetkileriPanel firmaId={firmaId} lokasyonlar={lokasyonlar as any} kullanicilar={kullanicilar as any} />
       )}
-      {aktifTab === 'modul-yetkileri' && (
+      {aktifTab === 'modul-yetkileri' && renaultAktif && (
         <ModulYetkileriClient
           isSA={isSA}
           firmaId={firmaId}
