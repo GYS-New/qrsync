@@ -450,6 +450,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
               <tr>
                 <Th>Plaka</Th>
+                <Th>Kullanıcı</Th>
                 <Th>İstasyon</Th>
                 <Th align="center">Yıkama Günü</Th>
                 <Th align="center">Durum</Th>
@@ -457,7 +458,6 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                 <Th align="center">Tamamlanma</Th>
                 <Th align="center">Süre</Th>
                 <Th align="right">KM</Th>
-                <Th>İşlem Yapan</Th>
                 <Th>Açıklama / Sebep</Th>
                 {canEdit && <Th align="right">İşlem</Th>}
               </tr>
@@ -474,6 +474,19 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                           <span style={{ padding: '1px 5px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>EKSTRA</span>
                         )}
                       </div>
+                    </Td>
+                    <Td>
+                      <span style={{ color: T.text, fontWeight: 600 }}>
+                        {gd === 'TAMAMLANDI' ? (k.tamamlayan ?? '—')
+                          : gd === 'ISLEMDE' ? (k.tamamlayan ?? '—')
+                          : gd === 'IPTAL' ? (k.iptal_eden ?? (
+                              <span style={{ fontStyle: 'italic', color: T.textSoft, fontWeight: 400 }}>Sistem (otomatik)</span>
+                            ))
+                          : gd === 'YAPILAMADI' ? (
+                              <span style={{ fontStyle: 'italic', color: T.textSoft, fontWeight: 400 }}>Sistem (süre aşımı)</span>
+                            )
+                          : <span style={{ color: T.textSoft, fontWeight: 400 }}>—</span>}
+                      </span>
                     </Td>
                     <Td muted>{k.istasyon}</Td>
                     <Td align="center">
@@ -500,17 +513,6 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                       <span style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap' }}>
                         {k.km != null ? k.km.toLocaleString('tr-TR') : '—'}
                       </span>
-                    </Td>
-                    <Td muted>
-                      {gd === 'TAMAMLANDI' ? (k.tamamlayan ?? '—')
-                        : gd === 'ISLEMDE' ? (k.tamamlayan ?? '—')
-                        : gd === 'IPTAL' ? (k.iptal_eden ?? (
-                            <span style={{ fontStyle: 'italic', color: T.textSoft }}>Sistem (otomatik)</span>
-                          ))
-                        : gd === 'YAPILAMADI' ? (
-                            <span style={{ fontStyle: 'italic', color: T.textSoft }}>Sistem (süre aşımı)</span>
-                          )
-                        : '—'}
                     </Td>
                     <Td muted>
                       {gd === 'IPTAL' && k.iptal_sebep ? (

@@ -68,6 +68,15 @@ function fmtTarih(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
+/** "01.01.2000 PAZARTESİ" formatı — TR günü adı uppercase */
+function fmtTarihGun(iso: string | null): string {
+  if (!iso) return '—'
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(iso + 'T12:00:00') : new Date(iso)
+  if (isNaN(d.getTime())) return '—'
+  const tarih = d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Istanbul' })
+  const gun = d.toLocaleDateString('tr-TR', { weekday: 'long', timeZone: 'Europe/Istanbul' }).toLocaleUpperCase('tr-TR')
+  return `${tarih} ${gun}`
+}
 function fmtSure(saniye: number | null | undefined): string {
   if (!saniye || saniye <= 0) return '—'
   const h = Math.floor(saniye / 3600)
@@ -491,12 +500,12 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                   <tr>
                     <th style={{ width: 50 }}>#</th>
                     <th style={{ width: 110 }}>Plaka</th>
+                    <th>Kullanıcı</th>
                     <th style={{ width: 90 }}>Tip</th>
-                    <th>Personel</th>
                     <th>İstasyon</th>
                     <th>Departman</th>
                     <th style={{ width: 130 }}>Yıkama Günü</th>
-                    <th style={{ width: 100 }}>Tarih</th>
+                    <th style={{ width: 180 }}>Tarih</th>
                     <th style={{ width: 110 }}>Başlatma</th>
                     <th style={{ width: 110 }}>Tamamlama</th>
                     <th style={{ width: 110 }}>Süre</th>
@@ -511,6 +520,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                           {r.plaka}
                         </span>
                       </td>
+                      <td style={{ fontSize: 14, color: T.text, fontWeight: 600 }}>{r.personel}</td>
                       <td>
                         {r.ekstra ? (
                           <span style={{ padding: '3px 9px', borderRadius: 999, background: T.amberLight, color: T.amber, fontSize: 12, fontWeight: 700 }}>Ekstra</span>
@@ -518,7 +528,6 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                           <span style={{ padding: '3px 9px', borderRadius: 999, background: T.greenLight, color: T.green, fontSize: 12, fontWeight: 700 }}>Planlı</span>
                         )}
                       </td>
-                      <td style={{ fontSize: 14, color: T.text }}>{r.personel}</td>
                       <td style={{ fontSize: 14, color: T.textSoft }}>{r.lokasyon}</td>
                       <td style={{ fontSize: 14, color: T.textSoft }}>{r.departman ?? '—'}</td>
                       <td style={{ fontSize: 14, color: T.textSoft, whiteSpace: 'nowrap' }}>
@@ -526,7 +535,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                           ? [...r.yikama_gunleri].sort((a, b) => a - b).map(g => GUN_KISA_TR[g] ?? g).join(', ')
                           : <span style={{ color: T.amber, fontStyle: 'italic', fontWeight: 600, fontSize: 14 }}>Plansız</span>}
                       </td>
-                      <td style={{ fontSize: 13, color: T.textSoft, whiteSpace: 'nowrap' }}>{fmtTarih(r.tamamlanma_tarihi ?? r.hedef_tarih)}</td>
+                      <td style={{ fontSize: 13, color: T.textSoft, whiteSpace: 'nowrap', fontWeight: 600 }}>{fmtTarihGun(r.tamamlanma_tarihi ?? r.hedef_tarih)}</td>
                       <td style={{ fontSize: 16, color: T.textSoft, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{fmtTime(r.baslatilma_tarihi)}</td>
                       <td style={{ fontSize: 16, color: T.textSoft, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{fmtTime(r.tamamlanma_tarihi)}</td>
                       <td style={{ fontSize: 16, color: T.text, fontFamily: 'monospace', fontWeight: 700, whiteSpace: 'nowrap' }}>{fmtSure(r.tamamlanma_suresi_saniye)}</td>
