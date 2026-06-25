@@ -13,7 +13,10 @@ export function vardiyaGunuHesapla(vardiyaAyari: VardiyaAyar[], baseIso?: string
     hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Istanbul',
   })
   for (const v of vardiyaAyari) {
-    const sarkan = v.bitis <= v.baslangic
+    // '00:00' bitiş = gün sonu (24:00 anlamında); sarkan değil. Çanakkale
+    // V3 "16:00-00:00" gibi akşam vardiyalarını sahte sarkan algılamamak için.
+    const bitisEff = v.bitis === '00:00' && v.baslangic !== '00:00' ? '24:00' : v.bitis
+    const sarkan = bitisEff <= v.baslangic
     if (sarkan && trSaat >= v.baslangic) {
       // Saat sarkan vardiyanın akşam yarısında → görevin ait olduğu gün YARIN
       const d = new Date(trDate + 'T00:00:00Z')
