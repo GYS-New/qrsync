@@ -30,6 +30,12 @@ export async function POST(req: Request) {
   const rol           = String(body.rol ?? 'tenant_user')
   const firma_id      = body.firma_id ? String(body.firma_id) : null
   const body_proje_id = body.proje_id ? String(body.proje_id) : null
+  // TA için çoklu proje atama (mig 098). SA TA oluştururken birden fazla
+  // proje seçebilir; ilk seçilen users.proje_id olur (default), tümü
+  // tenant_admin_projeler junction'a yazılır.
+  const body_proje_idler: string[] = Array.isArray(body.proje_idler)
+    ? body.proje_idler.filter((x: any) => typeof x === 'string' && x)
+    : []
   const ust_lokasyon_id = body.ust_lokasyon_id ? String(body.ust_lokasyon_id) : null
   const varsayilan_yikama_istasyon_id = body.varsayilan_yikama_istasyon_id ? String(body.varsayilan_yikama_istasyon_id) : null
   const cinsiyet = body.cinsiyet === 'E' || body.cinsiyet === 'K' ? body.cinsiyet : null
@@ -74,9 +80,16 @@ export async function POST(req: Request) {
   const admin = createAdminClient()
 
   // ── proje_id belirleme ────────────────────────────────────────────────────
-  // TA: client'tan gelen değeri kullan; yoksa cookie'den (getAktifProje) fallback
-  // SA: client'tan gelen değeri kullan; yoksa proje_id null (SA kendi seçer)
+  // TA çoklu proje (mig 098): SA TA oluştururken proje_idler[] gönderir,
+  // ilki users.proje_id olur (default), tümü junction'a yazılır.
+  // Diğer roller (M, U, tenant_user) tek proje_id.
+  const isTAOlusturma = rol === 'tenant_admin'
   let finalProjeId: string | null = body_proje_id
+
+  // SA + TA oluşturma + proje_idler dolu: ilkini default seç
+  if (isSA && isTAOlusturma && body_proje_idler.length > 0) {
+    finalProjeId = body_proje_idler[0]
+  }
 
   if (isTA && !finalProjeId && finalFirmaId) {
     // TA kendi aktif projesini cookie'den oku
@@ -129,11 +142,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: insertErr.message }, { status: 400 })
   }
 
+  // TA çoklu proje atama (mig 098): junction'a tüm seçilen projeleri yaz.
+  // SA gönderdiyse listeyi kullan; gönderilmediyse en azından default proje
+  // junction'a düşsün (seed davranışı).
+  if (isTAOlusturma && finalFirmaId && finalProjeId) {
+    const atanacaklar = body_proje_idler.length > 0 ? body_proje_idler : [finalProjeId]
+    const junctionRows = atanacaklar.map(pid => ({
+      user_id: userId,
+      proje_id: pid,
+      firma_id: finalFirmaId,
+      created_by: me.id,
+    }))
+    await admin.from('tenant_admin_projeler').insert(junctionRows)
+  }
+
   await auditLog({
     tip: 'kullanici_ekle', tablo: 'users',
     kullanici_id: me.id, firma_id: firma_id ?? me.firma_id ?? null,
-    proje_id: body_proje_id,
-    detay: { eklenen_id: userId, email, isim_soyisim, rol },
+    proje_id: finalProjeId,
+    detay: {
+      eklenen_id: userId, email, isim_soyisim, rol,
+      ...(isTAOlusturma && body_proje_idler.length > 0 ? { ta_proje_idler: body_proje_idler } : {}),
+    },
   })
 
   return NextResponse.json({ ok: true, id: userId })

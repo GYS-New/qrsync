@@ -229,6 +229,15 @@ export default function KullanicilarClient({
   // SA için form içi proje seçici
   const [formProjeler, setFormProjeler] = useState<{ id: string; ad: string }[]>([])
   const [formProjeId,  setFormProjeId]  = useState<string>('')
+  // TA çoklu proje seçimi (mig 098) — SA TA oluştururken birden fazla proje seçebilir
+  const [formProjeIdler, setFormProjeIdler] = useState<string[]>([])
+  // TA proje düzenleme modal'ı (SA-only, tenant_admin satırı için)
+  const [taProjeTarget, setTaProjeTarget] = useState<User | null>(null)
+  const [taProjeModalProjeler, setTaProjeModalProjeler] = useState<{ id: string; ad: string; aktif: boolean; secili: boolean }[]>([])
+  const [taProjeModalSecili, setTaProjeModalSecili] = useState<Set<string>>(new Set())
+  const [taProjeModalLoading, setTaProjeModalLoading] = useState(false)
+  // Listede TA başına atanmış proje sayısı (rozet)
+  const [taProjeSayilari, setTaProjeSayilari] = useState<Record<string, number>>({})
 
   // SA kullanıcı oluşturma modalı açıldığında projeleri yükle
   useEffect(() => {
@@ -242,9 +251,69 @@ export default function KullanicilarClient({
         if (aktifler.length === 1) setFormProjeId(aktifler[0].id)
         else if (projeId) setFormProjeId(projeId)
         else setFormProjeId('')
+        // TA çoklu proje: default olarak aktif proje seçili gelir
+        setFormProjeIdler(projeId ? [projeId] : (aktifler.length === 1 ? [aktifler[0].id] : []))
       })
       .catch(() => {})
   }, [openCreate, isSA, firmaId, projeId])
+
+  // SA Firma Adminleri sayfasında listelenen TA'ların proje sayılarını yükle (rozet)
+  useEffect(() => {
+    if (!isSA || !firmaId) { setTaProjeSayilari({}); return }
+    const taIds = users.filter(u => u.rol === 'tenant_admin').map(u => u.id)
+    if (taIds.length === 0) { setTaProjeSayilari({}); return }
+    let alive = true
+    ;(async () => {
+      const { data } = await supabase
+        .from('tenant_admin_projeler')
+        .select('user_id')
+        .in('user_id', taIds)
+      if (!alive) return
+      const map: Record<string, number> = {}
+      for (const r of (data ?? [])) {
+        const uid = (r as any).user_id as string
+        map[uid] = (map[uid] ?? 0) + 1
+      }
+      setTaProjeSayilari(map)
+    })()
+    return () => { alive = false }
+  }, [isSA, firmaId, users, supabase])
+
+  // TA proje düzenleme modal'ı aç
+  async function openTaProjeModal(ta: User) {
+    setTaProjeTarget(ta)
+    setTaProjeModalLoading(true)
+    setTaProjeModalProjeler([])
+    setTaProjeModalSecili(new Set())
+    try {
+      const res = await fetch(`/api/sa/tenant-admin-projeler?user_id=${ta.id}`)
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? 'Yüklenemedi')
+      const list = (j.projeler ?? []) as { id: string; ad: string; aktif: boolean; secili: boolean }[]
+      setTaProjeModalProjeler(list)
+      setTaProjeModalSecili(new Set(list.filter(p => p.secili).map(p => p.id)))
+    } catch (e: any) { showErr(e.message); setTaProjeTarget(null) }
+    setTaProjeModalLoading(false)
+  }
+
+  async function saveTaProjeler() {
+    if (!taProjeTarget) return
+    const ids = Array.from(taProjeModalSecili)
+    if (ids.length === 0) { showErr('En az 1 proje seçilmeli'); return }
+    setTaProjeModalLoading(true)
+    try {
+      const res = await fetch('/api/sa/tenant-admin-projeler', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: taProjeTarget.id, proje_idler: ids }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? 'Kaydedilemedi')
+      setTaProjeSayilari(prev => ({ ...prev, [taProjeTarget.id]: ids.length }))
+      showOk(`${ids.length} proje atandı`)
+      setTaProjeTarget(null)
+    } catch (e: any) { showErr(e.message) }
+    setTaProjeModalLoading(false)
+  }
 
   const filtered = useMemo(() => {
     let list = users
@@ -371,10 +440,22 @@ export default function KullanicilarClient({
 
     // SA: alt_super_admin harici rollerde proje zorunlu
     const isAltSA = createForm.rol === 'alt_super_admin'
-    if (isSA && !isAltSA && !formProjeId) { showErr('Lütfen bir proje seçin.'); return }
+    const isTAOlusturma = createForm.rol === 'tenant_admin'
 
-    // Hangi proje_id gönderilecek: SA → formProjeId, TA → projeId (API cookie fallback yapar)
-    const gonderilenProjeId = isSA ? (isAltSA ? undefined : formProjeId) : (projeId ?? undefined)
+    // SA TA oluşturma: çoklu proje seçimi zorunlu (en az 1)
+    if (isSA && isTAOlusturma && formProjeIdler.length === 0) {
+      showErr('TA için en az 1 proje seçin.'); return
+    }
+    // SA diğer roller: tek proje zorunlu
+    if (isSA && !isAltSA && !isTAOlusturma && !formProjeId) { showErr('Lütfen bir proje seçin.'); return }
+
+    // Hangi proje_id gönderilecek:
+    //   SA + TA → formProjeIdler[0] (default, geriye uyum) + proje_idler array
+    //   SA + diğer → formProjeId
+    //   TA/U/M → cookie fallback (API tarafında)
+    const gonderilenProjeId = isSA
+      ? (isAltSA ? undefined : (isTAOlusturma ? formProjeIdler[0] : formProjeId))
+      : (projeId ?? undefined)
 
     // U rolü: tek lokasyon varsa otomatik ata
     const ustLokId = (base === '/u' && ustLokasyonlar.length === 1)
@@ -397,6 +478,8 @@ export default function KullanicilarClient({
           varsayilan_yikama_istasyon_id: istasyonId,
           firma_id: firmaId,
           ...(gonderilenProjeId ? { proje_id: gonderilenProjeId } : {}),
+          // TA çoklu proje (mig 098): SA tarafından TA oluşturma anında
+          ...(isSA && isTAOlusturma && formProjeIdler.length > 0 ? { proje_idler: formProjeIdler } : {}),
         }),
       })
       const j = await res.json()
@@ -404,6 +487,7 @@ export default function KullanicilarClient({
       showOk('Kullanıcı oluşturuldu.')
       setCreateForm({ isim_soyisim: '', email: '', telefon: '', password: '', rol: 'tenant_user', ust_lokasyon_id: '', varsayilan_yikama_istasyon_id: '', cinsiyet: '', is_tester: false })
       setFormProjeId('')
+      setFormProjeIdler([])
       setOpenCreate(false)
       await refresh()
     } catch (e: any) { showErr(e.message) }
@@ -935,6 +1019,12 @@ export default function KullanicilarClient({
                         })
                         setOpenEdit(true)
                       }}>Düzenle</RowActionButton>}
+                      {/* SA-only: TA satırı için çoklu proje atama (mig 098) */}
+                      {isSA && u.rol === 'tenant_admin' && (
+                        <RowActionButton variant="base" onClick={() => openTaProjeModal(u)}>
+                          🗂 Projeler ({taProjeSayilari[u.id] ?? 0})
+                        </RowActionButton>
+                      )}
                       <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>
                       {pushYetki.benGonderebilirim && (deviceTokenMap[u.id] || lokasyonKolonModu === 'istasyon') && (
                         <RowActionButton variant="base" onClick={() => setPushModalAlicilar([{ id: u.id, isim_soyisim: u.isim_soyisim ?? '—', bildirim_izni: deviceTokenMap[u.id]?.bildirim_izni ?? null }])}>🔔 Bildirim</RowActionButton>
@@ -1005,13 +1095,44 @@ export default function KullanicilarClient({
                   </div>
                 )}
 
-                {/* SA: proje seçici (alt_super_admin hariç) */}
+                {/* SA: proje seçici (alt_super_admin hariç).
+                    TA için çoklu checkbox (mig 098), diğerleri için tek dropdown. */}
                 {isSA && createForm.rol !== 'alt_super_admin' && (
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <label className="verde-label">Proje *</label>
+                    <label className="verde-label">
+                      {createForm.rol === 'tenant_admin' ? 'Projeler * (çoklu seçim)' : 'Proje *'}
+                    </label>
                     {formProjeler.length === 0 ? (
                       <div style={{ fontSize: 13, color: '#dc2626', padding: '8px 0' }}>
                         Bu firmaya ait aktif proje bulunamadı. Önce proje oluşturun.
+                      </div>
+                    ) : createForm.rol === 'tenant_admin' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
+                        {formProjeler.map(p => {
+                          const secili = formProjeIdler.includes(p.id)
+                          return (
+                            <label key={p.id} style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '6px 8px', borderRadius: 6, cursor: 'pointer',
+                              background: secili ? '#eff6ff' : 'transparent',
+                              border: secili ? '1px solid #93c5fd' : '1px solid transparent',
+                              fontSize: 13, fontWeight: secili ? 600 : 400,
+                              color: secili ? '#1d4ed8' : '#374151',
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={secili}
+                                onChange={() => {
+                                  setFormProjeIdler(prev =>
+                                    secili ? prev.filter(x => x !== p.id) : [...prev, p.id]
+                                  )
+                                }}
+                                style={{ accentColor: '#1d4ed8' }}
+                              />
+                              {p.ad}
+                            </label>
+                          )
+                        })}
                       </div>
                     ) : (
                       <select
@@ -1026,7 +1147,9 @@ export default function KullanicilarClient({
                       </select>
                     )}
                     <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 4 }}>
-                      Kullanıcı bu projeye atanacak. Sonradan değiştirilebilir.
+                      {createForm.rol === 'tenant_admin'
+                        ? `TA bu projelere tam yetkiyle erişir. ${formProjeIdler.length} proje seçili. Sonradan satırdaki "Projeler" butonundan değiştirilebilir.`
+                        : 'Kullanıcı bu projeye atanacak. Sonradan değiştirilebilir.'}
                     </div>
                   </div>
                 )}
@@ -1234,6 +1357,96 @@ export default function KullanicilarClient({
             setPushSeciliIds(new Set())
           }}
         />
+      )}
+
+      {/* TA Çoklu Proje Atama Modal (SA-only, mig 098) */}
+      {taProjeTarget && (
+        <div
+          onClick={() => !taProjeModalLoading && setTaProjeTarget(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="verde-card"
+            style={{ width: 'min(560px, 96vw)', maxHeight: '90vh', overflowY: 'auto', padding: 24, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: '#0f172a' }}>TA Proje Atamaları</div>
+                <div style={{ fontSize: 12.5, color: '#6b7280', marginTop: 4 }}>
+                  <strong>{taProjeTarget.isim_soyisim}</strong> · seçili projelere tam TA yetkisiyle erişir
+                </div>
+              </div>
+              <button
+                onClick={() => !taProjeModalLoading && setTaProjeTarget(null)}
+                disabled={taProjeModalLoading}
+                style={{ padding: 6, borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280', fontSize: 18 }}
+              >×</button>
+            </div>
+
+            {taProjeModalLoading && taProjeModalProjeler.length === 0 ? (
+              <div style={{ padding: 30, textAlign: 'center', color: '#6b7280' }}>Yükleniyor...</div>
+            ) : taProjeModalProjeler.length === 0 ? (
+              <div style={{ padding: 30, textAlign: 'center', color: '#dc2626', fontSize: 13 }}>
+                Bu firmaya ait proje bulunamadı.
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 10, fontSize: 12.5, color: '#374151' }}>
+                  <strong>{taProjeModalSecili.size}</strong> / {taProjeModalProjeler.length} seçili
+                  {taProjeModalSecili.size === 0 && <span style={{ color: '#dc2626', marginLeft: 8 }}>(en az 1 zorunlu)</span>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
+                  {taProjeModalProjeler.map(p => {
+                    const secili = taProjeModalSecili.has(p.id)
+                    const pasif = !p.aktif
+                    return (
+                      <label key={p.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '7px 10px', borderRadius: 6, cursor: pasif ? 'not-allowed' : 'pointer',
+                        background: secili ? '#eff6ff' : 'transparent',
+                        border: secili ? '1px solid #93c5fd' : '1px solid transparent',
+                        fontSize: 13, fontWeight: secili ? 600 : 400,
+                        color: pasif ? '#9ca3af' : (secili ? '#1d4ed8' : '#374151'),
+                        opacity: pasif ? 0.6 : 1,
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={secili}
+                          disabled={pasif}
+                          onChange={() => {
+                            if (pasif) return
+                            setTaProjeModalSecili(prev => {
+                              const s = new Set(prev)
+                              if (secili) s.delete(p.id); else s.add(p.id)
+                              return s
+                            })
+                          }}
+                          style={{ accentColor: '#1d4ed8' }}
+                        />
+                        <span style={{ flex: 1 }}>{p.ad}</span>
+                        {pasif && <span style={{ fontSize: 10, color: '#dc2626', fontWeight: 700 }}>PASİF</span>}
+                      </label>
+                    )
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+                  <button
+                    onClick={() => !taProjeModalLoading && setTaProjeTarget(null)}
+                    disabled={taProjeModalLoading}
+                    style={{ padding: '8px 16px', borderRadius: 8, background: '#fff', color: '#374151', border: '1px solid #e2e8f0', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+                  >Vazgeç</button>
+                  <button
+                    onClick={saveTaProjeler}
+                    disabled={taProjeModalLoading || taProjeModalSecili.size === 0}
+                    style={{ padding: '8px 20px', borderRadius: 8, background: '#111827', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: taProjeModalLoading ? 'wait' : 'pointer', opacity: (taProjeModalLoading || taProjeModalSecili.size === 0) ? 0.5 : 1 }}
+                  >{taProjeModalLoading ? 'Kaydediliyor...' : 'Kaydet'}</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
