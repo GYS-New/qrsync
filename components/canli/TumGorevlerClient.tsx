@@ -799,11 +799,13 @@ async function del() {
 
   useEffect(() => {
     if (!firmaId) { setFirmaVardiyalari([]); return }
-    fetch(`/api/firma/vardiya-ayarlari?firma_id=${firmaId}`, { cache: 'no-store' })
+    const qs = new URLSearchParams({ firma_id: firmaId })
+    if (projeId) qs.set('proje_id', projeId)
+    fetch(`/api/firma/vardiya-ayarlari?${qs}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(j => setFirmaVardiyalari(j?.ok ? (j.vardiyalar ?? []) : []))
       .catch(() => setFirmaVardiyalari([]))
-  }, [firmaId])
+  }, [firmaId, projeId])
 
   // Vardiya filtre aralığı (dakika cinsinden, sarkan vardiya için bit > 1440)
   const vardiyaAralik = useMemo<{ basMin: number; bitMin: number } | null>(() => {

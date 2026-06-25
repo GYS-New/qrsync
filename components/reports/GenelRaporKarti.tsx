@@ -491,14 +491,16 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
       .catch(() => setLokasyonlar([]))
   }, [currentFirmaId, projeId])
 
-  // Firma vardiya ayarını çek (dropdown label'ları için)
+  // Efektif vardiya ayarı (proje override > firma, mig 094) — dropdown label'ları için
   useEffect(() => {
     if (!currentFirmaId) { setFirmaVardiyalari([]); return }
-    fetch(`/api/firma/vardiya-ayarlari?firma_id=${currentFirmaId}`, { cache: 'no-store' })
+    const qs = new URLSearchParams({ firma_id: currentFirmaId })
+    if (projeId) qs.set('proje_id', projeId)
+    fetch(`/api/firma/vardiya-ayarlari?${qs}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(j => setFirmaVardiyalari(j?.ok ? (j.vardiyalar ?? []) : []))
       .catch(() => setFirmaVardiyalari([]))
-  }, [currentFirmaId])
+  }, [currentFirmaId, projeId])
 
   // Tek üst lokasyona yetkisi olan U/M rollerinde otomatik seç — alt lokasyon filtresi açılsın
   useEffect(() => {
