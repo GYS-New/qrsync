@@ -29,12 +29,18 @@ export default async function UKullanicilarPage() {
   let users: any[] = []
   if (yetkiliUstLokIds) {
     // Yetkili üst lokasyonlardaki kullanıcıları getir (users.ust_lokasyon_id bazlı)
+    // + birincil ataması olmayan (ust_lokasyon_id IS NULL) projeye atanan kullanıcıları
+    // da dahil et. Aksi takdirde lokasyon ataması yapılmamış proje kullanıcıları
+    // (örn. yeni proje, henüz lokasyon atanmamış) yetkili U yöneticisinin
+    // listesinde görünmez.
     const admin = createAdminClient()
+    const ustLokFilter = `ust_lokasyon_id.in.(${yetkiliUstLokIds.join(',')})`
+    const projeFallback = projeId ? `,and(ust_lokasyon_id.is.null,proje_id.eq.${projeId})` : ''
     const { data } = await admin
       .from('users')
       .select('*')
       .eq('firma_id', firmaId)
-      .in('ust_lokasyon_id', yetkiliUstLokIds)
+      .or(`${ustLokFilter}${projeFallback}`)
       .order('isim_soyisim')
     users = data ?? []
   } else {
