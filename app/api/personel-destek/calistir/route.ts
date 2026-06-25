@@ -62,7 +62,9 @@ export async function POST(req: Request) {
         })
         continue
       }
-      const result = await destekCalistir(admin, ayar)
+      // Vardiya bitiş anını destekCalistir'a geçir → tamamlanma_tarihi
+      // bu ana çekilir, görev kendi vardiya gününe raporlanır
+      const result = await destekCalistir(admin, ayar, pencereSonuc.vardiyaBitisIso!)
       sonuclar.push({
         ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id,
         ust_lokasyon_id: ayar.ust_lokasyon_id,
@@ -121,14 +123,19 @@ function trSimdiDakika(): number {
  * Projenin efektif vardiyalarından herhangi birinin bitişi şu an pencerede mi?
  * Pencere: [bitis + PENCERE_BAS_DK, bitis + PENCERE_BIT_DK]
  *
- * Sarkan vardiya (örn V1 23:30-07:30) bitiş 07:30 → 08:00-08:15 penceresi
- * sabah TR günü içinde. 00:00 bitiş özel: 24:00 olarak normalize edilir.
+ * 24h modulo kullanılır → gün geçişinde de doğru çalışır:
+ *   Çanakkale V3 (16:00-00:00) bitişi 24:00 → cron 00:30 TR'de gecenDk=30 ✓
+ *   Renault V1 (23:30-07:30 sarkan) bitişi 07:30 → cron 08:00 TR'de gecenDk=30 ✓
+ *
+ * vardiyaBitisIso: tam vardiya bitiş anının ISO zamanı (TR saatinden UTC'ye).
+ * Bu, görevin tamamlanma_tarihi'ni vardiya bitişine çekmek için kullanılır
+ * (raporlar tamamlanma_tarihi'ne baktığında doğru vardiya gününe gider).
  */
 async function vardiyaBitisPenceresinde(
   admin: any,
   firmaId: string,
   projeId: string | null,
-): Promise<{ icerideMi: boolean; bitisDkOnce?: number; debug?: any }> {
+): Promise<{ icerideMi: boolean; bitisDkOnce?: number; vardiyaBitisIso?: string; debug?: any }> {
   const ev = await getEffectiveVardiya(admin, firmaId, projeId)
   const sayisi = ev.vardiya_sayisi
   if (!sayisi) return { icerideMi: false, debug: { sebep: 'vardiya_sayisi_yok' } }
@@ -136,28 +143,27 @@ async function vardiyaBitisPenceresinde(
   if (!Array.isArray(ayarlar) || ayarlar.length === 0) {
     return { icerideMi: false, debug: { sebep: 'ayar_yok' } }
   }
+  const simdiMs = Date.now()
   const simdiDk = trSimdiDakika()
 
   for (const v of ayarlar) {
     const basMin = parseHHMM(v?.baslangic)
     const bitMin0 = parseHHMM(v?.bitis)
     if (basMin == null || bitMin0 == null) continue
-    // "00:00" bitiş = gün sonu (24:00); sarkan değil
-    let bitMin = bitMin0
-    if (bitMin === 0 && basMin !== 0) bitMin = 24 * 60
-    // İki olası bitiş saati: bugünün ve dünün (sarkan vardiya gece geçer)
-    const adaylar: number[] = [bitMin]
-    if (bitMin <= basMin && bitMin !== 24 * 60) {
-      // Sarkan: dün başlamış, bugün sabah biten → bitis dakikası "bugünün sabahı"
-      adaylar.push(bitMin)
-      // Aynı zamanda bugün başlayacak sarkan vardiya için yarına bitiş — pencerede olamaz
-    }
-    for (const bit of adaylar) {
-      const gecenDk = simdiDk - bit
-      // Eğer geçen dakika negatifse (bitiş henüz olmamış) veya 24h üzerinde,
-      // pratikte pencerede değil
-      if (gecenDk >= PENCERE_BAS_DK && gecenDk <= PENCERE_BIT_DK) {
-        return { icerideMi: true, bitisDkOnce: gecenDk, debug: { vardiya_no: v.no, bitis: v.bitis } }
+    // "00:00" bitiş = gün sonu (24:00); sarkan değil. Modulo karşılaştırma
+    // için tek "TR günü dakikası" yeterli (0..1439). 1440 = 0 olarak gör.
+    const bitModulo = (bitMin0 === 0 && basMin !== 0) ? 0 : bitMin0
+    // (simdiDk - bit + 1440) % 1440 → "vardiya kaç dakika önce bitti"
+    // 00:30 (30) - 24:00 (0) = 30 ✓, 08:30 (510) - 08:00 (480) = 30 ✓
+    const gecenDk = ((simdiDk - bitModulo + 1440) % 1440)
+    if (gecenDk >= PENCERE_BAS_DK && gecenDk <= PENCERE_BIT_DK) {
+      // Vardiya bitiş anı = şimdi - gecenDk dakika
+      const vardiyaBitisIso = new Date(simdiMs - gecenDk * 60 * 1000).toISOString()
+      return {
+        icerideMi: true,
+        bitisDkOnce: gecenDk,
+        vardiyaBitisIso,
+        debug: { vardiya_no: v.no, bitis: v.bitis, simdiDk, bitModulo },
       }
     }
   }
@@ -184,9 +190,13 @@ function cinsiyetliPersonelSec(personeller: PersonelBilgi[], lokTanim: string): 
   return personeller[Math.floor(Math.random() * personeller.length)].id
 }
 
-async function destekCalistir(admin: any, ayar: any) {
+async function destekCalistir(admin: any, ayar: any, vardiyaBitisIso: string) {
   const { firma_id, proje_id, ust_lokasyon_id, hedef_oran } = ayar
   const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  // Vardiya bitiş anı timestamp — tamamlanma_tarihi bu ana çekilir (vardiya
+  // bitiminden 0-5 dk önce, doğal görünüm). Görev kendi vardiya gününe
+  // raporlanır (raporlar tamamlanma_tarihi'ne baksa bile doğru güne yazar).
+  const vardiyaBitisMs = new Date(vardiyaBitisIso).getTime()
 
   // Üst lokasyonun tüm alt lokasyonlarını BFS ile bul
   const { data: tumLokasyonlar } = await admin
@@ -289,8 +299,7 @@ async function destekCalistir(admin: any, ayar: any) {
   let skipPersonelCount = 0
   let updateErrorCount = 0
   const logPrefix = `[PD-${ayar.id.slice(0, 8)}]`
-  console.log(`${logPrefix} DÖNGÜ BAŞLIYOR — shuffled=${shuffled.length}, uygunPersonel=${uygunPersonel.length}, ilkAtanan=${shuffled[0]?.atanan_kullanici_id ?? 'NULL'}, ilkLok=${shuffled[0]?.lokasyon_id?.slice(0, 8) ?? 'NULL'}`)
-  const now = Date.now()
+  console.log(`${logPrefix} DÖNGÜ BAŞLIYOR — shuffled=${shuffled.length}, uygunPersonel=${uygunPersonel.length}, ilkAtanan=${shuffled[0]?.atanan_kullanici_id ?? 'NULL'}, ilkLok=${shuffled[0]?.lokasyon_id?.slice(0, 8) ?? 'NULL'}, vardiyaBitis=${vardiyaBitisIso}`)
 
   for (const gorev of shuffled) {
     const lok = lokMap.get(gorev.lokasyon_id)
@@ -313,8 +322,15 @@ async function destekCalistir(admin: any, ayar: any) {
     const minDk = lok?.min_sure_dakika ?? 3
     const sureDk = minDk + Math.random() * (hedefDk * 1.5 - minDk)
     const sureSaniye = Math.round(sureDk * 60)
-    const tamamlanmaIso = new Date().toISOString()
-    const baslatmaIso = new Date(now - sureSaniye * 1000).toISOString()
+    // Tamamlanma: vardiya bitişinden 0-5 dk önce (doğal görünüm + raporlama
+    // doğru vardiya gününe yazar). Başlatma: tamamlanma - süre.
+    // KRITIK: now() yerine vardiya bitiş anı, çünkü cron gerçekte bitiş+30dk
+    // sonra çalışıyor — eğer tamamlanma=now yazsak görev sonraki TR gününe
+    // kayar, raporlar yanlış güne raporlardı.
+    const onceDk = Math.floor(Math.random() * 5)  // 0-4 dk
+    const tamamlanmaMs = vardiyaBitisMs - onceDk * 60 * 1000
+    const tamamlanmaIso = new Date(tamamlanmaMs).toISOString()
+    const baslatmaIso = new Date(tamamlanmaMs - sureSaniye * 1000).toISOString()
 
     // BEKLEMEDE'den geç tamamlama → ZAMANINDA_YAPILAMAYAN (liveStatus.ts:78 ile tutarlı)
     // Kanal: WEB — PD destek personelleri (üst lokasyon yetkilileri) web kullanıcısı,
