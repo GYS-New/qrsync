@@ -3,6 +3,7 @@ import { fetchAll } from '@/lib/supabase/fetchAll'
 import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliUserIds'
 import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 // VardiyaFilter: 'all' veya vardiya numarası (1/2/3/4). Eski 'v1'/'v2'/'v3'
 // string'leri firma vardiya ayarına dinamik bağlanabilmesi için number'a
@@ -445,12 +446,9 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   let vardiyaAralik: { basMin: number; bitMin: number } | null = null
   const tumVardiyaAraliklari: { no: number; basMin: number; bitMin: number }[] = []
   {
-    const { data: firmaRow } = await admin
-      .from('firmalar')
-      .select('vardiya_sayisi, tum_vardiya_ayarlari, vardiya_saatleri')
-      .eq('id', filters.firmaId).single()
-    const vs = (firmaRow as any)?.vardiya_sayisi ?? 0
-    const ayarlar = (firmaRow as any)?.tum_vardiya_ayarlari?.[String(vs)] ?? (firmaRow as any)?.vardiya_saatleri ?? []
+    const ev = await getEffectiveVardiya(admin, filters.firmaId, filters.projeId)
+    const vs = ev.vardiya_sayisi ?? 0
+    const ayarlar = (ev.tum_vardiya_ayarlari ?? {})?.[String(vs)] ?? ev.vardiya_saatleri ?? []
     for (const v of (ayarlar as any[])) {
       if (!v?.baslangic || !v?.bitis) continue
       const [bh, bm] = v.baslangic.split(':').map(Number)

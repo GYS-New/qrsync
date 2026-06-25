@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,15 +36,11 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Firma vardiya ayarı
-  const { data: firma } = await admin
-    .from('firmalar')
-    .select('vardiya_sayisi, tum_vardiya_ayarlari')
-    .eq('id', firmaId)
-    .single()
-  const vardiyaSayisi: number = (firma as any)?.vardiya_sayisi ?? 3
+  // Vardiya ayarı — proje override > firma fallback (mig 094)
+  const ev = await getEffectiveVardiya(admin, firmaId, projeId)
+  const vardiyaSayisi: number = ev.vardiya_sayisi ?? 3
   const aktifSet: { no: number; baslangic: string; bitis: string }[] =
-    ((firma as any)?.tum_vardiya_ayarlari?.[String(vardiyaSayisi)] ?? []) as any
+    ((ev.tum_vardiya_ayarlari ?? {})[String(vardiyaSayisi)] ?? []) as any
 
   // Üst lokasyonun tüm alt-altlarını bul (BFS)
   const { data: tumLokasyonlar } = await admin

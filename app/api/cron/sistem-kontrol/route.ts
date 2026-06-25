@@ -20,6 +20,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { mergeVardiyaRows } from '@/lib/vardiya/getEffective'
 
 export const dynamic = 'force-dynamic'
 
@@ -540,15 +541,29 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
       return cur ?? null
     }
 
-    // Firma vardiya ayarı — kuralın aktif_olma_saati'nden vardiya_no çıkar
+    // Firma + proje vardiya ayarları — kuralın aktif_olma_saati'nden vardiya_no çıkar.
+    // Proje override > firma fallback (mig 094). Çanakkale gibi farklı vardiyalı
+    // projelerde, kural lokasyonunun projesine ait override kullanılır.
     const { data: firmaDetay } = await admin
       .from('firmalar')
       .select('vardiya_sayisi, tum_vardiya_ayarlari')
       .eq('id', f.id).single()
-    const vardiyaSayisi = (firmaDetay as any)?.vardiya_sayisi ?? 3
-    const vardiyaAyarlari: any[] = (firmaDetay as any)?.tum_vardiya_ayarlari?.[String(vardiyaSayisi)] ?? []
-    function vardiyaNoBul(saatStr: string): number | null {
-      for (const v of vardiyaAyarlari) {
+    const { data: firmaProjeler } = await admin
+      .from('projeler')
+      .select('id, vardiya_sayisi, tum_vardiya_ayarlari')
+      .eq('firma_id', f.id)
+    const firmaEv = mergeVardiyaRows(firmaDetay as any, null)
+    const firmaAyar: any[] =
+      (firmaEv.tum_vardiya_ayarlari ?? {})?.[String(firmaEv.vardiya_sayisi ?? 3)] ?? []
+    const projeVardiyaMap = new Map<string, any[]>()
+    for (const p of (firmaProjeler ?? []) as any[]) {
+      const ev = mergeVardiyaRows(firmaDetay as any, p)
+      const ayar = (ev.tum_vardiya_ayarlari ?? {})?.[String(ev.vardiya_sayisi ?? 3)] ?? []
+      projeVardiyaMap.set(p.id, Array.isArray(ayar) ? ayar : [])
+    }
+    function vardiyaNoBul(saatStr: string, projeId: string | null): number | null {
+      const ayarlar = (projeId && projeVardiyaMap.get(projeId)) || firmaAyar
+      for (const v of ayarlar) {
         const bas = v.baslangic as string
         const bit = v.bitis as string
         if (!bas || !bit) continue
@@ -572,7 +587,8 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
       // Duraklatma kontrolü — gece_gorev_uret ile aynı mantık
       const ustLok = k.lokasyon_id ? ustBul(k.lokasyon_id) : null
       const saatStr = String(k.aktif_olma_saati ?? '').slice(0, 5)
-      const vNo = saatStr ? vardiyaNoBul(saatStr) : null
+      const kuralProjeId: string | null = k.lokasyonlar?.proje_id ?? null
+      const vNo = saatStr ? vardiyaNoBul(saatStr, kuralProjeId) : null
       if (ustLok && vNo !== null && duraklatSet.has(`${k.tanim}::${ustLok}::${vNo}`)) {
         duraklatildiAdet++
         continue

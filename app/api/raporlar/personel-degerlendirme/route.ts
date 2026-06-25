@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { sayfaGorebilirMi } from '@/lib/yetki/sayfaYetkisi'
 import { fetchAll } from '@/lib/supabase/fetchAll'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -110,17 +111,13 @@ export async function GET(req: NextRequest) {
 
   const personelIds = (personeller ?? []).map((u: any) => u.id)
 
-  // ── 2. Firma vardiya ayarları ──────────────────────────────────────────────
-  const { data: firmaRow } = await admin
-    .from('firmalar')
-    .select('vardiya_sayisi, vardiya_saatleri, tum_vardiya_ayarlari')
-    .eq('id', firmaId)
-    .single()
-  const vardiyaSayisi = (firmaRow as any)?.vardiya_sayisi ?? 0
-  const tumAyarlar = (firmaRow as any)?.tum_vardiya_ayarlari ?? {}
+  // ── 2. Vardiya ayarları — proje override > firma fallback (mig 094) ───────
+  const ev = await getEffectiveVardiya(admin, firmaId, projeId)
+  const vardiyaSayisi = ev.vardiya_sayisi ?? 0
+  const tumAyarlar = ev.tum_vardiya_ayarlari ?? {}
   const vardiyaList: { no: number; baslangic: string; bitis: string }[] = (() => {
     const key = String(vardiyaSayisi)
-    const raw = (tumAyarlar?.[key] ?? (firmaRow as any)?.vardiya_saatleri ?? []) as any[]
+    const raw = (tumAyarlar?.[key] ?? ev.vardiya_saatleri ?? []) as any[]
     return raw
       .filter(v => v && v.baslangic && v.bitis)
       .map((v: any) => ({ no: Number(v.no), baslangic: String(v.baslangic), bitis: String(v.bitis) }))

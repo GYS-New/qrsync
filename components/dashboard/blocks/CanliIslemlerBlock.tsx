@@ -1,6 +1,7 @@
 import KpiCard from '@/components/dashboard/KpiCard'
 import { createClient } from '@/lib/supabase/server'
 import { suankiVardiyaGunu } from '@/lib/gorev/vardiyaGunu'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 /** Türkiye saatiyle bugünün UTC başlangıcını döndürür (UTC+3) */
 function bugunTR(): Date {
@@ -22,16 +23,13 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
   const todayISO = today.toISOString()
   const onlineSince = new Date(Date.now() - 120 * 1000).toISOString()
 
-  // Firma vardiya ayarlarını çek — sarkan V1 (örn 23:30-07:30) için bugünVG hesabı
+  // Vardiya ayarları (proje override > firma, mig 094) — sarkan V1 için bugünVG hesabı
   let bugunVG: string = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
   if (firmaId) {
-    const { data: firma } = await supabase
-      .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single()
-    if (firma) {
-      const sayisi = (firma as any).vardiya_sayisi ?? 3
-      const set = ((firma as any).tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
-      bugunVG = suankiVardiyaGunu(Array.isArray(set) ? set : [])
-    }
+    const ev = await getEffectiveVardiya(supabase as any, firmaId, projeId ?? null)
+    const sayisi = ev.vardiya_sayisi ?? 3
+    const set = ((ev.tum_vardiya_ayarlari ?? {})[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
+    bugunVG = suankiVardiyaGunu(Array.isArray(set) ? set : [])
   }
 
   // Görev sorguları: firma + proje + lokasyon yetki filtresi

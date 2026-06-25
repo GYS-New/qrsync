@@ -14,6 +14,7 @@ import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { useYetki } from '@/lib/yetki/useYetki'
 import { KanalBadge } from '@/components/shared/KanalBadge'
 import { suankiVardiyaGunu } from '@/lib/gorev/vardiyaGunu'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 type SortKey = 'grup' | 'tanim' | 'lokasyon' | 'atanan' | 'aktif' | 'islem' | 'durum' | 'actor'
 
@@ -343,24 +344,20 @@ const getLocUstAlt = (lokasyonId: string | null | undefined, fallbackName?: stri
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [firmaId, projeId])
 
-// Firma vardiya ayarlarını çek (vardiya bazlı özet için)
+// Efektif vardiya ayarları — proje override > firma fallback (mig 094)
 useEffect(() => {
   if (!firmaId) return
   let alive = true
   ;(async () => {
-    const { data: firma } = await supabase
-      .from('firmalar')
-      .select('vardiya_sayisi, tum_vardiya_ayarlari')
-      .eq('id', firmaId)
-      .single()
-    if (!alive || !firma) return
-    const sayisi = (firma as any).vardiya_sayisi ?? 3
-    const set = ((firma as any).tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
+    const ev = await getEffectiveVardiya(supabase as any, firmaId, projeId ?? null)
+    if (!alive) return
+    const sayisi = ev.vardiya_sayisi ?? 3
+    const set = ((ev.tum_vardiya_ayarlari ?? {})[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
     setVardiyaAyari(Array.isArray(set) ? set : [])
   })()
   return () => { alive = false }
 // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [firmaId])
+}, [firmaId, projeId])
 
 useEffect(() => {
     // Mount'ta sadece HAZIR→ACIK geçiş check'ini tetikle, listeyi SSR'den gelen

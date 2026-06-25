@@ -47,6 +47,7 @@ import { auditLog } from '@/lib/audit/log'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 import { getRequestMeta } from '@/lib/device/getRequestMeta'
 import { vardiyaGunuHesapla, type VardiyaAyar } from '@/lib/gorev/vardiyaGunu'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -324,13 +325,14 @@ async function ekstraGoreviOlustur(
   const nowIso = new Date().toISOString()
   const sure = sureSaniye(kayit.baslatilma_zamani, kayit.bitirme_zamani) ?? 0
 
-  // vardiya_gunu hesabı — görev başlatma zamanı (offline kayıt) baz alınır
+  // vardiya_gunu hesabı — görev başlatma zamanı (offline kayıt) baz alınır.
+  // Proje override > firma fallback (mig 094).
+  const gorevProjeId = lok.proje_id ?? personelProjeId ?? null
   let vardiyaGunu: string
   try {
-    const { data: firma } = await admin
-      .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single()
-    const sayisi = (firma as any)?.vardiya_sayisi ?? 3
-    const set = ((firma as any)?.tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as VardiyaAyar[]
+    const ev = await getEffectiveVardiya(admin, firmaId, gorevProjeId)
+    const sayisi = ev.vardiya_sayisi ?? 3
+    const set = ((ev.tum_vardiya_ayarlari ?? {})[String(sayisi)] ?? []) as VardiyaAyar[]
     vardiyaGunu = vardiyaGunuHesapla(Array.isArray(set) ? set : [], kayit.baslatilma_zamani)
   } catch {
     vardiyaGunu = new Date(kayit.baslatilma_zamani).toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })

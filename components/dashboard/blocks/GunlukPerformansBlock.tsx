@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
 import { suankiVardiyaGunu } from '@/lib/gorev/vardiyaGunu'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 import type { DashboardBlockProps } from '../types'
 
 const STAT = [
@@ -26,16 +27,13 @@ export default async function GunlukPerformansBlock({
   const supabase = createClient()
   const today = bugunTR()
 
-  // Firma vardiya ayarlarını çek — sarkan V1 (örn 23:30-07:30) için bugünVG hesabı
+  // Vardiya ayarları (proje override > firma, mig 094) — sarkan V1 için bugünVG hesabı
   let bugunVG: string = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
   if (firmaId) {
-    const { data: firma } = await supabase
-      .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single()
-    if (firma) {
-      const sayisi = (firma as any).vardiya_sayisi ?? 3
-      const set = ((firma as any).tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
-      bugunVG = suankiVardiyaGunu(Array.isArray(set) ? set : [])
-    }
+    const ev = await getEffectiveVardiya(supabase as any, firmaId, projeId ?? null)
+    const sayisi = ev.vardiya_sayisi ?? 3
+    const set = ((ev.tum_vardiya_ayarlari ?? {})[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
+    bugunVG = suankiVardiyaGunu(Array.isArray(set) ? set : [])
   }
 
   // Spesifik görevler (tek seferlik — vardiya kavramı yok, olusturma_tarihi korunur).

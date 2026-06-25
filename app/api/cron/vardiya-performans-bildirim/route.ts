@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendFCMToUser } from '@/lib/fcm-sender'
+import { mergeVardiyaRows } from '@/lib/vardiya/getEffective'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -91,28 +92,34 @@ export async function POST(req: NextRequest) {
   const sonuc: any[] = []
   let toplamGonderim = 0
 
-  // 1) Tüm aktif firmaları çek
+  // 1) Tüm aktif firmaları çek (firma-default vardiya — proje override yoksa fallback)
   const { data: firmalar } = await admin
     .from('firmalar')
     .select('id, firma_adi, ticari_unvan, vardiya_sayisi, tum_vardiya_ayarlari')
     .eq('aktif', true)
 
   for (const f of firmalar ?? []) {
-    const vs = f.vardiya_sayisi as number | null
-    if (!vs) continue
-    const ayarlar: VardiyaItem[] | undefined = (f.tum_vardiya_ayarlari ?? {})?.[String(vs)]
-    if (!Array.isArray(ayarlar) || ayarlar.length === 0) continue
-
-    // 2) Firmanın aktif projelerini çek (projesi olmayanlar için null ile tek tur)
+    // 2) Firmanın aktif projelerini + her birinin vardiya override'ını çek.
+    //    Proje override > firma fallback (mig 094).
     const { data: projeler } = await admin
       .from('projeler')
-      .select('id')
+      .select('id, vardiya_sayisi, tum_vardiya_ayarlari')
       .eq('firma_id', f.id)
       .eq('aktif', true)
-    const projeIdler: (string | null)[] = (projeler ?? []).map((p: any) => p.id as string)
-    if (projeIdler.length === 0) projeIdler.push(null)
+    const projeRows: ({ id: string | null; vardiya_sayisi?: any; tum_vardiya_ayarlari?: any })[] =
+      (projeler ?? []).length > 0
+        ? (projeler as any[])
+        : [{ id: null }]
 
-    for (const projeId of projeIdler) {
+    for (const proje of projeRows) {
+      const projeId = proje.id
+      // Bu firma+proje için efektif vardiya: proje override > firma fallback.
+      const ev = mergeVardiyaRows(f as any, proje as any)
+      const vs = ev.vardiya_sayisi
+      if (!vs) continue
+      const ayarlar: VardiyaItem[] | undefined = (ev.tum_vardiya_ayarlari ?? {})?.[String(vs)]
+      if (!Array.isArray(ayarlar) || ayarlar.length === 0) continue
+
       // 3) Her vardiya için: bitiş+10dk geçti mi + bugün için log yok mu?
       for (const v of ayarlar) {
         const basMin = parseHHMM(v.baslangic)

@@ -21,6 +21,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { aktifVardiyaAraligi } from '@/lib/scan/vardiya'
+import { mergeVardiyaRows } from '@/lib/vardiya/getEffective'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
         .eq('id', firmaId).single(),
       personelProjeId
         ? admin.from('projeler')
-            .select('personel_takibi_aktif, frekansiyel_ceklist_aktif, spesifik_ceklist_aktif')
+            .select('personel_takibi_aktif, frekansiyel_ceklist_aktif, spesifik_ceklist_aktif, vardiya_sayisi, tum_vardiya_ayarlari')
             .eq('id', personelProjeId).single()
         : Promise.resolve({ data: null }),
     ])
@@ -113,8 +114,9 @@ export async function POST(req: Request) {
       }
       mesaiKaydi = mesai
 
-      // Vardiya tespiti: iş başı giris_saati'ne göre
-      vardiyaBilgi = aktifVardiyaAraligi(firma?.vardiya_sayisi, firma?.tum_vardiya_ayarlari, mesai.giris_saati)
+      // Vardiya tespiti: iş başı giris_saati'ne göre (proje override > firma fallback)
+      const ev = mergeVardiyaRows(firma, proje)
+      vardiyaBilgi = aktifVardiyaAraligi(ev.vardiya_sayisi, ev.tum_vardiya_ayarlari, mesai.giris_saati)
     }
 
     // ── Yetkili üst lokasyonlar + BFS (kullanıcının çalışma alanı) ──────────

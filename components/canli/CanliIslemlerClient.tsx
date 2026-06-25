@@ -13,6 +13,7 @@ import { Pause, Play, Square } from 'lucide-react'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { iptalSebepKontrol } from '@/lib/validation/iptalSebep'
 import { suankiVardiyaGunu } from '@/lib/gorev/vardiyaGunu'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 // ── Tarih/saat formatlama yardımcıları (TR — Europe/Istanbul) ────────────
 function formatTarihTR(value?: string | null): string {
@@ -475,24 +476,20 @@ useEffect(() => {
     return new Date(Date.now() - canliAkisSureSaat * 60 * 60 * 1000).toISOString()
   }
 
-  // Vardiya ayarlarını çek (firma + vardiya_sayisi)
+  // Efektif vardiya ayarları — proje override > firma fallback (mig 094)
   useEffect(() => {
     if (!firmaId) return
     let alive = true
     ;(async () => {
-      const { data: firma } = await supabase
-        .from('firmalar')
-        .select('vardiya_sayisi, tum_vardiya_ayarlari')
-        .eq('id', firmaId)
-        .single()
-      if (!alive || !firma) return
-      const sayisi = (firma as any).vardiya_sayisi ?? 3
-      const set = ((firma as any).tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
+      const ev = await getEffectiveVardiya(supabase as any, firmaId, projeId ?? null)
+      if (!alive) return
+      const sayisi = ev.vardiya_sayisi ?? 3
+      const set = ((ev.tum_vardiya_ayarlari ?? {})[String(sayisi)] ?? []) as { no: number; baslangic: string; bitis: string }[]
       setVardiyaAyari(Array.isArray(set) ? set : [])
     })()
     return () => { alive = false }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmaId])
+  }, [firmaId, projeId])
 
   // Bugünün TR günü için tüm canlı görevleri çek (vardiya özet kartları)
   // Sarkan V1 (örn 23:30-07:30) aktif olduğunda "şu anki vardiya günü" yarına ait

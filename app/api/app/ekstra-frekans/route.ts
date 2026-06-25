@@ -5,6 +5,7 @@ import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
 import { vardiyaGunuHesapla, type VardiyaAyar } from '@/lib/gorev/vardiyaGunu'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -379,13 +380,13 @@ export async function POST(req: Request) {
     // Kayıt oluştur
     const nowIso = new Date().toISOString()
 
-    // vardiya_gunu hesabı — sarkan vardiya desteğiyle
+    // vardiya_gunu hesabı — sarkan vardiya desteğiyle (proje override > firma, mig 094)
+    const gorevProjeId = lok.proje_id ?? personelProjeId ?? null
     let vardiyaGunu: string
     try {
-      const { data: firma } = await admin
-        .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single()
-      const sayisi = (firma as any)?.vardiya_sayisi ?? 3
-      const set = ((firma as any)?.tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as VardiyaAyar[]
+      const ev = await getEffectiveVardiya(admin, firmaId, gorevProjeId)
+      const sayisi = ev.vardiya_sayisi ?? 3
+      const set = ((ev.tum_vardiya_ayarlari ?? {})[String(sayisi)] ?? []) as VardiyaAyar[]
       vardiyaGunu = vardiyaGunuHesapla(Array.isArray(set) ? set : [], nowIso)
     } catch {
       vardiyaGunu = new Date(nowIso).toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })

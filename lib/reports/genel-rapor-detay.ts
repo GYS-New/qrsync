@@ -9,6 +9,7 @@
 // istenen N satır taşınır, JS tarafında full-table aggregation yapılmaz.
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 import {
   formatDate, formatTarihTR, formatGorevSaatleri, formatGorevSuresi,
 } from './_format'
@@ -162,12 +163,11 @@ export async function buildGenelRaporDetay(
     const bv = b[sortCol] ? new Date(b[sortCol]).getTime() : 0
     return bv - av
   })
-  // Firma vardiya ayarlarını her zaman çek — hem filter hem row vardiyaNo için.
-  const { data: firmaRow } = await admin
-    .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari, vardiya_saatleri')
-    .eq('id', filters.firmaId).single()
-  const vs = (firmaRow as any)?.vardiya_sayisi ?? 0
-  const ayarlar = (firmaRow as any)?.tum_vardiya_ayarlari?.[String(vs)] ?? (firmaRow as any)?.vardiya_saatleri ?? []
+  // Vardiya ayarları (proje override > firma fallback, mig 094) —
+  // hem filter hem row vardiyaNo için.
+  const ev = await getEffectiveVardiya(admin, filters.firmaId, filters.projeId)
+  const vs = ev.vardiya_sayisi ?? 0
+  const ayarlar = (ev.tum_vardiya_ayarlari ?? {})?.[String(vs)] ?? ev.vardiya_saatleri ?? []
   const tumVardiyaAraliklari: { no: number; basMin: number; bitMin: number }[] = []
   for (const v of (ayarlar as any[])) {
     if (!v?.baslangic || !v?.bitis) continue

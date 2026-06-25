@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 /**
  * GET /api/arsiv/frekansiyel
@@ -94,11 +95,9 @@ export async function GET(req: NextRequest) {
   // Vardiya post-filter — firma vardiya ayarından dinamik (sarkan dahil destekli)
   if (vardiya !== 'all') {
     const vNo = vardiya === 'v1' ? 1 : vardiya === 'v2' ? 2 : vardiya === 'v3' ? 3 : 0
-    const { data: firmaRow } = await admin
-      .from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari, vardiya_saatleri')
-      .eq('id', firmaId).single()
-    const vs = (firmaRow as any)?.vardiya_sayisi ?? 0
-    const ayarlar = (firmaRow as any)?.tum_vardiya_ayarlari?.[String(vs)] ?? (firmaRow as any)?.vardiya_saatleri ?? []
+    const ev = await getEffectiveVardiya(admin, firmaId, projeId)
+    const vs = ev.vardiya_sayisi ?? 0
+    const ayarlar = (ev.tum_vardiya_ayarlari ?? {})?.[String(vs)] ?? ev.vardiya_saatleri ?? []
     const v = (ayarlar as any[]).find((x: any) => Number(x.no) === vNo)
     let aralik: { basMin: number; bitMin: number } | null = null
     if (v?.baslangic && v?.bitis) {

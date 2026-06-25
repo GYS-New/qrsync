@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { DashboardBlockProps } from '../types'
 import { suankiVardiyaGunu, type VardiyaAyar } from '@/lib/gorev/vardiyaGunu'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 type Mode = 'gunluk' | 'haftalik' | 'aylik'
 
@@ -29,18 +30,16 @@ export default function LokasyonGorevAnaliziBlock({
   const lastReq = useRef(0)
   const yetkiliLokIdsKey = useMemo(() => (yetkiliLokIds ?? []).slice().sort().join(','), [yetkiliLokIds])
 
-  // Firma vardiya ayarlarını çek (sarkan V1 için bugünVG hesabı)
+  // Efektif vardiya ayarları — proje override > firma fallback (mig 094)
   useEffect(() => {
     if (!firmaId) { setVardiyaAyari([]); return }
-    supabase.from('firmalar').select('vardiya_sayisi, tum_vardiya_ayarlari').eq('id', firmaId).single()
-      .then(({ data }: any) => {
-        if (!data) return
-        const sayisi = data.vardiya_sayisi ?? 3
-        const set = (data.tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as VardiyaAyar[]
-        setVardiyaAyari(Array.isArray(set) ? set : [])
-      })
+    getEffectiveVardiya(supabase as any, firmaId, projeId ?? null).then(ev => {
+      const sayisi = ev.vardiya_sayisi ?? 3
+      const set = ((ev.tum_vardiya_ayarlari ?? {})[String(sayisi)] ?? []) as VardiyaAyar[]
+      setVardiyaAyari(Array.isArray(set) ? set : [])
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmaId])
+  }, [firmaId, projeId])
 
   async function fetchData() {
     const reqId = Date.now()

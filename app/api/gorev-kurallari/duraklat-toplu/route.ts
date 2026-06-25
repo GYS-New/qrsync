@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
+import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -45,15 +46,11 @@ export async function POST(req: NextRequest) {
   // Vardiya, kuralın aktif_olma_saati ve firmanın vardiya ayarlarından derive edilir
   // SQL doğrudan çalıştırılır (kompleks join + jsonb iteration)
 
-  // Önce firma vardiya ayarını çek
-  const { data: firma } = await admin.from('firmalar')
-    .select('vardiya_sayisi, tum_vardiya_ayarlari')
-    .eq('id', firmaId).single()
-  if (!firma) return NextResponse.json({ error: 'Firma bulunamadı' }, { status: 404 })
-
-  const sayisi = (firma as any).vardiya_sayisi ?? 3
+  // Efektif vardiya — proje override > firma fallback (mig 094)
+  const ev = await getEffectiveVardiya(admin, firmaId, projeId)
+  const sayisi = ev.vardiya_sayisi ?? 3
   const aktifSet: { no: number; baslangic: string; bitis: string }[] =
-    ((firma as any).tum_vardiya_ayarlari?.[String(sayisi)] ?? []) as any
+    ((ev.tum_vardiya_ayarlari ?? {})[String(sayisi)] ?? []) as any
   if (!aktifSet.length) return NextResponse.json({ error: 'Vardiya ayarı yok' }, { status: 400 })
 
   // Üst lokasyondaki tüm aktif kuralları çek
