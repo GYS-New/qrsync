@@ -4,6 +4,31 @@ import { sendFCMToUser } from '@/lib/fcm-sender'
 
 export type GorevDurum = 'ACIK' | 'ISLEMDE' | 'IPTAL' | 'TAMAMLANDI'
 
+/**
+ * FCM push gönderimi — environment-aware.
+ * Client-side: /api/notifications/send-push fetch (SUPABASE_SERVICE_ROLE_KEY
+ *   client'ta yok, sendFCMToUser sessizce fail oluyor).
+ * Server-side: direkt sendFCMToUser çağrısı.
+ */
+async function pushIfPossible(
+  aliciId: string,
+  title: string,
+  message: string,
+  channelId: string = 'gorev_uyari',
+) {
+  try {
+    if (typeof window !== 'undefined') {
+      await fetch('/api/notifications/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aliciId, title, message, channelId }),
+      })
+    } else {
+      await sendFCMToUser(aliciId, title, message, channelId)
+    }
+  } catch { /* sessiz */ }
+}
+
 function extractGorevIdTag(mesaj: string): string | null {
   const m = /#gorev:([0-9a-fA-F-]{36})/.exec(mesaj ?? '')
   return m?.[1] ?? null
@@ -50,18 +75,13 @@ export async function createGorevAtamaNotification(opts: {
     tip: 'gorev_atama',
   })
 
-  // FCM push bildirim — server-side ortamda doğrudan helper çağrısı
-  // (önceden relative URL fetch'i çalışmıyordu, sessizce fail oluyordu;
-  //  o yüzden FCM atılmıyor, sadece webhook ile gidiyor zannediliyordu.
-  //  Çift bildirim cleanup'ı sonrası direkt çağırıyoruz.)
-  try {
-    await sendFCMToUser(
-      aliciId,
-      'Yeni Görev Ataması',
-      `${tanim}${lokasyonTanim ? ' — ' + lokasyonTanim : ''}`,
-      'gorev_uyari',
-    )
-  } catch {}
+  // FCM push — client/server farkını otomatik yönet (bkz pushIfPossible)
+  await pushIfPossible(
+    aliciId,
+    'Yeni Görev Ataması',
+    `${tanim}${lokasyonTanim ? ' — ' + lokasyonTanim : ''}`,
+    'gorev_uyari',
+  )
 }
 
 export async function notifyTenantAdminsOnGorevStatusChange(opts: {
@@ -117,9 +137,9 @@ export async function notifyTenantAdminsOnGorevStatusChange(opts: {
 
   await supabase.from('bildirimler').insert(payload)
 
-  // FCM — webhook devre dışı olduğu için direkt gönder (kısa mesaj formatı)
+  // FCM — client/server farkını otomatik yönet
   const mesajKisa = mesajLines.slice(0, 2).join(' ').substring(0, 100)
   for (const aId of adminIds) {
-    try { await sendFCMToUser(aId, 'Görev durumu güncellendi', mesajKisa, 'default') } catch {}
+    await pushIfPossible(aId, 'Görev durumu güncellendi', mesajKisa, 'default')
   }
 }

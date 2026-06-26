@@ -12,7 +12,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Pause, Play, Square } from 'lucide-react'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { iptalSebepKontrol } from '@/lib/validation/iptalSebep'
-import { suankiVardiyaGunu } from '@/lib/gorev/vardiyaGunu'
+import { suankiVardiyaGunu, vardiyaGunuHesapla } from '@/lib/gorev/vardiyaGunu'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 // ── Tarih/saat formatlama yardımcıları (TR — Europe/Istanbul) ────────────
@@ -864,21 +864,29 @@ useEffect(() => {
           throw new Error(kontrolJson.neden)
         }
       }
+      const aktifIso = new Date(form.aktif_olma_tarihi).toISOString()
       const payload: any = {
         tanim: form.tanim,
         lokasyon_id: form.lokasyon_id,
         atanan_kullanici_id: form.atanan_kullanici_id || null,
-        aktif_olma_tarihi: new Date(form.aktif_olma_tarihi).toISOString(),
+        aktif_olma_tarihi: aktifIso,
       }
       if (modal === 'edit' && form.durum) payload.durum = form.durum
 
       if (modal === 'create') {
+        // vardiya_gunu MUTLAKA set edilmeli — sayfa filtreleri bu kolon
+        // üzerinden çalışır. Eksik kalırsa sayfada görünmez (mig 068 sonrası
+        // standart). Manuel/ekstra görevlerde de bu kural geçerli.
+        const vGunu = vardiyaAyari.length > 0
+          ? vardiyaGunuHesapla(vardiyaAyari, aktifIso)
+          : new Date(aktifIso).toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
         const { error: err } = await supabase.from('canli_gorevler').insert({
           ...payload,
           firma_id: firmaId,
           durum: 'HAZIR',
           olusturan_id: meId,
           islemi_yapan_id: meId,
+          vardiya_gunu: vGunu,
           ...(projeId ? { proje_id: projeId } : {}),
         })
         if (err) throw err
