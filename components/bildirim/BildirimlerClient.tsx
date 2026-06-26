@@ -6,7 +6,7 @@ import { formatDateTime } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { NotificationUtils, markGorevAtamaNotificationsRead, notifyTenantAdminsOnGorevStatusChange, type GorevDurum } from '@/lib/notifications'
+import { NotificationUtils, markGorevAtamaNotificationsRead } from '@/lib/notifications'
 
 export default function BildirimlerClient({ meId, initialItems }: { meId: string; initialItems: any[] }) {
   const supabase = createClient()
@@ -229,7 +229,7 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
       return
     }
 
-    const yeniDurum = (karar === 'kabul' ? 'ISLEMDE' : 'IPTAL') as GorevDurum
+    const yeniDurum = karar === 'kabul' ? 'ISLEMDE' : 'IPTAL'
     const { data: updated, error: uErr } = await supabase
       .from('gorevler')
       .update({ durum: yeniDurum, durum_degisim_tarihi: new Date().toISOString(), islemi_yapan_id: meId })
@@ -251,15 +251,9 @@ export default function BildirimlerClient({ meId, initialItems }: { meId: string
       .eq('id', n.id)
       .eq('alici_id', meId)
 
-    // Tenant adminlere durum değişim bildirimi (tamamlandı hariç)
-    const actionText = karar === 'kabul' ? 'kabul etti' : 'reddetti'
-    await notifyTenantAdminsOnGorevStatusChange({
-      supabase,
-      firmaId: updated.firma_id,
-      gorev: { ...updated, durum: updated.durum as GorevDurum },
-      actionText,
-      actorName: meName || null,
-    })
+    // NOT: TA'lara durum değişim bildirimi gönderilmiyor (kullanıcı kararı).
+    // Bildirimi alan kişi (kabul/red eden) zaten bilgili; firma-wide spam
+    // yaratacak haber gönderimi devre dışı.
 
     showSuccess(karar === 'kabul' ? 'Görev kabul edildi ve İşlemde durumuna alındı.' : 'Görev reddedildi ve İptal durumuna alındı.')
     await refresh()

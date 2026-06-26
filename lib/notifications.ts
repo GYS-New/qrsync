@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { formatDateTime, GOREV_DURUM_LABEL } from '@/lib/utils'
+import { formatDateTime } from '@/lib/utils'
 import { sendFCMToUser } from '@/lib/fcm-sender'
 
 export type GorevDurum = 'ACIK' | 'ISLEMDE' | 'IPTAL' | 'TAMAMLANDI'
@@ -84,62 +84,9 @@ export async function createGorevAtamaNotification(opts: {
   )
 }
 
-export async function notifyTenantAdminsOnGorevStatusChange(opts: {
-  supabase: SupabaseClient
-  firmaId: string
-  gorev: {
-    id: string
-    tanim: string
-    durum: GorevDurum
-    olusturma_tarihi?: string | null
-    lokasyonlar?: { tanim?: string | null } | null
-    users?: { isim_soyisim?: string | null } | null
-  }
-  actionText: string
-  actorName?: string | null
-}) {
-  const { supabase, firmaId, gorev, actionText, actorName } = opts
-  if (gorev.durum === 'TAMAMLANDI') return
-
-  const { data: admins } = await supabase
-    .from('users')
-    .select('id')
-    .eq('firma_id', firmaId)
-    .eq('rol', 'tenant_admin')
-    .eq('aktif', true)
-
-  const adminIds = (admins ?? []).map((a: any) => a.id).filter(Boolean)
-  if (!adminIds.length) return
-
-  const lokasyon = gorev.lokasyonlar?.tanim ?? '—'
-  const atanan = gorev.users?.isim_soyisim ?? '—'
-  const tarih = gorev.olusturma_tarihi ? formatDateTime(gorev.olusturma_tarihi) : '—'
-  const durumLabel = (GOREV_DURUM_LABEL as any)[gorev.durum] ?? gorev.durum
-  const who = actorName ? `${actorName} tarafından` : 'Sistem tarafından'
-
-  const mesajLines = [
-    `${who} görev ${actionText}.`,
-    '',
-    `Görev: ${gorev.tanim}`,
-    `Lokasyon: ${lokasyon}`,
-    `Atanan: ${atanan}`,
-    `Tarih: ${tarih}`,
-    `Durum: ${durumLabel}`,
-    `#gorev:${gorev.id}`,
-  ]
-
-  const payload = adminIds.map(alici_id => ({
-    alici_id,
-    baslik: 'Görev durumu güncellendi',
-    mesaj: mesajLines.join('\n'),
-    tip: 'durum_degisimi',
-  }))
-
-  await supabase.from('bildirimler').insert(payload)
-
-  // FCM — client/server farkını otomatik yönet
-  const mesajKisa = mesajLines.slice(0, 2).join(' ').substring(0, 100)
-  for (const aId of adminIds) {
-    await pushIfPossible(aId, 'Görev durumu güncellendi', mesajKisa, 'default')
-  }
-}
+// notifyTenantAdminsOnGorevStatusChange kaldırıldı (2026-06-26).
+// Sebep: Görev durumu değişiminde firma-wide TA spam'i — değişikliği yapan
+// kullanıcı zaten haberdar, başka TA'ların bilgilendirilmesi kullanıcı kararıyla
+// istenmiyor. Hem proje izolasyonu yoktu (Çanakkale görev → Renault TA push),
+// hem de "Sistem tarafından" hatalı actor etiketi vardı. Fonksiyon ve tüm
+// çağrı noktaları (GorevlerClient, BildirimlerClient) kaldırıldı.

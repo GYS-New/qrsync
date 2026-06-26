@@ -8,7 +8,7 @@ import type { Lokasyon, User } from '@/types'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { createGorevAtamaNotification, notifyTenantAdminsOnGorevStatusChange, type GorevDurum } from '@/lib/notifications'
+import { createGorevAtamaNotification, type GorevDurum } from '@/lib/notifications'
 import { useFirma } from '@/components/layout/FirmaContext'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { useYetki } from '@/lib/yetki/useYetki'
@@ -401,15 +401,12 @@ export default function GorevlerClient({
       patch.baslatan_kullanici_id    = null
     }
 
-    const { data: updated, error: err } = await supabase.from('gorevler').update(patch).eq('id', g.id).select(SEL).single()
+    const { error: err } = await supabase.from('gorevler').update(patch).eq('id', g.id).select(SEL).single()
     if (err) showError(err.message)
-    else {
-      showSuccess('Görev durumu güncellendi.')
-      if (firmaId && durum !== 'TAMAMLANDI' && updated) {
-        const actionText = durum === 'IPTAL' ? 'iptal edildi' : durum === 'ISLEMDE' ? 'işleme alındı' : 'beklemeye alındı'
-        await notifyTenantAdminsOnGorevStatusChange({ supabase, firmaId, gorev: { ...updated, durum: updated.durum as GorevDurum }, actionText, actorName: null })
-      }
-    }
+    else showSuccess('Görev durumu güncellendi.')
+    // NOT: TA'lara durum değişim bildirimi gönderilmiyor (kullanıcı kararı).
+    // Web'den durum değiştiren zaten kendisi; başka TA'ların bilgilendirilmesi
+    // istenmiyor (özellikle proje izolasyonu olmadan firma-wide spam yaratıyordu).
     if (firmaId) await refreshAll(firmaId)
     setLoading(false)
   }
