@@ -3,7 +3,7 @@ import YikamaTakvimiChart from './YikamaTakvimiChart'
 import { aralikPlanTahmin, type TahminArac } from '@/lib/oto-yikama/yikamaPlanTahmin'
 
 /**
- * Yıkama Takvimi — bugün dahil önümüzdeki 7 gün için her gün:
+ * Yıkama Takvimi — bu hafta (Pzt-Pz) için her gün:
  *   - Planlanan (mevcut görevler ∪ araç kurallarından tahmin)
  *   - Tamamlanan (gerçek TAMAMLANDI olanlar)
  *
@@ -16,14 +16,21 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
   const admin = createAdminClient()
   const bugun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
 
-  // 7 günü önceden hesapla
-  const trMs = Date.now()
+  // Bu haftanın Pazartesi başlangıcı (TR konvansiyonu) — bugünden hafta başına
+  // kaç gün geriye gidilecek? Pazar=0 → 6, diğerleri → dow-1.
+  const bugunDt = new Date(bugun + 'T12:00:00Z')
+  const dow = bugunDt.getUTCDay()
+  const offset = dow === 0 ? 6 : dow - 1
+  const pazartesi = new Date(bugunDt)
+  pazartesi.setUTCDate(pazartesi.getUTCDate() - offset)
+
   const gunler: { tarih: string; gunAdi: string; etiket: string; isToday: boolean }[] = []
   const gunAdlari = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
   for (let i = 0; i < 7; i++) {
-    const d = new Date(trMs + i * 86400000)
-    const trIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(d)
-    const gunIndex = new Date(trIso + 'T12:00:00Z').getUTCDay()
+    const d = new Date(pazartesi)
+    d.setUTCDate(d.getUTCDate() + i)
+    const trIso = d.toISOString().slice(0, 10)
+    const gunIndex = d.getUTCDay()
     gunler.push({
       tarih: trIso,
       gunAdi: gunAdlari[gunIndex],
@@ -31,6 +38,7 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
       isToday: trIso === bugun,
     })
   }
+  const baslangicTarih = gunler[0].tarih
   const bitisTarih = gunler[gunler.length - 1].tarih
 
   // 1) Gerçek görevler — metadata + gorevler join
@@ -39,7 +47,7 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
       .from('oto_yikama_gorev_metadata')
       .select('arac_id, hedef_tarih, gorev:gorevler!inner(durum, firma_id)')
       .eq('gorev.firma_id', firmaId)
-      .gte('hedef_tarih', bugun)
+      .gte('hedef_tarih', baslangicTarih)
       .lte('hedef_tarih', bitisTarih),
     // 2) Aktif araçlar — kural-bazlı tahmin için
     admin
@@ -60,9 +68,9 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
     if (r.arac_id) gercekKeySet.add(`${r.hedef_tarih}|${r.arac_id}`)
   }
 
-  // 3) Tahmini plan — gerçek olmayan günler/araçlar için
+  // 3) Tahmini plan — gerçek olmayan günler/araçlar için (haftanın tamamı)
   const tahminAraclar = (araclar ?? []) as TahminArac[]
-  const tahminler = aralikPlanTahmin(tahminAraclar, bugun, bitisTarih)
+  const tahminler = aralikPlanTahmin(tahminAraclar, baslangicTarih, bitisTarih)
   for (const t of tahminler) {
     const key = `${t.tarih}|${t.arac_id}`
     if (gercekKeySet.has(key)) continue   // gerçek görev varsa atla
