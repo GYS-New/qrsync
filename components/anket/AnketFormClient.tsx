@@ -7,7 +7,8 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { Plus, Trash2, Search, Save, Send } from 'lucide-react'
 
 type Firma = { id: string; firma_adi: string; personel_sayisi: number }
-type User = { id: string; isim_soyisim: string; firma_id: string; firma_adi: string; rol: string }
+type Proje = { id: string; ad: string; firma_id: string }
+type User = { id: string; isim_soyisim: string; firma_id: string; firma_adi: string; proje_id: string | null; proje_adi: string | null; rol: string }
 
 const T = {
   text: '#0f172a', textSoft: '#64748b', border: '#e2e8f0',
@@ -48,9 +49,14 @@ export default function AnketFormClient({ base }: { base: string }) {
   const [durum, setDurum] = useState<'aktif' | 'taslak'>('aktif')
 
   const [firmalar, setFirmalar] = useState<Firma[]>([])
+  const [projeler, setProjeler] = useState<Proje[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+
+  // Kişi sekmesi filtreleri — proje bazlı izolasyon için
+  const [filtreFirmaId, setFiltreFirmaId] = useState<string>('')
+  const [filtreProjeId, setFiltreProjeId] = useState<string>('')
 
   useEffect(() => {
     (async () => {
@@ -59,6 +65,7 @@ export default function AnketFormClient({ base }: { base: string }) {
         const j = await r.json()
         if (j.ok) {
           setFirmalar(j.firmalar ?? [])
+          setProjeler(j.projeler ?? [])
           setUsers(j.users ?? [])
         }
       } finally {
@@ -67,14 +74,36 @@ export default function AnketFormClient({ base }: { base: string }) {
     })()
   }, [])
 
+  // Filtre dropdown'ları: firma seçilince proje listesi daralır
+  const firmaProjeleri = useMemo(() => {
+    if (!filtreFirmaId) return projeler
+    return projeler.filter(p => p.firma_id === filtreFirmaId)
+  }, [projeler, filtreFirmaId])
+
+  // Firma değişince proje filtresini sıfırla (uyumsuz proje seçili kalmasın)
+  useEffect(() => {
+    if (filtreProjeId && !firmaProjeleri.some(p => p.id === filtreProjeId)) {
+      setFiltreProjeId('')
+    }
+  }, [filtreFirmaId, firmaProjeleri, filtreProjeId])
+
   const filteredUsers = useMemo(() => {
-    if (!arama.trim()) return users
-    const q = arama.trim().toLocaleLowerCase('tr')
-    return users.filter(u =>
-      u.isim_soyisim.toLocaleLowerCase('tr').includes(q) ||
-      u.firma_adi.toLocaleLowerCase('tr').includes(q)
-    )
-  }, [users, arama])
+    let list = users
+    // Firma filtresi
+    if (filtreFirmaId) list = list.filter(u => u.firma_id === filtreFirmaId)
+    // Proje filtresi — sadece o projeye atanmış kullanıcılar
+    if (filtreProjeId) list = list.filter(u => u.proje_id === filtreProjeId)
+    // Arama metin filtresi
+    if (arama.trim()) {
+      const q = arama.trim().toLocaleLowerCase('tr')
+      list = list.filter(u =>
+        u.isim_soyisim.toLocaleLowerCase('tr').includes(q) ||
+        u.firma_adi.toLocaleLowerCase('tr').includes(q) ||
+        (u.proje_adi ?? '').toLocaleLowerCase('tr').includes(q)
+      )
+    }
+    return list
+  }, [users, arama, filtreFirmaId, filtreProjeId])
 
   // Seçilen toplam hedef adedi (firma altı + ek kişi, distinct user_id)
   const toplamHedef = useMemo(() => {
@@ -262,12 +291,33 @@ export default function AnketFormClient({ base }: { base: string }) {
               </div>
             ) : (
               <>
+                {/* Firma + Proje filtreleri — her proje sadece kendi kullanıcılarına anket göndersin */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                  <select value={filtreFirmaId} onChange={e => setFiltreFirmaId(e.target.value)}
+                    style={{ ...inp, height: 30, fontSize: 12 }}>
+                    <option value="">Firma (Tümü)</option>
+                    {firmalar.map(f => <option key={f.id} value={f.id}>{f.firma_adi}</option>)}
+                  </select>
+                  <select value={filtreProjeId} onChange={e => setFiltreProjeId(e.target.value)}
+                    style={{ ...inp, height: 30, fontSize: 12 }}
+                    disabled={firmaProjeleri.length === 0}>
+                    <option value="">Proje (Tümü)</option>
+                    {firmaProjeleri.map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}
+                  </select>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', border: `1px solid ${T.border}`, borderRadius: 6, marginBottom: 8 }}>
                   <Search size={13} color={T.textSoft} />
-                  <input value={arama} onChange={e => setArama(e.target.value)} placeholder="İsim veya firma ara…"
+                  <input value={arama} onChange={e => setArama(e.target.value)} placeholder="İsim, firma veya proje ara…"
                     style={{ flex: 1, border: 'none', outline: 'none', fontSize: 12.5 }} />
                 </div>
-                <div style={{ maxHeight: 280, overflow: 'auto', border: `1px solid ${T.border}`, borderRadius: 6 }}>
+                {(filtreFirmaId || filtreProjeId) && (
+                  <div style={{ marginBottom: 6, padding: '4px 8px', borderRadius: 4, background: T.greenLight, color: T.green, fontSize: 11, fontWeight: 600 }}>
+                    {filtreProjeId
+                      ? `Sadece ${firmaProjeleri.find(p => p.id === filtreProjeId)?.ad} projesinin kullanıcıları`
+                      : `Sadece ${firmalar.find(f => f.id === filtreFirmaId)?.firma_adi} firması`} · {filteredUsers.length} kişi
+                  </div>
+                )}
+                <div style={{ maxHeight: 260, overflow: 'auto', border: `1px solid ${T.border}`, borderRadius: 6 }}>
                   {filteredUsers.length === 0 ? (
                     <div style={{ padding: 16, textAlign: 'center', color: T.textSoft, fontSize: 12 }}>Eşleşen kullanıcı yok</div>
                   ) : filteredUsers.map(u => (
@@ -276,7 +326,9 @@ export default function AnketFormClient({ base }: { base: string }) {
                       <input type="checkbox" checked={secilenUserIds.has(u.id)} onChange={() => toggleUser(u.id)} />
                       <span style={{ flex: 1, fontSize: 12.5, color: T.text }}>
                         <strong>{u.isim_soyisim}</strong>
-                        <span style={{ color: T.textSoft, marginLeft: 6 }}>({u.firma_adi})</span>
+                        <span style={{ color: T.textSoft, marginLeft: 6 }}>
+                          ({u.firma_adi}{u.proje_adi ? ` · ${u.proje_adi}` : ''})
+                        </span>
                       </span>
                     </label>
                   ))}
