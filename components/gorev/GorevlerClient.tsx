@@ -367,7 +367,40 @@ export default function GorevlerClient({
 
   async function setDurum(g: any, durum: 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL') {
     setLoading(true); setError('')
-    const patch: any = { durum, durum_degisim_tarihi: new Date().toISOString(), islemi_yapan_id: meId }
+    const nowIso = new Date().toISOString()
+    const patch: any = { durum, durum_degisim_tarihi: nowIso, islemi_yapan_id: meId }
+
+    // Başlatma izleri: ISLEMDE'ye yeni geçişte baslatilma_tarihi set (yoksa).
+    // Halihazırda ISLEMDE'den ISLEMDE'ye çağrı olmaz; ACIK→ISLEMDE'de set.
+    if (durum === 'ISLEMDE' && !g.baslatilma_tarihi) {
+      patch.baslatilma_tarihi    = nowIso
+      patch.baslatan_kullanici_id = meId
+    }
+
+    // Tamamlanma izleri: tamamlanma_tarihi + kanal=WEB + süre hesabı
+    if (durum === 'TAMAMLANDI') {
+      patch.tamamlanma_tarihi    = nowIso
+      patch.son_tamamlama_kanali = 'WEB'
+      // Başlatma yoksa şimdi set et (web direkt TAMAMLA → süre=0)
+      if (!g.baslatilma_tarihi) {
+        patch.baslatilma_tarihi    = nowIso
+        patch.baslatan_kullanici_id = meId
+        patch.tamamlanma_suresi_saniye = 0
+      } else {
+        const sure = Math.max(0, Math.floor((Date.parse(nowIso) - Date.parse(g.baslatilma_tarihi)) / 1000))
+        patch.tamamlanma_suresi_saniye = sure
+      }
+    }
+
+    // ACIK'a geri çekme: önceki tamamlanma/iptal/başlatma izlerini sıfırla
+    if (durum === 'ACIK') {
+      patch.tamamlanma_tarihi        = null
+      patch.tamamlanma_suresi_saniye = null
+      patch.son_tamamlama_kanali     = null
+      patch.baslatilma_tarihi        = null
+      patch.baslatan_kullanici_id    = null
+    }
+
     const { data: updated, error: err } = await supabase.from('gorevler').update(patch).eq('id', g.id).select(SEL).single()
     if (err) showError(err.message)
     else {

@@ -819,14 +819,15 @@ useEffect(() => {
     const nowIso = new Date().toISOString()
     const patch: any = { durum: nd, durum_degisim_tarihi: nowIso, islemi_yapan_id: meId }
 
-    // Önce mevcut durumu kontrol et
+    // Önce mevcut durumu kontrol et — baslatilma_tarihi de gerek (süre hesabı için)
     const { data: liveTask } = await supabase
       .from('canli_gorevler')
-      .select('durum,aktif_olma_tarihi,durum_degisim_tarihi')
+      .select('durum,aktif_olma_tarihi,durum_degisim_tarihi,baslatilma_tarihi')
       .eq('id', gorevId)
       .maybeSingle()
 
     const mevcutDurum = (liveTask as any)?.durum
+    const mevcutBaslatilma = (liveTask as any)?.baslatilma_tarihi as string | null
 
     // ZAMANI_GECMIS → SA manuel yapabilir; TA ve diğerleri yapamaz
     if (nd === 'ZAMANI_GECMIS') {
@@ -868,6 +869,11 @@ useEffect(() => {
     }
 
     // Duruma göre ek alanları doldur
+    if (nd === 'ISLEMDE' && !mevcutBaslatilma) {
+      // Web'den ISLEMDE'ye geçiş: baslatilma_tarihi set (sadece yoksa)
+      patch.baslatilma_tarihi    = nowIso
+      patch.baslatan_kullanici_id = meId
+    }
     if (nd === 'TAMAMLANDI') {
       patch.durum = resolveLiveCompletionStatusByTask(liveTask as any, nowIso)
       if (patch.durum === 'ZAMANI_GECMIS' && !isSA) {
@@ -875,6 +881,16 @@ useEffect(() => {
       }
       patch.tamamlanma_tarihi       = nowIso
       patch.tamamlayan_kullanici_id = meId
+      patch.son_tamamlama_kanali    = 'WEB'
+      // Süre hesabı: baslatilma varsa farkı, yoksa şimdi başlat + tamamla (süre 0)
+      if (mevcutBaslatilma) {
+        patch.tamamlanma_suresi_saniye = Math.max(0,
+          Math.floor((Date.parse(nowIso) - Date.parse(mevcutBaslatilma)) / 1000))
+      } else {
+        patch.baslatilma_tarihi    = nowIso
+        patch.baslatan_kullanici_id = meId
+        patch.tamamlanma_suresi_saniye = 0
+      }
     }
     if (['IPTAL', 'KAPATILDI', 'SILINDI'].includes(nd)) {
       patch.iptal_tarihi  = nowIso

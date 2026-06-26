@@ -88,10 +88,24 @@ export default function GorevlerUserClient({
 
   async function setDurum(g: any, durum: 'TAMAMLANDI') {
     setLoading(true)
-    const { error: err } = await supabase
-      .from('gorevler')
-      .update({ durum, durum_degisim_tarihi: new Date().toISOString(), islemi_yapan_id: meId })
-      .eq('id', g.id)
+    const nowIso = new Date().toISOString()
+    const patch: any = {
+      durum,
+      durum_degisim_tarihi: nowIso,
+      islemi_yapan_id: meId,
+      tamamlanma_tarihi: nowIso,
+      son_tamamlama_kanali: 'WEB',
+    }
+    // Başlatma yoksa şimdi set et (ISLEMDE atlanarak direkt TAMAMLA → süre 0)
+    if (!g.baslatilma_tarihi) {
+      patch.baslatilma_tarihi    = nowIso
+      patch.baslatan_kullanici_id = meId
+      patch.tamamlanma_suresi_saniye = 0
+    } else {
+      patch.tamamlanma_suresi_saniye = Math.max(0,
+        Math.floor((Date.parse(nowIso) - Date.parse(g.baslatilma_tarihi)) / 1000))
+    }
+    const { error: err } = await supabase.from('gorevler').update(patch).eq('id', g.id)
     if (err) toast({ type: 'error', title: 'Hata', message: err.message })
     else toast({ type: 'success', title: 'Başarılı', message: 'Görev tamamlandı.' })
     await refresh()
