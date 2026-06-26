@@ -418,11 +418,12 @@ useEffect(() => {
           await Promise.all([refreshBrowse(), refreshLiveFlow()])
         },
       )
-      // Spesifik görevler de dinle (mobil tamamlama/iptal)
+      // Spesifik görevler de dinle (mobil/manuel tamamlama/iptal) — canlı akışa
+      // dahil edildiği için refreshLiveFlow'u da tetikle.
       .on(
         'postgres_changes' as any,
-        { event: 'UPDATE', schema: 'public', table: 'gorevler', filter: `firma_id=eq.${firmaId}` },
-        async () => { await refreshBrowse() },
+        { event: '*', schema: 'public', table: 'gorevler', filter: `firma_id=eq.${firmaId}` },
+        async () => { await Promise.all([refreshBrowse(), refreshLiveFlow()]) },
       )
       .subscribe()
 
@@ -635,6 +636,22 @@ useEffect(() => {
     if (projeId) liveQ = liveQ.eq('proje_id', projeId)
     if (yetkiliLokIds) liveQ = liveQ.in('lokasyon_id', yetkiliLokIds)
 
+    // Spesifik görevler (gorevler tablosu) de canlı akışa dahil — kullanıcı
+    // manuel ISLEMDE/TAMAMLANDI/IPTAL yaptığında veya mobil çalışırken görünsün.
+    // canli_gorevler ile aynı filtre + zaman aralığı.
+    const spesifikSelect =
+      'id,firma_id,proje_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,durum_degisim_tarihi,islemi_yapan_id,olusturan_id,atanan_kullanici_id,tamamlanma_suresi_saniye,iptal_sebep,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim)'
+    let spesifikQ = supabase
+      .from('gorevler')
+      .select(spesifikSelect)
+      .eq('firma_id', firmaId)
+      .not('durum', 'in', '(ACIK)')
+      .gte('olusturma_tarihi', liveSinceISO)
+      .order('durum_degisim_tarihi', { ascending: false })
+      .limit(10000)
+    if (projeId) spesifikQ = spesifikQ.eq('proje_id', projeId)
+    if (yetkiliLokIds) spesifikQ = spesifikQ.in('lokasyon_id', yetkiliLokIds)
+
     // KPI için ayrı count sorgusu — durum + kural_id (ekstra görevleri ayırt etmek için)
     let kpiQ = supabase
       .from('canli_gorevler')
@@ -646,14 +663,30 @@ useEffect(() => {
     if (projeId) kpiQ = kpiQ.eq('proje_id', projeId)
     if (yetkiliLokIds) kpiQ = kpiQ.in('lokasyon_id', yetkiliLokIds)
 
-    const [res, kpiRes] = await Promise.all([liveQ, kpiQ])
+    // Spesifik görevler için KPI count (ekstra=null sayımı için kural_id null gönderilir)
+    let spesifikKpiQ = supabase
+      .from('gorevler')
+      .select('durum')
+      .eq('firma_id', firmaId)
+      .not('durum', 'in', '(ACIK)')
+      .gte('olusturma_tarihi', liveSinceISO)
+      .limit(10000)
+    if (projeId) spesifikKpiQ = spesifikKpiQ.eq('proje_id', projeId)
+    if (yetkiliLokIds) spesifikKpiQ = spesifikKpiQ.in('lokasyon_id', yetkiliLokIds)
+
+    const [res, spesifikRes, kpiRes, spesifikKpiRes] = await Promise.all([liveQ, spesifikQ, kpiQ, spesifikKpiQ])
 
     if (kpiRes.error) {
       console.error('[LiveFlow] kpi error:', kpiRes.error)
     }
-    if (kpiRes.data && !kpiRes.error) {
-      setLiveKpiRows(kpiRes.data as { durum: string; kural_id: string | null }[])
-    }
+    // KPI: frekansiyel (kural_id korunur, ekstra için null) + spesifik (kural_id null)
+    const kpiData = (kpiRes.data ?? []) as { durum: string; kural_id: string | null }[]
+    const spesifikKpiData = (spesifikKpiRes.data ?? []) as { durum: string }[]
+    const merged = [
+      ...kpiData,
+      ...spesifikKpiData.map(r => ({ durum: r.durum, kural_id: null as string | null })),
+    ]
+    setLiveKpiRows(merged)
 
     if (res.error) {
       console.error('[LiveFlow] primary error:', res.error)
@@ -681,21 +714,29 @@ useEffect(() => {
       return
     }
 
-    const data = res.data
-    if (data) {
-      const nextTopId = data?.[0]?.id ?? null
+    // Spesifik görevleri canlı akışa dahil et — bayrak ile işaretle (UI ayırt etsin)
+    const spesifikData = ((spesifikRes.data ?? []) as any[]).map(g => ({
+      ...g,
+      _spesifik: true,
+      kural_id: null,
+      aktif_olma_tarihi: g.olusturma_tarihi,
+    }))
+    const data = [...(res.data ?? []), ...spesifikData]
+      .sort((a: any, b: any) => {
+        const aT = a.durum_degisim_tarihi ?? a.olusturma_tarihi ?? ''
+        const bT = b.durum_degisim_tarihi ?? b.olusturma_tarihi ?? ''
+        return bT.localeCompare(aT)
+      })
+
+    if (data.length > 0) {
+      const nextTopId = data[0]?.id ?? null
       const prevTopId = lastTopIdRef.current
-      // TEMP DEBUG — parlama sorununu bulmak için
-      console.log('[LiveFlow]', { count: data.length, nextTopId, prevTopId, willHighlight: !!(nextTopId && nextTopId !== prevTopId) })
       if (nextTopId && nextTopId !== prevTopId) {
-        const targetId = nextTopId
-        console.log('[LiveFlow] HIGHLIGHT SET →', targetId)
-        setHighlightId(targetId)
-        // 3sn sonra temizleme useEffect'te (DOM tarafı).
+        setHighlightId(nextTopId)
       }
       lastTopIdRef.current = nextTopId
-      setLiveFlowGorevler(data)
     }
+    setLiveFlowGorevler(data)
   }
 
   const selected = useMemo(() => {
