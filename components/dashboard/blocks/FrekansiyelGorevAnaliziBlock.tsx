@@ -10,12 +10,23 @@ import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 type Mode = 'gunluk' | 'haftalik' | 'aylik'
 
-// Vardiya günü range hesabı — bugün VG'den N gün geri (DATE string)
+// Vardiya günü range başlangıcı:
+//   gunluk   → bugün (tek gün)
+//   haftalik → bu haftanın Pazartesi'si
+//   aylik    → bu ayın 1'i
+// bugunVG 'YYYY-MM-DD' formatında TR günü (sarkan vardiya destekli).
 function getRangeStartDate(mode: Mode, bugunVG: string): string {
-  const days = mode === 'gunluk' ? 1 : mode === 'haftalik' ? 7 : 30
+  if (mode === 'gunluk') return bugunVG
   const d = new Date(bugunVG + 'T00:00:00Z')
-  d.setUTCDate(d.getUTCDate() - days)
-  return d.toISOString().slice(0, 10)
+  if (mode === 'haftalik') {
+    // Pazartesi başlangıç (TR konvansiyonu) — UTC getDay 0=Pazar
+    const dow = d.getUTCDay()
+    const offset = dow === 0 ? 6 : dow - 1
+    d.setUTCDate(d.getUTCDate() - offset)
+    return d.toISOString().slice(0, 10)
+  }
+  // aylik — ayın 1'i
+  return `${bugunVG.slice(0, 7)}-01`
 }
 
 function pct(num: number, den: number) {
@@ -140,7 +151,7 @@ export default function FrekansiyelGorevAnaliziBlock({
     <BlockWrapper title="FREKANSİYEL GÖREV ANALİZİ" size="big" href={`${basePath}/dashboard/canli-islemler`}>
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
         <div style={{ fontSize: 13, color: '#6b7280' }}>
-          {mode === 'gunluk' ? 'Son 24 saat' : mode === 'haftalik' ? 'Son 7 gün' : 'Son 30 gün'} • canlı + arşiv
+          {mode === 'gunluk' ? 'Bugün' : mode === 'haftalik' ? 'Bu hafta' : 'Bu ay'} • canlı + arşiv
         </div>
         <div className="flex gap-2">
           {[{ key: 'gunluk', label: 'GÜNLÜK' }, { key: 'haftalik', label: 'HAFTALIK' }, { key: 'aylik', label: 'AYLIK' }].map((m) => (
