@@ -1,11 +1,12 @@
 /**
  * Müşteri değerlendirmesi geldiğinde ilgili yetkililere FCM push + web bildirim.
  *
- * Bildirim alıcıları (kuralı):
- *   - Firmanın TÜM aktif TA'ları (tenant_admin)
- *   - Lokasyonun üst lokasyonuna açık yetki kaydı olan U'lar (tenant_user)
- *     · kullanici_lokasyon_yetkileri kayıtlı + ust_lokasyon_id eşleşen
- *     · NOT: yetki kaydı OLMAYAN U'lar (tüm erişim fallback) bildirim ALMAZ
+ * Bildirim alıcıları (kuralı) — mig 098 sonrası proje-scope'lu:
+ *   - Lokasyonun ait olduğu PROJEYE atanmış TA'lar (tenant_admin_projeler junction)
+ *     · Firma-wide TA'lar değil; sadece projeyi görüntüleme yetkisi olanlar
+ *   - Lokasyonun ait olduğu projeye atanmış U'lar (users.proje_id = proje)
+ *     ve üst lokasyona açık yetki kaydı olanlar (kullanici_lokasyon_yetkileri)
+ *     · Yetki kaydı OLMAYAN U'lar (tüm erişim fallback) bildirim ALMAZ
  *
  * İki kanal:
  *   - Web in-app: bildirimler tablosuna 'musteri_degerlendirme' tipinde kayıt
@@ -30,7 +31,11 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
   try {
     const admin = createAdminClient()
 
-    // 1) Üst lokasyonu bul (id + tanım)
+    // 1) Lokasyondan proje_id + üst lokasyon
+    const { data: lokRow } = await admin
+      .from('lokasyonlar').select('proje_id').eq('id', p.lokasyonId).maybeSingle()
+    const lokasyonProjeId = (lokRow as any)?.proje_id ?? null
+
     const { data: ustLokId } = await admin.rpc('get_ust_lokasyon_id', { p_lok_id: p.lokasyonId })
     const ustLokasyonId = ustLokId as string | null
     let ustLokasyonTanim: string | null = null
@@ -40,15 +45,34 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
       ustLokasyonTanim = (ustLok as any)?.tanim ?? null
     }
 
-    // 2) TA'ları çek
-    const { data: taList } = await admin
-      .from('users')
-      .select('id')
-      .eq('firma_id', p.firmaId)
-      .eq('rol', 'tenant_admin')
-      .eq('aktif', true)
+    // 2) Sadece bu PROJEYE atanmış TA'ları çek (mig 098 junction).
+    //    Projesiz lokasyon (proje_id NULL) durumunda firma-wide TA fallback.
+    let taList: { id: string }[] = []
+    if (lokasyonProjeId) {
+      const { data: junction } = await admin
+        .from('tenant_admin_projeler')
+        .select('user_id')
+        .eq('proje_id', lokasyonProjeId)
+      const taIds = (junction ?? []).map((j: any) => j.user_id)
+      if (taIds.length) {
+        const { data: aktifTA } = await admin
+          .from('users').select('id')
+          .in('id', taIds)
+          .eq('rol', 'tenant_admin')
+          .eq('aktif', true)
+        taList = (aktifTA ?? []) as any
+      }
+    } else {
+      // Proje atanmamış lokasyon (eski/legacy) — fallback firma-wide
+      const { data: fallbackTA } = await admin
+        .from('users').select('id')
+        .eq('firma_id', p.firmaId)
+        .eq('rol', 'tenant_admin')
+        .eq('aktif', true)
+      taList = (fallbackTA ?? []) as any
+    }
 
-    // 3) Sadece bu üst lokasyona AÇIK yetkisi olan U'ları çek
+    // 3) Sadece bu üst lokasyona AÇIK yetkisi olan + projeye atanmış U'ları çek
     // (yetki kaydı olmayan U "tüm erişim" sayılıyor ama bildirim ALMAZ)
     let uList: { id: string }[] = []
     if (ustLokasyonId) {
@@ -59,13 +83,17 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
 
       const yetkiliUserIds = Array.from(new Set((yetkiKayitlari ?? []).map((y: any) => y.user_id)))
       if (yetkiliUserIds.length) {
-        const { data: aktifU } = await admin
+        let uq = admin
           .from('users')
           .select('id')
           .in('id', yetkiliUserIds)
           .eq('firma_id', p.firmaId)
           .eq('rol', 'tenant_user')
           .eq('aktif', true)
+        // Lokasyonun projesine atanmış U'lar — başka projenin personeli
+        // yetki kaydı olsa bile (yanlış konfig) bildirim almasın.
+        if (lokasyonProjeId) uq = uq.eq('proje_id', lokasyonProjeId)
+        const { data: aktifU } = await uq
         uList = (aktifU ?? []) as any
       }
     }
