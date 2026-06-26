@@ -77,11 +77,17 @@ export default function AktiviteGrafigiBlock({
 
     const rangeISO = rangeStart.toISOString()
 
+    // KRITIK: order eklemek ZORUNLU — fetchAllPages range tabanlı pagination
+    // yapıyor; sıralama yoksa PostgreSQL stable garanti vermez, en yeni
+    // satırlar (en güncel gün) overlap'te tekrar yakalanır → çift sayım.
+    // Bug: Cuma piki 2× görünüyordu, sırasız range'in yan etkisi.
+
     // Tamamlanan canlı görevler (frekansiyel)
     const buildCanli = () => {
-      let q = supabase.from("canli_gorevler").select(groupCol)
+      let q = supabase.from("canli_gorevler").select(`id,${groupCol}`)
         .not("tamamlanma_tarihi", "is", null)
         .gte(groupCol, rangeISO)
+        .order('id', { ascending: true })
       if (firmaId) q = q.eq("firma_id", firmaId)
       if (projeId) q = (q as any).eq("proje_id", projeId)
       if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
@@ -90,9 +96,10 @@ export default function AktiviteGrafigiBlock({
 
     // Tamamlanan arşiv görevler
     const buildArsiv = () => {
-      let q = supabase.from("canli_gorevler_arsiv").select(groupCol)
+      let q = supabase.from("canli_gorevler_arsiv").select(`id,${groupCol}`)
         .not("tamamlanma_tarihi", "is", null)
         .gte(groupCol, rangeISO)
+        .order('id', { ascending: true })
       if (firmaId) q = q.eq("firma_id", firmaId)
       if (projeId) q = (q as any).eq("proje_id", projeId)
       if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
@@ -101,10 +108,11 @@ export default function AktiviteGrafigiBlock({
 
     // Tamamlanan spesifik görevler — gorevler_normal view Oto Yıkama'yı hariç tutar
     const buildSpesifik = () => {
-      let q = supabase.from("gorevler_normal").select(groupCol)
+      let q = supabase.from("gorevler_normal").select(`id,${groupCol}`)
         .eq("durum", "TAMAMLANDI")
         .not("tamamlanma_tarihi", "is", null)
         .gte(groupCol, rangeISO)
+        .order('id', { ascending: true })
       if (firmaId) q = q.eq("firma_id", firmaId)
       if (projeId) q = (q as any).eq("proje_id", projeId)
       if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
