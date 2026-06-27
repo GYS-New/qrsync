@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { createGorevAtamaNotification, type GorevDurum } from '@/lib/notifications'
+import DurumSebepModal from '@/components/gorev/DurumSebepModal'
 import { useFirma } from '@/components/layout/FirmaContext'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { useYetki } from '@/lib/yetki/useYetki'
@@ -365,13 +366,19 @@ export default function GorevlerClient({
     setLoading(false)
   }
 
-  async function setDurum(g: any, durum: 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL') {
+  // Durum sebep modal state (mig 099): tüm manuel durum değişimleri zorunlu gerekçeli
+  const [sebepHedef, setSebepHedef] = useState<{ g: any; durum: 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' } | null>(null)
+
+  function setDurumIste(g: any, durum: 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL') {
+    setSebepHedef({ g, durum })
+  }
+
+  async function setDurum(g: any, durum: 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL', sebep: string) {
     setLoading(true); setError('')
     const nowIso = new Date().toISOString()
-    const patch: any = { durum, durum_degisim_tarihi: nowIso, islemi_yapan_id: meId }
+    const patch: any = { durum, durum_degisim_tarihi: nowIso, islemi_yapan_id: meId, durum_sebep: sebep }
 
     // Başlatma izleri: ISLEMDE'ye yeni geçişte baslatilma_tarihi set (yoksa).
-    // Halihazırda ISLEMDE'den ISLEMDE'ye çağrı olmaz; ACIK→ISLEMDE'de set.
     if (durum === 'ISLEMDE' && !g.baslatilma_tarihi) {
       patch.baslatilma_tarihi    = nowIso
       patch.baslatan_kullanici_id = meId
@@ -381,18 +388,20 @@ export default function GorevlerClient({
     if (durum === 'TAMAMLANDI') {
       patch.tamamlanma_tarihi    = nowIso
       patch.son_tamamlama_kanali = 'WEB'
-      // Başlatma yoksa şimdi set et (web direkt TAMAMLA → süre=0)
       if (!g.baslatilma_tarihi) {
         patch.baslatilma_tarihi    = nowIso
         patch.baslatan_kullanici_id = meId
         patch.tamamlanma_suresi_saniye = 0
       } else {
-        const sure = Math.max(0, Math.floor((Date.parse(nowIso) - Date.parse(g.baslatilma_tarihi)) / 1000))
-        patch.tamamlanma_suresi_saniye = sure
+        patch.tamamlanma_suresi_saniye = Math.max(0,
+          Math.floor((Date.parse(nowIso) - Date.parse(g.baslatilma_tarihi)) / 1000))
       }
     }
 
-    // ACIK'a geri çekme: önceki tamamlanma/iptal/başlatma izlerini sıfırla
+    // IPTAL: iptal_sebep'i de set et (geriye uyum — eski okuma noktaları)
+    if (durum === 'IPTAL') patch.iptal_sebep = sebep
+
+    // ACIK'a geri çekme: önceki tamamlanma/başlatma izlerini sıfırla (sebep korunur)
     if (durum === 'ACIK') {
       patch.tamamlanma_tarihi        = null
       patch.tamamlanma_suresi_saniye = null
@@ -402,11 +411,8 @@ export default function GorevlerClient({
     }
 
     const { error: err } = await supabase.from('gorevler').update(patch).eq('id', g.id).select(SEL).single()
-    if (err) showError(err.message)
-    else showSuccess('Görev durumu güncellendi.')
-    // NOT: TA'lara durum değişim bildirimi gönderilmiyor (kullanıcı kararı).
-    // Web'den durum değiştiren zaten kendisi; başka TA'ların bilgilendirilmesi
-    // istenmiyor (özellikle proje izolasyonu olmadan firma-wide spam yaratıyordu).
+    if (err) { showError(err.message); setLoading(false); return }
+    showSuccess('Görev durumu güncellendi.')
     if (firmaId) await refreshAll(firmaId)
     setLoading(false)
   }
@@ -622,9 +628,9 @@ export default function GorevlerClient({
                                   </summary>
                                   <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 200, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '4px 0', minWidth: 155 }}
                                     onClick={e => (e.currentTarget.closest('details') as HTMLDetailsElement)?.removeAttribute('open')}>
-                                    <button onClick={() => setDurum(g, 'ISLEMDE')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#334155' }}>🔄 İşlemde</button>
-                                    <button onClick={() => setDurum(g, 'TAMAMLANDI')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#15803d' }}>✅ Tamamla</button>
-                                    <button onClick={() => setDurum(g, 'IPTAL')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#d97706' }}>⛔ İptal</button>
+                                    <button onClick={() => setDurumIste(g, 'ISLEMDE')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#334155' }}>🔄 İşlemde</button>
+                                    <button onClick={() => setDurumIste(g, 'TAMAMLANDI')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#15803d' }}>✅ Tamamla</button>
+                                    <button onClick={() => setDurumIste(g, 'IPTAL')} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#d97706' }}>⛔ İptal</button>
                                     <div style={{ borderTop: '1px solid #f1f5f9', margin: '4px 0' }} />
                                     {yetki.silebilir && <button onClick={() => del(g.id)} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: '#dc2626' }}>🗑️ Sil</button>}
                                   </div>
@@ -713,6 +719,16 @@ export default function GorevlerClient({
       {checklistGorev && (
         <ChecklistModal taskId={checklistGorev.id} taskType={checklistGorev.type} onKapat={() => setChecklistGorev(null)} />
       )}
+      <DurumSebepModal
+        open={!!sebepHedef}
+        yeniDurum={sebepHedef?.durum ?? ''}
+        onClose={() => setSebepHedef(null)}
+        onConfirm={async (sebep) => {
+          if (!sebepHedef) return
+          await setDurum(sebepHedef.g, sebepHedef.durum, sebep)
+          setSebepHedef(null)
+        }}
+      />
     </div>
   )
 }

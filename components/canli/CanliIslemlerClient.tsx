@@ -12,6 +12,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Pause, Play, Square } from 'lucide-react'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { iptalSebepKontrol } from '@/lib/validation/iptalSebep'
+import DurumSebepModal from '@/components/gorev/DurumSebepModal'
 import { suankiVardiyaGunu, vardiyaGunuHesapla } from '@/lib/gorev/vardiyaGunu'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
@@ -815,9 +816,16 @@ useEffect(() => {
     setModal('edit')
   }
 
-  async function updateDurum(gorevId: string, nd: string) {
+  // Durum sebep modal (mig 099 — manuel durum değişimleri zorunlu gerekçeli)
+  const [sebepHedef, setSebepHedef] = useState<{ gorevId: string; durum: string } | null>(null)
+
+  function updateDurumIste(gorevId: string, durum: string) {
+    setSebepHedef({ gorevId, durum })
+  }
+
+  async function updateDurum(gorevId: string, nd: string, sebep: string) {
     const nowIso = new Date().toISOString()
-    const patch: any = { durum: nd, durum_degisim_tarihi: nowIso, islemi_yapan_id: meId }
+    const patch: any = { durum: nd, durum_degisim_tarihi: nowIso, islemi_yapan_id: meId, durum_sebep: sebep }
 
     // Önce mevcut durumu kontrol et — baslatilma_tarihi de gerek (süre hesabı için)
     const { data: liveTask } = await supabase
@@ -895,6 +903,9 @@ useEffect(() => {
     if (['IPTAL', 'KAPATILDI', 'SILINDI'].includes(nd)) {
       patch.iptal_tarihi  = nowIso
       patch.iptal_eden_id = meId
+      // IPTAL/KAPATILDI/SILINDI için iptal_sebep de sebep'le doldurulur
+      // (geriye uyum — eski okuma noktaları iptal_sebep'e bakıyor)
+      if (sebep) patch.iptal_sebep = sebep
     }
 
     const { error: err } = await supabase.from('canli_gorevler').update(patch).eq('id', gorevId)
@@ -976,7 +987,9 @@ useEffect(() => {
     if (!ok) return
     if (isTA) {
       // TA için: fiziksel silme yok, durum SILINDI yapılır ve listeden düşer.
-      await updateDurum(selected.id, 'SILINDI')
+      // Gerekçe modal'ı zorunlu (mig 099)
+      updateDurumIste(selected.id, 'SILINDI')
+      return
     } else {
       const res = await fetch('/api/tasks/sil', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -990,23 +1003,10 @@ useEffect(() => {
     refreshLiveFlow()
   }
 
-  async function handleIptal(id: string) {
-    // İptal sebebi zorunlu — junk girişlere karşı ortak validator (lib/validation/iptalSebep)
-    // En az 5 char, 3 farklı karakter, harf/rakam içermeli ("....", "aaaaa" reddedilir).
-    let sebep = ''
-    while (true) {
-      const sebepRaw = window.prompt('Görev iptal sebebi (örn. "ekipman arızası", "personel yetişemedi"):', sebep)
-      if (sebepRaw === null) return  // Vazgeç
-      const check = iptalSebepKontrol(sebepRaw)
-      if (check.ok) { sebep = check.sebep; break }
-      sebep = sebepRaw  // tekrar göster, kullanıcı düzeltsin
-      toast({ type: 'error', title: 'Geçersiz İptal Sebebi', message: check.mesaj })
-    }
-    await supabase
-      .from('canli_gorevler')
-      .update({ durum: 'IPTAL', iptal_eden_id: meId, iptal_tarihi: new Date().toISOString(), islemi_yapan_id: meId, iptal_sebep: sebep })
-      .eq('id', id)
-    refreshLiveFlow()
+  // Mig 099: handleIptal/handleKapat artık tek tip — DurumSebepModal kullanır.
+  // Eski prompt + iptalSebepKontrol mantığı modal içine (durumSebepKontrol) taşındı.
+  function handleIptal(id: string) {
+    updateDurumIste(id, 'IPTAL')
   }
 
   async function handleKapat(id: string) {
@@ -1018,15 +1018,7 @@ useEffect(() => {
       variant: 'danger',
     })
     if (!ok) return
-    const nowIso = new Date().toISOString()
-    await supabase.from('canli_gorevler').update({
-      durum: 'ZAMANINDA_YAPILAMAYAN',
-      durum_degisim_tarihi: nowIso,
-      iptal_eden_id: meId,
-      iptal_tarihi: nowIso,
-      islemi_yapan_id: meId,
-    }).eq('id', id)
-    refreshLiveFlow()
+    updateDurumIste(id, 'ZAMANINDA_YAPILAMAYAN')
   }
 
   async function handleZamanGecmis(id: string) {
@@ -1038,16 +1030,8 @@ useEffect(() => {
       variant: 'danger',
     })
     if (!ok) return
-    const nowIso = new Date().toISOString()
-    await supabase.from('canli_gorevler').update({
-      durum: 'ZAMANI_GECMIS',
-      durum_degisim_tarihi: nowIso,
-      iptal_eden_id: meId,
-      iptal_tarihi: nowIso,
-      islemi_yapan_id: meId,
-    }).eq('id', id)
-    refreshBrowse()
-    refreshLiveFlow()
+    // Mig 099: gerekçe zorunlu — modal aç
+    updateDurumIste(id, 'ZAMANI_GECMIS')
   }
 
   const TableRow = ({
@@ -1376,6 +1360,24 @@ useEffect(() => {
           </div>
         )
       })()}
+
+      <DurumSebepModal
+        open={!!sebepHedef}
+        yeniDurum={sebepHedef?.durum ?? ''}
+        onClose={() => setSebepHedef(null)}
+        onConfirm={async (sebep) => {
+          if (!sebepHedef) return
+          try {
+            await updateDurum(sebepHedef.gorevId, sebepHedef.durum, sebep)
+            await Promise.all([refreshBrowse(), refreshLiveFlow()])
+            setSelectedId(null)
+            setSelectedGorev(null)
+          } catch (e: any) {
+            setError(e?.message ?? 'İşlem başarısız')
+          }
+          setSebepHedef(null)
+        }}
+      />
     </div>
   )
 }

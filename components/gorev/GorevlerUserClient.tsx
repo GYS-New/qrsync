@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatDateTime, GOREV_DURUM_LABEL } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
+import DurumSebepModal from '@/components/gorev/DurumSebepModal'
 
 const DURUM_RENK: Record<string, string> = {
   ACIK: 'status-acik',
@@ -86,17 +87,22 @@ export default function GorevlerUserClient({
     setLoading(false)
   }
 
-  async function setDurum(g: any, durum: 'TAMAMLANDI') {
+  // Durum sebep modal (mig 099 — manuel durum değişimi için zorunlu gerekçe)
+  const [sebepHedef, setSebepHedef] = useState<any | null>(null)
+
+  function setDurumIste(g: any) { setSebepHedef(g) }
+
+  async function setDurum(g: any, sebep: string) {
     setLoading(true)
     const nowIso = new Date().toISOString()
     const patch: any = {
-      durum,
+      durum: 'TAMAMLANDI',
       durum_degisim_tarihi: nowIso,
       islemi_yapan_id: meId,
       tamamlanma_tarihi: nowIso,
       son_tamamlama_kanali: 'WEB',
+      durum_sebep: sebep,
     }
-    // Başlatma yoksa şimdi set et (ISLEMDE atlanarak direkt TAMAMLA → süre 0)
     if (!g.baslatilma_tarihi) {
       patch.baslatilma_tarihi    = nowIso
       patch.baslatan_kullanici_id = meId
@@ -175,7 +181,7 @@ export default function GorevlerUserClient({
                   <td>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                       {mine && g.durum === 'ISLEMDE' && (
-                        <Button variant="primary" size="sm" onClick={() => setDurum(g, 'TAMAMLANDI')}>
+                        <Button variant="primary" size="sm" onClick={() => setDurumIste(g)}>
                           Tamamla
                         </Button>
                       )}
@@ -200,6 +206,16 @@ export default function GorevlerUserClient({
           </tbody>
         </table>
       </div>
+      <DurumSebepModal
+        open={!!sebepHedef}
+        yeniDurum="TAMAMLANDI"
+        onClose={() => setSebepHedef(null)}
+        onConfirm={async (sebep) => {
+          if (!sebepHedef) return
+          await setDurum(sebepHedef, sebep)
+          setSebepHedef(null)
+        }}
+      />
     </div>
   )
 }

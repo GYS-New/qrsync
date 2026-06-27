@@ -572,14 +572,15 @@ function openCreate() {
 
   async function applyBulkDuzenle() {
     if (!bulkDuzenleDurum || !bulkDuzenleIds.size) return
-    // IPTAL hedefinde sebep zorunlu (min 3 karakter)
-    if (bulkDuzenleDurum === 'IPTAL') {
-      const sebep = bulkIptalSebep.trim()
-      if (sebep.length < 3) {
-        toast({ type: 'error', title: 'İptal Sebebi Eksik', message: 'Lütfen en az 3 karakter iptal sebebi girin.' })
-        return
-      }
+    // Mig 099: TÜM durum değişimleri için gerekçe zorunlu (sadece IPTAL değil).
+    // Aynı gerekçe seçili tüm görevlerin durum_sebep kolonuna yazılır.
+    const { durumSebepKontrol } = await import('@/lib/validation/durumSebep')
+    const sebepKontrol = durumSebepKontrol(bulkIptalSebep)
+    if (!sebepKontrol.ok) {
+      toast({ type: 'error', title: 'Gerekçe Eksik', message: sebepKontrol.mesaj })
+      return
     }
+    const sebep = sebepKontrol.sebep
     const nowIso = new Date().toISOString()
     const allIds = Array.from(bulkDuzenleIds)
 
@@ -630,6 +631,8 @@ function openCreate() {
             tamamlanma_tarihi: nowIso,
             durum_degisim_tarihi: nowIso,
             islemi_yapan_id: meId,
+            son_tamamlama_kanali: 'WEB',
+            durum_sebep: sebep,
           }).in('id', ids).eq('firma_id', firmaId)
         }
       } else {
@@ -637,13 +640,18 @@ function openCreate() {
           durum: bulkDuzenleDurum,
           durum_degisim_tarihi: nowIso,
           islemi_yapan_id: meId,
+          durum_sebep: sebep,   // Mig 099: tüm durumlar için
         }
         if (['IPTAL', 'KAPATILDI', 'SILINDI'].includes(bulkDuzenleDurum)) {
           patch.iptal_eden_id = meId
           patch.iptal_tarihi = nowIso
         }
         if (bulkDuzenleDurum === 'IPTAL') {
-          patch.iptal_sebep = bulkIptalSebep.trim()
+          patch.iptal_sebep = sebep  // geriye uyum — eski okuma noktaları
+        }
+        if (bulkDuzenleDurum === 'ISLEMDE') {
+          patch.baslatilma_tarihi    = nowIso
+          patch.baslatan_kullanici_id = meId
         }
         const { error } = await supabase
           .from('canli_gorevler')
@@ -1563,13 +1571,20 @@ async function del() {
                 </label>
               ))}
             </div>
-            {bulkDuzenleDurum === 'IPTAL' && (
+            {/* Mig 099: gerekçe TÜM durumlar için zorunlu, sadece IPTAL değil.
+                Aynı gerekçe seçili tüm görevlerin durum_sebep kolonuna yazılır. */}
+            {bulkDuzenleDurum && (
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 6 }}>İptal Sebebi <span style={{ color: '#dc2626' }}>*</span></div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 6 }}>
+                  Gerekçe <span style={{ color: '#dc2626' }}>*</span>
+                  <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 6, fontSize: 12 }}>
+                    ({bulkDuzenleIds.size} görev için aynı gerekçe)
+                  </span>
+                </div>
                 <textarea
                   value={bulkIptalSebep}
                   onChange={(e) => setBulkIptalSebep(e.target.value)}
-                  placeholder="Görevlerin neden iptal edildiğini açıklayın (en az 3 karakter)"
+                  placeholder="Durum değişikliğinin nedenini açıklayın (en az 5 karakter)"
                   maxLength={500}
                   rows={3}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' as const, boxSizing: 'border-box' }}
@@ -1579,7 +1594,7 @@ async function del() {
             )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button variant="ghost" type="button" onClick={() => { setBulkDuzenlePopup(false); setBulkIptalSebep('') }}>Vazgeç</Button>
-              <Button variant="primary" type="button" disabled={!bulkDuzenleDurum || (bulkDuzenleDurum === 'IPTAL' && bulkIptalSebep.trim().length < 3)} onClick={applyBulkDuzenle}>Tamam</Button>
+              <Button variant="primary" type="button" disabled={!bulkDuzenleDurum || bulkIptalSebep.trim().length < 5} onClick={applyBulkDuzenle}>Tamam</Button>
             </div>
           </div>
         </div>
