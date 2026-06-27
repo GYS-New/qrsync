@@ -7,6 +7,7 @@ import { sayfaYetkileri } from '@/lib/yetki/sayfaYetkisi'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
 import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
+import { getActorMap } from '@/lib/yetki/getActorMap'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +65,7 @@ export default async function UTumGorevlerPage() {
   if (projeId) kulQ = (kulQ as any).eq('proje_id', projeId)
   const { data: kullanicilar } = await kulQ.order('isim_soyisim')
   const ayarlar = await getEfektifAyar(firmaId, projeId)
+  const actorAdMap = await getActorMap((gorevler as any) ?? [])
 
   return (
     <div>
@@ -79,6 +81,7 @@ export default async function UTumGorevlerPage() {
         lokasyonlar={(lokasyonlar as any) ?? []}
         kullanicilar={(kullanicilar as any) ?? []}
         initialGorevler={(gorevler as any) ?? []}
+        actorAdMap={actorAdMap}
         personelAtamaAktif={ayarlar.frekansiyel_personel_atama_aktif}
         ceklistAktif={ayarlar.frekansiyel_ceklist_aktif}
         islemSureleriAktif={ayarlar.islem_sureleri_aktif}

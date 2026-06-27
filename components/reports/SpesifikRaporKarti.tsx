@@ -4,10 +4,20 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
+import { CANLI_DURUM_LABEL } from '@/lib/utils'
 import {
   RefreshCw, FileSpreadsheet, FileText,
   CheckCircle, XCircle, Clock, AlertTriangle, TrendingUp, Activity,
 } from 'lucide-react'
+
+// Durum → badge rengi (verde-badge class)
+const DURUM_RENK: Record<string, string> = {
+  HAZIR: 'status-hazir', ACIK: 'status-acik', BEKLEMEDE: 'status-beklemede', ISLEMDE: 'status-islemde',
+  TAMAMLANDI: 'status-tamamlandi', ZAMANINDA_YAPILAMAYAN: 'status-zamaninda',
+  ZAMANINDA_TAMAMLANDI: 'status-tamamlandi', ZAMANI_GECMIS: 'status-zamaninda',
+  IPTAL: 'status-iptal', SILINDI: 'status-silindi', KAPATILDI: 'status-kapatildi',
+}
 
 interface Props {
   base: string
@@ -26,8 +36,16 @@ type SpesifikData = {
   ozet: Ozet
   lokBazliRows: { lokasyon: string; toplam: number; tamamlanan: number; iptal: number; basari: string }[]
   persBazliRows: { personel: string; toplam: number; tamamlanan: number; basari: string }[]
-  tamamlananGorevler: { sn: number; tanim: string; ustLokasyon: string; lokasyon: string; atanan: string; tamamlayan: string; olusturma: string; tamamlanma: string; sure: string }[]
-  aktifGorevler: { sn: number; tanim: string; ustLokasyon: string; lokasyon: string; atanan: string; durum: string; olusturma: string; sonIslem: string }[]
+  tamamlananGorevler: {
+    sn: number; tanim: string; ustLokasyon: string; lokasyon: string; atanan: string; tamamlayan: string;
+    olusturma: string; tamamlanma: string; sure: string;
+    durumSebep?: string | null; islemiYapan?: string | null; durumTarihi?: string | null;
+  }[]
+  aktifGorevler: {
+    sn: number; tanim: string; ustLokasyon: string; lokasyon: string; atanan: string; durum: string;
+    olusturma: string; sonIslem: string;
+    durumSebep?: string | null; iptalSebep?: string | null; islemiYapan?: string | null; durumTarihi?: string | null;
+  }[]
   lokasyonlar: LokRow[]
   kullanicilar: { id: string; isim_soyisim: string }[]
 }
@@ -155,7 +173,9 @@ function KpiCard({ label, value, sub, color, Icon }: { label: string; value: str
 }
 
 // ── DataTable ─────────────────────────────────────────────────────────────
-function DataTable({ headers, rows }: { headers: string[]; rows: (string|number)[][] }) {
+// Cell tipi: string|number → düz metin; React.ReactElement → olduğu gibi render
+type Cell = string | number | React.ReactElement | null | undefined
+function DataTable({ headers, rows }: { headers: string[]; rows: Cell[][] }) {
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
@@ -170,7 +190,9 @@ function DataTable({ headers, rows }: { headers: string[]; rows: (string|number)
             : rows.map((row, ri) => (
               <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : '#fff' }}>
                 {row.map((cell, ci) => (
-                  <td key={ci} style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: ci === 0 ? 'left' : 'center', fontSize: 13.5, fontWeight: ci === 0 ? 600 : 400 }}>{String(cell ?? '')}</td>
+                  <td key={ci} style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: ci === 0 ? 'left' : 'center', fontSize: 13.5, fontWeight: ci === 0 ? 600 : 400 }}>
+                    {React.isValidElement(cell) ? cell : String(cell ?? '')}
+                  </td>
                 ))}
               </tr>
             ))
@@ -178,6 +200,26 @@ function DataTable({ headers, rows }: { headers: string[]; rows: (string|number)
         </tbody>
       </table>
     </div>
+  )
+}
+
+// Açık/İptal sekmesinde durum hücresini tıklanabilir DurumBadgeWithSebep ile render eder.
+// Sebep + işlemi yapan + tarih bilgisi popup ile gösterilir (Mig 099 standardı).
+function renderDurumBadge(r: {
+  durum: string;
+  durumSebep?: string | null; iptalSebep?: string | null;
+  islemiYapan?: string | null; durumTarihi?: string | null;
+}) {
+  return (
+    <DurumBadgeWithSebep
+      durum={r.durum}
+      label={CANLI_DURUM_LABEL[r.durum] ?? r.durum}
+      durumSebep={r.durumSebep}
+      iptalSebep={r.iptalSebep}
+      eden={r.islemiYapan ?? null}
+      tarih={r.durumTarihi ?? null}
+      className={`verde-badge ${DURUM_RENK[r.durum] ?? 'status-acik'}`}
+    />
   )
 }
 
@@ -509,12 +551,12 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
                 {ustLokId ? (
                   <DataTable
                     headers={['SN', 'GÖREV', altAltLokId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'ATANAN', 'DURUM', 'OLUŞTURMA', 'SON İŞLEM']}
-                    rows={data.aktifGorevler.map(r => [r.sn, r.tanim, r.ustLokasyon, r.lokasyon, r.atanan, r.durum, r.olusturma, r.sonIslem])}
+                    rows={data.aktifGorevler.map(r => [r.sn, r.tanim, r.ustLokasyon, r.lokasyon, r.atanan, renderDurumBadge(r), r.olusturma, r.sonIslem])}
                   />
                 ) : (
                   <DataTable
                     headers={['SN', 'GÖREV', 'LOKASYON', 'ATANAN', 'DURUM', 'OLUŞTURMA', 'SON İŞLEM']}
-                    rows={data.aktifGorevler.map(r => [r.sn, r.tanim, r.lokasyon, r.atanan, r.durum, r.olusturma, r.sonIslem])}
+                    rows={data.aktifGorevler.map(r => [r.sn, r.tanim, r.lokasyon, r.atanan, renderDurumBadge(r), r.olusturma, r.sonIslem])}
                   />
                 )}
               </div>

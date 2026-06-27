@@ -72,12 +72,14 @@ function formatIslemSuresi(saniye?: number | null): string {
   return kalanDk > 0 ? `${saat} sa ${kalanDk} dk` : `${saat} sa`
 }
 
-function getIslemiYapan(g: any, ctx?: { meId?: string; meName?: string; kullanicilar?: { id: string; isim_soyisim: string }[] }) {
+function getIslemiYapan(g: any, ctx?: { meId?: string; meName?: string; kullanicilar?: { id: string; isim_soyisim: string }[]; actorAdMap?: Record<string, string> }) {
   if (g.islemi_yapan?.isim_soyisim) return g.islemi_yapan.isim_soyisim
-  // SA gibi farklı firma_id'li kullanıcılar join ile gelmez; id + isim eşleştirmesi ile fallback
+  // SA gibi farklı firma_id'li kullanıcılar join ile gelmez; id + isim eşleştirmesi ile fallback.
+  // actorAdMap: server'da admin client ile çözülen aktör listesi (SA dahil).
   const lookup = (id: string | null | undefined) => {
     if (!id) return null
     if (ctx?.meId && id === ctx.meId && ctx.meName) return ctx.meName
+    if (ctx?.actorAdMap && ctx.actorAdMap[id]) return ctx.actorAdMap[id]
     const u = ctx?.kullanicilar?.find(k => k.id === id)
     return u?.isim_soyisim ?? null
   }
@@ -102,6 +104,7 @@ export default function TumGorevlerClient({
   lokasyonlar,
   kullanicilar,
   initialGorevler,
+  actorAdMap,
   projeId,
   personelAtamaAktif = true,
   ceklistAktif = true,
@@ -116,6 +119,8 @@ export default function TumGorevlerClient({
   lokasyonlar: { id: string; tanim: string; parent_id?: string | null; checklist_sablon_id?: string | null }[]
   kullanicilar: { id: string; isim_soyisim: string }[]
   initialGorevler: any[]
+  /** id → isim_soyisim. Server'da admin client ile çözülen aktör listesi (SA dahil). */
+  actorAdMap?: Record<string, string>
   projeId?: string | null
   personelAtamaAktif?: boolean
   ceklistAktif?: boolean
@@ -901,7 +906,7 @@ async function del() {
   const actorOptions = useMemo(() => {
     const set = new Set<string>()
     ;(gorevler ?? []).forEach((g: any) => {
-      const name = getIslemiYapan(g, { meId, meName, kullanicilar })
+      const name = getIslemiYapan(g, { meId, meName, kullanicilar, actorAdMap })
       if (name && name !== '—') set.add(name)
     })
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'tr'))
@@ -979,7 +984,7 @@ async function del() {
           g.tanim ?? '',
           g.lokasyonlar?.tanim ?? '',
           g.atanan?.isim_soyisim ?? '',
-          getIslemiYapan(g, { meId, meName, kullanicilar }) ?? '',
+          getIslemiYapan(g, { meId, meName, kullanicilar, actorAdMap }) ?? '',
         ]
           .join(' ')
           .toLowerCase()
@@ -989,7 +994,7 @@ async function del() {
       if (lokasyonSet && (!g.lokasyon_id || !lokasyonSet.has(g.lokasyon_id))) return false
       if (atananId && g.atanan_kullanici_id !== atananId) return false
       if (durum && g.durum !== durum) return false
-      if (actor && getIslemiYapan(g, { meId, meName, kullanicilar }) !== actor) return false
+      if (actor && getIslemiYapan(g, { meId, meName, kullanicilar, actorAdMap }) !== actor) return false
 
       if (fromDate || toDate) {
         if (!g.vardiya_gunu) return false
@@ -1053,7 +1058,7 @@ async function del() {
       if (sortKey === 'lokasyon') return (g.lokasyonlar?.tanim ?? '').toString()
       if (sortKey === 'atanan') return (g.atanan?.isim_soyisim ?? '').toString()
       if (sortKey === 'durum') return (CANLI_DURUM_LABEL[g.durum] ?? g.durum ?? '').toString()
-      if (sortKey === 'actor') return (getIslemiYapan(g, { meId, meName, kullanicilar }) ?? '').toString()
+      if (sortKey === 'actor') return (getIslemiYapan(g, { meId, meName, kullanicilar, actorAdMap }) ?? '').toString()
       if (sortKey === 'islem') return g.durum_degisim_tarihi ? new Date(g.durum_degisim_tarihi).getTime() : 0
       // aktif
       return g.aktif_olma_tarihi ? new Date(g.aktif_olma_tarihi).getTime() : 0
@@ -1459,7 +1464,7 @@ async function del() {
                     }
                   </td>
                 )}
-                <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g, { meId, meName, kullanicilar })}</td>
+                <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g, { meId, meName, kullanicilar, actorAdMap })}</td>
                 <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                 <td>
                   <DurumBadgeWithSebep
@@ -1467,7 +1472,7 @@ async function del() {
                     label={CANLI_DURUM_LABEL[g.durum] ?? g.durum}
                     durumSebep={g.durum_sebep}
                     iptalSebep={g.iptal_sebep}
-                    eden={g.iptalEden?.isim_soyisim ?? g.islemi_yapan?.isim_soyisim ?? null}
+                    eden={getIslemiYapan(g, { meId, meName, kullanicilar, actorAdMap })}
                     tarih={g.iptal_tarihi ?? g.durum_degisim_tarihi}
                     className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}
                   />

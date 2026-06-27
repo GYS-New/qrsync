@@ -121,7 +121,7 @@ export async function GET(req: Request) {
 
     // Görevler (aktif tablo) — gorevler_normal view: yıkama görevleri hariç
     let qAktif = admin.from('gorevler_normal')
-      .select('id,tanim,durum,lokasyon_id,atanan_kullanici_id,olusturan_id,islemi_yapan_id,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi')
+      .select('id,tanim,durum,lokasyon_id,atanan_kullanici_id,olusturan_id,islemi_yapan_id,iptal_eden_id,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi,durum_sebep,iptal_sebep,iptal_tarihi')
       .eq('firma_id', firmaId)
     if (projeId)     qAktif = (qAktif as any).eq('proje_id', projeId)
     if (targetLokasyonIds) qAktif = (qAktif as any).in('lokasyon_id', targetLokasyonIds)
@@ -135,6 +135,23 @@ export async function GET(req: Request) {
       if (baslangic || bitis) return withinRange(g.olusturma_tarihi, baslangic, bitis)
       return true
     })
+
+    // Actor name map — islemi_yapan/iptal_eden için SA dahil tüm aktörler.
+    // userMap (kullanicilar) sadece firma içi kişileri tutar; SA'lar farklı firma_id'li
+    // oldukları için orada yoktur. Admin client ile id listesi üzerinden ayrıca çekiyoruz.
+    const actorIds = new Set<string>()
+    for (const g of tumGorevler) {
+      if (g.islemi_yapan_id) actorIds.add(g.islemi_yapan_id)
+      if (g.iptal_eden_id)   actorIds.add(g.iptal_eden_id)
+      if (g.olusturan_id)    actorIds.add(g.olusturan_id)
+    }
+    const actorMap = new Map<string, string>()
+    if (actorIds.size > 0) {
+      const { data: actors } = await admin.from('users').select('id, isim_soyisim').in('id', [...actorIds])
+      for (const u of (actors ?? []) as any[]) actorMap.set(u.id, u.isim_soyisim ?? '')
+    }
+    const resolveActor = (id: string | null | undefined): string =>
+      id ? (actorMap.get(id) ?? userMap.get(id) ?? '—') : '—'
 
     // ── İstatistikler ──────────────────────────────────────────────
     const toplam       = tumGorevler.length
@@ -198,10 +215,15 @@ export async function GET(req: Request) {
         ustLokasyon: targetLokasyonIds ? getUstLokasyon(g.lokasyon_id) : '',
         lokasyon: lokMap.get(g.lokasyon_id)?.tanim ?? '—',
         atanan: g.atanan_kullanici_id ? userMap.get(g.atanan_kullanici_id) ?? '—' : '—',
-        tamamlayan: g.islemi_yapan_id ? userMap.get(g.islemi_yapan_id) ?? '—' : '—',
+        // Mig 099: tamamlayan = islemi_yapan (SA dahil çözümlenir)
+        tamamlayan: resolveActor(g.islemi_yapan_id),
         olusturma: fmt(g.olusturma_tarihi),
         tamamlanma: fmt(g.tamamlanma_tarihi),
         sure: fmtSure(g.tamamlanma_suresi_saniye),
+        // Mig 099: tıklanabilir badge popup için
+        durumSebep: g.durum_sebep ?? null,
+        islemiYapan: resolveActor(g.islemi_yapan_id),
+        durumTarihi: g.tamamlanma_tarihi ?? g.durum_degisim_tarihi ?? null,
       }))
 
     // İptal / açık görevler listesi
@@ -217,6 +239,13 @@ export async function GET(req: Request) {
         durum: g.durum,
         olusturma: fmt(g.olusturma_tarihi),
         sonIslem: fmt(g.durum_degisim_tarihi),
+        // Mig 099: tıklanabilir badge popup için
+        durumSebep: g.durum_sebep ?? null,
+        iptalSebep: g.iptal_sebep ?? null,
+        islemiYapan: g.durum === 'IPTAL'
+          ? resolveActor(g.iptal_eden_id)
+          : resolveActor(g.islemi_yapan_id),
+        durumTarihi: g.iptal_tarihi ?? g.durum_degisim_tarihi ?? null,
       }))
 
     // Tarih aralığı etiketi

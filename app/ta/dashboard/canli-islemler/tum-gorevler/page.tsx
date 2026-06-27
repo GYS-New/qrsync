@@ -7,6 +7,7 @@ import ProjeSecilmedi from '@/components/projeler/ProjeSecilmedi'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
 import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
+import { getActorMap } from '@/lib/yetki/getActorMap'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,10 +52,11 @@ export default async function TATumGorevlerPage() {
     .order('tanim')
   if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
 
-  const [{ data: lokasyonlar }, { data: kullanicilar }, ayarlar] = await Promise.all([
+  const [{ data: lokasyonlar }, { data: kullanicilar }, ayarlar, actorAdMap] = await Promise.all([
     lokQ,
     (() => { let q = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true); q = (q as any).eq('proje_id', aktifProje.id); return q.order('isim_soyisim') })(),
     getEfektifAyar(firmaId, aktifProje.id),
+    getActorMap((gorevler as any) ?? []),
   ])
 
   return (
@@ -73,6 +75,7 @@ export default async function TATumGorevlerPage() {
         lokasyonlar={(lokasyonlar as any) ?? []}
         kullanicilar={(kullanicilar as any) ?? []}
         initialGorevler={(gorevler as any) ?? []}
+        actorAdMap={actorAdMap}
         projeId={aktifProje.id}
         personelAtamaAktif={ayarlar.frekansiyel_personel_atama_aktif}
         ceklistAktif={ayarlar.frekansiyel_ceklist_aktif}
