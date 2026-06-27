@@ -69,6 +69,10 @@ export interface TamamlananRow {
   /** YENİ — "X dk" / "Y sn" / "H sa M dk" */
   gorevSuresi: string
   durum: string
+  // Mig 099: Tıklanabilir durum badge popup için (opsiyonel)
+  durumSebep?: string | null
+  islemiYapan?: string | null
+  durumTarihi?: string | null
 }
 
 export interface SapmaRow {
@@ -84,6 +88,11 @@ export interface SapmaRow {
   gorevSaatleri: string
   gorevSuresi: string
   sapmaNedeni: string
+  // Mig 099: Tıklanabilir durum badge popup için
+  durumKod?: string
+  durumSebep?: string | null
+  islemiYapan?: string | null
+  durumTarihi?: string | null
 }
 
 export interface KayipRow {
@@ -105,6 +114,12 @@ export interface KayipRow {
   /** Görevin üretildiği vardiya numarası (1/2/3...). UI badge için — tanımda
    *  zaten "VARDİYA" geçen görevlerde badge gösterilmez. */
   vardiyaNo: number | null
+  // Mig 099: Tıklanabilir durum badge popup için
+  durumKod?: string
+  durumSebep?: string | null
+  iptalSebep?: string | null
+  islemiYapan?: string | null
+  durumTarihi?: string | null
 }
 
 export interface FrekansDisiRow {
@@ -139,6 +154,11 @@ export interface AtananFrekanRow {
   durumKod: string
   atamaTarihi: string
   tamamlanmaTarihi: string
+  // Mig 099: Tıklanabilir durum badge popup için
+  durumSebep?: string | null
+  iptalSebep?: string | null
+  islemiYapan?: string | null
+  durumTarihi?: string | null
 }
 
 /** Üst lokasyon (departman) bazında özet. Departman Analizi kartı için. */

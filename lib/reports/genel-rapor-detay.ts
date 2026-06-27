@@ -42,7 +42,7 @@ export interface DetayResponse {
   islemSureleriAktif: boolean
 }
 
-const SELECT_COLS = 'id,firma_id,tanim,aciklama,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,iptal_eden_id,durum_degisim_tarihi,olusturma_tarihi,iptal_sebep,kural_id'
+const SELECT_COLS = 'id,firma_id,tanim,aciklama,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,vardiya_gunu,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,tamamlayan_kullanici_id,islemi_yapan_id,iptal_eden_id,durum_degisim_tarihi,olusturma_tarihi,iptal_sebep,iptal_tarihi,durum_sebep,kural_id'
 
 // Kayıp tablosuna giren durumlar (TAMAMLANDI ve ara durumlar hariç).
 const KAYIP_DURUMLAR = ['ZAMANI_GECMIS', 'IPTAL', 'SILINDI', 'BEKLEMEDE', 'KAPATILDI']
@@ -230,10 +230,14 @@ export async function buildGenelRaporDetay(
   }
 
   // 8. Proje personel filtresi — yabancı proje personeli isim çıkmasın
+  //    SA (super_admin / alt_super_admin) bu kapsamda DEĞİL — onlar proje personeli
+  //    olmasalar da web'ten görev tamamlayabilir ve isimlerinin gösterilmesi gerekir.
   let projePersonelIds: Set<string> | null = null
   if (filters.projeId) {
     const { data: pu } = await admin.from('users').select('id').eq('proje_id', filters.projeId)
     projePersonelIds = new Set((pu ?? []).map((u: any) => u.id))
+    const { data: saUsers } = await admin.from('users').select('id').in('rol', ['super_admin', 'alt_super_admin'])
+    for (const u of saUsers ?? []) projePersonelIds.add((u as any).id)
   }
 
   // 9. Frekans Dışı için grup/üst lokasyon haritası (sadece bu tip)
@@ -282,6 +286,9 @@ export async function buildGenelRaporDetay(
         gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
         gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
         durum: 'TAMAMLANDI',
+        durumSebep: g.durum_sebep ?? null,
+        islemiYapan: userMap.get(g.islemi_yapan_id) ?? userMap.get(g.tamamlayan_kullanici_id) ?? null,
+        durumTarihi: g.tamamlanma_tarihi ?? g.durum_degisim_tarihi ?? null,
       } as TamamlananRow
     }
 
@@ -301,6 +308,10 @@ export async function buildGenelRaporDetay(
         gorevSaatleri: formatGorevSaatleri(g.baslatilma_tarihi, g.tamamlanma_tarihi),
         gorevSuresi: formatGorevSuresi(g.tamamlanma_suresi_saniye),
         sapmaNedeni: g.durum === 'BEKLEMEDE' ? 'Zamanında tamamlanamadı' : 'Gecikme ile tamamlandı',
+        durumKod: g.durum,
+        durumSebep: g.durum_sebep ?? null,
+        islemiYapan: userMap.get(g.islemi_yapan_id) ?? userMap.get(g.tamamlayan_kullanici_id) ?? null,
+        durumTarihi: g.tamamlanma_tarihi ?? g.durum_degisim_tarihi ?? null,
       } as SapmaRow
     }
 
@@ -330,6 +341,11 @@ export async function buildGenelRaporDetay(
         durum: durumLabel[g.durum] ?? g.durum ?? '',
         kayipNedeni,
         vardiyaNo: gorevVardiyaNo(g.aktif_olma_tarihi),
+        durumKod: g.durum,
+        durumSebep: g.durum_sebep ?? null,
+        iptalSebep: g.iptal_sebep ?? null,
+        islemiYapan: userMap.get(g.iptal_eden_id) ?? userMap.get(g.islemi_yapan_id) ?? null,
+        durumTarihi: g.iptal_tarihi ?? g.durum_degisim_tarihi ?? null,
       } as KayipRow
     }
 
@@ -364,6 +380,10 @@ export async function buildGenelRaporDetay(
       durumKod: g.durum ?? '',
       atamaTarihi: formatDate(g.olusturma_tarihi),
       tamamlanmaTarihi: g.tamamlanma_tarihi ? formatDate(g.tamamlanma_tarihi) : '—',
+      durumSebep: g.durum_sebep ?? null,
+      iptalSebep: g.iptal_sebep ?? null,
+      islemiYapan: userMap.get(g.islemi_yapan_id) ?? userMap.get(g.iptal_eden_id) ?? userMap.get(g.tamamlayan_kullanici_id) ?? null,
+      durumTarihi: g.iptal_tarihi ?? g.tamamlanma_tarihi ?? g.durum_degisim_tarihi ?? null,
     } as AtananFrekanRow
   })
 

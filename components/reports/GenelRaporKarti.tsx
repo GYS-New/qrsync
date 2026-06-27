@@ -4,10 +4,42 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useToast } from '@/components/ui/ToastProvider'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
+import { CANLI_DURUM_LABEL } from '@/lib/utils'
 import {
   RefreshCw, FileSpreadsheet,
   CheckCircle, XCircle, Clock, AlertTriangle, TrendingUp, Activity, Target,
 } from 'lucide-react'
+
+// Durum → badge rengi (verde-badge class)
+const DURUM_RENK: Record<string, string> = {
+  HAZIR: 'status-hazir', ACIK: 'status-acik', BEKLEMEDE: 'status-beklemede', ISLEMDE: 'status-islemde',
+  TAMAMLANDI: 'status-tamamlandi', ZAMANINDA_YAPILAMAYAN: 'status-zamaninda',
+  ZAMANINDA_TAMAMLANDI: 'status-tamamlandi', ZAMANI_GECMIS: 'status-zamaninda',
+  IPTAL: 'status-iptal', SILINDI: 'status-silindi', KAPATILDI: 'status-kapatildi',
+}
+
+// Tablo hücresinde tıklanabilir durum badge — sebep + işlemi yapan + tarih popup'ı (Mig 099).
+function renderDurumBadge(opts: {
+  durumKod: string
+  durumSebep?: string | null
+  iptalSebep?: string | null
+  islemiYapan?: string | null
+  durumTarihi?: string | null
+  label?: string
+}) {
+  return (
+    <DurumBadgeWithSebep
+      durum={opts.durumKod}
+      label={opts.label ?? CANLI_DURUM_LABEL[opts.durumKod] ?? opts.durumKod}
+      durumSebep={opts.durumSebep}
+      iptalSebep={opts.iptalSebep}
+      eden={opts.islemiYapan ?? null}
+      tarih={opts.durumTarihi ?? null}
+      className={`verde-badge ${DURUM_RENK[opts.durumKod] ?? 'status-acik'}`}
+    />
+  )
+}
 
 interface Props {
   base: string
@@ -254,8 +286,21 @@ function KpiCard({ label, value, sub, pct, color, Icon, tooltip }: { label: stri
 }
 
 // ── DataTable ──────────────────────────────────────────────────────
+// Cell tipi: string|number → düz metin; React.ReactElement → olduğu gibi.
+// React.ReactElement durumunda filter aramasında props.label/durum üzerinden bakar.
+type Cell = string | number | React.ReactElement | null | undefined
+
+function cellAsText(cell: Cell): string {
+  if (cell == null) return ''
+  if (React.isValidElement(cell)) {
+    const p: any = cell.props ?? {}
+    return String(p.label ?? p.durum ?? p.children ?? '')
+  }
+  return String(cell)
+}
+
 function DataTable({ headers, rows, accentCol, accentColor, leftCols, filterable, noFilterCols }: {
-  headers: string[]; rows: (string | number)[][]; accentCol?: number; accentColor?: string; leftCols?: number[];
+  headers: string[]; rows: Cell[][]; accentCol?: number; accentColor?: string; leftCols?: number[];
   filterable?: boolean; noFilterCols?: number[]
 }) {
   const isLeft = (i: number) => i === 0 || (leftCols?.includes(i) ?? false)
@@ -272,7 +317,7 @@ function DataTable({ headers, rows, accentCol, accentColor, leftCols, filterable
     return rows.filter(row =>
       filters.every((f, i) => {
         if (!f || !f.trim()) return true
-        return String(row[i] ?? '').toLowerCase().includes(f.trim().toLowerCase())
+        return cellAsText(row[i]).toLowerCase().includes(f.trim().toLowerCase())
       })
     )
   }, [rows, filters, filterable])
@@ -313,7 +358,9 @@ function DataTable({ headers, rows, accentCol, accentColor, leftCols, filterable
                     textAlign: isLeft(ci) ? 'left' : 'center', fontSize: 13.5,
                     fontWeight: ci === accentCol ? 700 : isLeft(ci) ? 600 : 400,
                     color: ci === accentCol ? (accentColor ?? T.greenMid) : undefined,
-                  }}>{String(cell ?? '')}</td>
+                  }}>
+                    {React.isValidElement(cell) ? cell : String(cell ?? '')}
+                  </td>
                 ))}
               </tr>
             ))
@@ -1260,7 +1307,14 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   </div>
                   <DataTable
                     headers={headers}
-                    rows={ds.rows.map((r: any) => [r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih, ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []), r.durum])}
+                    rows={ds.rows.map((r: any) => [
+                      r.sn, r.personel, r.ustLokasyon, r.lokasyon, r.gorevNo, r.gorevTanimi, r.tarih,
+                      ...(sureli ? [r.gorevSaatleri, r.gorevSuresi] : []),
+                      renderDurumBadge({
+                        durumKod: 'TAMAMLANDI', label: r.durum,
+                        durumSebep: r.durumSebep, islemiYapan: r.islemiYapan, durumTarihi: r.durumTarihi,
+                      }),
+                    ])}
                     filterable noFilterCols={[0]}
                   />
                   {ds.hasMore && <DahaFazlaButon loading={ds.loading} onClick={() => fetchDetay('tamamlanan', ds.rows.length, true)} />}
@@ -1308,7 +1362,12 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                       const tanim = (r.vardiyaNo && !/VARD[İI]YA/i.test(String(r.gorevTanimi ?? '')))
                         ? `${r.gorevTanimi}  ·  V${r.vardiyaNo}`
                         : r.gorevTanimi
-                      return [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, tanim, r.tarih, r.iptalEden ?? 'sistem', r.durum, r.kayipNedeni]
+                      const badge = renderDurumBadge({
+                        durumKod: r.durumKod ?? r.durum, label: r.durum,
+                        durumSebep: r.durumSebep, iptalSebep: r.iptalSebep,
+                        islemiYapan: r.islemiYapan, durumTarihi: r.durumTarihi,
+                      })
+                      return [r.sn, r.ustLokasyon, r.lokasyon, r.gorevNo, tanim, r.tarih, r.iptalEden ?? 'sistem', badge, r.kayipNedeni]
                     })}
                     filterable noFilterCols={[0]}
                   />
@@ -1358,7 +1417,15 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   </div>
                   <DataTable
                     headers={['SN', 'ATANAN', 'TAMAMLAYAN', 'ÜST LOKASYON', 'LOKASYON', 'GÖREV TANIMI', 'GÖREV DURUMU', 'ATAMA TARİHİ', 'TAMAMLANMA TARİH+SAAT']}
-                    rows={ds.rows.map((r: any) => [r.sn, r.atanan, r.tamamlayan, r.ustLokasyon, r.lokasyon, r.gorevTanimi, r.gorevDurumu, r.atamaTarihi, r.tamamlanmaTarihi])}
+                    rows={ds.rows.map((r: any) => [
+                      r.sn, r.atanan, r.tamamlayan, r.ustLokasyon, r.lokasyon, r.gorevTanimi,
+                      renderDurumBadge({
+                        durumKod: r.durumKod, label: r.gorevDurumu,
+                        durumSebep: r.durumSebep, iptalSebep: r.iptalSebep,
+                        islemiYapan: r.islemiYapan, durumTarihi: r.durumTarihi,
+                      }),
+                      r.atamaTarihi, r.tamamlanmaTarihi,
+                    ])}
                     leftCols={[1, 2, 3, 4, 5]}
                   />
                   {ds.hasMore && <DahaFazlaButon loading={ds.loading} onClick={() => fetchDetay('atanan', ds.rows.length, true)} />}
