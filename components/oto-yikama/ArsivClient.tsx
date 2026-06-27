@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Search, X, Download, Archive } from 'lucide-react'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 
 export interface ArsivKaydi {
   gorev_id: string
@@ -342,9 +343,15 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
                     <Td muted>{k.istasyon}</Td>
                     <Td align="center">{fmtTarih(k.hedef_tarih)}</Td>
                     <Td align="center">
-                      <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, background: DURUM_BG[gd], color: DURUM_FG[gd], fontSize: 12, fontWeight: 700 }}>
-                        {DURUM_LABEL[gd]}
-                      </span>
+                      <DurumBadgeWithSebep
+                        durum={gd}
+                        label={DURUM_LABEL[gd]}
+                        durumSebep={(k as any).durum_sebep}
+                        iptalSebep={(k as any).iptal_sebep}
+                        eden={(k as any).tamamlayan ?? (k as any).iptal_eden ?? null}
+                        tarih={(k as any).durum_degisim_tarihi ?? k.tamamlanma_tarihi}
+                        style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, background: DURUM_BG[gd], color: DURUM_FG[gd], fontSize: 12, fontWeight: 700 }}
+                      />
                     </Td>
                     <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 16, whiteSpace: 'nowrap' }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
                     <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 16, whiteSpace: 'nowrap' }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>

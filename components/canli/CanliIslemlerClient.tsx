@@ -13,6 +13,7 @@ import { Pause, Play, Square } from 'lucide-react'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { iptalSebepKontrol } from '@/lib/validation/iptalSebep'
 import DurumSebepModal from '@/components/gorev/DurumSebepModal'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 import { suankiVardiyaGunu, vardiyaGunuHesapla } from '@/lib/gorev/vardiyaGunu'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
@@ -1106,20 +1107,16 @@ useEffect(() => {
           </td>
         )}
         <td style={{ fontSize: fs, ...tdHL }}>
-          {g.durum === 'IPTAL' ? (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setIptalDetay({ sebep: g.iptal_sebep, eden: g.iptalEden?.isim_soyisim ?? null, tarih: g.iptal_tarihi }) }}
-              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-              title="İptal nedenini görüntüle"
-            >
-              <span style={{ fontSize: fs, cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 2 }} className={`verde-badge ${durumRenk[g.durum] ?? ''}`}>
-                {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
-              </span>
-            </button>
-          ) : (
-            <span style={{ fontSize: fs }} className={`verde-badge ${durumRenk[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
-          )}
+          <DurumBadgeWithSebep
+            durum={g.durum}
+            label={CANLI_DURUM_LABEL[g.durum] ?? g.durum}
+            durumSebep={g.durum_sebep}
+            iptalSebep={g.iptal_sebep}
+            eden={g.iptalEden?.isim_soyisim ?? g.islemi_yapan?.isim_soyisim ?? null}
+            tarih={g.iptal_tarihi ?? g.durum_degisim_tarihi}
+            className={`verde-badge ${durumRenk[g.durum] ?? ''}`}
+            style={{ fontSize: fs }}
+          />
         </td>
         {/* "İşlemi Yapan" sadece canlı akış tablosunda gösterilsin */}
         {showActor && (

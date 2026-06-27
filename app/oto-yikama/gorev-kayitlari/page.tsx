@@ -58,8 +58,9 @@ export default async function OtoYikamaGorevKayitlariPage() {
           .select(`
             id, tanim, durum, firma_id, lokasyon_id,
             olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
-            tamamlanma_suresi_saniye,
-            olusturan_id, islemi_yapan_id, baslatan_kullanici_id, iptal_sebep
+            tamamlanma_suresi_saniye, durum_degisim_tarihi,
+            olusturan_id, islemi_yapan_id, baslatan_kullanici_id,
+            iptal_sebep, durum_sebep
           `)
           .eq('firma_id', firmaId)
           .in('id', allGorevIds)
@@ -127,6 +128,8 @@ export default async function OtoYikamaGorevKayitlariPage() {
         tamamlayan_id:   islemYapanId,
         iptal_eden:      isIptal && islemYapanId ? (userMap.get(islemYapanId) ?? null) : null,
         iptal_sebep:     g.iptal_sebep ?? null,
+        durum_sebep:     g.durum_sebep ?? null,
+        durum_degisim_tarihi: g.durum_degisim_tarihi ?? null,
       }
     })
     // Geleceğe planlı henüz başlanmamış HAZIR kayıtları gizle — plan tarihi

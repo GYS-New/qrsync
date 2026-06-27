@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatDateTime, CANLI_DURUM_LABEL } from '@/lib/utils'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -737,7 +738,17 @@ export default function ArsivClient({
                     <td style={{ fontWeight: 600, color: cellColor }}>{r.tanim}</td>
                     <td style={{ color: cellColor }}>{getLocPath(r.lokasyon_id)}</td>
                     <td style={{ color: cellColor }}>{r.atanan?.isim_soyisim ?? '—'}</td>
-                    <td><span className={`verde-badge ${DURUM_RENK[r.durum] ?? 'status-acik'}`}>{CANLI_DURUM_LABEL[r.durum] ?? r.durum}</span></td>
+                    <td>
+                      <DurumBadgeWithSebep
+                        durum={r.durum}
+                        label={CANLI_DURUM_LABEL[r.durum] ?? r.durum}
+                        durumSebep={r.durum_sebep}
+                        iptalSebep={r.iptal_sebep}
+                        eden={r.islemi_yapan?.isim_soyisim ?? null}
+                        tarih={r.durum_degisim_tarihi ?? r.iptal_tarihi}
+                        className={`verde-badge ${DURUM_RENK[r.durum] ?? 'status-acik'}`}
+                      />
+                    </td>
                     <td style={{ whiteSpace:'nowrap', color: cellColor, fontSize:12 }}>{r.aktif_olma_tarihi ? formatDateTime(r.aktif_olma_tarihi) : '—'}</td>
                     <td style={{ whiteSpace:'nowrap', color: cellColor, fontSize:12 }}>{r.arsiv_tarihi ? formatDateTime(r.arsiv_tarihi) : '—'}</td>
                     <td>

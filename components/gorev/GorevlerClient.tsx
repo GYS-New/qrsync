@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { createGorevAtamaNotification, type GorevDurum } from '@/lib/notifications'
 import DurumSebepModal from '@/components/gorev/DurumSebepModal'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 import { useFirma } from '@/components/layout/FirmaContext'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { useYetki } from '@/lib/yetki/useYetki'
@@ -598,7 +599,15 @@ export default function GorevlerClient({
                       <td style={{ color: isArsiv ? '#64748b' : '#4b5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}>{getLocPath(g.lokasyon_id)}</td>
                       <td style={{ color: isArsiv ? '#64748b' : '#4b5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={atananAd}>{atananAd}</td>
                       <td>
-                        <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>{GOREV_DURUM_LABEL[g.durum] ?? g.durum}</span>
+                        <DurumBadgeWithSebep
+                          durum={g.durum}
+                          label={GOREV_DURUM_LABEL[g.durum] ?? g.durum}
+                          durumSebep={g.durum_sebep}
+                          iptalSebep={g.iptal_sebep}
+                          eden={islemiYapanAd}
+                          tarih={g.durum_degisim_tarihi}
+                          className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}
+                        />
                       </td>
                       <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', fontSize: 13, whiteSpace: 'nowrap' }}>{g.olusturma_tarihi ? formatDateTime(g.olusturma_tarihi) : '—'}</td>
                       <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={islemiYapanAd}>{islemiYapanAd}</td>

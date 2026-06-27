@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateTime, CANLI_DURUM_LABEL } from '@/lib/utils'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 import { KanalBadge } from '@/components/shared/KanalBadge'
 
 const DURUM_RENK: Record<string, string> = {
@@ -233,9 +234,15 @@ export default function TumGorevlerClient({
                 <td style={{ color:'#4b5563' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
                 <td style={{ color:'#6b7280', whiteSpace:'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
                 <td>
-                  <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>
-                    {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
-                  </span>
+                  <DurumBadgeWithSebep
+                    durum={g.durum}
+                    label={CANLI_DURUM_LABEL[g.durum] ?? g.durum}
+                    durumSebep={g.durum_sebep}
+                    iptalSebep={g.iptal_sebep}
+                    eden={g.islemi_yapan?.isim_soyisim ?? null}
+                    tarih={g.durum_degisim_tarihi}
+                    className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}
+                  />
                 </td>
                 <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                 <td style={{ color:'#6b7280', fontSize:13 }}>{g.islemi_yapan?.isim_soyisim ?? '—'}</td>
@@ -274,9 +281,15 @@ export default function TumGorevlerClient({
                     <td style={{ color:'#64748b' }}>{g.atanan?.isim_soyisim ?? '—'}</td>
                     <td style={{ color:'#94a3b8', whiteSpace:'nowrap', fontSize: 13 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
                     <td>
-                      <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>
-                        {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
-                      </span>
+                      <DurumBadgeWithSebep
+                        durum={g.durum}
+                        label={CANLI_DURUM_LABEL[g.durum] ?? g.durum}
+                        durumSebep={g.durum_sebep}
+                        iptalSebep={g.iptal_sebep}
+                        eden={g.islemi_yapan?.isim_soyisim ?? null}
+                        tarih={g.durum_degisim_tarihi}
+                        className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}
+                      />
                     </td>
                     <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                     <td style={{ color:'#94a3b8', whiteSpace:'nowrap', fontSize: 13 }}>{g.arsiv_tarihi ? formatDateTime(g.arsiv_tarihi) : '—'}</td>

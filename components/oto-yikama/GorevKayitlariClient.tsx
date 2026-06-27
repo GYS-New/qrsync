@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Search, X, Calendar, Download, Edit3, Trash2, Loader2 } from 'lucide-react'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 
 export interface GorevKaydi {
   gorev_id: string
@@ -29,6 +30,8 @@ export interface GorevKaydi {
   tamamlayan_id: string | null
   iptal_eden: string | null
   iptal_sebep: string | null
+  durum_sebep?: string | null
+  durum_degisim_tarihi?: string | null
 }
 
 export interface IstasyonOpt {
@@ -493,9 +496,15 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                       </div>
                     </Td>
                     <Td align="center">
-                      <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, background: DURUM_BG[gd], color: DURUM_FG[gd], fontSize: 12, fontWeight: 700 }}>
-                        {DURUM_LABEL[gd]}
-                      </span>
+                      <DurumBadgeWithSebep
+                        durum={gd}
+                        label={DURUM_LABEL[gd]}
+                        durumSebep={k.durum_sebep}
+                        iptalSebep={k.iptal_sebep}
+                        eden={k.tamamlayan ?? k.iptal_eden ?? null}
+                        tarih={k.durum_degisim_tarihi ?? k.tamamlanma_tarihi}
+                        style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, background: DURUM_BG[gd], color: DURUM_FG[gd], fontSize: 12, fontWeight: 700 }}
+                      />
                     </Td>
                     <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 16, whiteSpace: 'nowrap' }}>{fmtDateTime(k.baslatilma_tarihi)}</span></Td>
                     <Td align="center" muted><span style={{ fontFamily: 'monospace', fontSize: 16, whiteSpace: 'nowrap' }}>{fmtDateTime(k.tamamlanma_tarihi)}</span></Td>

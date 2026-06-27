@@ -15,6 +15,10 @@ interface Props {
   durum: string
   durumSebep?: string | null
   iptalSebep?: string | null   // geriye uyum fallback
+  /** Opsiyonel: işlemi yapan kullanıcının adı (popup'ta gösterilir) */
+  eden?: string | null
+  /** Opsiyonel: durum değişim/iptal tarihi ISO (popup'ta gösterilir) */
+  tarih?: string | null
   /** Verilirse badge bu className ile render — yoksa default style */
   className?: string
   style?: React.CSSProperties
@@ -22,13 +26,21 @@ interface Props {
   label?: string
 }
 
-export default function DurumBadgeWithSebep({ durum, durumSebep, iptalSebep, className, style, label }: Props) {
+function fmtTarihTR(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Istanbul' })
+  } catch { return iso }
+}
+
+export default function DurumBadgeWithSebep({ durum, durumSebep, iptalSebep, eden, tarih, className, style, label }: Props) {
   const [open, setOpen] = useState(false)
   const sebep = durumSebep ?? iptalSebep ?? null
   const hasSebep = !!(sebep && sebep.trim())
+  const hasMeta = !!(eden || tarih)
+  const tiklanabilir = hasSebep || hasMeta
 
   const handleClick = (e: React.MouseEvent) => {
-    if (!hasSebep) return
+    if (!tiklanabilir) return
     e.stopPropagation()
     setOpen(true)
   }
@@ -40,12 +52,12 @@ export default function DurumBadgeWithSebep({ durum, durumSebep, iptalSebep, cla
         className={className}
         style={{
           ...style,
-          cursor: hasSebep ? 'pointer' : (style?.cursor ?? 'default'),
-          textDecoration: hasSebep ? 'underline dotted' : undefined,
-          textDecorationThickness: hasSebep ? '1px' : undefined,
-          textUnderlineOffset: hasSebep ? '3px' : undefined,
+          cursor: tiklanabilir ? 'pointer' : (style?.cursor ?? 'default'),
+          textDecoration: tiklanabilir ? 'underline dotted' : undefined,
+          textDecorationThickness: tiklanabilir ? '1px' : undefined,
+          textUnderlineOffset: tiklanabilir ? '3px' : undefined,
         }}
-        title={hasSebep ? 'Gerekçeyi görmek için tıklayın' : undefined}
+        title={tiklanabilir ? 'Detay için tıklayın' : undefined}
       >
         {label ?? durum}
       </span>
@@ -74,15 +86,38 @@ export default function DurumBadgeWithSebep({ durum, durumSebep, iptalSebep, cla
                 style={{ padding: 6, borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280', fontSize: 18 }}
               >×</button>
             </div>
-            <div
-              style={{
-                padding: '12px 14px', borderRadius: 8, background: '#f9fafb',
-                border: '1px solid #e5e7eb', fontSize: 13.5, color: '#0f172a',
-                lineHeight: 1.55, whiteSpace: 'pre-wrap',
-              }}
-            >
-              {sebep}
-            </div>
+            {hasSebep && (
+              <div
+                style={{
+                  padding: '12px 14px', borderRadius: 8, background: '#f9fafb',
+                  border: '1px solid #e5e7eb', fontSize: 13.5, color: '#0f172a',
+                  lineHeight: 1.55, whiteSpace: 'pre-wrap', marginBottom: hasMeta ? 10 : 0,
+                }}
+              >
+                {sebep}
+              </div>
+            )}
+            {hasMeta && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, color: '#374151' }}>
+                {eden && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <span style={{ fontWeight: 600, color: '#6b7280', minWidth: 90 }}>İşlem yapan:</span>
+                    <span>{eden}</span>
+                  </div>
+                )}
+                {tarih && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <span style={{ fontWeight: 600, color: '#6b7280', minWidth: 90 }}>Tarih:</span>
+                    <span>{fmtTarihTR(tarih)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {!hasSebep && !hasMeta && (
+              <div style={{ padding: 12, fontSize: 12.5, color: '#6b7280', fontStyle: 'italic' }}>
+                Bu durum değişikliği için ek bilgi kaydedilmemiş.
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
               <button
                 onClick={() => setOpen(false)}

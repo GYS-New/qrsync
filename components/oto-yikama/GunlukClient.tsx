@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '@/components/ui/ToastProvider'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 import { Loader2, Search } from 'lucide-react'
 
 type Durum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI'
@@ -344,10 +345,16 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.lokasyon}</td>
                     <td style={{ paddingLeft: 2 }}>
-                      <span className={r.durum === 'ISLEMDE' ? 'islemde-flash' : undefined}
-                        style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, background: DURUM_BG[r.durum], color: DURUM_FG[r.durum], fontSize: 12, fontWeight: 700 }}>
-                        {DURUM_LABEL[r.durum]}
-                      </span>
+                      <DurumBadgeWithSebep
+                        durum={r.durum}
+                        label={DURUM_LABEL[r.durum]}
+                        durumSebep={(r as any).durum_sebep}
+                        iptalSebep={(r as any).iptal_sebep}
+                        eden={(r as any).tamamlayan ?? (r as any).iptal_eden ?? null}
+                        tarih={(r as any).durum_degisim_tarihi ?? r.tamamlanma_tarihi}
+                        className={r.durum === 'ISLEMDE' ? 'islemde-flash' : undefined}
+                        style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, background: DURUM_BG[r.durum], color: DURUM_FG[r.durum], fontSize: 12, fontWeight: 700 }}
+                      />
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 16, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{fmtTime(r.baslatilma_tarihi)}</td>
                     <td style={{ color: T.textSoft, fontSize: 16, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{fmtTime(r.tamamlanma_tarihi)}</td>

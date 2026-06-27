@@ -6,6 +6,7 @@ import { formatDateTime, GOREV_DURUM_LABEL } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
 import DurumSebepModal from '@/components/gorev/DurumSebepModal'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 
 const DURUM_RENK: Record<string, string> = {
   ACIK: 'status-acik',
@@ -171,9 +172,15 @@ export default function GorevlerUserClient({
                   <td style={{ color: '#4b5563' }}>{getLocPath(g.lokasyon_id, g.lokasyonlar?.tanim)}</td>
                   <td style={{ color: '#4b5563', fontSize: 13 }}>{g.atanan?.isim_soyisim ?? '—'}</td>
                   <td>
-                    <span className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}>
-                      {GOREV_DURUM_LABEL[g.durum] ?? g.durum}
-                    </span>
+                    <DurumBadgeWithSebep
+                      durum={g.durum}
+                      label={GOREV_DURUM_LABEL[g.durum] ?? g.durum}
+                      durumSebep={g.durum_sebep}
+                      iptalSebep={g.iptal_sebep}
+                      eden={g.islemi_yapan?.isim_soyisim ?? null}
+                      tarih={g.durum_degisim_tarihi}
+                      className={`verde-badge ${DURUM_RENK[g.durum] ?? 'status-acik'}`}
+                    />
                   </td>
                   <td style={{ color: '#6b7280', fontSize: 11.5, whiteSpace: 'nowrap' }}>
                     {formatDateTime(g.olusturma_tarihi)}

@@ -14,6 +14,7 @@ import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { useYetki } from '@/lib/yetki/useYetki'
 import { KanalBadge } from '@/components/shared/KanalBadge'
 import { suankiVardiyaGunu } from '@/lib/gorev/vardiyaGunu'
+import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 type SortKey = 'grup' | 'tanim' | 'lokasyon' | 'atanan' | 'aktif' | 'islem' | 'durum' | 'actor'
@@ -1459,20 +1460,15 @@ async function del() {
                 <td style={{ color: isArsiv ? '#94a3b8' : '#4b5563' }}>{getIslemiYapan(g, { meId, meName, kullanicilar })}</td>
                 <td><KanalBadge value={g.son_tamamlama_kanali} size="sm" /></td>
                 <td>
-                  {g.durum === 'IPTAL' ? (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setIptalDetay({ sebep: g.iptal_sebep, eden: g.iptalEden?.isim_soyisim ?? null, tarih: g.iptal_tarihi }) }}
-                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-                      title="İptal nedenini görüntüle"
-                    >
-                      <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`} style={{ cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 2 }}>
-                        {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
-                      </span>
-                    </button>
-                  ) : (
-                    <span className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}>{CANLI_DURUM_LABEL[g.durum] ?? g.durum}</span>
-                  )}
+                  <DurumBadgeWithSebep
+                    durum={g.durum}
+                    label={CANLI_DURUM_LABEL[g.durum] ?? g.durum}
+                    durumSebep={g.durum_sebep}
+                    iptalSebep={g.iptal_sebep}
+                    eden={g.iptalEden?.isim_soyisim ?? g.islemi_yapan?.isim_soyisim ?? null}
+                    tarih={g.iptal_tarihi ?? g.durum_degisim_tarihi}
+                    className={`verde-badge ${DURUM_RENK[g.durum] ?? ''}`}
+                  />
                 </td>
                 <td style={{ textAlign: 'center' }}>
                   {ceklistAktif && !isArsiv && lokasyonlar.find((l: any) => l.id === g.lokasyon_id && (l as any).checklist_sablon_id) ? (
