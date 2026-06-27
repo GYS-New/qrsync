@@ -173,15 +173,17 @@ function KpiCard({ label, value, sub, color, Icon }: { label: string; value: str
 }
 
 // ── DataTable ─────────────────────────────────────────────────────────────
-// Cell tipi: string|number → düz metin; React.ReactElement → olduğu gibi render
+// Cell tipi: string|number → düz metin; React.ReactElement → olduğu gibi render.
+// leftCols: 0 her zaman sol; diğer text-heavy kolonlar için ek index'ler ver.
 type Cell = string | number | React.ReactElement | null | undefined
-function DataTable({ headers, rows }: { headers: string[]; rows: Cell[][] }) {
+function DataTable({ headers, rows, leftCols }: { headers: string[]; rows: Cell[][]; leftCols?: number[] }) {
+  const isLeft = (i: number) => i === 0 || (leftCols?.includes(i) ?? false)
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
         <thead>
           <tr>{headers.map((h, i) => (
-            <th key={i} style={{ padding: '8px 12px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 12.5, textAlign: i === 0 ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
+            <th key={i} style={{ padding: '8px 12px', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 12.5, textAlign: isLeft(i) ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
           ))}</tr>
         </thead>
         <tbody>
@@ -190,7 +192,7 @@ function DataTable({ headers, rows }: { headers: string[]; rows: Cell[][] }) {
             : rows.map((row, ri) => (
               <tr key={ri} style={{ background: ri % 2 === 0 ? T.grayLight : '#fff' }}>
                 {row.map((cell, ci) => (
-                  <td key={ci} style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: ci === 0 ? 'left' : 'center', fontSize: 13.5, fontWeight: ci === 0 ? 600 : 400 }}>
+                  <td key={ci} style={{ padding: '7px 12px', borderBottom: `1px solid ${T.border}`, textAlign: isLeft(ci) ? 'left' : 'center', fontSize: 13.5, fontWeight: isLeft(ci) ? 600 : 400 }}>
                     {React.isValidElement(cell) ? cell : String(cell ?? '')}
                   </td>
                 ))}
@@ -531,11 +533,13 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
                   <DataTable
                     headers={['SN', 'GÖREV', altAltLokId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'ATANAN', 'TAMAMLAYAN', 'OLUŞTURMA', 'TAMAMLANMA', 'SÜRE']}
                     rows={data.tamamlananGorevler.map(r => [r.sn, r.tanim, r.ustLokasyon, r.lokasyon, r.atanan, r.tamamlayan, r.olusturma, r.tamamlanma, r.sure])}
+                    leftCols={[1]}
                   />
                 ) : (
                   <DataTable
                     headers={['SN', 'GÖREV', 'LOKASYON', 'ATANAN', 'TAMAMLAYAN', 'OLUŞTURMA', 'TAMAMLANMA', 'SÜRE']}
                     rows={data.tamamlananGorevler.map(r => [r.sn, r.tanim, r.lokasyon, r.atanan, r.tamamlayan, r.olusturma, r.tamamlanma, r.sure])}
+                    leftCols={[1]}
                   />
                 )}
               </div>
@@ -552,11 +556,13 @@ export default function SpesifikRaporKarti({ base, isSA, tenantFirmaId, projeId 
                   <DataTable
                     headers={['SN', 'GÖREV', altAltLokId ? 'ALT LOKASYON' : 'ÜST LOKASYON', altAltLokId ? 'ALT-ALT LOKASYON' : 'LOKASYON', 'ATANAN', 'DURUM', 'OLUŞTURMA', 'SON İŞLEM']}
                     rows={data.aktifGorevler.map(r => [r.sn, r.tanim, r.ustLokasyon, r.lokasyon, r.atanan, renderDurumBadge(r), r.olusturma, r.sonIslem])}
+                    leftCols={[1]}
                   />
                 ) : (
                   <DataTable
                     headers={['SN', 'GÖREV', 'LOKASYON', 'ATANAN', 'DURUM', 'OLUŞTURMA', 'SON İŞLEM']}
                     rows={data.aktifGorevler.map(r => [r.sn, r.tanim, r.lokasyon, r.atanan, renderDurumBadge(r), r.olusturma, r.sonIslem])}
+                    leftCols={[1]}
                   />
                 )}
               </div>
