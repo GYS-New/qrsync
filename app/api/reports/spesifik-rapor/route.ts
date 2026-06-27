@@ -119,9 +119,11 @@ export async function GET(req: Request) {
     const { data: kullanicilar } = await kulQ
     const userMap = new Map<string, string>((kullanicilar ?? []).map((u: any) => [u.id, u.isim_soyisim ?? '']))
 
-    // Görevler (aktif tablo) — gorevler_normal view: yıkama görevleri hariç
+    // Görevler (aktif tablo) — gorevler_normal view: yıkama görevleri hariç.
+    // NOT: gorevler tablosunda iptal_eden_id / iptal_tarihi YOK (sadece canli_gorevler'de).
+    // Spesifik görevlerde IPTAL eden = islemi_yapan_id, IPTAL tarihi = durum_degisim_tarihi.
     let qAktif = admin.from('gorevler_normal')
-      .select('id,tanim,durum,lokasyon_id,atanan_kullanici_id,olusturan_id,islemi_yapan_id,iptal_eden_id,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi,durum_sebep,iptal_sebep,iptal_tarihi')
+      .select('id,tanim,durum,lokasyon_id,atanan_kullanici_id,olusturan_id,islemi_yapan_id,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi,durum_sebep,iptal_sebep')
       .eq('firma_id', firmaId)
     if (projeId)     qAktif = (qAktif as any).eq('proje_id', projeId)
     if (targetLokasyonIds) qAktif = (qAktif as any).in('lokasyon_id', targetLokasyonIds)
@@ -136,13 +138,13 @@ export async function GET(req: Request) {
       return true
     })
 
-    // Actor name map — islemi_yapan/iptal_eden için SA dahil tüm aktörler.
+    // Actor name map — islemi_yapan/olusturan için SA dahil tüm aktörler.
     // userMap (kullanicilar) sadece firma içi kişileri tutar; SA'lar farklı firma_id'li
     // oldukları için orada yoktur. Admin client ile id listesi üzerinden ayrıca çekiyoruz.
+    // Spesifik görevlerde iptal_eden_id ayrı kolon değil — islemi_yapan_id kullanılır.
     const actorIds = new Set<string>()
     for (const g of tumGorevler) {
       if (g.islemi_yapan_id) actorIds.add(g.islemi_yapan_id)
-      if (g.iptal_eden_id)   actorIds.add(g.iptal_eden_id)
       if (g.olusturan_id)    actorIds.add(g.olusturan_id)
     }
     const actorMap = new Map<string, string>()
@@ -239,13 +241,12 @@ export async function GET(req: Request) {
         durum: g.durum,
         olusturma: fmt(g.olusturma_tarihi),
         sonIslem: fmt(g.durum_degisim_tarihi),
-        // Mig 099: tıklanabilir badge popup için
+        // Mig 099: tıklanabilir badge popup için.
+        // Spesifik görevlerde IPTAL eden = islemi_yapan_id (ayrı kolon yok).
         durumSebep: g.durum_sebep ?? null,
         iptalSebep: g.iptal_sebep ?? null,
-        islemiYapan: g.durum === 'IPTAL'
-          ? resolveActor(g.iptal_eden_id)
-          : resolveActor(g.islemi_yapan_id),
-        durumTarihi: g.iptal_tarihi ?? g.durum_degisim_tarihi ?? null,
+        islemiYapan: resolveActor(g.islemi_yapan_id),
+        durumTarihi: g.durum_degisim_tarihi ?? null,
       }))
 
     // Tarih aralığı etiketi
