@@ -13,7 +13,6 @@ import { Pause, Play, Square } from 'lucide-react'
 import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { iptalSebepKontrol } from '@/lib/validation/iptalSebep'
 import DurumSebepModal from '@/components/gorev/DurumSebepModal'
-import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 import { suankiVardiyaGunu, vardiyaGunuHesapla } from '@/lib/gorev/vardiyaGunu'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
@@ -1117,16 +1116,11 @@ useEffect(() => {
           </td>
         )}
         <td style={{ fontSize: fs, ...tdHL }}>
-          <DurumBadgeWithSebep
-            durum={g.durum}
-            label={CANLI_DURUM_LABEL[g.durum] ?? g.durum}
-            durumSebep={g.durum_sebep}
-            iptalSebep={g.iptal_sebep}
-            eden={g.iptalEden?.isim_soyisim ?? g.islemi_yapan?.isim_soyisim ?? null}
-            tarih={g.iptal_tarihi ?? g.durum_degisim_tarihi}
-            className={`verde-badge ${durumRenk[g.durum] ?? ''}`}
-            style={{ fontSize: fs }}
-          />
+          {/* Canlı tablo sürekli realtime ile yenilendiği için popup açık kalamıyor —
+              burada badge tıklanabilir DEĞİL. Gerekçe için Görev Kayıtları / Arşiv sayfası kullanılır. */}
+          <span className={`verde-badge ${durumRenk[g.durum] ?? ''}`} style={{ fontSize: fs }}>
+            {CANLI_DURUM_LABEL[g.durum] ?? g.durum}
+          </span>
         </td>
         {/* "İşlemi Yapan" sadece canlı akış tablosunda gösterilsin */}
         {showActor && (
