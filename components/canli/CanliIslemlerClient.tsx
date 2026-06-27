@@ -819,6 +819,8 @@ useEffect(() => {
 
   // Durum sebep modal (mig 099 — manuel durum değişimleri zorunlu gerekçeli)
   const [sebepHedef, setSebepHedef] = useState<{ gorevId: string; durum: string } | null>(null)
+  // Edit modal'da durum değişimi (diğer alanlarla birlikte) için ek state
+  const [editPending, setEditPending] = useState<{ payload: any; yeniDurum: string; id: string } | null>(null)
 
   function updateDurumIste(gorevId: string, durum: string) {
     setSebepHedef({ gorevId, durum })
@@ -939,6 +941,14 @@ useEffect(() => {
         lokasyon_id: form.lokasyon_id,
         atanan_kullanici_id: form.atanan_kullanici_id || null,
         aktif_olma_tarihi: aktifIso,
+      }
+
+      // Mig 099: edit modunda durum DEĞİŞMİŞSE → gerekçe modal'ı zorunlu.
+      // Diğer alanlar aynı update'te birlikte gönderilir.
+      if (modal === 'edit' && selected && form.durum && form.durum !== selected.durum) {
+        setEditPending({ payload, yeniDurum: form.durum, id: selected.id })
+        setSaving(false)
+        return
       }
       if (modal === 'edit' && form.durum) payload.durum = form.durum
 
@@ -1359,20 +1369,54 @@ useEffect(() => {
       })()}
 
       <DurumSebepModal
-        open={!!sebepHedef}
-        yeniDurum={sebepHedef?.durum ?? ''}
-        onClose={() => setSebepHedef(null)}
+        open={!!sebepHedef || !!editPending}
+        yeniDurum={sebepHedef?.durum ?? editPending?.yeniDurum ?? ''}
+        onClose={() => { setSebepHedef(null); setEditPending(null) }}
         onConfirm={async (sebep) => {
-          if (!sebepHedef) return
           try {
-            await updateDurum(sebepHedef.gorevId, sebepHedef.durum, sebep)
-            await Promise.all([refreshBrowse(), refreshLiveFlow()])
-            setSelectedId(null)
-            setSelectedGorev(null)
+            if (sebepHedef) {
+              await updateDurum(sebepHedef.gorevId, sebepHedef.durum, sebep)
+              await Promise.all([refreshBrowse(), refreshLiveFlow()])
+              setSelectedId(null)
+              setSelectedGorev(null)
+              setSebepHedef(null)
+              return
+            }
+            if (editPending) {
+              // Edit form payload + durum + sebep tek update
+              const nowIso = new Date().toISOString()
+              const fullPatch: any = {
+                ...editPending.payload,
+                durum: editPending.yeniDurum,
+                durum_degisim_tarihi: nowIso,
+                islemi_yapan_id: meId,
+                durum_sebep: sebep,
+              }
+              // Terminal durum ek alanlar
+              if (editPending.yeniDurum === 'TAMAMLANDI') {
+                fullPatch.tamamlanma_tarihi    = nowIso
+                fullPatch.tamamlayan_kullanici_id = meId
+                fullPatch.son_tamamlama_kanali = 'WEB'
+              }
+              if (['IPTAL', 'KAPATILDI', 'SILINDI'].includes(editPending.yeniDurum)) {
+                fullPatch.iptal_tarihi  = nowIso
+                fullPatch.iptal_eden_id = meId
+                fullPatch.iptal_sebep   = sebep
+              }
+              if (editPending.yeniDurum === 'ISLEMDE') {
+                fullPatch.baslatilma_tarihi    = nowIso
+                fullPatch.baslatan_kullanici_id = meId
+              }
+              const { error: err } = await supabase.from('canli_gorevler').update(fullPatch).eq('id', editPending.id)
+              if (err) throw err
+              setSuccess('Frekansiyel görev güncellendi!')
+              setModal(null)
+              await Promise.all([refreshBrowse(), refreshLiveFlow()])
+              setEditPending(null)
+            }
           } catch (e: any) {
             setError(e?.message ?? 'İşlem başarısız')
           }
-          setSebepHedef(null)
         }}
       />
     </div>

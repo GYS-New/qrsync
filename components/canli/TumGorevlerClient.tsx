@@ -484,6 +484,15 @@ function openCreate() {
           setSaving(false)
           return
         }
+        // Mig 099: TÜM durum değişimleri için gerekçe zorunlu (sadece IPTAL değil).
+        const { durumSebepKontrol } = await import('@/lib/validation/durumSebep')
+        const sebepKontrol = durumSebepKontrol(editIptalSebep)
+        if (!sebepKontrol.ok) {
+          toast({ type: 'error', title: 'Gerekçe Eksik', message: sebepKontrol.mesaj })
+          setSaving(false)
+          return
+        }
+        payload.durum_sebep = sebepKontrol.sebep
         if (form.durum === 'TAMAMLANDI') {
           if ((selected as any)?.durum === 'ZAMANI_GECMIS') {
             toast({ type: 'error', title: 'İşlem yapılamaz', message: 'Zamanı geçmiş görevlerde işlem yapılamaz.' })
@@ -498,22 +507,15 @@ function openCreate() {
           }
           payload.tamamlayan_kullanici_id = meId
           payload.tamamlanma_tarihi = nowIso
+          payload.son_tamamlama_kanali = 'WEB'
         } else if (['IPTAL', 'KAPATILDI', 'SILINDI'].includes(form.durum)) {
           payload.iptal_eden_id = meId
           payload.iptal_tarihi = nowIso
-          // IPTAL'de sebep zorunlu (web tarafı)
           if (form.durum === 'IPTAL') {
-            const sebep = editIptalSebep.trim()
-            if (sebep.length < 3) {
-              toast({ type: 'error', title: 'İptal Sebebi Eksik', message: 'Lütfen en az 3 karakter iptal sebebi girin.' })
-              setSaving(false)
-              return
-            }
-            payload.iptal_sebep = sebep
+            payload.iptal_sebep = sebepKontrol.sebep
           }
         } else {
-          // Diğer durumlar (BEKLEMEDE, ZAMANINDA_YAPILAMAYAN, KAPATILDI, SILINDI, ZAMANI_GECMIS vs.)
-          // Şimdilik iptal_eden_id alanını "işlemi yapan" olarak kullanıyoruz (mobil taraf ayrı ele alınacak)
+          // Diğer durumlar (BEKLEMEDE, ZAMANINDA_YAPILAMAYAN, ISLEMDE vs.)
           payload.iptal_eden_id = meId
         }
       }
@@ -1786,15 +1788,15 @@ async function del() {
                 )}
               </div>
 
-              {modal === 'edit' && form.durum === 'IPTAL' && (
+              {modal === 'edit' && selected && form.durum && form.durum !== selected.durum && (
                 <div style={{ gridColumn: '1 / -1' }}>
                   <div style={{ fontSize: 13, color: '#4b5563', marginBottom: 6 }}>
-                    İptal Sebebi <span style={{ color: '#dc2626' }}>*</span>
+                    Durum Değişikliği Gerekçesi <span style={{ color: '#dc2626' }}>*</span>
                   </div>
                   <textarea
                     value={editIptalSebep}
                     onChange={(e) => setEditIptalSebep(e.target.value)}
-                    placeholder="Görevin neden iptal edildiğini açıklayın (en az 3 karakter)"
+                    placeholder="Durumu neden değiştirdiğinizi açıklayın (en az 5 karakter)"
                     maxLength={500}
                     rows={3}
                     style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' as const, boxSizing: 'border-box' }}
