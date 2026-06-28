@@ -178,7 +178,7 @@ export default function AktiviteGrafigiBlock({
           </button>
         ))}
       </div>
-      <div style={{ flex: 1, minHeight: 0, width: "100%", minWidth: 0 }}>
+      <div style={{ height: 300, width: "100%", minWidth: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
