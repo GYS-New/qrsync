@@ -1,9 +1,9 @@
 "use client"
 
 import BlockWrapper from "./BlockWrapper"
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts"
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import type { DashboardBlockProps } from '../types'
 
 /** Client-side pagination helper — PostgREST max_rows=1000 limitini aşmak için */
@@ -41,23 +41,6 @@ export default function AktiviteGrafigiBlock({
   const [mode, setMode] = useState<Mode>("gunluk")
   const [data, setData] = useState<Array<{ label: string; value: number }>>([])
   const yetkiliLokIdsKey = useMemo(() => (yetkiliLokIds ?? []).slice().sort().join(','), [yetkiliLokIds])
-
-  const chartWrapRef = useRef<HTMLDivElement | null>(null)
-  const [chartSize, setChartSize] = useState({ w: 0, h: 0 })
-
-  useLayoutEffect(() => {
-    const el = chartWrapRef.current
-    if (!el) return
-    const measure = () => {
-      const rect = el.getBoundingClientRect()
-      const w = Math.floor(rect.width), h = Math.floor(rect.height)
-      if (w > 0 && h > 0) setChartSize({ w, h })
-    }
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
 
   const rangeStart = useMemo(() => {
     const now = new Date()
@@ -195,15 +178,15 @@ export default function AktiviteGrafigiBlock({
           </button>
         ))}
       </div>
-      <div ref={chartWrapRef} style={{ height: 300, minHeight: 300, width: "100%", minWidth: 0 }}>
-        {chartSize.w > 0 && chartSize.h > 0 ? (
-          <AreaChart width={chartSize.w} height={chartSize.h} data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, width: "100%", minWidth: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
             <Tooltip />
             <Area type="monotone" dataKey="value" stroke="#22c55e" fill="#dcfce7" name="Tamamlanan Görev" />
           </AreaChart>
-        ) : null}
+        </ResponsiveContainer>
       </div>
     </BlockWrapper>
   )
