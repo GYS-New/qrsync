@@ -9,11 +9,20 @@ import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
 type Mode = 'gunluk' | 'haftalik' | 'aylik'
 
-// Vardiya günü range hesabı — bugün VG'den N gün geri (DATE string)
+// Vardiya günü range hesabı — periyodun BAŞLANGICI (DATE string)
+//  - gunluk:   bugün (bugunVG)
+//  - haftalik: bu haftanın Pazartesi'si
+//  - aylik:    bu ayın 1'i
 function rangeStartDateFor(mode: Mode, bugunVG: string): string {
-  const days = mode === 'gunluk' ? 1 : mode === 'haftalik' ? 7 : 30
+  if (mode === 'gunluk') return bugunVG
   const d = new Date(bugunVG + 'T00:00:00Z')
-  d.setUTCDate(d.getUTCDate() - days)
+  if (mode === 'haftalik') {
+    const dow = d.getUTCDay() // 0=Pazar, 1=Pazartesi, ..., 6=Cumartesi
+    const back = dow === 0 ? 6 : dow - 1
+    d.setUTCDate(d.getUTCDate() - back)
+    return d.toISOString().slice(0, 10)
+  }
+  d.setUTCDate(1)
   return d.toISOString().slice(0, 10)
 }
 

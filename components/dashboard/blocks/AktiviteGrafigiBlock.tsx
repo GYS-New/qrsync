@@ -40,6 +40,7 @@ export default function AktiviteGrafigiBlock({
   const supabase = createClient()
   const [mode, setMode] = useState<Mode>("gunluk")
   const [data, setData] = useState<Array<{ label: string; value: number }>>([])
+  const [loading, setLoading] = useState(false)
   const yetkiliLokIdsKey = useMemo(() => (yetkiliLokIds ?? []).slice().sort().join(','), [yetkiliLokIds])
 
   const rangeStart = useMemo(() => {
@@ -50,6 +51,8 @@ export default function AktiviteGrafigiBlock({
   }, [mode])
 
   async function fetchData() {
+    setLoading(true)
+    try {
     // Grup kolonu mode'a göre:
     //  - GÜNLÜK (saatlik): tamamlanma_tarihi — gün içinde gerçek dağılım için.
     //  - HAFTALIK/AYLIK: vardiya_gunu — "ait olduğu vardiya günü". Sarkan V1
@@ -151,6 +154,9 @@ export default function AktiviteGrafigiBlock({
     }
 
     setData(labels.map((label) => ({ label, value: grouped[label] || 0 })))
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -166,7 +172,7 @@ export default function AktiviteGrafigiBlock({
 
   return (
     <BlockWrapper title="AKTİVİTE GRAFİĞİ" size="big" href={`${basePath}/dashboard/canli-islemler`}>
-      <div className="flex gap-2 mb-2">
+      <div className="flex gap-2 mb-2 items-center">
         {[
           { key: "gunluk", label: "GÜNLÜK" },
           { key: "haftalik", label: "HAFTALIK" },
@@ -177,8 +183,14 @@ export default function AktiviteGrafigiBlock({
             {m.label}
           </button>
         ))}
+        {loading && <div style={{ fontSize: 12, color: '#6b7280', marginLeft: 4 }}>Yükleniyor…</div>}
       </div>
-      <div style={{ height: 300, width: "100%", minWidth: 0 }}>
+      <div style={{ height: 300, width: "100%", minWidth: 0, position: 'relative' }}>
+        {loading && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.6)', zIndex: 1, fontSize: 13, color: '#6b7280' }}>
+            Yükleniyor…
+          </div>
+        )}
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
