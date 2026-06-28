@@ -43,18 +43,18 @@
   padding: 0;
 }
 
-html {
-  font-size: 12px;
-}
-
 html, body {
   font-family: 'Inter', sans-serif;
   background: var(--bg);
   color: var(--text-900);
-  font-size: 11.25px;
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
+}
+
+body {
+  zoom: 0.75;
 }
 
 /* ── AUTH INPUTS (LOGIN) ── */
