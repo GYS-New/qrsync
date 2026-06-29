@@ -31,7 +31,7 @@ export default async function TAArsivPage() {
   const arsiv: any[] = []
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+    <div>
       <Topbar title="Arşiv" base="/ta" breadcrumbs={[{ label: 'Yönetim' }, { label: aktifProje.ad }, { label: 'Arşiv' }]} />
       <PasswordGate
         storageKey="qrsync_ta_archive_verified_at"

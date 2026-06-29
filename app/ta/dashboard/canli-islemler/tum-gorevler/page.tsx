@@ -60,7 +60,7 @@ export default async function TATumGorevlerPage() {
   ])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+    <div>
       <Topbar
         title="Tum Gorevler"
         base="/ta"

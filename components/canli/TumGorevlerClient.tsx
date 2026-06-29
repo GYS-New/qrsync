@@ -1146,7 +1146,7 @@ async function del() {
   )
 
   return (
-    <div className="verde-card" style={{ padding: 16, overflowX: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div className="verde-card" style={{ padding: 16, overflowX: 'hidden' }}>
 
       {/* ── VARDİYA BAZLI BUGÜNKÜ ÖZET ── */}
       {vardiyaOzetleri.length > 0 && (
@@ -1364,7 +1364,7 @@ async function del() {
         </button>
       </div>
 
-      <div className="verde-table-wrap" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+      <div className="verde-table-wrap" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 290px)' }}>
         <table className="verde-table" style={{ fontFamily: "Inter, ui-sans-serif, system-ui", fontSize: 13 }}>
           <thead>
             <tr>

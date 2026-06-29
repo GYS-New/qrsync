@@ -68,7 +68,7 @@ export default async function UTumGorevlerPage() {
   const actorAdMap = await getActorMap((gorevler as any) ?? [])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+    <div>
       <Topbar title="Tüm Görevler" base="/u" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Frekansiyel Görevler' }, { label: 'Tüm Görevler' }]} />
       <TumGorevlerClient
         base="/u"
