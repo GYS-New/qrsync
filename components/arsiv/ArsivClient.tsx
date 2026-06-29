@@ -232,8 +232,10 @@ export default function ArsivClient({
     setSpesifikLoading(true)
     try {
       const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      // gorevler_normal view = gorevler tablosu MINUS Oto Yıkama (mig 052).
+      // Oto Yıkama'nın kendi arşivi var, Spesifik arşivde görünmemeli.
       let q2 = supabase
-        .from('gorevler')
+        .from('gorevler_normal')
         .select(`id,tanim,durum,lokasyon_id,olusturma_tarihi,tamamlanma_tarihi,durum_degisim_tarihi,
           atanan:users!atanan_kullanici_id(isim_soyisim),
           olusturan:users!olusturan_id(isim_soyisim)`)
@@ -413,7 +415,10 @@ export default function ArsivClient({
 
       } else if (topluSilSekme === 'spesifik') {
         const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-        let q = supabase.from('gorevler').select('id').eq('firma_id', firmaId)
+        // ID listesi gorevler_normal view'inden — Oto Yıkama'lar dışlanır
+        // (Oto Yıkama'nın kendi arşivi var, oradan silinir). Aksi halde
+        // arşivde görünmeyen kayıtlar toplu silmede sessizce silinirdi.
+        let q = supabase.from('gorevler_normal').select('id').eq('firma_id', firmaId)
           .or(`durum.eq.IPTAL,and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.lt.${sinir24s})`)
         if (projeId) q = (q as any).eq('proje_id', projeId)
         if (fromISO) q = (q as any).gte('olusturma_tarihi', fromISO)
