@@ -204,7 +204,7 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
   }
 
   return (
-    <div className="verde-card" style={{ padding: 0, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div className="verde-card" style={{ padding: 0, overflow: 'hidden' }}>
       {/* Başlık satırı */}
       <div style={{ padding: '14px 18px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <Archive size={20} style={{ color: T.indigo }} />
@@ -310,7 +310,7 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
             : 'Filtreye uyan kayıt yok.'}
         </div>
       ) : (
-        <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+        <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 1200 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
               <tr>

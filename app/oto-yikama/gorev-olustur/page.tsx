@@ -15,7 +15,7 @@ export default async function OtoYikamaGorevOlusturPage() {
   if (!firmaId) redirect('/oto-yikama/dashboard')
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+    <div>
       <Topbar
         title="Ekstra Görev Oluştur"
         base={rolBase}
