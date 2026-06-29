@@ -195,7 +195,7 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
   }
 
   return (
-    <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14, flex: 1, minHeight: 0 }}>
       {/* BİLGİ NOTU */}
       <div style={{
         padding: '10px 14px', borderRadius: 8,
@@ -254,13 +254,13 @@ export default function GorevOlusturClient({ firmaId }: { firmaId: string }) {
       {/* ANA İKİ KART: Plaka listesi (sol) + İstasyon (sağ) */}
       <div style={{
         display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px',
-        gap: 14, alignItems: 'start',
-        minHeight: 'calc(100vh - 260px)',
+        gap: 14, alignItems: 'stretch',
+        flex: 1, minHeight: 0,
       }}>
         {/* PLAKA LİSTESİ */}
         <div className="verde-card" style={{
           overflow: 'hidden', display: 'flex', flexDirection: 'column',
-          height: 'calc(100vh - 260px)',
+          flex: 1, minHeight: 0,
         }}>
           <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>

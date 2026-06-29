@@ -324,7 +324,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
   }
 
   return (
-    <div className="verde-card" style={{ overflow: 'hidden' }}>
+    <div className="verde-card" style={{ overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* ÜST BAR — başlık + KPI filtre pill'leri */}
       <div style={{ padding: '14px 18px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 220 }}>
@@ -450,7 +450,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
           {kayitlar.length === 0 ? 'Henüz görev kaydı yok.' : 'Filtre koşullarına uyan kayıt yok.'}
         </div>
       ) : (
-        <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 1300 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
               <tr>
