@@ -146,12 +146,10 @@ body {
   }
 
   .verde-table {
-    @apply w-full;
-    border-collapse: separate;
-    border-spacing: 0;
+    @apply w-full border-collapse;
   }
   .verde-table thead tr {
-    @apply bg-[#f9fafb];
+    @apply bg-[#f9fafb] border-b border-[#e5e7eb];
   }
   .verde-table thead th {
     @apply px-4 py-2 text-left text-[13px] font-bold text-[#6b7280]
@@ -160,20 +158,14 @@ body {
     top: 0;
     z-index: 2;
     background: #f9fafb;
-    /* border-collapse:separate ile th border'i ayri cizilir; box-shadow ile
-       alta tek satir cizgi taklit edilir, sticky kayarken kayıp olmaz. */
-    box-shadow: inset 0 -1px 0 #e5e7eb;
   }
   .verde-table tbody tr {
-    @apply transition-colors duration-100 cursor-pointer;
+    @apply border-b border-[#e5e7eb] transition-colors duration-100 cursor-pointer;
   }
   .verde-table tbody tr:hover { @apply bg-[#f9fafb]; }
+  .verde-table tbody tr:last-child { @apply border-b-0; }
   .verde-table tbody td {
     @apply px-4 py-3 text-[13.5px] text-[#374151];
-    border-bottom: 1px solid #e5e7eb;
-  }
-  .verde-table tbody tr:last-child td {
-    border-bottom: 0;
   }
 
   .verde-select {
