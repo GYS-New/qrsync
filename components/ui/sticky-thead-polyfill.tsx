@@ -20,17 +20,12 @@ import { useEffect } from 'react'
  */
 export default function StickyTheadPolyfill() {
   useEffect(() => {
-    const DEBUG = true // TODO: false yap, dogrulama sonrasi
-    const log = (...a: any[]) => { if (DEBUG) console.log('[StickyThead]', ...a) }
-    log('mounted')
-
     const attached = new WeakSet<HTMLElement>()
 
     function findScrollableAncestor(el: HTMLElement | null): HTMLElement | null {
       let cur: HTMLElement | null = el?.parentElement ?? null
       while (cur && cur !== document.body) {
-        const cs = window.getComputedStyle(cur)
-        const overflow = cs.overflowY || cs.overflow
+        const overflow = window.getComputedStyle(cur).overflowY
         if (overflow === 'auto' || overflow === 'scroll') return cur
         cur = cur.parentElement
       }
@@ -40,25 +35,14 @@ export default function StickyTheadPolyfill() {
     function attach(thead: HTMLElement) {
       if (attached.has(thead)) return
       const table = thead.closest('table')
-      if (!table) { log('no table for thead'); return }
+      if (!table) return
       const scroller = findScrollableAncestor(table as HTMLElement)
-      if (!scroller) {
-        log('NO scrollable ancestor for table; body or page scrolling instead', { tableClass: table.className })
-        return
-      }
+      if (!scroller) return
 
       attached.add(thead)
       thead.style.position = 'relative'
       thead.style.zIndex = '10'
       thead.style.willChange = 'transform'
-
-      log('attached to scroller', {
-        scrollerClass: scroller.className,
-        scrollerTag: scroller.tagName,
-        scrollerHeight: scroller.clientHeight,
-        scrollHeight: scroller.scrollHeight,
-        canScroll: scroller.scrollHeight > scroller.clientHeight,
-      })
 
       let rafId = 0
       const update = () => {
@@ -70,13 +54,12 @@ export default function StickyTheadPolyfill() {
       }
 
       scroller.addEventListener('scroll', update, { passive: true })
+      // Initial — eger sayfada zaten scroll varsa thead dogru pozisyonda olsun
       update()
     }
 
     function scan() {
-      const theads = document.querySelectorAll<HTMLElement>('table.verde-table > thead')
-      log('scan found', theads.length, 'theads')
-      theads.forEach(attach)
+      document.querySelectorAll<HTMLElement>('table.verde-table > thead').forEach(attach)
     }
 
     scan()
@@ -86,6 +69,8 @@ export default function StickyTheadPolyfill() {
 
     return () => {
       observer.disconnect()
+      // Scroll listener'lari ve transform stilleri thead unmount oldugunda
+      // GC tarafindan temizlenir (WeakSet referans tutmuyor).
     }
   }, [])
 
