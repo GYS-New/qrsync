@@ -150,18 +150,28 @@ body {
     border-collapse: separate;
     border-spacing: 0;
   }
+  /* Sticky thead — multi-target: bazi tarayicilar (ozellikle body{zoom}
+     altinda) <thead>'da sticky bekler, bazilari <th>'de. Hepsine veriyoruz. */
+  .verde-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #f9fafb;
+  }
   .verde-table thead tr {
     @apply bg-[#f9fafb];
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
   .verde-table thead th {
     @apply px-4 py-2 text-left text-[13px] font-bold text-[#6b7280]
            uppercase tracking-[0.8px];
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: 10;
     background: #f9fafb;
-    /* border-collapse:separate ile th border'i ayri cizilir; box-shadow ile
-       alta tek satir cizgi taklit edilir, sticky kayarken kayıp olmaz. */
+    /* Alt cizgi box-shadow ile — sticky kayarken kaybolmaz. */
     box-shadow: inset 0 -1px 0 #e5e7eb;
   }
   .verde-table tbody tr {
@@ -174,6 +184,13 @@ body {
   }
   .verde-table tbody tr:last-child td {
     border-bottom: 0;
+  }
+
+  /* Sticky thead'in dogru calismasi icin tablo wrap'inin pozisyon baglami
+     belirgin olmali. body{zoom:0.75} altinda bazi tarayicilarda relative
+     yoksa sticky offset hatali hesaplaniyor. */
+  .verde-table-wrap {
+    position: relative;
   }
 
   .verde-select {
