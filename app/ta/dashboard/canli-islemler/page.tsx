@@ -49,7 +49,7 @@ export default async function CanliIslemlerPage() {
   const efektifAyar = await getEfektifAyar(firmaId, aktifProje.id)
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <Topbar
         title="Frekansiyel Gorevler"
         base="/ta"
