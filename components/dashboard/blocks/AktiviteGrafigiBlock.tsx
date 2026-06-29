@@ -111,7 +111,20 @@ export default function AktiviteGrafigiBlock({
     const [canliRows, arsivRows, spesifikRows] = await Promise.all([
       fetchAllPages(buildCanli), fetchAllPages(buildArsiv), fetchAllPages(buildSpesifik)
     ])
-    const rows = [...canliRows, ...arsivRows, ...spesifikRows]
+    // Defansif dedupe — pagination overlap veya farkli kaynaktan gelen
+    // ayni ID'yi cift saymamak icin. Her tablo kendi ID universe'i ama
+    // emniyet acisindan tablo-bazli set tutuyoruz.
+    const seen = { canli: new Set<string>(), arsiv: new Set<string>(), spesifik: new Set<string>() }
+    const dedupeBy = (arr: any[], set: Set<string>) => arr.filter(r => {
+      if (!r?.id || set.has(r.id)) return false
+      set.add(r.id)
+      return true
+    })
+    const rows = [
+      ...dedupeBy(canliRows as any[], seen.canli),
+      ...dedupeBy(arsivRows as any[], seen.arsiv),
+      ...dedupeBy(spesifikRows as any[], seen.spesifik),
+    ]
 
     // Label sırasını ayrı bir array'de tutuyoruz; Object key'lerinde "10".."23"
     // integer-index olarak numeric sıralanır, "00".."09" insertion order'da kalır
