@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
+import StickyTheadPolyfill from '@/components/ui/sticky-thead-polyfill'
 
 export default async function ULayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
@@ -16,7 +17,9 @@ export default async function ULayout({ children }: { children: React.ReactNode 
     ? await supabase.from('projeler').select('ad,logo_url,personel_takibi_aktif').eq('id', user.proje_id).single()
     : { data: null }
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#fafafa' }}>
+    <>
+      <StickyTheadPolyfill />
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#fafafa' }}>
       <Sidebar
         user={user}
         firma={firma}
@@ -29,5 +32,6 @@ export default async function ULayout({ children }: { children: React.ReactNode 
         {children}
       </div>
     </div>
+    </>
   )
 }

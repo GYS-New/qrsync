@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
 import SAProviders from '@/components/layout/SAProviders'
+import StickyTheadPolyfill from '@/components/ui/sticky-thead-polyfill'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 
@@ -30,6 +31,7 @@ export default async function SALayout({ children }: { children: React.ReactNode
 
   return (
     <SAProviders>
+      <StickyTheadPolyfill />
       <div style={{ display:'flex', minHeight:'100vh', background:'#fafafa' }}>
         <Sidebar user={user} firma={null} sidebarLogo={sidebarLogo} projeLogo={projeLogo} projeAdi={projeAdi} />
         <div style={{ marginLeft:282, flex:1, minWidth:0, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:'100vh' }}>

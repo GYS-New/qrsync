@@ -5,6 +5,7 @@ import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getOtoYikamaNav } from '@/lib/modul/otoYikamaNav'
 import { getOtoYikamaFirmaId } from '@/lib/oto-yikama/getOtoYikamaFirmaId'
+import StickyTheadPolyfill from '@/components/ui/sticky-thead-polyfill'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,6 +72,7 @@ export default async function OtoYikamaLayout({ children }: { children: React.Re
 
   return (
     <SAProviders>
+      <StickyTheadPolyfill />
       <div style={{ display: 'flex', minHeight: '100vh', background: '#fafafa' }}>
         <Sidebar
           user={me as any}
