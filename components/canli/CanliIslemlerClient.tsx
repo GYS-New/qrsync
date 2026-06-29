@@ -1284,7 +1284,7 @@ useEffect(() => {
   }
 
   return (
-    <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+    <div style={{ padding: '24px 28px' }}>
 
       {/* ── VARDİYA BAZLI BUGÜNKÜ ÖZET ── */}
       {vardiyaKartlari}
@@ -1293,8 +1293,8 @@ useEffect(() => {
       {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: false, showTumGorevler, canliAkisSureSaat })}
 
       {/* ── GÖREV TABLOSU ── */}
-      <div className="verde-card" style={{ overflow: 'hidden', marginBottom: 16, marginTop: 12, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }} className="verde-table-wrap">
+      <div className="verde-card" style={{ overflow: 'hidden', marginBottom: 16, marginTop: 12 }}>
+        <div style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }} className="verde-table-wrap">
           <table className="verde-table">
             <thead><tr>
               <th>Görev</th><th>Lokasyon</th>{personelAtamaAktif && <th>Atanan</th>}
