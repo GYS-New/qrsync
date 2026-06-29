@@ -46,7 +46,10 @@ export default function AktiviteGrafigiBlock({
   const rangeStart = useMemo(() => {
     const now = new Date()
     if (mode === "gunluk")   return new Date(now.getTime() - 24 * 60 * 60 * 1000)
-    if (mode === "haftalik") return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    // HAFTALIK: 7 gun label (bugun + son 6), range tam 7 gun. Onceki '7d
+    // geriden' hesabi 8 gunluk veri donduruyordu -> ayni weekday iki kere
+    // (orn. Pzt 22 + Pzt 29) ayni gruba dusup ciftleniyordu.
+    if (mode === "haftalik") return startOfDayTR(new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000))
     return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   }, [mode])
 
