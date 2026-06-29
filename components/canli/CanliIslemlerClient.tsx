@@ -1297,7 +1297,7 @@ useEffect(() => {
       {LiveHeader({ kpi, durumFilter, setDurumFilter, clock, streamState, setStreamState, pathname, readonly: false, showTumGorevler, canliAkisSureSaat })}
 
       {/* ── GÖREV TABLOSU ── */}
-      <div className="verde-card" style={{ overflow: 'hidden', marginTop: 12, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="verde-card" style={{ overflow: 'hidden', marginBottom: 16, marginTop: 12, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }} className="verde-table-wrap">
           <table className="verde-table">
             <thead><tr>
