@@ -28,7 +28,7 @@ export default async function ULayout({ children }: { children: React.ReactNode 
         birimFiyatAktifProp={(firma as any)?.birim_fiyat_aktif === true}
         personelTakibiAktifProp={(proje as any)?.personel_takibi_aktif !== false}
       />
-      <div style={{ marginLeft: 282, flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <div style={{ marginLeft: 282, flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100vh' }}>
         {children}
       </div>
     </div>
