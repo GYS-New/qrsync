@@ -53,9 +53,8 @@ html, body {
   letter-spacing: -0.01em;
 }
 
-body {
-  zoom: 0.75;
-}
+/* Zoom artik body'de degil — sa/ta/u/oto-yikama layout outer div'ine
+   uygulaniyor. Body'de zoom flex chain ve sticky'yi bozuyordu. */
 
 /* ── AUTH INPUTS (LOGIN) ── */
 .auth-input:-webkit-autofill,
