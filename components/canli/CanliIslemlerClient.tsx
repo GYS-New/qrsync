@@ -448,8 +448,12 @@ useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firmaId, vardiyaAyari])
 
-  // Hazır -> Aktif otomasyonu (dev ortamında cron yoksa): 10 sn'de bir kontrol et
+  // Hazır -> Aktif otomasyonu sadece DEV ortamında client-side tetiklenir.
+  // Production'da pg_cron job'u yapar (secret-protected /api/canli-gorevler/check
+  // endpoint'i). Eski hali her client'tan secret'siz cagiriyordu -> 10 sn'de bir
+  // 401 spam'i. process.env.NODE_ENV client'a inline expand edilir.
   useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return
     const interval = setInterval(async () => {
       try {
         await fetch('/api/canli-gorevler/check', { cache: 'no-store' })
