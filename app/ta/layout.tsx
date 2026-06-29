@@ -61,7 +61,7 @@ export default async function TALayout({ children }: { children: React.ReactNode
       <UstLokasyonProvider firmaId={user.firma_id ?? null}>
         <TesterProvider isTester={isTester}>
           <StickyTheadPolyfill />
-          <div style={{ display: 'flex', minHeight: 'calc(100vh / 0.75)', background: '#fafafa', zoom: 0.75 }}>
+          <div style={{ display: 'flex', minHeight: '100vh', background: '#fafafa' }}>
             <Sidebar user={user} firma={firma} birimFiyatAktifProp={(firma as any)?.birim_fiyat_aktif === true} projeLogo={projeLogo} />
             <div style={{ marginLeft: 282, flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
               <FirmaDurumBanner durum={durum} lisansTarihi={lisansTarihi} />
