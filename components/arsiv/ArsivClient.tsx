@@ -557,7 +557,7 @@ export default function ArsivClient({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="verde-card" style={{ padding: 16 }}>
+    <div className="verde-card" style={{ padding: 16, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 900, color: '#111827' }}>ARŞİV YÖNETİMİ</div>
@@ -656,7 +656,7 @@ export default function ArsivClient({
           1 — FREKANSİYEL GÖREVLER
       ═══════════════════════════════════════════════════════════ */}
       {firmaId && aktifSekme === 'frekansiyel' && (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontSize: 13, color: '#64748b' }}><strong style={{ color: '#1f2937' }}>{frekTotal}</strong> kayıt · Sayfa {frekSayfa}/{frekToplamSayfa}</span>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -714,7 +714,7 @@ export default function ArsivClient({
             </button>
           </div>
 
-          <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
+          <div className="verde-table-wrap" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
             <table className="verde-table">
               <thead><tr>
                 <th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th>
@@ -794,14 +794,14 @@ export default function ArsivClient({
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════
           2 — PERSONEL TAKİBİ ARŞİVİ
       ═══════════════════════════════════════════════════════════ */}
       {firmaId && aktifSekme === 'personel' && (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
             <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f2937' }}>{filtrePersonel.length}</strong> kayıt</span>
             <div style={{ display:'flex', gap:8 }}>
@@ -865,7 +865,7 @@ export default function ArsivClient({
             </button>
           </div>
 
-          <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
+          <div className="verde-table-wrap" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
             <table className="verde-table">
               <thead><tr>
                 <th>Personel</th><th>Tarih</th><th>İş Başı</th><th>İş Bitimi</th>
@@ -890,14 +890,14 @@ export default function ArsivClient({
               </tbody>
             </table>
           </div>
-        </>
+        </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════
           3 — MÜŞTERİ DEĞERLENDİRMELERİ ARŞİVİ
       ═══════════════════════════════════════════════════════════ */}
       {firmaId && aktifSekme === 'musteri' && (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
             <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f2937' }}>{filtreMusteri.length}</strong> kayıt</span>
             <div style={{ display:'flex', gap:8 }}>
@@ -965,7 +965,7 @@ export default function ArsivClient({
             </button>
           </div>
 
-          <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
+          <div className="verde-table-wrap" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
             <table className="verde-table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <colgroup>
                 <col style={{ width: 140 }} />
@@ -1010,14 +1010,14 @@ export default function ArsivClient({
               </tbody>
             </table>
           </div>
-        </>
+        </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════
           4 — SPESİFİK GÖREVLER ARŞİVİ
       ═══════════════════════════════════════════════════════════ */}
       {firmaId && aktifSekme === 'spesifik' && (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
             <span style={{ fontSize:13, color:'#64748b' }}><strong style={{ color:'#1f2937' }}>{filtreSpesifik.length}</strong> kayıt</span>
             <div style={{ display:'flex', gap:8 }}>
@@ -1081,7 +1081,7 @@ export default function ArsivClient({
             </button>
           </div>
 
-          <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
+          <div className="verde-table-wrap" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
             <table className="verde-table">
               <thead><tr>
                 <th>Görev</th><th>Lokasyon</th><th>Atanan</th><th>Durum</th>
@@ -1118,18 +1118,20 @@ export default function ArsivClient({
               </tbody>
             </table>
           </div>
-        </>
+        </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════
           5 — ÇEKLİST RAPORLARI (ARŞİV)
       ═══════════════════════════════════════════════════════════ */}
       {firmaId && aktifSekme === 'ceklist' && (
-        <CeklistArsivSekme
-          firmaId={firmaId}
-          projeId={projeId}
-          getLocPath={getLocPath}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <CeklistArsivSekme
+            firmaId={firmaId}
+            projeId={projeId}
+            getLocPath={getLocPath}
+          />
+        </div>
       )}
 
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
@@ -1534,7 +1536,7 @@ function CeklistArsivSekme({
       </div>
 
       {/* Tablo */}
-      <div className="verde-table-wrap" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
+      <div className="verde-table-wrap" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         <table className="verde-table">
           <thead>
             <tr>

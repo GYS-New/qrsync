@@ -21,7 +21,7 @@ export default async function UPushLogPage() {
   if (!yetki.gorebilir) redirect('/u/dashboard')
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <Topbar title="Push Bildirim Geçmişi" base="/u" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Push Bildirim Geçmişi' }]} />
       <PushLogClient firmaId={me.firma_id} projeId={me.proje_id ?? null} />
     </div>

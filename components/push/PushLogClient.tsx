@@ -147,8 +147,8 @@ export default function PushLogClient({ firmaId, projeId, canDelete = false, isS
   }
 
   return (
-    <div style={{ padding: '20px 24px' }}>
-      <div className="verde-card">
+    <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div className="verde-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {/* Başlık + filtreler */}
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
@@ -213,7 +213,7 @@ export default function PushLogClient({ firmaId, projeId, canDelete = false, isS
         </div>
 
         {/* Tablo */}
-        <div style={{ maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <table className="verde-table" style={{ tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {silMode && <col style={{ width: 36 }} />}

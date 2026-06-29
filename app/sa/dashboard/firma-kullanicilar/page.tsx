@@ -23,7 +23,7 @@ export default async function SAFirmaKullanicilarPage() {
   const { data: users } = q ? await q : { data: [] as any[] }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <Topbar title="Firma Kullanıcıları" base="/sa" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Firma Kullanıcıları' }]} />
       <FirmaKullanicilariClient initialFirmaId={firmaId} initialUsers={(users as any) ?? []} />
     </div>

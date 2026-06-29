@@ -613,7 +613,7 @@ export default function KullanicilarClient({
   const isTA = base === '/ta'
 
   return (
-    <div className="users-scale" style={{ padding: '24px 28px' }}>
+    <div className="users-scale" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* Üst lokasyon bazında özet kartlar */}
       {ustLokStats.length > 0 && (
         <div style={{
@@ -674,7 +674,7 @@ export default function KullanicilarClient({
         </div>
       )}
 
-      <div className="verde-card">
+      <div className="verde-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             className="verde-input" placeholder="Ara…"
@@ -772,7 +772,7 @@ export default function KullanicilarClient({
           </div>
         </div>
 
-        <div style={{ maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         <table className="verde-table">
           <thead>
             <tr>

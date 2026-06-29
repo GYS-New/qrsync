@@ -25,7 +25,7 @@ export default async function TAPushLogPage() {
   )
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <Topbar
         title="Push Bildirim Geçmişi"
         base="/ta"

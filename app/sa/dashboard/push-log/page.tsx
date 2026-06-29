@@ -28,7 +28,7 @@ export default async function SAPushLogPage() {
   const projeId = aktifProje?.id ?? null
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <Topbar title="Push Bildirim Geçmişi" base="/sa" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Push Bildirim Geçmişi' }]} />
       <PushLogClient
         firmaId={aktifFirmaId}

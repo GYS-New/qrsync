@@ -67,7 +67,7 @@ export default async function SATumGorevlerPage() {
   ])
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <Topbar title="Tüm Görevler" base="/sa" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Frekansiyel Görevler' }, { label: 'Tüm Görevler' }]} />
       <TumGorevlerClient
         base="/sa"
