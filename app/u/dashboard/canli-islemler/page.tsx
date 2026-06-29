@@ -62,7 +62,7 @@ export default async function UserCanliIslemler() {
   const efektifAyar = await getEfektifAyar(firmaId!, projeId)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+    <div>
       <Topbar title="Frekansiyel Görevler" base="/u" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Frekansiyel Görevler' }]} />
       <CanliIslemlerClient
         firmaId={firmaId}
