@@ -19,7 +19,7 @@ export default async function ULayout({ children }: { children: React.ReactNode 
   return (
     <>
       <StickyTheadPolyfill />
-      <div style={{ display: 'flex', minHeight: 'calc(100vh / 0.75)', background: '#fafafa', zoom: 0.75 }}>
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#fafafa' }}>
       <Sidebar
         user={user}
         firma={firma}
