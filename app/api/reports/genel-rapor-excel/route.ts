@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { buildGenelRaporData } from '@/lib/reports/genel-rapor-data'
+import { barChart, dualBarChart, stackedBarChart, pieChart } from '@/lib/reports/chart-images'
 
 export const runtime = 'nodejs'
 
@@ -110,6 +111,77 @@ export async function GET(request: Request) {
       const fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL
       c1.fill = fill; c2.fill = fill
     })
+
+    // ── Özet sayfasına 5 grafik PNG embed ────────────────────────────────────
+    // ozetAgg backend'de hesaplanmış agregasyonlar (lib/reports/genel-rapor-data).
+    // Sharp ile SVG -> PNG dönüşümü; ExcelJS addImage ile yerleştirme.
+    const agg = data.ozetAgg
+    // Grup bazlı agregasyon — frontend'deki ozetData mantığıyla aynı
+    const grupAggMap = new Map<string, { tamamlanan: number; sapma: number; kayip: number }>()
+    for (const g of data.grupMetrikleri) {
+      const ex = grupAggMap.get(g.grup) ?? { tamamlanan: 0, sapma: 0, kayip: 0 }
+      grupAggMap.set(g.grup, {
+        tamamlanan: ex.tamamlanan + g.tamamlanan,
+        sapma: ex.sapma + g.sapma,
+        kayip: ex.kayip + g.kayip,
+      })
+    }
+    const grupBazli = [...grupAggMap.entries()]
+      .map(([grup, v]) => ({ grup, ...v }))
+      .sort((a, b) => b.tamamlanan - a.tamamlanan)
+      .slice(0, 10)
+    // 5 grafiği paralel render et — IO ağır, sharp threaded
+    const [pngHedef, pngPersonel, pngGrup, pngKayip, pngSapma] = await Promise.all([
+      // 1) Hedef vs Tamamlanan / Sapma / Kayıp (top-level karşılaştırma)
+      barChart('Hedef / Gerçekleşme Dağılımı', [
+        { label: 'Hedef',      value: toplamHedef,             color: '#94a3b8' },
+        { label: 'Tamamlanan', value: data.toplamTamamlanan,    color: '#10b981' },
+        { label: 'Sapma',      value: data.toplamSapma,         color: '#f59e0b' },
+        { label: 'Kayıp',      value: data.toplamKayip,         color: '#ef4444' },
+        { label: 'Ekstra',     value: data.toplamEkstra ?? 0,   color: '#8b5cf6' },
+      ], { width: 760, height: 320 }),
+      // 2) Personel başarı (atanan vs tamamlanan top 10)
+      dualBarChart('Personel Başarı (Atanan / Tamamlanan)',
+        ((agg?.atananPersonelBasari ?? []).slice(0, 10)).map((v: any) => ({
+          label: v.personel, v1: v.atanan, v2: v.tamamlanan,
+        })),
+        { width: 920, height: 380, v1Label: 'Atanan', v2Label: 'Tamamlanan', v1Color: '#94a3b8', v2Color: '#10b981' }
+      ),
+      // 3) Grup bazlı stacked (tamamlanan / sapma / kayıp)
+      stackedBarChart('Grup Bazlı Performans',
+        grupBazli.map((g) => ({
+          label: g.grup,
+          segments: [
+            { name: 'Tamamlanan', value: g.tamamlanan, color: '#10b981' },
+            { name: 'Sapma',      value: g.sapma,      color: '#f59e0b' },
+            { name: 'Kayıp',      value: g.kayip,      color: '#ef4444' },
+          ],
+        })).filter((g) => g.segments.some((s) => s.value > 0)),
+        { width: 920, height: 380, legend: ['Tamamlanan', 'Sapma', 'Kayıp'], legendColors: ['#10b981', '#f59e0b', '#ef4444'] }
+      ),
+      // 4) Kayıp neden dağılımı (pie)
+      pieChart('Kayıp Neden Dağılımı',
+        (agg?.kayipNedeniDagilim ?? []).slice(0, 8).map((x: any) => ({ label: x.neden, value: x.sayi })),
+        { width: 700, height: 360 }
+      ),
+      // 5) Sapma neden dağılımı (pie)
+      pieChart('Sapma Neden Dağılımı',
+        (agg?.sapmaNedeniDagilim ?? []).slice(0, 8).map((x: any) => ({ label: x.neden, value: x.sayi })),
+        { width: 700, height: 360 }
+      ),
+    ])
+
+    // Görselleri Özet sayfasının sağ tarafına yerleştir (KPI tablosu sol)
+    function placeImg(buf: Buffer, row: number, col: number, w: number, h: number) {
+      const id = wb.addImage({ buffer: buf as any, extension: 'png' })
+      ws1.addImage(id, { tl: { col, row } as any, ext: { width: w, height: h } })
+    }
+    // Sol KPI tablosu: A1:B19 alanı kullanır. Sağ tarafa grafikler.
+    placeImg(pngHedef,    1,  3, 760, 320)   // C2'den başla
+    placeImg(pngPersonel, 20, 0, 920, 380)   // KPI altında
+    placeImg(pngGrup,     42, 0, 920, 380)
+    placeImg(pngKayip,    64, 0, 700, 360)
+    placeImg(pngSapma,    64, 8, 700, 360)   // yan yana
 
     // ── Sayfa 2: Grup Metrikleri ─────────────────────────────────────────────
     const ws2 = wb.addWorksheet('Grup Metrikleri')

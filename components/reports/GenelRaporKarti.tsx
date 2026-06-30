@@ -683,6 +683,26 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
     setDlLoading(false)
   }
 
+  async function downloadPDF() {
+    if (!data || !currentFirmaId) return
+    setDlLoading(true)
+    try {
+      const res = await fetch(`/api/reports/genel-rapor-pdf?${buildParams()}`)
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? 'PDF indirilemedi.')
+      }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url; a.download = `frekansiyel-rapor-${Date.now()}.pdf`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      toast({ type: 'error', title: 'Hata', message: e.message })
+    }
+    setDlLoading(false)
+  }
+
   const tabStyle = (t: Tab): React.CSSProperties => ({
     padding: '7px 16px', borderRadius: 6, fontSize: 13.5, fontWeight: 600,
     border: 'none', cursor: 'pointer', transition: 'all .15s',
@@ -758,6 +778,11 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #d1fae5', background: '#f9fafb', color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
                 <FileSpreadsheet size={13} style={dlLoading ? spinning : {}} />
                 Excel İndir
+              </button>
+              <button onClick={downloadPDF} disabled={!data || dlLoading}
+                style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #fecaca', background: '#fef9f9', color: '#dc2626', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                <FileSpreadsheet size={13} style={dlLoading ? spinning : {}} />
+                PDF İndir
               </button>
             </div>
           </div>
