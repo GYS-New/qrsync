@@ -12,7 +12,13 @@ RUN apt-get update \
       -o Acquire::AllowInsecureRepositories=true \
       -o Acquire::AllowDowngradeToInsecureRepositories=true && \
     apt-get install -y --no-install-recommends --allow-unauthenticated \
-      python3 python3-pip python3-venv && \
+      python3 python3-pip python3-venv \
+      # Puppeteer headless Chrome dependencies (libglib, libnss, libatk vs.)
+      libglib2.0-0 libnss3 libatk-bridge2.0-0 libatk1.0-0 \
+      libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
+      libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 \
+      libasound2 libxshmfence1 libnspr4 fonts-liberation \
+      libx11-6 libx11-xcb1 libxcb1 libxext6 libxi6 libxtst6 ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 # Python paketleri
