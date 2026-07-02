@@ -1,14 +1,23 @@
 /**
- * GET /api/reports/genel-rapor-excel?firmaId=...&...
- * Frekansiyel Görevler Raporu'nu ExcelJS ile oluşturur.
- * Şablona bağımlılık yoktur — sayfa yapısı UI sekmeleriyle birebir örtüşür.
+ * GET /api/reports/genel-rapor-excel?firmaId=...&ustLokasyonId=...
+ *
+ * ŞABLON BAZLI: lib/reports/templates altındaki .xlsx dosyalarını kullanır.
+ * Chart'lar şablonda tanımlı, KPI hücrelerinden formülle bağlı.
+ * Kod sadece veri hücrelerini doldurur, chart'lara hiç dokunmaz.
+ *
+ * Filtreye göre şablon seçimi:
+ *   ustLokasyonId varsa (spesifik departman) → template-tek.xlsx
+ *   yoksa/Tümü                               → template-tumu.xlsx
  */
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { buildGenelRaporData } from '@/lib/reports/genel-rapor-data'
-import { barChart, dualBarChart, stackedBarChart, pieChart } from '@/lib/reports/chart-images'
+import path from 'path'
 
 export const runtime = 'nodejs'
+
+function fmt(n: number | null | undefined): number { return typeof n === 'number' ? n : 0 }
+function pct(n: number | null | undefined): string { return `%${typeof n === 'number' ? n : 0}` }
 
 export async function GET(request: Request) {
   try {
@@ -20,10 +29,11 @@ export async function GET(request: Request) {
     const firmaId = p.get('firmaId')
     if (!firmaId) return NextResponse.json({ error: 'Firma ID gerekli' }, { status: 400 })
 
+    const ustLokasyonId = p.get('ustLokasyonId')
     const data = await buildGenelRaporData({
       firmaId,
       projeId:          p.get('projeId')          || null,
-      ustLokasyonId:    p.get('ustLokasyonId')    || null,
+      ustLokasyonId,
       altLokasyonId:    p.get('altLokasyonId')    || null,
       altAltLokasyonId: p.get('altAltLokasyonId') || null,
       raporBaslangic: p.get('raporBaslangic') || null,
@@ -31,176 +41,63 @@ export async function GET(request: Request) {
       raporuAlan:     p.get('raporuAlan')     || null,
     })
 
+    const toplamHedef       = data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0) || data.toplamGorev
+    const toplamTamamlanan  = data.toplamTamamlanan
+    const toplamSapma       = data.toplamSapma
+    const toplamKayip       = data.toplamKayip
+    const toplamEkstra      = data.toplamEkstra ?? data.frekansDisiGorevler.length
+    const toplamGerceklesen = toplamTamamlanan + toplamSapma
+    const genelOran         = toplamHedef > 0 ? Math.round(toplamGerceklesen / toplamHedef * 100) : 0
+    const basari            = data.genelBasari ?? 0
+
+    // Şablonu filtreye göre seç
+    const templateFile = ustLokasyonId
+      ? 'frekansiyel-rapor-tek.xlsx'
+      : 'frekansiyel-rapor-tumu.xlsx'
+    const templatePath = path.join(process.cwd(), 'lib', 'reports', 'templates', templateFile)
+
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
-    wb.creator = 'QR-Sync'
+    await wb.xlsx.readFile(templatePath)
 
-    // ── Ortak stiller ────────────────────────────────────────────────────────
-    const HDR_FILL  = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF1A5C2A' } }
-    const HDR_FONT  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
-    const HDR_ALIGN = { horizontal: 'center' as const, vertical: 'middle' as const }
-    const META_FILL = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFEFF6FF' } }
-    const EVEN_FILL = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFF8FAFC' } }
-    const ODD_FILL  = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFFFFF' } }
+    // ── Özet Sayfası ─────────────────────────────────────────────────────
+    const wsOzet = wb.getWorksheet('Özet')
+    if (!wsOzet) throw new Error("Sablon 'Özet' sheet'i bulunamadi")
 
-    function setHdr(ws: any, rowNum: number, cols: { col: number; text: string; width?: number }[]) {
-      const row = ws.getRow(rowNum)
-      row.height = 22
-      cols.forEach(({ col, text, width }) => {
-        const c = row.getCell(col)
-        c.value = text
-        c.style = { font: HDR_FONT, fill: HDR_FILL, alignment: HDR_ALIGN }
-        if (width) ws.getColumn(col).width = width
-      })
-    }
+    // Rapor bilgileri (A2-A8 = label, B2-B8 = değer)
+    wsOzet.getCell('B2').value = data.firmaAdi    || '—'
+    wsOzet.getCell('B3').value = data.projeAdi    || '—'
+    wsOzet.getCell('B4').value = data.ustLokTanim || 'Tümü'
+    wsOzet.getCell('B5').value = data.altLokTanim || 'Tümü'
+    wsOzet.getCell('B6').value = data.raporTarihLabel || '—'
+    wsOzet.getCell('B7').value = data.gunSayisi
+    wsOzet.getCell('B8').value = data.raporuAlan  || '—'
 
-    function setMeta(ws: any, rowNum: number, label: string, value: string) {
-      const row = ws.getRow(rowNum)
-      row.height = 18
-      const c1 = row.getCell(1); c1.value = label
-      c1.style = { font: { bold: true, size: 10 }, fill: META_FILL, alignment: { horizontal: 'right' as const } }
-      const c2 = row.getCell(2); c2.value = value
-      c2.style = { font: { size: 10 }, fill: META_FILL }
-    }
+    // KPI metrikleri (B11-B18) — chart'lar bunlardan formülle bağlı
+    wsOzet.getCell('B11').value = fmt(toplamHedef)
+    wsOzet.getCell('B12').value = fmt(toplamTamamlanan)
+    wsOzet.getCell('B13').value = fmt(toplamEkstra)
+    wsOzet.getCell('B14').value = fmt(toplamGerceklesen)
+    wsOzet.getCell('B15').value = fmt(toplamSapma)
+    wsOzet.getCell('B16').value = fmt(toplamKayip)
+    wsOzet.getCell('B17').value = pct(basari)
+    wsOzet.getCell('B18').value = pct(genelOran)
 
-    const toplamHedef       = data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0) || data.toplamGorev
-    const toplamGerceklesen = data.toplamTamamlanan + data.toplamSapma
-    const genelOran         = toplamHedef > 0 ? Math.round(toplamGerceklesen / toplamHedef * 100) : 0
+    // ── Grup Metrikleri ──────────────────────────────────────────────────
+    // Row 1 = header (şablonda mevcut, dokunma)
+    // Row 2 = TOPLAM satırı (şablonda formatlı, veriyi güncelle)
+    // Row 3+ = detay satırları
+    const wsGrup = wb.getWorksheet('Grup Metrikleri')
+    if (wsGrup) {
+      // Şablonda önceden yerleştirilen örnek satırları temizle (row 2'den itibaren
+      // header dışında kalan tüm satırlar). Row 2'yi TOPLAM olarak kullanacağız.
+      const eskiRowSayisi = wsGrup.rowCount
+      for (let r = eskiRowSayisi; r >= 2; r--) {
+        const row = wsGrup.getRow(r)
+        row.eachCell({ includeEmpty: true }, c => { c.value = null })
+      }
 
-    // ── Sayfa 1: Özet ────────────────────────────────────────────────────────
-    const ws1 = wb.addWorksheet('Özet')
-    ws1.getColumn(1).width = 22
-    ws1.getColumn(2).width = 30
-
-    const titleRow = ws1.getRow(1)
-    titleRow.height = 28
-    const tc = titleRow.getCell(1)
-    tc.value = 'Frekansiyel Görevler Raporu'
-    tc.font  = { bold: true, size: 15, color: { argb: 'FF0F1A0F' } }
-    ws1.mergeCells('A1:B1')
-
-    setMeta(ws1, 2, 'Firma:',        data.firmaAdi    || '—')
-    setMeta(ws1, 3, 'Proje:',        data.projeAdi    || '—')
-    setMeta(ws1, 4, 'Üst Lokasyon:', data.ustLokTanim || 'Tümü')
-    setMeta(ws1, 5, 'Alt Lokasyon:', data.altLokTanim || 'Tümü')
-    setMeta(ws1, 6, 'Dönem:',        data.raporTarihLabel || '—')
-    setMeta(ws1, 7, 'Gün Sayısı:',   String(data.gunSayisi))
-    setMeta(ws1, 8, 'Raporu Alan:',  data.raporuAlan  || '—')
-
-    ws1.getRow(9).height = 8
-
-    setHdr(ws1, 10, [
-      { col: 1, text: 'METRİK', width: 22 },
-      { col: 2, text: 'DEĞER',  width: 18 },
-    ])
-    const kpiRows: [string, string][] = [
-      ['Hedef Frekans',  String(toplamHedef)],
-      ['Tamamlanan',     String(data.toplamTamamlanan)],
-      ['Ekstra (Frekans Dışı)', String(data.toplamEkstra ?? data.frekansDisiGorevler.length)],
-      ['Gerçekleşen',    String(toplamGerceklesen)],
-      ['Sapma',          String(data.toplamSapma)],
-      ['Kayıp',          String(data.toplamKayip)],
-      ['Başarı Oranı',   `%${data.genelBasari}`],
-      ['Genel Oran',     `%${genelOran}`],
-    ]
-    kpiRows.forEach(([label, value], i) => {
-      const r = ws1.getRow(11 + i)
-      r.height = 18
-      const c1 = r.getCell(1); c1.value = label; c1.font = { bold: true, size: 10 }
-      const c2 = r.getCell(2); c2.value = value;  c2.font = { size: 10 }
-      const fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL
-      c1.fill = fill; c2.fill = fill
-    })
-
-    // ── Özet sayfasına 5 grafik PNG embed ────────────────────────────────────
-    // ozetAgg backend'de hesaplanmış agregasyonlar (lib/reports/genel-rapor-data).
-    // Sharp ile SVG -> PNG dönüşümü; ExcelJS addImage ile yerleştirme.
-    const agg = data.ozetAgg
-    // Grup bazlı agregasyon — frontend'deki ozetData mantığıyla aynı
-    const grupAggMap = new Map<string, { tamamlanan: number; sapma: number; kayip: number }>()
-    for (const g of data.grupMetrikleri) {
-      const ex = grupAggMap.get(g.grup) ?? { tamamlanan: 0, sapma: 0, kayip: 0 }
-      grupAggMap.set(g.grup, {
-        tamamlanan: ex.tamamlanan + g.tamamlanan,
-        sapma: ex.sapma + g.sapma,
-        kayip: ex.kayip + g.kayip,
-      })
-    }
-    const grupBazli = [...grupAggMap.entries()]
-      .map(([grup, v]) => ({ grup, ...v }))
-      .sort((a, b) => b.tamamlanan - a.tamamlanan)
-      .slice(0, 10)
-    // 5 grafiği paralel render et — IO ağır, sharp threaded
-    const [pngHedef, pngPersonel, pngGrup, pngKayip, pngSapma] = await Promise.all([
-      // 1) Hedef vs Tamamlanan / Sapma / Kayıp (top-level karşılaştırma)
-      barChart('Hedef / Gerçekleşme Dağılımı', [
-        { label: 'Hedef',      value: toplamHedef,             color: '#94a3b8' },
-        { label: 'Tamamlanan', value: data.toplamTamamlanan,    color: '#10b981' },
-        { label: 'Sapma',      value: data.toplamSapma,         color: '#f59e0b' },
-        { label: 'Kayıp',      value: data.toplamKayip,         color: '#ef4444' },
-        { label: 'Ekstra',     value: data.toplamEkstra ?? 0,   color: '#8b5cf6' },
-      ], { width: 760, height: 320 }),
-      // 2) Personel başarı (atanan vs tamamlanan top 10)
-      dualBarChart('Personel Başarı (Atanan / Tamamlanan)',
-        ((agg?.atananPersonelBasari ?? []).slice(0, 10)).map((v: any) => ({
-          label: v.personel, v1: v.atanan, v2: v.tamamlanan,
-        })),
-        { width: 920, height: 380, v1Label: 'Atanan', v2Label: 'Tamamlanan', v1Color: '#94a3b8', v2Color: '#10b981' }
-      ),
-      // 3) Grup bazlı stacked (tamamlanan / sapma / kayıp)
-      stackedBarChart('Grup Bazlı Performans',
-        grupBazli.map((g) => ({
-          label: g.grup,
-          segments: [
-            { name: 'Tamamlanan', value: g.tamamlanan, color: '#10b981' },
-            { name: 'Sapma',      value: g.sapma,      color: '#f59e0b' },
-            { name: 'Kayıp',      value: g.kayip,      color: '#ef4444' },
-          ],
-        })).filter((g) => g.segments.some((s) => s.value > 0)),
-        { width: 920, height: 380, legend: ['Tamamlanan', 'Sapma', 'Kayıp'], legendColors: ['#10b981', '#f59e0b', '#ef4444'] }
-      ),
-      // 4) Kayıp neden dağılımı (pie)
-      pieChart('Kayıp Neden Dağılımı',
-        (agg?.kayipNedeniDagilim ?? []).slice(0, 8).map((x: any) => ({ label: x.neden, value: x.sayi })),
-        { width: 700, height: 360 }
-      ),
-      // 5) Sapma neden dağılımı (pie)
-      pieChart('Sapma Neden Dağılımı',
-        (agg?.sapmaNedeniDagilim ?? []).slice(0, 8).map((x: any) => ({ label: x.neden, value: x.sayi })),
-        { width: 700, height: 360 }
-      ),
-    ])
-
-    // Görselleri Özet sayfasının sağ tarafına yerleştir (KPI tablosu sol)
-    function placeImg(buf: Buffer, row: number, col: number, w: number, h: number) {
-      const id = wb.addImage({ buffer: buf as any, extension: 'png' })
-      ws1.addImage(id, { tl: { col, row } as any, ext: { width: w, height: h } })
-    }
-    // Sol KPI tablosu: A1:B19 alanı kullanır. Sağ tarafa grafikler.
-    placeImg(pngHedef,    1,  3, 760, 320)   // C2'den başla
-    placeImg(pngPersonel, 20, 0, 920, 380)   // KPI altında
-    placeImg(pngGrup,     42, 0, 920, 380)
-    placeImg(pngKayip,    64, 0, 700, 360)
-    placeImg(pngSapma,    64, 8, 700, 360)   // yan yana
-
-    // ── Sayfa 2: Grup Metrikleri ─────────────────────────────────────────────
-    const ws2 = wb.addWorksheet('Grup Metrikleri')
-    setHdr(ws2, 1, [
-      { col: 1,  text: 'SN',             width: 6  },
-      { col: 2,  text: 'GRUP',           width: 28 },
-      { col: 3,  text: 'ÜST LOKASYON',  width: 20 },
-      { col: 4,  text: 'LOKASYON',       width: 22 },
-      { col: 5,  text: 'VARDİYA FREKANS', width: 16 },
-      { col: 6,  text: 'HEDEF',          width: 10 },
-      { col: 7,  text: 'TAMAMLANAN',     width: 13 },
-      { col: 8,  text: 'EKSTRA',         width: 10 },
-      { col: 9,  text: 'SAPMA',          width: 10 },
-      { col: 10, text: 'KAYIP',          width: 10 },
-      { col: 11, text: 'BAŞARI',         width: 10 },
-      { col: 12, text: 'GENEL ORAN',     width: 12 },
-    ])
-
-    if (data.grupMetrikleri.length > 0) {
+      // Row 2: TOPLAM
       const tGunluk = data.grupMetrikleri.reduce((s, g) => s + g.gunlukFrekans, 0)
       const tHedef  = data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0)
       const tTam    = data.grupMetrikleri.reduce((s, g) => s + g.tamamlanan, 0)
@@ -210,112 +107,82 @@ export async function GET(request: Request) {
       const tGer    = tTam + tEks
       const tBas    = tHedef > 0 ? Math.round(tGer / tHedef * 100) : 0
       const tGenel  = tHedef > 0 ? Math.round((tGer + tSap) / tHedef * 100) : 0
-      const totFill = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFD1FAE5' } }
-      const totRow  = ws2.getRow(2)
-      totRow.height = 20
-      const totVals: any[] = ['—', 'TOPLAM', '—', '—', tGunluk, tHedef, tTam, tEks, tSap, tKay, `%${tBas}`, `%${tGenel}`]
-      totVals.forEach((v, ci) => {
-        const c = totRow.getCell(ci + 1)
-        c.value = v; c.font = { bold: true, size: 10 }; c.fill = totFill
-        c.alignment = { horizontal: ci < 3 ? 'left' : 'center' }
+      const totRow  = wsGrup.getRow(2)
+      totRow.getCell(1).value  = '—'
+      totRow.getCell(2).value  = 'TOPLAM'
+      totRow.getCell(3).value  = '—'
+      totRow.getCell(4).value  = '—'
+      totRow.getCell(5).value  = tGunluk
+      totRow.getCell(6).value  = tHedef
+      totRow.getCell(7).value  = tTam
+      totRow.getCell(8).value  = tEks
+      totRow.getCell(9).value  = tSap
+      totRow.getCell(10).value = tKay
+      totRow.getCell(11).value = `%${tBas}`
+      totRow.getCell(12).value = `%${tGenel}`
+      totRow.font = { bold: true }
+
+      // Row 3+: detay
+      data.grupMetrikleri.forEach((g, i) => {
+        const row = wsGrup.getRow(3 + i)
+        row.getCell(1).value  = i + 1
+        row.getCell(2).value  = g.grup
+        row.getCell(3).value  = g.ustLokasyon
+        row.getCell(4).value  = g.lokasyon
+        row.getCell(5).value  = g.gunlukFrekans
+        row.getCell(6).value  = g.hedef
+        row.getCell(7).value  = g.tamamlanan
+        row.getCell(8).value  = g.ekstra ?? 0
+        row.getCell(9).value  = g.sapma
+        row.getCell(10).value = g.kayip
+        row.getCell(11).value = `%${g.basariOrani}`
+        row.getCell(12).value = `%${g.genelOran}`
       })
     }
 
-    data.grupMetrikleri.forEach((g, i) => {
-      const r = ws2.getRow((data.grupMetrikleri.length > 0 ? 3 : 2) + i)
-      r.height = 18
-      const vals: any[] = [i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans, g.hedef, g.tamamlanan, g.ekstra ?? 0, g.sapma, g.kayip, g.basariOrani, g.genelOran]
-      vals.forEach((v, ci) => {
-        const c = r.getCell(ci + 1)
-        c.value = v; c.font = { size: 10 }
-        c.fill  = i % 2 === 0 ? EVEN_FILL : ODD_FILL
-        c.alignment = { horizontal: ci < 3 ? 'left' : 'center' }
+    // ── Yardımcı: bir sheet'i data ile doldur ────────────────────────────
+    function fillDetaySheet(sheetName: string, rows: any[], mapper: (r: any, i: number) => any[]) {
+      const ws = wb.getWorksheet(sheetName)
+      if (!ws) return
+      // Eski örnek satırları temizle (row 2'den itibaren)
+      const eskiRowSayisi = ws.rowCount
+      for (let r = eskiRowSayisi; r >= 2; r--) {
+        const row = ws.getRow(r)
+        row.eachCell({ includeEmpty: true }, c => { c.value = null })
+      }
+      rows.forEach((r, i) => {
+        const excelRow = ws.getRow(2 + i)
+        const vals = mapper(r, i)
+        vals.forEach((v, ci) => { excelRow.getCell(ci + 1).value = v })
       })
-    })
+    }
 
-    // ── Sayfa 3: Tamamlanan Frekanslar ───────────────────────────────────────
-    const ws3 = wb.addWorksheet('Tamamlanan')
-    setHdr(ws3, 1, [
-      { col: 1, text: 'SN',            width: 6  },
-      { col: 2, text: 'PERSONEL',      width: 22 },
-      { col: 3, text: 'ÜST LOKASYON', width: 20 },
-      { col: 4, text: 'LOKASYON',      width: 22 },
-      { col: 5, text: 'GÖREV NO',      width: 14 },
-      { col: 6, text: 'GÖREV TANIMI',  width: 32 },
-      { col: 7, text: 'TARİH-SAAT',   width: 18 },
-      { col: 8, text: 'DURUM',         width: 14 },
+    // ── Tamamlanan ───────────────────────────────────────────────────────
+    fillDetaySheet('Tamamlanan', data.tamamlananGorevler, (t) => [
+      t.sn, t.personel, t.ustLokasyon, t.lokasyon, t.gorevNo, t.gorevTanimi, t.tarihSaat, t.durum,
     ])
-    data.tamamlananGorevler.forEach((t, i) => {
-      const r = ws3.getRow(2 + i); r.height = 17
-      const vals: any[] = [t.sn, t.personel, t.ustLokasyon, t.lokasyon, t.gorevNo, t.gorevTanimi, t.tarihSaat, t.durum]
-      vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
-    })
 
-    // ── Sayfa 4: Sapmalar ────────────────────────────────────────────────────
-    const ws4 = wb.addWorksheet('Sapmalar')
-    setHdr(ws4, 1, [
-      { col: 1, text: 'SN',            width: 6  },
-      { col: 2, text: 'PERSONEL',      width: 22 },
-      { col: 3, text: 'ÜST LOKASYON', width: 20 },
-      { col: 4, text: 'LOKASYON',      width: 22 },
-      { col: 5, text: 'GÖREV NO',      width: 14 },
-      { col: 6, text: 'GÖREV TANIMI',  width: 32 },
-      { col: 7, text: 'TARİH-SAAT',   width: 18 },
-      { col: 8, text: 'SAPMA NEDENİ', width: 24 },
+    // ── Sapmalar ─────────────────────────────────────────────────────────
+    fillDetaySheet('Sapmalar', data.sapmaGorevler, (s) => [
+      s.sn, s.personel, s.ustLokasyon, s.lokasyon, s.gorevNo, s.gorevTanimi, s.tarihSaat, s.sapmaNedeni,
     ])
-    data.sapmaGorevler.forEach((s, i) => {
-      const r = ws4.getRow(2 + i); r.height = 17
-      const vals: any[] = [s.sn, s.personel, s.ustLokasyon, s.lokasyon, s.gorevNo, s.gorevTanimi, s.tarihSaat, s.sapmaNedeni]
-      vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
-    })
 
-    // ── Sayfa 5: Kayıp Frekanslar ────────────────────────────────────────────
-    const ws5 = wb.addWorksheet('Kayıp Frekanslar')
-    setHdr(ws5, 1, [
-      { col: 1, text: 'SN',            width: 6  },
-      { col: 2, text: 'ÜST LOKASYON', width: 20 },
-      { col: 3, text: 'LOKASYON',      width: 22 },
-      { col: 4, text: 'GÖREV NO',      width: 14 },
-      { col: 5, text: 'GÖREV TANIMI',  width: 32 },
-      { col: 6, text: 'TARİH',         width: 14 },
-      { col: 7, text: 'PERSONEL',     width: 22 },
-      { col: 8, text: 'DURUM',         width: 14 },
-      { col: 9, text: 'KAYIP NEDENİ', width: 24 },
-    ])
-    data.kayipGorevler.forEach((k, i) => {
-      const r = ws5.getRow(2 + i); r.height = 17
-      // Tanımda "VARDIYA" geçmiyorsa, üretildiği vardiya no'yu suffix olarak ekle
+    // ── Kayıp Frekanslar ─────────────────────────────────────────────────
+    fillDetaySheet('Kayıp Frekanslar', data.kayipGorevler, (k) => {
+      // Tanımda "VARDIYA" geçmiyorsa üretildiği vardiya no'yu suffix ekle
       const tanim = (k.vardiyaNo && !/VARD[İI]YA/i.test(String(k.gorevTanimi ?? '')))
         ? `${k.gorevTanimi}  ·  V${k.vardiyaNo}`
         : k.gorevTanimi
-      const vals: any[] = [k.sn, k.ustLokasyon, k.lokasyon, k.gorevNo, tanim, k.tarih, k.iptalEden ?? 'sistem', k.durum, k.kayipNedeni]
-      vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
+      return [k.sn, k.ustLokasyon, k.lokasyon, k.gorevNo, tanim, k.tarih, k.iptalEden ?? 'sistem', k.durum, k.kayipNedeni]
     })
 
-    // ── Sayfa 6: Frekans Dışı ────────────────────────────────────────────────
-    // Mobil v1.0.28+ ekstra görev akışı: baslat/tamamla → gerçek SÜRE + GEREKÇE.
-    // Eski tek-POST kayıtlarda gerekçe boş, süre "Tek tık".
-    const ws6 = wb.addWorksheet('Frekans Dışı')
-    setHdr(ws6, 1, [
-      { col: 1, text: 'SN',           width: 6  },
-      { col: 2, text: 'ÜST LOKASYON', width: 20 },
-      { col: 3, text: 'GRUP TANIMI',  width: 26 },
-      { col: 4, text: 'LOKASYON',     width: 22 },
-      { col: 5, text: 'GÖREV TANIMI', width: 26 },
-      { col: 6, text: 'TARİH-SAAT',   width: 18 },
-      { col: 7, text: 'SÜRE',         width: 14 },
-      { col: 8, text: 'PERSONEL',     width: 22 },
-      { col: 9, text: 'GEREKÇE',      width: 40 },
+    // ── Frekans Dışı ─────────────────────────────────────────────────────
+    fillDetaySheet('Frekans Dışı', data.frekansDisiGorevler, (f) => [
+      f.sn, f.ustLokasyon, f.grupTanimi, f.lokasyonTanimi, f.aciklama,
+      f.tarihSaat, f.gorevSuresi, f.personel, f.gerekce || '',
     ])
-    data.frekansDisiGorevler.forEach((f, i) => {
-      const r = ws6.getRow(2 + i); r.height = 17
-      const vals: any[] = [
-        f.sn, f.ustLokasyon, f.grupTanimi, f.lokasyonTanimi, f.aciklama,
-        f.tarihSaat, f.gorevSuresi, f.personel, f.gerekce || '',
-      ]
-      vals.forEach((v, ci) => { const c = r.getCell(ci + 1); c.value = v; c.font = { size: 10 }; c.fill = i % 2 === 0 ? EVEN_FILL : ODD_FILL })
-    })
 
+    // ── Export ───────────────────────────────────────────────────────────
     const buf  = await wb.xlsx.writeBuffer()
     const date = new Date().toISOString().slice(0, 10)
     return new NextResponse(buf as unknown as BodyInit, {

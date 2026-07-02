@@ -1,24 +1,20 @@
 /**
- * GET /api/reports/genel-rapor-pdf?firmaId=...&...
+ * GET /api/reports/genel-rapor-pdf?firmaId=...
  *
  * Server-side HTML template + Puppeteer → A4 PDF.
- * Excel'deki sayfalarla birebir aynı veri yapısı (KPI + 5 grafik + 5
- * detay tablosu). Chart'lar SVG'den PNG data URI olarak embed edilir.
+ * NOT: Grafikler için Excel şablonu daha zengin; PDF sadece KPI + detay
+ * tabloları içerir. Görsel grafik istenirse Excel indirilip "Save as PDF"
+ * ile dönüştürülebilir. (Excel şablonu chart'ları KPI formülleriyle bağlı.)
  */
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { buildGenelRaporData } from '@/lib/reports/genel-rapor-data'
-import { barChart, dualBarChart, stackedBarChart, pieChart } from '@/lib/reports/chart-images'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
 function esc(s: any): string {
   return String(s ?? '').replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]!))
-}
-
-function pngDataUri(buf: Buffer): string {
-  return `data:image/png;base64,${buf.toString('base64')}`
 }
 
 export async function GET(request: Request) {
@@ -46,66 +42,13 @@ export async function GET(request: Request) {
     const toplamGerceklesen = data.toplamTamamlanan + data.toplamSapma
     const genelOran         = toplamHedef > 0 ? Math.round(toplamGerceklesen / toplamHedef * 100) : 0
 
-    const agg = data.ozetAgg
-    // Grup bazlı agregasyon
-    const grupAggMap = new Map<string, { tamamlanan: number; sapma: number; kayip: number }>()
-    for (const g of data.grupMetrikleri) {
-      const ex = grupAggMap.get(g.grup) ?? { tamamlanan: 0, sapma: 0, kayip: 0 }
-      grupAggMap.set(g.grup, {
-        tamamlanan: ex.tamamlanan + g.tamamlanan,
-        sapma: ex.sapma + g.sapma,
-        kayip: ex.kayip + g.kayip,
-      })
-    }
-    const grupBazli = [...grupAggMap.entries()]
-      .map(([grup, v]) => ({ grup, ...v }))
-      .sort((a, b) => b.tamamlanan - a.tamamlanan)
-      .slice(0, 10)
-
-    // 5 grafik PNG paralel
-    const [pngHedef, pngPersonel, pngGrup, pngKayip, pngSapma] = await Promise.all([
-      barChart('Hedef / Gerçekleşme Dağılımı', [
-        { label: 'Hedef',      value: toplamHedef,             color: '#94a3b8' },
-        { label: 'Tamamlanan', value: data.toplamTamamlanan,    color: '#10b981' },
-        { label: 'Sapma',      value: data.toplamSapma,         color: '#f59e0b' },
-        { label: 'Kayıp',      value: data.toplamKayip,         color: '#ef4444' },
-        { label: 'Ekstra',     value: data.toplamEkstra ?? 0,   color: '#8b5cf6' },
-      ], { width: 760, height: 320 }),
-      dualBarChart('Personel Başarı (Atanan / Tamamlanan)',
-        ((agg?.atananPersonelBasari ?? []).slice(0, 10)).map((v: any) => ({
-          label: v.personel, v1: v.atanan, v2: v.tamamlanan,
-        })),
-        { width: 920, height: 380, v1Label: 'Atanan', v2Label: 'Tamamlanan', v1Color: '#94a3b8', v2Color: '#10b981' }
-      ),
-      stackedBarChart('Grup Bazlı Performans',
-        grupBazli.map((g) => ({
-          label: g.grup,
-          segments: [
-            { name: 'Tamamlanan', value: g.tamamlanan, color: '#10b981' },
-            { name: 'Sapma',      value: g.sapma,      color: '#f59e0b' },
-            { name: 'Kayıp',      value: g.kayip,      color: '#ef4444' },
-          ],
-        })).filter((g) => g.segments.some((s) => s.value > 0)),
-        { width: 920, height: 380, legend: ['Tamamlanan', 'Sapma', 'Kayıp'], legendColors: ['#10b981', '#f59e0b', '#ef4444'] }
-      ),
-      pieChart('Kayıp Neden Dağılımı',
-        (agg?.kayipNedeniDagilim ?? []).slice(0, 8).map((x: any) => ({ label: x.neden, value: x.sayi })),
-        { width: 700, height: 360 }
-      ),
-      pieChart('Sapma Neden Dağılımı',
-        (agg?.sapmaNedeniDagilim ?? []).slice(0, 8).map((x: any) => ({ label: x.neden, value: x.sayi })),
-        { width: 700, height: 360 }
-      ),
-    ])
-
-    // ── HTML template ────────────────────────────────────────────────
     const css = `
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: 'Inter', -apple-system, sans-serif; color: #111827; font-size: 11px; }
-      .page { page-break-after: always; padding: 16px 20px; }
+      .page { page-break-after: always; padding: 14px 18px; }
       .page:last-child { page-break-after: auto; }
       h1 { font-size: 18px; font-weight: 800; margin-bottom: 6px; color: #0F1A0F; }
-      h2 { font-size: 14px; font-weight: 700; margin: 14px 0 8px; color: #1A5C2A; border-bottom: 2px solid #1A5C2A; padding-bottom: 4px; }
+      h2 { font-size: 14px; font-weight: 700; margin: 12px 0 8px; color: #1A5C2A; border-bottom: 2px solid #1A5C2A; padding-bottom: 4px; }
       .meta { display: grid; grid-template-columns: 110px 1fr 110px 1fr; gap: 4px 12px; background: #EFF6FF; padding: 8px 12px; border-radius: 4px; font-size: 10.5px; margin: 8px 0 12px; }
       .meta b { color: #475569; }
       table { width: 100%; border-collapse: collapse; font-size: 10px; }
@@ -117,13 +60,7 @@ export async function GET(request: Request) {
       .kpi { background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; text-align: center; }
       .kpi .label { font-size: 9.5px; color: #6b7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
       .kpi .value { font-size: 18px; font-weight: 900; color: #111827; margin-top: 4px; }
-      .chart { margin: 12px 0; text-align: center; page-break-inside: avoid; }
-      .chart img { max-width: 100%; height: auto; border: 1px solid #e5e7eb; border-radius: 4px; }
-      .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
-      .chart-row .chart { margin: 0; }
       .footer { margin-top: 10px; font-size: 9px; color: #9ca3af; text-align: center; }
-      .text-center { text-align: center; }
-      .text-right { text-align: right; }
     `
 
     function tableRows(rows: any[][]): string {
@@ -160,37 +97,27 @@ export async function GET(request: Request) {
       <b>Tarih:</b><span>${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}</span>
     </div>
     ${kpiCards}
-    <div class="chart"><img src="${pngDataUri(pngHedef)}" /></div>
-    <div class="chart"><img src="${pngDataUri(pngPersonel)}" /></div>
+    <p style="font-size:10px;color:#6b7280;margin-top:8px;font-style:italic">
+      Grafik görünümü için Excel indir → Excel'de "Kaydet As → PDF" yaparak grafikli PDF elde edebilirsiniz.
+    </p>
   </div>
 
-  <!-- Sayfa 2: Grup + Dağılımlar -->
-  <div class="page">
-    <h2>Grup Bazlı Performans</h2>
-    <div class="chart"><img src="${pngDataUri(pngGrup)}" /></div>
-    <div class="chart-row">
-      <div class="chart"><img src="${pngDataUri(pngKayip)}" /></div>
-      <div class="chart"><img src="${pngDataUri(pngSapma)}" /></div>
-    </div>
-  </div>
-
-  <!-- Sayfa 3: Grup Metrikleri tablosu -->
+  <!-- Sayfa 2: Grup Metrikleri tablosu -->
   <div class="page">
     <h2>Grup Metrikleri</h2>
     <table>
       <thead><tr>
         <th>SN</th><th>Grup</th><th>Üst Lok.</th><th>Lokasyon</th><th>V.Frekans</th>
-        <th class="text-right">Hedef</th><th class="text-right">Tamam.</th><th class="text-right">Ekstra</th>
-        <th class="text-right">Sapma</th><th class="text-right">Kayıp</th><th class="text-right">Başarı</th><th class="text-right">Genel</th>
+        <th>Hedef</th><th>Tamam.</th><th>Ekstra</th><th>Sapma</th><th>Kayıp</th><th>Başarı</th><th>Genel</th>
       </tr></thead>
       <tbody>${tableRows(data.grupMetrikleri.map((g, i) => [
         i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans,
-        g.hedef, g.tamamlanan, g.ekstra ?? 0, g.sapma, g.kayip, g.basariOrani, g.genelOran,
+        g.hedef, g.tamamlanan, g.ekstra ?? 0, g.sapma, g.kayip, `%${g.basariOrani}`, `%${g.genelOran}`,
       ]))}</tbody>
     </table>
   </div>
 
-  <!-- Sayfa 4: Tamamlanan -->
+  <!-- Sayfa 3: Tamamlanan -->
   <div class="page">
     <h2>Tamamlanan Frekanslar (${data.tamamlananGorevler.length})</h2>
     <table>
@@ -204,7 +131,7 @@ export async function GET(request: Request) {
     </table>
   </div>
 
-  <!-- Sayfa 5: Sapmalar -->
+  <!-- Sayfa 4: Sapmalar -->
   <div class="page">
     <h2>Sapmalar (${data.sapmaGorevler.length})</h2>
     <table>
@@ -218,7 +145,7 @@ export async function GET(request: Request) {
     </table>
   </div>
 
-  <!-- Sayfa 6: Kayıp -->
+  <!-- Sayfa 5: Kayıp -->
   <div class="page">
     <h2>Kayıp Frekanslar (${data.kayipGorevler.length})</h2>
     <table>
@@ -234,7 +161,7 @@ export async function GET(request: Request) {
     </table>
   </div>
 
-  <!-- Sayfa 7: Frekans Dışı -->
+  <!-- Sayfa 6: Frekans Dışı -->
   <div class="page">
     <h2>Frekans Dışı / Ekstra Görevler (${data.frekansDisiGorevler.length})</h2>
     <table>
@@ -250,7 +177,6 @@ export async function GET(request: Request) {
   </div>
 </body></html>`
 
-    // Puppeteer
     const puppeteer = (await import('puppeteer')).default
     const browser = await puppeteer.launch({
       headless: true,
