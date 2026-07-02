@@ -26,34 +26,52 @@ function trDateStr(d: Date): string {
 
 export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
   const supabase = createClient()
-  const [mode, setMode] = useState<Mode>('haftalik')
+  const [mode, setMode] = useState<Mode>('gunluk')
   const [chartData, setChartData] = useState<{ label: string; value: number }[]>([])
   const [kpi, setKpi] = useState({ bugun: 0, hafta: 0, ay: 0 })
-  const [yukleniyor, setYukleniyor] = useState(true)
+  const [yukleniyor, setYukleniyor] = useState(false)
+  const [hata, setHata] = useState<string | null>(null)
 
   async function yukle() {
+    if (!firmaId) return
     setYukleniyor(true)
+    setHata(null)
     try {
       // 30 günlük metadata + tamamlanan gorevler (2-step query, embed güvenilir değil)
+      // NOT: gorevIds büyürse .in() URL çok uzayabiliyor (Cloudflare 431/414).
+      // Metadata sorgusunda hedef_tarih + arac_id + firma_id filter'ini
+      // metadata seviyesinde uygulayamıyoruz çünkü firma_id metadata'da yok.
+      // Çözüm: gorevIds'i chunk'la tara veya toplam limit koy.
       const son30 = trDateStr(new Date(Date.now() - 30 * 86400000))
-      const { data: metaRows } = await supabase
+      const { data: metaRows, error: metaErr } = await supabase
         .from('oto_yikama_gorev_metadata')
         .select('gorev_id')
         .gte('hedef_tarih', son30)
+        .limit(5000)
+      if (metaErr) throw new Error('metadata: ' + metaErr.message)
       const gorevIds = (metaRows ?? []).map(m => m.gorev_id)
       if (gorevIds.length === 0) {
-        setChartData([])
+        setChartData(bosCartData(mode))
         setKpi({ bugun: 0, hafta: 0, ay: 0 })
         return
       }
-      const { data: gorevRows } = await supabase
-        .from('gorevler')
-        .select('id, tamamlanma_tarihi')
-        .in('id', gorevIds)
-        .eq('firma_id', firmaId)
-        .eq('durum', 'TAMAMLANDI')
-        .not('tamamlanma_tarihi', 'is', null)
-      const tamamlanmaList: Date[] = (gorevRows ?? []).map((g: any) => new Date(g.tamamlanma_tarihi))
+      // in() URL'sini şişirmemek için chunk'la
+      const CHUNK = 500
+      const tamamlanmaList: Date[] = []
+      for (let i = 0; i < gorevIds.length; i += CHUNK) {
+        const chunk = gorevIds.slice(i, i + CHUNK)
+        const { data: gorevRows, error: gorevErr } = await supabase
+          .from('gorevler')
+          .select('id, tamamlanma_tarihi')
+          .in('id', chunk)
+          .eq('firma_id', firmaId)
+          .eq('durum', 'TAMAMLANDI')
+          .not('tamamlanma_tarihi', 'is', null)
+        if (gorevErr) throw new Error('gorevler: ' + gorevErr.message)
+        for (const g of (gorevRows ?? []) as any[]) {
+          tamamlanmaList.push(new Date(g.tamamlanma_tarihi))
+        }
+      }
 
       // KPI
       const bugun = trDateStr(new Date())
@@ -113,11 +131,30 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
         }
         setChartData(labels.map(l => ({ label: l, value: grouped[l] || 0 })))
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('[AktiviteBlock] yükleme hatası:', e)
+      setHata(e?.message ?? String(e))
+      setChartData(bosCartData(mode))
     } finally {
       setYukleniyor(false)
     }
+  }
+
+  function bosCartData(m: Mode): { label: string; value: number }[] {
+    // Chart'ın x-axis'i her zaman görünsün diye boş data yerine sıfır bucket'lar
+    if (m === 'gunluk') {
+      return Array.from({ length: 24 }, (_, i) => {
+        const d = new Date(Date.now() - (23 - i) * 3600000)
+        return { label: d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false }), value: 0 }
+      })
+    }
+    if (m === 'haftalik') {
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(Date.now() - (6 - i) * 86400000)
+        return { label: d.toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', weekday: 'short' }), value: 0 }
+      })
+    }
+    return ['4 hf önce', '3 hf önce', '2 hf önce', 'Geçen hafta', 'Bu hafta'].map(l => ({ label: l, value: 0 }))
   }
 
   useEffect(() => { yukle() /* eslint-disable-next-line */ }, [firmaId, mode])
@@ -168,12 +205,19 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
       {/* Area chart — ResponsiveContainer boyutu otomatik hesaplar,
           zoom / flex parent race'inden etkilenmez. */}
       <div style={{ width: '100%', height: 280, position: 'relative' }}>
-        {yukleniyor && (
+        {yukleniyor && chartData.length === 0 && (
           <div style={{
             position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', zIndex: 5,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: T.textSoft, fontSize: 13,
           }}>Yükleniyor…</div>
+        )}
+        {hata && (
+          <div style={{
+            position: 'absolute', top: 8, right: 8, zIndex: 5,
+            padding: '4px 8px', background: '#fef2f2', color: '#b91c1c',
+            fontSize: 11, borderRadius: 4, border: '1px solid #fecaca',
+          }} title={hata}>Veri hatası</div>
         )}
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
