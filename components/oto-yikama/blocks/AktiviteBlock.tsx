@@ -24,17 +24,35 @@ function trDateStr(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(d)
 }
 
+function bosBucket(m: Mode): { label: string; value: number }[] {
+  if (m === 'gunluk') {
+    return Array.from({ length: 24 }, (_, i) => {
+      const d = new Date(Date.now() - (23 - i) * 3600000)
+      return { label: d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false }), value: 0 }
+    })
+  }
+  if (m === 'haftalik') {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(Date.now() - (6 - i) * 86400000)
+      return { label: d.toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', weekday: 'short' }), value: 0 }
+    })
+  }
+  return ['4 hf önce', '3 hf önce', '2 hf önce', 'Geçen hafta', 'Bu hafta'].map(l => ({ label: l, value: 0 }))
+}
+
 export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
   const supabase = createClient()
   const [mode, setMode] = useState<Mode>('gunluk')
-  const [chartData, setChartData] = useState<{ label: string; value: number }[]>([])
+  // Baslangicta bos bucket - chart hep gorunur, "Yukleniyor" takintisi olmaz
+  const [chartData, setChartData] = useState<{ label: string; value: number }[]>(() => bosBucket('gunluk'))
   const [kpi, setKpi] = useState({ bugun: 0, hafta: 0, ay: 0 })
-  const [yukleniyor, setYukleniyor] = useState(false)
   const [hata, setHata] = useState<string | null>(null)
+
+  // Mode degisince chart'i o mode'un bos bucket'i ile reset et (guncel labels)
+  useEffect(() => { setChartData(bosBucket(mode)) }, [mode])
 
   async function yukle() {
     if (!firmaId) return
-    setYukleniyor(true)
     setHata(null)
     try {
       // 30 günlük metadata + tamamlanan gorevler (2-step query, embed güvenilir değil)
@@ -51,7 +69,7 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
       if (metaErr) throw new Error('metadata: ' + metaErr.message)
       const gorevIds = (metaRows ?? []).map(m => m.gorev_id)
       if (gorevIds.length === 0) {
-        setChartData(bosCartData(mode))
+        setChartData(bosBucket(mode))
         setKpi({ bugun: 0, hafta: 0, ay: 0 })
         return
       }
@@ -134,27 +152,7 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
     } catch (e: any) {
       console.error('[AktiviteBlock] yükleme hatası:', e)
       setHata(e?.message ?? String(e))
-      setChartData(bosCartData(mode))
-    } finally {
-      setYukleniyor(false)
     }
-  }
-
-  function bosCartData(m: Mode): { label: string; value: number }[] {
-    // Chart'ın x-axis'i her zaman görünsün diye boş data yerine sıfır bucket'lar
-    if (m === 'gunluk') {
-      return Array.from({ length: 24 }, (_, i) => {
-        const d = new Date(Date.now() - (23 - i) * 3600000)
-        return { label: d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false }), value: 0 }
-      })
-    }
-    if (m === 'haftalik') {
-      return Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(Date.now() - (6 - i) * 86400000)
-        return { label: d.toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', weekday: 'short' }), value: 0 }
-      })
-    }
-    return ['4 hf önce', '3 hf önce', '2 hf önce', 'Geçen hafta', 'Bu hafta'].map(l => ({ label: l, value: 0 }))
   }
 
   useEffect(() => { yukle() /* eslint-disable-next-line */ }, [firmaId, mode])
@@ -205,13 +203,6 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
       {/* Area chart — ResponsiveContainer boyutu otomatik hesaplar,
           zoom / flex parent race'inden etkilenmez. */}
       <div style={{ width: '100%', height: 280, position: 'relative' }}>
-        {yukleniyor && chartData.length === 0 && (
-          <div style={{
-            position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', zIndex: 5,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: T.textSoft, fontSize: 13,
-          }}>Yükleniyor…</div>
-        )}
         {hata && (
           <div style={{
             position: 'absolute', top: 8, right: 8, zIndex: 5,
