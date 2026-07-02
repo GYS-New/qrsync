@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 
 /**
  * Yıkama Aktivitesi — GYS AktiviteGrafigi pattern'i ile uyumlu.
@@ -30,23 +30,6 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
   const [chartData, setChartData] = useState<{ label: string; value: number }[]>([])
   const [kpi, setKpi] = useState({ bugun: 0, hafta: 0, ay: 0 })
   const [yukleniyor, setYukleniyor] = useState(true)
-
-  const chartWrapRef = useRef<HTMLDivElement | null>(null)
-  const [chartSize, setChartSize] = useState({ w: 0, h: 280 })
-
-  useLayoutEffect(() => {
-    const el = chartWrapRef.current
-    if (!el) return
-    const measure = () => {
-      const rect = el.getBoundingClientRect()
-      const w = Math.floor(rect.width)
-      if (w > 0) setChartSize({ w, h: 280 })
-    }
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
 
   async function yukle() {
     setYukleniyor(true)
@@ -182,8 +165,9 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
         <KpiMini etiket="Bu Ay"    sayi={kpi.ay}    renk={T.purple} />
       </div>
 
-      {/* Area chart */}
-      <div ref={chartWrapRef} style={{ width: '100%', height: 280, position: 'relative' }}>
+      {/* Area chart — ResponsiveContainer boyutu otomatik hesaplar,
+          zoom / flex parent race'inden etkilenmez. */}
+      <div style={{ width: '100%', height: 280, position: 'relative' }}>
         {yukleniyor && (
           <div style={{
             position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', zIndex: 5,
@@ -191,9 +175,8 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
             color: T.textSoft, fontSize: 13,
           }}>Yükleniyor…</div>
         )}
-        {chartSize.w > 0 && (
-          <AreaChart width={chartSize.w} height={chartSize.h} data={chartData}
-            margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
             <defs>
               <linearGradient id="aktiviteFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={T.green} stopOpacity={0.32} />
@@ -207,7 +190,7 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
             <Area type="monotone" dataKey="value" stroke={T.green} strokeWidth={2}
               fill="url(#aktiviteFill)" name="Tamamlanan Yıkama" />
           </AreaChart>
-        )}
+        </ResponsiveContainer>
       </div>
     </div>
   )
