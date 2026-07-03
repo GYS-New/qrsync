@@ -86,6 +86,57 @@ export async function GET(request: Request) {
     wsOzet.getCell('B17').value = pct(basari)
     wsOzet.getCell('B18').value = pct(genelOran)
 
+    // ── Departman Analizi Tablosu (Row 17: sablonda D17-AA17 arasi) ─────
+    // Sablonda row 15'te departman adlari, row 16'da Hedef/Tamamlanan/Sapma
+    // sub-header var. Row 17 bos data satiri — dolduracak alan.
+    // Sablondaki sabit sira: DISGS, MONTAJ, KAPORTA, PRES, LOJISTIK DUV,
+    // SASI, DLSC, BOYA. Backend'den gelen ustLokasyon'a gore eslestir.
+    const departmanSlotlari: Array<{ header: string; hedef: string; tamamlanan: string; sapma: string }> = [
+      { header: 'D15', hedef: 'D17', tamamlanan: 'E17', sapma: 'F17' },
+      { header: 'G15', hedef: 'G17', tamamlanan: 'H17', sapma: 'I17' },
+      { header: 'J15', hedef: 'J17', tamamlanan: 'K17', sapma: 'L17' },
+      { header: 'M15', hedef: 'M17', tamamlanan: 'N17', sapma: 'O17' },
+      { header: 'P15', hedef: 'P17', tamamlanan: 'Q17', sapma: 'R17' },
+      { header: 'S15', hedef: 'S17', tamamlanan: 'T17', sapma: 'U17' },
+      { header: 'V15', hedef: 'V17', tamamlanan: 'W17', sapma: 'X17' },
+      { header: 'Y15', hedef: 'Y17', tamamlanan: 'Z17', sapma: 'AA17' },
+    ]
+
+    // grupMetrikleri'ni ustLokasyon (departman) bazli grupla
+    const norm = (s: any) => String(s ?? '').toLocaleUpperCase('tr').trim()
+    const departmanAgg = new Map<string, { hedef: number; tamamlanan: number; sapma: number }>()
+    for (const g of data.grupMetrikleri) {
+      const key = norm(g.ustLokasyon)
+      if (!key) continue
+      const ex = departmanAgg.get(key) ?? { hedef: 0, tamamlanan: 0, sapma: 0 }
+      departmanAgg.set(key, {
+        hedef: ex.hedef + g.hedef,
+        tamamlanan: ex.tamamlanan + g.tamamlanan,
+        sapma: ex.sapma + g.sapma,
+      })
+    }
+
+    // Sablondaki departman adlarina gore hücreleri doldur
+    for (const slot of departmanSlotlari) {
+      const headerCell = wsOzet.getCell(slot.header)
+      const rawHeader = headerCell.value
+      const headerName = norm(typeof rawHeader === 'object' && rawHeader !== null && 'result' in rawHeader
+        ? (rawHeader as any).result
+        : rawHeader)
+      if (!headerName) continue
+      const agg = departmanAgg.get(headerName)
+      if (agg) {
+        wsOzet.getCell(slot.hedef).value      = agg.hedef
+        wsOzet.getCell(slot.tamamlanan).value = agg.tamamlanan
+        wsOzet.getCell(slot.sapma).value      = agg.sapma
+      } else {
+        // Departman bu raporda yok → 0 yaz (chart bar'i gorunmesin)
+        wsOzet.getCell(slot.hedef).value      = 0
+        wsOzet.getCell(slot.tamamlanan).value = 0
+        wsOzet.getCell(slot.sapma).value      = 0
+      }
+    }
+
     // ── Grup Metrikleri ──────────────────────────────────────────────────
     // Row 1 = header (şablonda mevcut, dokunma)
     // Row 2 = TOPLAM satırı (şablonda formatlı, veriyi güncelle)
