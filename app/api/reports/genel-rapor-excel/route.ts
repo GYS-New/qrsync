@@ -102,17 +102,19 @@ export async function GET(request: Request) {
       { header: 'Y15', hedef: 'Y17', tamamlanan: 'Z17', sapma: 'AA17' },
     ]
 
-    // grupMetrikleri'ni ustLokasyon (departman) bazli grupla
+    // Departman bazli hesap: data.ozetAgg.departmanMetrikleri kullan.
+    // NOT: data.grupMetrikleri'nin ustLokasyon field'i filter yoksa "Tümü"
+    // olarak doner. departmanMetrikleri ise HER ZAMAN gercek departman
+    // adini (MONTAJ, DISGS vs.) icerir — dogru kaynak.
     const norm = (s: any) => String(s ?? '').toLocaleUpperCase('tr').trim()
     const departmanAgg = new Map<string, { hedef: number; tamamlanan: number; sapma: number }>()
-    for (const g of data.grupMetrikleri) {
-      const key = norm(g.ustLokasyon)
+    for (const d of (data.ozetAgg?.departmanMetrikleri ?? [])) {
+      const key = norm(d.ustLokasyonAd)
       if (!key) continue
-      const ex = departmanAgg.get(key) ?? { hedef: 0, tamamlanan: 0, sapma: 0 }
       departmanAgg.set(key, {
-        hedef: ex.hedef + g.hedef,
-        tamamlanan: ex.tamamlanan + g.tamamlanan,
-        sapma: ex.sapma + g.sapma,
+        hedef:      d.hedef,
+        tamamlanan: d.tamamlanan,
+        sapma:      d.sapma,
       })
     }
 
