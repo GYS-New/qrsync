@@ -186,54 +186,62 @@ export async function GET(request: Request) {
     ])
 
     // ── Export ───────────────────────────────────────────────────────────
-    // ExcelJS writeBuffer chart/drawing XML'lerini silir (bilinen sinir).
-    // Cozum: JSZip hybrid — ExcelJS output'una sablon'daki chart/drawing
-    // dosyalarini geri kopyala. Chart'lar sablondaki formullerle hucrelere
-    // bagli, veri degisince Excel acilis sirasinda otomatik recalculate eder.
-    const filledBuffer = await wb.xlsx.writeBuffer()
+    // Hybrid yaklasim (Ters yon): Sabloni TAMAMEN preserve et, sadece
+    // worksheet XML'lerini ExcelJS'ten alarak sablona overwrite et.
+    // Chart'lar, workbook.xml, calcChain, styles, sharedStrings hepsi
+    // orijinal sablondaki gibi kalir -> Excel "onarim" istegi cikarmaz.
+    const excelJSBuffer = await wb.xlsx.writeBuffer()
 
     const fs = await import('fs')
     const JSZip = (await import('jszip')).default
     const templateBuffer = await fs.promises.readFile(templatePath)
-    const templateZip = await JSZip.loadAsync(templateBuffer)
-    const filledZip   = await JSZip.loadAsync(filledBuffer as any)
+    const outputZip = await JSZip.loadAsync(templateBuffer)  // Sablonun kopyasi
+    const excelJSZip = await JSZip.loadAsync(excelJSBuffer as any)
 
-    // Sablondan output'a kopyalanacak dosyalar (chart/drawing/rels/content-types)
-    const preservePatterns = [
-      /^xl\/charts\//,
-      /^xl\/drawings\//,
-      /^xl\/_rels\/workbook\.xml\.rels$/,
-      /^xl\/worksheets\/_rels\//,
-      /^\[Content_Types\]\.xml$/,
-      /^xl\/calcChain\.xml$/,
-    ]
-
-    const filesToCopy: string[] = []
-    templateZip.forEach((relPath, file) => {
+    // ExcelJS output'undan sadece worksheet XML'lerini + sharedStrings'i
+    // sabloya kopyala. sharedStrings'i de almamiz gerekli cunku worksheet'ler
+    // string ID'lerini kullanabilir.
+    const excelJSFiles: string[] = []
+    excelJSZip.forEach((relPath, file) => {
       if (file.dir) return
-      if (preservePatterns.some(re => re.test(relPath))) filesToCopy.push(relPath)
+      if (/^xl\/worksheets\/sheet\d+\.xml$/.test(relPath)) excelJSFiles.push(relPath)
+      if (relPath === 'xl/sharedStrings.xml') excelJSFiles.push(relPath)
     })
 
-    for (const relPath of filesToCopy) {
-      const file = templateZip.file(relPath)
+    for (const relPath of excelJSFiles) {
+      const file = excelJSZip.file(relPath)
       if (!file) continue
       const content = await file.async('nodebuffer')
-      filledZip.file(relPath, content)
+      outputZip.file(relPath, content)
     }
 
-    // Excel acilinca formul recalculation zorla — workbook.xml'e calcPr set et
-    const wbXmlFile = filledZip.file('xl/workbook.xml')
+    // Excel acilinca formul recalculation zorla — sablonun workbook.xml'ine
+    // calcPr fullCalcOnLoad ekle.
+    const wbXmlFile = outputZip.file('xl/workbook.xml')
     if (wbXmlFile) {
       let wbXml = await wbXmlFile.async('string')
-      if (/<calcPr\b[^>]*\/>/.test(wbXml)) {
-        wbXml = wbXml.replace(/<calcPr\b([^>]*)\/>/, '<calcPr$1 fullCalcOnLoad="1" forceFullCalc="1"/>')
+      if (/<calcPr\b[^>]*\bfullCalcOnLoad=/.test(wbXml)) {
+        // Zaten var, dokunma
+      } else if (/<calcPr\b[^>]*\/>/.test(wbXml)) {
+        wbXml = wbXml.replace(/<calcPr\b([^>]*)\/>/, '<calcPr$1 fullCalcOnLoad="1"/>')
       } else if (!wbXml.includes('<calcPr')) {
-        wbXml = wbXml.replace(/<\/workbook>/, '<calcPr fullCalcOnLoad="1" forceFullCalc="1"/></workbook>')
+        wbXml = wbXml.replace(/<\/workbook>/, '<calcPr fullCalcOnLoad="1"/></workbook>')
       }
-      filledZip.file('xl/workbook.xml', wbXml)
+      outputZip.file('xl/workbook.xml', wbXml)
     }
 
-    const finalBuffer = await filledZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
+    // calcChain.xml'i sil — worksheet degistiginde stale reference'lari
+    // olabilir. Excel calcPr fullCalcOnLoad ile yeniden hesaplayacak.
+    outputZip.remove('xl/calcChain.xml')
+    // [Content_Types].xml'den calcChain reference'ini da temizle
+    const ctFile = outputZip.file('[Content_Types].xml')
+    if (ctFile) {
+      let ct = await ctFile.async('string')
+      ct = ct.replace(/<Override\b[^/]*PartName="\/xl\/calcChain\.xml"[^/]*\/>/g, '')
+      outputZip.file('[Content_Types].xml', ct)
+    }
+
+    const finalBuffer = await outputZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
     const date = new Date().toISOString().slice(0, 10)
     return new NextResponse(finalBuffer as unknown as BodyInit, {
       headers: {
