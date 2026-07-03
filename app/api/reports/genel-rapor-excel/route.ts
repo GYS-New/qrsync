@@ -198,14 +198,18 @@ export async function GET(request: Request) {
     const outputZip = await JSZip.loadAsync(templateBuffer)  // Sablonun kopyasi
     const excelJSZip = await JSZip.loadAsync(excelJSBuffer as any)
 
-    // ExcelJS output'undan sadece worksheet XML'lerini + sharedStrings'i
-    // sabloya kopyala. sharedStrings'i de almamiz gerekli cunku worksheet'ler
-    // string ID'lerini kullanabilir.
+    // ExcelJS output'undan alinacak dosyalar:
+    //  - worksheet XML'leri (yeni cell degerleri)
+    //  - sharedStrings.xml (worksheet string ID'leri)
+    //  - styles.xml (worksheet cell style ID referanslari — sablondaki
+    //    styles.xml'i preserve edersek ExcelJS'in <c s="5"> gibi refleri
+    //    yanlis style'a bakip percent format vs. corruption yapiyor)
     const excelJSFiles: string[] = []
     excelJSZip.forEach((relPath, file) => {
       if (file.dir) return
       if (/^xl\/worksheets\/sheet\d+\.xml$/.test(relPath)) excelJSFiles.push(relPath)
       if (relPath === 'xl/sharedStrings.xml') excelJSFiles.push(relPath)
+      if (relPath === 'xl/styles.xml') excelJSFiles.push(relPath)
     })
 
     for (const relPath of excelJSFiles) {
@@ -213,6 +217,41 @@ export async function GET(request: Request) {
       if (!file) continue
       const content = await file.async('nodebuffer')
       outputZip.file(relPath, content)
+    }
+
+    // ExcelJS worksheet'lerinin drawing (chart) bagli kalmasi icin
+    // xl/worksheets/_rels/sheet1.xml.rels'te drawing referansi olmali.
+    // ExcelJS bunu ureten sheet1.xml.rels'te chart yok cunku ExcelJS chart'i
+    // silmisti. Sablondaki .rels dosyalari zaten preserve edilmis (biz
+    // ExcelJS'in .rels dosyalarini almiyoruz). Ancak ExcelJS sheet1.xml
+    // icinde <drawing r:id="rId1"/> reference'ini uretmiyor olabilir.
+    // Bu durumda sheet1.xml'in sonuna manuel drawing reference ekle.
+    const sheet1XmlFile = outputZip.file('xl/worksheets/sheet1.xml')
+    if (sheet1XmlFile) {
+      let sheet1Xml = await sheet1XmlFile.async('string')
+      if (!sheet1Xml.includes('<drawing ')) {
+        // </worksheet>'ten hemen once <drawing r:id="rIdX"/> ekle
+        // ExcelJS'in sheet1.xml.rels'inde drawing icin bir rId olmali.
+        // Sablondan sheet1.xml.rels'i okuyup drawing rId'sini bul.
+        const sheetRelsFile = outputZip.file('xl/worksheets/_rels/sheet1.xml.rels')
+        if (sheetRelsFile) {
+          const relsXml = await sheetRelsFile.async('string')
+          // Her <Relationship .../>'in kendi icinde Id ve Type attribute'larini bul
+          const relMatches = relsXml.matchAll(/<Relationship\s+([^>]+?)\/>/g)
+          let drawingRId: string | null = null
+          for (const m of relMatches) {
+            const attrs = m[1]
+            if (/Type="[^"]*drawing"/.test(attrs)) {
+              const idMatch = attrs.match(/Id="([^"]+)"/)
+              if (idMatch) { drawingRId = idMatch[1]; break }
+            }
+          }
+          if (drawingRId) {
+            sheet1Xml = sheet1Xml.replace(/<\/worksheet>/, `<drawing r:id="${drawingRId}"/></worksheet>`)
+            outputZip.file('xl/worksheets/sheet1.xml', sheet1Xml)
+          }
+        }
+      }
     }
 
     // Excel acilinca formul recalculation zorla — sablonun workbook.xml'ine
