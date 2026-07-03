@@ -39,6 +39,9 @@ export async function GET(request: Request) {
       raporBaslangic: p.get('raporBaslangic') || null,
       raporBitis:     p.get('raporBitis')     || null,
       raporuAlan:     p.get('raporuAlan')     || null,
+      // KRITIK: UI'daki buildParams() 'vardiya' gonderiyor ama Excel endpoint
+      // bunu almiyordu -> UI kartlari filtreli, Excel filtresiz -> tutarsizlik.
+      vardiya: (p.get('vardiya') as any) || 'all',
     })
 
     const toplamHedef       = data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0) || data.toplamGorev
