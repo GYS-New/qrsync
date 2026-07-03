@@ -119,24 +119,23 @@ export async function GET(request: Request) {
     }
 
     // Sablondaki departman adlarina gore hücreleri doldur
+    const centerAlign: any = { horizontal: 'center', vertical: 'middle' }
     for (const slot of departmanSlotlari) {
       const headerCell = wsOzet.getCell(slot.header)
       const rawHeader = headerCell.value
       const headerName = norm(typeof rawHeader === 'object' && rawHeader !== null && 'result' in rawHeader
         ? (rawHeader as any).result
         : rawHeader)
-      if (!headerName) continue
-      const agg = departmanAgg.get(headerName)
-      if (agg) {
-        wsOzet.getCell(slot.hedef).value      = agg.hedef
-        wsOzet.getCell(slot.tamamlanan).value = agg.tamamlanan
-        wsOzet.getCell(slot.sapma).value      = agg.sapma
-      } else {
-        // Departman bu raporda yok → 0 yaz (chart bar'i gorunmesin)
-        wsOzet.getCell(slot.hedef).value      = 0
-        wsOzet.getCell(slot.tamamlanan).value = 0
-        wsOzet.getCell(slot.sapma).value      = 0
-      }
+      const agg = headerName ? departmanAgg.get(headerName) : undefined
+      const [hedef, tamamlanan, sapma] = agg
+        ? [agg.hedef, agg.tamamlanan, agg.sapma]
+        : [0, 0, 0]
+      const cellH = wsOzet.getCell(slot.hedef)
+      const cellT = wsOzet.getCell(slot.tamamlanan)
+      const cellS = wsOzet.getCell(slot.sapma)
+      cellH.value = hedef;      cellH.alignment = centerAlign
+      cellT.value = tamamlanan; cellT.alignment = centerAlign
+      cellS.value = sapma;      cellS.alignment = centerAlign
     }
 
     // ── Grup Metrikleri ──────────────────────────────────────────────────
