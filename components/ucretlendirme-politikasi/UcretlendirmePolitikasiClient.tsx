@@ -28,28 +28,28 @@ type SabitKalem = {
 }
 const SABIT_KALEMLER: SabitKalem[] = [
   {
-    ad: 'Sunucu Aylık Kira',
+    ad: 'Sunucu Aylık Kira Bedeli',
     ikon: <Server size={16} color={T.blue} />,
     kapasite: '300 kullanıcı · 1.500 görev/gün · 4 GB ön bellek',
     aciklama: '0-300 kullanıcı aktivitesi, 0-3.000 günlük veri işleme kapasitesi',
     tutar: 7650,
   },
   {
-    ad: 'Veritabanı Aylık Kira',
+    ad: 'Veritabanı Aylık Kira Bedeli',
     ikon: <Database size={16} color={T.purple} />,
     kapasite: '8 GB SSD depolama',
     aciklama: 'Kapasiteye göre 1 yıllık veri depolama',
     tutar: 3916,
   },
   {
-    ad: 'Yapay Zeka Modeli Aylık Kira',
+    ad: 'Yapay Zeka Modeli Aylık Kira Bedeli',
     ikon: <Bot size={16} color={T.green} />,
     kapasite: '300 kullanıcı · 1.500 görev/gün',
     aciklama: 'Kapasiteye göre anlık izleme',
     tutar: 5300,
   },
   {
-    ad: 'Web İşletme Maliyeti',
+    ad: 'İşletme Maliyeti',
     ikon: <Globe size={16} color={T.amber} />,
     kapasite: '300 user aktivite · 1.500 görev/gün',
     aciklama: 'Genel işletme ve web yazılım geliştirme',
