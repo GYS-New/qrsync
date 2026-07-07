@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Users, MapPin, Server, Database, Bot, Globe, Infinity as InfinityIcon, Calculator, Info, TrendingUp, Building2, Layers } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Users, MapPin, Server, Database, Bot, Globe, Infinity as InfinityIcon, Calculator, Info, TrendingUp, Building2, FolderKanban, Loader2, AlertCircle } from 'lucide-react'
 
 const T = {
   text: '#0f172a', textSoft: '#64748b', border: '#e2e8f0',
@@ -63,44 +63,92 @@ function fmtTL(n: number): string {
   return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n) + ' ₺'
 }
 
-export default function UcretlendirmePolitikasiClient() {
-  // Hesap girdileri — proje seviyesinde kullanici + lokasyon,
-  // firma seviyesinde toplam proje sayisi (sabit maliyeti bolmek icin)
+type FirmaAnaliziProje = {
+  id: string
+  ad: string
+  aktif: boolean
+  kullanici_sayisi: number
+  lokasyon_sayisi: number
+}
+
+type FirmaAnaliziResp = {
+  ok: true
+  firma: { id: string; ad: string }
+  projeler: FirmaAnaliziProje[]
+  firmaToplam: { kullanici: number; lokasyon: number; projeSayisi: number }
+}
+
+interface Props {
+  firmaId: string | null
+}
+
+export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
+  const [tab, setTab] = useState<'politika' | 'analiz'>('politika')
+
+  // ─── SEKME 1: Hesap makinesi (proje bazli) girdileri ──────────────────
   const [kullaniciSayisi, setKullaniciSayisi] = useState<number>(100)
   const [lokasyonSayisi, setLokasyonSayisi] = useState<number>(50)
-  const [projeSayisi, setProjeSayisi] = useState<number>(1)
 
   const hesap = useMemo(() => {
     const u = Math.max(0, kullaniciSayisi || 0)
     const l = Math.max(0, lokasyonSayisi || 0)
-    const p = Math.max(1, projeSayisi || 1)
     const kullaniciMaliyeti = u * FIYAT_KULLANICI
     const lokasyonMaliyeti = l * FIYAT_LOKASYON
     const projeDegisken = kullaniciMaliyeti + lokasyonMaliyeti
-    // Sabit maliyet firma seviyesinde tek — proje sayisina bolunur
-    const sabitPay = SABIT_TOPLAM / p
-    const projeKdvHaric = sabitPay + projeDegisken
-    const projeKdv = projeKdvHaric * KDV_ORAN
-    const projeKdvDahil = projeKdvHaric + projeKdv
-    // Firma seviyesinde (tum projeler icin varsayilan olarak: N proje ayni degisken)
-    const firmaKdvHaric = SABIT_TOPLAM + projeDegisken * p
-    const firmaKdv = firmaKdvHaric * KDV_ORAN
-    const firmaKdvDahil = firmaKdvHaric + firmaKdv
-    // Sinirsiz esik firma seviyesindeki toplam ile karsilastirilir
-    const sinirsizPct = Math.min(100, (firmaKdvHaric / SINIRSIZ_ESIK) * 100)
-    const sinirsizUzerinde = firmaKdvHaric > SINIRSIZ_ESIK
+    // Sabit maliyet firma seviyesinde tek — proje bazli hesapta doğrudan eklenmez;
+    // sadece bilgi olarak yandaki notta gorunur. Toplam sadece degisken + KDV.
+    const kdvHaric = projeDegisken
+    const kdv = kdvHaric * KDV_ORAN
+    const kdvDahil = kdvHaric + kdv
     return {
-      u, l, p,
+      u, l,
       kullaniciMaliyeti, lokasyonMaliyeti, projeDegisken,
-      sabitPay,
-      projeKdvHaric, projeKdv, projeKdvDahil,
-      firmaKdvHaric, firmaKdv, firmaKdvDahil,
-      sinirsizPct, sinirsizUzerinde,
+      kdvHaric, kdv, kdvDahil,
     }
-  }, [kullaniciSayisi, lokasyonSayisi, projeSayisi])
+  }, [kullaniciSayisi, lokasyonSayisi])
+
+  // ─── SEKME 2: Firma analizi verisi ───────────────────────────────────
+  const [analiz, setAnaliz] = useState<FirmaAnaliziResp | null>(null)
+  const [analizLoading, setAnalizLoading] = useState(false)
+  const [analizHata, setAnalizHata] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (tab !== 'analiz' || !firmaId) return
+    let iptal = false
+    ;(async () => {
+      setAnalizLoading(true)
+      setAnalizHata(null)
+      try {
+        const res = await fetch(`/api/sa/ucretlendirme/firma-analizi?firma_id=${firmaId}`, { cache: 'no-store' })
+        const j = await res.json()
+        if (iptal) return
+        if (!j.ok) throw new Error(j.error ?? 'Analiz verisi alınamadı')
+        setAnaliz(j as FirmaAnaliziResp)
+      } catch (e: any) {
+        if (!iptal) setAnalizHata(e?.message ?? 'Bilinmeyen hata')
+      } finally {
+        if (!iptal) setAnalizLoading(false)
+      }
+    })()
+    return () => { iptal = true }
+  }, [tab, firmaId])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
+      {/* SEKME ÇUBUĞU */}
+      <div style={{
+        display: 'flex', gap: 4, borderBottom: `2px solid ${T.border}`,
+        paddingBottom: 0, marginBottom: 4,
+      }}>
+        <TabBtn active={tab === 'politika'} onClick={() => setTab('politika')} icon={<TrendingUp size={16} />}>
+          Genel Politika
+        </TabBtn>
+        <TabBtn active={tab === 'analiz'} onClick={() => setTab('analiz')} icon={<FolderKanban size={16} />}>
+          Firma Analizi
+        </TabBtn>
+      </div>
+
+      {tab === 'politika' && (<>
       {/* HERO */}
       <div style={{
         background: `linear-gradient(135deg, ${T.blue} 0%, ${T.purple} 100%)`,
@@ -227,14 +275,14 @@ export default function UcretlendirmePolitikasiClient() {
         </div>
       </div>
 
-      {/* HESAP MAKİNESİ */}
+      {/* HESAP MAKİNESİ — proje bazli */}
       <div>
-        <SectionTitle icon={<Calculator size={18} color={T.slate} />}>Aylık Maliyet Hesaplayıcı</SectionTitle>
+        <SectionTitle icon={<Calculator size={18} color={T.slate} />}>Proje Bazlı Aylık Maliyet Hesaplayıcı</SectionTitle>
         <div className="verde-card" style={{ padding: 24 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18, marginBottom: 20 }}>
             <div>
               <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
-                Kullanıcı Sayısı <span style={{ textTransform: 'none', fontWeight: 500, opacity: 0.7 }}>(proje)</span>
+                Proje Kullanıcı Sayısı
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Users size={22} color={T.blue} />
@@ -250,7 +298,7 @@ export default function UcretlendirmePolitikasiClient() {
             </div>
             <div>
               <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
-                Lokasyon (QR) Sayısı <span style={{ textTransform: 'none', fontWeight: 500, opacity: 0.7 }}>(proje)</span>
+                Proje Lokasyon (QR) Sayısı
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <MapPin size={22} color={T.purple} />
@@ -264,92 +312,37 @@ export default function UcretlendirmePolitikasiClient() {
                 × {fmtTL(FIYAT_LOKASYON)} = <strong style={{ color: T.purple, fontSize: 15 }}>{fmtTL(hesap.lokasyonMaliyeti)}</strong>
               </div>
             </div>
+          </div>
+
+          {/* Ozet tablo */}
+          <div style={{ background: T.blueLight, borderRadius: 12, padding: 18, border: `1px solid ${T.blue}33` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 14, fontWeight: 800, color: T.blue, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <Calculator size={17} />
+              Proje Aylık Maliyeti
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
+              <tbody>
+                <OzetSatir label="Kullanıcı Maliyeti" tutar={hesap.kullaniciMaliyeti} muted />
+                <OzetSatir label="Lokasyon (QR) Maliyeti" tutar={hesap.lokasyonMaliyeti} muted />
+                <OzetSatir label="AYLIK TOPLAM (KDV HARİÇ)" tutar={hesap.kdvHaric} bold highlight />
+                <OzetSatir label={`KDV (%${KDV_ORAN * 100})`} tutar={hesap.kdv} muted />
+                <OzetSatir label="AYLIK TOPLAM (KDV DAHİL)" tutar={hesap.kdvDahil} bold highlight2 />
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{
+            marginTop: 14, padding: '12px 16px', background: T.amberLight,
+            border: `1px solid ${T.amber}`, borderRadius: 10,
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+            fontSize: 13.5, color: '#78350f', lineHeight: 1.55,
+          }}>
+            <Info size={18} color={T.amber} style={{ flexShrink: 0, marginTop: 1 }} />
             <div>
-              <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
-                Firmada Toplam Proje Sayısı
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Layers size={22} color={T.slate} />
-                <input
-                  type="number" min={1} value={projeSayisi}
-                  onChange={e => setProjeSayisi(parseInt(e.target.value) || 1)}
-                  style={inputStyle}
-                />
-              </div>
-              <div style={{ fontSize: 14, color: T.textSoft, marginTop: 6 }}>
-                Sabit ÷ {hesap.p} = <strong style={{ color: T.slate, fontSize: 15 }}>{fmtTL(hesap.sabitPay)}</strong> / proje
-              </div>
+              Sabit maliyet ({fmtTL(SABIT_TOPLAM)}) firma seviyesinde tek ödenir ve
+              projelere <strong>kullanıcı + lokasyon oranı</strong> ile paylaştırılır. Her projenin
+              gerçek sabit maliyet payını <strong>Firma Analizi</strong> sekmesinden görebilirsiniz.
             </div>
-          </div>
-
-          {/* İki panel: Proje bazlı + Firma toplamı */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 18 }}>
-            {/* Sol: Proje bazlı */}
-            <div style={{ background: T.blueLight, borderRadius: 12, padding: 18, border: `1px solid ${T.blue}33` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 14, fontWeight: 800, color: T.blue, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <Calculator size={17} />
-                Proje Bazlı Aylık Maliyet
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
-                <tbody>
-                  <OzetSatir label={`Sabit Pay (${hesap.p} projeye bölünmüş)`} tutar={hesap.sabitPay} muted />
-                  <OzetSatir label="Kullanıcı Maliyeti" tutar={hesap.kullaniciMaliyeti} muted />
-                  <OzetSatir label="Lokasyon (QR) Maliyeti" tutar={hesap.lokasyonMaliyeti} muted />
-                  <OzetSatir label="Proje Değişken Ara Toplam" tutar={hesap.projeDegisken} border />
-                  <OzetSatir label="PROJE TOPLAMI (KDV HARİÇ)" tutar={hesap.projeKdvHaric} bold highlight />
-                  <OzetSatir label={`KDV (%${KDV_ORAN * 100})`} tutar={hesap.projeKdv} muted />
-                  <OzetSatir label="PROJE TOPLAMI (KDV DAHİL)" tutar={hesap.projeKdvDahil} bold highlight2 />
-                </tbody>
-              </table>
-            </div>
-            {/* Sağ: Firma toplamı */}
-            <div style={{ background: '#faf5ff', borderRadius: 12, padding: 18, border: `1px solid ${T.purple}33` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 14, fontWeight: 800, color: T.purple, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <Building2 size={17} />
-                Firma Toplamı (Tüm Projeler)
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
-                <tbody>
-                  <OzetSatir label="Sabit Maliyet (firma tek)" tutar={SABIT_TOPLAM} muted />
-                  <OzetSatir label={`Değişken × ${hesap.p} proje`} tutar={hesap.projeDegisken * hesap.p} muted />
-                  <OzetSatir label="FİRMA TOPLAMI (KDV HARİÇ)" tutar={hesap.firmaKdvHaric} bold highlight />
-                  <OzetSatir label={`KDV (%${KDV_ORAN * 100})`} tutar={hesap.firmaKdv} muted />
-                  <OzetSatir label="FİRMA TOPLAMI (KDV DAHİL)" tutar={hesap.firmaKdvDahil} bold highlight2 />
-                </tbody>
-              </table>
-              <div style={{ marginTop: 10, fontSize: 12.5, color: T.textSoft, fontStyle: 'italic' }}>
-                * Değişken tutar tüm projelerin aynı boyutta olduğu varsayımıyla gösterilir. Gerçekte her proje kendi kullanıcı/lokasyon adediyle hesaplanır.
-              </div>
-            </div>
-          </div>
-
-          {/* Sınırsız eşik barı — firma toplamı üzerinden */}
-          <div style={{ marginTop: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8, color: T.textSoft }}>
-              <span>Sınırsız Eşiğe Yakınlık <strong style={{ color: T.slate }}>(firma toplamı)</strong></span>
-              <strong style={{ color: hesap.sinirsizUzerinde ? T.green : T.slate, fontSize: 15 }}>
-                %{hesap.sinirsizPct.toFixed(1)}
-              </strong>
-            </div>
-            <div style={{ height: 14, borderRadius: 999, background: T.slateLight, overflow: 'hidden' }}>
-              <div style={{
-                width: `${hesap.sinirsizPct}%`, height: '100%',
-                background: hesap.sinirsizUzerinde
-                  ? `linear-gradient(90deg, ${T.green}, ${T.blue})`
-                  : `linear-gradient(90deg, ${T.blue}, ${T.purple})`,
-                transition: 'width 0.3s ease',
-              }} />
-            </div>
-            {hesap.sinirsizUzerinde && (
-              <div style={{
-                marginTop: 12, padding: '12px 18px', background: T.greenLight,
-                border: `1px solid ${T.green}`, borderRadius: 10, color: '#065f46', fontSize: 15,
-                display: 'flex', alignItems: 'center', gap: 10,
-              }}>
-                <InfinityIcon size={20} />
-                <span>Bu firma <strong>sınırsız kullanım eşiğinin üzerinde</strong> — sınırsız plan avantajı devreye girer.</span>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -371,7 +364,239 @@ export default function UcretlendirmePolitikasiClient() {
           </ul>
         </div>
       </div>
+      </>)}
+
+      {tab === 'analiz' && (
+        <FirmaAnaliziSekmesi
+          firmaId={firmaId}
+          analiz={analiz}
+          loading={analizLoading}
+          hata={analizHata}
+        />
+      )}
     </div>
+  )
+}
+
+// ─── SEKME 2: Firma Analizi ─────────────────────────────────────────────────
+
+function FirmaAnaliziSekmesi({
+  firmaId, analiz, loading, hata,
+}: {
+  firmaId: string | null
+  analiz: FirmaAnaliziResp | null
+  loading: boolean
+  hata: string | null
+}) {
+  // Sabit maliyet paylasimi: her projenin (kullanici + lokasyon) unite payi
+  // Aslinda yalniz adet toplami adil degil (lokasyon 4x maliyetli) — bu yuzden
+  // "birim maliyet agirlikli" (kullanici×20 + lokasyon×80) oran kullanilir.
+  const projelerHesap = useMemo(() => {
+    if (!analiz) return []
+    const firmaTopBirim = analiz.projeler.reduce(
+      (s, p) => s + p.kullanici_sayisi * FIYAT_KULLANICI + p.lokasyon_sayisi * FIYAT_LOKASYON,
+      0
+    )
+    return analiz.projeler.map(p => {
+      const kulMaliyet = p.kullanici_sayisi * FIYAT_KULLANICI
+      const lokMaliyet = p.lokasyon_sayisi * FIYAT_LOKASYON
+      const degisken = kulMaliyet + lokMaliyet
+      const sabitPayOran = firmaTopBirim > 0 ? degisken / firmaTopBirim : 0
+      const sabitPay = SABIT_TOPLAM * sabitPayOran
+      const kdvHaric = degisken + sabitPay
+      const kdv = kdvHaric * KDV_ORAN
+      const kdvDahil = kdvHaric + kdv
+      return {
+        ...p,
+        kulMaliyet, lokMaliyet, degisken,
+        sabitPayOran, sabitPay,
+        kdvHaric, kdv, kdvDahil,
+      }
+    })
+  }, [analiz])
+
+  const firmaToplam = useMemo(() => {
+    const t = projelerHesap.reduce((acc, p) => ({
+      kullanici: acc.kullanici + p.kullanici_sayisi,
+      lokasyon: acc.lokasyon + p.lokasyon_sayisi,
+      kulMaliyet: acc.kulMaliyet + p.kulMaliyet,
+      lokMaliyet: acc.lokMaliyet + p.lokMaliyet,
+      degisken: acc.degisken + p.degisken,
+      sabitPay: acc.sabitPay + p.sabitPay,
+      kdvHaric: acc.kdvHaric + p.kdvHaric,
+      kdv: acc.kdv + p.kdv,
+      kdvDahil: acc.kdvDahil + p.kdvDahil,
+    }), { kullanici: 0, lokasyon: 0, kulMaliyet: 0, lokMaliyet: 0, degisken: 0, sabitPay: 0, kdvHaric: 0, kdv: 0, kdvDahil: 0 })
+    return t
+  }, [projelerHesap])
+
+  if (!firmaId) {
+    return (
+      <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: T.textSoft, fontSize: 15 }}>
+        <Building2 size={40} color={T.border} style={{ marginBottom: 12 }} />
+        <div>Analiz için üst bardan bir firma seçin.</div>
+      </div>
+    )
+  }
+  if (loading) {
+    return (
+      <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: T.textSoft, fontSize: 15 }}>
+        <Loader2 size={28} className="animate-spin" style={{ animation: 'spin 0.8s linear infinite', marginBottom: 10 }} />
+        <div>Firma analizi hazırlanıyor…</div>
+      </div>
+    )
+  }
+  if (hata) {
+    return (
+      <div className="verde-card" style={{ padding: 24, border: `1px solid ${T.red}`, background: T.redLight, color: '#7f1d1d', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <AlertCircle size={22} color={T.red} style={{ flexShrink: 0 }} />
+        <div>
+          <strong>Analiz yüklenemedi</strong>
+          <div style={{ fontSize: 13.5, marginTop: 4 }}>{hata}</div>
+        </div>
+      </div>
+    )
+  }
+  if (!analiz) return null
+
+  return (
+    <>
+      {/* Firma özet kartı */}
+      <div style={{
+        background: `linear-gradient(135deg, ${T.blue} 0%, ${T.purple} 100%)`,
+        borderRadius: 16, padding: '24px 28px', color: '#fff',
+        boxShadow: '0 10px 25px -6px rgba(29, 78, 216, 0.4)',
+        display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap',
+      }}>
+        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 14, padding: 14, display: 'inline-flex' }}>
+          <Building2 size={40} color="#fff" strokeWidth={2.2} />
+        </div>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontSize: 13, opacity: 0.85, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}>
+            Firma Analizi
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+            {analiz.firma.ad}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+          <MetrikMini ikon={<FolderKanban size={18} />} etiket="Proje" deger={analiz.firmaToplam.projeSayisi} />
+          <MetrikMini ikon={<Users size={18} />} etiket="Kullanıcı" deger={analiz.firmaToplam.kullanici} />
+          <MetrikMini ikon={<MapPin size={18} />} etiket="Lokasyon" deger={analiz.firmaToplam.lokasyon} />
+        </div>
+      </div>
+
+      {/* Projeler tablosu */}
+      <div>
+        <SectionTitle icon={<FolderKanban size={18} color={T.slate} />}>Proje Bazlı Maliyet Analizi</SectionTitle>
+        <div className="verde-card" style={{ padding: 0, overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 1100 }}>
+            <thead>
+              <tr style={{ background: T.slate, color: '#fff' }}>
+                <Th>Proje</Th>
+                <Th align="right">Kullanıcı</Th>
+                <Th align="right">Lokasyon</Th>
+                <Th align="right">Kullanıcı Maliyeti</Th>
+                <Th align="right">Lokasyon Maliyeti</Th>
+                <Th align="right">Değişken Toplam</Th>
+                <Th align="right">Sabit Pay (%)</Th>
+                <Th align="right">Sabit Payı</Th>
+                <Th align="right">KDV Hariç</Th>
+                <Th align="right">KDV Dahil</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {projelerHesap.length === 0 && (
+                <tr>
+                  <td colSpan={10} style={{ padding: 40, textAlign: 'center', color: T.textSoft }}>
+                    Bu firmaya ait proje kaydı bulunamadı.
+                  </td>
+                </tr>
+              )}
+              {projelerHesap.map((p, i) => {
+                const isProjesiz = p.id === '__projesiz__'
+                return (
+                  <tr key={p.id} style={{
+                    background: i % 2 === 0 ? '#fff' : T.slateLight,
+                    opacity: isProjesiz || !p.aktif ? 0.75 : 1,
+                  }}>
+                    <Td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <strong style={{ color: isProjesiz ? T.textSoft : T.text, fontSize: 15 }}>{p.ad}</strong>
+                        {!p.aktif && !isProjesiz && (
+                          <span style={{ padding: '2px 6px', borderRadius: 999, background: '#fee2e2', color: '#991b1b', fontSize: 10, fontWeight: 700 }}>PASİF</span>
+                        )}
+                        {isProjesiz && (
+                          <span style={{ padding: '2px 6px', borderRadius: 999, background: '#e0e7ff', color: '#3730a3', fontSize: 10, fontWeight: 700 }}>ATANMAMIŞ</span>
+                        )}
+                      </div>
+                    </Td>
+                    <Td align="right" mono>{p.kullanici_sayisi}</Td>
+                    <Td align="right" mono>{p.lokasyon_sayisi}</Td>
+                    <Td align="right" mono>{fmtTL(p.kulMaliyet)}</Td>
+                    <Td align="right" mono>{fmtTL(p.lokMaliyet)}</Td>
+                    <Td align="right" mono bold>{fmtTL(p.degisken)}</Td>
+                    <Td align="right" mono muted small>%{(p.sabitPayOran * 100).toFixed(1)}</Td>
+                    <Td align="right" mono>{fmtTL(p.sabitPay)}</Td>
+                    <Td align="right" mono bold style={{ color: T.blue }}>{fmtTL(p.kdvHaric)}</Td>
+                    <Td align="right" mono bold style={{ color: T.green, fontSize: 15 }}>{fmtTL(p.kdvDahil)}</Td>
+                  </tr>
+                )
+              })}
+              {projelerHesap.length > 0 && (
+                <tr style={{ background: T.blueLight, borderTop: `3px solid ${T.blue}` }}>
+                  <Td bold><span style={{ color: T.blue, fontSize: 15 }}>FİRMA TOPLAMI</span></Td>
+                  <Td align="right" mono bold>{firmaToplam.kullanici}</Td>
+                  <Td align="right" mono bold>{firmaToplam.lokasyon}</Td>
+                  <Td align="right" mono bold>{fmtTL(firmaToplam.kulMaliyet)}</Td>
+                  <Td align="right" mono bold>{fmtTL(firmaToplam.lokMaliyet)}</Td>
+                  <Td align="right" mono bold>{fmtTL(firmaToplam.degisken)}</Td>
+                  <Td align="right" mono muted small>%100</Td>
+                  <Td align="right" mono bold>{fmtTL(firmaToplam.sabitPay)}</Td>
+                  <Td align="right" mono bold style={{ color: T.blue, fontSize: 16 }}>{fmtTL(firmaToplam.kdvHaric)}</Td>
+                  <Td align="right" mono bold style={{ color: T.green, fontSize: 17 }}>{fmtTL(firmaToplam.kdvDahil)}</Td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <p style={{ margin: '10px 4px 0', fontSize: 13, color: T.textSoft, fontStyle: 'italic' }}>
+          * Sabit maliyet ({fmtTL(SABIT_TOPLAM)}) firma seviyesinde tektir. Her projeye,
+          projenin değişken maliyet ağırlığı ({'kullanıcı × ' + FIYAT_KULLANICI + ' + lokasyon × ' + FIYAT_LOKASYON})
+          firma toplam değişken maliyeti içindeki payı oranında dağıtılır.
+        </p>
+      </div>
+    </>
+  )
+}
+
+function MetrikMini({ ikon, etiket, deger }: { ikon: React.ReactNode; etiket: string; deger: number }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: 0.85, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {ikon}
+        <span>{etiket}</span>
+      </div>
+      <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em' }}>{deger}</div>
+    </div>
+  )
+}
+
+function TabBtn({ active, onClick, icon, children }: {
+  active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode
+}) {
+  return (
+    <button onClick={onClick} style={{
+      padding: '12px 20px', fontSize: 15, fontWeight: 700,
+      background: 'transparent', border: 'none', cursor: 'pointer',
+      borderBottom: active ? `3px solid ${T.blue}` : '3px solid transparent',
+      color: active ? T.blue : T.textSoft, marginBottom: -2,
+      display: 'flex', alignItems: 'center', gap: 8,
+      transition: 'color 0.15s',
+    }}>
+      {icon}
+      {children}
+    </button>
   )
 }
 
