@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { assertModulYetkisi } from '@/lib/modul/serverYetki'
 import { getFirmaModulDurumu } from '@/lib/firmalar/modulDurumu'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -90,48 +91,64 @@ export async function GET(req: NextRequest) {
   }
 
   // 1) Aktif gorevler için metadata (aralık) — 2 step (PostgREST nested embed bu tabloda güvenilmez)
-  const { data: metaRows, error: metaErr } = await admin
-    .from('oto_yikama_gorev_metadata')
-    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar')
-    .gte('hedef_tarih', baslangic)
-    .lte('hedef_tarih', bitis)
-  if (metaErr) return NextResponse.json({ ok: false, error: metaErr.message }, { status: 500 })
+  // fetchAll ile 1000+ satır destegi (PostgREST default max_rows cap'i asilir).
+  let metaArr: any[]
+  try {
+    metaArr = await fetchAll<any>(() => admin
+      .from('oto_yikama_gorev_metadata')
+      .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar')
+      .gte('hedef_tarih', baslangic)
+      .lte('hedef_tarih', bitis)
+      .order('gorev_id', { ascending: true })
+    )
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? 'metadata sorgusu basarisiz' }, { status: 500 })
+  }
 
-  const metaArr = (metaRows ?? []) as any[]
   const gorevIds = metaArr.map(m => m.gorev_id).filter(Boolean) as string[]
 
-  let gorevlerRows: any[] = []
+  // .in('id', gorevIds) URL'yi sisirebilir (500+ ID = 20KB+ URL, Cloudflare 431).
+  // 500'luk chunk'lar halinde parcala.
+  const gorevMap = new Map<string, any>()
   if (gorevIds.length > 0) {
-    const { data, error } = await admin
-      .from('gorevler')
-      .select(`
-        id, durum, firma_id, lokasyon_id,
-        baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
-        olusturan_id, islemi_yapan_id, iptal_sebep
-      `)
-      .eq('firma_id', firmaId)
-      .in('id', gorevIds)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-    gorevlerRows = data ?? []
+    const CHUNK = 500
+    for (let i = 0; i < gorevIds.length; i += CHUNK) {
+      const slice = gorevIds.slice(i, i + CHUNK)
+      const { data, error } = await admin
+        .from('gorevler')
+        .select(`
+          id, durum, firma_id, lokasyon_id,
+          baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
+          olusturan_id, islemi_yapan_id, iptal_sebep
+        `)
+        .eq('firma_id', firmaId)
+        .in('id', slice)
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      for (const g of (data ?? []) as any[]) gorevMap.set(g.id, g)
+    }
   }
-  const gorevMap = new Map(gorevlerRows.map((g: any) => [g.id, g]))
 
   // Sadece firma scope'una düşen metadata'ları al
   const aktifMeta = metaArr.filter(m => gorevMap.has(m.gorev_id))
 
-  // 2) Arşiv (zaten firma_id taşır, tek sorgu)
-  const { data: arsivRows, error: arsivErr } = await admin
-    .from('oto_yikama_arsiv')
-    .select(`
-      gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, durum, lokasyon_id,
-      baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
-      olusturan_id, islemi_yapan_id, iptal_sebep, km, notlar
-    `)
-    .eq('firma_id', firmaId)
-    .gte('hedef_tarih', baslangic)
-    .lte('hedef_tarih', bitis)
-  if (arsivErr) return NextResponse.json({ ok: false, error: arsivErr.message }, { status: 500 })
-  const arsivArr = (arsivRows ?? []) as any[]
+  // 2) Arşiv (zaten firma_id taşır) — fetchAll pagination ile 1000+ satir destegi
+  let arsivArr: any[]
+  try {
+    arsivArr = await fetchAll<any>(() => admin
+      .from('oto_yikama_arsiv')
+      .select(`
+        gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, durum, lokasyon_id,
+        baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
+        olusturan_id, islemi_yapan_id, iptal_sebep, km, notlar
+      `)
+      .eq('firma_id', firmaId)
+      .gte('hedef_tarih', baslangic)
+      .lte('hedef_tarih', bitis)
+      .order('gorev_id', { ascending: true })
+    )
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? 'arsiv sorgusu basarisiz' }, { status: 500 })
+  }
 
   // 3) Aktif araçlar — tahmin için
   const { data: aracRows, error: aracErr } = await admin
