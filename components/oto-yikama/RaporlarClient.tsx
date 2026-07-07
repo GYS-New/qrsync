@@ -405,17 +405,17 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
               </div>
             </div>
 
-            {/* Personel + Plaka top — tek kart içinde 2 kolon, PDF'ten gizli */}
+            {/* İstasyon + Plaka top — tek kart içinde 2 kolon, PDF'ten gizli */}
             <div className="verde-card pdf-card pdf-hide" style={{ padding: 12, gridColumn: '1 / -1' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
-                  <Baslik>Personel Bazlı Yıkama (Top 10)</Baslik>
+                  <Baslik>İstasyon Bazlı Yıkama (Top 10)</Baslik>
                   <div style={{ height: 200 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={agg.personel_top} layout="vertical" margin={{ top: 4, right: 18, left: 110, bottom: 4 }}>
+                      <BarChart data={agg.lokasyon_dagilim.slice(0, 10)} layout="vertical" margin={{ top: 4, right: 18, left: 110, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fontWeight: 600 }} />
-                        <YAxis type="category" dataKey="personel" interval={0}
+                        <YAxis type="category" dataKey="lokasyon" interval={0}
                           tick={{ fontSize: 12, fontWeight: 600 }} width={110}
                           tickFormatter={t => t.length > 16 ? `${t.slice(0, 16)}…` : t} />
                         <Tooltip />
