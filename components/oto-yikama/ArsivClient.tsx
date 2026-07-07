@@ -221,7 +221,7 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
           <Pill label="Tamamlandı" sayi={sayilar.TAMAMLANDI} renk={T.green}   aktif={durumFilter === 'TAMAMLANDI'} onClick={() => setDurumFilter('TAMAMLANDI')} />
           <Pill label="İptal"      sayi={sayilar.IPTAL}      renk={T.red}     aktif={durumFilter === 'IPTAL'}      onClick={() => setDurumFilter('IPTAL')} />
           <Pill label="Yapılamadı" sayi={sayilar.YAPILAMADI} renk={'#991b1b'} aktif={durumFilter === 'YAPILAMADI'} onClick={() => setDurumFilter('YAPILAMADI')} />
-          <Pill label="Ekstra"     sayi={sayilar.EKSTRA}     renk={T.purple}  aktif={durumFilter === 'EKSTRA'}     onClick={() => setDurumFilter('EKSTRA')} />
+          <Pill label="Plansız"    sayi={sayilar.EKSTRA}     renk={T.purple}  aktif={durumFilter === 'EKSTRA'}     onClick={() => setDurumFilter('EKSTRA')} />
         </div>
       </div>
 
@@ -336,7 +336,7 @@ export default function ArsivClient({ kayitlar, istasyonlar, tamamlayanlar }: Pr
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
                         {k.ekstra && (
-                          <span style={{ padding: '1px 5px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>EKSTRA</span>
+                          <span style={{ padding: '1px 5px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>PLANSIZ</span>
                         )}
                       </div>
                     </Td>

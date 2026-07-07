@@ -347,7 +347,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                 onClick={() => setFiltre(filtre === 'IPTAL' ? 'TUMU' : 'IPTAL')} />
         <KpiPil renk={'#991b1b'}   etiket="yapılamadı" sayi={sayilar.yapilamadi} active={filtre === 'YAPILAMADI'}
                 onClick={() => setFiltre(filtre === 'YAPILAMADI' ? 'TUMU' : 'YAPILAMADI')} />
-        <KpiPil renk={T.purple}    etiket="ekstra"     sayi={sayilar.ekstra}   active={filtre === 'EKSTRA'}
+        <KpiPil renk={T.purple}    etiket="plansız"    sayi={sayilar.ekstra}   active={filtre === 'EKSTRA'}
                 onClick={() => setFiltre(filtre === 'EKSTRA' ? 'TUMU' : 'EKSTRA')} />
       </div>
 
@@ -425,7 +425,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
             <option value="TAMAMLANDI">Tamamlandı</option>
             <option value="IPTAL">İptal</option>
             <option value="YAPILAMADI">Yapılamadı</option>
-            <option value="EKSTRA">Ekstra</option>
+            <option value="EKSTRA">Plansız</option>
           </select>
         </FilterField>
       </div>
@@ -477,7 +477,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
                         {k.ekstra && (
-                          <span style={{ padding: '1px 5px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>EKSTRA</span>
+                          <span style={{ padding: '1px 5px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>PLANSIZ</span>
                         )}
                       </div>
                     </Td>

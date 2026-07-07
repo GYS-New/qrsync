@@ -331,7 +331,7 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
                         {r.plaka}
                         {r.ekstra && (
                           <span style={{ padding: '2px 7px', borderRadius: 999, background: '#fde68a', color: '#92400e', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em' }}>
-                            EKSTRA
+                            PLANSIZ
                           </span>
                         )}
                       </span>

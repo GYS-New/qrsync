@@ -36,24 +36,43 @@ export default async function OtoYikamaGorevKayitlariPage() {
       istasyonlar = (istLoks ?? []).map((l: any) => ({ id: l.id, tanim: l.tanim }))
     }
 
-    // İki ayrı sorgu + client-side join — PostgREST nested embed'i bu tabloda
-    // (FK relationship cache nedeniyle) güvenilir değil.
-    // 1) Tüm metadata kayıtlarını çek (arac_id de — departman/yikama_gunleri için)
+    // 1) Metadata + arac bilgisi tek sorguda — araclar!inner(firma_id) ile
+    //    firma filter erken uygulanir. Metadata tablosunda firma_id yok, ama
+    //    arac_id → araclar → firma_id FK zinciri var. Bu sayede tum firmalarin
+    //    metadata'si degil, sadece bu firma'ninkiler gelir. Ayrica araclar bilgisi
+    //    (departman, yikama_gunleri, kullanici_adi_soyadi) da embed'den okunur —
+    //    ayri sorguya gerek kalmaz.
     const { data: metaAll } = await admin
       .from('oto_yikama_gorev_metadata')
-      .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar')
+      .select(`
+        gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar,
+        arac:arac_id!inner(firma_id, departman, yikama_gunleri, kullanici_adi_soyadi)
+      `)
+      .eq('arac.firma_id', firmaId)
       .order('hedef_tarih', { ascending: false })
       .limit(2000)
     const metaArr = (metaAll ?? []) as any[]
-    const allGorevIds = metaArr.map(m => m.gorev_id).filter(Boolean)
-    const allAracIds = [...new Set(metaArr.map(m => m.arac_id).filter(Boolean))] as string[]
+    const allGorevIds = metaArr.map(m => m.gorev_id).filter(Boolean) as string[]
 
-    // 2) Firma scope'lu gorevler — yalnız metadata'lı olanlar
+    // Aracmap embed'den doldur — ayri sorguya gerek yok
+    const aracMap = new Map<string, any>()
+    for (const m of metaArr) {
+      if (m.arac_id && m.arac) aracMap.set(m.arac_id, m.arac)
+    }
+
+    // 2) Firma scope'lu gorevler — .in(id, N-UUIDs) URL'yi sisirir; 500+ UUID
+    //    ~18KB olur, Cloudflare 8KB HTTP request-line limitini asar. Supabase
+    //    'TypeError: fetch failed' doner (undici socket kesildi) ve sayfa BOS
+    //    gelir. 100'luk chunk'la parcala (100 UUID ~3.7KB — guvenli marj).
     // NOT: gorevler tablosunda tamamlayan/iptal_eden için ayrı kolon yok;
     //      durum değişimini yapan kişi islemi_yapan_id'de tutuluyor.
     //      TAMAMLANDI → tamamlayan, IPTAL → iptal eden olarak yorumlanır.
-    const { data: gorevlerData } = allGorevIds.length > 0
-      ? await admin
+    const gorevMap = new Map<string, any>()
+    if (allGorevIds.length > 0) {
+      const CHUNK = 100
+      for (let i = 0; i < allGorevIds.length; i += CHUNK) {
+        const slice = allGorevIds.slice(i, i + CHUNK)
+        const { data } = await admin
           .from('gorevler')
           .select(`
             id, tanim, durum, firma_id, lokasyon_id,
@@ -63,9 +82,10 @@ export default async function OtoYikamaGorevKayitlariPage() {
             iptal_sebep, durum_sebep
           `)
           .eq('firma_id', firmaId)
-          .in('id', allGorevIds)
-      : { data: [] as any[] }
-    const gorevMap = new Map(((gorevlerData ?? []) as any[]).map((g: any) => [g.id, g]))
+          .in('id', slice)
+        for (const g of ((data ?? []) as any[])) gorevMap.set(g.id, g)
+      }
+    }
 
     // 3) Sadece bu firma'ya ait metadata'ları al
     const arr = metaArr.filter(m => gorevMap.has(m.gorev_id))
@@ -76,20 +96,17 @@ export default async function OtoYikamaGorevKayitlariPage() {
     }).filter(Boolean))] as string[]
     const lokIds = [...new Set(arr.map(m => gorevMap.get(m.gorev_id)?.lokasyon_id).filter(Boolean))] as string[]
 
-    const [usersRes, loksRes, araclarRes] = await Promise.all([
+    const [usersRes, loksRes] = await Promise.all([
       userIds.length > 0
         ? admin.from('users').select('id, isim_soyisim').in('id', userIds)
         : Promise.resolve({ data: [] as any[] }),
       lokIds.length > 0
         ? admin.from('lokasyonlar').select('id, tanim, parent_id').in('id', lokIds)
         : Promise.resolve({ data: [] as any[] }),
-      allAracIds.length > 0
-        ? admin.from('araclar').select('id, departman, yikama_gunleri, kullanici_adi_soyadi').in('id', allAracIds)
-        : Promise.resolve({ data: [] as any[] }),
     ])
     const userMap = new Map(((usersRes.data ?? []) as any[]).map(u => [u.id, u.isim_soyisim ?? '—']))
     const lokMap  = new Map(((loksRes.data ?? []) as any[]).map(l => [l.id, l.tanim ?? '—']))
-    const aracMap = new Map(((araclarRes.data ?? []) as any[]).map(a => [a.id, a]))
+    // aracMap yukarida embed'den doldurulmustu
 
     kayitlar = arr.map(m => {
       const g = gorevMap.get(m.gorev_id) ?? {} as any

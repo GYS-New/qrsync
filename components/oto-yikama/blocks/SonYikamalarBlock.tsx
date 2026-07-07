@@ -103,7 +103,7 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     {r.plaka}
                     {r.ekstra && (
-                      <span style={{ padding: '1px 6px', borderRadius: 999, background: '#fef3c7', color: '#92400e', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>EKSTRA</span>
+                      <span style={{ padding: '1px 6px', borderRadius: 999, background: '#fef3c7', color: '#92400e', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>PLANSIZ</span>
                     )}
                   </span>
                 </Td>
