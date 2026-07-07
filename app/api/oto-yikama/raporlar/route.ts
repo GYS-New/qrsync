@@ -55,7 +55,22 @@ export async function GET(req: NextRequest) {
   const lokasyonId = sp.get('lokasyon_id') || null
   const tip = sp.get('tip') || ''
 
-  // 1) Metadata: tarih aralığında kayıtlar
+  // 1) Hedef: aralikta planlanan (ekstra=false) toplam gorev sayisi — durumdan
+  //    bagimsiz. Metadata'da firma_id yok, araclar embed ile filtreleniyor.
+  //    personel/lokasyon/tip filter'lari hedefi bozmasin — sadece plaka uygulanir.
+  //    Erken return'lerde de dogru hedef donsun diye en basa cekildi.
+  let hedefQ = admin
+    .from('oto_yikama_gorev_metadata')
+    .select('gorev_id, arac:arac_id!inner(firma_id)', { count: 'exact', head: true })
+    .eq('ekstra', false)
+    .gte('hedef_tarih', baslangic)
+    .lte('hedef_tarih', bitis)
+    .eq('arac.firma_id', firmaId)
+  if (plaka) hedefQ = hedefQ.eq('plaka_snapshot', plaka)
+  const { count: hedefCount } = await hedefQ
+  const hedef = hedefCount ?? 0
+
+  // 2) Metadata: tarih aralığında kayıtlar
   let metaQ = admin
     .from('oto_yikama_gorev_metadata')
     .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra')
@@ -68,12 +83,12 @@ export async function GET(req: NextRequest) {
   const { data: metaRows, error: metaErr } = await metaQ
   if (metaErr) return NextResponse.json({ ok: false, error: metaErr.message }, { status: 500 })
   if (!metaRows || metaRows.length === 0) {
-    return NextResponse.json({ ok: true, baslangic, bitis, data: [], agg: emptyAgg() })
+    return NextResponse.json({ ok: true, baslangic, bitis, data: [], agg: emptyAgg(hedef) })
   }
 
   const gorevIds = metaRows.map(m => m.gorev_id)
 
-  // 2) Gorevler — sadece TAMAMLANDI olanlar + firma filtresi
+  // 3) Gorevler — sadece TAMAMLANDI olanlar + firma filtresi
   let gQ = admin
     .from('gorevler')
     .select(`
@@ -88,7 +103,7 @@ export async function GET(req: NextRequest) {
   if (personelId) gQ = gQ.eq('islemi_yapan_id', personelId)
   const { data: gorevler } = await gQ
   if (!gorevler || gorevler.length === 0) {
-    return NextResponse.json({ ok: true, baslangic, bitis, data: [], agg: emptyAgg() })
+    return NextResponse.json({ ok: true, baslangic, bitis, data: [], agg: emptyAgg(hedef) })
   }
 
   const gMap = new Map((gorevler as any[]).map((g: any) => [g.id, g]))
@@ -143,8 +158,9 @@ export async function GET(req: NextRequest) {
     })
     .sort((a, b) => (b.tamamlanma_tarihi ?? '').localeCompare(a.tamamlanma_tarihi ?? ''))
 
-  // 5) Agregasyonlar
+  // 6) Agregasyonlar — hedef en basta hesaplandi
   const agg = {
+    hedef,
     toplam: data.length,
     planli: data.filter(d => !d.ekstra).length,
     ekstra: data.filter(d => d.ekstra).length,
@@ -173,8 +189,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, baslangic, bitis, data, agg, filter_meta: filterMeta })
 }
 
-function emptyAgg() {
+function emptyAgg(hedef = 0) {
   return {
+    hedef,
     toplam: 0, planli: 0, ekstra: 0,
     personel_sayisi: 0, plaka_sayisi: 0,
     toplam_sure_saniye: 0, ortalama_sure_saniye: 0,

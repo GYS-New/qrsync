@@ -27,6 +27,7 @@ type Row = {
 }
 
 type Agg = {
+  hedef: number
   toplam: number
   planli: number
   ekstra: number
@@ -288,7 +289,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
           <select value={tip} onChange={e => setTip(e.target.value as any)} style={inp}>
             <option value="">Tip (Tümü)</option>
             <option value="planli">Planlı</option>
-            <option value="ekstra">Ekstra</option>
+            <option value="ekstra">Plansız</option>
           </select>
           <input placeholder="Tablo ara..." value={arama} onChange={e => setArama(e.target.value)}
             style={{ ...inp, width: 160 }} />
@@ -328,16 +329,17 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
             return p ? <> · Personel: <strong>{p.ad}</strong></> : null
           })()}
           {plaka && <> · Plaka: <strong>{plaka}</strong></>}
-          {tip && <> · Tip: <strong>{tip === 'ekstra' ? 'Ekstra' : 'Planlı'}</strong></>}
+          {tip && <> · Tip: <strong>{tip === 'ekstra' ? 'Plansız' : 'Planlı'}</strong></>}
         </div>
       </div>
 
       {/* KPI KARTLARI */}
       {agg && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+          <Kpi label="Hedef" deger={agg.hedef} renk={T.purple} />
           <Kpi label="Toplam Yıkama" deger={agg.toplam} renk={T.blue} />
           <Kpi label="Planlı" deger={agg.planli} renk={T.green} />
-          <Kpi label="Ekstra" deger={agg.ekstra} renk={T.amber} />
+          <Kpi label="Plansız" deger={agg.ekstra} renk={T.amber} />
           <Kpi label="Personel" deger={agg.personel_sayisi} renk={T.text} />
           <Kpi label="Toplam Süre" deger={fmtSure(agg.toplam_sure_saniye)} renk={T.text} kucuk />
           <Kpi label="Ortalama Süre" deger={fmtSure(agg.ortalama_sure_saniye)} renk={T.text} kucuk />
@@ -388,7 +390,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                 </div>
                 <div style={{ height: 220 }}>
                   <div style={{ fontSize: 11.5, fontWeight: 700, color: T.amber, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    🟡 Plansız (Ekstra)
+                    🟡 Plansız
                   </div>
                   <ResponsiveContainer width="100%" height="92%">
                     <BarChart data={agg.saatlik_trend} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
@@ -440,11 +442,11 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
               </div>
             </div>
 
-            {/* Donutlar tek kart — Planlı/Ekstra + İstasyon (yan yana), PDF'ten gizli */}
+            {/* Donutlar tek kart — Planlı/Plansız + İstasyon (yan yana), PDF'ten gizli */}
             <div className="verde-card pdf-card pdf-hide" style={{ padding: 12, gridColumn: '1 / -1' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
-                  <Baslik>Planlı / Ekstra Dağılımı</Baslik>
+                  <Baslik>Planlı / Plansız Dağılımı</Baslik>
                   <div style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -452,7 +454,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                         <Pie data={[
                           { name: 'Planlı', value: agg.planli },
-                          { name: 'Ekstra', value: agg.ekstra },
+                          { name: 'Plansız', value: agg.ekstra },
                         ]} dataKey="value" nameKey="name" innerRadius={42} outerRadius={75} paddingAngle={2}
                           label={(e: any) => `${e.name} (${e.value})`}>
                           <Cell fill={T.green} />
@@ -528,7 +530,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                       </td>
                       <td>
                         {r.ekstra ? (
-                          <span style={{ padding: '3px 9px', borderRadius: 999, background: T.amberLight, color: T.amber, fontSize: 12, fontWeight: 700 }}>Ekstra</span>
+                          <span style={{ padding: '3px 9px', borderRadius: 999, background: T.amberLight, color: T.amber, fontSize: 12, fontWeight: 700 }}>Plansız</span>
                         ) : (
                           <span style={{ padding: '3px 9px', borderRadius: 999, background: T.greenLight, color: T.green, fontSize: 12, fontWeight: 700 }}>Planlı</span>
                         )}

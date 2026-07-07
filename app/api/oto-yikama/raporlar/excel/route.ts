@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
           tamamlanma_tarihi: g.tamamlanma_tarihi,
           tamamlanma_suresi_saniye: sure,
           ekstra: !!(m as any).ekstra,
-          tip: (m as any).ekstra ? 'Ekstra' : 'Planlı',
+          tip: (m as any).ekstra ? 'Plansız' : 'Planlı',
           durum: g.durum as string,
           km: (m as any).km ?? null,
           notlar: (m as any).notlar ?? null,
@@ -141,6 +141,18 @@ export async function GET(req: NextRequest) {
       })
       .sort((a, b) => (b.tamamlanma_tarihi ?? '').localeCompare(a.tamamlanma_tarihi ?? ''))
   }
+
+  // Hedef: aralikta planlanan (ekstra=false) toplam gorev sayisi — durumdan bagimsiz
+  let hedefQ = admin
+    .from('oto_yikama_gorev_metadata')
+    .select('gorev_id, arac:arac_id!inner(firma_id)', { count: 'exact', head: true })
+    .eq('ekstra', false)
+    .gte('hedef_tarih', baslangic)
+    .lte('hedef_tarih', bitis)
+    .eq('arac.firma_id', firmaId)
+  if (plaka) hedefQ = hedefQ.eq('plaka_snapshot', plaka)
+  const { count: hedefCount } = await hedefQ
+  const hedef = hedefCount ?? 0
 
   // Agregasyonlar
   const toplam = rows.length
@@ -227,15 +239,16 @@ export async function GET(req: NextRequest) {
   setMeta(ws1, 5, 'Oluşturulma:', new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }))
   if (personelId) setMeta(ws1, 6, 'Personel Filtresi:', personelTop[0]?.ad ?? '—')
   if (plaka) setMeta(ws1, 7, 'Plaka Filtresi:', plaka)
-  if (tip) setMeta(ws1, 8, 'Tip Filtresi:', tip === 'ekstra' ? 'Ekstra' : 'Planlı')
+  if (tip) setMeta(ws1, 8, 'Tip Filtresi:', tip === 'ekstra' ? 'Plansız' : 'Planlı')
 
   ws1.getRow(10).height = 8
 
   setHdrRow(ws1, 11, ['METRİK', 'DEĞER'])
   const kpis: [string, any][] = [
+    ['Hedef', hedef],
     ['Toplam Yıkama', toplam],
     ['Planlı Yıkama', planli],
-    ['Ekstra Yıkama', ekstra],
+    ['Plansız Yıkama', ekstra],
     ['Farklı Plaka', plakaMap.size],
     ['Personel', personelMap.size],
     ['Toplam Süre', fmtSure(toplamSure)],
