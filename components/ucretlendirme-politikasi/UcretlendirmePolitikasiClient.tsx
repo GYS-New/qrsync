@@ -163,11 +163,16 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
     const kullaniciMaliyeti = u * kullaniciBirim
     const lokasyonMaliyeti = l * FIYAT_LOKASYON
     const projeDegisken = kullaniciMaliyeti + lokasyonMaliyeti
-    // Sabit maliyet payi: proje degiskeninin firma toplam degisken icindeki
-    // orani. Firma toplami yoksa (veri henuz yuklenmedi): pay = 0.
-    const firmaDegisken = fu * FIYAT_KULLANICI + fl * FIYAT_LOKASYON
-    const sabitPayOran = firmaDegisken > 0 ? Math.min(1, projeDegisken / firmaDegisken) : 0
+    // Sabit maliyet payi: 'yeni eklenecek proje' senaryosu.
+    // Girilen proje henuz firmaya eklenmedi varsayilir; sabit pay,
+    // projenin firmanin YENI (mevcut + girilen) toplam degiskeni icindeki
+    // agirligina gore hesaplanir:
+    //   pay = SABIT × (projeDegisken / (firmaMevcutDegisken + projeDegisken))
+    const firmaMevcutDegisken = fu * FIYAT_KULLANICI + fl * FIYAT_LOKASYON
+    const firmaYeniDegisken = firmaMevcutDegisken + projeDegisken
+    const sabitPayOran = firmaYeniDegisken > 0 ? projeDegisken / firmaYeniDegisken : 0
     const sabitPay = SABIT_TOPLAM * sabitPayOran
+    const firmaDegisken = firmaMevcutDegisken // geri uyum icin
     const kdvHaric = projeDegisken + sabitPay
     const kdv = kdvHaric * KDV_ORAN
     const kdvDahil = kdvHaric + kdv
@@ -458,9 +463,13 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
           }}>
             <Info size={18} color={T.amber} style={{ flexShrink: 0, marginTop: 1 }} />
             <div>
-              Sabit maliyet payı formülü: <strong>SABİT × (proje değişkeni / firma toplam değişken)</strong>.
-              Firma toplamları seçili firmadan otomatik alınır. Tüm projelerin dağılımını
-              görmek için <strong>Firma Analizi</strong> sekmesine geçin.
+              Sabit maliyet payı formülü <strong>(yeni eklenecek proje senaryosu)</strong>:
+              <br />
+              <strong>SABİT × (proje değişkeni / (firma mevcut değişkeni + proje değişkeni))</strong>.
+              <br />
+              Girilen proje, seçili firmaya <strong>eklenecek bir proje</strong> varsayılarak firmanın
+              güncellenmiş toplamı içindeki ağırlığına göre sabitten pay alır. Mevcut projelerin
+              gerçek dağılımını görmek için <strong>Firma Analizi</strong> sekmesine geçin.
             </div>
           </div>
         </div>
