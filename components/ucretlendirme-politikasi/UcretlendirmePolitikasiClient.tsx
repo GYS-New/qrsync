@@ -118,8 +118,8 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
   const [tab, setTab] = useState<'politika' | 'analiz'>('politika')
 
   // ─── SEKME 1: Hesap makinesi (proje bazli) girdileri ──────────────────
-  const [kullaniciSayisi, setKullaniciSayisi] = useState<number>(100)
-  const [lokasyonSayisi, setLokasyonSayisi] = useState<number>(50)
+  const [kullaniciSayisi, setKullaniciSayisi] = useState<number>(0)
+  const [lokasyonSayisi, setLokasyonSayisi] = useState<number>(0)
 
   // ─── Firma analizi verisi — her iki sekme icin de gerekli ───────────
   // Sekme 1: firma toplamlari sabit maliyet payini hesaplamak icin.
@@ -156,7 +156,11 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
     const l = Math.max(0, lokasyonSayisi || 0)
     const fu = analiz?.firmaToplam.kullanici ?? 0
     const fl = analiz?.firmaToplam.lokasyon ?? 0
-    const kullaniciMaliyeti = u * FIYAT_KULLANICI
+    // Senaryo: Lokasyon yok ise (l=0), her kullanici QR-siz calisir ve
+    // kullanici basi birim fiyat KULLANICI + LOKASYON birim fiyatlari toplami
+    // (20 + 80 = 100 TL) olarak alinir. Lokasyon >= 1 ise normal hesap.
+    const kullaniciBirim = l === 0 ? FIYAT_KULLANICI + FIYAT_LOKASYON : FIYAT_KULLANICI
+    const kullaniciMaliyeti = u * kullaniciBirim
     const lokasyonMaliyeti = l * FIYAT_LOKASYON
     const projeDegisken = kullaniciMaliyeti + lokasyonMaliyeti
     // Sabit maliyet payi: proje degiskeninin firma toplam degisken icindeki
@@ -169,6 +173,7 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
     const kdvDahil = kdvHaric + kdv
     return {
       u, l, fu, fl,
+      kullaniciBirim,
       kullaniciMaliyeti, lokasyonMaliyeti, projeDegisken,
       firmaDegisken, sabitPayOran, sabitPay,
       kdvHaric, kdv, kdvDahil,
@@ -369,7 +374,14 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
                 />
               </div>
               <div style={{ fontSize: 14, color: T.textSoft, marginTop: 6 }}>
-                × {fmtTL(FIYAT_KULLANICI)} = <strong style={{ color: T.blue, fontSize: 15 }}>{fmtTL(hesap.kullaniciMaliyeti)}</strong>
+                × {fmtTL(hesap.kullaniciBirim)}
+                {hesap.l === 0 && (
+                  <span style={{ color: T.amber, fontWeight: 700, marginLeft: 4 }}>
+                    (kul. + lok. — QR yok)
+                  </span>
+                )}
+                {' = '}
+                <strong style={{ color: T.blue, fontSize: 15 }}>{fmtTL(hesap.kullaniciMaliyeti)}</strong>
               </div>
             </div>
             <div>
