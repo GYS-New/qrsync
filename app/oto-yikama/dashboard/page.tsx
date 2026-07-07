@@ -74,7 +74,7 @@ export default async function OtoYikamaDashboardPage() {
             {/* SIRA 1: KPI kartları */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
               <KpiCard label="Bugün Planlı"     value={kpiBugunPlanli}     ikon="🗓️" renk="#1d4ed8" />
-              <KpiCard label="Bugün Ekstra"     value={kpiBugunEkstra}     ikon="➕" renk="#d97706" />
+              <KpiCard label="Bugün Plansız"    value={kpiBugunEkstra}     ikon="➕" renk="#d97706" />
               <KpiCard label="Bugün Tamamlanan" value={kpiBugunTamamlanan} suffix={`(%${tamamlanmaPct})`} ikon="✓"  renk="#16a34a" />
               <KpiCard label="Geciken"          value={kpiGeciken}         ikon="⏰" renk={kpiGeciken > 0 ? '#dc2626' : '#6b7280'} />
               <KpiCard label="Aktif Araç"       value={kpiAktifArac}       ikon="🚗" renk="#0f172a" />
