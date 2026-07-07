@@ -89,20 +89,33 @@ export async function GET(req: NextRequest) {
   const gorevIds = metaRows.map(m => m.gorev_id)
 
   // 3) Gorevler — sadece TAMAMLANDI olanlar + firma filtresi
-  let gQ = admin
-    .from('gorevler')
-    .select(`
-      id, durum, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
-      olusturma_tarihi, lokasyon_id, islemi_yapan_id,
-      lokasyon:lokasyon_id (id, tanim, parent_id, ust:parent_id (tanim))
-    `)
-    .in('id', gorevIds)
-    .eq('firma_id', firmaId)
-    .eq('durum', 'TAMAMLANDI')
-  if (lokasyonId) gQ = gQ.eq('lokasyon_id', lokasyonId)
-  if (personelId) gQ = gQ.eq('islemi_yapan_id', personelId)
-  const { data: gorevler } = await gQ
-  if (!gorevler || gorevler.length === 0) {
+  // .in('id', N-UUIDs) URL'yi sisirir; 500+ UUID ~18KB olur, Cloudflare 8KB
+  // HTTP request-line limitini asar. Supabase 'TypeError: fetch failed' doner,
+  // sayfa BOS gelir. 100'luk chunk (100 UUID ~3.7KB — guvenli marj).
+  const gorevlerAll: any[] = []
+  {
+    const CHUNK = 100
+    for (let i = 0; i < gorevIds.length; i += CHUNK) {
+      const slice = gorevIds.slice(i, i + CHUNK)
+      let gQ = admin
+        .from('gorevler')
+        .select(`
+          id, durum, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
+          olusturma_tarihi, lokasyon_id, islemi_yapan_id,
+          lokasyon:lokasyon_id (id, tanim, parent_id, ust:parent_id (tanim))
+        `)
+        .in('id', slice)
+        .eq('firma_id', firmaId)
+        .eq('durum', 'TAMAMLANDI')
+      if (lokasyonId) gQ = gQ.eq('lokasyon_id', lokasyonId)
+      if (personelId) gQ = gQ.eq('islemi_yapan_id', personelId)
+      const { data, error } = await gQ
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      if (data && data.length > 0) gorevlerAll.push(...data)
+    }
+  }
+  const gorevler = gorevlerAll
+  if (gorevler.length === 0) {
     return NextResponse.json({ ok: true, baslangic, bitis, data: [], agg: emptyAgg(hedef) })
   }
 

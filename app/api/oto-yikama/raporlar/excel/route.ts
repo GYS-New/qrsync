@@ -89,15 +89,24 @@ export async function GET(req: NextRequest) {
   let rows: any[] = []
   if (gorevIds.length > 0) {
     // Rapor tüm durumları içerir (TAMAMLANDI/ACIK/ISLEMDE/IPTAL/YAPILAMADI/HAZIR)
-    let gQ = admin
-      .from('gorevler')
-      .select(`id, durum, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, lokasyon_id, islemi_yapan_id,
-        lokasyon:lokasyon_id (tanim, parent_id, ust:parent_id (tanim))`)
-      .in('id', gorevIds)
-      .eq('firma_id', firmaId)
-    if (personelId) gQ = gQ.eq('islemi_yapan_id', personelId)
-    const { data: gorevler } = await gQ
-    const gMap = new Map((gorevler ?? []).map((g: any) => [g.id, g]))
+    // .in('id', N-UUIDs) URL'yi sisirir; 500+ UUID Cloudflare 8KB HTTP
+    // request-line limitini asar. 100'luk chunk (100 UUID ~3.7KB — guvenli marj).
+    const gorevlerAll: any[] = []
+    const CHUNK = 100
+    for (let i = 0; i < gorevIds.length; i += CHUNK) {
+      const slice = gorevIds.slice(i, i + CHUNK)
+      let gQ = admin
+        .from('gorevler')
+        .select(`id, durum, baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, lokasyon_id, islemi_yapan_id,
+          lokasyon:lokasyon_id (tanim, parent_id, ust:parent_id (tanim))`)
+        .in('id', slice)
+        .eq('firma_id', firmaId)
+      if (personelId) gQ = gQ.eq('islemi_yapan_id', personelId)
+      const { data } = await gQ
+      if (data && data.length > 0) gorevlerAll.push(...data)
+    }
+    const gorevler = gorevlerAll
+    const gMap = new Map(gorevler.map((g: any) => [g.id, g]))
 
     const aracIds = [...new Set((metaRows ?? []).map(m => m.arac_id))]
     const userIds = [...new Set((gorevler ?? []).map((g: any) => g.islemi_yapan_id).filter(Boolean))]
