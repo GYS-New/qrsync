@@ -376,7 +376,9 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Users size={22} color={T.blue} />
                 <input
-                  type="number" min={0} value={kullaniciSayisi}
+                  type="number" min={0}
+                  value={kullaniciSayisi === 0 ? '' : kullaniciSayisi}
+                  placeholder="0"
                   onChange={e => setKullaniciSayisi(parseInt(e.target.value) || 0)}
                   style={inputStyle}
                 />
@@ -399,7 +401,9 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <MapPin size={22} color={T.purple} />
                 <input
-                  type="number" min={0} value={lokasyonSayisi}
+                  type="number" min={0}
+                  value={lokasyonSayisi === 0 ? '' : lokasyonSayisi}
+                  placeholder="0"
                   onChange={e => setLokasyonSayisi(parseInt(e.target.value) || 0)}
                   style={inputStyle}
                 />
