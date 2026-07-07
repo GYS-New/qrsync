@@ -88,43 +88,17 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
   // ─── SEKME 1: Hesap makinesi (proje bazli) girdileri ──────────────────
   const [kullaniciSayisi, setKullaniciSayisi] = useState<number>(100)
   const [lokasyonSayisi, setLokasyonSayisi] = useState<number>(50)
-  // Firma toplamlari sabit maliyet payi hesabinda kullanilir.
-  // Default = proje ile ayni (tek proje senaryosu) — bu durumda sabit tamami
-  // bu projeye dusuyor.
-  const [firmaKullaniciTop, setFirmaKullaniciTop] = useState<number>(100)
-  const [firmaLokasyonTop, setFirmaLokasyonTop] = useState<number>(50)
 
-  const hesap = useMemo(() => {
-    const u = Math.max(0, kullaniciSayisi || 0)
-    const l = Math.max(0, lokasyonSayisi || 0)
-    const fu = Math.max(u, firmaKullaniciTop || 0)  // firma toplami en az proje kadar
-    const fl = Math.max(l, firmaLokasyonTop || 0)
-    const kullaniciMaliyeti = u * FIYAT_KULLANICI
-    const lokasyonMaliyeti = l * FIYAT_LOKASYON
-    const projeDegisken = kullaniciMaliyeti + lokasyonMaliyeti
-    // Sabit maliyet payi: proje degiskeninin firma toplam degisken icindeki
-    // orani. Ornek: 6000 / 18000 = %33 → sabitPay = 33616 × 0.33 = 11205
-    const firmaDegisken = fu * FIYAT_KULLANICI + fl * FIYAT_LOKASYON
-    const sabitPayOran = firmaDegisken > 0 ? projeDegisken / firmaDegisken : 1
-    const sabitPay = SABIT_TOPLAM * sabitPayOran
-    const kdvHaric = projeDegisken + sabitPay
-    const kdv = kdvHaric * KDV_ORAN
-    const kdvDahil = kdvHaric + kdv
-    return {
-      u, l, fu, fl,
-      kullaniciMaliyeti, lokasyonMaliyeti, projeDegisken,
-      firmaDegisken, sabitPayOran, sabitPay,
-      kdvHaric, kdv, kdvDahil,
-    }
-  }, [kullaniciSayisi, lokasyonSayisi, firmaKullaniciTop, firmaLokasyonTop])
-
-  // ─── SEKME 2: Firma analizi verisi ───────────────────────────────────
+  // ─── Firma analizi verisi — her iki sekme icin de gerekli ───────────
+  // Sekme 1: firma toplamlari sabit maliyet payini hesaplamak icin.
+  // Sekme 2: proje bazli maliyet analizi tablosu.
+  // Firma degistigi anda sekmeden bagimsiz yenilenir.
   const [analiz, setAnaliz] = useState<FirmaAnaliziResp | null>(null)
   const [analizLoading, setAnalizLoading] = useState(false)
   const [analizHata, setAnalizHata] = useState<string | null>(null)
 
   useEffect(() => {
-    if (tab !== 'analiz' || !firmaId) return
+    if (!firmaId) { setAnaliz(null); return }
     let iptal = false
     ;(async () => {
       setAnalizLoading(true)
@@ -142,7 +116,32 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
       }
     })()
     return () => { iptal = true }
-  }, [tab, firmaId])
+  }, [firmaId])
+
+  // Sabit maliyet payi hesabi — Firma Analizi verisinden firma toplamini alir
+  const hesap = useMemo(() => {
+    const u = Math.max(0, kullaniciSayisi || 0)
+    const l = Math.max(0, lokasyonSayisi || 0)
+    const fu = analiz?.firmaToplam.kullanici ?? 0
+    const fl = analiz?.firmaToplam.lokasyon ?? 0
+    const kullaniciMaliyeti = u * FIYAT_KULLANICI
+    const lokasyonMaliyeti = l * FIYAT_LOKASYON
+    const projeDegisken = kullaniciMaliyeti + lokasyonMaliyeti
+    // Sabit maliyet payi: proje degiskeninin firma toplam degisken icindeki
+    // orani. Firma toplami yoksa (veri henuz yuklenmedi): pay = 0.
+    const firmaDegisken = fu * FIYAT_KULLANICI + fl * FIYAT_LOKASYON
+    const sabitPayOran = firmaDegisken > 0 ? Math.min(1, projeDegisken / firmaDegisken) : 0
+    const sabitPay = SABIT_TOPLAM * sabitPayOran
+    const kdvHaric = projeDegisken + sabitPay
+    const kdv = kdvHaric * KDV_ORAN
+    const kdvDahil = kdvHaric + kdv
+    return {
+      u, l, fu, fl,
+      kullaniciMaliyeti, lokasyonMaliyeti, projeDegisken,
+      firmaDegisken, sabitPayOran, sabitPay,
+      kdvHaric, kdv, kdvDahil,
+    }
+  }, [kullaniciSayisi, lokasyonSayisi, analiz])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
@@ -329,51 +328,48 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
             </div>
           </div>
 
-          {/* Firma toplami girdileri — sabit pay hesabi icin */}
-          <div style={{
-            marginBottom: 12, fontSize: 12, fontWeight: 800, color: T.slate,
-            textTransform: 'uppercase', letterSpacing: '0.06em',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <Building2 size={14} />
-            Firma Toplamı <span style={{ color: T.textSoft, fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>
-              (sabit maliyet payını hesaplamak için)
-            </span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18, marginBottom: 20 }}>
-            <div>
-              <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
-                Firma Toplam Kullanıcı
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Users size={22} color={T.slate} />
-                <input
-                  type="number" min={0} value={firmaKullaniciTop}
-                  onChange={e => setFirmaKullaniciTop(parseInt(e.target.value) || 0)}
-                  style={inputStyle}
-                />
+          {/* Firma toplami bilgisi — otomatik olarak API'den gelir */}
+          {firmaId && analiz && (
+            <div style={{
+              background: '#faf5ff', border: `1px solid ${T.purple}33`, borderRadius: 10,
+              padding: '12px 16px', marginBottom: 20,
+              display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Building2 size={18} color={T.purple} />
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Seçili Firma
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: T.text }}>{analiz.firma.ad}</div>
+                </div>
               </div>
-              <div style={{ fontSize: 14, color: T.textSoft, marginTop: 6 }}>
-                Bu proje payı: <strong style={{ color: T.slate }}>%{hesap.fu > 0 ? ((hesap.u / hesap.fu) * 100).toFixed(1) : '0.0'}</strong>
+              <div style={{ display: 'flex', gap: 20, marginLeft: 'auto', flexWrap: 'wrap' }}>
+                <FirmaBilgi ikon={<Users size={16} color={T.slate} />} etiket="Firma Toplam Kullanıcı" deger={analiz.firmaToplam.kullanici} />
+                <FirmaBilgi ikon={<MapPin size={16} color={T.slate} />} etiket="Firma Toplam Lokasyon" deger={analiz.firmaToplam.lokasyon} />
+                <FirmaBilgi ikon={<FolderKanban size={16} color={T.slate} />} etiket="Toplam Proje" deger={analiz.firmaToplam.projeSayisi} />
               </div>
             </div>
-            <div>
-              <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
-                Firma Toplam Lokasyon
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <MapPin size={22} color={T.slate} />
-                <input
-                  type="number" min={0} value={firmaLokasyonTop}
-                  onChange={e => setFirmaLokasyonTop(parseInt(e.target.value) || 0)}
-                  style={inputStyle}
-                />
-              </div>
-              <div style={{ fontSize: 14, color: T.textSoft, marginTop: 6 }}>
-                Bu proje payı: <strong style={{ color: T.slate }}>%{hesap.fl > 0 ? ((hesap.l / hesap.fl) * 100).toFixed(1) : '0.0'}</strong>
-              </div>
+          )}
+          {firmaId && analizLoading && !analiz && (
+            <div style={{
+              background: T.slateLight, borderRadius: 10, padding: '12px 16px', marginBottom: 20,
+              display: 'flex', gap: 10, alignItems: 'center', fontSize: 14, color: T.textSoft,
+            }}>
+              <Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite' }} />
+              Firma verisi yükleniyor…
             </div>
-          </div>
+          )}
+          {!firmaId && (
+            <div style={{
+              background: T.amberLight, border: `1px solid ${T.amber}`, borderRadius: 10,
+              padding: '12px 16px', marginBottom: 20,
+              display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: '#78350f',
+            }}>
+              <AlertCircle size={18} color={T.amber} />
+              <div>Sabit maliyet payı hesaplamak için üst bardan bir firma seçin. Firma seçilmezse pay <strong>%0</strong> olarak hesaplanır.</div>
+            </div>
+          )}
 
           {/* Ozet tablo */}
           <div style={{ background: T.blueLight, borderRadius: 12, padding: 18, border: `1px solid ${T.blue}33` }}>
@@ -407,8 +403,8 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
             <Info size={18} color={T.amber} style={{ flexShrink: 0, marginTop: 1 }} />
             <div>
               Sabit maliyet payı formülü: <strong>SABİT × (proje değişkeni / firma toplam değişken)</strong>.
-              Firma toplamları proje ile aynı bırakılırsa (tek proje senaryosu) sabit tamamı bu projeye düşer.
-              Gerçek firma verisini <strong>Firma Analizi</strong> sekmesinden görebilirsiniz.
+              Firma toplamları seçili firmadan otomatik alınır. Tüm projelerin dağılımını
+              görmek için <strong>Firma Analizi</strong> sekmesine geçin.
             </div>
           </div>
         </div>
@@ -634,6 +630,20 @@ function FirmaAnaliziSekmesi({
         </p>
       </div>
     </>
+  )
+}
+
+function FirmaBilgi({ ikon, etiket, deger }: { ikon: React.ReactNode; etiket: string; deger: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      {ikon}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          {etiket}
+        </div>
+        <div style={{ fontSize: 17, fontWeight: 900, color: T.text, letterSpacing: '-0.01em' }}>{deger}</div>
+      </div>
+    </div>
   )
 }
 
