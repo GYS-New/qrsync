@@ -60,9 +60,44 @@ export type TakvimResponse = {
   kullaniciAdMap: Record<string, string>
 }
 
-export async function GET(req: NextRequest) {
+// Undici hata zincirini duz string'e cevir — cause.cause.cause chain'i dahil
+function serializeError(e: any): string {
+  const parts: string[] = []
+  let cur = e
+  let depth = 0
+  while (cur && depth < 5) {
+    const code = cur.code ?? cur.errno ?? ''
+    const msg = cur.message ?? String(cur)
+    parts.push(`${depth === 0 ? '' : `→cause[${depth}]:`}${code ? `[${code}] ` : ''}${msg}`)
+    cur = cur.cause
+    depth++
+  }
+  return parts.join(' ')
+}
+
+async function timedStep<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const t0 = Date.now()
   try {
-  const { me } = await assertModulYetkisi('oto_yikama')
+    const res = await fn()
+    const dt = Date.now() - t0
+    const rows = Array.isArray(res) ? res.length : (res as any)?.data?.length ?? '-'
+    // eslint-disable-next-line no-console
+    console.log(`[TAKVIM] ${label} OK ${dt}ms rows=${rows}`)
+    return res
+  } catch (e: any) {
+    const dt = Date.now() - t0
+    // eslint-disable-next-line no-console
+    console.log(`[TAKVIM] ${label} FAIL ${dt}ms err=${serializeError(e)}`)
+    throw e
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const reqStart = Date.now()
+  // eslint-disable-next-line no-console
+  console.log(`[TAKVIM] REQUEST BASLADI url=${req.nextUrl.pathname}${req.nextUrl.search}`)
+  try {
+  const { me } = await timedStep('assertModulYetkisi', () => assertModulYetkisi('oto_yikama'))
 
   const sp = req.nextUrl.searchParams
   const firmaId = sp.get('firma_id')
@@ -87,24 +122,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Bu firmaya erişim yok' }, { status: 403 })
   }
 
-  if (!(await getFirmaModulDurumu(admin as any, firmaId, 'oto_yikama_aktif'))) {
+  const modulAktif = await timedStep('getFirmaModulDurumu', () =>
+    getFirmaModulDurumu(admin as any, firmaId, 'oto_yikama_aktif')
+  )
+  if (!modulAktif) {
     return NextResponse.json({ ok: false, error: 'Oto Yıkama modülü pasif' }, { status: 403 })
   }
 
   // 1) Aktif gorevler için metadata (aralık) — 2 step (PostgREST nested embed bu tabloda güvenilmez)
   // fetchAll ile 1000+ satır destegi (PostgREST default max_rows cap'i asilir).
-  let metaArr: any[]
-  try {
-    metaArr = await fetchAll<any>(() => admin
-      .from('oto_yikama_gorev_metadata')
-      .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar')
-      .gte('hedef_tarih', baslangic)
-      .lte('hedef_tarih', bitis)
-      .order('gorev_id', { ascending: true })
-    )
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? 'metadata sorgusu basarisiz' }, { status: 500 })
-  }
+  const metaArr = await timedStep('metadata.fetchAll', () => fetchAll<any>(() => admin
+    .from('oto_yikama_gorev_metadata')
+    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar')
+    .gte('hedef_tarih', baslangic)
+    .lte('hedef_tarih', bitis)
+    .order('gorev_id', { ascending: true })
+  ))
 
   const gorevIds = metaArr.map(m => m.gorev_id).filter(Boolean) as string[]
 
@@ -115,17 +148,21 @@ export async function GET(req: NextRequest) {
     const CHUNK = 500
     for (let i = 0; i < gorevIds.length; i += CHUNK) {
       const slice = gorevIds.slice(i, i + CHUNK)
-      const { data, error } = await admin
-        .from('gorevler')
-        .select(`
-          id, durum, firma_id, lokasyon_id,
-          baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
-          olusturan_id, islemi_yapan_id, iptal_sebep
-        `)
-        .eq('firma_id', firmaId)
-        .in('id', slice)
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-      for (const g of (data ?? []) as any[]) gorevMap.set(g.id, g)
+      const chunkIdx = Math.floor(i / CHUNK) + 1
+      const totalChunks = Math.ceil(gorevIds.length / CHUNK)
+      const res = await timedStep(`gorevler.chunk[${chunkIdx}/${totalChunks}] size=${slice.length}`, async () =>
+        admin
+          .from('gorevler')
+          .select(`
+            id, durum, firma_id, lokasyon_id,
+            baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
+            olusturan_id, islemi_yapan_id, iptal_sebep
+          `)
+          .eq('firma_id', firmaId)
+          .in('id', slice)
+      )
+      if (res.error) throw new Error(`gorevler chunk ${chunkIdx} err: ${res.error.message}`)
+      for (const g of (res.data ?? []) as any[]) gorevMap.set(g.id, g)
     }
   }
 
@@ -133,43 +170,44 @@ export async function GET(req: NextRequest) {
   const aktifMeta = metaArr.filter(m => gorevMap.has(m.gorev_id))
 
   // 2) Arşiv (zaten firma_id taşır) — fetchAll pagination ile 1000+ satir destegi
-  let arsivArr: any[]
-  try {
-    arsivArr = await fetchAll<any>(() => admin
-      .from('oto_yikama_arsiv')
-      .select(`
-        gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, durum, lokasyon_id,
-        baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
-        olusturan_id, islemi_yapan_id, iptal_sebep, km, notlar
-      `)
-      .eq('firma_id', firmaId)
-      .gte('hedef_tarih', baslangic)
-      .lte('hedef_tarih', bitis)
-      .order('gorev_id', { ascending: true })
-    )
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? 'arsiv sorgusu basarisiz' }, { status: 500 })
-  }
-
-  // 3) Aktif araçlar — tahmin için
-  const { data: aracRows, error: aracErr } = await admin
-    .from('araclar')
+  const arsivArr = await timedStep('arsiv.fetchAll', () => fetchAll<any>(() => admin
+    .from('oto_yikama_arsiv')
     .select(`
-      id, plaka, departman, varsayilan_lokasyon_id,
-      yikama_frekans_tip, yikama_frekans_aralik, yikama_referans_tarih, yikama_gunleri, aktif
+      gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, durum, lokasyon_id,
+      baslatilma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye,
+      olusturan_id, islemi_yapan_id, iptal_sebep, km, notlar
     `)
     .eq('firma_id', firmaId)
-    .eq('aktif', true)
-  if (aracErr) return NextResponse.json({ ok: false, error: aracErr.message }, { status: 500 })
+    .gte('hedef_tarih', baslangic)
+    .lte('hedef_tarih', bitis)
+    .order('gorev_id', { ascending: true })
+  ))
+
+  // 3) Aktif araçlar — tahmin için
+  const aracRes = await timedStep('araclar.select', async () =>
+    admin
+      .from('araclar')
+      .select(`
+        id, plaka, departman, varsayilan_lokasyon_id,
+        yikama_frekans_tip, yikama_frekans_aralik, yikama_referans_tarih, yikama_gunleri, aktif
+      `)
+      .eq('firma_id', firmaId)
+      .eq('aktif', true)
+  )
+  if (aracRes.error) throw new Error(`araclar err: ${aracRes.error.message}`)
+  const aracRows = aracRes.data
 
   // 4) Skip kayıtları — tahmin merge'de bu (arac_id|tarih) çiftleri atlanır.
   // Migration 089/090 ile takvim popup'tan tahmin iptal edilince buraya yazılır.
-  const { data: skipRows } = await admin
-    .from('oto_yikama_gorev_skip')
-    .select('arac_id, tarih')
-    .eq('firma_id', firmaId)
-    .gte('tarih', baslangic)
-    .lte('tarih', bitis)
+  const skipRes = await timedStep('skip.select', async () =>
+    admin
+      .from('oto_yikama_gorev_skip')
+      .select('arac_id, tarih')
+      .eq('firma_id', firmaId)
+      .gte('tarih', baslangic)
+      .lte('tarih', bitis)
+  )
+  const skipRows = skipRes.data
   const skipler: { arac_id: string; tarih: string }[] = ((skipRows ?? []) as any[])
     .map(s => ({ arac_id: s.arac_id, tarih: s.tarih }))
   const araclar: TakvimArac[] = (aracRows ?? []).map((a: any) => ({
@@ -202,14 +240,16 @@ export async function GET(req: NextRequest) {
     if (a.varsayilan_lokasyon_id) lokIds.add(a.varsayilan_lokasyon_id)
   }
 
-  const [lokRes, userRes] = await Promise.all([
-    lokIds.size > 0
-      ? admin.from('lokasyonlar').select('id, tanim').in('id', [...lokIds])
-      : Promise.resolve({ data: [] as any[] }),
-    userIds.size > 0
-      ? admin.from('users').select('id, isim_soyisim').in('id', [...userIds])
-      : Promise.resolve({ data: [] as any[] }),
-  ])
+  const [lokRes, userRes] = await timedStep(`lookups.parallel loks=${lokIds.size} users=${userIds.size}`, () =>
+    Promise.all([
+      lokIds.size > 0
+        ? admin.from('lokasyonlar').select('id, tanim').in('id', [...lokIds])
+        : Promise.resolve({ data: [] as any[] }),
+      userIds.size > 0
+        ? admin.from('users').select('id, isim_soyisim').in('id', [...userIds])
+        : Promise.resolve({ data: [] as any[] }),
+    ])
+  )
   const lokasyonAdMap: Record<string, string> = {}
   for (const l of ((lokRes.data ?? []) as any[])) lokasyonAdMap[l.id] = l.tanim ?? '—'
   const kullaniciAdMap: Record<string, string> = {}
@@ -260,14 +300,17 @@ export async function GET(req: NextRequest) {
   }
 
   const payload: TakvimResponse = { ok: true, gercek, araclar, skipler, lokasyonAdMap, kullaniciAdMap }
+  // eslint-disable-next-line no-console
+  console.log(`[TAKVIM] REQUEST OK total=${Date.now() - reqStart}ms gercek=${gercek.length} araclar=${araclar.length}`)
   return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e: any) {
-    // Undici "fetch failed" gibi network hatalarinin gercek sebebini (cause) log'a yaz
-    const cause = e?.cause ? ` | cause=${e.cause?.code ?? ''} ${e.cause?.message ?? String(e.cause)}` : ''
+    const errStr = serializeError(e)
     // eslint-disable-next-line no-console
-    console.error('[oto-yikama/takvim] beklenmedik hata:', e?.message, cause, e?.stack)
+    console.log(`[TAKVIM] REQUEST FAIL total=${Date.now() - reqStart}ms err=${errStr}`)
+    // eslint-disable-next-line no-console
+    console.log(`[TAKVIM] STACK:`, e?.stack ?? '(stack yok)')
     return NextResponse.json(
-      { ok: false, error: `${e?.message ?? 'beklenmedik hata'}${cause}` },
+      { ok: false, error: errStr },
       { status: 500 }
     )
   }
