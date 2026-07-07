@@ -278,8 +278,9 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
             {fmtTL(SINIRSIZ_ESIK)} <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.9 }}>/ ay (KDV Hariç)</span>
           </div>
         </div>
-        <div style={{ maxWidth: 480, fontSize: 15, lineHeight: 1.55, opacity: 0.95 }}>
-          Bu tavan tutar üzerinde ödeme yapan projeler; <strong>sınırsız kullanıcı ve lokasyon
+        <div style={{ maxWidth: 520, fontSize: 15, lineHeight: 1.55, opacity: 0.95 }}>
+          Bu tavan tutar <strong>firma geneli</strong> için — tüm projelerin toplam aylık
+          maliyeti bu eşiğin üzerine çıkan firmalar; <strong>sınırsız kullanıcı ve lokasyon
           kullanımına uygun sunucu, altyapı, geliştirme ve yönetim destek hizmetlerinden</strong>
           bütünüyle faydalanır.
         </div>
@@ -528,6 +529,9 @@ function FirmaAnaliziSekmesi({
         </div>
       </div>
 
+      {/* Sınırsız kullanım eşiği progress bar */}
+      <SinirsizEsikBar firmaKdvHaric={firmaToplam.kdvHaric} />
+
       {/* Projeler tablosu */}
       <div>
         <SectionTitle icon={<FolderKanban size={18} color={T.slate} />}>Proje Bazlı Maliyet Analizi</SectionTitle>
@@ -609,6 +613,90 @@ function FirmaAnaliziSekmesi({
         </p>
       </div>
     </>
+  )
+}
+
+function SinirsizEsikBar({ firmaKdvHaric }: { firmaKdvHaric: number }) {
+  const pct = Math.min(100, (firmaKdvHaric / SINIRSIZ_ESIK) * 100)
+  const uzerinde = firmaKdvHaric > SINIRSIZ_ESIK
+  const kalan = Math.max(0, SINIRSIZ_ESIK - firmaKdvHaric)
+
+  return (
+    <div className="verde-card" style={{ padding: 20 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 12, marginBottom: 12, flexWrap: 'wrap',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            background: uzerinde ? T.greenLight : T.blueLight,
+            borderRadius: 10, padding: 8, display: 'inline-flex',
+          }}>
+            <InfinityIcon size={22} color={uzerinde ? T.green : T.blue} strokeWidth={2.4} />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Sınırsız Kullanım Eşiği <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(firma geneli)</span>
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 2 }}>
+              <span style={{ fontFamily: 'ui-monospace, monospace', color: uzerinde ? T.green : T.blue, fontSize: 20, fontWeight: 900 }}>
+                {fmtTL(firmaKdvHaric)}
+              </span>
+              <span style={{ color: T.textSoft, fontWeight: 500, margin: '0 6px' }}>/</span>
+              <span style={{ fontFamily: 'ui-monospace, monospace' }}>{fmtTL(SINIRSIZ_ESIK)}</span>
+              <span style={{ color: T.textSoft, fontSize: 13, fontWeight: 500, marginLeft: 6 }}>(KDV Hariç)</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Doluluk
+          </div>
+          <div style={{
+            fontSize: 30, fontWeight: 900, letterSpacing: '-0.02em',
+            color: uzerinde ? T.green : T.blue, lineHeight: 1,
+          }}>
+            %{pct.toFixed(1)}
+          </div>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{
+        position: 'relative', height: 22, borderRadius: 999,
+        background: T.slateLight, overflow: 'hidden',
+        border: `1px solid ${T.border}`,
+      }}>
+        <div style={{
+          width: `${pct}%`, height: '100%',
+          background: uzerinde
+            ? `linear-gradient(90deg, ${T.green}, ${T.blue})`
+            : `linear-gradient(90deg, ${T.blue}, ${T.purple})`,
+          transition: 'width 0.4s ease',
+          boxShadow: uzerinde ? `0 0 12px ${T.green}66` : `0 0 8px ${T.blue}44`,
+        }} />
+      </div>
+
+      {/* Alt bilgi */}
+      <div style={{
+        marginTop: 10, display: 'flex', justifyContent: 'space-between',
+        fontSize: 13, color: T.textSoft, flexWrap: 'wrap', gap: 8,
+      }}>
+        {uzerinde ? (
+          <div style={{ color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <InfinityIcon size={15} />
+            <span>Firma sınırsız kullanım eşiğinin üzerinde — sınırsız plan avantajı devrededir.</span>
+          </div>
+        ) : (
+          <div>
+            Sınırsız eşiğe kalan: <strong style={{ color: T.text, fontFamily: 'ui-monospace, monospace' }}>{fmtTL(kalan)}</strong>
+          </div>
+        )}
+        <div>
+          Firma toplam maliyeti tavan tutara ulaştığında sınırsız kullanım devreye girer.
+        </div>
+      </div>
+    </div>
   )
 }
 
