@@ -100,20 +100,20 @@ export default function UcretlendirmePolitikasiClient() {
   }, [kullaniciSayisi, lokasyonSayisi, projeSayisi])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
       {/* HERO */}
       <div style={{
         background: `linear-gradient(135deg, ${T.blue} 0%, ${T.purple} 100%)`,
-        borderRadius: 14, padding: '20px 26px', color: '#fff',
-        boxShadow: '0 10px 25px -8px rgba(29, 78, 216, 0.35)',
+        borderRadius: 16, padding: '28px 32px', color: '#fff',
+        boxShadow: '0 12px 30px -8px rgba(29, 78, 216, 0.4)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <TrendingUp size={22} />
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, letterSpacing: '-0.01em' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <TrendingUp size={28} />
+          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em' }}>
             GYS Ücretlendirme Politikası
           </h2>
         </div>
-        <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, opacity: 0.95 }}>
+        <p style={{ margin: 0, fontSize: 16, lineHeight: 1.6, opacity: 0.95 }}>
           Görev Yönetim Sistemi (GYS) ücretlendirme yapısı; <strong>sabit altyapı maliyetleri</strong> ile
           <strong> kullanıcı ve lokasyon (QR) başına değişken bileşenlerden</strong> oluşur.
           Rakamlar KDV hariçtir. Nihai fiyat her projenin ihtiyacına, kapasite ve destek
@@ -123,8 +123,8 @@ export default function UcretlendirmePolitikasiClient() {
 
       {/* DEĞİŞKEN BİRİM FİYATLAR */}
       <div>
-        <SectionTitle icon={<Users size={15} color={T.slate} />}>Değişken Birim Fiyatlar</SectionTitle>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+        <SectionTitle icon={<Users size={18} color={T.slate} />}>Değişken Birim Fiyatlar</SectionTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
           <BirimKart
             ikon={<Users size={26} color="#fff" />}
             renk={T.blue}
@@ -144,13 +144,13 @@ export default function UcretlendirmePolitikasiClient() {
 
       {/* SABİT MALİYETLER TABLOSU */}
       <div>
-        <SectionTitle icon={<Server size={15} color={T.slate} />}>Sabit Altyapı ve İşletme Maliyetleri</SectionTitle>
+        <SectionTitle icon={<Server size={18} color={T.slate} />}>Sabit Altyapı ve İşletme Maliyetleri</SectionTitle>
         <div style={{
-          background: T.blueLight, border: `1px solid ${T.blue}`, borderRadius: 10,
-          padding: '10px 14px', marginBottom: 10, display: 'flex', gap: 10,
-          alignItems: 'flex-start', fontSize: 12.5, color: '#1e3a8a', lineHeight: 1.5,
+          background: T.blueLight, border: `1px solid ${T.blue}`, borderRadius: 12,
+          padding: '14px 18px', marginBottom: 12, display: 'flex', gap: 12,
+          alignItems: 'flex-start', fontSize: 15, color: '#1e3a8a', lineHeight: 1.55,
         }}>
-          <Building2 size={16} color={T.blue} style={{ flexShrink: 0, marginTop: 1 }} />
+          <Building2 size={20} color={T.blue} style={{ flexShrink: 0, marginTop: 2 }} />
           <div>
             Aşağıdaki sabit maliyet <strong>firma seviyesindedir</strong> — bir firma için
             <strong> tek bir kez</strong> ödenir ve firmanın tüm projelerine paylaştırılır. Proje bazlı
@@ -158,14 +158,14 @@ export default function UcretlendirmePolitikasiClient() {
           </div>
         </div>
         <div className="verde-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
             <thead>
               <tr style={{ background: T.slate, color: '#fff' }}>
-                <Th style={{ width: 40 }}>#</Th>
+                <Th style={{ width: 50 }}>#</Th>
                 <Th>Kalem</Th>
                 <Th>Kapasite / Özellik</Th>
                 <Th>Açıklama</Th>
-                <Th align="right" style={{ width: 140 }}>Aylık Bedel (KDV Hariç)</Th>
+                <Th align="right" style={{ width: 200 }}>Aylık Bedel (KDV Hariç)</Th>
               </tr>
             </thead>
             <tbody>
@@ -173,28 +173,28 @@ export default function UcretlendirmePolitikasiClient() {
                 <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : T.slateLight }}>
                   <Td align="center" muted>{i + 1}</Td>
                   <Td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       {k.ikon}
-                      <strong style={{ color: T.text }}>{k.ad}</strong>
+                      <strong style={{ color: T.text, fontSize: 16 }}>{k.ad}</strong>
                     </div>
                   </Td>
                   <Td muted>{k.kapasite}</Td>
                   <Td muted small>{k.aciklama}</Td>
-                  <Td align="right" mono bold>{fmtTL(k.tutar)}</Td>
+                  <Td align="right" mono bold style={{ fontSize: 16 }}>{fmtTL(k.tutar)}</Td>
                 </tr>
               ))}
-              <tr style={{ background: T.blueLight, borderTop: `2px solid ${T.blue}` }}>
+              <tr style={{ background: T.blueLight, borderTop: `3px solid ${T.blue}` }}>
                 <Td colSpan={4} align="right" bold>
-                  <span style={{ color: T.blue }}>SABİT MALİYET TOPLAMI</span>
+                  <span style={{ color: T.blue, fontSize: 15, letterSpacing: '0.03em' }}>SABİT MALİYET TOPLAMI</span>
                 </Td>
-                <Td align="right" mono bold style={{ color: T.blue, fontSize: 15 }}>
+                <Td align="right" mono bold style={{ color: T.blue, fontSize: 22 }}>
                   {fmtTL(SABIT_TOPLAM)}
                 </Td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p style={{ margin: '8px 4px 0', fontSize: 12, color: T.textSoft, fontStyle: 'italic' }}>
+        <p style={{ margin: '10px 4px 0', fontSize: 13.5, color: T.textSoft, fontStyle: 'italic' }}>
           * Sabit maliyetler; sunucu, veritabanı, yapay zeka altyapısı ve web platform işletmesi olmak üzere temel altyapıyı kapsar.
         </p>
       </div>
@@ -202,25 +202,25 @@ export default function UcretlendirmePolitikasiClient() {
       {/* SINIRSIZ KULLANIM EŞİĞİ */}
       <div style={{
         background: `linear-gradient(135deg, ${T.green} 0%, ${T.blue} 100%)`,
-        borderRadius: 14, padding: '18px 24px', color: '#fff',
-        boxShadow: '0 8px 20px -6px rgba(5, 150, 105, 0.35)',
-        display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
+        borderRadius: 16, padding: '24px 32px', color: '#fff',
+        boxShadow: '0 10px 25px -6px rgba(5, 150, 105, 0.4)',
+        display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap',
       }}>
         <div style={{
-          background: 'rgba(255,255,255,0.18)', borderRadius: 12, padding: 12,
+          background: 'rgba(255,255,255,0.2)', borderRadius: 14, padding: 16,
           display: 'inline-flex',
         }}>
-          <InfinityIcon size={38} color="#fff" strokeWidth={2.4} />
+          <InfinityIcon size={54} color="#fff" strokeWidth={2.4} />
         </div>
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ fontSize: 12, opacity: 0.9, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>
+        <div style={{ flex: 1, minWidth: 280 }}>
+          <div style={{ fontSize: 14, opacity: 0.92, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 700 }}>
             Sınırsız Kullanım Üst Ödeme Eşiği
           </div>
-          <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-            {fmtTL(SINIRSIZ_ESIK)} <span style={{ fontSize: 14, fontWeight: 500, opacity: 0.9 }}>/ ay (KDV Hariç)</span>
+          <div style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.05 }}>
+            {fmtTL(SINIRSIZ_ESIK)} <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.9 }}>/ ay (KDV Hariç)</span>
           </div>
         </div>
-        <div style={{ maxWidth: 380, fontSize: 12.5, lineHeight: 1.5, opacity: 0.95 }}>
+        <div style={{ maxWidth: 480, fontSize: 15, lineHeight: 1.55, opacity: 0.95 }}>
           Bu tavan tutar üzerinde ödeme yapan projeler; <strong>sınırsız kullanıcı ve lokasyon
           kullanımına uygun sunucu, altyapı, geliştirme ve yönetim destek hizmetlerinden</strong>
           bütünüyle faydalanır.
@@ -229,68 +229,68 @@ export default function UcretlendirmePolitikasiClient() {
 
       {/* HESAP MAKİNESİ */}
       <div>
-        <SectionTitle icon={<Calculator size={15} color={T.slate} />}>Aylık Maliyet Hesaplayıcı</SectionTitle>
-        <div className="verde-card" style={{ padding: 18 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
+        <SectionTitle icon={<Calculator size={18} color={T.slate} />}>Aylık Maliyet Hesaplayıcı</SectionTitle>
+        <div className="verde-card" style={{ padding: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18, marginBottom: 20 }}>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
+              <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
                 Kullanıcı Sayısı <span style={{ textTransform: 'none', fontWeight: 500, opacity: 0.7 }}>(proje)</span>
               </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Users size={18} color={T.blue} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Users size={22} color={T.blue} />
                 <input
                   type="number" min={0} value={kullaniciSayisi}
                   onChange={e => setKullaniciSayisi(parseInt(e.target.value) || 0)}
                   style={inputStyle}
                 />
               </div>
-              <div style={{ fontSize: 12, color: T.textSoft, marginTop: 4 }}>
-                × {fmtTL(FIYAT_KULLANICI)} = <strong style={{ color: T.blue }}>{fmtTL(hesap.kullaniciMaliyeti)}</strong>
+              <div style={{ fontSize: 14, color: T.textSoft, marginTop: 6 }}>
+                × {fmtTL(FIYAT_KULLANICI)} = <strong style={{ color: T.blue, fontSize: 15 }}>{fmtTL(hesap.kullaniciMaliyeti)}</strong>
               </div>
             </div>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
+              <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
                 Lokasyon (QR) Sayısı <span style={{ textTransform: 'none', fontWeight: 500, opacity: 0.7 }}>(proje)</span>
               </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <MapPin size={18} color={T.purple} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <MapPin size={22} color={T.purple} />
                 <input
                   type="number" min={0} value={lokasyonSayisi}
                   onChange={e => setLokasyonSayisi(parseInt(e.target.value) || 0)}
                   style={inputStyle}
                 />
               </div>
-              <div style={{ fontSize: 12, color: T.textSoft, marginTop: 4 }}>
-                × {fmtTL(FIYAT_LOKASYON)} = <strong style={{ color: T.purple }}>{fmtTL(hesap.lokasyonMaliyeti)}</strong>
+              <div style={{ fontSize: 14, color: T.textSoft, marginTop: 6 }}>
+                × {fmtTL(FIYAT_LOKASYON)} = <strong style={{ color: T.purple, fontSize: 15 }}>{fmtTL(hesap.lokasyonMaliyeti)}</strong>
               </div>
             </div>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
+              <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
                 Firmada Toplam Proje Sayısı
               </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Layers size={18} color={T.slate} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Layers size={22} color={T.slate} />
                 <input
                   type="number" min={1} value={projeSayisi}
                   onChange={e => setProjeSayisi(parseInt(e.target.value) || 1)}
                   style={inputStyle}
                 />
               </div>
-              <div style={{ fontSize: 12, color: T.textSoft, marginTop: 4 }}>
-                Sabit ÷ {hesap.p} = <strong style={{ color: T.slate }}>{fmtTL(hesap.sabitPay)}</strong> / proje
+              <div style={{ fontSize: 14, color: T.textSoft, marginTop: 6 }}>
+                Sabit ÷ {hesap.p} = <strong style={{ color: T.slate, fontSize: 15 }}>{fmtTL(hesap.sabitPay)}</strong> / proje
               </div>
             </div>
           </div>
 
           {/* İki panel: Proje bazlı + Firma toplamı */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 18 }}>
             {/* Sol: Proje bazlı */}
-            <div style={{ background: T.blueLight, borderRadius: 10, padding: 14, border: `1px solid ${T.blue}33` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 12, fontWeight: 800, color: T.blue, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <Calculator size={14} />
+            <div style={{ background: T.blueLight, borderRadius: 12, padding: 18, border: `1px solid ${T.blue}33` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 14, fontWeight: 800, color: T.blue, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <Calculator size={17} />
                 Proje Bazlı Aylık Maliyet
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
                 <tbody>
                   <OzetSatir label={`Sabit Pay (${hesap.p} projeye bölünmüş)`} tutar={hesap.sabitPay} muted />
                   <OzetSatir label="Kullanıcı Maliyeti" tutar={hesap.kullaniciMaliyeti} muted />
@@ -303,12 +303,12 @@ export default function UcretlendirmePolitikasiClient() {
               </table>
             </div>
             {/* Sağ: Firma toplamı */}
-            <div style={{ background: '#faf5ff', borderRadius: 10, padding: 14, border: `1px solid ${T.purple}33` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 12, fontWeight: 800, color: T.purple, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <Building2 size={14} />
+            <div style={{ background: '#faf5ff', borderRadius: 12, padding: 18, border: `1px solid ${T.purple}33` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 14, fontWeight: 800, color: T.purple, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <Building2 size={17} />
                 Firma Toplamı (Tüm Projeler)
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
                 <tbody>
                   <OzetSatir label="Sabit Maliyet (firma tek)" tutar={SABIT_TOPLAM} muted />
                   <OzetSatir label={`Değişken × ${hesap.p} proje`} tutar={hesap.projeDegisken * hesap.p} muted />
@@ -317,21 +317,21 @@ export default function UcretlendirmePolitikasiClient() {
                   <OzetSatir label="FİRMA TOPLAMI (KDV DAHİL)" tutar={hesap.firmaKdvDahil} bold highlight2 />
                 </tbody>
               </table>
-              <div style={{ marginTop: 8, fontSize: 11, color: T.textSoft, fontStyle: 'italic' }}>
+              <div style={{ marginTop: 10, fontSize: 12.5, color: T.textSoft, fontStyle: 'italic' }}>
                 * Değişken tutar tüm projelerin aynı boyutta olduğu varsayımıyla gösterilir. Gerçekte her proje kendi kullanıcı/lokasyon adediyle hesaplanır.
               </div>
             </div>
           </div>
 
           {/* Sınırsız eşik barı — firma toplamı üzerinden */}
-          <div style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6, color: T.textSoft }}>
+          <div style={{ marginTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8, color: T.textSoft }}>
               <span>Sınırsız Eşiğe Yakınlık <strong style={{ color: T.slate }}>(firma toplamı)</strong></span>
-              <strong style={{ color: hesap.sinirsizUzerinde ? T.green : T.slate }}>
+              <strong style={{ color: hesap.sinirsizUzerinde ? T.green : T.slate, fontSize: 15 }}>
                 %{hesap.sinirsizPct.toFixed(1)}
               </strong>
             </div>
-            <div style={{ height: 10, borderRadius: 999, background: T.slateLight, overflow: 'hidden' }}>
+            <div style={{ height: 14, borderRadius: 999, background: T.slateLight, overflow: 'hidden' }}>
               <div style={{
                 width: `${hesap.sinirsizPct}%`, height: '100%',
                 background: hesap.sinirsizUzerinde
@@ -342,11 +342,11 @@ export default function UcretlendirmePolitikasiClient() {
             </div>
             {hesap.sinirsizUzerinde && (
               <div style={{
-                marginTop: 10, padding: '10px 14px', background: T.greenLight,
-                border: `1px solid ${T.green}`, borderRadius: 8, color: '#065f46', fontSize: 13,
-                display: 'flex', alignItems: 'center', gap: 8,
+                marginTop: 12, padding: '12px 18px', background: T.greenLight,
+                border: `1px solid ${T.green}`, borderRadius: 10, color: '#065f46', fontSize: 15,
+                display: 'flex', alignItems: 'center', gap: 10,
               }}>
-                <InfinityIcon size={16} />
+                <InfinityIcon size={20} />
                 <span>Bu firma <strong>sınırsız kullanım eşiğinin üzerinde</strong> — sınırsız plan avantajı devreye girer.</span>
               </div>
             )}
@@ -356,12 +356,12 @@ export default function UcretlendirmePolitikasiClient() {
 
       {/* NOTLAR */}
       <div className="verde-card" style={{
-        padding: 16, background: T.amberLight, border: `1px solid ${T.amber}`,
-        display: 'flex', gap: 12, alignItems: 'flex-start',
+        padding: 20, background: T.amberLight, border: `1px solid ${T.amber}`,
+        display: 'flex', gap: 14, alignItems: 'flex-start',
       }}>
-        <Info size={18} color={T.amber} style={{ flexShrink: 0, marginTop: 2 }} />
-        <div style={{ fontSize: 13, color: '#78350f', lineHeight: 1.6 }}>
-          <strong style={{ display: 'block', marginBottom: 4, color: '#92400e' }}>Önemli Notlar</strong>
+        <Info size={22} color={T.amber} style={{ flexShrink: 0, marginTop: 2 }} />
+        <div style={{ fontSize: 15, color: '#78350f', lineHeight: 1.65 }}>
+          <strong style={{ display: 'block', marginBottom: 8, color: '#92400e', fontSize: 16 }}>Önemli Notlar</strong>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             <li>Tüm fiyatlar Türk Lirası (₺) cinsinden, aylık ve KDV hariçtir. KDV oranı %{KDV_ORAN * 100}'dir.</li>
             <li><strong>Sabit maliyet firma seviyesinde tek ödenir</strong> — firmanın tüm projelerine paylaştırılır, her proje için ayrıca faturalanmaz.</li>
@@ -380,8 +380,8 @@ export default function UcretlendirmePolitikasiClient() {
 function SectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
-      fontSize: 12, fontWeight: 800, color: T.slate,
+      display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
+      fontSize: 15, fontWeight: 800, color: T.slate,
       textTransform: 'uppercase', letterSpacing: '0.06em',
     }}>
       {icon}
@@ -395,25 +395,25 @@ function BirimKart({ ikon, renk, baslik, fiyat, aciklama }: {
 }) {
   return (
     <div className="verde-card" style={{
-      padding: 18, position: 'relative', overflow: 'hidden',
-      borderTop: `4px solid ${renk}`,
+      padding: 26, position: 'relative', overflow: 'hidden',
+      borderTop: `5px solid ${renk}`,
     }}>
       <div style={{
-        position: 'absolute', top: 12, right: 12,
-        background: renk, borderRadius: 10, padding: 8,
+        position: 'absolute', top: 16, right: 16,
+        background: renk, borderRadius: 12, padding: 12,
         display: 'inline-flex',
       }}>{ikon}</div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {baslik}
       </div>
-      <div style={{ marginTop: 6, marginBottom: 4 }}>
-        <span style={{ fontSize: 34, fontWeight: 900, color: renk, letterSpacing: '-0.02em' }}>
+      <div style={{ marginTop: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 52, fontWeight: 900, color: renk, letterSpacing: '-0.03em', lineHeight: 1 }}>
           {fiyat}
         </span>
-        <span style={{ fontSize: 16, fontWeight: 700, color: renk, marginLeft: 4 }}>₺</span>
-        <span style={{ fontSize: 12, color: T.textSoft, marginLeft: 6 }}>+ KDV / ay</span>
+        <span style={{ fontSize: 22, fontWeight: 800, color: renk, marginLeft: 6 }}>₺</span>
+        <span style={{ fontSize: 14, color: T.textSoft, marginLeft: 8 }}>+ KDV / ay</span>
       </div>
-      <div style={{ fontSize: 12.5, color: T.textSoft, lineHeight: 1.45 }}>
+      <div style={{ fontSize: 14.5, color: T.textSoft, lineHeight: 1.5 }}>
         {aciklama}
       </div>
     </div>
@@ -423,8 +423,8 @@ function BirimKart({ ikon, renk, baslik, fiyat, aciklama }: {
 function Th({ children, align = 'left', style }: { children: React.ReactNode; align?: 'left' | 'right' | 'center'; style?: React.CSSProperties }) {
   return (
     <th style={{
-      padding: '11px 14px', fontSize: 11.5, fontWeight: 800,
-      textAlign: align, letterSpacing: '0.05em', textTransform: 'uppercase',
+      padding: '14px 18px', fontSize: 13, fontWeight: 800,
+      textAlign: align, letterSpacing: '0.06em', textTransform: 'uppercase',
       borderBottom: '1px solid rgba(255,255,255,0.15)', ...style,
     }}>{children}</th>
   )
@@ -437,7 +437,7 @@ function Td({ children, align = 'left', muted, bold, mono, small, colSpan, style
 }) {
   return (
     <td colSpan={colSpan} style={{
-      padding: '10px 14px', fontSize: small ? 12 : 13.5,
+      padding: '14px 18px', fontSize: small ? 13.5 : 15,
       textAlign: align, color: muted ? T.textSoft : T.text,
       fontWeight: bold ? 700 : 400,
       fontFamily: mono ? 'ui-monospace, monospace' : undefined,
@@ -454,15 +454,15 @@ function OzetSatir({ label, tutar, bold, muted, border, highlight, highlight2 }:
       borderTop: border ? `2px dashed ${T.border}` : undefined,
     }}>
       <td style={{
-        padding: highlight || highlight2 ? '10px 12px' : '6px 12px',
-        fontSize: highlight2 ? 14 : (highlight ? 13.5 : 13),
+        padding: highlight || highlight2 ? '14px 14px' : '9px 14px',
+        fontSize: highlight2 ? 16 : (highlight ? 15.5 : 14.5),
         color: highlight2 ? '#065f46' : (highlight ? T.blue : (muted ? T.textSoft : T.text)),
         fontWeight: bold ? 800 : 500,
         letterSpacing: (highlight || highlight2) ? '0.02em' : undefined,
       }}>{label}</td>
       <td style={{
-        padding: highlight || highlight2 ? '10px 12px' : '6px 12px',
-        fontSize: highlight2 ? 18 : (highlight ? 16 : 13),
+        padding: highlight || highlight2 ? '14px 14px' : '9px 14px',
+        fontSize: highlight2 ? 22 : (highlight ? 19 : 15),
         color: highlight2 ? T.green : (highlight ? T.blue : (muted ? T.textSoft : T.text)),
         fontWeight: bold ? 900 : 600,
         fontFamily: 'ui-monospace, monospace',
@@ -473,7 +473,7 @@ function OzetSatir({ label, tutar, bold, muted, border, highlight, highlight2 }:
 }
 
 const inputStyle: React.CSSProperties = {
-  flex: 1, padding: '8px 12px', fontSize: 15, fontWeight: 700,
-  border: `1px solid ${T.border}`, borderRadius: 8, background: '#fff',
+  flex: 1, padding: '12px 16px', fontSize: 18, fontWeight: 800,
+  border: `1px solid ${T.border}`, borderRadius: 10, background: '#fff',
   color: T.text, outline: 'none',
 }
