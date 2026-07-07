@@ -88,24 +88,35 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
   // ─── SEKME 1: Hesap makinesi (proje bazli) girdileri ──────────────────
   const [kullaniciSayisi, setKullaniciSayisi] = useState<number>(100)
   const [lokasyonSayisi, setLokasyonSayisi] = useState<number>(50)
+  // Firma toplamlari sabit maliyet payi hesabinda kullanilir.
+  // Default = proje ile ayni (tek proje senaryosu) — bu durumda sabit tamami
+  // bu projeye dusuyor.
+  const [firmaKullaniciTop, setFirmaKullaniciTop] = useState<number>(100)
+  const [firmaLokasyonTop, setFirmaLokasyonTop] = useState<number>(50)
 
   const hesap = useMemo(() => {
     const u = Math.max(0, kullaniciSayisi || 0)
     const l = Math.max(0, lokasyonSayisi || 0)
+    const fu = Math.max(u, firmaKullaniciTop || 0)  // firma toplami en az proje kadar
+    const fl = Math.max(l, firmaLokasyonTop || 0)
     const kullaniciMaliyeti = u * FIYAT_KULLANICI
     const lokasyonMaliyeti = l * FIYAT_LOKASYON
     const projeDegisken = kullaniciMaliyeti + lokasyonMaliyeti
-    // Sabit maliyet firma seviyesinde tek — proje bazli hesapta doğrudan eklenmez;
-    // sadece bilgi olarak yandaki notta gorunur. Toplam sadece degisken + KDV.
-    const kdvHaric = projeDegisken
+    // Sabit maliyet payi: proje degiskeninin firma toplam degisken icindeki
+    // orani. Ornek: 6000 / 18000 = %33 → sabitPay = 33616 × 0.33 = 11205
+    const firmaDegisken = fu * FIYAT_KULLANICI + fl * FIYAT_LOKASYON
+    const sabitPayOran = firmaDegisken > 0 ? projeDegisken / firmaDegisken : 1
+    const sabitPay = SABIT_TOPLAM * sabitPayOran
+    const kdvHaric = projeDegisken + sabitPay
     const kdv = kdvHaric * KDV_ORAN
     const kdvDahil = kdvHaric + kdv
     return {
-      u, l,
+      u, l, fu, fl,
       kullaniciMaliyeti, lokasyonMaliyeti, projeDegisken,
+      firmaDegisken, sabitPayOran, sabitPay,
       kdvHaric, kdv, kdvDahil,
     }
-  }, [kullaniciSayisi, lokasyonSayisi])
+  }, [kullaniciSayisi, lokasyonSayisi, firmaKullaniciTop, firmaLokasyonTop])
 
   // ─── SEKME 2: Firma analizi verisi ───────────────────────────────────
   const [analiz, setAnaliz] = useState<FirmaAnaliziResp | null>(null)
@@ -279,6 +290,10 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
       <div>
         <SectionTitle icon={<Calculator size={18} color={T.slate} />}>Proje Bazlı Aylık Maliyet Hesaplayıcı</SectionTitle>
         <div className="verde-card" style={{ padding: 24 }}>
+          {/* Proje girdileri */}
+          <div style={{ marginBottom: 12, fontSize: 12, fontWeight: 800, color: T.blue, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            ▸ Proje Bilgileri
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18, marginBottom: 20 }}>
             <div>
               <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
@@ -314,6 +329,52 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
             </div>
           </div>
 
+          {/* Firma toplami girdileri — sabit pay hesabi icin */}
+          <div style={{
+            marginBottom: 12, fontSize: 12, fontWeight: 800, color: T.slate,
+            textTransform: 'uppercase', letterSpacing: '0.06em',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <Building2 size={14} />
+            Firma Toplamı <span style={{ color: T.textSoft, fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>
+              (sabit maliyet payını hesaplamak için)
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18, marginBottom: 20 }}>
+            <div>
+              <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
+                Firma Toplam Kullanıcı
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Users size={22} color={T.slate} />
+                <input
+                  type="number" min={0} value={firmaKullaniciTop}
+                  onChange={e => setFirmaKullaniciTop(parseInt(e.target.value) || 0)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ fontSize: 14, color: T.textSoft, marginTop: 6 }}>
+                Bu proje payı: <strong style={{ color: T.slate }}>%{hesap.fu > 0 ? ((hesap.u / hesap.fu) * 100).toFixed(1) : '0.0'}</strong>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 13.5, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 8 }}>
+                Firma Toplam Lokasyon
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <MapPin size={22} color={T.slate} />
+                <input
+                  type="number" min={0} value={firmaLokasyonTop}
+                  onChange={e => setFirmaLokasyonTop(parseInt(e.target.value) || 0)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ fontSize: 14, color: T.textSoft, marginTop: 6 }}>
+                Bu proje payı: <strong style={{ color: T.slate }}>%{hesap.fl > 0 ? ((hesap.l / hesap.fl) * 100).toFixed(1) : '0.0'}</strong>
+              </div>
+            </div>
+          </div>
+
           {/* Ozet tablo */}
           <div style={{ background: T.blueLight, borderRadius: 12, padding: 18, border: `1px solid ${T.blue}33` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 14, fontWeight: 800, color: T.blue, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -324,6 +385,12 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
               <tbody>
                 <OzetSatir label="Kullanıcı Maliyeti" tutar={hesap.kullaniciMaliyeti} muted />
                 <OzetSatir label="Lokasyon (QR) Maliyeti" tutar={hesap.lokasyonMaliyeti} muted />
+                <OzetSatir label="Proje Değişken Ara Toplam" tutar={hesap.projeDegisken} border />
+                <OzetSatir
+                  label={`Sabit Maliyet Payı (%${(hesap.sabitPayOran * 100).toFixed(1)} × ${fmtTL(SABIT_TOPLAM)})`}
+                  tutar={hesap.sabitPay}
+                  muted
+                />
                 <OzetSatir label="AYLIK TOPLAM (KDV HARİÇ)" tutar={hesap.kdvHaric} bold highlight />
                 <OzetSatir label={`KDV (%${KDV_ORAN * 100})`} tutar={hesap.kdv} muted />
                 <OzetSatir label="AYLIK TOPLAM (KDV DAHİL)" tutar={hesap.kdvDahil} bold highlight2 />
@@ -339,9 +406,9 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
           }}>
             <Info size={18} color={T.amber} style={{ flexShrink: 0, marginTop: 1 }} />
             <div>
-              Sabit maliyet ({fmtTL(SABIT_TOPLAM)}) firma seviyesinde tek ödenir ve
-              projelere <strong>kullanıcı + lokasyon oranı</strong> ile paylaştırılır. Her projenin
-              gerçek sabit maliyet payını <strong>Firma Analizi</strong> sekmesinden görebilirsiniz.
+              Sabit maliyet payı formülü: <strong>SABİT × (proje değişkeni / firma toplam değişken)</strong>.
+              Firma toplamları proje ile aynı bırakılırsa (tek proje senaryosu) sabit tamamı bu projeye düşer.
+              Gerçek firma verisini <strong>Firma Analizi</strong> sekmesinden görebilirsiniz.
             </div>
           </div>
         </div>
