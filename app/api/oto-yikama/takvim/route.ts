@@ -80,6 +80,13 @@ async function timedStep<T>(label: string, fn: () => Promise<T>): Promise<T> {
   try {
     const res = await fn()
     const dt = Date.now() - t0
+    // Postgrest response'unda .error dolu ise "OK" yazmak yaniltici olur
+    const postgrestErr = (res as any)?.error
+    if (postgrestErr) {
+      // eslint-disable-next-line no-console
+      console.log(`[TAKVIM] ${label} FAIL(postgrest) ${dt}ms err=${serializeError(postgrestErr)}`)
+      return res
+    }
     const rows = Array.isArray(res) ? res.length : (res as any)?.data?.length ?? '-'
     // eslint-disable-next-line no-console
     console.log(`[TAKVIM] ${label} OK ${dt}ms rows=${rows}`)
@@ -141,11 +148,13 @@ export async function GET(req: NextRequest) {
 
   const gorevIds = metaArr.map(m => m.gorev_id).filter(Boolean) as string[]
 
-  // .in('id', gorevIds) URL'yi sisirebilir (500+ ID = 20KB+ URL, Cloudflare 431).
-  // 500'luk chunk'lar halinde parcala.
+  // .in('id', gorevIds) URL'yi sisirebilir. Bir UUID = 37 char (36 + virgul).
+  // Cloudflare 8KB HTTP request-line limiti var — 500 UUID = ~18KB, RED.
+  // Supabase edge'i "TypeError: fetch failed" olarak dondurur (undici socket kesildi).
+  // 100 UUID = ~3.7KB + query base ~500B = ~4.2KB — guvenli marj.
   const gorevMap = new Map<string, any>()
   if (gorevIds.length > 0) {
-    const CHUNK = 500
+    const CHUNK = 100
     for (let i = 0; i < gorevIds.length; i += CHUNK) {
       const slice = gorevIds.slice(i, i + CHUNK)
       const chunkIdx = Math.floor(i / CHUNK) + 1
