@@ -105,6 +105,10 @@ function getNav(base: string, rol: UserRole, otoYikamaAktif: boolean): NavGroup[
       label: 'Sistem',
       items: [
         { label: 'Profil Ayarları', href: `${base}/dashboard/ayarlar`, icon: '⚙' },
+        ...(isSA
+          ? [{ label: 'Ücretlendirme Politikası', href: `${base}/dashboard/ucretlendirme-politikasi`, icon: '💵' }]
+          : []
+        ),
         ...(isSA || isTA
           ? [
               { label: 'Sistem Ayarları', href: `${base}/dashboard/sistem-ayarlari`, icon: '🛠️' },
