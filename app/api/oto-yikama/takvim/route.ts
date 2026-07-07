@@ -61,6 +61,7 @@ export type TakvimResponse = {
 }
 
 export async function GET(req: NextRequest) {
+  try {
   const { me } = await assertModulYetkisi('oto_yikama')
 
   const sp = req.nextUrl.searchParams
@@ -260,4 +261,14 @@ export async function GET(req: NextRequest) {
 
   const payload: TakvimResponse = { ok: true, gercek, araclar, skipler, lokasyonAdMap, kullaniciAdMap }
   return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (e: any) {
+    // Undici "fetch failed" gibi network hatalarinin gercek sebebini (cause) log'a yaz
+    const cause = e?.cause ? ` | cause=${e.cause?.code ?? ''} ${e.cause?.message ?? String(e.cause)}` : ''
+    // eslint-disable-next-line no-console
+    console.error('[oto-yikama/takvim] beklenmedik hata:', e?.message, cause, e?.stack)
+    return NextResponse.json(
+      { ok: false, error: `${e?.message ?? 'beklenmedik hata'}${cause}` },
+      { status: 500 }
+    )
+  }
 }
