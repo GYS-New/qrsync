@@ -328,29 +328,8 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
             </div>
           </div>
 
-          {/* Firma toplami bilgisi — otomatik olarak API'den gelir */}
-          {firmaId && analiz && (
-            <div style={{
-              background: '#faf5ff', border: `1px solid ${T.purple}33`, borderRadius: 10,
-              padding: '12px 16px', marginBottom: 20,
-              display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Building2 size={18} color={T.purple} />
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Seçili Firma
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: T.text }}>{analiz.firma.ad}</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 20, marginLeft: 'auto', flexWrap: 'wrap' }}>
-                <FirmaBilgi ikon={<Users size={16} color={T.slate} />} etiket="Firma Toplam Kullanıcı" deger={analiz.firmaToplam.kullanici} />
-                <FirmaBilgi ikon={<MapPin size={16} color={T.slate} />} etiket="Firma Toplam Lokasyon" deger={analiz.firmaToplam.lokasyon} />
-                <FirmaBilgi ikon={<FolderKanban size={16} color={T.slate} />} etiket="Toplam Proje" deger={analiz.firmaToplam.projeSayisi} />
-              </div>
-            </div>
-          )}
+          {/* Firma toplami arka planda API'den otomatik alinir ve sabit pay
+              hesabinda kullanilir — bilgi bandi UI'de gosterilmez. */}
           {firmaId && analizLoading && !analiz && (
             <div style={{
               background: T.slateLight, borderRadius: 10, padding: '12px 16px', marginBottom: 20,
@@ -630,20 +609,6 @@ function FirmaAnaliziSekmesi({
         </p>
       </div>
     </>
-  )
-}
-
-function FirmaBilgi({ ikon, etiket, deger }: { ikon: React.ReactNode; etiket: string; deger: number }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      {ikon}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          {etiket}
-        </div>
-        <div style={{ fontSize: 17, fontWeight: 900, color: T.text, letterSpacing: '-0.01em' }}>{deger}</div>
-      </div>
-    </div>
   )
 }
 
