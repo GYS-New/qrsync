@@ -37,17 +37,19 @@ export async function GET(req: NextRequest) {
     .single()
   if (!firma) return NextResponse.json({ ok: false, error: 'Firma bulunamadı' }, { status: 404 })
 
-  // Firmanin tum projeleri (aktif + pasif — analizde hepsi gorunsun)
-  const { data: projeler } = await admin
+  // Firmanin tum projeleri (pasif dahil — pasif projedeki kayitlari 'Projesiz'
+  // grubuna dahil edip firma toplamin butunlugunu koruruz).
+  const { data: tumProjeler } = await admin
     .from('projeler')
     .select('id, ad, aktif')
     .eq('firma_id', firmaId)
-    .order('aktif', { ascending: false })
     .order('ad', { ascending: true })
 
-  const projeIds = (projeler ?? []).map(p => p.id)
+  const aktifProjeIds = new Set(
+    (tumProjeler ?? []).filter(p => p.aktif === true).map(p => p.id)
+  )
 
-  // Firmanin tum kullanicilarini + lokasyonlarini cek (aktif olanlar)
+  // Firmanin tum aktif kullanicilarini + lokasyonlarini cek
   const [usersRes, loksRes] = await Promise.all([
     admin.from('users').select('id, proje_id, aktif').eq('firma_id', firmaId).eq('aktif', true),
     admin.from('lokasyonlar').select('id, proje_id, aktif').eq('firma_id', firmaId).eq('aktif', true),
@@ -55,29 +57,38 @@ export async function GET(req: NextRequest) {
   const users = (usersRes.data ?? []) as any[]
   const loks = (loksRes.data ?? []) as any[]
 
-  // Proje bazli sayim
+  // Proje bazli sayim — sadece AKTIF projelere sayilir; proje_id NULL veya
+  // pasif projeye ait olanlar 'Projesiz' grubunda toplanir.
   const kullaniciMap = new Map<string, number>()
   const lokasyonMap = new Map<string, number>()
   let projesizKullanici = 0
   let projesizLokasyon = 0
   for (const u of users) {
-    if (u.proje_id) kullaniciMap.set(u.proje_id, (kullaniciMap.get(u.proje_id) ?? 0) + 1)
-    else projesizKullanici++
+    if (u.proje_id && aktifProjeIds.has(u.proje_id)) {
+      kullaniciMap.set(u.proje_id, (kullaniciMap.get(u.proje_id) ?? 0) + 1)
+    } else {
+      projesizKullanici++
+    }
   }
   for (const l of loks) {
-    if (l.proje_id) lokasyonMap.set(l.proje_id, (lokasyonMap.get(l.proje_id) ?? 0) + 1)
-    else projesizLokasyon++
+    if (l.proje_id && aktifProjeIds.has(l.proje_id)) {
+      lokasyonMap.set(l.proje_id, (lokasyonMap.get(l.proje_id) ?? 0) + 1)
+    } else {
+      projesizLokasyon++
+    }
   }
 
-  const projeSonuc = (projeler ?? []).map(p => ({
+  // Response'ta sadece aktif projeler
+  const aktifProjeler = (tumProjeler ?? []).filter(p => p.aktif === true)
+  const projeSonuc = aktifProjeler.map(p => ({
     id: p.id,
     ad: p.ad ?? '—',
-    aktif: p.aktif === true,
+    aktif: true,
     kullanici_sayisi: kullaniciMap.get(p.id) ?? 0,
     lokasyon_sayisi: lokasyonMap.get(p.id) ?? 0,
   }))
 
-  // Projesiz (proje_id NULL) satiri — hesaba katilir cunku firma toplamin parcasi
+  // Projesiz satiri — hesaba katilir cunku firma toplamin parcasi
   if (projesizKullanici > 0 || projesizLokasyon > 0) {
     projeSonuc.push({
       id: '__projesiz__',
@@ -97,7 +108,7 @@ export async function GET(req: NextRequest) {
     firmaToplam: {
       kullanici: users.length,
       lokasyon: loks.length,
-      projeSayisi: projeIds.length,
+      projeSayisi: aktifProjeler.length, // aktif proje sayisi
     },
   })
 }

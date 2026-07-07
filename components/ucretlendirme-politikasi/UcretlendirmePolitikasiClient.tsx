@@ -522,7 +522,7 @@ function FirmaAnaliziSekmesi({
           </div>
         </div>
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          <MetrikMini ikon={<FolderKanban size={18} />} etiket="Proje" deger={analiz.firmaToplam.projeSayisi} />
+          <MetrikMini ikon={<FolderKanban size={18} />} etiket="Aktif Proje" deger={analiz.firmaToplam.projeSayisi} />
           <MetrikMini ikon={<Users size={18} />} etiket="Kullanıcı" deger={analiz.firmaToplam.kullanici} />
           <MetrikMini ikon={<MapPin size={18} />} etiket="Lokasyon" deger={analiz.firmaToplam.lokasyon} />
         </div>
