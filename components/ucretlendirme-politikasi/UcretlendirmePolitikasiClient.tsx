@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Users, MapPin, Server, Database, Bot, Globe, Infinity as InfinityIcon, Calculator, Info, TrendingUp, Building2, FolderKanban, Loader2, AlertCircle } from 'lucide-react'
+import { Users, MapPin, Server, Database, Bot, Globe, Infinity as InfinityIcon, Calculator, Info, TrendingUp, Building2, FolderKanban, Loader2, AlertCircle, Package, Car, Wrench, AudioLines } from 'lucide-react'
 
 const T = {
   text: '#0f172a', textSoft: '#64748b', border: '#e2e8f0',
@@ -115,7 +115,7 @@ interface Props {
 }
 
 export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
-  const [tab, setTab] = useState<'politika' | 'analiz'>('politika')
+  const [tab, setTab] = useState<'politika' | 'analiz' | 'moduller'>('politika')
 
   // ─── SEKME 1: Hesap makinesi (proje bazli) girdileri ──────────────────
   const [kullaniciSayisi, setKullaniciSayisi] = useState<number>(0)
@@ -192,6 +192,9 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
         </TabBtn>
         <TabBtn active={tab === 'analiz'} onClick={() => setTab('analiz')} icon={<FolderKanban size={16} />}>
           Firma Analizi
+        </TabBtn>
+        <TabBtn active={tab === 'moduller'} onClick={() => setTab('moduller')} icon={<Package size={16} />}>
+          Özel Modüller
         </TabBtn>
       </div>
 
@@ -490,6 +493,8 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
           hata={analizHata}
         />
       )}
+
+      {tab === 'moduller' && <OzelModullerSekmesi />}
     </div>
   )
 }
@@ -770,6 +775,163 @@ function SinirsizEsikBar({ firmaKdvHaric }: { firmaKdvHaric: number }) {
         </div>
       </div>
     </div>
+  )
+}
+
+// ─── SEKME 3: Özel Modüller ────────────────────────────────────────────
+
+type OzelModul = {
+  ad: string
+  kod: string
+  ikon: React.ReactNode
+  renk: string
+  kapsam: string
+  aciklama: string
+  fiyatTutar: number
+  fiyatBirim: string    // ör: 'ay', 'tespit'
+}
+
+const OZEL_MODULLER: OzelModul[] = [
+  {
+    ad: 'Oto Yıkama',
+    kod: 'OTO_YIKAMA',
+    ikon: <Car size={17} color="#0891b2" />,
+    renk: '#0891b2',
+    kapsam: 'Araç yıkama takibi · Personel yönetimi · QR taramalı iş akışı',
+    aciklama: 'Frekans bazlı yıkama planı, gerçek zamanlı görev takibi, arşiv ve raporlama',
+    fiyatTutar: 5000,
+    fiyatBirim: 'ay',
+  },
+  {
+    ad: 'FMS — Facility Management System',
+    kod: 'FMS',
+    ikon: <Wrench size={17} color="#7c3aed" />,
+    renk: '#7c3aed',
+    kapsam: 'Tesis yönetimi · Bakım planlaması · Talep ve arıza takibi',
+    aciklama: 'Firmaların tesis operasyonlarını uçtan uca yönettiği kapsamlı yönetim modülü',
+    fiyatTutar: 5000,
+    fiyatBirim: 'ay',
+  },
+  {
+    ad: 'ATS — Akustik Kaçak Takip Sistemi',
+    kod: 'ATS',
+    ikon: <AudioLines size={17} color="#dc2626" />,
+    renk: '#dc2626',
+    kapsam: 'Akustik sensör verisi · Kaçak tespit ve konumlandırma · Uyarı yönetimi',
+    aciklama: 'Su/gaz hatlarındaki kaçakları akustik veri işleyerek tespit eder — tespit başına faturalanır',
+    fiyatTutar: 100,
+    fiyatBirim: 'tespit',
+  },
+]
+
+function OzelModullerSekmesi() {
+  return (
+    <>
+      {/* Hero — GYS sabit payından etkilenmez uyarısı */}
+      <div style={{
+        background: `linear-gradient(135deg, #0891b2 0%, ${T.purple} 100%)`,
+        borderRadius: 16, padding: '24px 28px', color: '#fff',
+        boxShadow: '0 10px 25px -6px rgba(8, 145, 178, 0.4)',
+        display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap',
+      }}>
+        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 14, padding: 14, display: 'inline-flex' }}>
+          <Package size={40} color="#fff" strokeWidth={2.2} />
+        </div>
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <div style={{ fontSize: 13, opacity: 0.9, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
+            GYS'den Bağımsız Özel Modüller
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+            Özel Modül Fiyatlandırması
+          </div>
+          <div style={{ fontSize: 14.5, opacity: 0.95, marginTop: 8, lineHeight: 1.5 }}>
+            Bu modüller <strong>GYS sabit maliyet payından etkilenmez</strong>. Her modül kendi bağımsız
+            fiyat kalemi olarak faturalanır.
+          </div>
+        </div>
+      </div>
+
+      {/* Modüller tablosu */}
+      <div>
+        <SectionTitle icon={<Package size={18} color={T.slate} />}>Özel Modül Kalemleri</SectionTitle>
+        <div className="verde-card" style={{ padding: 0, overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15, minWidth: 900 }}>
+            <thead>
+              <tr style={{ background: T.slate, color: '#fff' }}>
+                <Th style={{ width: 50 }}>#</Th>
+                <Th>Modül</Th>
+                <Th>Kapsam</Th>
+                <Th>Açıklama</Th>
+                <Th align="right" style={{ width: 220 }}>Fiyatlandırma (KDV Hariç)</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {OZEL_MODULLER.map((m, i) => (
+                <tr key={m.kod} style={{ background: i % 2 === 0 ? '#fff' : T.slateLight }}>
+                  <Td align="center" muted>{i + 1}</Td>
+                  <Td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        background: m.renk + '18', borderRadius: 8, padding: 6,
+                        display: 'inline-flex',
+                      }}>{m.ikon}</div>
+                      <strong style={{ color: T.text, fontSize: 16 }}>{m.ad}</strong>
+                    </div>
+                  </Td>
+                  <Td muted>{m.kapsam}</Td>
+                  <Td muted small>{m.aciklama}</Td>
+                  <Td align="right">
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'baseline', gap: 4,
+                      fontFamily: 'ui-monospace, monospace',
+                    }}>
+                      <span style={{ fontSize: 20, fontWeight: 900, color: m.renk }}>
+                        {fmtTL(m.fiyatTutar)}
+                      </span>
+                      <span style={{ fontSize: 13, color: T.textSoft, fontWeight: 600 }}>
+                        / {m.fiyatBirim}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: T.textSoft, marginTop: 2 }}>+ KDV</div>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Fiyat politikası notu */}
+      <div className="verde-card" style={{
+        padding: 20, background: T.amberLight, border: `1px solid ${T.amber}`,
+        display: 'flex', gap: 14, alignItems: 'flex-start',
+      }}>
+        <Info size={22} color={T.amber} style={{ flexShrink: 0, marginTop: 2 }} />
+        <div style={{ fontSize: 15, color: '#78350f', lineHeight: 1.65 }}>
+          <strong style={{ display: 'block', marginBottom: 8, color: '#92400e', fontSize: 16 }}>
+            Özel Modül Fiyat Politikası
+          </strong>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            <li>
+              Özel modül tasarımları <strong>satış</strong> veya <strong>aylık kiralık</strong> olarak ücretlendirilebilir.
+            </li>
+            <li>
+              Fiyat politikası modülün kapsamına göre değişiklik gösterir.
+            </li>
+            <li>
+              <strong>1 aylık çalışma sonunda devreye alınabilir</strong> bir modül için standart fiyatlandırma:
+              <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                <li>Aylık kiralama: <strong>{fmtTL(5000)} / ay + KDV</strong></li>
+                <li>Satış (tek seferlik): <strong>{fmtTL(150000)} + KDV</strong></li>
+              </ul>
+            </li>
+            <li>
+              Özel modüller GYS sabit maliyet payından etkilenmez — her biri bağımsız fiyat kalemi olarak faturalanır.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </>
   )
 }
 
