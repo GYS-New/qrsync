@@ -15,7 +15,6 @@ const T = {
 }
 
 const KDV_ORAN = 0.20
-const SINIRSIZ_ESIK = 264500     // TL / ay (KDV Hariç)
 const FIYAT_KULLANICI = 20       // TL / kullanıcı / ay
 const FIYAT_LOKASYON = 80        // TL / lokasyon / ay
 
@@ -58,6 +57,39 @@ const SABIT_KALEMLER: SabitKalem[] = [
   },
 ]
 const SABIT_TOPLAM = SABIT_KALEMLER.reduce((s, k) => s + k.tutar, 0) // 33.616 TL
+
+// Sinirsiz kullanim odeme esigi kirilimi — daha buyuk kapasite icin
+const ESIK_KALEMLER: SabitKalem[] = [
+  {
+    ad: 'Sunucu Aylık Kira Bedeli',
+    ikon: <Server size={16} color={T.blue} />,
+    kapasite: '2.000 kullanıcı · 10.000 görev/gün · 16 GB bellek',
+    aciklama: '2.000 kullanıcı aktivitesi, 20.000 üzeri veri işleme kapasitesi',
+    tutar: 38560,
+  },
+  {
+    ad: 'Veritabanı Aylık Kira Bedeli',
+    ikon: <Database size={16} color={T.purple} />,
+    kapasite: '32 GB SSD depolama',
+    aciklama: '1 yıllık veri depolama',
+    tutar: 22350,
+  },
+  {
+    ad: 'Yapay Zeka Modeli Aylık Kira Bedeli',
+    ikon: <Bot size={16} color={T.green} />,
+    kapasite: '2.000 kullanıcı · 10.000 görev/gün',
+    aciklama: 'Kapasiteye göre anlık izleme',
+    tutar: 12840,
+  },
+  {
+    ad: 'İşletme Maliyeti',
+    ikon: <Globe size={16} color={T.amber} />,
+    kapasite: '2.000 kullanıcı · 10.000 görev/gün',
+    aciklama: 'Personel, izleme, geliştirme ve yönetim',
+    tutar: 190750,
+  },
+]
+const SINIRSIZ_ESIK = ESIK_KALEMLER.reduce((s, k) => s + k.tutar, 0) // 264.500 TL
 
 function fmtTL(n: number): string {
   return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n) + ' ₺'
@@ -257,33 +289,62 @@ export default function UcretlendirmePolitikasiClient({ firmaId }: Props) {
         </p>
       </div>
 
-      {/* SINIRSIZ KULLANIM EŞİĞİ */}
-      <div style={{
-        background: `linear-gradient(135deg, ${T.green} 0%, ${T.blue} 100%)`,
-        borderRadius: 16, padding: '24px 32px', color: '#fff',
-        boxShadow: '0 10px 25px -6px rgba(5, 150, 105, 0.4)',
-        display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap',
-      }}>
+      {/* SINIRSIZ KULLANIM ÖDEME EŞİĞİ TABLOSU */}
+      <div>
+        <SectionTitle icon={<InfinityIcon size={18} color={T.slate} />}>Sınırsız Kullanım Ödeme Eşiği</SectionTitle>
         <div style={{
-          background: 'rgba(255,255,255,0.2)', borderRadius: 14, padding: 16,
-          display: 'inline-flex',
+          background: T.greenLight, border: `1px solid ${T.green}`, borderRadius: 12,
+          padding: '14px 18px', marginBottom: 12, display: 'flex', gap: 12,
+          alignItems: 'flex-start', fontSize: 15, color: '#064e3b', lineHeight: 1.55,
         }}>
-          <InfinityIcon size={54} color="#fff" strokeWidth={2.4} />
-        </div>
-        <div style={{ flex: 1, minWidth: 280 }}>
-          <div style={{ fontSize: 14, opacity: 0.92, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 700 }}>
-            Sınırsız Kullanım Üst Ödeme Eşiği
-          </div>
-          <div style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.05 }}>
-            {fmtTL(SINIRSIZ_ESIK)} <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.9 }}>/ ay (KDV Hariç)</span>
+          <InfinityIcon size={22} color={T.green} style={{ flexShrink: 0, marginTop: 1 }} strokeWidth={2.4} />
+          <div>
+            Firma toplam aylık maliyeti bu eşiğin üzerine çıkarsa <strong>sınırsız kullanıcı ve
+            lokasyon kullanımına uygun sunucu, altyapı, geliştirme ve yönetim destek
+            hizmetleri</strong> devreye girer. Bu tavan <strong>firma genelidir</strong> — tüm projelerin
+            toplam maliyeti dikkate alınır, tek proje bazlı değildir.
           </div>
         </div>
-        <div style={{ maxWidth: 520, fontSize: 15, lineHeight: 1.55, opacity: 0.95 }}>
-          Bu tavan tutar <strong>firma geneli</strong> için — tüm projelerin toplam aylık
-          maliyeti bu eşiğin üzerine çıkan firmalar; <strong>sınırsız kullanıcı ve lokasyon
-          kullanımına uygun sunucu, altyapı, geliştirme ve yönetim destek hizmetlerinden</strong>
-          bütünüyle faydalanır.
+        <div className="verde-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
+            <thead>
+              <tr style={{ background: T.green, color: '#fff' }}>
+                <Th style={{ width: 50 }}>#</Th>
+                <Th>Kalem</Th>
+                <Th>Kapasite / Özellik</Th>
+                <Th>Açıklama</Th>
+                <Th align="right" style={{ width: 200 }}>Aylık Bedel (KDV Hariç)</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {ESIK_KALEMLER.map((k, i) => (
+                <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : T.slateLight }}>
+                  <Td align="center" muted>{i + 1}</Td>
+                  <Td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {k.ikon}
+                      <strong style={{ color: T.text, fontSize: 16 }}>{k.ad}</strong>
+                    </div>
+                  </Td>
+                  <Td muted>{k.kapasite}</Td>
+                  <Td muted small>{k.aciklama}</Td>
+                  <Td align="right" mono bold style={{ fontSize: 16 }}>{fmtTL(k.tutar)}</Td>
+                </tr>
+              ))}
+              <tr style={{ background: T.greenLight, borderTop: `3px solid ${T.green}` }}>
+                <Td colSpan={4} align="right" bold>
+                  <span style={{ color: T.green, fontSize: 15, letterSpacing: '0.03em' }}>SINIRSIZ KULLANIM EŞİĞİ</span>
+                </Td>
+                <Td align="right" mono bold style={{ color: T.green, fontSize: 22 }}>
+                  {fmtTL(SINIRSIZ_ESIK)}
+                </Td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+        <p style={{ margin: '10px 4px 0', fontSize: 13.5, color: T.textSoft, fontStyle: 'italic' }}>
+          * Ödeme eşiği; 2.000 aktif kullanıcı ve 10.000 günlük görev veri işleme kapasitesine göre boyutlandırılmıştır.
+        </p>
       </div>
 
       {/* HESAP MAKİNESİ — proje bazli */}
