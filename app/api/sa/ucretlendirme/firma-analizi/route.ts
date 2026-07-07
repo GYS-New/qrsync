@@ -57,24 +57,19 @@ export async function GET(req: NextRequest) {
   const users = (usersRes.data ?? []) as any[]
   const loks = (loksRes.data ?? []) as any[]
 
-  // Proje bazli sayim — sadece AKTIF projelere sayilir; proje_id NULL veya
-  // pasif projeye ait olanlar 'Projesiz' grubunda toplanir.
+  // Proje bazli sayim — sadece AKTIF projelere sayilir. proje_id NULL veya
+  // pasif projeye atanmis kayitlar tabloda gosterilmez (Projesiz satiri
+  // kaldirildi), ancak firmaToplam'a dahil edilirler.
   const kullaniciMap = new Map<string, number>()
   const lokasyonMap = new Map<string, number>()
-  let projesizKullanici = 0
-  let projesizLokasyon = 0
   for (const u of users) {
     if (u.proje_id && aktifProjeIds.has(u.proje_id)) {
       kullaniciMap.set(u.proje_id, (kullaniciMap.get(u.proje_id) ?? 0) + 1)
-    } else {
-      projesizKullanici++
     }
   }
   for (const l of loks) {
     if (l.proje_id && aktifProjeIds.has(l.proje_id)) {
       lokasyonMap.set(l.proje_id, (lokasyonMap.get(l.proje_id) ?? 0) + 1)
-    } else {
-      projesizLokasyon++
     }
   }
 
@@ -88,16 +83,9 @@ export async function GET(req: NextRequest) {
     lokasyon_sayisi: lokasyonMap.get(p.id) ?? 0,
   }))
 
-  // Projesiz satiri — hesaba katilir cunku firma toplamin parcasi
-  if (projesizKullanici > 0 || projesizLokasyon > 0) {
-    projeSonuc.push({
-      id: '__projesiz__',
-      ad: 'Projesiz',
-      aktif: false,
-      kullanici_sayisi: projesizKullanici,
-      lokasyon_sayisi: projesizLokasyon,
-    })
-  }
+  // Projesiz satiri artik gosterilmez (kullanici tercihi). Firma toplamlari
+  // hesaba dahildir; sayilarin gorunur projeler toplami ile birebir esitlenmemesi
+  // durumu artik yalniz veri temizligi konusu olarak kalir.
 
   const firmaAd = (firma as any).firma_adi ?? (firma as any).ticari_unvan ?? '—'
 
