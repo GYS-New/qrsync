@@ -55,26 +55,26 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
     if (!firmaId) return
     setHata(null)
     try {
-      // 30 günlük metadata + tamamlanan gorevler (2-step query, embed güvenilir değil)
-      // NOT: gorevIds büyürse .in() URL çok uzayabiliyor (Cloudflare 431/414).
-      // Metadata sorgusunda hedef_tarih + arac_id + firma_id filter'ini
-      // metadata seviyesinde uygulayamıyoruz çünkü firma_id metadata'da yok.
-      // Çözüm: gorevIds'i chunk'la tara veya toplam limit koy.
+      // 30 gunluk metadata — araclar!inner(firma_id) embed ile firma filter
+      // erken uygulanir, boylece sadece bu firmaya ait metadata gelir.
+      // Aksi halde tum firmalarin 5000 kadar kaydi cekilirdi.
       const son30 = trDateStr(new Date(Date.now() - 30 * 86400000))
       const { data: metaRows, error: metaErr } = await supabase
         .from('oto_yikama_gorev_metadata')
-        .select('gorev_id')
+        .select('gorev_id, arac:arac_id!inner(firma_id)')
+        .eq('arac.firma_id', firmaId)
         .gte('hedef_tarih', son30)
         .limit(5000)
       if (metaErr) throw new Error('metadata: ' + metaErr.message)
-      const gorevIds = (metaRows ?? []).map(m => m.gorev_id)
+      const gorevIds = (metaRows ?? []).map((m: any) => m.gorev_id).filter(Boolean) as string[]
       if (gorevIds.length === 0) {
         setChartData(bosBucket(mode))
         setKpi({ bugun: 0, hafta: 0, ay: 0 })
         return
       }
-      // in() URL'sini şişirmemek için chunk'la
-      const CHUNK = 500
+      // .in('id', N-UUIDs) URL'yi sisirir; 500 UUID ~18.5KB olur, Cloudflare
+      // 8KB HTTP request-line limitini asar. 100'luk chunk (100 UUID ~3.7KB).
+      const CHUNK = 100
       const tamamlanmaList: Date[] = []
       for (let i = 0; i < gorevIds.length; i += CHUNK) {
         const chunk = gorevIds.slice(i, i + CHUNK)
