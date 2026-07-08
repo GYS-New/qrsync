@@ -71,11 +71,13 @@ export async function GET(req: NextRequest) {
   const hedef = hedefCount ?? 0
 
   // 2) Metadata: tarih aralığında kayıtlar
+  // Onay bekleyen kayitlar rapora dahil edilmez — amir onaylayana kadar askıda.
   let metaQ = admin
     .from('oto_yikama_gorev_metadata')
     .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra')
     .gte('hedef_tarih', baslangic)
     .lte('hedef_tarih', bitis)
+    .neq('onay_durumu', 'ONAY_BEKLIYOR')
   if (plaka) metaQ = metaQ.eq('plaka_snapshot', plaka)
   if (tip === 'ekstra') metaQ = metaQ.eq('ekstra', true)
   if (tip === 'planli') metaQ = metaQ.eq('ekstra', false)

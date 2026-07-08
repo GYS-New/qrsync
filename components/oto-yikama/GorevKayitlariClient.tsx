@@ -13,6 +13,7 @@ export interface GorevKaydi {
   hedef_tarih: string | null
   ekstra: boolean
   durum: string | null
+  onay_durumu?: string
   lokasyon_id: string | null
   istasyon: string
   departman: string | null
@@ -55,7 +56,9 @@ const T = {
 }
 
 // Türetilmiş durum: ACIK + hedef_tarih > bugün → HAZIR
-type GoruntuDurum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI' | 'DIGER'
+// ONAY_BEKLIYOR: metadata.onay_durumu === 'ONAY_BEKLIYOR' ise gerçek durumu
+// TAMAMLANDI/ISLEMDE olsa da UI'da 'ONAY_BEKLIYOR' göster.
+type GoruntuDurum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI' | 'ONAY_BEKLIYOR' | 'DIGER'
 type DurumFilter = 'TUMU' | GoruntuDurum | 'EKSTRA'
 
 function bugunTRDate(): string {
@@ -63,6 +66,8 @@ function bugunTRDate(): string {
 }
 
 function turetilenDurum(k: GorevKaydi, bugun: string): GoruntuDurum {
+  // Onay bekleyen kayıtlar — gerçek gorev.durum'dan bağımsız 'ONAY_BEKLIYOR'
+  if (k.onay_durumu === 'ONAY_BEKLIYOR' || k.durum === 'ONAY_BEKLIYOR') return 'ONAY_BEKLIYOR'
   const d = k.durum ?? ''
   if (d === 'HAZIR') return 'HAZIR'
   if (d === 'YAPILAMADI') return 'YAPILAMADI'
@@ -79,17 +84,17 @@ function turetilenDurum(k: GorevKaydi, bugun: string): GoruntuDurum {
 const DURUM_BG: Record<GoruntuDurum, string> = {
   HAZIR: '#f1f5f9', ACIK: T.amberLight, ISLEMDE: T.blueLight,
   TAMAMLANDI: T.greenLight, IPTAL: T.redLight,
-  YAPILAMADI: '#fee2e2', DIGER: '#f1f5f9',
+  YAPILAMADI: '#fee2e2', ONAY_BEKLIYOR: '#cffafe', DIGER: '#f1f5f9',
 }
 const DURUM_FG: Record<GoruntuDurum, string> = {
   HAZIR: '#475569', ACIK: T.amber, ISLEMDE: T.blue,
   TAMAMLANDI: T.green, IPTAL: T.red,
-  YAPILAMADI: '#991b1b', DIGER: T.textSoft,
+  YAPILAMADI: '#991b1b', ONAY_BEKLIYOR: '#0891b2', DIGER: T.textSoft,
 }
 const DURUM_LABEL: Record<GoruntuDurum, string> = {
   HAZIR: 'Hazır', ACIK: 'Açık', ISLEMDE: 'İşlemde',
   TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal',
-  YAPILAMADI: 'Yapılamadı', DIGER: '—',
+  YAPILAMADI: 'Yapılamadı', ONAY_BEKLIYOR: 'Onay Bekliyor', DIGER: '—',
 }
 
 function fmtTarih(d: string | null): string {
@@ -159,17 +164,19 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
 
   // KPI sayıları
   const sayilar = useMemo(() => {
-    let hazir = 0, acik = 0, islemde = 0, tamam = 0, iptal = 0, yapilamadi = 0, ekstra = 0
+    let hazir = 0, acik = 0, islemde = 0, tamam = 0, iptal = 0, yapilamadi = 0, ekstra = 0, onayBekleyen = 0
     for (const { k, gd } of kayitlarTuretilmis) {
-      if (gd === 'HAZIR')      hazir++
-      if (gd === 'ACIK')       acik++
-      if (gd === 'ISLEMDE')    islemde++
-      if (gd === 'TAMAMLANDI') tamam++
-      if (gd === 'IPTAL')      iptal++
-      if (gd === 'YAPILAMADI') yapilamadi++
-      if (k.ekstra)            ekstra++
+      if (gd === 'HAZIR')         hazir++
+      if (gd === 'ACIK')          acik++
+      if (gd === 'ISLEMDE')       islemde++
+      if (gd === 'TAMAMLANDI')    tamam++
+      if (gd === 'IPTAL')         iptal++
+      if (gd === 'YAPILAMADI')    yapilamadi++
+      if (gd === 'ONAY_BEKLIYOR') onayBekleyen++
+      // Ekstra: onay bekleyen olsa da 'plansız' sayılır (mevcut kural)
+      if (k.ekstra)               ekstra++
     }
-    return { toplam: kayitlar.length, hazir, acik, islemde, tamam, iptal, yapilamadi, ekstra }
+    return { toplam: kayitlar.length, hazir, acik, islemde, tamam, iptal, yapilamadi, ekstra, onayBekleyen }
   }, [kayitlarTuretilmis, kayitlar.length])
 
   // Filtre dropdown'ları için unique departman listesi (kayıtlardan toplanır)
@@ -341,6 +348,8 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                 onClick={() => setFiltre(filtre === 'ACIK' ? 'TUMU' : 'ACIK')} />
         <KpiPil renk={T.blue}      etiket="işlemde"    sayi={sayilar.islemde}  active={filtre === 'ISLEMDE'}
                 onClick={() => setFiltre(filtre === 'ISLEMDE' ? 'TUMU' : 'ISLEMDE')} />
+        <KpiPil renk={'#0891b2'}   etiket="onay bekleyen" sayi={sayilar.onayBekleyen} active={filtre === 'ONAY_BEKLIYOR'}
+                onClick={() => setFiltre(filtre === 'ONAY_BEKLIYOR' ? 'TUMU' : 'ONAY_BEKLIYOR')} />
         <KpiPil renk={T.green}     etiket="tamamlandı" sayi={sayilar.tamam}    active={filtre === 'TAMAMLANDI'}
                 onClick={() => setFiltre(filtre === 'TAMAMLANDI' ? 'TUMU' : 'TAMAMLANDI')} />
         <KpiPil renk={T.red}       etiket="iptal"      sayi={sayilar.iptal}    active={filtre === 'IPTAL'}
@@ -422,6 +431,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
             <option value="HAZIR">Hazır</option>
             <option value="ACIK">Açık</option>
             <option value="ISLEMDE">İşlemde</option>
+            <option value="ONAY_BEKLIYOR">Onay Bekliyor</option>
             <option value="TAMAMLANDI">Tamamlandı</option>
             <option value="IPTAL">İptal</option>
             <option value="YAPILAMADI">Yapılamadı</option>

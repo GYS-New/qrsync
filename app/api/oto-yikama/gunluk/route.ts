@@ -43,10 +43,11 @@ export async function GET(req: NextRequest) {
 
   const today = bugunTRDate()
 
-  // 1) Bugünün metadata kayıtlarını çek
+  // 1) Bugünün metadata kayıtlarını çek (onay_durumu dahil — canlı işlemlerde
+  // onay bekleyen görevler ayrı durum olarak gösterilir)
   const { data: metaRows, error: metaErr } = await admin
     .from('oto_yikama_gorev_metadata')
-    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra')
+    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, onay_durumu')
     .eq('hedef_tarih', today)
 
   if (metaErr) return NextResponse.json({ ok: false, error: metaErr.message }, { status: 500 })
@@ -91,6 +92,8 @@ export async function GET(req: NextRequest) {
       const islemiYapan = terminal
         ? (g.tamamlayan?.isim_soyisim ?? null)
         : (g.durum === 'ISLEMDE' ? (g.baslatan?.isim_soyisim ?? null) : null)
+      const onayDurumu = (m as any).onay_durumu as string | undefined
+      const bekliyor = onayDurumu === 'ONAY_BEKLIYOR'
       return {
         gorev_id: m.gorev_id,
         ekstra: !!(m as any).ekstra,
@@ -99,7 +102,9 @@ export async function GET(req: NextRequest) {
         kullanici: a?.kullanici_adi_soyadi ?? null,
         yikama_gunleri: Array.isArray(a?.yikama_gunleri) ? a.yikama_gunleri : [],
         lokasyon,
-        durum: g.durum as 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL',
+        // Onay bekleyen görev: gerçek durumu ne olursa olsun UI'da ONAY_BEKLIYOR göster
+        durum: (bekliyor ? 'ONAY_BEKLIYOR' : g.durum) as 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'ONAY_BEKLIYOR',
+        onay_durumu: onayDurumu ?? 'ONAYSIZ',
         baslatilma_tarihi: g.baslatilma_tarihi,
         tamamlanma_suresi_saniye: g.tamamlanma_suresi_saniye,
         islemi_yapan: islemiYapan,

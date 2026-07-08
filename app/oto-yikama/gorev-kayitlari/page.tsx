@@ -42,16 +42,29 @@ export default async function OtoYikamaGorevKayitlariPage() {
     //    metadata'si degil, sadece bu firma'ninkiler gelir. Ayrica araclar bilgisi
     //    (departman, yikama_gunleri, kullanici_adi_soyadi) da embed'den okunur —
     //    ayri sorguya gerek kalmaz.
+    // A) Kayıtlı plaka metadata'ları (arac_id dolu, arac.firma_id filter)
     const { data: metaAll } = await admin
       .from('oto_yikama_gorev_metadata')
       .select(`
-        gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar,
+        gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar, onay_durumu,
         arac:arac_id!inner(firma_id, departman, yikama_gunleri, kullanici_adi_soyadi)
       `)
       .eq('arac.firma_id', firmaId)
       .order('hedef_tarih', { ascending: false })
       .limit(2000)
-    const metaArr = (metaAll ?? []) as any[]
+
+    // B) Tanımsız plaka onay bekleyen metadata'ları (arac_id NULL). Bunlar
+    // 'arac!inner' filter'ı yüzünden A'ya girmiyor. Firma filter'ı sonra
+    // gorevler tarafında uygulanacak.
+    const { data: metaOnayBekleyen } = await admin
+      .from('oto_yikama_gorev_metadata')
+      .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar, onay_durumu')
+      .eq('onay_durumu', 'ONAY_BEKLIYOR')
+      .is('arac_id', null)
+      .order('hedef_tarih', { ascending: false })
+      .limit(500)
+
+    const metaArr = [...((metaAll ?? []) as any[]), ...((metaOnayBekleyen ?? []) as any[])]
     const allGorevIds = metaArr.map(m => m.gorev_id).filter(Boolean) as string[]
 
     // Aracmap embed'den doldur — ayri sorguya gerek yok
@@ -122,6 +135,10 @@ export default async function OtoYikamaGorevKayitlariPage() {
       const islemYapanId = (isTamamlandi || isIptal || isYapilamadi)
         ? (g.islemi_yapan_id ?? null)
         : isIslemde ? (g.baslatan_kullanici_id ?? null) : null
+      // Onay bekleyen görev: metadata.onay_durumu = ONAY_BEKLIYOR ise, gerçek
+      // gorev.durum TAMAMLANDI/ISLEMDE olsa da UI'da 'ONAY_BEKLIYOR' göster.
+      const onayDurumu = (m as any).onay_durumu as string | null
+      const bekliyor = onayDurumu === 'ONAY_BEKLIYOR'
       return {
         gorev_id:        m.gorev_id,
         plaka:           m.plaka_snapshot ?? '—',
@@ -129,7 +146,8 @@ export default async function OtoYikamaGorevKayitlariPage() {
         ekstra:          m.ekstra === true,
         km:              m.km ?? null,
         notlar:          m.notlar ?? null,
-        durum:           g.durum ?? null,
+        durum:           bekliyor ? 'ONAY_BEKLIYOR' : (g.durum ?? null),
+        onay_durumu:     onayDurumu ?? 'ONAYSIZ',
         lokasyon_id:     g.lokasyon_id ?? null,
         istasyon:        lokMap.get(g.lokasyon_id) ?? '—',
         departman:       a.departman ?? null,

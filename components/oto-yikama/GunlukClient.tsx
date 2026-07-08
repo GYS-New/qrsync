@@ -5,7 +5,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 import { Loader2, Search } from 'lucide-react'
 
-type Durum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI'
+type Durum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI' | 'ONAY_BEKLIYOR'
 
 type Row = {
   gorev_id: string
@@ -37,9 +37,9 @@ const T = {
   grayLight: '#f8fafc',
 }
 
-const DURUM_LABEL: Record<Durum, string> = { HAZIR: 'Hazır', ISLEMDE: 'İşlemde', ACIK: 'Açık', TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal', YAPILAMADI: 'Yapılamadı' }
-const DURUM_BG: Record<Durum, string> = { HAZIR: '#f1f5f9', ISLEMDE: T.blueLight, ACIK: T.amberLight, TAMAMLANDI: T.greenLight, IPTAL: T.redLight, YAPILAMADI: '#fee2e2' }
-const DURUM_FG: Record<Durum, string> = { HAZIR: '#475569', ISLEMDE: T.blue, ACIK: T.amber, TAMAMLANDI: T.green, IPTAL: T.red, YAPILAMADI: '#991b1b' }
+const DURUM_LABEL: Record<Durum, string> = { HAZIR: 'Hazır', ISLEMDE: 'İşlemde', ACIK: 'Açık', TAMAMLANDI: 'Tamamlandı', IPTAL: 'İptal', YAPILAMADI: 'Yapılamadı', ONAY_BEKLIYOR: 'Onay Bekliyor' }
+const DURUM_BG: Record<Durum, string> = { HAZIR: '#f1f5f9', ISLEMDE: T.blueLight, ACIK: T.amberLight, TAMAMLANDI: T.greenLight, IPTAL: T.redLight, YAPILAMADI: '#fee2e2', ONAY_BEKLIYOR: '#cffafe' }
+const DURUM_FG: Record<Durum, string> = { HAZIR: '#475569', ISLEMDE: T.blue, ACIK: T.amber, TAMAMLANDI: T.green, IPTAL: T.red, YAPILAMADI: '#991b1b', ONAY_BEKLIYOR: '#0891b2' }
 
 function fmtTime(iso: string | null): string {
   if (!iso) return '—'
@@ -153,10 +153,11 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
   }, [rows])
 
   const sayilar = useMemo(() => {
-    const c = { toplam: rows.length, planli: 0, HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0 }
+    const c = { toplam: rows.length, planli: 0, HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0, ONAY_BEKLIYOR: 0 }
     for (const r of rows) {
       c[r.durum]++
-      if (!r.ekstra) c.planli++
+      // Onay bekleyen hedefe girmesin — planli sayimindan ciktar
+      if (!r.ekstra && r.durum !== 'ONAY_BEKLIYOR') c.planli++
     }
     return c
   }, [rows])
@@ -178,12 +179,13 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
   const dotColor = streamState === 'running' ? '#374151' : streamState === 'paused' ? '#d97706' : '#9ca3af'
 
   const kpiKartlari: { key: DurumFilter; label: string; val: number; bg: string; vColor: string; lColor: string }[] = [
-    { key: 'TUMU',       label: 'Tümü',           val: sayilar.toplam,     bg: 'transparent', vColor: '#111827', lColor: '#6b7280' },
-    { key: 'PLANLI',     label: 'Bugün Planlı',   val: sayilar.planli,     bg: '#f5f3ff',     vColor: '#6d28d9', lColor: '#5B21B6' },
-    { key: 'ISLEMDE',    label: 'İşlemde',        val: sayilar.ISLEMDE,    bg: '#eff6ff',     vColor: '#1d4ed8', lColor: '#185FA5' },
-    { key: 'ACIK',       label: 'Açık',           val: sayilar.ACIK,       bg: '#fffbeb',     vColor: '#92400e', lColor: '#854F0B' },
-    { key: 'TAMAMLANDI', label: 'Tamamlandı',     val: sayilar.TAMAMLANDI, bg: '#f0fdf4',     vColor: '#166534', lColor: '#3B6D11' },
-    { key: 'IPTAL',      label: 'İptal',          val: sayilar.IPTAL,      bg: '#fef2f2',     vColor: '#991b1b', lColor: '#A32D2D' },
+    { key: 'TUMU',         label: 'Tümü',         val: sayilar.toplam,        bg: 'transparent', vColor: '#111827', lColor: '#6b7280' },
+    { key: 'PLANLI',       label: 'Bugün Planlı', val: sayilar.planli,        bg: '#f5f3ff',     vColor: '#6d28d9', lColor: '#5B21B6' },
+    { key: 'ISLEMDE',      label: 'İşlemde',      val: sayilar.ISLEMDE,       bg: '#eff6ff',     vColor: '#1d4ed8', lColor: '#185FA5' },
+    { key: 'ACIK',         label: 'Açık',         val: sayilar.ACIK,          bg: '#fffbeb',     vColor: '#92400e', lColor: '#854F0B' },
+    { key: 'ONAY_BEKLIYOR', label: 'Onay Bekleyen', val: sayilar.ONAY_BEKLIYOR, bg: '#ecfeff',    vColor: '#0891b2', lColor: '#0E7490' },
+    { key: 'TAMAMLANDI',   label: 'Tamamlandı',   val: sayilar.TAMAMLANDI,    bg: '#f0fdf4',     vColor: '#166534', lColor: '#3B6D11' },
+    { key: 'IPTAL',        label: 'İptal',        val: sayilar.IPTAL,         bg: '#fef2f2',     vColor: '#991b1b', lColor: '#A32D2D' },
   ]
 
   return (
