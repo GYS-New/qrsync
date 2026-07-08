@@ -70,14 +70,14 @@ export async function GET(req: NextRequest) {
   const { count: hedefCount } = await hedefQ
   const hedef = hedefCount ?? 0
 
-  // 2) Metadata: tarih aralığında kayıtlar
-  // Onay bekleyen kayitlar rapora dahil edilmez — amir onaylayana kadar askıda.
+  // 2) Metadata: tarih aralığında kayıtlar (onay bekleyen dahil — 'Ekstra'
+  // kategorisi olarak Toplam Yıkama'ya girer; Hedef zaten ekstra=false ile
+  // filtrelenmis oldugu icin bekleyenler hedefe girmez).
   let metaQ = admin
     .from('oto_yikama_gorev_metadata')
-    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra')
+    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, onay_durumu')
     .gte('hedef_tarih', baslangic)
     .lte('hedef_tarih', bitis)
-    .neq('onay_durumu', 'ONAY_BEKLIYOR')
   if (plaka) metaQ = metaQ.eq('plaka_snapshot', plaka)
   if (tip === 'ekstra') metaQ = metaQ.eq('ekstra', true)
   if (tip === 'planli') metaQ = metaQ.eq('ekstra', false)
@@ -169,16 +169,24 @@ export async function GET(req: NextRequest) {
         tamamlanma_tarihi: g.tamamlanma_tarihi,
         tamamlanma_suresi_saniye: sure,
         ekstra: !!(m as any).ekstra,
+        onay_durumu: (m as any).onay_durumu as string | undefined,
       }
     })
     .sort((a, b) => (b.tamamlanma_tarihi ?? '').localeCompare(a.tamamlanma_tarihi ?? ''))
 
   // 6) Agregasyonlar — hedef en basta hesaplandi
+  // Yeni kural: 3 kategori — Planli / Plansiz / Ekstra (onay bekleyen)
+  //   • Planli   = ekstra=false (cron plani)
+  //   • Plansiz  = ekstra=true AND onay_durumu != 'ONAY_BEKLIYOR' (kayitli plaka manuel)
+  //   • Ekstra   = onay_durumu = 'ONAY_BEKLIYOR' (tanimsiz plaka, amir onayi bekliyor)
+  //   • Toplam   = Planli + Plansiz + Ekstra
+  //   • Hedef    = sadece Planli (degismedi — bekleyenler ekstra=true olduğu için etkilenmez)
   const agg = {
     hedef,
     toplam: data.length,
     planli: data.filter(d => !d.ekstra).length,
-    ekstra: data.filter(d => d.ekstra).length,
+    ekstra: data.filter(d => d.ekstra && d.onay_durumu !== 'ONAY_BEKLIYOR').length,
+    ekstra_onay_bekleyen: data.filter(d => d.onay_durumu === 'ONAY_BEKLIYOR').length,
     personel_sayisi: new Set(data.map(d => d.personel_id).filter(Boolean)).size,
     plaka_sayisi: new Set(data.map(d => d.plaka).filter(Boolean)).size,
     toplam_sure_saniye: data.reduce((s, d) => s + (d.tamamlanma_suresi_saniye ?? 0), 0),
@@ -207,7 +215,7 @@ export async function GET(req: NextRequest) {
 function emptyAgg(hedef = 0) {
   return {
     hedef,
-    toplam: 0, planli: 0, ekstra: 0,
+    toplam: 0, planli: 0, ekstra: 0, ekstra_onay_bekleyen: 0,
     personel_sayisi: 0, plaka_sayisi: 0,
     toplam_sure_saniye: 0, ortalama_sure_saniye: 0,
     gunluk_trend: [], saatlik_trend: [],

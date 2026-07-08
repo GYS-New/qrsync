@@ -31,6 +31,7 @@ type Agg = {
   toplam: number
   planli: number
   ekstra: number
+  ekstra_onay_bekleyen: number
   personel_sayisi: number
   plaka_sayisi: number
   toplam_sure_saniye: number
@@ -340,6 +341,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
           <Kpi label="Toplam Yıkama" deger={agg.toplam} renk={T.blue} />
           <Kpi label="Planlı" deger={agg.planli} renk={T.green} />
           <Kpi label="Plansız" deger={agg.ekstra} renk={T.amber} />
+          <Kpi label="Ekstra" deger={agg.ekstra_onay_bekleyen ?? 0} renk="#0891b2" />
           <Kpi label="Personel" deger={agg.personel_sayisi} renk={T.text} />
           <Kpi label="Toplam Süre" deger={fmtSure(agg.toplam_sure_saniye)} renk={T.text} kucuk />
           <Kpi label="Ortalama Süre" deger={fmtSure(agg.ortalama_sure_saniye)} renk={T.text} kucuk />

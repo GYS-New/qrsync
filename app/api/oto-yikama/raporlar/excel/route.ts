@@ -75,13 +75,13 @@ export async function GET(req: NextRequest) {
   const tip = sp.get('tip') || ''
 
   // Veriyi raporlar API'sındaki mantığa benzer şekilde topla
-  // Onay bekleyen kayitlar hariç (aynı raporlar route.ts kurali).
+  // Onay bekleyen dahil (3 kategori: Planli / Plansiz / Ekstra); Toplam Yikama
+  // hepsini icerir. Hedef zaten ekstra=false ile filtreli.
   let metaQ = admin
     .from('oto_yikama_gorev_metadata')
-    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar')
+    .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, onay_durumu, km, notlar')
     .gte('hedef_tarih', baslangic)
     .lte('hedef_tarih', bitis)
-    .neq('onay_durumu', 'ONAY_BEKLIYOR')
   if (plaka) metaQ = metaQ.eq('plaka_snapshot', plaka)
   if (tip === 'ekstra') metaQ = metaQ.eq('ekstra', true)
   if (tip === 'planli') metaQ = metaQ.eq('ekstra', false)
@@ -144,7 +144,10 @@ export async function GET(req: NextRequest) {
           tamamlanma_tarihi: g.tamamlanma_tarihi,
           tamamlanma_suresi_saniye: sure,
           ekstra: !!(m as any).ekstra,
-          tip: (m as any).ekstra ? 'Plansız' : 'Planlı',
+          onay_durumu: (m as any).onay_durumu as string | undefined,
+          tip: (m as any).onay_durumu === 'ONAY_BEKLIYOR'
+            ? 'Ekstra'
+            : ((m as any).ekstra ? 'Plansız' : 'Planlı'),
           durum: g.durum as string,
           km: (m as any).km ?? null,
           notlar: (m as any).notlar ?? null,
@@ -165,10 +168,11 @@ export async function GET(req: NextRequest) {
   const { count: hedefCount } = await hedefQ
   const hedef = hedefCount ?? 0
 
-  // Agregasyonlar
+  // Agregasyonlar — 3 kategori: Planli / Plansiz / Ekstra (onay bekleyen)
   const toplam = rows.length
   const planli = rows.filter(r => !r.ekstra).length
-  const ekstra = rows.filter(r => r.ekstra).length
+  const ekstra = rows.filter(r => r.ekstra && r.onay_durumu !== 'ONAY_BEKLIYOR').length
+  const ekstraOnayBekleyen = rows.filter(r => r.onay_durumu === 'ONAY_BEKLIYOR').length
   const personelMap = new Map<string, number>()
   const plakaMap = new Map<string, number>()
   let toplamSure = 0
@@ -260,6 +264,7 @@ export async function GET(req: NextRequest) {
     ['Toplam Yıkama', toplam],
     ['Planlı Yıkama', planli],
     ['Plansız Yıkama', ekstra],
+    ['Ekstra Yıkama (Onay Bekleyen)', ekstraOnayBekleyen],
     ['Farklı Plaka', plakaMap.size],
     ['Personel', personelMap.size],
     ['Toplam Süre', fmtSure(toplamSure)],

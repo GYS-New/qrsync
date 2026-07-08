@@ -30,21 +30,13 @@ export default async function OtoYikamaDashboardPage() {
       kpiGeciken = 0, kpiAktifArac = 0, kpiYikamaPersonel = 0
 
   if (firmaId) {
-    const [bugunRes, bugunOnayRes, gecikenRes, aracRes, yikamaIds] = await Promise.all([
-      // Ana KPI sorgusu — onay bekleyenler HARIC (askıda, hedefe girmez)
+    const [bugunRes, gecikenRes, aracRes, yikamaIds] = await Promise.all([
+      // Ana KPI sorgusu — TÜM bugünkü metadata (onay bekleyen dahil)
       admin
         .from('oto_yikama_gorev_metadata')
-        .select('gorev_id, ekstra, gorev:gorevler!inner(durum, firma_id)')
+        .select('gorev_id, ekstra, onay_durumu, gorev:gorevler!inner(durum, firma_id)')
         .eq('gorev.firma_id', firmaId)
-        .eq('hedef_tarih', bugun)
-        .neq('onay_durumu', 'ONAY_BEKLIYOR'),
-      // Onay Bekleyen KPI — ayrı sayım (planli/plansiz/tamamlanan'a girmez)
-      admin
-        .from('oto_yikama_gorev_metadata')
-        .select('gorev_id, gorev:gorevler!inner(firma_id)', { count: 'exact', head: true })
-        .eq('gorev.firma_id', firmaId)
-        .eq('hedef_tarih', bugun)
-        .eq('onay_durumu', 'ONAY_BEKLIYOR'),
+        .eq('hedef_tarih', bugun),
       // Geciken = hedef_tarih < bugün ve hâlâ AÇIK durumda (HAZIR/ACIK/ISLEMDE).
       // IPTAL, YAPILAMADI ve TAMAMLANDI kapalı sayılır — geciken'e dahil edilmez.
       admin
@@ -58,12 +50,14 @@ export default async function OtoYikamaDashboardPage() {
       getYikamaSahaPersoneliUserIds(admin, firmaId),
     ])
     const bugunArr = (bugunRes.data ?? []) as any[]
-    // Planlı = ekstra olmayanlar (cron'un ürettikleri); Ekstra = ekstra=true
-    // (onay bekleyenler filtered out; kendi ayri KPI'sinda gozukur)
-    kpiBugunPlanli     = bugunArr.filter(r => !r.ekstra).length
-    kpiBugunEkstra     = bugunArr.filter(r => r.ekstra === true).length
-    kpiBugunTamamlanan = bugunArr.filter(r => r.gorev?.durum === 'TAMAMLANDI').length
-    kpiBugunOnayBekleyen = bugunOnayRes.count ?? 0
+    // 3 kategori — Planli / Plansiz / Ekstra (onay bekleyen)
+    // Toplam Yikama sayimina hepsi dahil edilir (Bugun Tamamlanan = tumu).
+    // Hedef sadece Planlidir (ekstra=false).
+    kpiBugunPlanli       = bugunArr.filter(r => !r.ekstra).length
+    kpiBugunEkstra       = bugunArr.filter(r => r.ekstra === true && r.onay_durumu !== 'ONAY_BEKLIYOR').length
+    kpiBugunOnayBekleyen = bugunArr.filter(r => r.onay_durumu === 'ONAY_BEKLIYOR').length
+    // Tamamlanan: durum=TAMAMLANDI olan tumu (ekstra + onay bekleyen dahil)
+    kpiBugunTamamlanan   = bugunArr.filter(r => r.gorev?.durum === 'TAMAMLANDI').length
     kpiGeciken = gecikenRes.count ?? 0
     kpiAktifArac = aracRes.count ?? 0
     kpiYikamaPersonel = yikamaIds.length
@@ -89,7 +83,7 @@ export default async function OtoYikamaDashboardPage() {
               <KpiCard label="Bugün Planlı"     value={kpiBugunPlanli}     ikon="🗓️" renk="#1d4ed8" />
               <KpiCard label="Bugün Plansız"    value={kpiBugunEkstra}     ikon="➕" renk="#d97706" />
               <KpiCard label="Bugün Tamamlanan" value={kpiBugunTamamlanan} suffix={`(%${tamamlanmaPct})`} ikon="✓"  renk="#16a34a" />
-              <KpiCard label="Onay Bekleyen"    value={kpiBugunOnayBekleyen} ikon="✋" renk={kpiBugunOnayBekleyen > 0 ? '#0891b2' : '#6b7280'} />
+              <KpiCard label="Bugün Ekstra"     value={kpiBugunOnayBekleyen} ikon="✋" renk={kpiBugunOnayBekleyen > 0 ? '#0891b2' : '#6b7280'} />
               <KpiCard label="Geciken"          value={kpiGeciken}         ikon="⏰" renk={kpiGeciken > 0 ? '#dc2626' : '#6b7280'} />
               <KpiCard label="Aktif Araç"       value={kpiAktifArac}       ikon="🚗" renk="#0f172a" />
               <KpiCard label="Yıkama Personeli" value={kpiYikamaPersonel}  ikon="👥" renk="#7c3aed" />
