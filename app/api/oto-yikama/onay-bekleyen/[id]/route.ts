@@ -27,6 +27,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { normalizePlaka } from '@/lib/oto-yikama/plakaFuzzyMatch'
+import { getAktifProje } from '@/lib/projeler/getAktifProje'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -137,12 +138,24 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
         await admin.from('araclar').update(guncelle).eq('id', aracId)
       }
     } else {
+      // Aktif proje bilgisi (SA amirin cookie'sinden) — arac firmanin aktif
+      // projesine baglanir ki Arac Kayitlari sayfasi (proje filter'li)
+      // acildiginda gorunur olsun.
+      const aktifProje = await getAktifProje(firmaId)
       const { data: yeniArac, error: aErr } = await admin
         .from('araclar')
         .insert({
           plaka,
           firma_id: firmaId,
+          proje_id: aktifProje?.id ?? null,
           aktif: true,
+          // Onay ile eklenen arac 'plansiz' arac — frekans plani yok. Explicit
+          // NULL vermek gerekli cunku DB default 'HAFTALIK' olabiliyor.
+          // yikama_gunleri NOT NULL, bos array olarak ver.
+          yikama_frekans_tip: null,
+          yikama_gunleri: [],
+          yikama_frekans_aralik: null,
+          yikama_referans_tarih: null,
           departman: typeof d.departman === 'string' ? d.departman : null,
           kullanici_adi_soyadi: typeof d.kullanici_adi_soyadi === 'string' ? d.kullanici_adi_soyadi : null,
           varsayilan_lokasyon_id: typeof d.varsayilan_lokasyon_id === 'string' ? d.varsayilan_lokasyon_id : null,

@@ -23,9 +23,12 @@ export default async function OtoYikamaDashboardPage() {
   const admin = createAdminClient()
   const firmaId = await getOtoYikamaFirmaId(admin, me)
   const bugun = bugunTRDate()
+  // Bu ayin ilk gunu (TR) — geciken kartinda sadece ay ici gerideler sayilir.
+  const ayIlkGun = bugun.slice(0, 8) + '01'  // YYYY-MM-01
 
   // Üst sıra KPI'ları — sayfa-bazlı, blok değil (hızlı yükleme için)
-  let kpiBugunPlanli = 0, kpiBugunEkstra = 0, kpiBugunTamamlanan = 0,
+  let kpiBugunPlanli = 0, kpiBugunPlanliTamamlanan = 0,
+      kpiBugunEkstra = 0, kpiBugunTamamlanan = 0,
       kpiBugunOnayBekleyen = 0,
       kpiGeciken = 0, kpiAktifArac = 0, kpiYikamaPersonel = 0
 
@@ -37,12 +40,14 @@ export default async function OtoYikamaDashboardPage() {
         .select('gorev_id, ekstra, onay_durumu, gorev:gorevler!inner(durum, firma_id)')
         .eq('gorev.firma_id', firmaId)
         .eq('hedef_tarih', bugun),
-      // Geciken = hedef_tarih < bugün ve hâlâ AÇIK durumda (HAZIR/ACIK/ISLEMDE).
-      // IPTAL, YAPILAMADI ve TAMAMLANDI kapalı sayılır — geciken'e dahil edilmez.
+      // Geciken = ay ici (ayIlkGun ≤ hedef_tarih < bugün) ve HAZIR/ACIK/ISLEMDE.
+      // IPTAL, YAPILAMADI ve TAMAMLANDI kapali sayilir. Onceki aylardan gelen
+      // gerideler sayilmaz (kullanici tercihi 2026-07-08).
       admin
         .from('oto_yikama_gorev_metadata')
         .select('gorev_id, gorev:gorevler!inner(durum, firma_id)', { count: 'exact', head: true })
         .eq('gorev.firma_id', firmaId)
+        .gte('hedef_tarih', ayIlkGun)
         .lt('hedef_tarih', bugun)
         .in('gorev.durum', ['HAZIR', 'ACIK', 'ISLEMDE'])
         .neq('onay_durumu', 'ONAY_BEKLIYOR'),
@@ -59,6 +64,7 @@ export default async function OtoYikamaDashboardPage() {
     const isEkstraTanimsiz = (r: any) =>
       r.onay_durumu === 'ONAY_BEKLIYOR' || r.onay_durumu === 'ONAYLANDI'
     kpiBugunPlanli       = bugunArr.filter(r => !r.ekstra).length
+    kpiBugunPlanliTamamlanan = bugunArr.filter(r => !r.ekstra && r.gorev?.durum === 'TAMAMLANDI').length
     kpiBugunEkstra       = bugunArr.filter(r => r.ekstra === true && !isEkstraTanimsiz(r)).length
     kpiBugunOnayBekleyen = bugunArr.filter(r => isEkstraTanimsiz(r)).length
     // Tamamlanan: durum=TAMAMLANDI olan tumu (planli + plansiz + ekstra dahil)
@@ -85,13 +91,14 @@ export default async function OtoYikamaDashboardPage() {
           <>
             {/* SIRA 1: KPI kartları */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
-              <KpiCard label="Bugün Planlı"     value={kpiBugunPlanli}     ikon="🗓️" renk="#1d4ed8" />
-              <KpiCard label="Bugün Plansız"    value={kpiBugunEkstra}     ikon="➕" renk="#d97706" />
-              <KpiCard label="Bugün Tamamlanan" value={kpiBugunTamamlanan} suffix={`(%${tamamlanmaPct})`} ikon="✓"  renk="#16a34a" />
-              <KpiCard label="Bugün Ekstra"     value={kpiBugunOnayBekleyen} ikon="✋" renk={kpiBugunOnayBekleyen > 0 ? '#0891b2' : '#6b7280'} />
-              <KpiCard label="Geciken"          value={kpiGeciken}         ikon="⏰" renk={kpiGeciken > 0 ? '#dc2626' : '#6b7280'} />
-              <KpiCard label="Aktif Araç"       value={kpiAktifArac}       ikon="🚗" renk="#0f172a" />
-              <KpiCard label="Yıkama Personeli" value={kpiYikamaPersonel}  ikon="👥" renk="#7c3aed" />
+              <KpiCard label="Bugün Planlı"      value={kpiBugunPlanli}          ikon="🗓️" renk="#1d4ed8" />
+              <KpiCard label="Bugün Tamamlanan"  value={kpiBugunTamamlanan}       suffix={`(%${tamamlanmaPct})`} ikon="✓" renk="#16a34a" />
+              <KpiCard label="Planlı Tamamlanan" value={kpiBugunPlanliTamamlanan} ikon="✅" renk="#0d9488" />
+              <KpiCard label="Bugün Plansız"     value={kpiBugunEkstra}          ikon="➕" renk="#d97706" />
+              <KpiCard label="Bugün Ekstra"      value={kpiBugunOnayBekleyen}    ikon="✋" renk={kpiBugunOnayBekleyen > 0 ? '#0891b2' : '#6b7280'} />
+              <KpiCard label="Geciken"           value={kpiGeciken}              ikon="⏰" renk={kpiGeciken > 0 ? '#dc2626' : '#6b7280'} />
+              <KpiCard label="Aktif Araç"        value={kpiAktifArac}            ikon="🚗" renk="#0f172a" />
+              <KpiCard label="Yıkama Personeli"  value={kpiYikamaPersonel}       ikon="👥" renk="#7c3aed" />
             </div>
 
             {/* SIRA 2: Bugün İlerleme + Hedef/Tamamlanan/İptal Donut + Online Personel */}

@@ -37,8 +37,8 @@ type Agg = {
   plaka_sayisi: number
   toplam_sure_saniye: number
   ortalama_sure_saniye: number
-  gunluk_trend: { tarih: string; planli: number; ekstra: number; toplam: number }[]
-  saatlik_trend: { saat: string; planli: number; plansiz: number }[]
+  gunluk_trend: { tarih: string; planli: number; ekstra: number; ekstra_tanimsiz?: number; toplam: number }[]
+  saatlik_trend: { saat: string; planli: number; plansiz: number; ekstra?: number }[]
   personel_top: { personel_id: string; personel: string; adet: number }[]
   plaka_top: { plaka: string; adet: number }[]
   lokasyon_dagilim: { lokasyon: string; adet: number }[]
@@ -373,10 +373,10 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
         <>
           {/* GRAFİKLER GRID */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            {/* Saatlik trend — sol Planlı, sağ Plansız (08:00-18:00 TR) */}
+            {/* Saatlik trend — 3 grafik: Planlı / Plansız / Ekstra (08:00-18:00 TR) */}
             <div className="verde-card pdf-card pdf-hide" style={{ padding: 12, gridColumn: '1 / -1' }}>
-              <Baslik>Saatlik Yıkama Trendi — 08:00 – 18:00 (Planlı / Plansız)</Baslik>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <Baslik>Saatlik Yıkama Trendi — 08:00 – 18:00 (Planlı / Plansız / Ekstra)</Baslik>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
                 <div style={{ height: 220 }}>
                   <div style={{ fontSize: 11.5, fontWeight: 700, color: T.green, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     🟢 Planlı (Cron)
@@ -387,7 +387,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                       <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                       <Tooltip />
-                      <Bar dataKey="planli" name="Planlı" fill={T.green} radius={[5, 5, 0, 0]} maxBarSize={32} />
+                      <Bar dataKey="planli" name="Planlı" fill={T.green} radius={[5, 5, 0, 0]} maxBarSize={28} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -401,7 +401,21 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                       <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                       <Tooltip />
-                      <Bar dataKey="plansiz" name="Plansız" fill={T.amber} radius={[5, 5, 0, 0]} maxBarSize={32} />
+                      <Bar dataKey="plansiz" name="Plansız" fill={T.amber} radius={[5, 5, 0, 0]} maxBarSize={28} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={{ height: 220 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: '#0891b2', marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    🔵 Ekstra
+                  </div>
+                  <ResponsiveContainer width="100%" height="92%">
+                    <BarChart data={agg.saatlik_trend} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="ekstra" name="Ekstra" fill="#0891b2" radius={[5, 5, 0, 0]} maxBarSize={28} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -449,7 +463,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
             <div className="verde-card pdf-card pdf-hide" style={{ padding: 12, gridColumn: '1 / -1' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
-                  <Baslik>Planlı / Plansız Dağılımı</Baslik>
+                  <Baslik>Planlı / Plansız / Ekstra Dağılımı</Baslik>
                   <div style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -458,10 +472,12 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                         <Pie data={[
                           { name: 'Planlı', value: agg.planli },
                           { name: 'Plansız', value: agg.ekstra },
+                          { name: 'Ekstra', value: agg.ekstra_onay_bekleyen ?? 0 },
                         ]} dataKey="value" nameKey="name" innerRadius={42} outerRadius={75} paddingAngle={2}
                           label={(e: any) => `${e.name} (${e.value})`}>
                           <Cell fill={T.green} />
                           <Cell fill={T.amber} />
+                          <Cell fill="#0891b2" />
                         </Pie>
                       </PieChart>
                     </ResponsiveContainer>

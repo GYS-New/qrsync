@@ -231,19 +231,23 @@ function emptyAgg(hedef = 0) {
 type Row = {
   hedef_tarih: string; ekstra: boolean; personel: string; personel_id: string | null
   plaka: string; lokasyon: string; baslatilma_tarihi?: string | null
+  onay_durumu?: string
+}
+
+function isEkstraTanimsizRow(r: Row): boolean {
+  return r.onay_durumu === 'ONAY_BEKLIYOR' || r.onay_durumu === 'ONAYLANDI'
 }
 
 // 08:00-18:00 TR saatleri arası saatlik bucket (11 nokta).
-// "planli" = ekstra=false (cron'un ürettiği rutin), "plansiz" = ekstra=true.
+// 3 seri: planli (ekstra=false), plansiz (ekstra=true & !tanimsiz), ekstra (tanimsiz)
 // baslatilma_tarihi'nin TR saati hesaba katılır; başlamamış görevler atlanır.
 function buildSaatlikTrend(rows: Row[]) {
   const SAATLER = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-  const map = new Map<number, { planli: number; plansiz: number }>()
-  for (const s of SAATLER) map.set(s, { planli: 0, plansiz: 0 })
+  const map = new Map<number, { planli: number; plansiz: number; ekstra: number }>()
+  for (const s of SAATLER) map.set(s, { planli: 0, plansiz: 0, ekstra: 0 })
 
   for (const r of rows) {
     if (!r.baslatilma_tarihi) continue
-    // TR saatini hesapla — Intl.DateTimeFormat ile saati al
     const trSaat = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false,
     }).format(new Date(r.baslatilma_tarihi))
@@ -251,28 +255,42 @@ function buildSaatlikTrend(rows: Row[]) {
     if (!Number.isFinite(saat)) continue
     if (saat < 8 || saat > 18) continue
     const bucket = map.get(saat)!
-    if (r.ekstra) bucket.plansiz++
-    else bucket.planli++
+    if (isEkstraTanimsizRow(r))      bucket.ekstra++
+    else if (r.ekstra)               bucket.plansiz++
+    else                             bucket.planli++
   }
 
   return SAATLER.map(s => ({
     saat: `${String(s).padStart(2, '0')}:00`,
     planli: map.get(s)!.planli,
     plansiz: map.get(s)!.plansiz,
+    ekstra: map.get(s)!.ekstra,
   }))
 }
 
 function buildGunlukTrend(rows: Row[]) {
-  const map = new Map<string, { planli: number; ekstra: number }>()
+  // 3 seri: planli / plansiz / ekstra (tanimsiz)
+  // NOT: 'ekstra' alan adi geriye uyum icin plansiz+tanimsiz TOPLAMINI
+  // saklamiyor — mevcut client alani ('plansiz' anlaminda) ile karismasin
+  // diye 'ekstra_tanimsiz' alani yeni eklendi. 'ekstra' = plansiz'i belirtir
+  // (eski gunlerdeki 'ekstra' anlami).
+  const map = new Map<string, { planli: number; ekstra: number; ekstra_tanimsiz: number }>()
   for (const r of rows) {
     const t = r.hedef_tarih
-    const ex = map.get(t) ?? { planli: 0, ekstra: 0 }
-    if (r.ekstra) ex.ekstra++
-    else ex.planli++
+    const ex = map.get(t) ?? { planli: 0, ekstra: 0, ekstra_tanimsiz: 0 }
+    if (isEkstraTanimsizRow(r))   ex.ekstra_tanimsiz++
+    else if (r.ekstra)            ex.ekstra++
+    else                          ex.planli++
     map.set(t, ex)
   }
   return Array.from(map.entries())
-    .map(([tarih, v]) => ({ tarih, planli: v.planli, ekstra: v.ekstra, toplam: v.planli + v.ekstra }))
+    .map(([tarih, v]) => ({
+      tarih,
+      planli: v.planli,
+      ekstra: v.ekstra,
+      ekstra_tanimsiz: v.ekstra_tanimsiz,
+      toplam: v.planli + v.ekstra + v.ekstra_tanimsiz,
+    }))
     .sort((a, b) => a.tarih.localeCompare(b.tarih))
 }
 

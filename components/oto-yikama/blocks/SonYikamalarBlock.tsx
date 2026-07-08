@@ -36,7 +36,7 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
   const gorevIds = gorevArr.map(g => g.id)
   const { data: metaRows } = await admin
     .from('oto_yikama_gorev_metadata')
-    .select('gorev_id, plaka_snapshot, hedef_tarih, ekstra')
+    .select('gorev_id, plaka_snapshot, hedef_tarih, ekstra, onay_durumu')
     .in('gorev_id', gorevIds)
 
   const metaMap = new Map(((metaRows ?? []) as any[]).map(m => [m.gorev_id, m]))
@@ -54,6 +54,7 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
       tamamlayan_id:      g.islemi_yapan_id,
       plaka:              metaMap.get(g.id)?.plaka_snapshot ?? '—',
       ekstra:             metaMap.get(g.id)?.ekstra === true,
+      onay_durumu:        metaMap.get(g.id)?.onay_durumu as string | undefined,
     }))
 
   if (otoYikama.length === 0) {
@@ -102,9 +103,11 @@ export default async function SonYikamalarBlock({ firmaId, limit = 8 }: {
                 <Td bold mono>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     {r.plaka}
-                    {r.ekstra && (
+                    {(r.onay_durumu === 'ONAY_BEKLIYOR' || r.onay_durumu === 'ONAYLANDI') ? (
+                      <span style={{ padding: '1px 6px', borderRadius: 999, background: '#cffafe', color: '#0891b2', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>EKSTRA</span>
+                    ) : r.ekstra ? (
                       <span style={{ padding: '1px 6px', borderRadius: 999, background: '#fef3c7', color: '#92400e', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>PLANSIZ</span>
-                    )}
+                    ) : null}
                   </span>
                 </Td>
                 <Td>{lokMap.get(r.lokasyon_id) ?? '—'}</Td>
