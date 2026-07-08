@@ -16,6 +16,8 @@ export interface NavItem {
   icon: string
   /** "Canlı" satırların başında yanıp sönen yeşil nokta gösterilir. */
   live?: boolean
+  /** Server-side olarak hesaplanan badge (kirmizi count) — Onay Bekleyenler gibi. */
+  badge?: { value: number; tone: 'green' | 'yellow' | 'blue' | 'orange' | 'red' }
 }
 export interface NavGroup {
   label: string
@@ -256,12 +258,13 @@ function SidebarLogo({ src, alt, bordered = false, imgWidth = '80%', maxHeight =
   )
 }
 
-function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' | 'blue' | 'orange' }) {
+function CountBadge({ value, tone }: { value: number; tone: 'green' | 'yellow' | 'blue' | 'orange' | 'red' }) {
   const palette = {
     green: { bg: '#e5e7eb', border: '#d1d5db', text: '#1f2937' },
     yellow: { bg: '#fff2cc', border: '#ffe08a', text: '#7a5a00' },
     blue: { bg: '#e3f2ff', border: '#b7dcff', text: '#185a9b' },
     orange: { bg: '#ffe7d6', border: '#ffd0b0', text: '#8a3b00' },
+    red: { bg: '#dc2626', border: '#b91c1c', text: '#ffffff' },
   } as const
 
   const p = palette[tone]
@@ -684,10 +687,13 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
                 <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.label}
                 </span>
-                {/* Right aligned count badges for management items */}
-                {badgeByHref[item.href] && !countsError ? (
+                {/* Right aligned count badges — NavItem.badge (server-side) yoksa
+                    sidebar-counts fetch'inden gelen badgeByHref denenir. */}
+                {(item as any).badge && (item as any).badge.value > 0 ? (
+                  <CountBadge value={(item as any).badge.value} tone={(item as any).badge.tone} />
+                ) : (badgeByHref[item.href] && !countsError ? (
                   <CountBadge value={badgeByHref[item.href].value} tone={badgeByHref[item.href].tone} />
-                ) : null}
+                ) : null)}
               </div>
             ))}
           </div>

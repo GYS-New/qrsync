@@ -90,19 +90,21 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
       setCount(notifCount)
       return
     }
-    if (isOtoYikama) {
-      setCount(0)
-      return
-    }
     let active = true
     ;(async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { count } = await supabase
+      // Oto Yikama modulunde sadece oto_yikama_onay tipini say (GYS bildirimleri
+      // gizli kalir — ATALIAN TA talebi). Diger modullerde tumu.
+      let query = supabase
         .from('bildirimler')
         .select('id', { count: 'exact', head: true })
         .eq('alici_id', user.id)
         .eq('okundu', false)
+      if (isOtoYikama) {
+        query = query.eq('tip', 'oto_yikama_onay')
+      }
+      const { count } = await query
       if (active) setCount(count ?? 0)
     })()
 
@@ -111,11 +113,13 @@ export default function Topbar({ title, subtitle, actions, breadcrumbs, notifCou
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bildirimler' }, async () => {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
-        const { count } = await supabase
+        let q = supabase
           .from('bildirimler')
           .select('id', { count: 'exact', head: true })
           .eq('alici_id', user.id)
           .eq('okundu', false)
+        if (isOtoYikama) q = q.eq('tip', 'oto_yikama_onay')
+        const { count } = await q
         if (active) setCount(count ?? 0)
       })
       .subscribe()

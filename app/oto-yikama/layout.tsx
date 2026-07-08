@@ -79,7 +79,18 @@ export default async function OtoYikamaLayout({ children }: { children: React.Re
     isAmir = (firmaOnayInfo as any)?.oto_yikama_onay_yetkilisi_id === me.id
   }
 
-  const navGroups = getOtoYikamaNav({ isSA, isAmir })
+  // Onay bekleyen sayisi — sidebar badge'i icin (SA veya amir gorur)
+  let onayBekleyenSayisi = 0
+  if (firmaId && (isSA || isAmir)) {
+    const { count } = await admin
+      .from('oto_yikama_gorev_metadata')
+      .select('gorev_id, gorev:gorevler!inner(firma_id)', { count: 'exact', head: true })
+      .eq('onay_durumu', 'ONAY_BEKLIYOR')
+      .eq('gorev.firma_id', firmaId)
+    onayBekleyenSayisi = count ?? 0
+  }
+
+  const navGroups = getOtoYikamaNav({ isSA, isAmir, onayBekleyenSayisi })
 
   return (
     <SAProviders>

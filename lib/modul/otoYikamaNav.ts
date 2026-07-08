@@ -13,10 +13,12 @@ import type { NavGroup } from '@/components/layout/Sidebar'
 export interface OtoYikamaNavOpts {
   isSA?: boolean
   isAmir?: boolean  // firmalar.oto_yikama_onay_yetkilisi_id === me.id
+  onayBekleyenSayisi?: number  // sidebar badge icin
 }
 
 export function getOtoYikamaNav(opts: OtoYikamaNavOpts = {}): NavGroup[] {
   const gorebilirOnay = !!(opts.isSA || opts.isAmir)
+  const onaySayisi = opts.onayBekleyenSayisi ?? 0
   return [
     {
       label: 'Ana Menü',
@@ -36,7 +38,12 @@ export function getOtoYikamaNav(opts: OtoYikamaNavOpts = {}): NavGroup[] {
       items: [
         { label: 'Canlı İşlemler',  href: '/oto-yikama/gunluk',          icon: '📋', live: true },
         ...(gorebilirOnay
-          ? [{ label: 'Onay Bekleyenler', href: '/oto-yikama/onay-bekleyen', icon: '✋' }]
+          ? [{
+              label: 'Onay Bekleyenler',
+              href: '/oto-yikama/onay-bekleyen',
+              icon: '✋',
+              badge: onaySayisi > 0 ? { value: onaySayisi, tone: 'red' as const } : undefined,
+            }]
           : []
         ),
         { label: 'Yıkama Takvimi',  href: '/oto-yikama/takvim',          icon: '📅' },
