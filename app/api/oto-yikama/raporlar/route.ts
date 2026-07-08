@@ -175,18 +175,23 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => (b.tamamlanma_tarihi ?? '').localeCompare(a.tamamlanma_tarihi ?? ''))
 
   // 6) Agregasyonlar — hedef en basta hesaplandi
-  // Yeni kural: 3 kategori — Planli / Plansiz / Ekstra (onay bekleyen)
+  // Kural: 3 kategori — Planli / Plansiz / Ekstra
   //   • Planli   = ekstra=false (cron plani)
-  //   • Plansiz  = ekstra=true AND onay_durumu != 'ONAY_BEKLIYOR' (kayitli plaka manuel)
-  //   • Ekstra   = onay_durumu = 'ONAY_BEKLIYOR' (tanimsiz plaka, amir onayi bekliyor)
+  //   • Plansiz  = ekstra=true AND onay_durumu='ONAYSIZ' (kayitli plaka manuel yikama)
+  //   • Ekstra   = onay_durumu IN ('ONAY_BEKLIYOR', 'ONAYLANDI') — tanimsiz plaka
+  //                akisindaki yikama; onay bekliyor VEYA onaylanmis hepsi Ekstra
+  //                kategorisinde kalir (onay sadece arac ekleme karari, yikamanin
+  //                kategorisini degistirmez).
   //   • Toplam   = Planli + Plansiz + Ekstra
-  //   • Hedef    = sadece Planli (degismedi — bekleyenler ekstra=true olduğu için etkilenmez)
+  //   • Hedef    = sadece Planli (degismedi)
+  const isEkstraTanimsiz = (d: any) =>
+    d.onay_durumu === 'ONAY_BEKLIYOR' || d.onay_durumu === 'ONAYLANDI'
   const agg = {
     hedef,
     toplam: data.length,
     planli: data.filter(d => !d.ekstra).length,
-    ekstra: data.filter(d => d.ekstra && d.onay_durumu !== 'ONAY_BEKLIYOR').length,
-    ekstra_onay_bekleyen: data.filter(d => d.onay_durumu === 'ONAY_BEKLIYOR').length,
+    ekstra: data.filter(d => d.ekstra && !isEkstraTanimsiz(d)).length,
+    ekstra_onay_bekleyen: data.filter(d => isEkstraTanimsiz(d)).length,
     personel_sayisi: new Set(data.map(d => d.personel_id).filter(Boolean)).size,
     plaka_sayisi: new Set(data.map(d => d.plaka).filter(Boolean)).size,
     toplam_sure_saniye: data.reduce((s, d) => s + (d.tamamlanma_suresi_saniye ?? 0), 0),

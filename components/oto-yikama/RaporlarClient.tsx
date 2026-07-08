@@ -24,6 +24,7 @@ type Row = {
   tamamlanma_tarihi: string | null
   tamamlanma_suresi_saniye: number
   ekstra: boolean
+  onay_durumu?: string
 }
 
 type Agg = {
@@ -531,7 +532,9 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                           : <span style={{ color: T.textSoft, fontStyle: 'italic', fontWeight: 400 }}>—</span>}
                       </td>
                       <td>
-                        {r.ekstra ? (
+                        {(r.onay_durumu === 'ONAY_BEKLIYOR' || r.onay_durumu === 'ONAYLANDI') ? (
+                          <span style={{ padding: '3px 9px', borderRadius: 999, background: '#cffafe', color: '#0891b2', fontSize: 12, fontWeight: 700 }}>Ekstra</span>
+                        ) : r.ekstra ? (
                           <span style={{ padding: '3px 9px', borderRadius: 999, background: T.amberLight, color: T.amber, fontSize: 12, fontWeight: 700 }}>Plansız</span>
                         ) : (
                           <span style={{ padding: '3px 9px', borderRadius: 999, background: T.greenLight, color: T.green, fontSize: 12, fontWeight: 700 }}>Planlı</span>

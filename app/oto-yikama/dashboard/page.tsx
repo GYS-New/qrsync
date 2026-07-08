@@ -50,13 +50,18 @@ export default async function OtoYikamaDashboardPage() {
       getYikamaSahaPersoneliUserIds(admin, firmaId),
     ])
     const bugunArr = (bugunRes.data ?? []) as any[]
-    // 3 kategori — Planli / Plansiz / Ekstra (onay bekleyen)
-    // Toplam Yikama sayimina hepsi dahil edilir (Bugun Tamamlanan = tumu).
-    // Hedef sadece Planlidir (ekstra=false).
+    // 3 kategori:
+    //   Planli   = ekstra=false
+    //   Plansiz  = ekstra=true AND onay_durumu='ONAYSIZ' (kayitli plaka manuel)
+    //   Ekstra   = onay_durumu IN ('ONAY_BEKLIYOR','ONAYLANDI') — tanimsiz plaka
+    // Toplam Yikama = Planli + Plansiz + Ekstra; Bugun Tamamlanan tumu icerir.
+    // Hedef sadece Planlidir (degismedi).
+    const isEkstraTanimsiz = (r: any) =>
+      r.onay_durumu === 'ONAY_BEKLIYOR' || r.onay_durumu === 'ONAYLANDI'
     kpiBugunPlanli       = bugunArr.filter(r => !r.ekstra).length
-    kpiBugunEkstra       = bugunArr.filter(r => r.ekstra === true && r.onay_durumu !== 'ONAY_BEKLIYOR').length
-    kpiBugunOnayBekleyen = bugunArr.filter(r => r.onay_durumu === 'ONAY_BEKLIYOR').length
-    // Tamamlanan: durum=TAMAMLANDI olan tumu (ekstra + onay bekleyen dahil)
+    kpiBugunEkstra       = bugunArr.filter(r => r.ekstra === true && !isEkstraTanimsiz(r)).length
+    kpiBugunOnayBekleyen = bugunArr.filter(r => isEkstraTanimsiz(r)).length
+    // Tamamlanan: durum=TAMAMLANDI olan tumu (planli + plansiz + ekstra dahil)
     kpiBugunTamamlanan   = bugunArr.filter(r => r.gorev?.durum === 'TAMAMLANDI').length
     kpiGeciken = gecikenRes.count ?? 0
     kpiAktifArac = aracRes.count ?? 0

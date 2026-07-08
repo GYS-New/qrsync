@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
           tamamlanma_suresi_saniye: sure,
           ekstra: !!(m as any).ekstra,
           onay_durumu: (m as any).onay_durumu as string | undefined,
-          tip: (m as any).onay_durumu === 'ONAY_BEKLIYOR'
+          tip: ((m as any).onay_durumu === 'ONAY_BEKLIYOR' || (m as any).onay_durumu === 'ONAYLANDI')
             ? 'Ekstra'
             : ((m as any).ekstra ? 'Plansız' : 'Planlı'),
           durum: g.durum as string,
@@ -168,11 +168,17 @@ export async function GET(req: NextRequest) {
   const { count: hedefCount } = await hedefQ
   const hedef = hedefCount ?? 0
 
-  // Agregasyonlar — 3 kategori: Planli / Plansiz / Ekstra (onay bekleyen)
+  // Agregasyonlar — 3 kategori:
+  //   Planli   = ekstra=false
+  //   Plansiz  = ekstra=true AND onay_durumu='ONAYSIZ' (kayitli plaka manuel)
+  //   Ekstra   = onay_durumu IN ('ONAY_BEKLIYOR','ONAYLANDI') — tanimsiz plaka
+  //              (onay bekliyor veya onaylanmis hepsi Ekstra kategorisinde)
+  const isEkstraTanimsiz = (r: any) =>
+    r.onay_durumu === 'ONAY_BEKLIYOR' || r.onay_durumu === 'ONAYLANDI'
   const toplam = rows.length
   const planli = rows.filter(r => !r.ekstra).length
-  const ekstra = rows.filter(r => r.ekstra && r.onay_durumu !== 'ONAY_BEKLIYOR').length
-  const ekstraOnayBekleyen = rows.filter(r => r.onay_durumu === 'ONAY_BEKLIYOR').length
+  const ekstra = rows.filter(r => r.ekstra && !isEkstraTanimsiz(r)).length
+  const ekstraOnayBekleyen = rows.filter(r => isEkstraTanimsiz(r)).length
   const personelMap = new Map<string, number>()
   const plakaMap = new Map<string, number>()
   let toplamSure = 0
@@ -264,7 +270,7 @@ export async function GET(req: NextRequest) {
     ['Toplam Yıkama', toplam],
     ['Planlı Yıkama', planli],
     ['Plansız Yıkama', ekstra],
-    ['Ekstra Yıkama (Onay Bekleyen)', ekstraOnayBekleyen],
+    ['Ekstra Yıkama', ekstraOnayBekleyen],
     ['Farklı Plaka', plakaMap.size],
     ['Personel', personelMap.size],
     ['Toplam Süre', fmtSure(toplamSure)],
