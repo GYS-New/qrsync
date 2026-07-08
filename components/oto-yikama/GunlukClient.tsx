@@ -10,6 +10,7 @@ type Durum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI
 type Row = {
   gorev_id: string
   ekstra: boolean
+  onay_durumu?: string
   plaka: string
   departman: string | null
   kullanici: string | null
@@ -237,8 +238,8 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
           </div>
         </div>
 
-        {/* KPI filtre kartları */}
-        <div style={{ padding: '8px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, alignItems: 'stretch' }}>
+        {/* KPI filtre kartları — 7 karta gore auto-fit + daraltilmis padding/font */}
+        <div style={{ padding: '8px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: `repeat(${kpiKartlari.length}, minmax(0, 1fr))`, gap: 5, alignItems: 'stretch' }}>
           {kpiKartlari.map(({ key, label, val, bg, vColor, lColor }) => {
             const active = durumFilter === key
             const onClick = () => {
@@ -250,13 +251,14 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
                 title={active && key !== 'TUMU' ? 'Filtreyi kaldır' : label}
                 style={{
                   background: active ? vColor + '0F' : bg === 'transparent' ? '#fafafa' : bg,
-                  borderRadius: 8, padding: '8px 8px', textAlign: 'left', cursor: 'pointer',
+                  borderRadius: 7, padding: '6px 6px', textAlign: 'left', cursor: 'pointer',
                   border: active ? `2px solid ${vColor}` : '1px solid #e5e7eb',
                   transition: 'all 0.15s',
                   outline: 'none',
+                  minWidth: 0,
                 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: vColor, lineHeight: 1 }}>{val}</div>
-                <div style={{ fontSize: 10, color: lColor, marginTop: 2, fontWeight: active ? 700 : 500 }}>{label}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: vColor, lineHeight: 1 }}>{val}</div>
+                <div style={{ fontSize: 9.5, color: lColor, marginTop: 2, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
               </button>
             )
           })}
@@ -331,11 +333,15 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
                     <td style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         {r.plaka}
-                        {r.ekstra && (
+                        {(r.onay_durumu === 'ONAY_BEKLIYOR' || r.onay_durumu === 'ONAYLANDI') ? (
+                          <span style={{ padding: '2px 7px', borderRadius: 999, background: '#cffafe', color: '#0891b2', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em' }}>
+                            EKSTRA
+                          </span>
+                        ) : r.ekstra ? (
                           <span style={{ padding: '2px 7px', borderRadius: 999, background: '#fde68a', color: '#92400e', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em' }}>
                             PLANSIZ
                           </span>
-                        )}
+                        ) : null}
                       </span>
                     </td>
                     <td style={{ color: T.textSoft, fontSize: 14 }}>{r.kullanici ?? '—'}</td>

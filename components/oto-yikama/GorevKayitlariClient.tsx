@@ -59,7 +59,13 @@ const T = {
 // ONAY_BEKLIYOR: metadata.onay_durumu === 'ONAY_BEKLIYOR' ise gerçek durumu
 // TAMAMLANDI/ISLEMDE olsa da UI'da 'ONAY_BEKLIYOR' göster.
 type GoruntuDurum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI' | 'ONAY_BEKLIYOR' | 'DIGER'
-type DurumFilter = 'TUMU' | GoruntuDurum | 'EKSTRA'
+// EKSTRA_TANIMSIZ pill/filter = tanimsiz plaka akisi (onay bekliyor + onaylanmis)
+// EKSTRA pill/filter = kayitli plaka manuel plansiz yikama (ekstra=true & onay_durumu='ONAYSIZ')
+type DurumFilter = 'TUMU' | GoruntuDurum | 'EKSTRA' | 'EKSTRA_TANIMSIZ'
+
+function isEkstraTanimsizKayit(k: GorevKaydi): boolean {
+  return k.onay_durumu === 'ONAY_BEKLIYOR' || k.onay_durumu === 'ONAYLANDI'
+}
 
 function bugunTRDate(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
@@ -164,7 +170,8 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
 
   // KPI sayıları
   const sayilar = useMemo(() => {
-    let hazir = 0, acik = 0, islemde = 0, tamam = 0, iptal = 0, yapilamadi = 0, ekstra = 0, onayBekleyen = 0
+    let hazir = 0, acik = 0, islemde = 0, tamam = 0, iptal = 0, yapilamadi = 0
+    let plansiz = 0, ekstraTanimsiz = 0, onayBekleyen = 0
     for (const { k, gd } of kayitlarTuretilmis) {
       if (gd === 'HAZIR')         hazir++
       if (gd === 'ACIK')          acik++
@@ -173,10 +180,19 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
       if (gd === 'IPTAL')         iptal++
       if (gd === 'YAPILAMADI')    yapilamadi++
       if (gd === 'ONAY_BEKLIYOR') onayBekleyen++
-      // Ekstra: onay bekleyen olsa da 'plansız' sayılır (mevcut kural)
-      if (k.ekstra)               ekstra++
+      // Kategori sayimlari (durumdan bagimsiz):
+      // • Ekstra (tanimsiz plaka) = onay bekleyen + onaylanmis
+      // • Plansiz = kayitli plaka manuel yikama (ekstra=true & tanimsiz degil)
+      if (isEkstraTanimsizKayit(k)) ekstraTanimsiz++
+      else if (k.ekstra)            plansiz++
     }
-    return { toplam: kayitlar.length, hazir, acik, islemde, tamam, iptal, yapilamadi, ekstra, onayBekleyen }
+    return {
+      toplam: kayitlar.length,
+      hazir, acik, islemde, tamam, iptal, yapilamadi,
+      onayBekleyen,
+      ekstra: plansiz,           // 'ekstra' alan adi geriye uyum icin (Plansiz pill)
+      ekstraTanimsiz,            // yeni: tanimsiz plaka akisindaki tumu
+    }
   }, [kayitlarTuretilmis, kayitlar.length])
 
   // Filtre dropdown'ları için unique departman listesi (kayıtlardan toplanır)
@@ -191,8 +207,11 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
     const ygFiltre = yikamaGunuFilter === '' ? null : Number(yikamaGunuFilter)
 
     return kayitlarTuretilmis.filter(({ k, gd }) => {
-      if (filtre === 'EKSTRA' && !k.ekstra) return false
-      if (filtre !== 'TUMU' && filtre !== 'EKSTRA' && filtre !== gd) return false
+      // 'EKSTRA' pill = Plansiz (kayitli plaka manuel), tanimsiz haric
+      if (filtre === 'EKSTRA' && (!k.ekstra || isEkstraTanimsizKayit(k))) return false
+      // 'EKSTRA_TANIMSIZ' pill = tanimsiz plaka akisi (onay bekliyor + onaylanmis)
+      if (filtre === 'EKSTRA_TANIMSIZ' && !isEkstraTanimsizKayit(k)) return false
+      if (filtre !== 'TUMU' && filtre !== 'EKSTRA' && filtre !== 'EKSTRA_TANIMSIZ' && filtre !== gd) return false
       if (istasyonId && k.lokasyon_id !== istasyonId) return false
       if (tamamlayanId && k.tamamlayan_id !== tamamlayanId) return false
       if (departmanFilter && k.departman !== departmanFilter) return false
@@ -350,6 +369,8 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                 onClick={() => setFiltre(filtre === 'ISLEMDE' ? 'TUMU' : 'ISLEMDE')} />
         <KpiPil renk={'#0891b2'}   etiket="onay bekleyen" sayi={sayilar.onayBekleyen} active={filtre === 'ONAY_BEKLIYOR'}
                 onClick={() => setFiltre(filtre === 'ONAY_BEKLIYOR' ? 'TUMU' : 'ONAY_BEKLIYOR')} />
+        <KpiPil renk={'#0891b2'}   etiket="ekstra"     sayi={sayilar.ekstraTanimsiz} active={filtre === 'EKSTRA_TANIMSIZ'}
+                onClick={() => setFiltre(filtre === 'EKSTRA_TANIMSIZ' ? 'TUMU' : 'EKSTRA_TANIMSIZ')} />
         <KpiPil renk={T.green}     etiket="tamamlandı" sayi={sayilar.tamam}    active={filtre === 'TAMAMLANDI'}
                 onClick={() => setFiltre(filtre === 'TAMAMLANDI' ? 'TUMU' : 'TAMAMLANDI')} />
         <KpiPil renk={T.red}       etiket="iptal"      sayi={sayilar.iptal}    active={filtre === 'IPTAL'}
@@ -432,6 +453,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
             <option value="ACIK">Açık</option>
             <option value="ISLEMDE">İşlemde</option>
             <option value="ONAY_BEKLIYOR">Onay Bekliyor</option>
+            <option value="EKSTRA_TANIMSIZ">Ekstra (Tanımsız Plaka)</option>
             <option value="TAMAMLANDI">Tamamlandı</option>
             <option value="IPTAL">İptal</option>
             <option value="YAPILAMADI">Yapılamadı</option>
@@ -486,9 +508,11 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                     <Td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
-                        {k.ekstra && (
+                        {(k.onay_durumu === 'ONAY_BEKLIYOR' || k.onay_durumu === 'ONAYLANDI') ? (
+                          <span style={{ padding: '1px 5px', borderRadius: 999, background: '#cffafe', color: '#0891b2', fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>EKSTRA</span>
+                        ) : k.ekstra ? (
                           <span style={{ padding: '1px 5px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>PLANSIZ</span>
-                        )}
+                        ) : null}
                       </div>
                     </Td>
                     <Td>
