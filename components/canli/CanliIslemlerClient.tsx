@@ -15,6 +15,7 @@ import { iptalSebepKontrol } from '@/lib/validation/iptalSebep'
 import DurumSebepModal from '@/components/gorev/DurumSebepModal'
 import { suankiVardiyaGunu, vardiyaGunuHesapla } from '@/lib/gorev/vardiyaGunu'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 // ── Tarih/saat formatlama yardımcıları (TR — Europe/Istanbul) ────────────
 function formatTarihTR(value?: string | null): string {
@@ -499,16 +500,24 @@ useEffect(() => {
   async function refreshBugun() {
     if (!firmaId) return
     const trDate = suankiVardiyaGunu(vardiyaAyari)
-    let q = supabase
-      .from('canli_gorevler')
-      .select('id,durum,aktif_olma_tarihi,vardiya_gunu')
-      .eq('firma_id', firmaId)
-      .eq('vardiya_gunu', trDate)
-      .limit(2000)
-    if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
-    if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
-    const { data } = await q
-    if (data) setBugunGorevler(data)
+    // fetchAll pagination — PostgREST default max_rows=1000 cap'ini asar.
+    // Bugunku gorev sayisi 1000+ olabilir (bkz ATALIAN 2026-07-09 = 1533).
+    // Aksi halde vardiya ozet KPI'lari eksik sayim gosterir.
+    try {
+      const data = await fetchAll<any>(() => {
+        let q = supabase
+          .from('canli_gorevler')
+          .select('id,durum,aktif_olma_tarihi,vardiya_gunu')
+          .eq('firma_id', firmaId)
+          .eq('vardiya_gunu', trDate)
+        if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+        if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
+        return q
+      })
+      setBugunGorevler(data)
+    } catch (e) {
+      console.error('[refreshBugun] fetchAll hata:', e)
+    }
   }
 
   // Vardiya özet kartlarını her dakika tazele (canlı veriden ayrı, hafif sorgu)

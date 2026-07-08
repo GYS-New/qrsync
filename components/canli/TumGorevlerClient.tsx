@@ -16,6 +16,7 @@ import { KanalBadge } from '@/components/shared/KanalBadge'
 import { suankiVardiyaGunu } from '@/lib/gorev/vardiyaGunu'
 import DurumBadgeWithSebep from '@/components/gorev/DurumBadgeWithSebep'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 type SortKey = 'grup' | 'tanim' | 'lokasyon' | 'atanan' | 'aktif' | 'islem' | 'durum' | 'actor'
 
@@ -289,19 +290,23 @@ const getLocUstAlt = (lokasyonId: string | null | undefined, fallbackName?: stri
         ? ['HAZIR','ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI']
         : ['HAZIR','ACIK', 'BEKLEMEDE', 'ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'ZAMANI_GECMIS', 'IPTAL', 'KAPATILDI', 'SILINDI']
 
-      let q = supabase
-        .from('canli_gorevler')
-        .select(liveSelect)
-        .eq('firma_id', firmaId)
-        .in('durum', durumlar)
-        .order('aktif_olma_tarihi', { ascending: false })
-        .limit(2000)
-      if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
-      const { data, error } = await q
-
-      // Hata varsa veya data null ise mevcut listeyi ezme
-      if (error || !data) {
-        console.error('refresh error', error)
+      // fetchAll pagination — PostgREST default max_rows=1000 cap'ini asar.
+      // 1000+ canli gorev olabilen firmalarda vardiya ozet KPI'lari eksik
+      // kalmasin diye tumu paginate ile cekiliyor.
+      let data: any[] = []
+      try {
+        data = await fetchAll<any>(() => {
+          let q = supabase
+            .from('canli_gorevler')
+            .select(liveSelect)
+            .eq('firma_id', firmaId)
+            .in('durum', durumlar)
+            .order('aktif_olma_tarihi', { ascending: false })
+          if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+          return q
+        })
+      } catch (e) {
+        console.error('refresh error', e)
         return
       }
 
