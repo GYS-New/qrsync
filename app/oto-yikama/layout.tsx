@@ -67,7 +67,19 @@ export default async function OtoYikamaLayout({ children }: { children: React.Re
     }
   }
 
-  const navGroups = getOtoYikamaNav()
+  // Amir gorunumu: firmanin oto_yikama_onay_yetkilisi_id == me.id ise
+  // 'Onay Bekleyenler' menu itemini ac.
+  let isAmir = false
+  if (firmaId && !isSA) {
+    const { data: firmaOnayInfo } = await admin
+      .from('firmalar')
+      .select('oto_yikama_onay_yetkilisi_id')
+      .eq('id', firmaId)
+      .single()
+    isAmir = (firmaOnayInfo as any)?.oto_yikama_onay_yetkilisi_id === me.id
+  }
+
+  const navGroups = getOtoYikamaNav({ isSA, isAmir })
 
   return (
     <SAProviders>

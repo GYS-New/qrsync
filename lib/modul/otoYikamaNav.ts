@@ -6,8 +6,17 @@ import type { NavGroup } from '@/components/layout/Sidebar'
  * Rol-agnostik: aynı menü tüm rollere gösterilir. Yetki kontrolü
  * sayfa seviyesinde yapılır (örn. ekleyebilir/duzenleyebilir vs).
  * Erişim hakkı zaten `lib/modul/serverYetki.ts` katmanında kontrol edilmiş.
+ *
+ * İstisna: 'Onay Bekleyenler' menüsü sadece SA veya firmanın atanmış
+ * oto_yikama_onay_yetkilisi'ne gösterilir.
  */
-export function getOtoYikamaNav(): NavGroup[] {
+export interface OtoYikamaNavOpts {
+  isSA?: boolean
+  isAmir?: boolean  // firmalar.oto_yikama_onay_yetkilisi_id === me.id
+}
+
+export function getOtoYikamaNav(opts: OtoYikamaNavOpts = {}): NavGroup[] {
+  const gorebilirOnay = !!(opts.isSA || opts.isAmir)
   return [
     {
       label: 'Ana Menü',
@@ -26,6 +35,10 @@ export function getOtoYikamaNav(): NavGroup[] {
       label: 'Operasyon',
       items: [
         { label: 'Canlı İşlemler',  href: '/oto-yikama/gunluk',          icon: '📋', live: true },
+        ...(gorebilirOnay
+          ? [{ label: 'Onay Bekleyenler', href: '/oto-yikama/onay-bekleyen', icon: '✋' }]
+          : []
+        ),
         { label: 'Yıkama Takvimi',  href: '/oto-yikama/takvim',          icon: '📅' },
         { label: 'Araç Kayıtları',  href: '/oto-yikama/araclar',         icon: '🚗' },
         { label: 'Ekstra Görev',    href: '/oto-yikama/gorev-olustur',   icon: '➕' },
