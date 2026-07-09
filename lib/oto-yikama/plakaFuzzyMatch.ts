@@ -50,9 +50,19 @@ export function levenshtein(a: string, b: string): number {
 /**
  * Firma'ya ait aktif araçlardan okunan plakayla eşleştirme yapar.
  *
- * lokasyon_id verilirse fuzzy match yalnız o üst lokasyonun alt
- * istasyonlarına atanmış araçlarla yapılır (false-positive azalır).
- * lokasyon_id yoksa firma genelinde tarama yapılır.
+ * Kesin eşleşme (fark=0): HER ZAMAN firma geneli — lokasyon filtresi uygulanmaz.
+ * Neden: bir aracın varsayilan_lokasyon_id'si başka bir istasyon olabilir; plaka
+ * hangi istasyonda okunursa okunsun DB'de kayıtlıysa "kayıtlı" sayılmalı, tanımsız
+ * akışa düşmemelidir. Kullanıcı kuralı (2026-07-09): "Plaka okunur db kayıt sorgusu
+ * yapılır ve kayıtlı değilse ekstra yazılır, kayıtlı ise zaten normal yıkama
+ * davranışı gerçekleşir." Eski davranış: lokasyon filtresi hem kesin hem fuzzy
+ * icin uygulaniyordu — kayitli plaka farkli istasyona atanmissa fuzzy match'te
+ * bulunmuyordu ve mobil "tanimsiz plaka" akisina yonelmis oluyordu.
+ *
+ * Fuzzy adaylar (fark 1-2): lokasyon_id verilirse o üst lokasyonun alt istasyonlarına
+ * atanmış araçlarla sınırlandırılır (false-positive azaltmak için — mesela 16BSA669
+ * ile 16BSA659 karışması riski yakın istasyonlardan gelenlere odaklansın).
+ * lokasyon_id yoksa firma geneli.
  */
 export async function plakaFuzzyMatch(
   admin: SupabaseClient,
@@ -63,14 +73,34 @@ export async function plakaFuzzyMatch(
   const okunanNorm = normalizePlaka(okunan_plaka)
   if (!okunanNorm) return { kesin: null, adaylar: [] }
 
+  // 1) KESİN EŞLEŞME — firma geneli, lokasyon filtresi YOK
+  const { data: kesinRow } = await admin
+    .from('araclar')
+    .select('id, plaka, departman, kullanici_adi_soyadi')
+    .eq('firma_id', firma_id)
+    .eq('aktif', true)
+    .eq('plaka', okunanNorm)
+    .maybeSingle()
+  if (kesinRow) {
+    return {
+      kesin: {
+        id: (kesinRow as any).id,
+        plaka: (kesinRow as any).plaka,
+        departman: (kesinRow as any).departman,
+        kullanici_adi_soyadi: (kesinRow as any).kullanici_adi_soyadi,
+        fark: 0,
+      },
+      adaylar: [],
+    }
+  }
+
+  // 2) FUZZY ADAYLAR — lokasyon_id verildiyse o üst lokasyonun altına scope'la
   let query = admin
     .from('araclar')
     .select('id, plaka, departman, kullanici_adi_soyadi')
     .eq('firma_id', firma_id)
     .eq('aktif', true)
 
-  // lokasyon_id verildiyse o üst lokasyonun alt istasyonlarına atanmış
-  // araçları getir (araclar.lokasyon_id alt istasyon id'sidir).
   if (lokasyon_id) {
     const { data: altLoks } = await admin
       .from('lokasyonlar')
@@ -78,7 +108,7 @@ export async function plakaFuzzyMatch(
       .eq('parent_id', lokasyon_id)
     const altIds = (altLoks ?? []).map((l: any) => l.id)
     if (altIds.length > 0) {
-      query = (query as any).in('lokasyon_id', altIds)
+      query = (query as any).in('varsayilan_lokasyon_id', altIds)
     }
   }
 
@@ -87,26 +117,13 @@ export async function plakaFuzzyMatch(
     return { kesin: null, adaylar: [] }
   }
 
-  const kesinAday = araclar.find((a: any) => normalizePlaka(a.plaka) === okunanNorm)
-  if (kesinAday) {
-    return {
-      kesin: {
-        id: kesinAday.id, plaka: kesinAday.plaka,
-        departman: kesinAday.departman,
-        kullanici_adi_soyadi: kesinAday.kullanici_adi_soyadi,
-        fark: 0,
-      },
-      adaylar: [],
-    }
-  }
-
   const adaylar = (araclar as any[])
     .map(a => ({
       id: a.id, plaka: a.plaka,
       departman: a.departman, kullanici_adi_soyadi: a.kullanici_adi_soyadi,
       fark: levenshtein(okunanNorm, normalizePlaka(a.plaka)),
     }))
-    .filter(a => a.fark <= 2)
+    .filter(a => a.fark > 0 && a.fark <= 2)
     .sort((a, b) => a.fark - b.fark)
     .slice(0, 5)
 

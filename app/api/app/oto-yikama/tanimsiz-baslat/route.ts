@@ -126,6 +126,37 @@ export async function POST(req: Request) {
       )
     }
 
+    // Plaka DB'de zaten kayitli mi? Kullanici karari (2026-07-09):
+    //   "Plaka okunur db kayit sorgusu yapilir ve kayitli degilse ekstra yazilir,
+    //    kayitli ise zaten normal yikama davranisi gerceklesir."
+    // Yani tanimsiz akis SADECE kayitsiz plaka icin. Kayitli plaka gelirse
+    // mobil arama listesinden secmeli veya kayitli-plaka-ekstra-baslat kullanmali.
+    // Bu guard fuzzy match bug'i (varsayilan_lokasyon_id fix'ten once) atlanan
+    // vakalari da yakalar.
+    const { data: mevcut } = await admin
+      .from('araclar')
+      .select('id, plaka, departman, kullanici_adi_soyadi')
+      .eq('firma_id', firmaId)
+      .eq('aktif', true)
+      .eq('plaka', plaka)
+      .maybeSingle()
+    if (mevcut) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'PLAKA_KAYITLI',
+          error: `${plaka} plakası zaten sistemde kayıtlı. Arama listesinden seçip başlatın.`,
+          arac: {
+            id: (mevcut as any).id,
+            plaka: (mevcut as any).plaka,
+            departman: (mevcut as any).departman,
+            kullanici_adi_soyadi: (mevcut as any).kullanici_adi_soyadi,
+          },
+        },
+        { status: 409, headers: CORS },
+      )
+    }
+
     // Aynı plaka için AKTIF (ONAY_BEKLIYOR) kayıt var mı?
     // Chunk gerekmez — bugünlük az sayıda kayıt.
     const { data: bekleyen } = await admin
