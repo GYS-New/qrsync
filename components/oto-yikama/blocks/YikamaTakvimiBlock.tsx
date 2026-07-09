@@ -42,10 +42,15 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
   const bitisTarih = gunler[gunler.length - 1].tarih
 
   // 1) Gerçek görevler — metadata + gorevler join
+  // NOT: Sayac'a SADECE planli (ekstra=false, onay_durumu != ONAY_BEKLIYOR) satirlar eklenir —
+  // KPI kartlari ile ayni tanim (Bugun Planli = 39). Aksi halde takvim "Planlanan 50"
+  // gosterirken KPI "Planli 39" gosterip tutarsizlik olusturuyor.
+  // gercekKeySet ise TUM satirlari icerir — plansiz/ekstra yikanmis arac icin ayni gunde
+  // tahminin de eklenmesini engellemek icin.
   const [{ data: rows }, { data: araclar }] = await Promise.all([
     admin
       .from('oto_yikama_gorev_metadata')
-      .select('arac_id, hedef_tarih, gorev:gorevler!inner(durum, firma_id)')
+      .select('arac_id, hedef_tarih, ekstra, onay_durumu, gorev:gorevler!inner(durum, firma_id)')
       .eq('gorev.firma_id', firmaId)
       .gte('hedef_tarih', baslangicTarih)
       .lte('hedef_tarih', bitisTarih),
@@ -61,11 +66,14 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
   const gercekKeySet = new Set<string>()
   const sayac = new Map<string, { tamamlanan: number; planli: number }>()
   for (const r of (rows ?? []) as any[]) {
+    if (r.arac_id) gercekKeySet.add(`${r.hedef_tarih}|${r.arac_id}`)
+    // Planli tanimi: ekstra=false AND onay_durumu != 'ONAY_BEKLIYOR'
+    const isPlanli = r.ekstra === false && r.onay_durumu !== 'ONAY_BEKLIYOR'
+    if (!isPlanli) continue
     const e = sayac.get(r.hedef_tarih) ?? { tamamlanan: 0, planli: 0 }
     if (r.gorev?.durum === 'TAMAMLANDI') e.tamamlanan++
-    e.planli++  // gerçek görev = planlanan
+    e.planli++  // gerçek planli görev
     sayac.set(r.hedef_tarih, e)
-    if (r.arac_id) gercekKeySet.add(`${r.hedef_tarih}|${r.arac_id}`)
   }
 
   // 3) Tahmini plan — gerçek olmayan günler/araçlar için (haftanın tamamı)

@@ -44,7 +44,7 @@ export default function YikamaTakvimiChart({ data }: { data: Veri[] }) {
     <div className="verde-card" style={{ padding: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Yıkama Takvimi — Bu Hafta (Pzt-Pz)
+          Yıkama Takvimi — Bu Hafta (Pzt-Pz) · Planlı
         </div>
         <div style={{ display: 'flex', gap: 14, fontSize: 12, color: T.textSoft }}>
           <span>Planlanan: <strong style={{ color: T.blue }}>{toplamPlanli}</strong></span>
