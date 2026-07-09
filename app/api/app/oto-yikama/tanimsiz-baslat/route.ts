@@ -53,6 +53,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getUserOtoYikamaUstIds } from '@/lib/oto-yikama/getUserOtoYikamaUstIds'
+import { getPersonelIstasyonId } from '@/lib/oto-yikama/getPersonelIstasyonId'
 import { normalizePlaka } from '@/lib/oto-yikama/plakaFuzzyMatch'
 
 const CORS = {
@@ -188,10 +189,13 @@ export async function POST(req: Request) {
     const now = new Date().toISOString()
     const hedefTarih = bugunTR()
 
-    // Kayit lokasyonu: mobil'in gonderdigi body.lokasyon_id (personel'in bulundugu
-    // istasyon — child). Onceki commit'lerdeki getPersonelIstasyonId revizyonu
-    // iptal edildi cunku users.ust_lokasyon_id parent (ARAC YIKAMA) donuyordu.
-    const kayitLokasyonId = lokasyonId
+    // Istasyon revizyonu (2026-07-09): "yikanan aracin istasyonu = islemi yapan
+    // personelin kayitli istasyonu". Body'den gelen lokasyon_id sadece yetki
+    // kontrolu icin kullanildi; INSERT edilecek deger personel'in
+    // varsayilan_yikama_istasyon_id (child). Personelin varsayili yoksa
+    // body'den geleni kullan (mobilin secisi).
+    const personelIstasyon = await getPersonelIstasyonId(admin, userId, firmaId)
+    const kayitLokasyonId = personelIstasyon ?? lokasyonId
 
     // ==== DAL 1: Kayitli plaka + bugun PLANLI gorev VAR ise mevcut gorevi ISLEMDE'ye cek ====
     // Kullanici kurali (2026-07-09): Plaka kayitli ise ve bugun yikama plani var ise
@@ -220,9 +224,11 @@ export async function POST(req: Request) {
         if (planliGorev.atanan_kullanici_id == null) {
           patch.atanan_kullanici_id = userId
         }
-        // NOT: onceki "istasyon revizyonu" iptal edildi (2026-07-09) —
-        // parent lokasyon dondugu icin gorevin lokasyonu bozuluyordu.
-        // Planli gorevin mevcut lokasyon_id'si (araca varsayilan child) korunur.
+        // Istasyon revizyonu — planli gorev personelin varsayilan istasyonu ile
+        // ayni degilse tasi (child istasyon: users.varsayilan_yikama_istasyon_id).
+        if (personelIstasyon && personelIstasyon !== planliGorev.lokasyon_id) {
+          patch.lokasyon_id = personelIstasyon
+        }
         // Optimistic lock: durum HAZIR/ACIK degistiyse (race), update etkisiz
         const { data: updated, error: upErr } = await admin
           .from('gorevler')

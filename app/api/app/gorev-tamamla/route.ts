@@ -4,6 +4,7 @@ import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
 import { resolveLiveCompletionStatusByTask } from '@/lib/tasks/liveStatus'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
+import { getPersonelIstasyonId } from '@/lib/oto-yikama/getPersonelIstasyonId'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -377,11 +378,19 @@ export async function POST(req: Request) {
     // (Görev gorevler tablosundaysa + body'de bu alanlar varsa)
     let kmUyarisi: string | null = null
     if (gorevTipi === 'gorevler') {
-      // NOT: onceki commit'teki oto yikama istasyon revizyonu iptal edildi
-      // (2026-07-09) — users.ust_lokasyon_id parent (ARAC YIKAMA) donuyordu,
-      // gorevin lokasyonu parent'a atanip rapor grafiginde sahte istasyon
-      // olarak goruluyordu. Gorevin mevcut lokasyon_id'si (aracin varsayilan
-      // child istasyonu) korunur.
+      // Istasyon revizyonu (2026-07-09): oto yikama gorevi tamamlanirken
+      // gorevler.lokasyon_id = tamamlayan personelin varsayilan_yikama_istasyon_id.
+      const { data: otoMeta } = await admin
+        .from('oto_yikama_gorev_metadata')
+        .select('gorev_id')
+        .eq('gorev_id', gorevId)
+        .maybeSingle()
+      if (otoMeta) {
+        const personelIstasyon = await getPersonelIstasyonId(admin, userId, firmaId)
+        if (personelIstasyon && personelIstasyon !== (gorev as any).lokasyon_id) {
+          await admin.from('gorevler').update({ lokasyon_id: personelIstasyon }).eq('id', gorevId)
+        }
+      }
       const km = Number.isFinite(Number(body?.km)) ? Math.floor(Number(body.km)) : null
       const fotoOnce = typeof body?.foto_oncesi_url === 'string' ? body.foto_oncesi_url.trim() : null
       const fotoSonra = typeof body?.foto_sonrasi_url === 'string' ? body.foto_sonrasi_url.trim() : null

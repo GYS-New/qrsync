@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
+import { getPersonelIstasyonId } from '@/lib/oto-yikama/getPersonelIstasyonId'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,9 +66,10 @@ export async function PATCH(_req: NextRequest, { params }: { params: { id: strin
       durum_degisim_tarihi: nowIso,
       islemi_yapan_id: auth.user.id,
     }
-    // NOT: onceki commit'teki personel-istasyon revizyonu iptal edildi
-    // (2026-07-09) — users.ust_lokasyon_id parent (ARAC YIKAMA) donuyordu.
-    // Gorevin mevcut lokasyon_id'si (aracin varsayilan child) korunur.
+    // Istasyon revizyonu (2026-07-09): toggle'i tetikleyen kullanicinin
+    // varsayilan_yikama_istasyon_id (child) varsa lokasyona atanir.
+    const personelIstasyon = await getPersonelIstasyonId(createAdminClient(), auth.user.id, gorev.firma_id)
+    if (personelIstasyon) update.lokasyon_id = personelIstasyon
   } else if (gorev.durum === 'TAMAMLANDI') {
     yeniDurum = 'ACIK'
     update = {
