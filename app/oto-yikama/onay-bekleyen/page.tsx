@@ -37,12 +37,14 @@ export default async function OnayBekleyenPage() {
   // İstasyon dropdown'ı için — amir düzenleme modalında varsayılan_lokasyon seçebilsin
   let istasyonlar: { id: string; tanim: string }[] = []
   if (firmaId) {
+    // Oto yikama ust lokasyonlarini flag'den bul (ilike/turkce karakter fark
+    // etmesin diye). Sonra direkt cocuklari = istasyonlar.
     const { data: yikamaUst } = await admin
       .from('lokasyonlar')
       .select('id')
       .eq('firma_id', firmaId)
       .eq('aktif', true)
-      .ilike('tanim', '%araç yıkama%')
+      .eq('oto_yikama_lokasyon', true)
     const ustIds = ((yikamaUst ?? []) as any[]).map(u => u.id)
     if (ustIds.length > 0) {
       const { data: alt } = await admin
