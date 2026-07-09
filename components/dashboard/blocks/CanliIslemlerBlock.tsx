@@ -124,17 +124,6 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <KpiCard
-        label="Spesifik Görevler"
-        value={anlikToplam}
-        secondaryValue={anlikTamam}
-        secondaryLabel="Tamamlanan"
-        icon="✓"
-        iconBg="#e5e7eb"
-        showToday
-        percent={pct(anlikTamam, anlikToplam)}
-        delay={0}
-      />
-      <KpiCard
         label="Frekansiyel Görevler"
         value={canliToplam}
         secondaryValue={canliTamam}
@@ -143,6 +132,17 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
         iconBg="#e5e7eb"
         showToday
         percent={pct(canliTamam, canliToplam)}
+        delay={0}
+      />
+      <KpiCard
+        label="Spesifik Görevler"
+        value={anlikToplam}
+        secondaryValue={anlikTamam}
+        secondaryLabel="Tamamlanan"
+        icon="✓"
+        iconBg="#e5e7eb"
+        showToday
+        percent={pct(anlikTamam, anlikToplam)}
         delay={100}
       />
       <KpiCard
