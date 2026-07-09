@@ -255,6 +255,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
       const islemYapan =
         gd === 'TAMAMLANDI' ? (k.tamamlayan ?? '')
         : gd === 'ISLEMDE' ? (k.tamamlayan ?? '')
+        : gd === 'ONAY_BEKLIYOR' ? (k.tamamlayan ?? '')
         : gd === 'IPTAL' ? (k.iptal_eden ?? 'Sistem (otomatik)')
         : gd === 'YAPILAMADI' ? 'Sistem (süre aşımı)'
         : ''
@@ -555,6 +556,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                     <Td muted>
                       {gd === 'TAMAMLANDI' ? (k.tamamlayan ?? '—')
                         : gd === 'ISLEMDE' ? (k.tamamlayan ?? '—')
+                        : gd === 'ONAY_BEKLIYOR' ? (k.tamamlayan ?? '—')
                         : gd === 'IPTAL' ? (k.iptal_eden ?? (
                             <span style={{ fontStyle: 'italic', color: T.textSoft }}>Sistem (otomatik)</span>
                           ))
