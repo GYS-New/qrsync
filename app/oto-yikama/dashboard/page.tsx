@@ -113,6 +113,7 @@ export default async function OtoYikamaDashboardPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
               <BugunIlerleme
                 tamamlanan={kpiBugunPlanliTamamlanan}
+                toplamTamamlanan={kpiBugunTamamlanan}
                 hedef={kpiBugunPlanli}
                 geciken={kpiGeciken}
               />
@@ -163,8 +164,15 @@ function KpiCard({ label, value, suffix, ikon, renk }: { label: string; value: n
   )
 }
 
-function BugunIlerleme({ tamamlanan, hedef, geciken }: { tamamlanan: number; hedef: number; geciken: number }) {
+function BugunIlerleme({
+  tamamlanan, toplamTamamlanan, hedef, geciken,
+}: { tamamlanan: number; toplamTamamlanan: number; hedef: number; geciken: number }) {
   const pct = hedef > 0 ? Math.round((tamamlanan / hedef) * 100) : 0
+  // Toplam bar: planli+plansiz+ekstra tamamlanan / planli hedef.
+  // %100'i asabilir (aracin ekstra yikanmasi + planli tamamlanma). Bar gorseli
+  // 100'de clamp, sayi (toplamPct) gercek yuzdeyi gosterir.
+  const toplamPct = hedef > 0 ? Math.round((toplamTamamlanan / hedef) * 100) : 0
+  const toplamBarWidth = Math.min(100, toplamPct)
   return (
     <div className="verde-card" style={{ padding: 20 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
@@ -182,6 +190,26 @@ function BugunIlerleme({ tamamlanan, hedef, geciken }: { tamamlanan: number; hed
           transition: 'width 0.3s',
         }} />
       </div>
+
+      {/* Ikinci bar: Toplam tamamlanan (planli+plansiz+ekstra) / planli hedef */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6, marginTop: 12, marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Toplam / Planlı Hedef
+        </div>
+        <div style={{ fontSize: 12, color: '#6b7280' }}>
+          <span style={{ fontWeight: 800, color: '#0f172a' }}>%{toplamPct}</span>
+          <span style={{ marginLeft: 4 }}>({toplamTamamlanan} / {hedef})</span>
+        </div>
+      </div>
+      <div style={{ height: 8, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
+        <div style={{
+          height: '100%',
+          width: `${toplamBarWidth}%`,
+          background: toplamPct >= 100 ? '#7c3aed' : '#1d4ed8',
+          transition: 'width 0.3s',
+        }} />
+      </div>
+
       {geciken > 0 && (
         <div style={{ marginTop: 14, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 12, color: '#991b1b' }}>
           <strong>{geciken}</strong> yıkama önceki günlerden eksik kaldı
