@@ -1,11 +1,29 @@
 /**
  * POST /api/app/oto-yikama/tanimsiz-baslat
  *
- * Mobil — tanımsız (kayıtsız) plaka yıkama başlat.
+ * Mobil — plakayı OCR ile okuduğunda plakanın kayıtlı olup olmamasına
+ * bakmaksızın bu endpoint'e gönderir. Backend plakayı araclar tablosunda
+ * arar ve iki senaryodan birini uygular:
+ *
+ *   1) Plaka DB'de KAYITLI  (arac bulundu):
+ *      - arac_id = mevcut arac.id
+ *      - ekstra = true, onay_durumu = 'ONAYSIZ'  (PLANSIZ kategorisi)
+ *      - Amir onayı GEREKMEZ, bildirim gönderilmez
+ *      Neden: kayıtlı plaka için "plansız yıkama" — sistem sadece kayıt tutar.
+ *
+ *   2) Plaka DB'de YOK (kayıtsız):
+ *      - arac_id = null
+ *      - ekstra = true, onay_durumu = 'ONAY_BEKLIYOR'  (EKSTRA — amir onayı bekler)
+ *      - Amire bildirim gönderilir (bildirimler + FCM)
+ *
+ * İki senaryoda da görev ISLEMDE durumunda başlar; mobil aynı isteği yollar
+ * (mobilin karar mekanizması yok, backend otomatik dallanır).
+ *
+ * Karar kaynağı: kullanıcı 2026-07-09 — "plaka kayıtlı ise mobil UI bir
+ * uyarı göstermez, doğrudan planlı ya da plansız kabul eder. Mobilin
+ * yapması gereken bir şey yok, backend halletsin."
  *
  * Mobil ekip spec: parent_id 40a291f6-b400-4703-9326-b863c649165d (1.0.34).
- * Backend cevabı: onay_durumu = ONAY_BEKLIYOR ile yıkama başlatılır,
- * TAMAMLANDI'ya vardıktan sonra amir GYS'den onaylar veya reddeder.
  *
  * Headers:
  *   X-Device-Token
@@ -15,15 +33,16 @@
  *
  * Response (201):
  *   { ok: true, gorev_id, baslatilma_tarihi, durum: 'ISLEMDE',
- *     onay_durumu: 'ONAY_BEKLIYOR', plaka: <normalize>, amir_bildirildi: true }
+ *     onay_durumu: 'ONAYSIZ' | 'ONAY_BEKLIYOR',
+ *     plaka: <normalize>, kayitli: boolean, amir_bildirildi: boolean }
  *
  * Hata kodları:
  *   400 PLAKA_GECERSIZ         — normalize sonrası boş / geçersiz
- *   400 AMIR_ATANMAMIS         — firma amirini atamamış (endpoint disabled)
+ *   400 AMIR_ATANMAMIS         — SADECE kayıtsız plaka için — firma amiri atanmamış
  *   403 OTO_YIKAMA_YETKISI_YOK — personel istasyona yetkili değil
  *   403 ISTASYON_YETKI_YOK    — lokasyon_id personelin yetkili istasyonları arasında yok
  *   404 LOKASYON_YOK           — geçersiz lokasyon_id
- *   409 AYNI_PLAKA_ONAY_BEKLIYOR — aynı plaka için AKTIF bekleyen kayıt var
+ *   409 AYNI_PLAKA_ONAY_BEKLIYOR — kayıtsız plakada aynı plaka için AKTIF bekleyen kayıt
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -84,19 +103,15 @@ export async function POST(req: Request) {
       )
     }
 
-    // Firma amiri atanmis mi?
+    // Firma amiri atanmis mi? (Amir SADECE kayitsiz plaka onay akisi icin gerekli;
+    // kayitli plakada zaten onay istenmiyor. Yine de bilgiyi cek — kayitsiz case'de
+    // guard uygulanacak.)
     const { data: firma } = await admin
       .from('firmalar')
       .select('oto_yikama_onay_yetkilisi_id')
       .eq('id', firmaId)
       .single()
     const amirId = (firma as any)?.oto_yikama_onay_yetkilisi_id as string | null
-    if (!amirId) {
-      return NextResponse.json(
-        { ok: false, code: 'AMIR_ATANMAMIS', error: 'Firmada oto yıkama onay yetkilisi atanmamış — tanımsız yıkama devre dışı' },
-        { status: 400, headers: CORS },
-      )
-    }
 
     // Yıkama personeli yetkisi
     const yetkiliUstIds = await getUserOtoYikamaUstIds(admin, userId, firmaId)
@@ -126,13 +141,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // Plaka DB'de zaten kayitli mi? Kullanici karari (2026-07-09):
-    //   "Plaka okunur db kayit sorgusu yapilir ve kayitli degilse ekstra yazilir,
-    //    kayitli ise zaten normal yikama davranisi gerceklesir."
-    // Yani tanimsiz akis SADECE kayitsiz plaka icin. Kayitli plaka gelirse
-    // mobil arama listesinden secmeli veya kayitli-plaka-ekstra-baslat kullanmali.
-    // Bu guard fuzzy match bug'i (varsayilan_lokasyon_id fix'ten once) atlanan
-    // vakalari da yakalar.
+    // Plaka DB'de kayitli mi? Karar noktasi — kayitli ise ONAYSIZ (PLANSIZ,
+    // amir onayi yok), degilse ONAY_BEKLIYOR (EKSTRA, amir onayi).
+    // Kullanici karari (2026-07-09): mobil UI karar vermez, backend halleder.
     const { data: mevcut } = await admin
       .from('araclar')
       .select('id, plaka, departman, kullanici_adi_soyadi')
@@ -140,40 +151,33 @@ export async function POST(req: Request) {
       .eq('aktif', true)
       .eq('plaka', plaka)
       .maybeSingle()
-    if (mevcut) {
-      return NextResponse.json(
-        {
-          ok: false,
-          code: 'PLAKA_KAYITLI',
-          error: `${plaka} plakası zaten sistemde kayıtlı. Arama listesinden seçip başlatın.`,
-          arac: {
-            id: (mevcut as any).id,
-            plaka: (mevcut as any).plaka,
-            departman: (mevcut as any).departman,
-            kullanici_adi_soyadi: (mevcut as any).kullanici_adi_soyadi,
-          },
-        },
-        { status: 409, headers: CORS },
-      )
-    }
+    const kayitliArac = mevcut as { id: string; plaka: string; departman: string | null; kullanici_adi_soyadi: string | null } | null
 
-    // Aynı plaka için AKTIF (ONAY_BEKLIYOR) kayıt var mı?
-    // Chunk gerekmez — bugünlük az sayıda kayıt.
-    const { data: bekleyen } = await admin
-      .from('oto_yikama_gorev_metadata')
-      .select('gorev_id, plaka_snapshot')
-      .eq('onay_durumu', 'ONAY_BEKLIYOR')
-      .eq('plaka_snapshot', plaka)
-      .limit(1)
-    if ((bekleyen ?? []).length > 0) {
-      return NextResponse.json(
-        {
-          ok: false,
-          code: 'AYNI_PLAKA_ONAY_BEKLIYOR',
-          error: `${plaka} plakası için zaten onay bekleyen bir yıkama var`,
-        },
-        { status: 409, headers: CORS },
-      )
+    // Sadece KAYITSIZ plaka icin amir + AYNI_PLAKA_ONAY_BEKLIYOR kontrolleri
+    if (!kayitliArac) {
+      if (!amirId) {
+        return NextResponse.json(
+          { ok: false, code: 'AMIR_ATANMAMIS', error: 'Firmada oto yıkama onay yetkilisi atanmamış — kayıtsız plaka yıkaması devre dışı' },
+          { status: 400, headers: CORS },
+        )
+      }
+      // Ayni plaka icin AKTIF (ONAY_BEKLIYOR) kayit var mi?
+      const { data: bekleyen } = await admin
+        .from('oto_yikama_gorev_metadata')
+        .select('gorev_id, plaka_snapshot')
+        .eq('onay_durumu', 'ONAY_BEKLIYOR')
+        .eq('plaka_snapshot', plaka)
+        .limit(1)
+      if ((bekleyen ?? []).length > 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'AYNI_PLAKA_ONAY_BEKLIYOR',
+            error: `${plaka} plakası için zaten onay bekleyen bir yıkama var`,
+          },
+          { status: 409, headers: CORS },
+        )
+      }
     }
 
     const now = new Date().toISOString()
@@ -188,10 +192,14 @@ export async function POST(req: Request) {
     const kayitLokasyonId = personelIstasyon ?? lokasyonId
 
     // 1) gorevler INSERT — durum ISLEMDE olarak baslar
+    // Tanim: kayitli plaka icin "Plansiz yikama", kayitsiz icin "Tanimsiz plaka".
+    const gorevTanim = kayitliArac
+      ? `Oto Yıkama — Plansız yıkama: ${plaka}`
+      : `Oto Yıkama — Tanımsız plaka: ${plaka}`
     const { data: newGorev, error: gErr } = await admin
       .from('gorevler')
       .insert({
-        tanim: `Oto Yıkama — Tanımsız plaka: ${plaka}`,
+        tanim: gorevTanim,
         durum: 'ISLEMDE',
         firma_id: firmaId,
         lokasyon_id: kayitLokasyonId,
@@ -211,16 +219,17 @@ export async function POST(req: Request) {
       )
     }
 
-    // 2) metadata INSERT — arac_id NULL, ekstra=true, onay_durumu=ONAY_BEKLIYOR
+    // 2) metadata INSERT — kayitli plaka: arac_id + ONAYSIZ; kayitsiz: null + ONAY_BEKLIYOR
+    const metaOnay: 'ONAYSIZ' | 'ONAY_BEKLIYOR' = kayitliArac ? 'ONAYSIZ' : 'ONAY_BEKLIYOR'
     const { error: mErr } = await admin
       .from('oto_yikama_gorev_metadata')
       .insert({
         gorev_id: newGorev.id,
-        arac_id: null,
+        arac_id: kayitliArac?.id ?? null,
         plaka_snapshot: plaka,
         hedef_tarih: hedefTarih,
         ekstra: true,
-        onay_durumu: 'ONAY_BEKLIYOR',
+        onay_durumu: metaOnay,
       })
     if (mErr) {
       // Rollback: metadata yazamadıysak görevi de sil
@@ -231,40 +240,42 @@ export async function POST(req: Request) {
       )
     }
 
-    // 3) Amire bildirim — bildirimler tablosuna + FCM push (fire-and-forget)
+    // 3) Amire bildirim — SADECE kayitsiz plaka icin (kayitli plakada onay istenmiyor).
     // Bildirim başarısız olsa bile yıkama tamamlanmalı; sessizce try/catch
-    ;(async () => {
-      try {
-        // Personel bilgisi (mesajda göstermek için)
-        const [{ data: personel }, { data: lokFull }] = await Promise.all([
-          admin.from('users').select('isim_soyisim').eq('id', userId).maybeSingle(),
-          admin.from('lokasyonlar').select('tanim').eq('id', lokasyonId).maybeSingle(),
-        ])
-        const personelAd = (personel as any)?.isim_soyisim ?? 'Bilinmeyen personel'
-        const istasyonAd = (lokFull as any)?.tanim ?? 'Bilinmeyen istasyon'
-        const baslik = `Tanımsız plaka onayı bekliyor`
-        const mesaj = [
-          `Plaka: ${plaka}`,
-          `Personel: ${personelAd}`,
-          `İstasyon: ${istasyonAd}`,
-          `Yıkama başlatıldı — TAMAMLANDI olduğunda onay için hazır olacak`,
-          `#gorev:${newGorev.id}`,
-        ].join('\n')
+    let amirBildirildi = false
+    if (!kayitliArac && amirId) {
+      amirBildirildi = true
+      ;(async () => {
+        try {
+          const [{ data: personel }, { data: lokFull }] = await Promise.all([
+            admin.from('users').select('isim_soyisim').eq('id', userId).maybeSingle(),
+            admin.from('lokasyonlar').select('tanim').eq('id', lokasyonId).maybeSingle(),
+          ])
+          const personelAd = (personel as any)?.isim_soyisim ?? 'Bilinmeyen personel'
+          const istasyonAd = (lokFull as any)?.tanim ?? 'Bilinmeyen istasyon'
+          const baslik = `Tanımsız plaka onayı bekliyor`
+          const mesaj = [
+            `Plaka: ${plaka}`,
+            `Personel: ${personelAd}`,
+            `İstasyon: ${istasyonAd}`,
+            `Yıkama başlatıldı — TAMAMLANDI olduğunda onay için hazır olacak`,
+            `#gorev:${newGorev.id}`,
+          ].join('\n')
 
-        await admin.from('bildirimler').insert({
-          alici_id: amirId,
-          baslik,
-          mesaj,
-          tip: 'oto_yikama_onay',
-        })
-        // FCM push — server-side olduğu için sendFCMToUser'ı direkt çağırabiliriz
-        const { sendFCMToUser } = await import('@/lib/fcm-sender')
-        await sendFCMToUser(amirId, baslik, `${plaka} — ${personelAd}`, 'gorev_uyari')
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.warn('[tanimsiz-baslat] bildirim gönderilemedi:', err)
-      }
-    })()
+          await admin.from('bildirimler').insert({
+            alici_id: amirId,
+            baslik,
+            mesaj,
+            tip: 'oto_yikama_onay',
+          })
+          const { sendFCMToUser } = await import('@/lib/fcm-sender')
+          await sendFCMToUser(amirId, baslik, `${plaka} — ${personelAd}`, 'gorev_uyari')
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('[tanimsiz-baslat] bildirim gönderilemedi:', err)
+        }
+      })()
+    }
 
     return NextResponse.json(
       {
@@ -272,9 +283,10 @@ export async function POST(req: Request) {
         gorev_id: newGorev.id,
         baslatilma_tarihi: newGorev.baslatilma_tarihi,
         durum: 'ISLEMDE',
-        onay_durumu: 'ONAY_BEKLIYOR',
+        onay_durumu: metaOnay,
         plaka,
-        amir_bildirildi: true,
+        kayitli: kayitliArac !== null,
+        amir_bildirildi: amirBildirildi,
       },
       { status: 201, headers: CORS },
     )
