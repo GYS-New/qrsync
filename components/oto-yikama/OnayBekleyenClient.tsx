@@ -226,7 +226,7 @@ function Kart({ k, disabled, onOnayla, onReddet, onDuzenle }: {
 
       <div style={{ fontSize: 13, color: T.textSoft, lineHeight: 1.7 }}>
         <Row ikon={<User size={13} />} etiket="Personel" deger={k.personel_ad} />
-        <Row ikon={<MapPin size={13} />} etiket="İstasyon" deger={k.ust_lokasyon ? `${k.ust_lokasyon} > ${k.lokasyon_ad}` : k.lokasyon_ad} />
+        <Row ikon={<MapPin size={13} />} etiket="İstasyon" deger={k.lokasyon_ad ?? '—'} />
         <Row ikon={<Clock size={13} />} etiket="Başlatma" deger={fmtDT(k.baslatilma_tarihi)} />
         <Row ikon={<Clock size={13} />} etiket="Tamamlanma" deger={fmtDT(k.tamamlanma_tarihi)} />
         <Row ikon={<Clock size={13} />} etiket="Süre" deger={fmtSure(k.tamamlanma_suresi_saniye)} />

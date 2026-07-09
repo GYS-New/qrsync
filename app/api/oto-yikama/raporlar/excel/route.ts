@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
       .map(m => {
         const g: any = gMap.get(m.gorev_id)
         const a: any = aMap.get(m.arac_id)
-        const ust = g.lokasyon?.ust?.tanim ?? null
+        // Sistem zaten Oto Yikama — ust ibaresi gereksiz.
         const lok = g.lokasyon?.tanim ?? null
         const sure = g.tamamlanma_suresi_saniye && g.tamamlanma_suresi_saniye > 0
           ? g.tamamlanma_suresi_saniye
@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
           arac_sahibi: a?.kullanici_adi_soyadi ?? '',
           personel_id: g.islemi_yapan_id,
           personel: g.islemi_yapan_id ? (uMap.get(g.islemi_yapan_id) ?? '—') : '—',
-          lokasyon: ust && lok ? `${ust} > ${lok}` : (lok ?? ''),
+          lokasyon: lok ?? '',
           hedef_tarih: m.hedef_tarih,
           baslatilma_tarihi: g.baslatilma_tarihi,
           tamamlanma_tarihi: g.tamamlanma_tarihi,

@@ -83,9 +83,10 @@ export async function GET(req: NextRequest) {
     .map(m => {
       const g: any = gorevMap.get(m.gorev_id)
       const a: any = aracMap.get(m.arac_id)
-      const ustTanim = g.lokasyon?.ust?.tanim ?? null
+      // Sistem zaten Oto Yikama modulu — ust istasyon (ARAC YIKAMA) ibaresi gereksiz.
+      // Sadece child istasyon (ISTASYON-1 vs) gosteriliyor.
       const lokTanim = g.lokasyon?.tanim ?? null
-      const lokasyon = ustTanim && lokTanim ? `${ustTanim} > ${lokTanim}` : (lokTanim ?? '—')
+      const lokasyon = lokTanim ?? '—'
       // İşlemi Yapan: terminal durumda tamamlayan/iptal eden, ISLEMDE'de
       // başlatan kullanıcı. HAZIR/ACIK'ta boş.
       const terminal = ['TAMAMLANDI', 'IPTAL', 'YAPILAMADI'].includes(g.durum)

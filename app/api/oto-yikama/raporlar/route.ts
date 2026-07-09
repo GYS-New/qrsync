@@ -144,9 +144,9 @@ export async function GET(req: NextRequest) {
     .map(m => {
       const g: any = gMap.get(m.gorev_id)
       const a: any = aracMap.get(m.arac_id)
-      const ust = g.lokasyon?.ust?.tanim ?? null
+      // Sistem zaten Oto Yikama — ust ibaresi (ARAC YIKAMA) gereksiz.
       const lok = g.lokasyon?.tanim ?? null
-      const lokasyonTam = ust && lok ? `${ust} > ${lok}` : (lok ?? '—')
+      const lokasyonTam = lok ?? '—'
       const personelAd = g.islemi_yapan_id ? (userMap.get(g.islemi_yapan_id) ?? '—') : '—'
       const sure = g.tamamlanma_suresi_saniye && g.tamamlanma_suresi_saniye > 0
         ? g.tamamlanma_suresi_saniye
