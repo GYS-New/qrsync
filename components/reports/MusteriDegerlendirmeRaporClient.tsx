@@ -397,22 +397,55 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
     const ws = wb.addWorksheet('Müşteri Değerlendirmeleri')
     ws.columns = [
-      { header: 'Tarih',    key: 'tarih',    width: 20 },
-      { header: 'Lokasyon', key: 'lokasyon', width: 28 },
-      { header: 'Puan',     key: 'puan',     width: 8 },
-      { header: 'Etiket',   key: 'etiket',   width: 14 },
-      { header: 'Yorum',    key: 'yorum',    width: 50 },
-      { header: 'Ad Soyad', key: 'ad',       width: 20 },
+      { header: 'Tarih',                  key: 'tarih',           width: 20 },
+      { header: 'Lokasyon',               key: 'lokasyon',        width: 28 },
+      { header: 'Puan',                   key: 'puan',            width: 8 },
+      { header: 'Etiket',                 key: 'etiket',          width: 14 },
+      { header: 'Yorum',                  key: 'yorum',           width: 50 },
+      { header: 'Ad Soyad',               key: 'ad',              width: 20 },
+      { header: 'Değerlendirme Görseli',  key: 'gorsel',          width: 40 },
+      { header: 'Aksiyon',                key: 'aksiyon',         width: 50 },
+      { header: 'Aksiyon Görselleri',     key: 'aksiyonGorseller', width: 40 },
     ]
     const hr = ws.getRow(1)
     hr.font = { bold: true, color: { argb: 'FFFFFFFF' } }
     hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } }
     hr.height = 22
-    filtreliKayitlar.forEach((k: any) => ws.addRow({
-      tarih: new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }),
-      lokasyon: k.lokasyon_tanim, puan: k.yildiz,
-      etiket: YILDIZ_ETIKET[k.yildiz], yorum: k.yorum ?? '', ad: k.ad_soyad ?? '',
-    }))
+    filtreliKayitlar.forEach((k: any) => {
+      const aksiyonGorseller: string[] = (k.aksiyon?.gorsel_urls ?? []).filter(Boolean)
+      const row = ws.addRow({
+        tarih: new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }),
+        lokasyon: k.lokasyon_tanim,
+        puan: k.yildiz,
+        etiket: YILDIZ_ETIKET[k.yildiz],
+        yorum: k.yorum ?? '',
+        ad: k.ad_soyad ?? '',
+        gorsel: k.gorsel_url ?? '',
+        aksiyon: k.aksiyon?.aksiyon_metni ?? '',
+        aksiyonGorseller: aksiyonGorseller.join('\n'),
+      })
+      // Degerlendirme gorseli — hyperlink (tiklanabilir mavi link)
+      if (k.gorsel_url) {
+        const cell = row.getCell('gorsel')
+        cell.value = { text: 'Görseli Aç', hyperlink: k.gorsel_url } as any
+        cell.font = { color: { argb: 'FF1D4ED8' }, underline: true }
+      }
+      // Aksiyon gorselleri — birden fazla olabilir, her satirda 'Görsel N' link
+      if (aksiyonGorseller.length > 0) {
+        const cell = row.getCell('aksiyonGorseller')
+        // Tek görsel varsa hyperlink; birden fazla varsa metin olarak URL'ler
+        if (aksiyonGorseller.length === 1) {
+          cell.value = { text: 'Görseli Aç', hyperlink: aksiyonGorseller[0] } as any
+          cell.font = { color: { argb: 'FF1D4ED8' }, underline: true }
+        } else {
+          cell.value = aksiyonGorseller.join('\n')
+          cell.alignment = { wrapText: true, vertical: 'top' }
+        }
+      }
+      // Uzun metin hucreleri icin wrap
+      row.getCell('yorum').alignment = { wrapText: true, vertical: 'top' }
+      row.getCell('aksiyon').alignment = { wrapText: true, vertical: 'top' }
+    })
     const buf = await wb.xlsx.writeBuffer()
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
@@ -422,15 +455,30 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
 
   // ── PDF (Yazdır) ────────────────────────────────────────────────────────
   function pdfIndir() {
-    const rows = filtreliKayitlar.map((k: any) =>
-      `<tr>
-        <td>${new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</td>
-        <td>${k.lokasyon_tanim}</td>
-        <td>${'★'.repeat(k.yildiz)} ${YILDIZ_ETIKET[k.yildiz]}</td>
-        <td>${k.yorum ?? '—'}</td>
-        <td>${k.ad_soyad ?? '—'}</td>
+    // XSS koruması — HTML enjeksiyonu önle
+    const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, ch => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]!
+    ))
+    const linkHtml = (url: string, label: string) =>
+      `<a href="${esc(url)}" target="_blank" style="color:#1d4ed8;text-decoration:underline">${esc(label)}</a>`
+    const rows = filtreliKayitlar.map((k: any) => {
+      const aksiyonGorseller: string[] = (k.aksiyon?.gorsel_urls ?? []).filter(Boolean)
+      const gorselCell = k.gorsel_url ? linkHtml(k.gorsel_url, 'Görseli Aç') : '—'
+      const aksiyonMetni = k.aksiyon?.aksiyon_metni ? esc(k.aksiyon.aksiyon_metni) : '—'
+      const aksiyonGorselCell = aksiyonGorseller.length === 0
+        ? '—'
+        : aksiyonGorseller.map((u, i) => linkHtml(u, `Görsel ${i + 1}`)).join('<br>')
+      return `<tr>
+        <td>${esc(new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }))}</td>
+        <td>${esc(k.lokasyon_tanim)}</td>
+        <td>${'★'.repeat(k.yildiz)} ${esc(YILDIZ_ETIKET[k.yildiz])}</td>
+        <td>${esc(k.yorum ?? '—')}</td>
+        <td>${esc(k.ad_soyad ?? '—')}</td>
+        <td>${gorselCell}</td>
+        <td>${aksiyonMetni}</td>
+        <td>${aksiyonGorselCell}</td>
       </tr>`
-    ).join('')
+    }).join('')
 
     const ozetHtml = ozet ? `
       <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
@@ -441,24 +489,34 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       </div>
     ` : ''
 
-    const w = window.open('', '_blank', 'width=1100,height=700')
+    const w = window.open('', '_blank', 'width=1400,height=800')
     if (!w) return
     w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/>
       <title>Müşteri Değerlendirmeleri</title>
       <style>
-        body{font-family:Arial,sans-serif;font-size:11px;padding:20px;color:#111827}
+        body{font-family:Arial,sans-serif;font-size:10.5px;padding:20px;color:#111827}
         h2{color:#1f2937;margin-bottom:8px}
-        table{width:100%;border-collapse:collapse;margin-top:8px}
-        th{background:#1f2937;color:#fff;font-weight:700;padding:7px 10px;text-align:left;font-size:11px}
-        td{padding:6px 10px;border:1px solid #e5e7eb;font-size:11px}
+        table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed}
+        th{background:#1f2937;color:#fff;font-weight:700;padding:7px 8px;text-align:left;font-size:10.5px}
+        td{padding:6px 8px;border:1px solid #e5e7eb;font-size:10.5px;vertical-align:top;word-wrap:break-word}
         tr:nth-child(even) td{background:#f9fafb}
+        a{word-break:break-all}
       </style>
     </head><body>
       <h2>Müşteri Değerlendirmeleri Raporu</h2>
-      <div style="font-size:11px;color:#64748b;margin-bottom:12px">${new Date().toLocaleDateString('tr-TR')} — ${filtreliKayitlar.length} kayıt</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:12px">${esc(new Date().toLocaleDateString('tr-TR'))} — ${filtreliKayitlar.length} kayıt</div>
       ${ozetHtml}
       <table>
-        <thead><tr><th>Tarih</th><th>Lokasyon</th><th>Puan</th><th>Yorum</th><th>Ad Soyad</th></tr></thead>
+        <thead><tr>
+          <th style="width:9%">Tarih</th>
+          <th style="width:11%">Lokasyon</th>
+          <th style="width:8%">Puan</th>
+          <th style="width:20%">Yorum</th>
+          <th style="width:9%">Ad Soyad</th>
+          <th style="width:9%">Görsel</th>
+          <th style="width:22%">Aksiyon</th>
+          <th style="width:12%">Aksiyon Görselleri</th>
+        </tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </body></html>`)
