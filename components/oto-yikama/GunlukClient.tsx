@@ -69,7 +69,7 @@ function gorevSuresiSaniye(r: Row): number {
   return 0
 }
 
-type DurumFilter = 'TUMU' | 'PLANLI' | Durum
+type DurumFilter = 'TUMU' | 'PLANLI' | 'PLANSIZ' | 'EKSTRA' | Durum
 
 export default function GunlukClient({ firmaId }: { firmaId: string }) {
   const { toast } = useToast()
@@ -122,11 +122,18 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
   const sorted = useMemo(() => {
     const ara = arama.trim().toUpperCase()
     return [...rows]
-      .filter(r =>
-        durumFilter === 'TUMU' ? true
-        : durumFilter === 'PLANLI' ? !r.ekstra
-        : r.durum === durumFilter
-      )
+      .filter(r => {
+        if (durumFilter === 'TUMU') return true
+        // Kategori filtreleri: Planli / Plansiz / Ekstra tanimlari:
+        //   Planli   = ekstra=false (durum ne olursa olsun onay bekleyen degil)
+        //   Plansiz  = ekstra=true AND onay_durumu ∉ {ONAY_BEKLIYOR, ONAYLANDI}
+        //   Ekstra   = onay_durumu = 'ONAYLANDI' (onaylanmis tanimsiz plaka)
+        if (durumFilter === 'PLANLI')  return !r.ekstra && r.durum !== 'ONAY_BEKLIYOR'
+        if (durumFilter === 'PLANSIZ') return r.ekstra === true && r.onay_durumu !== 'ONAY_BEKLIYOR' && r.onay_durumu !== 'ONAYLANDI'
+        if (durumFilter === 'EKSTRA')  return r.onay_durumu === 'ONAYLANDI'
+        // Durum filtreleri
+        return r.durum === durumFilter
+      })
       .filter(r => departmanFilter ? r.departman === departmanFilter : true)
       .filter(r => {
         if (!ara) return true
@@ -154,11 +161,19 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
   }, [rows])
 
   const sayilar = useMemo(() => {
-    const c = { toplam: rows.length, planli: 0, HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0, ONAY_BEKLIYOR: 0 }
+    const c = {
+      toplam: rows.length, planli: 0, plansiz: 0, ekstra: 0,
+      HAZIR: 0, ACIK: 0, ISLEMDE: 0, TAMAMLANDI: 0, IPTAL: 0, YAPILAMADI: 0, ONAY_BEKLIYOR: 0,
+    }
     for (const r of rows) {
       c[r.durum]++
-      // Onay bekleyen hedefe girmesin — planli sayimindan ciktar
+      // Kategori sayimlari (kullanici 2026-07-09 tanimlarina gore):
+      //   Planli   = ekstra=false (onay bekleyen degil)
+      //   Plansiz  = ekstra=true AND onay_durumu ∉ {ONAY_BEKLIYOR, ONAYLANDI}
+      //   Ekstra   = onay_durumu = 'ONAYLANDI' (onaylanmis tanimsiz plaka)
       if (!r.ekstra && r.durum !== 'ONAY_BEKLIYOR') c.planli++
+      else if (r.ekstra && r.onay_durumu !== 'ONAY_BEKLIYOR' && r.onay_durumu !== 'ONAYLANDI') c.plansiz++
+      else if (r.onay_durumu === 'ONAYLANDI') c.ekstra++
     }
     return c
   }, [rows])
@@ -179,14 +194,23 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
 
   const dotColor = streamState === 'running' ? '#374151' : streamState === 'paused' ? '#d97706' : '#9ca3af'
 
-  const kpiKartlari: { key: DurumFilter; label: string; val: number; bg: string; vColor: string; lColor: string }[] = [
-    { key: 'TUMU',         label: 'Tümü',         val: sayilar.toplam,        bg: 'transparent', vColor: '#111827', lColor: '#6b7280' },
-    { key: 'PLANLI',       label: 'Bugün Planlı', val: sayilar.planli,        bg: '#f5f3ff',     vColor: '#6d28d9', lColor: '#5B21B6' },
-    { key: 'ISLEMDE',      label: 'İşlemde',      val: sayilar.ISLEMDE,       bg: '#eff6ff',     vColor: '#1d4ed8', lColor: '#185FA5' },
-    { key: 'ACIK',         label: 'Açık',         val: sayilar.ACIK,          bg: '#fffbeb',     vColor: '#92400e', lColor: '#854F0B' },
-    { key: 'ONAY_BEKLIYOR', label: 'Onay Bekleyen', val: sayilar.ONAY_BEKLIYOR, bg: '#ecfeff',    vColor: '#0891b2', lColor: '#0E7490' },
-    { key: 'TAMAMLANDI',   label: 'Tamamlandı',   val: sayilar.TAMAMLANDI,    bg: '#f0fdf4',     vColor: '#166534', lColor: '#3B6D11' },
-    { key: 'IPTAL',        label: 'İptal',        val: sayilar.IPTAL,         bg: '#fef2f2',     vColor: '#991b1b', lColor: '#A32D2D' },
+  // KPI kartlari 2 grup: KATEGORI (kayit tipi) + DURUM (is akisi asamasi).
+  // "Tumu" belirsizdi — kullanici (2026-07-09) net kategori dokumu istedi.
+  // Kategori toplami = Planli + Plansiz + Ekstra + Onay Bekleyen = Toplam.
+  // Durum toplami = Islemde + Acik + Tamamlandi + Iptal = Toplam.
+  type Kart = { key: DurumFilter; label: string; val: number; bg: string; vColor: string; lColor: string }
+  const kategoriKartlari: Kart[] = [
+    { key: 'TUMU',          label: 'Toplam',        val: sayilar.toplam,        bg: 'transparent', vColor: '#111827', lColor: '#6b7280' },
+    { key: 'PLANLI',        label: 'Planlı',        val: sayilar.planli,        bg: '#f5f3ff',     vColor: '#6d28d9', lColor: '#5B21B6' },
+    { key: 'PLANSIZ',       label: 'Plansız',       val: sayilar.plansiz,       bg: '#fff7ed',     vColor: '#c2410c', lColor: '#9A3412' },
+    { key: 'EKSTRA',        label: 'Ekstra',        val: sayilar.ekstra,        bg: '#ecfeff',     vColor: '#0e7490', lColor: '#155e75' },
+    { key: 'ONAY_BEKLIYOR', label: 'Onay Bekleyen', val: sayilar.ONAY_BEKLIYOR, bg: '#fef3c7',     vColor: '#a16207', lColor: '#854D0E' },
+  ]
+  const durumKartlari: Kart[] = [
+    { key: 'ISLEMDE',       label: 'İşlemde',       val: sayilar.ISLEMDE,       bg: '#eff6ff',     vColor: '#1d4ed8', lColor: '#185FA5' },
+    { key: 'ACIK',          label: 'Açık',          val: sayilar.ACIK,          bg: '#fffbeb',     vColor: '#92400e', lColor: '#854F0B' },
+    { key: 'TAMAMLANDI',    label: 'Tamamlandı',    val: sayilar.TAMAMLANDI,    bg: '#f0fdf4',     vColor: '#166534', lColor: '#3B6D11' },
+    { key: 'IPTAL',         label: 'İptal',         val: sayilar.IPTAL,         bg: '#fef2f2',     vColor: '#991b1b', lColor: '#A32D2D' },
   ]
 
   return (
@@ -238,30 +262,59 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
           </div>
         </div>
 
-        {/* KPI filtre kartları — 7 karta gore auto-fit + daraltilmis padding/font */}
-        <div style={{ padding: '8px 18px', borderBottom: '1px solid #f3f4f6', display: 'grid', gridTemplateColumns: `repeat(${kpiKartlari.length}, minmax(0, 1fr))`, gap: 5, alignItems: 'stretch' }}>
-          {kpiKartlari.map(({ key, label, val, bg, vColor, lColor }) => {
-            const active = durumFilter === key
-            const onClick = () => {
-              if (active && key !== 'TUMU') setDurumFilter('TUMU')
-              else setDurumFilter(key)
-            }
-            return (
-              <button key={key} type="button" onClick={onClick}
-                title={active && key !== 'TUMU' ? 'Filtreyi kaldır' : label}
-                style={{
-                  background: active ? vColor + '0F' : bg === 'transparent' ? '#fafafa' : bg,
-                  borderRadius: 7, padding: '6px 6px', textAlign: 'left', cursor: 'pointer',
-                  border: active ? `2px solid ${vColor}` : '1px solid #e5e7eb',
-                  transition: 'all 0.15s',
-                  outline: 'none',
-                  minWidth: 0,
-                }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: vColor, lineHeight: 1 }}>{val}</div>
-                <div style={{ fontSize: 9.5, color: lColor, marginTop: 2, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
-              </button>
-            )
-          })}
+        {/* KPI filtre kartları — 2 satir: KATEGORI (5) + DURUM (4).
+            Tumu belirsizdi (2026-07-09 fix); kategori dokumu netlestirildi.
+            Kategori toplam = Planli + Plansiz + Ekstra + Onay Bekleyen = Toplam.
+            Durum   toplam = Islemde + Acik + Tamamlandi + Iptal = Toplam. */}
+        <div style={{ padding: '8px 18px 4px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 60 }}>Kategori</div>
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${kategoriKartlari.length}, minmax(0, 1fr))`, gap: 5, alignItems: 'stretch' }}>
+            {kategoriKartlari.map(({ key, label, val, bg, vColor, lColor }) => {
+              const active = durumFilter === key
+              const onClick = () => {
+                if (active && key !== 'TUMU') setDurumFilter('TUMU')
+                else setDurumFilter(key)
+              }
+              return (
+                <button key={key} type="button" onClick={onClick}
+                  title={active && key !== 'TUMU' ? 'Filtreyi kaldır' : label}
+                  style={{
+                    background: active ? vColor + '0F' : bg === 'transparent' ? '#fafafa' : bg,
+                    borderRadius: 7, padding: '6px 6px', textAlign: 'left', cursor: 'pointer',
+                    border: active ? `2px solid ${vColor}` : '1px solid #e5e7eb',
+                    transition: 'all 0.15s', outline: 'none', minWidth: 0,
+                  }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: vColor, lineHeight: 1 }}>{val}</div>
+                  <div style={{ fontSize: 9.5, color: lColor, marginTop: 2, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+        <div style={{ padding: '4px 18px 8px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 60 }}>Durum</div>
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${durumKartlari.length}, minmax(0, 1fr))`, gap: 5, alignItems: 'stretch' }}>
+            {durumKartlari.map(({ key, label, val, bg, vColor, lColor }) => {
+              const active = durumFilter === key
+              const onClick = () => {
+                if (active) setDurumFilter('TUMU')
+                else setDurumFilter(key)
+              }
+              return (
+                <button key={key} type="button" onClick={onClick}
+                  title={active ? 'Filtreyi kaldır' : label}
+                  style={{
+                    background: active ? vColor + '0F' : bg,
+                    borderRadius: 7, padding: '6px 6px', textAlign: 'left', cursor: 'pointer',
+                    border: active ? `2px solid ${vColor}` : '1px solid #e5e7eb',
+                    transition: 'all 0.15s', outline: 'none', minWidth: 0,
+                  }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: vColor, lineHeight: 1 }}>{val}</div>
+                  <div style={{ fontSize: 9.5, color: lColor, marginTop: 2, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Arama + son güncelleme */}
