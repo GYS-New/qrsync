@@ -167,47 +167,38 @@ function KpiCard({ label, value, suffix, ikon, renk }: { label: string; value: n
 function BugunIlerleme({
   tamamlanan, toplamTamamlanan, hedef, geciken,
 }: { tamamlanan: number; toplamTamamlanan: number; hedef: number; geciken: number }) {
-  const pct = hedef > 0 ? Math.round((tamamlanan / hedef) * 100) : 0
+  const planliPct = hedef > 0 ? Math.round((tamamlanan / hedef) * 100) : 0
   // Toplam bar: planli+plansiz+ekstra tamamlanan / planli hedef.
   // %100'i asabilir (aracin ekstra yikanmasi + planli tamamlanma). Bar gorseli
-  // 100'de clamp, sayi (toplamPct) gercek yuzdeyi gosterir.
+  // 100'de clamp, sayi gercek yuzdeyi gosterir.
   const toplamPct = hedef > 0 ? Math.round((toplamTamamlanan / hedef) * 100) : 0
   const toplamBarWidth = Math.min(100, toplamPct)
   return (
     <div className="verde-card" style={{ padding: 20 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
-        Bugün Planlı İlerleme
-      </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
-        <div style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>%{pct}</div>
-        <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 4 }}>{tamamlanan} / {hedef} araç</div>
-      </div>
-      <div style={{ height: 8, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{
-          height: '100%',
-          width: `${pct}%`,
-          background: pct >= 80 ? '#16a34a' : pct >= 50 ? '#f59e0b' : '#dc2626',
-          transition: 'width 0.3s',
-        }} />
+        Bugün İlerleme
       </div>
 
-      {/* Ikinci bar: Toplam tamamlanan (planli+plansiz+ekstra) / planli hedef */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6, marginTop: 12, marginBottom: 6 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Toplam / Planlı Hedef
-        </div>
-        <div style={{ fontSize: 12, color: '#6b7280' }}>
-          <span style={{ fontWeight: 800, color: '#0f172a' }}>%{toplamPct}</span>
-          <span style={{ marginLeft: 4 }}>({toplamTamamlanan} / {hedef})</span>
-        </div>
-      </div>
-      <div style={{ height: 8, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{
-          height: '100%',
-          width: `${toplamBarWidth}%`,
-          background: toplamPct >= 100 ? '#7c3aed' : '#1d4ed8',
-          transition: 'width 0.3s',
-        }} />
+      {/* Bar 1: Planli tamamlanan / Planli hedef */}
+      <Ilerleme
+        baslik="Planlı Tamamlanan"
+        pct={planliPct}
+        deger={tamamlanan}
+        hedef={hedef}
+        renk={planliPct >= 80 ? '#16a34a' : planliPct >= 50 ? '#f59e0b' : '#dc2626'}
+        barWidth={Math.min(100, planliPct)}
+      />
+
+      {/* Bar 2: Toplam tamamlanan (planli+plansiz+ekstra) / planli hedef */}
+      <div style={{ marginTop: 14 }}>
+        <Ilerleme
+          baslik="Toplam Tamamlanan"
+          pct={toplamPct}
+          deger={toplamTamamlanan}
+          hedef={hedef}
+          renk={toplamPct >= 100 ? '#7c3aed' : '#1d4ed8'}
+          barWidth={toplamBarWidth}
+        />
       </div>
 
       {geciken > 0 && (
@@ -216,5 +207,29 @@ function BugunIlerleme({
         </div>
       )}
     </div>
+  )
+}
+
+function Ilerleme({ baslik, pct, deger, hedef, renk, barWidth }: {
+  baslik: string; pct: number; deger: number; hedef: number; renk: string; barWidth: number
+}) {
+  return (
+    <>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+        {baslik}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 8 }}>
+        <div style={{ fontSize: 30, fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>%{pct}</div>
+        <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 3 }}>{deger} / {hedef} araç</div>
+      </div>
+      <div style={{ height: 8, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
+        <div style={{
+          height: '100%',
+          width: `${barWidth}%`,
+          background: renk,
+          transition: 'width 0.3s',
+        }} />
+      </div>
+    </>
   )
 }
