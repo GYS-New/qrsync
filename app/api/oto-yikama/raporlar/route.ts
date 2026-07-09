@@ -163,7 +163,7 @@ export async function GET(req: NextRequest) {
         personel_id: g.islemi_yapan_id ?? null,
         lokasyon: lokasyonTam,
         lokasyon_id: g.lokasyon_id ?? null,
-        ust_lokasyon: ust,
+        ust_lokasyon: null,
         hedef_tarih: m.hedef_tarih,
         baslatilma_tarihi: g.baslatilma_tarihi,
         tamamlanma_tarihi: g.tamamlanma_tarihi,
