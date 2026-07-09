@@ -75,6 +75,7 @@ export default async function UserCanliIslemler() {
         readonly={readonly}
         showTumGorevler={tumGorevlerYetki.gorebilir}
         yetkiliLokIds={yetkiliLokIds}
+        gizliOtoYikamaLokIds={[...gizliOtoIds]}
         canliAkisSureSaat={efektifAyar.canli_akis_sure_saat}
         ceklistAktif={efektifAyar.frekansiyel_ceklist_aktif}
         personelAtamaAktif={efektifAyar.frekansiyel_personel_atama_aktif}

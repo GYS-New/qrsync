@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { getAktifFirmaId } from '@/lib/firmalar/getAktifFirmaId'
 import { getAktifProje } from '@/lib/projeler/getAktifProje'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
+import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +60,10 @@ export default async function SACanliIslemlerPage() {
 
   const efektifAyar = firmaId ? await getEfektifAyar(firmaId, projeId) : null
 
+  // Modul izolasyonu: Oto Yikama lokasyonlarindaki gorevleri GYS canli
+  // akis'ta gizle (spesifik gorevler tablosuna karisiyorlar).
+  const gizliOtoYikamaIds = await getOtoYikamaLokasyonIds(createClient() as any, firmaId)
+
   return (
     <div>
       <Topbar title="Frekansiyel Görevler" base="/sa" breadcrumbs={[{ label: 'Yönetim' }, { label: 'Frekansiyel Görevler' }]} />
@@ -71,6 +76,7 @@ export default async function SACanliIslemlerPage() {
         meName={me.isim_soyisim ?? undefined}
         projeId={projeId}
         yetkiliLokIds={yetkiliLokIds}
+        gizliOtoYikamaLokIds={[...gizliOtoYikamaIds]}
         readonly={false}
         canliAkisSureSaat={efektifAyar?.canli_akis_sure_saat ?? 8}
         ceklistAktif={efektifAyar?.frekansiyel_ceklist_aktif ?? true}

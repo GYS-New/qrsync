@@ -64,6 +64,7 @@ export default async function CanliIslemlerPage() {
         meName={me.isim_soyisim ?? undefined}
         projeId={aktifProje.id}
         yetkiliLokIds={yetkiliLokIds}
+        gizliOtoYikamaLokIds={[...gizliOtoIds]}
         readonly={me.rol === 'tenant_user'}
         canliAkisSureSaat={efektifAyar.canli_akis_sure_saat}
         ceklistAktif={efektifAyar.frekansiyel_ceklist_aktif}

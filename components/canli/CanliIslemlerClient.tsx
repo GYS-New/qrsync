@@ -68,6 +68,9 @@ interface Props {
   projeId?: string | null
   showTumGorevler?: boolean  // false yapılırsa "Tüm Görevler" linki gizlenir
   yetkiliLokIds?: string[] | null
+  /** Modul izolasyonu — GYS canli akiş sayfasinda Oto Yikama lokasyonlarindaki
+   *  gorevler gizlenir. Server-side'da getOtoYikamaLokasyonIds ile hesaplanir. */
+  gizliOtoYikamaLokIds?: string[] | null
   canliAkisSureSaat?: number  // canlı akış listeleme süresi (varsayılan 8)
   ceklistAktif?: boolean  // proje bazlı: frekansiyel görev çeklist aç/kapat
   personelAtamaAktif?: boolean  // proje bazlı: kapalıysa Atanan sütunu gizlenir
@@ -220,7 +223,7 @@ function LiveHeader({
   )
 }
 
-export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, meName, readonly, projeId, showTumGorevler = true, yetkiliLokIds, canliAkisSureSaat = 8, ceklistAktif = true, personelAtamaAktif = true, islemSureleriAktif = true }: Props) {
+export default function CanliIslemlerClient({ firmaId, lokasyonlar, kullanicilar, initialGorevler, meId, meName, readonly, projeId, showTumGorevler = true, yetkiliLokIds, gizliOtoYikamaLokIds, canliAkisSureSaat = 8, ceklistAktif = true, personelAtamaAktif = true, islemSureleriAktif = true }: Props) {
   const supabase = createClient()
   const { toast } = useToast()
   const { confirm } = useConfirm()
@@ -661,6 +664,10 @@ useEffect(() => {
       .limit(10000)
     if (projeId) spesifikQ = spesifikQ.eq('proje_id', projeId)
     if (yetkiliLokIds) spesifikQ = spesifikQ.in('lokasyon_id', yetkiliLokIds)
+    // Modul izolasyonu: Oto Yikama lokasyonlarindaki gorevler GYS canli akiş'ta gizli
+    if (gizliOtoYikamaLokIds && gizliOtoYikamaLokIds.length > 0) {
+      spesifikQ = (spesifikQ as any).not('lokasyon_id', 'in', `(${gizliOtoYikamaLokIds.join(',')})`)
+    }
 
     // KPI için ayrı count sorgusu — durum + kural_id (ekstra görevleri ayırt etmek için)
     let kpiQ = supabase
@@ -683,6 +690,9 @@ useEffect(() => {
       .limit(10000)
     if (projeId) spesifikKpiQ = spesifikKpiQ.eq('proje_id', projeId)
     if (yetkiliLokIds) spesifikKpiQ = spesifikKpiQ.in('lokasyon_id', yetkiliLokIds)
+    if (gizliOtoYikamaLokIds && gizliOtoYikamaLokIds.length > 0) {
+      spesifikKpiQ = (spesifikKpiQ as any).not('lokasyon_id', 'in', `(${gizliOtoYikamaLokIds.join(',')})`)
+    }
 
     const [res, spesifikRes, kpiRes, spesifikKpiRes] = await Promise.all([liveQ, spesifikQ, kpiQ, spesifikKpiQ])
 
