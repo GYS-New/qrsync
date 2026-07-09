@@ -434,7 +434,11 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                         <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fontWeight: 600 }} />
                         <YAxis type="category" dataKey="lokasyon" interval={0}
                           tick={{ fontSize: 12, fontWeight: 600 }} width={110}
-                          tickFormatter={t => t.length > 16 ? `${t.slice(0, 16)}…` : t} />
+                          tickFormatter={t => {
+                            // 'ARAÇ YIKAMA > İSTASYON - 1' → sadece alt lokasyon adi
+                            const s = String(t ?? '').split(' > ').pop() ?? String(t ?? '')
+                            return s.length > 16 ? `${s.slice(0, 16)}…` : s
+                          }} />
                         <Tooltip />
                         <Bar dataKey="adet" fill={T.blue} radius={[0, 6, 6, 0]} maxBarSize={22} />
                       </BarChart>
