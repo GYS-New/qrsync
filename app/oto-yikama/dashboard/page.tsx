@@ -190,7 +190,7 @@ function BugunIlerleme({
       />
 
       {/* Bar 2: Toplam tamamlanan (planli+plansiz+ekstra) / planli hedef */}
-      <div style={{ marginTop: 14 }}>
+      <div style={{ marginTop: 28 }}>
         <Ilerleme
           baslik="Toplam Tamamlanan"
           pct={toplamPct}
