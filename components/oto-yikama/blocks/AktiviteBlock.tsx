@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 /**
  * Yıkama Aktivitesi — GYS AktiviteGrafigi pattern'i ile uyumlu.
@@ -55,18 +56,39 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
     if (!firmaId) return
     setHata(null)
     try {
-      // 30 gunluk metadata — araclar!inner(firma_id) embed ile firma filter
-      // erken uygulanir, boylece sadece bu firmaya ait metadata gelir.
-      // Aksi halde tum firmalarin 5000 kadar kaydi cekilirdi.
+      // 30 gunluk metadata. Iki asama:
+      //  1) Firma araclari (id listesi) — .limit(5000) 1000 cap'te sikisir,
+      //     fetchAll pagination sart.
+      //  2) Metadata .in('arac_id', aracIds) — chunk gerekli (100 UUID).
+      // Onceki .eq('arac.firma_id') nested filter Supabase JS'te bazen ignore
+      // ediliyordu ve PostgREST 1000 cap tum firmalari doldurunca ATALIAN
+      // kayitlari listeden dusuyordu. Iki-adim + fetchAll ile temiz.
       const son30 = trDateStr(new Date(Date.now() - 30 * 86400000))
-      const { data: metaRows, error: metaErr } = await supabase
-        .from('oto_yikama_gorev_metadata')
-        .select('gorev_id, arac:arac_id!inner(firma_id)')
-        .eq('arac.firma_id', firmaId)
-        .gte('hedef_tarih', son30)
-        .limit(5000)
-      if (metaErr) throw new Error('metadata: ' + metaErr.message)
-      const gorevIds = (metaRows ?? []).map((m: any) => m.gorev_id).filter(Boolean) as string[]
+      const firmaAraclar = await fetchAll<{ id: string }>(() => supabase
+        .from('araclar')
+        .select('id')
+        .eq('firma_id', firmaId)
+      )
+      const aracIds = firmaAraclar.map(a => a.id)
+      if (aracIds.length === 0) {
+        setChartData(bosBucket(mode))
+        setKpi({ bugun: 0, hafta: 0, ay: 0 })
+        return
+      }
+      // Metadata: arac_id IN chunks, hedef_tarih son 30 gun
+      const metaGorevIds: string[] = []
+      const ARAC_CHUNK = 100
+      for (let i = 0; i < aracIds.length; i += ARAC_CHUNK) {
+        const slice = aracIds.slice(i, i + ARAC_CHUNK)
+        const chunkRows = await fetchAll<{ gorev_id: string }>(() => supabase
+          .from('oto_yikama_gorev_metadata')
+          .select('gorev_id')
+          .in('arac_id', slice)
+          .gte('hedef_tarih', son30)
+        )
+        for (const r of chunkRows) if (r.gorev_id) metaGorevIds.push(r.gorev_id)
+      }
+      const gorevIds = metaGorevIds
       if (gorevIds.length === 0) {
         setChartData(bosBucket(mode))
         setKpi({ bugun: 0, hafta: 0, ay: 0 })

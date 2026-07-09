@@ -74,8 +74,12 @@ export default async function OtoYikamaDashboardPage() {
     kpiYikamaPersonel = yikamaIds.length
   }
 
-  // İlerleme: hedef = planlı (ekstra hariç). Ekstralar bonus sayılır, oranı şişirmez.
-  const tamamlanmaPct = kpiBugunPlanli > 0 ? Math.round((kpiBugunTamamlanan / kpiBugunPlanli) * 100) : 0
+  // İlerleme: PLANLI hedef içinde PLANLI tamamlanan oranı. Ekstra ve plansız
+  // yikamalar HEDEF'i arttirmadigi gibi bu oranin payini da sisirmez.
+  // Onceki: kpiBugunTamamlanan (hepsi) / kpiBugunPlanli (sadece planli) —
+  // iki farkli kategori boluyordu, ekran'da %62 gosteriyordu (24/39).
+  // Yeni: kpiBugunPlanliTamamlanan (16) / kpiBugunPlanli (39) → %41 (donut ile ayni).
+  const tamamlanmaPct = kpiBugunPlanli > 0 ? Math.round((kpiBugunPlanliTamamlanan / kpiBugunPlanli) * 100) : 0
 
   return (
     <div>

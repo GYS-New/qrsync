@@ -8,11 +8,15 @@ export default async function OranDonutBlock({ firmaId }: { firmaId: string }) {
   const admin = createAdminClient()
   const bugun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
 
+  // HEDEF sadece planli yikamalar (ekstra=false, onay bekleyen haric) — kural:
+  // 'plansiz ve ekstra yikamalar hedef toplamini arttirmamalidir'.
   const { data: rows } = await admin
     .from('oto_yikama_gorev_metadata')
     .select('gorev_id, gorev:gorevler!inner(durum, firma_id)')
     .eq('gorev.firma_id', firmaId)
     .eq('hedef_tarih', bugun)
+    .eq('ekstra', false)
+    .neq('onay_durumu', 'ONAY_BEKLIYOR')
 
   const arr = (rows ?? []) as any[]
   const hedef = arr.length
