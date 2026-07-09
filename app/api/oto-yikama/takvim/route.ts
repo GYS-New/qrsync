@@ -138,9 +138,13 @@ export async function GET(req: NextRequest) {
 
   // 1) Aktif gorevler için metadata (aralık) — 2 step (PostgREST nested embed bu tabloda güvenilmez)
   // fetchAll ile 1000+ satır destegi (PostgREST default max_rows cap'i asilir).
+  // NOT: Yikama Takvimi PLANLI planini gosterir — ekstra (plansiz + tanimsiz plaka onay bekleyen/onaylanan)
+  // kayitlari burada gorunmez. Kullanici karari: "plansiz ve extra yikama kayitlari takvimde gorunemez".
+  // ekstra=false filtresi PLANSIZ (ekstra=true, ONAYSIZ) ve EKSTRA (ONAY_BEKLIYOR/ONAYLANDI) her ikisini de eler.
   const metaArr = await timedStep('metadata.fetchAll', () => fetchAll<any>(() => admin
     .from('oto_yikama_gorev_metadata')
     .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar')
+    .eq('ekstra', false)
     .gte('hedef_tarih', baslangic)
     .lte('hedef_tarih', bitis)
     .order('gorev_id', { ascending: true })
@@ -179,6 +183,8 @@ export async function GET(req: NextRequest) {
   const aktifMeta = metaArr.filter(m => gorevMap.has(m.gorev_id))
 
   // 2) Arşiv (zaten firma_id taşır) — fetchAll pagination ile 1000+ satir destegi
+  // Arsiv de PLANLI kapsaminda kalir — ekstra=true kayitlar (gecmis plansiz/tanimsiz)
+  // takvimde gorunmez.
   const arsivArr = await timedStep('arsiv.fetchAll', () => fetchAll<any>(() => admin
     .from('oto_yikama_arsiv')
     .select(`
@@ -187,6 +193,7 @@ export async function GET(req: NextRequest) {
       olusturan_id, islemi_yapan_id, iptal_sebep, km, notlar
     `)
     .eq('firma_id', firmaId)
+    .eq('ekstra', false)
     .gte('hedef_tarih', baslangic)
     .lte('hedef_tarih', bitis)
     .order('gorev_id', { ascending: true })
