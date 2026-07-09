@@ -396,56 +396,120 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
     const ws = wb.addWorksheet('Müşteri Değerlendirmeleri')
-    ws.columns = [
-      { header: 'Tarih',                  key: 'tarih',           width: 20 },
-      { header: 'Lokasyon',               key: 'lokasyon',        width: 28 },
-      { header: 'Puan',                   key: 'puan',            width: 8 },
-      { header: 'Etiket',                 key: 'etiket',          width: 14 },
-      { header: 'Yorum',                  key: 'yorum',           width: 50 },
-      { header: 'Ad Soyad',               key: 'ad',              width: 20 },
-      { header: 'Değerlendirme Görseli',  key: 'gorsel',          width: 40 },
-      { header: 'Aksiyon',                key: 'aksiyon',         width: 50 },
-      { header: 'Aksiyon Görselleri',     key: 'aksiyonGorseller', width: 40 },
+
+    // Aksiyon gorsel maksimum sayisini bul — dinamik sutun olusturmak icin
+    const maxAksiyonGorsel = Math.max(
+      0,
+      ...filtreliKayitlar.map((k: any) => (k.aksiyon?.gorsel_urls ?? []).filter(Boolean).length),
+    )
+
+    // Sabit sutunlar + dinamik aksiyon gorsel sutunlari
+    const cols: any[] = [
+      { header: 'Tarih',                 key: 'tarih',    width: 18 },
+      { header: 'Lokasyon',              key: 'lokasyon', width: 30 },
+      { header: 'Puan',                  key: 'puan',     width: 7 },
+      { header: 'Etiket',                key: 'etiket',   width: 12 },
+      { header: 'Yorum',                 key: 'yorum',    width: 48 },
+      { header: 'Ad Soyad',              key: 'ad',       width: 18 },
+      { header: 'Değerlendirme Görseli', key: 'gorsel',   width: 18 },
+      { header: 'Aksiyon',               key: 'aksiyon',  width: 48 },
     ]
+    for (let i = 1; i <= maxAksiyonGorsel; i++) {
+      cols.push({ header: `Aksiyon Görseli ${i}`, key: `aksiyon_gorsel_${i}`, width: 18 })
+    }
+    ws.columns = cols
+
+    // Header row style
     const hr = ws.getRow(1)
-    hr.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    hr.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
     hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } }
-    hr.height = 22
-    filtreliKayitlar.forEach((k: any) => {
+    hr.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true }
+    hr.height = 28
+    hr.border = {
+      bottom: { style: 'medium', color: { argb: 'FF111827' } },
+    }
+    ws.views = [{ state: 'frozen', ySplit: 1 }]
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } }
+
+    // Puan rengi
+    const puanRengi = (p: number): string => (
+      p >= 5 ? 'FF16A34A' : p >= 4 ? 'FF65A30D' : p >= 3 ? 'FFCA8A04' : p >= 2 ? 'FFEA580C' : 'FFDC2626'
+    )
+
+    filtreliKayitlar.forEach((k: any, idx: number) => {
       const aksiyonGorseller: string[] = (k.aksiyon?.gorsel_urls ?? []).filter(Boolean)
-      const row = ws.addRow({
+      const rowData: any = {
         tarih: new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }),
         lokasyon: k.lokasyon_tanim,
         puan: k.yildiz,
         etiket: YILDIZ_ETIKET[k.yildiz],
         yorum: k.yorum ?? '',
         ad: k.ad_soyad ?? '',
-        gorsel: k.gorsel_url ?? '',
+        gorsel: '',
         aksiyon: k.aksiyon?.aksiyon_metni ?? '',
-        aksiyonGorseller: aksiyonGorseller.join('\n'),
+      }
+      const row = ws.addRow(rowData)
+
+      // Zebra striping (alternate row background)
+      const zebra = idx % 2 === 1
+      if (zebra) {
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } }
+        })
+      }
+
+      // Border — tum hucrelere ince gri
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top:    { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          left:   { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          right:  { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        }
       })
-      // Degerlendirme gorseli — hyperlink (tiklanabilir mavi link)
+
+      // Puan hucresi renk (yildiz seviyesi)
+      const puanCell = row.getCell('puan')
+      puanCell.font = { bold: true, color: { argb: puanRengi(k.yildiz) }, size: 12 }
+      puanCell.alignment = { horizontal: 'center', vertical: 'middle' }
+
+      // Etiket hucresi renk
+      const etCell = row.getCell('etiket')
+      etCell.font = { bold: true, color: { argb: puanRengi(k.yildiz) } }
+      etCell.alignment = { horizontal: 'center', vertical: 'middle' }
+
+      // Yorum ve Aksiyon metni — wrap + top align
+      row.getCell('yorum').alignment = { wrapText: true, vertical: 'top' }
+      row.getCell('aksiyon').alignment = { wrapText: true, vertical: 'top' }
+      row.getCell('lokasyon').alignment = { vertical: 'top', wrapText: true }
+      row.getCell('tarih').alignment = { vertical: 'top' }
+      row.getCell('ad').alignment = { vertical: 'top' }
+
+      // Değerlendirme görseli — hyperlink
       if (k.gorsel_url) {
         const cell = row.getCell('gorsel')
         cell.value = { text: 'Görseli Aç', hyperlink: k.gorsel_url } as any
         cell.font = { color: { argb: 'FF1D4ED8' }, underline: true }
+        cell.alignment = { horizontal: 'center', vertical: 'middle' }
       }
-      // Aksiyon gorselleri — birden fazla olabilir, her satirda 'Görsel N' link
-      if (aksiyonGorseller.length > 0) {
-        const cell = row.getCell('aksiyonGorseller')
-        // Tek görsel varsa hyperlink; birden fazla varsa metin olarak URL'ler
-        if (aksiyonGorseller.length === 1) {
-          cell.value = { text: 'Görseli Aç', hyperlink: aksiyonGorseller[0] } as any
-          cell.font = { color: { argb: 'FF1D4ED8' }, underline: true }
-        } else {
-          cell.value = aksiyonGorseller.join('\n')
-          cell.alignment = { wrapText: true, vertical: 'top' }
-        }
-      }
-      // Uzun metin hucreleri icin wrap
-      row.getCell('yorum').alignment = { wrapText: true, vertical: 'top' }
-      row.getCell('aksiyon').alignment = { wrapText: true, vertical: 'top' }
+
+      // Aksiyon gorselleri — HER BiR gorsel kendi sutununa hyperlink
+      aksiyonGorseller.forEach((url, i) => {
+        const cell = row.getCell(`aksiyon_gorsel_${i + 1}`)
+        cell.value = { text: `Görsel ${i + 1}`, hyperlink: url } as any
+        cell.font = { color: { argb: 'FF1D4ED8' }, underline: true }
+        cell.alignment = { horizontal: 'center', vertical: 'middle' }
+      })
+
+      // Row auto-height for wrapped content
+      const yorumLen = (k.yorum ?? '').length
+      const aksiyonLen = (k.aksiyon?.aksiyon_metni ?? '').length
+      const maxLen = Math.max(yorumLen, aksiyonLen)
+      // Kaba tahmini yukseklik hesap (yaklasik 50 karakter/satir @ width 48)
+      const satirSayisi = Math.max(1, Math.ceil(maxLen / 50))
+      row.height = Math.max(22, Math.min(120, satirSayisi * 15 + 4))
     })
+
     const buf = await wb.xlsx.writeBuffer()
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
