@@ -31,6 +31,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
 import { getYikamaSahaPersoneliUserIds } from '@/lib/oto-yikama/yetkililer'
+import { getPersonelIstasyonId } from '@/lib/oto-yikama/getPersonelIstasyonId'
 
 export const dynamic = 'force-dynamic'
 
@@ -213,6 +214,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       gorevUpdate.baslatan_kullanici_id = null
       gorevUpdate.islemi_yapan_id = personelId
       gorevUpdate.iptal_sebep = iptalSebep
+    }
+
+    // Istasyon revizyonu (2026-07-09): "yikanan aracin istasyonu = islemi yapan
+    // personelin kayitli istasyonu; aracin varsayilan istasyonu sadece kayit".
+    // ISLEMDE ve TAMAMLANDI'da personelin birincil istasyonuna tasi.
+    // Amir manuel lokasyon secmisse (yeniLok) onu koru — amir override.
+    // IPTAL'de lokasyon degistirmeye gerek yok (islem gerceklesmedi).
+    if (!yeniLok && personelId && (yeniDurum === 'ISLEMDE' || yeniDurum === 'TAMAMLANDI')) {
+      const personelIstasyon = await getPersonelIstasyonId(admin, personelId, rec.gorev.firma_id)
+      if (personelIstasyon && personelIstasyon !== rec.gorev.lokasyon_id) {
+        gorevUpdate.lokasyon_id = personelIstasyon
+      }
     }
   }
 

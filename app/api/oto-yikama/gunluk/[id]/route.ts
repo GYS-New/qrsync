@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
+import { getPersonelIstasyonId } from '@/lib/oto-yikama/getPersonelIstasyonId'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +66,11 @@ export async function PATCH(_req: NextRequest, { params }: { params: { id: strin
       durum_degisim_tarihi: nowIso,
       islemi_yapan_id: auth.user.id,
     }
+    // Istasyon revizyonu (2026-07-09): "islemi yapan personelin kayitli istasyonu".
+    // Toggle'i tetikleyen kullanicinin (genelde amir) birincil oto yikama istasyonu
+    // varsa lokasyona geciririz. Yoksa (SA vb.) dokunmaz.
+    const personelIstasyon = await getPersonelIstasyonId(createAdminClient(), auth.user.id, gorev.firma_id)
+    if (personelIstasyon) update.lokasyon_id = personelIstasyon
   } else if (gorev.durum === 'TAMAMLANDI') {
     yeniDurum = 'ACIK'
     update = {

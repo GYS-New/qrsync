@@ -28,6 +28,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getUserOtoYikamaUstIds } from '@/lib/oto-yikama/getUserOtoYikamaUstIds'
+import { getPersonelIstasyonId } from '@/lib/oto-yikama/getPersonelIstasyonId'
 import { normalizePlaka } from '@/lib/oto-yikama/plakaFuzzyMatch'
 
 const CORS = {
@@ -147,6 +148,14 @@ export async function POST(req: Request) {
     const now = new Date().toISOString()
     const hedefTarih = bugunTR()
 
+    // Istasyon revizyonu (2026-07-09): "yikanan aracin istasyonu = islemi yapan
+    // personelin kayitli istasyonu". Body'den gelen lokasyon_id sadece yetki
+    // kontrolu icin kullanildi; INSERT edilecek deger personel'in birincili
+    // (users.ust_lokasyon_id → KLY fallback). Personelin kayitli istasyonu
+    // yoksa body'den geleni kullanan geri düs şartına duser.
+    const personelIstasyon = await getPersonelIstasyonId(admin, userId, firmaId)
+    const kayitLokasyonId = personelIstasyon ?? lokasyonId
+
     // 1) gorevler INSERT — durum ISLEMDE olarak baslar
     const { data: newGorev, error: gErr } = await admin
       .from('gorevler')
@@ -154,7 +163,7 @@ export async function POST(req: Request) {
         tanim: `Oto Yıkama — Tanımsız plaka: ${plaka}`,
         durum: 'ISLEMDE',
         firma_id: firmaId,
-        lokasyon_id: lokasyonId,
+        lokasyon_id: kayitLokasyonId,
         olusturan_id: userId,
         atanan_kullanici_id: userId,
         baslatan_kullanici_id: userId,

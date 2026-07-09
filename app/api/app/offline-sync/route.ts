@@ -48,6 +48,7 @@ import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 import { getRequestMeta } from '@/lib/device/getRequestMeta'
 import { vardiyaGunuHesapla, type VardiyaAyar } from '@/lib/gorev/vardiyaGunu'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
+import { getPersonelIstasyonId } from '@/lib/oto-yikama/getPersonelIstasyonId'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -256,6 +257,23 @@ async function normalGoreviTamamla(
 
   if (updErr) {
     return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'hata', error: updErr.message }
+  }
+
+  // Istasyon revizyonu (2026-07-09): oto yikama gorevi ise gorevler.lokasyon_id'yi
+  // islemi yapan personelin kayitli istasyonu ile guncelle.
+  // (getPersonelIstasyonId helper module top'a import edilmis olmali)
+  if (kayit.gorev_tipi === 'gorevler') {
+    const { data: otoMeta } = await admin
+      .from('oto_yikama_gorev_metadata')
+      .select('gorev_id')
+      .eq('gorev_id', kayit.gorev_id)
+      .maybeSingle()
+    if (otoMeta) {
+      const personelIstasyon = await getPersonelIstasyonId(admin, userId, gorev.firma_id)
+      if (personelIstasyon && personelIstasyon !== gorev.lokasyon_id) {
+        await admin.from('gorevler').update({ lokasyon_id: personelIstasyon }).eq('id', kayit.gorev_id)
+      }
+    }
   }
 
   return { _mobil_kayit_id: kayit._mobil_kayit_id, status: 'ok' }
