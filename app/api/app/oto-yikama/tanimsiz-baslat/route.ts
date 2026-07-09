@@ -53,7 +53,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getUserOtoYikamaUstIds } from '@/lib/oto-yikama/getUserOtoYikamaUstIds'
-import { getPersonelIstasyonId } from '@/lib/oto-yikama/getPersonelIstasyonId'
 import { normalizePlaka } from '@/lib/oto-yikama/plakaFuzzyMatch'
 
 const CORS = {
@@ -189,13 +188,10 @@ export async function POST(req: Request) {
     const now = new Date().toISOString()
     const hedefTarih = bugunTR()
 
-    // Istasyon revizyonu (2026-07-09): "yikanan aracin istasyonu = islemi yapan
-    // personelin kayitli istasyonu". Body'den gelen lokasyon_id sadece yetki
-    // kontrolu icin kullanildi; INSERT edilecek deger personel'in birincili
-    // (users.ust_lokasyon_id → KLY fallback). Personelin kayitli istasyonu
-    // yoksa body'den geleni kullanan geri düs şartına duser.
-    const personelIstasyon = await getPersonelIstasyonId(admin, userId, firmaId)
-    const kayitLokasyonId = personelIstasyon ?? lokasyonId
+    // Kayit lokasyonu: mobil'in gonderdigi body.lokasyon_id (personel'in bulundugu
+    // istasyon — child). Onceki commit'lerdeki getPersonelIstasyonId revizyonu
+    // iptal edildi cunku users.ust_lokasyon_id parent (ARAC YIKAMA) donuyordu.
+    const kayitLokasyonId = lokasyonId
 
     // ==== DAL 1: Kayitli plaka + bugun PLANLI gorev VAR ise mevcut gorevi ISLEMDE'ye cek ====
     // Kullanici kurali (2026-07-09): Plaka kayitli ise ve bugun yikama plani var ise
@@ -224,10 +220,9 @@ export async function POST(req: Request) {
         if (planliGorev.atanan_kullanici_id == null) {
           patch.atanan_kullanici_id = userId
         }
-        // Istasyon revizyonu — planli gorev kayitli istasyonunda degilse personelinkine tasi
-        if (personelIstasyon && personelIstasyon !== planliGorev.lokasyon_id) {
-          patch.lokasyon_id = personelIstasyon
-        }
+        // NOT: onceki "istasyon revizyonu" iptal edildi (2026-07-09) —
+        // parent lokasyon dondugu icin gorevin lokasyonu bozuluyordu.
+        // Planli gorevin mevcut lokasyon_id'si (araca varsayilan child) korunur.
         // Optimistic lock: durum HAZIR/ACIK degistiyse (race), update etkisiz
         const { data: updated, error: upErr } = await admin
           .from('gorevler')

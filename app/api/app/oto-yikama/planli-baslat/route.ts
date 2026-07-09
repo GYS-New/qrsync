@@ -34,7 +34,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getUserOtoYikamaUstIds } from '@/lib/oto-yikama/getUserOtoYikamaUstIds'
-import { getPersonelIstasyonId } from '@/lib/oto-yikama/getPersonelIstasyonId'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -180,13 +179,11 @@ export async function POST(req: Request) {
     if (gorev.atanan_kullanici_id == null) {
       patch.atanan_kullanici_id = userId
     }
-    // Istasyon revizyonu (2026-07-09): "yikanan aracin istasyonu = islemi yapan
-    // personelin kayitli istasyonu; aracin varsayilan istasyonu sadece kayit".
-    // Personel birincil ust_lokasyon_id'sine (fallback KLY) tasi. Yoksa dokunma.
-    const personelIstasyon = await getPersonelIstasyonId(admin, userId, firmaId)
-    if (personelIstasyon && personelIstasyon !== gorev.lokasyon_id) {
-      patch.lokasyon_id = personelIstasyon
-    }
+    // NOT: Onceki commit'lerdeki "istasyon revizyonu" (getPersonelIstasyonId)
+    // iptal edildi — users.ust_lokasyon_id parent (ARAC YIKAMA) donuyordu ve
+    // gorevler.lokasyon_id parent olarak yazilip rapor grafiginde
+    // sahte 'ARAC YIKAMA' istasyonu belirtiyordu (2026-07-09 bugu).
+    // Aracin varsayilan istasyonu (child) korunur.
 
     const { data: updated, error: upErr } = await admin
       .from('gorevler')
