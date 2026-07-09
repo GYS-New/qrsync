@@ -3,21 +3,26 @@
  *
  * Mobil — plakayı OCR ile okuduğunda plakanın kayıtlı olup olmamasına
  * bakmaksızın bu endpoint'e gönderir. Backend plakayı araclar tablosunda
- * arar ve iki senaryodan birini uygular:
+ * arar ve ÜÇ senaryodan birini uygular:
  *
- *   1) Plaka DB'de KAYITLI  (arac bulundu):
- *      - arac_id = mevcut arac.id
- *      - ekstra = true, onay_durumu = 'ONAYSIZ'  (PLANSIZ kategorisi)
+ *   1) Plaka KAYITLI + bugün için PLANLI görev VAR:
+ *      - Yeni görev oluşturulmaz; mevcut görev ISLEMDE'ye çekilir
+ *        (planli-baslat mantığı: baslatilma_tarihi, baslatan_kullanici_id,
+ *         atanan_kullanici_id set edilir).
+ *      - plan_tipi='PLANLI', onay_durumu='ONAYSIZ' (metadata degismez)
+ *
+ *   2) Plaka KAYITLI + bugün için PLANLI görev YOK:
+ *      - Yeni görev INSERT: arac_id=mevcut, ekstra=true, onay_durumu='ONAYSIZ'
  *      - Amir onayı GEREKMEZ, bildirim gönderilmez
- *      Neden: kayıtlı plaka için "plansız yıkama" — sistem sadece kayıt tutar.
+ *      - plan_tipi='PLANSIZ'
  *
- *   2) Plaka DB'de YOK (kayıtsız):
- *      - arac_id = null
- *      - ekstra = true, onay_durumu = 'ONAY_BEKLIYOR'  (EKSTRA — amir onayı bekler)
- *      - Amire bildirim gönderilir (bildirimler + FCM)
+ *   3) Plaka KAYITSIZ:
+ *      - Yeni görev INSERT: arac_id=null, ekstra=true, onay_durumu='ONAY_BEKLIYOR'
+ *      - Amire bildirim + FCM push
+ *      - plan_tipi='EKSTRA'
  *
- * İki senaryoda da görev ISLEMDE durumunda başlar; mobil aynı isteği yollar
- * (mobilin karar mekanizması yok, backend otomatik dallanır).
+ * Üç senaryoda da response.plan_tipi ile hangi dallanmaya girildiği net döner.
+ * Mobil aynı isteği yollar (mobilin karar mekanizması yok, backend otomatik).
  *
  * Karar kaynağı: kullanıcı 2026-07-09 — "plaka kayıtlı ise mobil UI bir
  * uyarı göstermez, doğrudan planlı ya da plansız kabul eder. Mobilin
@@ -31,8 +36,9 @@
  * Body:
  *   { lokasyon_id: uuid, plaka: string }
  *
- * Response (201):
+ * Response (200 planli-devam / 201 yeni-kayit):
  *   { ok: true, gorev_id, baslatilma_tarihi, durum: 'ISLEMDE',
+ *     plan_tipi: 'PLANLI' | 'PLANSIZ' | 'EKSTRA',
  *     onay_durumu: 'ONAYSIZ' | 'ONAY_BEKLIYOR',
  *     plaka: <normalize>, kayitli: boolean, amir_bildirildi: boolean }
  *
@@ -191,6 +197,72 @@ export async function POST(req: Request) {
     const personelIstasyon = await getPersonelIstasyonId(admin, userId, firmaId)
     const kayitLokasyonId = personelIstasyon ?? lokasyonId
 
+    // ==== DAL 1: Kayitli plaka + bugun PLANLI gorev VAR ise mevcut gorevi ISLEMDE'ye cek ====
+    // Kullanici kurali (2026-07-09): Plaka kayitli ise ve bugun yikama plani var ise
+    // backend planli doner (yeni gorev olusturmaz, mevcut planli gorevi baslatir).
+    // Bu sayede mukerrer kayit engellenir — 16CAH315 senaryosu.
+    if (kayitliArac) {
+      const { data: planliMeta } = await admin
+        .from('oto_yikama_gorev_metadata')
+        .select('gorev_id, gorev:gorevler!inner(id, durum, firma_id, atanan_kullanici_id, lokasyon_id)')
+        .eq('arac_id', kayitliArac.id)
+        .eq('hedef_tarih', hedefTarih)
+        .eq('ekstra', false)
+        .eq('gorev.firma_id', firmaId)
+        .in('gorev.durum', ['HAZIR', 'ACIK'])
+        .limit(1)
+        .maybeSingle()
+
+      const planliGorev = (planliMeta as any)?.gorev
+      if (planliGorev) {
+        const patch: Record<string, any> = {
+          durum: 'ISLEMDE',
+          baslatilma_tarihi: now,
+          durum_degisim_tarihi: now,
+          baslatan_kullanici_id: userId,
+        }
+        if (planliGorev.atanan_kullanici_id == null) {
+          patch.atanan_kullanici_id = userId
+        }
+        // Istasyon revizyonu — planli gorev kayitli istasyonunda degilse personelinkine tasi
+        if (personelIstasyon && personelIstasyon !== planliGorev.lokasyon_id) {
+          patch.lokasyon_id = personelIstasyon
+        }
+        // Optimistic lock: durum HAZIR/ACIK degistiyse (race), update etkisiz
+        const { data: updated, error: upErr } = await admin
+          .from('gorevler')
+          .update(patch)
+          .eq('id', planliGorev.id)
+          .in('durum', ['HAZIR', 'ACIK'])
+          .select('id, baslatilma_tarihi')
+          .maybeSingle()
+        if (upErr) {
+          return NextResponse.json(
+            { ok: false, error: upErr.message },
+            { status: 500, headers: CORS },
+          )
+        }
+        if (updated) {
+          return NextResponse.json(
+            {
+              ok: true,
+              gorev_id: planliGorev.id,
+              baslatilma_tarihi: (updated as any).baslatilma_tarihi,
+              durum: 'ISLEMDE',
+              plan_tipi: 'PLANLI',
+              onay_durumu: 'ONAYSIZ',
+              plaka,
+              kayitli: true,
+              amir_bildirildi: false,
+            },
+            { status: 200, headers: CORS },
+          )
+        }
+        // Race: baska biri baslatmis olabilir → PLANSIZ INSERT'e dus (asagida)
+      }
+    }
+
+    // ==== DAL 2 (kayitli, planli yok) veya DAL 3 (kayitsiz): YENI INSERT ====
     // 1) gorevler INSERT — durum ISLEMDE olarak baslar
     // Tanim: kayitli plaka icin "Plansiz yikama", kayitsiz icin "Tanimsiz plaka".
     const gorevTanim = kayitliArac
@@ -283,6 +355,7 @@ export async function POST(req: Request) {
         gorev_id: newGorev.id,
         baslatilma_tarihi: newGorev.baslatilma_tarihi,
         durum: 'ISLEMDE',
+        plan_tipi: kayitliArac ? 'PLANSIZ' : 'EKSTRA',
         onay_durumu: metaOnay,
         plaka,
         kayitli: kayitliArac !== null,
