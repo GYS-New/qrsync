@@ -210,9 +210,9 @@ function Kart({ k, disabled, onOnayla, onReddet, onDuzenle }: {
           }}>{k.plaka}</span>
           <span style={{
             padding: '2px 8px', borderRadius: 999,
-            background: T.amberLight, color: '#92400e',
+            background: '#cffafe', color: '#0891b2',
             fontSize: 10, fontWeight: 800, letterSpacing: '0.05em',
-          }}>PLANSIZ</span>
+          }}>EKSTRA</span>
         </div>
         <span style={{
           padding: '3px 8px', borderRadius: 6,
