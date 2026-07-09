@@ -8,6 +8,7 @@ import { getOtoYikamaFirmaId } from '@/lib/oto-yikama/getOtoYikamaFirmaId'
 import SonYikamalarBlock from '@/components/oto-yikama/blocks/SonYikamalarBlock'
 import OnlinePersonelBlock from '@/components/oto-yikama/blocks/OnlinePersonelBlock'
 import OranDonutBlock from '@/components/oto-yikama/blocks/OranDonutBlock'
+import KategoriDagilimBlock from '@/components/oto-yikama/blocks/KategoriDagilimBlock'
 import YikamaTakvimiBlock from '@/components/oto-yikama/blocks/YikamaTakvimiBlock'
 import AktiviteBlock from '@/components/oto-yikama/blocks/AktiviteBlock'
 
@@ -29,6 +30,7 @@ export default async function OtoYikamaDashboardPage() {
   // Üst sıra KPI'ları — sayfa-bazlı, blok değil (hızlı yükleme için)
   let kpiBugunPlanli = 0, kpiBugunPlanliTamamlanan = 0,
       kpiBugunEkstra = 0, kpiBugunTamamlanan = 0,
+      kpiBugunPlansizTamamlanan = 0, kpiBugunEkstraTamamlanan = 0,
       kpiBugunOnayBekleyen = 0,
       kpiGeciken = 0, kpiAktifArac = 0, kpiYikamaPersonel = 0
 
@@ -67,6 +69,8 @@ export default async function OtoYikamaDashboardPage() {
     kpiBugunPlanliTamamlanan = bugunArr.filter(r => !r.ekstra && r.gorev?.durum === 'TAMAMLANDI').length
     kpiBugunEkstra       = bugunArr.filter(r => r.ekstra === true && !isEkstraTanimsiz(r)).length
     kpiBugunOnayBekleyen = bugunArr.filter(r => isEkstraTanimsiz(r)).length
+    kpiBugunPlansizTamamlanan = bugunArr.filter(r => r.ekstra === true && !isEkstraTanimsiz(r) && r.gorev?.durum === 'TAMAMLANDI').length
+    kpiBugunEkstraTamamlanan  = bugunArr.filter(r => isEkstraTanimsiz(r) && r.gorev?.durum === 'TAMAMLANDI').length
     // Tamamlanan: durum=TAMAMLANDI olan tumu (planli + plansiz + ekstra dahil)
     kpiBugunTamamlanan   = bugunArr.filter(r => r.gorev?.durum === 'TAMAMLANDI').length
     kpiGeciken = gecikenRes.count ?? 0
@@ -105,14 +109,21 @@ export default async function OtoYikamaDashboardPage() {
               <KpiCard label="Yıkama Personeli"  value={kpiYikamaPersonel}       ikon="👥" renk="#7c3aed" />
             </div>
 
-            {/* SIRA 2: Bugün İlerleme + Hedef/Tamamlanan/İptal Donut + Online Personel */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+            {/* SIRA 2: Bugün İlerleme + Donut + Kategori Dağılımı + Online Personel (4 kolon, sabit) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
               <BugunIlerleme
-                tamamlanan={kpiBugunTamamlanan}
+                tamamlanan={kpiBugunPlanliTamamlanan}
                 hedef={kpiBugunPlanli}
                 geciken={kpiGeciken}
               />
               <OranDonutBlock firmaId={firmaId} />
+              <KategoriDagilimBlock
+                hedef={kpiBugunPlanli}
+                toplamTamamlanan={kpiBugunTamamlanan}
+                planliTamamlanan={kpiBugunPlanliTamamlanan}
+                plansizTamamlanan={kpiBugunPlansizTamamlanan}
+                ekstraTamamlanan={kpiBugunEkstraTamamlanan}
+              />
               <OnlinePersonelBlock firmaId={firmaId} />
             </div>
 
@@ -157,7 +168,7 @@ function BugunIlerleme({ tamamlanan, hedef, geciken }: { tamamlanan: number; hed
   return (
     <div className="verde-card" style={{ padding: 20 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
-        Bugün İlerleme
+        Bugün Planlı İlerleme
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
         <div style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>%{pct}</div>

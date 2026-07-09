@@ -43,7 +43,7 @@ export default async function OranDonutBlock({ firmaId }: { firmaId: string }) {
   return (
     <div className="verde-card" style={{ padding: 20 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
-        Bugün — Hedef / Tamamlanan / İptal
+        Bugün — Planlı Hedef / Tamamlanan / İptal
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
