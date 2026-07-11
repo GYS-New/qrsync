@@ -7,7 +7,10 @@ export const dynamic = 'force-dynamic'
 
 /**
  * POST /api/push/manuel-gonder
- * body: { userIds: string[], title: string, body: string, kanal?: 'default'|'gorev_uyari'|'gorev_tamamla' }
+ * body: { userIds: string[], title: string, body: string, kanal?: 'default'|'gorev_uyari'|'gorev_tamamla', link?: string }
+ *
+ * link: opsiyonel URL — bildirimler.link kolonuna yazılır; mobil "🔗 Bağlantıyı Aç"
+ * butonu gösterir (mobil 1.0.35+, haberleşme msg de78c02e).
  *
  * Yetki:
  *   - Proje veya firma ayarında manuel_push_aktif=false → kimse gönderemez
@@ -29,12 +32,17 @@ export async function POST(req: NextRequest) {
   const title: string = (body.title ?? '').toString().trim()
   const icerik: string = (body.body ?? '').toString().trim()
   const kanal: string = ['default', 'gorev_uyari', 'gorev_tamamla'].includes(body.kanal) ? body.kanal : 'default'
+  const link: string = (body.link ?? '').toString().trim()
 
   if (!userIds.length) return NextResponse.json({ error: 'En az bir alıcı seçin' }, { status: 400 })
   if (!title) return NextResponse.json({ error: 'Başlık zorunlu' }, { status: 400 })
   if (!icerik) return NextResponse.json({ error: 'İçerik zorunlu' }, { status: 400 })
   if (title.length > 80) return NextResponse.json({ error: 'Başlık en fazla 80 karakter' }, { status: 400 })
   if (icerik.length > 500) return NextResponse.json({ error: 'İçerik en fazla 500 karakter' }, { status: 400 })
+  if (link && !/^https?:\/\/.+/i.test(link)) {
+    return NextResponse.json({ error: 'Link http:// veya https:// ile başlamalı' }, { status: 400 })
+  }
+  if (link.length > 500) return NextResponse.json({ error: 'Link en fazla 500 karakter' }, { status: 400 })
 
   const admin = createAdminClient()
 
@@ -59,7 +67,7 @@ export async function POST(req: NextRequest) {
   // Efektif ayar: proje varsa proje, yoksa firma
   // Ortak proje yoksa firma seviyesinden bak
   const ortakProjeId: string | null =
-    alicilar.every(a => a.proje_id && a.proje_id === alicilar[0].proje_id) ? alicilar[0].proje_id : null
+    alicilar.every((a: any) => a.proje_id && a.proje_id === alicilar[0].proje_id) ? alicilar[0].proje_id : null
   const ayar = await getEfektifAyar(firmaId, ortakProjeId)
 
   if (!ayar.manuel_push_aktif) {
@@ -103,6 +111,7 @@ export async function POST(req: NextRequest) {
       tip: 'manuel_push',
       okundu: false,
       tarih: nowIso,
+      ...(link ? { link } : {}),
     })
 
     try {

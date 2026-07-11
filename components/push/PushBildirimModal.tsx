@@ -14,6 +14,7 @@ export default function PushBildirimModal({ alicilar, onClose }: Props) {
   const { toast } = useToast()
   const [baslik, setBaslik] = useState('')
   const [icerik, setIcerik] = useState('')
+  const [link, setLink] = useState('')
   const [kanal, setKanal] = useState<'default' | 'gorev_uyari' | 'gorev_tamamla'>('default')
   const [sending, setSending] = useState(false)
 
@@ -22,6 +23,9 @@ export default function PushBildirimModal({ alicilar, onClose }: Props) {
     if (!icerik.trim()) return toast({ type: 'error', title: 'Hata', message: 'İçerik zorunlu' })
     if (baslik.length > 80) return toast({ type: 'error', title: 'Hata', message: 'Başlık en fazla 80 karakter' })
     if (icerik.length > 500) return toast({ type: 'error', title: 'Hata', message: 'İçerik en fazla 500 karakter' })
+    if (link.trim() && !/^https?:\/\/.+/i.test(link.trim())) {
+      return toast({ type: 'error', title: 'Hata', message: 'Link http:// veya https:// ile başlamalı' })
+    }
 
     setSending(true)
     try {
@@ -32,6 +36,7 @@ export default function PushBildirimModal({ alicilar, onClose }: Props) {
           title: baslik.trim(),
           body: icerik.trim(),
           kanal,
+          ...(link.trim() ? { link: link.trim() } : {}),
         }),
       })
       const j = await res.json()
@@ -136,6 +141,20 @@ export default function PushBildirimModal({ alicilar, onClose }: Props) {
               disabled={sending}
             />
             <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 3, textAlign: 'right' }}>{icerik.length}/500</div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#4b5563', marginBottom: 5 }}>Link (URL) — opsiyonel</label>
+            <input
+              type="url"
+              className="verde-input"
+              style={{ width: '100%' }}
+              value={link}
+              onChange={e => setLink(e.target.value)}
+              maxLength={500}
+              placeholder="https://… (mobilde 🔗 Bağlantıyı Aç butonu olarak görünür)"
+              disabled={sending}
+            />
           </div>
 
           <div>
