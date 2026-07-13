@@ -43,10 +43,11 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
 
   // Lazy temizlik (her GET'te, fire-and-forget):
-  // - CRON bildirimleri (gonderen_id IS NULL) → 24 saat ömür
+  // - CRON bildirimleri (gonderen_id IS NULL) → 7 gün ömür
+  //   (2026-07-13'te 24 saatten 7 güne çıkarıldı — incident debug'ta 24s çok kısaydı)
   // - MANUEL push'lar (gonderen_id IS NOT NULL) → 30 gün ömür
   // Ayrı cron yerine pratik; tablo büyümesini sınırlar, denetim arşivini korur.
-  const cronEsik = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+  const cronEsik = new Date(Date.now() - 7 * 86400000).toISOString()
   const manuelEsik = new Date(Date.now() - 30 * 86400000).toISOString()
   void admin.from('push_bildirim_log').delete()
     .is('gonderen_id', null).lt('olusturma_tarihi', cronEsik)
