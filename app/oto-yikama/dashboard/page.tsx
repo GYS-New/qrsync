@@ -78,13 +78,6 @@ export default async function OtoYikamaDashboardPage() {
     kpiYikamaPersonel = yikamaIds.length
   }
 
-  // İlerleme: PLANLI hedef içinde PLANLI tamamlanan oranı. Ekstra ve plansız
-  // yikamalar HEDEF'i arttirmadigi gibi bu oranin payini da sisirmez.
-  // Onceki: kpiBugunTamamlanan (hepsi) / kpiBugunPlanli (sadece planli) —
-  // iki farkli kategori boluyordu, ekran'da %62 gosteriyordu (24/39).
-  // Yeni: kpiBugunPlanliTamamlanan (16) / kpiBugunPlanli (39) → %41 (donut ile ayni).
-  const tamamlanmaPct = kpiBugunPlanli > 0 ? Math.round((kpiBugunPlanliTamamlanan / kpiBugunPlanli) * 100) : 0
-
   return (
     <div>
       <Topbar title="Oto Yıkama" base={rolBase} breadcrumbs={[{ label: 'Oto Yıkama' }]} hideScopeControls hideNotifBar />
@@ -99,14 +92,14 @@ export default async function OtoYikamaDashboardPage() {
           <>
             {/* SIRA 1: KPI kartları */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
-              <KpiCard label="Bugün Planlı"      value={kpiBugunPlanli}          ikon="🗓️" renk="#1d4ed8" />
-              <KpiCard label="Bugün Tamamlanan"  value={kpiBugunTamamlanan}       suffix={`(%${tamamlanmaPct})`} ikon="✓" renk="#16a34a" />
-              <KpiCard label="Planlı Tamamlanan" value={kpiBugunPlanliTamamlanan} ikon="✅" renk="#0d9488" />
-              <KpiCard label="Bugün Plansız"     value={kpiBugunEkstra}          ikon="➕" renk="#d97706" />
-              <KpiCard label="Bugün Ekstra"      value={kpiBugunOnayBekleyen}    ikon="✋" renk={kpiBugunOnayBekleyen > 0 ? '#0891b2' : '#6b7280'} />
-              <KpiCard label="Geciken"           value={kpiGeciken}              ikon="⏰" renk={kpiGeciken > 0 ? '#dc2626' : '#6b7280'} />
-              <KpiCard label="Aktif Araç"        value={kpiAktifArac}            ikon="🚗" renk="#0f172a" />
-              <KpiCard label="Yıkama Personeli"  value={kpiYikamaPersonel}       ikon="👥" renk="#7c3aed" />
+              <KpiCard label="Bugün Planlı"      value={kpiBugunPlanli}           ikon="🗓️" renk="#1d4ed8" />
+              <KpiCard label="Bugün Tamamlanan"  value={kpiBugunTamamlanan}       ikon="✓" renk="#16a34a" hedef={kpiBugunPlanli} />
+              <KpiCard label="Planlı Tamamlanan" value={kpiBugunPlanliTamamlanan} ikon="✅" renk="#0d9488" hedef={kpiBugunPlanli} />
+              <KpiCard label="Bugün Plansız"     value={kpiBugunEkstra}           ikon="➕" renk="#d97706" hedef={kpiBugunPlanli} />
+              <KpiCard label="Bugün Ekstra"      value={kpiBugunOnayBekleyen}     ikon="✋" renk={kpiBugunOnayBekleyen > 0 ? '#0891b2' : '#6b7280'} hedef={kpiBugunPlanli} />
+              <KpiCard label="Geciken"           value={kpiGeciken}               ikon="⏰" renk={kpiGeciken > 0 ? '#dc2626' : '#6b7280'} />
+              <KpiCard label="Aktif Araç"        value={kpiAktifArac}             ikon="🚗" renk="#0f172a" />
+              <KpiCard label="Yıkama Personeli"  value={kpiYikamaPersonel}        ikon="👥" renk="#7c3aed" />
             </div>
 
             {/* SIRA 2: Bugün İlerleme + Donut + Kategori Dağılımı + Online Personel (4 kolon, sabit) */}
@@ -143,7 +136,11 @@ export default async function OtoYikamaDashboardPage() {
   )
 }
 
-function KpiCard({ label, value, suffix, ikon, renk }: { label: string; value: number; suffix?: string; ikon: string; renk: string }) {
+function KpiCard({ label, value, ikon, renk, hedef }: { label: string; value: number; ikon: string; renk: string; hedef?: number }) {
+  // Hedefe oran — sadece hedef verilmişse sağ kenara %XX yazılır.
+  // Hedef kartın kendisi + Geciken/Aktif Araç/Personel gibi orantısız
+  // metriklerde boş kalır.
+  const oran = (hedef && hedef > 0) ? Math.round((value / hedef) * 100) : null
   return (
     <div className="verde-card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
       <div style={{
@@ -151,13 +148,19 @@ function KpiCard({ label, value, suffix, ikon, renk }: { label: string; value: n
         background: renk + '14',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 22,
+        flexShrink: 0,
       }}>
         {ikon}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 11.5, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-        <div style={{ fontSize: 22, fontWeight: 900, color: renk, lineHeight: 1.1 }}>
-          {value}{suffix && <span style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginLeft: 6 }}>{suffix}</span>}
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ fontSize: 22, fontWeight: 900, color: renk, lineHeight: 1.1 }}>{value}</div>
+          {oran !== null && (
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', letterSpacing: '-0.01em' }}>
+              %{oran}
+            </div>
+          )}
         </div>
       </div>
     </div>
