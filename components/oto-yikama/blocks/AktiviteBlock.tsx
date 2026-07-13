@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { fetchAll } from '@/lib/supabase/fetchAll'
@@ -48,12 +48,19 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
   const [chartData, setChartData] = useState<{ label: string; value: number }[]>(() => bosBucket('gunluk'))
   const [kpi, setKpi] = useState({ bugun: 0, hafta: 0, ay: 0 })
   const [hata, setHata] = useState<string | null>(null)
+  // Stale fetch koruması: mode/firmaId değişince yeni run id verilir, eski
+  // yukle() sonuçları setState'e yazmadan önce runIdRef ile teyit eder.
+  const runIdRef = useRef(0)
+  // Real-time debounce: ard arda gelen UPDATE'lerde tek re-fetch tetiklenir
+  const rtDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Mode degisince chart'i o mode'un bos bucket'i ile reset et (guncel labels)
   useEffect(() => { setChartData(bosBucket(mode)) }, [mode])
 
   async function yukle() {
     if (!firmaId) return
+    const myRunId = ++runIdRef.current
+    const stale = () => runIdRef.current !== myRunId
     setHata(null)
     try {
       // 30 gunluk metadata. Iki asama:
@@ -69,6 +76,7 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
         .select('id')
         .eq('firma_id', firmaId)
       )
+      if (stale()) return
       const aracIds = firmaAraclar.map(a => a.id)
       if (aracIds.length === 0) {
         setChartData(bosBucket(mode))
@@ -86,6 +94,7 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
           .in('arac_id', slice)
           .gte('hedef_tarih', son30)
         )
+        if (stale()) return
         for (const r of chunkRows) if (r.gorev_id) metaGorevIds.push(r.gorev_id)
       }
       const gorevIds = metaGorevIds
@@ -108,6 +117,7 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
           .eq('durum', 'TAMAMLANDI')
           .not('tamamlanma_tarihi', 'is', null)
         if (gorevErr) throw new Error('gorevler: ' + gorevErr.message)
+        if (stale()) return
         for (const g of (gorevRows ?? []) as any[]) {
           tamamlanmaList.push(new Date(g.tamamlanma_tarihi))
         }
@@ -124,6 +134,7 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
         if (t.getTime() >= haftaCutMs) haftaSay++
         if (t.getTime() >= ayCutMs)    aySay++
       }
+      if (stale()) return
       setKpi({ bugun: bugunSay, hafta: haftaSay, ay: aySay })
 
       // Chart bucket'ları mode'a göre
@@ -179,13 +190,27 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
 
   useEffect(() => { yukle() /* eslint-disable-next-line */ }, [firmaId, mode])
 
-  // Real-time subscription — yıkama tamamlanınca chart anlık yenilensin
+  // Real-time subscription — yıkama tamamlanınca chart yenilensin.
+  // Filtresiz + debouncesiz varyant sistemi kilitliyordu (başka firmaların
+  // update'leri de tetikliyor, seri N+1 fetch birbirinin üstüne biniyor,
+  // sayfa dakikalarca "yükleniyor" hissi veriyordu).
   useEffect(() => {
+    if (!firmaId) return
+    const scheduleYukle = () => {
+      if (rtDebounceRef.current) clearTimeout(rtDebounceRef.current)
+      rtDebounceRef.current = setTimeout(() => yukle(), 2000)
+    }
     const channel = supabase
-      .channel('oto-yikama-aktivite')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gorevler' }, () => yukle())
+      .channel(`oto-yikama-aktivite:${firmaId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'gorevler',
+        filter: `firma_id=eq.${firmaId}`,
+      }, scheduleYukle)
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      if (rtDebounceRef.current) clearTimeout(rtDebounceRef.current)
+      supabase.removeChannel(channel)
+    }
     // eslint-disable-next-line
   }, [firmaId])
 
