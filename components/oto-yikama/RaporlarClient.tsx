@@ -339,10 +339,10 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
       {agg && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
           <Kpi label="Hedef" deger={agg.hedef} renk={T.purple} />
-          <Kpi label="Toplam Yıkama" deger={agg.toplam} renk={T.blue} />
-          <Kpi label="Planlı" deger={agg.planli} renk={T.green} />
-          <Kpi label="Plansız" deger={agg.ekstra} renk={T.amber} />
-          <Kpi label="Ekstra" deger={agg.ekstra_onay_bekleyen ?? 0} renk="#0891b2" />
+          <Kpi label="Toplam Yıkama" deger={agg.toplam} renk={T.blue} hedef={agg.hedef} />
+          <Kpi label="Planlı" deger={agg.planli} renk={T.green} hedef={agg.hedef} />
+          <Kpi label="Plansız" deger={agg.ekstra} renk={T.amber} hedef={agg.hedef} />
+          <Kpi label="Ekstra" deger={agg.ekstra_onay_bekleyen ?? 0} renk="#0891b2" hedef={agg.hedef} />
           <Kpi label="Personel" deger={agg.personel_sayisi} renk={T.text} />
           <Kpi label="Toplam Süre" deger={fmtSure(agg.toplam_sure_saniye)} renk={T.text} kucuk />
           <Kpi label="Ortalama Süre" deger={fmtSure(agg.ortalama_sure_saniye)} renk={T.text} kucuk />
@@ -596,11 +596,24 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
   )
 }
 
-function Kpi({ label, deger, renk, kucuk }: { label: string; deger: any; renk: string; kucuk?: boolean }) {
+function Kpi({ label, deger, renk, kucuk, hedef }: { label: string; deger: any; renk: string; kucuk?: boolean; hedef?: number }) {
+  // Hedefe oran — sadece sayısal deger + pozitif hedef verildiğinde. Kartın
+  // sağ kenarına yazılır; hedefin kendisinde veya süre/personel gibi
+  // orantısız metriklerde boş bırakılır.
+  const oran = (typeof deger === 'number' && hedef && hedef > 0)
+    ? Math.round((deger / hedef) * 100)
+    : null
   return (
     <div className="verde-card" style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
       <div style={{ fontSize: 10.5, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-      <div style={{ fontSize: kucuk ? 16 : 22, fontWeight: 900, color: renk }}>{deger}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ fontSize: kucuk ? 16 : 22, fontWeight: 900, color: renk }}>{deger}</div>
+        {oran !== null && (
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', letterSpacing: '-0.01em' }}>
+            %{oran}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
