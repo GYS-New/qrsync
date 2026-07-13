@@ -18,64 +18,22 @@ export default async function OtoYikamaArsivPage() {
   let tamamlayanlar: KullaniciOpt[] = []
 
   if (firmaId) {
-    // İki kaynak union:
-    //  A) oto_yikama_arsiv  — cron tarafından 30+ gün önce taşınmış (kalıcı arşiv)
-    //  B) gorevler + metadata WHERE durum IN (TAMAMLANDI,IPTAL,YAPILAMADI)
-    //     — aktif tablodaki "tamamlanmış" kayıtlar (henüz cron taşımamış)
-    // Sonuç: bekleyen + eski tüm Oto Yıkama kayıtları tek arşivde görünür.
-    const [arsivRes, aktifRes] = await Promise.all([
-      admin
-        .from('oto_yikama_arsiv')
-        .select(`
-          gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, durum, lokasyon_id,
-          olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
-          tamamlanma_suresi_saniye, olusturan_id, islemi_yapan_id, iptal_sebep,
-          km, notlar, arsivleme_tarihi
-        `)
-        .eq('firma_id', firmaId)
-        .order('hedef_tarih', { ascending: false })
-        .limit(5000),
-      admin
-        .from('gorevler')
-        .select(`
-          id, lokasyon_id, durum, olusturma_tarihi, baslatilma_tarihi,
-          tamamlanma_tarihi, tamamlanma_suresi_saniye, olusturan_id,
-          islemi_yapan_id, iptal_sebep,
-          oto_yikama_gorev_metadata!inner(arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar)
-        `)
-        .eq('firma_id', firmaId)
-        .in('durum', ['TAMAMLANDI', 'IPTAL', 'YAPILAMADI'])
-        .order('tamamlanma_tarihi', { ascending: false, nullsFirst: false })
-        .limit(5000),
-    ])
-    const arsivRows = (arsivRes.data ?? []) as any[]
-    const aktifRows = ((aktifRes.data ?? []) as any[]).map((g: any) => {
-      const m = g.oto_yikama_gorev_metadata
-      return {
-        gorev_id: g.id,
-        arac_id: m?.arac_id ?? null,
-        plaka_snapshot: m?.plaka_snapshot ?? null,
-        hedef_tarih: m?.hedef_tarih ?? null,
-        ekstra: m?.ekstra === true,
-        durum: g.durum,
-        lokasyon_id: g.lokasyon_id,
-        olusturma_tarihi: g.olusturma_tarihi,
-        baslatilma_tarihi: g.baslatilma_tarihi,
-        tamamlanma_tarihi: g.tamamlanma_tarihi,
-        tamamlanma_suresi_saniye: g.tamamlanma_suresi_saniye,
-        olusturan_id: g.olusturan_id,
-        islemi_yapan_id: g.islemi_yapan_id,
-        iptal_sebep: g.iptal_sebep,
-        km: m?.km ?? null,
-        notlar: m?.notlar ?? null,
-        arsivleme_tarihi: null, // henüz arşive taşınmadı
-      }
-    })
-    // Aynı gorev_id iki tarafta da varsa (edge case: cron çalışmadan önce
-    // taşınmış) arşiv tablosunu tercih et.
-    const seen = new Set(arsivRows.map(r => r.gorev_id))
-    const arr = [...arsivRows, ...aktifRows.filter(r => !seen.has(r.gorev_id))]
-    arr.sort((a, b) => (b.hedef_tarih ?? '').localeCompare(a.hedef_tarih ?? ''))
+    // Sadece fiziksel olarak arşive taşınmış kayıtlar. Henüz taşınmamış
+    // TAMAMLANDI/IPTAL/YAPILAMADI kayıtları Görev Kayıtları sayfasında görünür;
+    // burada union yapılırsa "Arşiv Tarihi" kolonu boş kalıyordu ve
+    // kullanıcı arşiv ≠ aktif tablo ayrımını göremiyordu.
+    const { data: arsivData } = await admin
+      .from('oto_yikama_arsiv')
+      .select(`
+        gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, durum, lokasyon_id,
+        olusturma_tarihi, baslatilma_tarihi, tamamlanma_tarihi,
+        tamamlanma_suresi_saniye, olusturan_id, islemi_yapan_id, iptal_sebep,
+        km, notlar, arsivleme_tarihi
+      `)
+      .eq('firma_id', firmaId)
+      .order('hedef_tarih', { ascending: false })
+      .limit(5000)
+    const arr = (arsivData ?? []) as any[]
 
     const userIds = [...new Set(arr.flatMap(r => [r.olusturan_id, r.islemi_yapan_id]).filter(Boolean))] as string[]
     const lokIds = [...new Set(arr.map(r => r.lokasyon_id).filter(Boolean))] as string[]
