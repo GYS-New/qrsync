@@ -69,11 +69,18 @@ export async function GET(req: NextRequest) {
   if (gorevErr) return NextResponse.json({ ok: false, error: gorevErr.message }, { status: 500 })
 
   // 3) Araçlar — yikama_gunleri tablo görünümünde "Yıkama Günü" kolonu için.
-  const aracIds = [...new Set(metaRows.map(m => m.arac_id))]
-  const { data: araclar } = await admin
-    .from('araclar')
-    .select('id, plaka, departman, kullanici_adi_soyadi, yikama_gunleri')
-    .in('id', aracIds)
+  // Tanımsız plaka onay bekleyen kayıtlarda metadata.arac_id NULL olur
+  // (migration 101). Bu null'lar Set'e giriyor ve .in('id', [null, ...uuids])
+  // PostgREST'te syntax error verip TÜM araclar sorgusunu sessizce
+  // boşaltıyordu → Canlı İşlemler tablosunda KULLANICI/DEPARTMAN kolonları
+  // hepsi '—' görünüyordu (2026-07-13 regresyonu, kullanıcı bildirimi).
+  const aracIds = [...new Set(metaRows.map(m => m.arac_id).filter((x): x is string => !!x))]
+  const { data: araclar } = aracIds.length > 0
+    ? await admin
+        .from('araclar')
+        .select('id, plaka, departman, kullanici_adi_soyadi, yikama_gunleri')
+        .in('id', aracIds)
+    : { data: [] as any[] }
 
   const aracMap = new Map((araclar ?? []).map((a: any) => [a.id, a]))
   const gorevMap = new Map((gorevler ?? []).map((g: any) => [g.id, g]))

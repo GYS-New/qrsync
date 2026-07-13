@@ -110,7 +110,9 @@ export async function GET(req: NextRequest) {
     const gorevler = gorevlerAll
     const gMap = new Map(gorevler.map((g: any) => [g.id, g]))
 
-    const aracIds = [...new Set((metaRows ?? []).map(m => m.arac_id))]
+    // Tanımsız plaka (arac_id NULL) kayıtlarda .in('id', [null, ...]) PostgREST
+    // syntax error verir → araclar sorgusu boş, departman/kullanıcı '—' olur.
+    const aracIds = [...new Set((metaRows ?? []).map(m => m.arac_id).filter((x): x is string => !!x))]
     const userIds = [...new Set((gorevler ?? []).map((g: any) => g.islemi_yapan_id).filter(Boolean))]
     const [aRes, uRes] = await Promise.all([
       aracIds.length > 0 ? admin.from('araclar').select('id, plaka, departman, kullanici_adi_soyadi, yikama_gunleri').in('id', aracIds) : Promise.resolve({ data: [] as any[] }),

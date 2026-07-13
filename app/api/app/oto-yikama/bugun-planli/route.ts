@@ -115,8 +115,9 @@ export async function GET(req: Request) {
       for (const u of (ustRows ?? []) as any[]) ustMap.set(u.id, u.tanim)
     }
 
-    // Araçlar
-    const aracIds = [...new Set(metaRows.map(m => m.arac_id))]
+    // Araçlar — arac_id NULL (onay bekleyen tanımsız plaka) kayıtlar filter'lı
+    // olmalı; .in('id', [null, ...]) PostgREST'te syntax error verir.
+    const aracIds = [...new Set(metaRows.map(m => m.arac_id).filter((x): x is string => !!x))]
     const { data: araclar } = aracIds.length > 0
       ? await admin.from('araclar').select('id, plaka, departman, kullanici_adi_soyadi').in('id', aracIds)
       : { data: [] as any[] }

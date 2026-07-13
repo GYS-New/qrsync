@@ -123,8 +123,10 @@ export async function GET(req: NextRequest) {
 
   const gMap = new Map((gorevler as any[]).map((g: any) => [g.id, g]))
 
-  // 3) Araçlar + kullanıcılar
-  const aracIds = [...new Set(metaRows.map(m => m.arac_id))]
+  // 3) Araçlar + kullanıcılar. Tanımsız plaka (onay bekleyen) kayıtlarda
+  // arac_id NULL — .in('id', [null, ...uuids]) PostgREST syntax error verir,
+  // araclar sorgusu boş döner, departman/kullanıcı kolonları '—' olur.
+  const aracIds = [...new Set(metaRows.map(m => m.arac_id).filter((x): x is string => !!x))]
   const kullaniciIds = [...new Set((gorevler as any[]).map(g => g.islemi_yapan_id).filter(Boolean))]
 
   const [aracRes, userRes] = await Promise.all([
