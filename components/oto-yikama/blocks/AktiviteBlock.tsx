@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
-import { fetchAll } from '@/lib/supabase/fetchAll'
 
 /**
  * Yıkama Aktivitesi — GYS AktiviteGrafigi pattern'i ile uyumlu.
@@ -11,8 +10,10 @@ import { fetchAll } from '@/lib/supabase/fetchAll'
  * 3 mode tab (GÜNLÜK saatlik / HAFTALIK gün / AYLIK hafta) + Recharts
  * AreaChart. KPI üçlüsü (Bugün/Bu Hafta/Bu Ay) chart üstünde.
  *
- * Veri: oto_yikama_gorev_metadata + gorevler!inner (durum=TAMAMLANDI).
- * PostgREST nested embed güvenilir değil → 2-step query.
+ * Veri: oto_yikama_aktivite_verisi RPC (migration 105) — server-side JOIN,
+ * son 30 gün TAMAMLANDI kayıtları tek-shot çeker. Önceki N+1 pattern
+ * (araclar → metadata chunks → gorevler chunks) 40sn sürüyor ve sık
+ * timeout veriyordu.
  */
 type Mode = 'gunluk' | 'haftalik' | 'aylik'
 
@@ -63,64 +64,20 @@ export default function AktiviteBlock({ firmaId }: { firmaId: string }) {
     const stale = () => runIdRef.current !== myRunId
     setHata(null)
     try {
-      // 30 gunluk metadata. Iki asama:
-      //  1) Firma araclari (id listesi) — .limit(5000) 1000 cap'te sikisir,
-      //     fetchAll pagination sart.
-      //  2) Metadata .in('arac_id', aracIds) — chunk gerekli (100 UUID).
-      // Onceki .eq('arac.firma_id') nested filter Supabase JS'te bazen ignore
-      // ediliyordu ve PostgREST 1000 cap tum firmalari doldurunca ATALIAN
-      // kayitlari listeden dusuyordu. Iki-adim + fetchAll ile temiz.
-      const son30 = trDateStr(new Date(Date.now() - 30 * 86400000))
-      const firmaAraclar = await fetchAll<{ id: string }>(() => supabase
-        .from('araclar')
-        .select('id')
-        .eq('firma_id', firmaId)
-      )
+      // Tek-shot RPC: server-side JOIN + firma filtresi + son 30 gün + TAMAMLANDI.
+      // (Migration 105.) Composite index (arac_id, hedef_tarih) + gorevler PK
+      // ile plan efficient. Auth kontrolü RPC içinde.
+      const { data: rpcRows, error: rpcErr } = await supabase
+        .rpc('oto_yikama_aktivite_verisi', { p_firma_id: firmaId })
+      if (rpcErr) throw new Error('aktivite RPC: ' + rpcErr.message)
       if (stale()) return
-      const aracIds = firmaAraclar.map(a => a.id)
-      if (aracIds.length === 0) {
+      const tamamlanmaList: Date[] = ((rpcRows ?? []) as any[])
+        .map(r => r.tamamlanma_tarihi ? new Date(r.tamamlanma_tarihi) : null)
+        .filter((d): d is Date => d !== null)
+      if (tamamlanmaList.length === 0) {
         setChartData(bosBucket(mode))
         setKpi({ bugun: 0, hafta: 0, ay: 0 })
         return
-      }
-      // Metadata: arac_id IN chunks, hedef_tarih son 30 gun
-      const metaGorevIds: string[] = []
-      const ARAC_CHUNK = 100
-      for (let i = 0; i < aracIds.length; i += ARAC_CHUNK) {
-        const slice = aracIds.slice(i, i + ARAC_CHUNK)
-        const chunkRows = await fetchAll<{ gorev_id: string }>(() => supabase
-          .from('oto_yikama_gorev_metadata')
-          .select('gorev_id')
-          .in('arac_id', slice)
-          .gte('hedef_tarih', son30)
-        )
-        if (stale()) return
-        for (const r of chunkRows) if (r.gorev_id) metaGorevIds.push(r.gorev_id)
-      }
-      const gorevIds = metaGorevIds
-      if (gorevIds.length === 0) {
-        setChartData(bosBucket(mode))
-        setKpi({ bugun: 0, hafta: 0, ay: 0 })
-        return
-      }
-      // .in('id', N-UUIDs) URL'yi sisirir; 500 UUID ~18.5KB olur, Cloudflare
-      // 8KB HTTP request-line limitini asar. 100'luk chunk (100 UUID ~3.7KB).
-      const CHUNK = 100
-      const tamamlanmaList: Date[] = []
-      for (let i = 0; i < gorevIds.length; i += CHUNK) {
-        const chunk = gorevIds.slice(i, i + CHUNK)
-        const { data: gorevRows, error: gorevErr } = await supabase
-          .from('gorevler')
-          .select('id, tamamlanma_tarihi')
-          .in('id', chunk)
-          .eq('firma_id', firmaId)
-          .eq('durum', 'TAMAMLANDI')
-          .not('tamamlanma_tarihi', 'is', null)
-        if (gorevErr) throw new Error('gorevler: ' + gorevErr.message)
-        if (stale()) return
-        for (const g of (gorevRows ?? []) as any[]) {
-          tamamlanmaList.push(new Date(g.tamamlanma_tarihi))
-        }
       }
 
       // KPI
