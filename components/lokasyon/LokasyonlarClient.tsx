@@ -418,9 +418,36 @@ export default function LokasyonlarClient({
 
   async function toggle(l: Lokasyon) {
     setLoading(true); setError('')
+
+    // Migration 106: Lokasyon aktif toggle olunca DB trigger'ı bağlı
+    // gorev_kurallari.aktif'i de otomatik senkronlar (aktif -> false yapar
+    // veya tersi). Kullanıcıya toggle öncesi kaç kural etkileneceğini gösterip
+    // onay al. Etkilenen kural = şu an lokasyonla aynı state'te olanlar
+    // (trigger sadece farklı olanları update eder).
+    const { count: etkilenenSayi } = await supabase
+      .from('gorev_kurallari')
+      .select('id', { count: 'exact', head: true })
+      .eq('lokasyon_id', l.id)
+      .eq('aktif', l.aktif)
+
+    if (etkilenenSayi && etkilenenSayi > 0) {
+      const mesaj = l.aktif
+        ? `Bu lokasyona bağlı ${etkilenenSayi} görev kuralı da duraklatılacak — aktif edilene kadar yeni görev üretilmez.\n\nDevam edilsin mi?`
+        : `Bu lokasyona bağlı ${etkilenenSayi} görev kuralı da yeniden aktif edilecek — bu gece görev üretimi başlar.\n\nDurdurmak istediğin kurallar varsa daha sonra "Görev Kuralları" sayfasından ayrıca kapatabilirsin.\n\nDevam edilsin mi?`
+      if (!window.confirm(mesaj)) {
+        setLoading(false)
+        return
+      }
+    }
+
     const { error: err } = await supabase.from('lokasyonlar').update({ aktif: !l.aktif }).eq('id', l.id)
     if (err) showError(err.message)
-    else showSuccess('Durum güncellendi.')
+    else {
+      const suffix = etkilenenSayi && etkilenenSayi > 0
+        ? ` (${etkilenenSayi} görev kuralı da senkronlandı)`
+        : ''
+      showSuccess(`Durum güncellendi.${suffix}`)
+    }
     if (firmaId) await refresh(firmaId)
     setLoading(false)
   }
