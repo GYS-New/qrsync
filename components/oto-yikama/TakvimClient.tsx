@@ -514,17 +514,21 @@ function GunPopup({ tarih, kartlar, lokAd, araclar, firmaId, onClose, onChange }
         const j = await res.json()
         if (!j.ok) throw new Error(j.error)
       }
-      // 2) Tahmini görevler için sırayla POST {iptal:true}
+      // 2) Tahmini görevleri tek atomik istekte iptal — önceden 37 sequential
+      // POST vardı, modal kapatılırsa yarım kalıyor ve takvimde tahminler
+      // kalıyordu (2026-07-14 bug).
       let tahminBasarili = 0
-      for (const k of silinebilirler.filter(k => !k.gercek)) {
-        try {
-          const res = await fetch('/api/oto-yikama/takvim/gun', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ firma_id: firmaId, arac_id: k.arac_id, tarih, iptal: true }),
-          })
-          const j = await res.json()
-          if (j.ok) tahminBasarili++
-        } catch {}
+      const tahminAracIds = silinebilirler
+        .filter(k => !k.gercek && k.arac_id)
+        .map(k => k.arac_id) as string[]
+      if (tahminAracIds.length > 0) {
+        const res = await fetch('/api/oto-yikama/takvim/gun/toplu-iptal', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firma_id: firmaId, tarih, arac_ids: tahminAracIds }),
+        })
+        const j = await res.json()
+        if (!j.ok) throw new Error(j.error ?? 'Toplu iptal başarısız')
+        tahminBasarili = j.skip_yazilan ?? 0
       }
       toast({
         type: 'success', title: 'Temizlendi',
