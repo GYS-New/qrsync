@@ -165,13 +165,24 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
     ta:     { width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: 15, outline: 'none', resize: 'vertical' as const, minHeight: 80, boxSizing: 'border-box' as const, fontFamily: 'inherit' },
     btn:    (dis: boolean) => ({ width: '100%', padding: 13, borderRadius: 12, border: 'none', background: '#1f2937', color: '#fff', fontSize: 16, fontWeight: 700 as const, cursor: dis ? 'not-allowed' as const : 'pointer' as const, opacity: dis ? 0.55 : 1, marginTop: 2 }),
     dashed: { width: '100%', padding: 12, borderRadius: 10, border: '1.5px dashed #d1d5db', background: '#f8fafc', color: '#64748b', fontSize: 14, cursor: 'pointer' as const, display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 8 },
-    // Dil pill — header sağ-üst köşesinde
-    dilPill: { position: 'absolute' as const, top: 12, right: 14, display: 'inline-flex' as const, background: 'rgba(255,255,255,0.15)', borderRadius: 999, padding: 2, fontSize: 11, fontWeight: 700 as const, letterSpacing: '0.03em' },
+    // Dil pill — header sağ-üst köşesinde. Dokunma hedefi mobilde min 40px
+    // olmalı, aksi halde parmak isabet ettiremez ve "hassas değil" hissi verir.
+    // Ayrıca touchAction: manipulation ile 300ms iOS click gecikmesi kalkar,
+    // -webkit-tap-highlight ile de görsel geribildirim netleşir.
+    dilPill: {
+      position: 'absolute' as const, top: 10, right: 12,
+      display: 'inline-flex' as const, background: 'rgba(255,255,255,0.18)',
+      borderRadius: 999, padding: 3,
+    },
     dilBtn:  (aktif: boolean) => ({
-      padding: '4px 10px', borderRadius: 999, border: 'none', cursor: 'pointer' as const,
+      minWidth: 44, minHeight: 34, padding: '7px 14px', borderRadius: 999,
+      border: 'none', cursor: 'pointer' as const,
       background: aktif ? '#fff' : 'transparent',
-      color: aktif ? '#1f2937' : 'rgba(255,255,255,0.85)',
-      fontSize: 11, fontWeight: 700 as const, letterSpacing: '0.03em',
+      color: aktif ? '#1f2937' : 'rgba(255,255,255,0.92)',
+      fontSize: 12.5, fontWeight: 800 as const, letterSpacing: '0.04em',
+      touchAction: 'manipulation' as const,
+      WebkitTapHighlightColor: 'rgba(255,255,255,0.3)' as any,
+      transition: 'background 0.15s',
     }),
   }
 
@@ -228,8 +239,8 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
         {/* Header */}
         <div style={S.head()}>
           {DilPill}
-          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em', paddingRight: 68 }}>{firmaAdi}</div>
-          <div style={{ fontSize: 21, fontWeight: 900, lineHeight: 1.2, paddingRight: 68 }}>{lokasyon?.tanim}</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em', paddingRight: 108 }}>{firmaAdi}</div>
+          <div style={{ fontSize: 21, fontWeight: 900, lineHeight: 1.2, paddingRight: 108 }}>{lokasyon?.tanim}</div>
           {lokasyon?.ust_tanim && <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>{lokasyon.ust_tanim}</div>}
           <div style={{ marginTop: 8, fontSize: 13.5, opacity: 0.85 }}>{L.subtitle}</div>
         </div>
