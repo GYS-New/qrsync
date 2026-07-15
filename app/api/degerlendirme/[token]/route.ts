@@ -96,10 +96,22 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ ok: false, error: 'Geçersiz istek' }, { status: 400 })
   }
 
-  const { yildiz, yorum, ad_soyad, gorsel_url } = body
+  const { yildiz, yorum, ad_soyad, gsm, gorsel_url } = body
 
   if (!yildiz || yildiz < 1 || yildiz > 5) {
     return NextResponse.json({ ok: false, error: 'Geçerli bir değerlendirme puanı seçin (1-5)' }, { status: 400 })
+  }
+
+  // GSM opsiyonel — verilirse en az 10 rakam içermeli (uluslararası
+  // format için sadece rakam sayısı; format serbest, mask yok).
+  let gsmClean: string | null = null
+  if (typeof gsm === 'string' && gsm.trim()) {
+    const raw = gsm.trim()
+    const digits = raw.replace(/\D/g, '')
+    if (digits.length < 10) {
+      return NextResponse.json({ ok: false, error: 'GSM numarası en az 10 rakam içermeli' }, { status: 400 })
+    }
+    gsmClean = raw.slice(0, 40)  // aşırı uzun payload'a karşı kalkan
   }
 
   const { lok, kanal } = await lokasyonBul(admin, params.token)
@@ -179,6 +191,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     yildiz,
     yorum:            yorum?.trim()    || null,
     ad_soyad:         ad_soyad?.trim() || null,
+    gsm:              gsmClean,
     gorsel_url:       gorsel_url       || null,
     ip_adresi:        ip,
     user_agent:       ua,
