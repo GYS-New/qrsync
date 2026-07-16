@@ -47,7 +47,7 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
   // gosterirken KPI "Planli 39" gosterip tutarsizlik olusturuyor.
   // gercekKeySet ise TUM satirlari icerir — plansiz/ekstra yikanmis arac icin ayni gunde
   // tahminin de eklenmesini engellemek icin.
-  const [{ data: rows }, { data: araclar }] = await Promise.all([
+  const [{ data: rows }, { data: araclar }, { data: skipRows }] = await Promise.all([
     admin
       .from('oto_yikama_gorev_metadata')
       .select('arac_id, hedef_tarih, ekstra, onay_durumu, gorev:gorevler!inner(durum, firma_id)')
@@ -60,6 +60,15 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
       .select('id, plaka, departman, varsayilan_lokasyon_id, yikama_frekans_tip, yikama_frekans_aralik, yikama_referans_tarih, yikama_gunleri, aktif')
       .eq('firma_id', firmaId)
       .eq('aktif', true),
+    // 3) Skip kayıtları — takvimden 'Tümünü Sil' / bireysel iptal ile yazılır.
+    // Tahmin merge'de bu (arac_id, tarih) çiftleri sayılmamalı; aksi halde
+    // kullanıcı iptal etse bile grafikte hâlâ planlı görünür (2026-07-14 bug).
+    admin
+      .from('oto_yikama_gorev_skip')
+      .select('arac_id, tarih')
+      .eq('firma_id', firmaId)
+      .gte('tarih', baslangicTarih)
+      .lte('tarih', bitisTarih),
   ])
 
   // Gerçek görev key seti (arac_id|tarih) — tahminden bunları çıkar
@@ -76,12 +85,19 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
     sayac.set(r.hedef_tarih, e)
   }
 
-  // 3) Tahmini plan — gerçek olmayan günler/araçlar için (haftanın tamamı)
+  // Skip seti — kullanıcı iptal ettiyse tahminden çıkar
+  const skipSet = new Set<string>()
+  for (const s of (skipRows ?? []) as any[]) {
+    skipSet.add(`${s.tarih}|${s.arac_id}`)
+  }
+
+  // 4) Tahmini plan — gerçek olmayan günler/araçlar için (haftanın tamamı)
   const tahminAraclar = (araclar ?? []) as TahminArac[]
   const tahminler = aralikPlanTahmin(tahminAraclar, baslangicTarih, bitisTarih)
   for (const t of tahminler) {
     const key = `${t.tarih}|${t.arac_id}`
     if (gercekKeySet.has(key)) continue   // gerçek görev varsa atla
+    if (skipSet.has(key)) continue         // kullanıcı iptal etmiş — atla
     const e = sayac.get(t.tarih) ?? { tamamlanan: 0, planli: 0 }
     e.planli++
     sayac.set(t.tarih, e)
