@@ -377,8 +377,11 @@ function chartStats(chart: QuickPayload['charts'][number] | null) {
 }
 
 function getDefaultChartFilters(): ChartFilters {
+  // Default 30 gün → 1 gün (2026-07-17). 30 günlük varsayılan raporun
+  // 1-1.5 dakika yüklenmesine neden oluyordu; kullanıcı hızlı bir bakış
+  // sonrası tarih aralığını kendisi genişletiyor.
   return {
-    dateFrom: todayMinus(30),
+    dateFrom: todayMinus(1),
     dateTo: todayMinus(0),
     locationId: '',
     userId: '',
@@ -1027,7 +1030,7 @@ export default function QuickReportsClient({
         params.set('type', type)
         if (firmaId) params.set('firmaId', firmaId)
         if (projeId) params.set('projeId', projeId)
-        params.set('dateFrom', todayMinus(30))
+        params.set('dateFrom', todayMinus(1))
         params.set('dateTo', todayMinus(0))
         const json = await fetchQuickPayload(`/api/reports/quick?${params.toString()}`)
         if (!cancelled) setPayload(json)
