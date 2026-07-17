@@ -6,24 +6,30 @@ import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliU
  * Aktif canli_gorevler + canli_gorevler_arsiv tablosunu paralel çekip
  * id bazında deduplicate ederek birleştirir.
  * Aktif tablo kaydı her zaman arşiv kaydının önüne geçer (daha güncel).
+ *
+ * dateFrom/dateTo (YYYY-MM-DD) verildiyse `olusturma_tarihi` üzerinde SQL
+ * tarafında filtrelenir. Aksi halde `fetchAll` binlerce arşiv satırını
+ * client'a çekip JS'de `isWithinRange` ile eliyordu — 5dk yüklemenin
+ * ana kaynağıydı. TR gün başı/sonu +03 offset ile ISO'ya çevrilir.
  */
 async function fetchCanliGorevlerMerged(admin: any, selectCols: string, filters: {
   firmaId?: string | null
   projeId?: string | null
+  dateFrom?: string | null
+  dateTo?: string | null
 }): Promise<any[]> {
+  const gteIso = filters.dateFrom ? new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString() : null
+  const lteIso = filters.dateTo   ? new Date(filters.dateTo   + 'T23:59:59.999+03:00').toISOString() : null
+  const applyFilters = (q: any) => {
+    if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+    if (filters.projeId) q = q.eq('proje_id', filters.projeId)
+    if (gteIso) q = q.gte('olusturma_tarihi', gteIso)
+    if (lteIso) q = q.lte('olusturma_tarihi', lteIso)
+    return q
+  }
   const [aktif, arsiv] = await Promise.all([
-    fetchAll(() => {
-      let q = admin.from('canli_gorevler').select(selectCols)
-      if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
-      if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
-      return q
-    }),
-    fetchAll(() => {
-      let q = admin.from('canli_gorevler_arsiv').select(selectCols)
-      if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
-      if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
-      return q
-    }),
+    fetchAll(() => applyFilters(admin.from('canli_gorevler').select(selectCols))),
+    fetchAll(() => applyFilters(admin.from('canli_gorevler_arsiv').select(selectCols))),
   ])
   const map = new Map<string, any>()
   for (const r of arsiv) map.set(r.id, r)
@@ -204,15 +210,20 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
   const locationOptions = locs.map((x: any) => ({ id: x.id, label: locationPath(x.id, locMap) || x.tanim || '-', parentId: x.parent_id ?? null }))
   const userOptions = userList.map((x: any) => ({ id: x.id, label: x.isim_soyisim ?? '-' })).sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label, 'tr'))
 
+  // Tarih aralığını SQL'e taşımak için (YYYY-MM-DD → ISO, TR offset)
+  const gteIso = filters.dateFrom ? new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString() : null
+  const lteIso = filters.dateTo   ? new Date(filters.dateTo   + 'T23:59:59.999+03:00').toISOString() : null
+
   if (type === 'locations') {
     const [liveTasks, { data: manualTasks, error: manualError }] = await Promise.all([
       fetchCanliGorevlerMerged(admin, 'id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id', filters),
       (() => {
         // gorevler_normal view: Oto Yıkama görevleri spesifik raporlara dahil olmaz
-        let q = filters.firmaId
-          ? admin.from('gorevler_normal').select('id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id').eq('firma_id', filters.firmaId)
-          : admin.from('gorevler_normal').select('id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id')
-        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+        let q = admin.from('gorevler_normal').select('id,lokasyon_id,durum,olusturma_tarihi,tamamlanma_tarihi,firma_id')
+        if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+        if (filters.projeId) q = q.eq('proje_id', filters.projeId)
+        if (gteIso) q = q.gte('olusturma_tarihi', gteIso)
+        if (lteIso) q = q.lte('olusturma_tarihi', lteIso)
         return q
       })(),
     ])
@@ -299,18 +310,20 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
       fetchCanliGorevlerMerged(admin, 'id,durum,olusturma_tarihi,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id,atanan_kullanici_id,iptal_eden_id,firma_id', filters),
       // Spesifik aktif: gorevler_normal view (Oto Yıkama görevleri hariç)
       (() => {
-        let q = filters.firmaId
-          ? admin.from('gorevler_normal').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id').eq('firma_id', filters.firmaId)
-          : admin.from('gorevler_normal').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id')
-        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+        let q = admin.from('gorevler_normal').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,islemi_yapan_id,firma_id')
+        if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+        if (filters.projeId) q = q.eq('proje_id', filters.projeId)
+        if (gteIso) q = q.gte('olusturma_tarihi', gteIso)
+        if (lteIso) q = q.lte('olusturma_tarihi', lteIso)
         return q
       })(),
       // Spesifik arşiv: gorevler_arsiv (islemi_yapan_id YOK ama tamamlayan_kullanici_id var)
       (() => {
-        let q = filters.firmaId
-          ? admin.from('gorevler_arsiv').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,firma_id').eq('firma_id', filters.firmaId)
-          : admin.from('gorevler_arsiv').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,firma_id')
-        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+        let q = admin.from('gorevler_arsiv').select('id,durum,olusturma_tarihi,atanan_kullanici_id,olusturan_id,tamamlayan_kullanici_id,firma_id')
+        if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+        if (filters.projeId) q = q.eq('proje_id', filters.projeId)
+        if (gteIso) q = q.gte('olusturma_tarihi', gteIso)
+        if (lteIso) q = q.lte('olusturma_tarihi', lteIso)
         return q
       })(),
       filters.firmaId ? getUstLokasyonYetkiliUserIds(filters.firmaId) : Promise.resolve(new Set<string>()),
@@ -436,6 +449,8 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     let taskQuery = admin.from('gorevler_normal').select('id,tanim,durum,olusturma_tarihi,tamamlanma_tarihi,lokasyon_id,firma_id')
     if (filters.firmaId) taskQuery = taskQuery.eq('firma_id', filters.firmaId)
     if (filters.projeId) taskQuery = (taskQuery as any).eq('proje_id', filters.projeId)
+    if (gteIso) taskQuery = taskQuery.gte('olusturma_tarihi', gteIso)
+    if (lteIso) taskQuery = taskQuery.lte('olusturma_tarihi', lteIso)
     const { data: t, error: taskError } = await taskQuery
     if (taskError) throw new Error(taskError.message)
     tasks = t ?? []
@@ -477,14 +492,22 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
       ? grpList.filter((g: any) => g.ust_lokasyon_id === selectedParentId)
       : grpList
 
-    // Üyeleri çek — proje filtreli lokasyonlarla sınırla
-    const { data: members } = await admin.from('lokasyon_grup_uyeleri').select('grup_id,lokasyon_id')
+    // Üyeleri çek — sadece bu firma/proje kapsamındaki grupların üyeleri.
+    // Önceden filtresizdi (`lokasyon_grup_uyeleri`.select('*')) → çok kiracılı
+    // tabloyu tam tarıyordu. Şimdi grup_id in (bu firma'nın grupları) filtresi.
+    const grpListIds = (grpList ?? []).map((g: any) => g.id)
     const grpLocMap: Record<string, string[]> = {}
-    for (const m of members ?? []) {
-      // Proje filtresi: sadece projedeki lokasyonları say
-      if (!projeLokIds.has(m.lokasyon_id)) continue
-      if (!grpLocMap[m.grup_id]) grpLocMap[m.grup_id] = []
-      grpLocMap[m.grup_id].push(m.lokasyon_id)
+    if (grpListIds.length > 0) {
+      const { data: members } = await admin
+        .from('lokasyon_grup_uyeleri')
+        .select('grup_id,lokasyon_id')
+        .in('grup_id', grpListIds)
+      for (const m of members ?? []) {
+        // Proje filtresi: sadece projedeki lokasyonları say
+        if (!projeLokIds.has(m.lokasyon_id)) continue
+        if (!grpLocMap[m.grup_id]) grpLocMap[m.grup_id] = []
+        grpLocMap[m.grup_id].push(m.lokasyon_id)
+      }
     }
 
     // Seçili gruptaki lokasyon id'leri

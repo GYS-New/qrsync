@@ -1,6 +1,24 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+
+// Module-level cache: ChartCard 4 grafik için ayrı ayrı fetch atıyor ama aynı
+// params ile aynı payload dönüyor (server tüm grafikleri hesaplayıp gönderiyor,
+// client `.find(chartKey)` ile sadece bir tanesini alıyor). Bu 4x maliyeti
+// önlemek için params-hash key'inde 60sn TTL cache.
+type _CacheEntry = { payload: any; exp: number }
+const _quickPayloadCache = new Map<string, _CacheEntry>()
+const _QUICK_CACHE_TTL_MS = 60 * 1000
+async function fetchQuickPayload(url: string): Promise<any> {
+  const now = Date.now()
+  const hit = _quickPayloadCache.get(url)
+  if (hit && hit.exp > now) return hit.payload
+  const res = await fetch(url, { cache: 'no-store' })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json?.error ?? 'Grafik verisi alınamadı.')
+  _quickPayloadCache.set(url, { payload: json, exp: now + _QUICK_CACHE_TTL_MS })
+  return json
+}
 import Link from 'next/link'
 import { ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Download, FileCode2, FileSpreadsheet, Image as ImageIcon, LineChart as LineChartIcon, Loader2, PieChart as PieChartIcon, Table2, Wand2 } from 'lucide-react'
 import {
@@ -823,9 +841,7 @@ function QuickChartCard({
         if ((filterMeta as any).group && filters.groupId) params.set('groupId', filters.groupId)
         if ((filterMeta as any).parentLocation && filters.parentLocationId) params.set('parentLocationId', filters.parentLocationId)
 
-        const res = await fetch(`/api/reports/quick?${params.toString()}`, { cache: 'no-store' })
-        const json = await res.json()
-        if (!res.ok) throw new Error(json?.error ?? 'Grafik verisi alınamadı.')
+        const json = await fetchQuickPayload(`/api/reports/quick?${params.toString()}`)
         const matched = (json?.charts ?? []).find((item: QuickPayload['charts'][number]) => item.key === chartKey)
         if (!matched) throw new Error('Grafik bulunamadı.')
         if (!cancelled) setChart(matched)
@@ -1013,9 +1029,7 @@ export default function QuickReportsClient({
         if (projeId) params.set('projeId', projeId)
         params.set('dateFrom', todayMinus(30))
         params.set('dateTo', todayMinus(0))
-        const res = await fetch(`/api/reports/quick?${params.toString()}`, { cache: 'no-store' })
-        const json = await res.json()
-        if (!res.ok) throw new Error(json?.error ?? 'Hızlı rapor alınamadı.')
+        const json = await fetchQuickPayload(`/api/reports/quick?${params.toString()}`)
         if (!cancelled) setPayload(json)
       } catch (err: any) {
         if (!cancelled) setError(err?.message ?? 'Hızlı rapor alınamadı.')
