@@ -7,6 +7,10 @@
  *   - Lokasyonun ait olduğu projeye atanmış U'lar (users.proje_id = proje)
  *     ve üst lokasyona açık yetki kaydı olanlar (kullanici_lokasyon_yetkileri)
  *     · Yetki kaydı OLMAYAN U'lar (tüm erişim fallback) bildirim ALMAZ
+ *   - Lokasyonun ait olduğu projeye atanmış MÜŞTERİ rolü kullanıcılar
+ *     (users.rol='musteri' + users.proje_id = proje) — proje müşterisi rapor
+ *     tüketicisidir; kendi verdiği anonim QR değerlendirmesi olmaz
+ *     (2026-07-28 eklendi, BURAK SEMKİN vakası).
  *
  * İki kanal:
  *   - Web in-app: bildirimler tablosuna 'musteri_degerlendirme' tipinde kayıt
@@ -98,9 +102,23 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
       }
     }
 
+    // 4) Projeye atanmış müşteri rolü kullanıcıları (proje müşterisi = rapor
+    //    tüketici, ör. tesis sahibi tarafındaki temsilci).
+    let musteriList: { id: string }[] = []
+    if (lokasyonProjeId) {
+      const { data: aktifMusteri } = await admin
+        .from('users').select('id')
+        .eq('firma_id', p.firmaId)
+        .eq('proje_id', lokasyonProjeId)
+        .eq('rol', 'musteri')
+        .eq('aktif', true)
+      musteriList = (aktifMusteri ?? []) as any
+    }
+
     const aliciIds = Array.from(new Set([
       ...(taList ?? []).map((u: any) => u.id),
       ...uList.map(u => u.id),
+      ...musteriList.map(u => u.id),
     ]))
     if (!aliciIds.length) return
 
