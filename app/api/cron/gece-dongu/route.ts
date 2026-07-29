@@ -18,8 +18,11 @@ import { createAdminClient } from '@/lib/supabase/server'
  *   - `v_tr_date = (bugün TRT + 1 gün)` mantığı "vardiya başlamadan hemen önce
  *     üretim" kurgusuna dayanır. Cron 23:30–23:59 TRT'de çalışırsa hedef gün
  *     yarın (00:00'da başlayacak V1 vardiyaları için ~1–30 dk önceden üretim).
- *   - gun_sonu_arsivle() `vardiya_gunu < BUGUN` guard'ı taşır — sarkan V3
- *     bitişleri veya Çanakkale V3 (00:00 bitişi) gece cron'unda ARŞİVLENMEZ.
+ *   - gun_sonu_arsivle() firma/proje `arsiv_frekansiyel_saat` ayarına göre
+ *     çalışır (default 24h). Sadece `durum_degisim_tarihi < now - N saat`
+ *     olan terminal durum görevler arşivlenir — bugün tamamlananlar 24 saat
+ *     dolmadan asla arşive gitmez (V3 23:30 bitişi veya Çanakkale V3 00:00
+ *     bitişi dahil).
  *
  * Güvenlik: CRON_SECRET env değişkeni ile korunur.
  */
