@@ -4,8 +4,17 @@ import { createAdminClient } from '@/lib/supabase/server'
 /**
  * GET /api/cron/gece-dongu
  *
- * Vercel Cron veya harici scheduler tarafından her gece 00:01 TRT (21:01 UTC) çağrılır.
- * Supabase pg_cron ile de çalışıyor, bu route yedek/alternatif olarak durur.
+ * Supabase pg_cron `qrsync-gece-dongu` her gece **00:30 TRT (21:30 UTC)**
+ * çağırır (SELECT gece_tam_dongu()). Bu route yedek/manuel tetik yolu.
+ *
+ * Zaman seçimi kritik:
+ *   - Vardiya bitiş anlarından SONRA olmalı (Çanakkale V3 16:00-00:00 gibi
+ *     00:00'da biten vardiyalar dahil). Aksi halde gun_sonu_arsivle()
+ *     vardiya devam ederken bugünkü tamamlananları arşive taşır, UI kartı
+ *     eksik sayım gösterir.
+ *   - gun_sonu_arsivle() ayrıca `vardiya_gunu < BUGUN` guard'ı taşır
+ *     (migration: gun_sonu_arsivle_vardiya_gunu_guard) — cron zamanı ne
+ *     olursa olsun bugünün görevleri arşivlenmez.
  *
  * Güvenlik: CRON_SECRET env değişkeni ile korunur.
  */
