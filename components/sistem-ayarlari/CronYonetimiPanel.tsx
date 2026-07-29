@@ -8,8 +8,26 @@ import { Play, RefreshCw, Clock } from 'lucide-react'
 
 type CronTipi = 'personel_destek' | 'max_sure' | 'arsivleme' | 'simulasyon' | 'sistem_kontrol' | 'rapor_gonder' | 'gece_dongu' | 'yedekleme'
 
-const CRONLAR: { tip: CronTipi; ad: string; aciklama: string; periyot: string; tehlike?: boolean }[] = [
-  { tip: 'gece_dongu',      ad: 'Gece Tam Döngü',         aciklama: 'Durum geçişleri (HAZIR→ACIK→BEKLEMEDE→ZAMANI_GECMIS) + arşivleme + yarınki vardiya günü görev üretimi (V1 sarkan dahil).', periyot: 'Her gece 23:30 TRT', tehlike: true },
+type CronKarti = {
+  tip: CronTipi
+  ad: string
+  aciklama: string
+  periyot: string
+  tehlike?: boolean
+  projeId?: string  // gece_dongu için proje-bazlı tetikleme
+}
+
+// Proje-bazlı gece cron kurulumu (pg_cron zamanları ile senkron):
+//   qrsync-gece-dongu-renault:   20:30 UTC = 23:30 TRT
+//   qrsync-gece-dongu-canakkale: 20:59 UTC = 23:59 TRT
+const PROJE_ID = {
+  RENAULT:   'bd9dfb20-16aa-4038-9542-83abb167e6ee',
+  CANAKKALE: 'c80e60d3-87fd-4d74-846b-054ab8f9ed37',
+}
+
+const CRONLAR: CronKarti[] = [
+  { tip: 'gece_dongu',      ad: 'Gece Tam Döngü — Oyak Renault',  aciklama: 'Renault projesi için durum geçişleri + arşivleme + yarınki vardiya günü görev üretimi (V1 23:30 başlangıç öncesi).', periyot: 'Her gece 23:30 TRT', tehlike: true, projeId: PROJE_ID.RENAULT },
+  { tip: 'gece_dongu',      ad: 'Gece Tam Döngü — Çanakkale',      aciklama: 'Çanakkale projesi için durum geçişleri + arşivleme + yarınki vardiya günü görev üretimi (V1 00:00 başlangıç öncesi).', periyot: 'Her gece 23:59 TRT', tehlike: true, projeId: PROJE_ID.CANAKKALE },
   { tip: 'yedekleme',       ad: 'Veri Yedekleme',          aciklama: 'Kritik tabloları JSON+gzip olarak Supabase Storage\'a yedekler (26 tablo). 90 günden eski yedekler otomatik silinir.', periyot: 'Her gece 00:30 TRT' },
   { tip: 'personel_destek', ad: 'Personel Görev Desteği', aciklama: 'Vardiya bitiminde BEKLEMEDE görevleri ZAMANINDA_YAPILAMAYAN olarak destek personeline yazar (hedef oran %).', periyot: '00:00, 08:00, 16:00 TRT' },
   { tip: 'max_sure',        ad: 'Max Süre Kontrol',        aciklama: 'ISLEMDE durumdaki görevleri max_sure_dakika dolduğunda otomatik tamamlar; ek olarak 10 dk kala uyarı bildirimi gönderir.', periyot: 'Her 5 dakika' },
@@ -44,7 +62,8 @@ export default function CronYonetimiPanel() {
   async function yukleLoglar() {
     setYukleniyor(true)
     try {
-      const tipler = CRONLAR.map(c => c.tip).filter(t => t !== 'gece_dongu')  // gece_dongu cron_log'a yazmıyor
+      // gece_dongu proje-bazlı iki kartta tekrarlanır + cron_log ayrımı yok — bu kart log göstermez
+      const tipler = Array.from(new Set(CRONLAR.map(c => c.tip))).filter(t => t !== 'gece_dongu')
       const map: Record<string, SonLog> = {}
       for (const tip of tipler) {
         const { data } = await supabase
@@ -62,7 +81,7 @@ export default function CronYonetimiPanel() {
 
   useEffect(() => { yukleLoglar() }, [])
 
-  async function tetikle(tip: CronTipi, ad: string, tehlike?: boolean) {
+  async function tetikle(tip: CronTipi, ad: string, tehlike?: boolean, projeId?: string) {
     if (tehlike) {
       const ok = await confirm({
         title: '⚠️ Kritik Cron',
@@ -78,7 +97,7 @@ export default function CronYonetimiPanel() {
       const res = await fetch('/api/admin/cron-tetikle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tip }),
+        body: JSON.stringify({ tip, proje_id: projeId ?? null }),
       })
       const json = await res.json()
       if (!res.ok || !json.ok) {
@@ -116,8 +135,9 @@ export default function CronYonetimiPanel() {
           const log = sonLoglar[c.tip]
           const sonZaman = log ? formatGecen(log.tarih) : null
           const isLoading = tetikleniyor === c.tip
+          const kartKey = `${c.tip}-${c.projeId ?? 'all'}`
           return (
-            <div key={c.tip} style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 18px', display: 'grid', gridTemplateColumns: '1fr auto', gap: 14, alignItems: 'center' }}>
+            <div key={kartKey} style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 18px', display: 'grid', gridTemplateColumns: '1fr auto', gap: 14, alignItems: 'center' }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: T.text }}>{c.ad}</span>
@@ -132,12 +152,12 @@ export default function CronYonetimiPanel() {
                   {sonZaman ? (
                     <span>Son çalışma: <strong style={{ color: T.text }}>{sonZaman}</strong> {log && <span>· {ozetMetni(c.tip, log.sonuc)}</span>}</span>
                   ) : (
-                    <span style={{ fontStyle: 'italic' }}>{c.tip === 'gece_dongu' ? 'Pg_cron tarafından çalıştırılır, cron_log\'a yazmaz' : 'Son çalışma kaydı yok'}</span>
+                    <span style={{ fontStyle: 'italic' }}>{c.tip === 'gece_dongu' ? 'Pg_cron ile otomatik — manuel tetiklemeler cron_log\'a yazar' : 'Son çalışma kaydı yok'}</span>
                   )}
                 </div>
               </div>
               <button
-                onClick={() => tetikle(c.tip, c.ad, c.tehlike)}
+                onClick={() => tetikle(c.tip, c.ad, c.tehlike, c.projeId)}
                 disabled={isLoading}
                 style={{
                   padding: '8px 16px', borderRadius: 8, border: 'none',

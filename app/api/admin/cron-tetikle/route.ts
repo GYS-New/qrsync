@@ -44,23 +44,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Geçersiz JSON' }, { status: 400 })
   }
   const tip = body?.tip as string | undefined
+  const projeId = (body?.proje_id ?? null) as string | null
   if (!tip) return NextResponse.json({ ok: false, error: 'tip gerekli' }, { status: 400 })
 
-  // gece_dongu özel — pg_cron RPC ile çağrılır
+  // gece_dongu özel — pg_cron RPC ile çağrılır (proje bazlı)
   if (tip === 'gece_dongu') {
     const admin = createAdminClient()
-    const { data, error } = await admin.rpc('gece_tam_dongu')
+    const { data, error } = await admin.rpc('gece_tam_dongu', { p_proje_id: projeId })
     if (error) {
       await auditLog({
         tip: 'cron_manuel_tetik', tablo: 'cron_log', basarili: false,
         hata_mesaji: error.message, kullanici_id: user.id,
-        detay: { cron_tipi: tip },
+        detay: { cron_tipi: tip, proje_id: projeId },
       })
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
     }
     await auditLog({
       tip: 'cron_manuel_tetik', tablo: 'cron_log',
-      kullanici_id: user.id, detay: { cron_tipi: tip, sonuc: data },
+      kullanici_id: user.id, detay: { cron_tipi: tip, proje_id: projeId, sonuc: data },
     })
     return NextResponse.json({ ok: true, sonuc: data })
   }

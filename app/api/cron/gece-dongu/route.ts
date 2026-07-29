@@ -4,17 +4,22 @@ import { createAdminClient } from '@/lib/supabase/server'
 /**
  * GET /api/cron/gece-dongu
  *
- * Supabase pg_cron `qrsync-gece-dongu` her gece **00:30 TRT (21:30 UTC)**
- * çağırır (SELECT gece_tam_dongu()). Bu route yedek/manuel tetik yolu.
+ * Supabase pg_cron her aktif proje için AYRI job çalıştırır:
+ *   - qrsync-gece-dongu-renault:  20:30 UTC = 23:30 TRT (Renault V1 baş = 23:30)
+ *   - qrsync-gece-dongu-canakkale: 20:59 UTC = 23:59 TRT (Çanakkale V1 baş = 00:00)
+ *
+ * gece_tam_dongu(p_proje_id UUID DEFAULT NULL) proje-bazlı çalışır.
+ * NULL → tüm projeler (backward-compat, manuel toplu tetik için).
+ *
+ * Bu route yedek/manuel tetik yolu. `?proje_id=<uuid>` parametresi ile
+ * spesifik proje tetiklenir. Parametresiz çağrı tüm projelere uygulanır.
  *
  * Zaman seçimi kritik:
- *   - Vardiya bitiş anlarından SONRA olmalı (Çanakkale V3 16:00-00:00 gibi
- *     00:00'da biten vardiyalar dahil). Aksi halde gun_sonu_arsivle()
- *     vardiya devam ederken bugünkü tamamlananları arşive taşır, UI kartı
- *     eksik sayım gösterir.
- *   - gun_sonu_arsivle() ayrıca `vardiya_gunu < BUGUN` guard'ı taşır
- *     (migration: gun_sonu_arsivle_vardiya_gunu_guard) — cron zamanı ne
- *     olursa olsun bugünün görevleri arşivlenmez.
+ *   - `v_tr_date = (bugün TRT + 1 gün)` mantığı "vardiya başlamadan hemen önce
+ *     üretim" kurgusuna dayanır. Cron 23:30–23:59 TRT'de çalışırsa hedef gün
+ *     yarın (00:00'da başlayacak V1 vardiyaları için ~1–30 dk önceden üretim).
+ *   - gun_sonu_arsivle() `vardiya_gunu < BUGUN` guard'ı taşır — sarkan V3
+ *     bitişleri veya Çanakkale V3 (00:00 bitişi) gece cron'unda ARŞİVLENMEZ.
  *
  * Güvenlik: CRON_SECRET env değişkeni ile korunur.
  */
@@ -27,15 +32,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 
+  const projeId = url.searchParams.get('proje_id') || null
+
   try {
     const admin = createAdminClient()
 
-    // Supabase RPC: gece_tam_dongu() → durum geçişleri + arşivle + üret
-    const { data, error } = await admin.rpc('gece_tam_dongu')
+    const { data, error } = await admin.rpc('gece_tam_dongu', { p_proje_id: projeId })
     if (error) throw new Error(error.message)
 
-    console.log('[cron/gece-dongu]', JSON.stringify(data))
-    // Cron log kaydet
+    console.log('[cron/gece-dongu]', projeId ?? 'ALL', JSON.stringify(data))
     await admin.from('cron_log').insert({ tip: 'gece_dongu', sonuc: data })
     return NextResponse.json({ ok: true, sonuc: data })
   } catch (err: any) {
