@@ -36,14 +36,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401, headers: CORS })
   }
 
+  // Proje filtresi: ?proje_id=<uuid> veya body.proje_id — NULL = tum projeler
+  const url = new URL(req.url)
+  let projeIdFiltre: string | null = url.searchParams.get('proje_id')
+  if (!projeIdFiltre) {
+    try {
+      const body = await req.clone().json()
+      projeIdFiltre = body?.proje_id ?? null
+    } catch { /* body yoksa null */ }
+  }
+
   const admin = createAdminClient()
   const sonuclar: any[] = []
 
   try {
-    const { data: ayarlar } = await admin
+    let q = admin
       .from('personel_gorev_destegi')
       .select('*')
       .eq('aktif', true)
+    if (projeIdFiltre) q = q.eq('proje_id', projeIdFiltre)
+    const { data: ayarlar } = await q
 
     if (!ayarlar || ayarlar.length === 0) {
       return NextResponse.json({ ok: true, mesaj: 'Aktif destek yok', sonuclar: [] }, { headers: CORS })

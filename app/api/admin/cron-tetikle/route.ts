@@ -81,8 +81,13 @@ export async function POST(req: NextRequest) {
   const protocol = req.headers.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
   const baseUrl = `${protocol}://${host}`
 
+  // personel_destek proje-bazli olabilir — query string ile ilet
+  const yolIle = tip === 'personel_destek' && projeId
+    ? `${config.yol}?proje_id=${encodeURIComponent(projeId)}`
+    : config.yol
+
   try {
-    const res = await fetch(`${baseUrl}${config.yol}`, {
+    const res = await fetch(`${baseUrl}${yolIle}`, {
       method: config.method,
       headers: { 'x-cron-token': cronToken, 'Content-Type': 'application/json' },
     })
