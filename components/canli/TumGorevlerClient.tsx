@@ -86,6 +86,15 @@ function getIslemiYapan(g: any, ctx?: { meId?: string; meName?: string; kullanic
   }
   const byId = lookup(g.islemi_yapan_id)
   if (byId) return byId
+  // islemi_yapan_id NULL + otomatik cron durumu → "Sistem" (PD cron hariç:
+  // o WEB kanal + personel id yazar; islemi_yapan doludur, üstteki bloktan cıkar).
+  if ((g.durum === 'BEKLEMEDE' || g.durum === 'ZAMANI_GECMIS') && !g.son_tamamlama_kanali) {
+    return 'Sistem'
+  }
+  // Max-sure cron oto-iptali: IPTAL + iptal_eden_id NULL + sebep sistem-tipik
+  if (g.durum === 'IPTAL' && !g.iptal_eden_id && g.iptal_sebep === 'Görev Zaman Aşımı') {
+    return 'Sistem'
+  }
   if (['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'].includes(g.durum)) {
     return g.tamamlayan?.isim_soyisim ?? lookup(g.tamamlayan_kullanici_id) ?? '—'
   }

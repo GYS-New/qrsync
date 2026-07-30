@@ -53,6 +53,9 @@ async function otomatikIptal(
       ek: {
         iptal_tarihi: now.toISOString(),
         iptal_eden_id: null,
+        // Cron isleminin gercek kullaniciya bagli olmadigini isaretle;
+        // UI islemi_yapan_id NULL -> "Sistem" gosterir. PD hariç tüm cron'lar için standart.
+        islemi_yapan_id: null,
         tamamlanma_suresi_saniye: elapsedSec,
       },
     })

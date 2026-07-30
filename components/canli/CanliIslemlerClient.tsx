@@ -1086,6 +1086,17 @@ useEffect(() => {
         const u = kullanicilar.find(k => k.id === g.islemi_yapan_id)
         if (u) return u.isim_soyisim
       }
+      // islemi_yapan_id NULL + otomatik cron durumu (BEKLEMEDE, ZAMANI_GECMIS) →
+      // durum degisikligi cron tarafindan yapildi (gun_ici_durum_guncelle,
+      // gece_tam_dongu). Kullaniciya "Sistem" olarak goster.
+      // PD cron hariç — o son_tamamlama_kanali='WEB' ile personel id atar.
+      if ((g.durum === 'BEKLEMEDE' || g.durum === 'ZAMANI_GECMIS') && !g.son_tamamlama_kanali) {
+        return 'Sistem'
+      }
+      // IPTAL + iptal_eden_id NULL → max-sure cron oto-iptali → "Sistem"
+      if (g.durum === 'IPTAL' && !g.iptal_eden_id && g.iptal_sebep === 'Görev Zaman Aşımı') {
+        return 'Sistem'
+      }
       if (g.tamamlayan?.isim_soyisim) return g.tamamlayan.isim_soyisim
       if (g.tamamlayan_kullanici_id) {
         if (g.tamamlayan_kullanici_id === meId && meName) return meName
