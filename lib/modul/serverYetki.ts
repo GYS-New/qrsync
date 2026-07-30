@@ -27,14 +27,22 @@ export async function assertModulYetkisi(modul: ModulKodu) {
 
   const isSA = me.rol === 'super_admin' || me.rol === 'alt_super_admin'
   if (isSA) {
-    // SA için modül flag kontrolü dahi yapılmıyor — admin tarafında her şey görünür
     return { authUser, me }
   }
 
   const yetkili = await getYetkiliModuller(me.rol, me.firma_id ?? null, me.id)
   const secilen = yetkili.moduller.find(m => m.kod === modul)
   if (!secilen || !secilen.aktif || !secilen.yetkili) {
-    redirect('/modul-sec')
+    // LOOP-KIRICI: force=1 ile /modul-sec'e gönder. Bu sayede /modul-sec tek-modul
+    // otomasyonu atlanır, kullanıcı seçim ekranını görür — /X → /modul-sec → /X
+    // sonsuz döngüsü asla oluşamaz. hata param'ı UI'da uyarı göstermek için.
+    // Debug: Railway loglarında root cause tespit edilebilir.
+    console.warn('[assertModulYetkisi] FAIL', {
+      user_id: me.id, email: (me as any).email, rol: me.rol, firma_id: me.firma_id,
+      istenen_modul: modul,
+      yetkili_moduller: yetkili.moduller.map(m => ({ kod: m.kod, aktif: m.aktif, yetkili: m.yetkili })),
+    })
+    redirect(`/modul-sec?force=1&hata=yetki_yok&modul=${encodeURIComponent(modul)}`)
   }
 
   return { authUser, me }

@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic'
  * 3. Yetkili modül sayısı 1 ise → direkt o modüle redirect, seçim ekranı atlanır.
  * 4. Çoklu yetkili modül → kart UI gösterilir.
  */
-export default async function ModulSecPage({ searchParams }: { searchParams: { force?: string } }) {
+export default async function ModulSecPage({ searchParams }: { searchParams: { force?: string; hata?: string; modul?: string } }) {
   const supabase = createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) redirect('/login')
@@ -33,7 +33,14 @@ export default async function ModulSecPage({ searchParams }: { searchParams: { f
   // ?force=1 → cookie'yi görmezden gel (server component'ten cookie SİLİNEMEZ;
   // bu sınır Next.js 14'ün kuralı. Bunun yerine cookie'yi okumayı atla; kullanıcı
   // yeni bir modül seçince POST /api/modul/sec cookie'yi üzerine yazar.)
-  const force = searchParams.force === '1'
+  //
+  // Ek olarak: ?hata parametresi geldiyse (assertModulYetkisi'den geliyorsa)
+  // force otomatik true olur — loop kırıcı. Modül sayfası hata gösterip
+  // seçim ekranını render eder.
+  const force = searchParams.force === '1' || Boolean(searchParams.hata)
+  const hataMesaji = searchParams.hata === 'yetki_yok' && searchParams.modul
+    ? `"${searchParams.modul.toUpperCase()}" modülüne yetkiniz kısıtlı görünüyor. Farklı bir modül seçin veya yöneticinize başvurun.`
+    : null
 
   const yetkili = await getYetkiliModuller(me.rol, me.firma_id ?? null, me.id)
   const aktifYetkili = yetkili.moduller.filter(m => m.aktif)
@@ -64,9 +71,10 @@ export default async function ModulSecPage({ searchParams }: { searchParams: { f
     return <ErisimYokEkran isim={me.isim_soyisim ?? null} email={authUser.email ?? null} />
   }
 
-  // 4. Çoklu modül → seçim ekranı
+  // 4. Çoklu modül → seçim ekranı (veya loop-kırıcı hata durumu)
   return <ModulSecClient
     moduller={yetkili.moduller}
     kullaniciAdi={me.isim_soyisim ?? ''}
+    hataMesaji={hataMesaji}
   />
 }

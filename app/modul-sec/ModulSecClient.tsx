@@ -9,6 +9,7 @@ import type { ModulBilgisi, ModulKodu } from '@/lib/modul/yetkiliModuller'
 interface Props {
   moduller: ModulBilgisi[]
   kullaniciAdi: string
+  hataMesaji?: string | null  // server tarafından iletilen loop-kırıcı hata mesajı
 }
 
 const IKON_MAP: Record<string, any> = {
@@ -37,11 +38,11 @@ const MODUL_ETIKET: Record<ModulKodu, string> = {
   fms:        'Tesis & bakım yönetimi',
 }
 
-export default function ModulSecClient({ moduller, kullaniciAdi }: Props) {
+export default function ModulSecClient({ moduller, kullaniciAdi, hataMesaji }: Props) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState<ModulKodu | null>(null)
-  const [hata, setHata] = useState('')
+  const [hata, setHata] = useState(hataMesaji ?? '')
   const [appLogo, setAppLogo] = useState<string | null | undefined>(undefined)
   const [appName, setAppName] = useState('iO-GYS')
 
