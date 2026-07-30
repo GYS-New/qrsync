@@ -499,8 +499,43 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
   for (const f of firmalar as any[]) {
     const firmaAdi = f.firma_adi ?? f.ticari_unvan ?? 'Firma'
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // ÖNCE cron audit log'undan bilgi al — beklenen sayı için tek doğru kaynak.
+    // ---------------------------------------------------------------------
+    // Neden: kural_duraklatmalari tablosu bir sonraki cron döngüsünde
+    // temizleniyor (DELETE WHERE tarih < p_tarih), sistem-kontrol saat başı
+    // çalıştığında bugünün duraklatmalarını tabloda göremiyor → beklenen'i
+    // olduğundan yüksek hesaplıyor → yanlış "üretim eksik" uyarısı.
+    //
+    // Cron audit log'unda ise `duraklatilan` sayısı kalıcı. `uretilen +
+    // atlanan + duraklatilan` = cron'un bugün işlediği toplam kural. Gerçek
+    // beklenen = uretilen (cron ne ürettiyse gerçek de o olmalı).
+    // ═══════════════════════════════════════════════════════════════════════
+    const bir_gun_once = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
+    const { data: cronAudit } = await admin
+      .from('audit_log')
+      .select('detay, basarili')
+      .eq('tip', 'cron_gece_dongu')
+      .gte('tarih', bir_gun_once)
+      .order('tarih', { ascending: false })
+      .limit(10)
+    // Bugünün vardiya_gunu için çalışan cron kayıtlarını topla
+    // (proje-bazlı 2 cron olabilir: Renault + Çanakkale)
+    const bugunAudit = (cronAudit ?? []).filter((log: any) =>
+      log.detay?.uretim?.tarih === trDate
+    )
+    let cronToplamUretilen = 0
+    let cronToplamDuraklatilan = 0
+    let cronToplamAtlanan = 0
+    for (const log of bugunAudit) {
+      cronToplamUretilen    += Number(log.detay?.uretim?.uretilen ?? 0)
+      cronToplamDuraklatilan += Number(log.detay?.uretim?.duraklatilan ?? 0)
+      cronToplamAtlanan     += Number(log.detay?.uretim?.atlanan ?? 0)
+    }
+    const cronCalisti = bugunAudit.length > 0
+
     // Bugün için aktif olan, projesi aktif (veya projesiz) kuralları çek
-    // (gece_gorev_uret'in atladığı pasif proje kuralları beklentiden düşülür)
+    // Kural sayısı sadece metrik için — beklenen hesabı cron audit'ten gelecek.
     const { data: kurallar } = await admin
       .from('gorev_kurallari')
       .select(`
@@ -514,7 +549,7 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
       .or(`bitis_tarihi.is.null,bitis_tarihi.gte.${trDate}`)
 
     // Duraklatmalar — bugün için (tanim, ust_lokasyon_id, vardiya_no) tripletleri
-    // gece_gorev_uret bunları atladığı için "beklenen"den de düşülmeli
+    // Cron temizlemiş olabilir; bu yüzden bilgi eksik olabilir. Fallback için tutuluyor.
     const { data: duraklatmalar } = await admin
       .from('kural_duraklatmalari')
       .select('tanim, ust_lokasyon_id, vardiya_no')
@@ -574,8 +609,9 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
       return null
     }
 
-    // Beklenen hesabı: bugünün DOW'unda aktif + projesi aktif + DURAKLATILMAMIŞ
-    let beklenen = 0
+    // ─── Kural bazlı fallback hesaplama (cron audit yoksa devreye girer) ───
+    // Beklenen: bugünün DOW'unda aktif + projesi aktif + DURAKLATILMAMIŞ
+    let fallbackBeklenen = 0
     let aktifKural = 0
     let duraklatildiAdet = 0
     for (const k of (kurallar ?? []) as any[]) {
@@ -584,7 +620,6 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
       const projeAktif = k.lokasyonlar?.proje_id == null || k.lokasyonlar?.projeler?.aktif === true
       if (!projeAktif) continue
 
-      // Duraklatma kontrolü — gece_gorev_uret ile aynı mantık
       const ustLok = k.lokasyon_id ? ustBul(k.lokasyon_id) : null
       const saatStr = String(k.aktif_olma_saati ?? '').slice(0, 5)
       const kuralProjeId: string | null = k.lokasyonlar?.proje_id ?? null
@@ -596,14 +631,24 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
 
       aktifKural++
       if (k.frekans_tipi === 'haftalik') {
-        beklenen += 1   // haftalık kural başına 1 görev (yaklaşım)
+        fallbackBeklenen += 1
       } else {
-        beklenen += k.gunluk_frekans_sayisi ?? 1
+        fallbackBeklenen += k.gunluk_frekans_sayisi ?? 1
       }
     }
 
+    // ─── KESIN BEKLENEN: cron audit önceliği ───
+    // Cron çalıştıysa "uretilen" sayısı gerçek beklenen'dir (duraklatılan zaten
+    // cron tarafından atlandı, hesap dışı). Cron çalışmadıysa fallback devreye girer.
+    const beklenen = cronCalisti ? cronToplamUretilen : fallbackBeklenen
+
     if (beklenen === 0) {
-      metrikler.firmalar.push({ firma_id: f.id, ad: firmaAdi, durum: 'beklenen_uretim_yok' })
+      metrikler.firmalar.push({
+        firma_id: f.id, ad: firmaAdi,
+        durum: cronCalisti ? 'cron_uretim_yapmadi' : 'beklenen_uretim_yok',
+        cron_calisti: cronCalisti,
+        cron_duraklatilan: cronToplamDuraklatilan,
+      })
       continue
     }
 
@@ -627,6 +672,10 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
       ad: firmaAdi,
       aktif_kural: aktifKural,
       duraklatilmis_kural: duraklatildiAdet,
+      cron_calisti: cronCalisti,
+      cron_uretilen: cronToplamUretilen,
+      cron_duraklatilan: cronToplamDuraklatilan,
+      cron_atlanan: cronToplamAtlanan,
       beklenen,
       gercek,
       eksiklik_yuzde: eksiklikYuzde,
@@ -634,9 +683,12 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
 
     if (eksiklikOrani >= EKSIKLIK_ESIGI) {
       const eksik = beklenen - gercek
+      const duraklatmaNotu = cronToplamDuraklatilan > 0
+        ? ` (Cron ayrıca ${cronToplamDuraklatilan} kural bilinçli duraklatılmış olarak atladı.)`
+        : ''
       sorunlar.push({
         kod: 'GOREV_URETIM_EKSIK',
-        mesaj: `${firmaAdi}: bugün için ${gercek}/${beklenen} görev üretilmiş (%${eksiklikYuzde} eksik, ${eksik} kayıp)`,
+        mesaj: `${firmaAdi}: bugün için ${gercek}/${beklenen} görev DB'de mevcut (%${eksiklikYuzde} eksik, ${eksik} kayıp).${duraklatmaNotu}`,
         adet: eksik,
       })
 
@@ -646,7 +698,7 @@ async function kontrolGorevUretimi(admin: any, nowMs: number): Promise<SistemRap
           firmaId: f.id,
           kod: 'GOREV_URETIM_EKSIK',
           baslik: '🚨 Görev Üretimi Eksik',
-          mesaj: `Bugün için ${beklenen} görev beklenirken sadece ${gercek} üretilmiş (%${eksiklikYuzde} eksik). Gece otomatik üretimi tam çalışmamış olabilir. Sistem yöneticisi ile iletişime geçin.`,
+          mesaj: `Bugün cron ${beklenen} görev ürettiğini raporladı ancak DB'de yalnızca ${gercek} kayıt var (%${eksiklikYuzde} eksik). Muhtemelen bir arşivleme/silme sorunu var. Sistem yöneticisi ile iletişime geçin.${duraklatmaNotu}`,
         })
       } catch (e) {
         console.error('[kontrolGorevUretimi] uyarı gönderme hatası:', e)
