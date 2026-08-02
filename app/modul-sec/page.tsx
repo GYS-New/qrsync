@@ -17,6 +17,13 @@ export const dynamic = 'force-dynamic'
  * 2. Cookie'de aktif_modul varsa → o modülün landing URL'ine redirect.
  * 3. Yetkili modül sayısı 1 ise → direkt o modüle redirect, seçim ekranı atlanır.
  * 4. Çoklu yetkili modül → kart UI gösterilir.
+ *
+ * FMS İSTİSNASI: FMS için otomatik yönlendirme (cookie bypass ve tek-modül
+ * otomasyonu) DEVRE DIŞI. FMS-only kullanıcılar bile her login sonrası seçim
+ * ekranını görür ve FMS kartına manuel tıklayarak SSO akışını başlatır.
+ * Neden: cross-domain SSO (fms.iogys.com.tr) cookie zamanlamasına duyarlı;
+ * kullanıcının açık tıklaması redirect zincirinin öngörülebilir bir noktada
+ * başlamasını sağlar (daha önce yaşanan sonsuz loop deneyimi).
  */
 export default async function ModulSecPage({ searchParams }: { searchParams: { force?: string; hata?: string; modul?: string } }) {
   const supabase = createClient()
@@ -46,9 +53,11 @@ export default async function ModulSecPage({ searchParams }: { searchParams: { f
   const aktifYetkili = yetkili.moduller.filter(m => m.aktif)
 
   // 1. Cookie'deki aktif modül hala yetkili+aktif mi? (force=1 ise atlanır)
+  //    FMS için cookie bypass'ı DEVRE DIŞI — her login sonrası seçim ekranı
+  //    zorunlu (cross-domain SSO cookie zamanlaması hassas).
   if (!force) {
     const cookieModul = getAktifModul()
-    if (cookieModul) {
+    if (cookieModul && cookieModul !== 'fms') {
       const cookieGecerli = aktifYetkili.find(m => m.kod === cookieModul)
       if (cookieGecerli) {
         redirect(modulLandingUrl(cookieModul, me.rol))
@@ -60,9 +69,16 @@ export default async function ModulSecPage({ searchParams }: { searchParams: { f
   // server component'ten cookie yazılamaz, production'da hata verir).
   // Kullanıcı her login'de bu redirect'i geçer; cookie sadece çoklu modül
   // seçiminden sonra POST /api/modul/sec ile yazılır.
+  //
+  // FMS İSTİSNASI: FMS-only kullanıcı seçim ekranını görür ve FMS kartına
+  // manuel tıklar. Bu, cross-domain SSO'da öngörülebilir bir başlama noktası
+  // sağlar; sessiz otomasyonun tetiklediği race condition'ları önler.
   if (!force && aktifYetkili.length === 1) {
     const tek = aktifYetkili[0].kod
-    redirect(modulLandingUrl(tek, me.rol))
+    if (tek !== 'fms') {
+      redirect(modulLandingUrl(tek, me.rol))
+    }
+    // FMS → devam et, seçim ekranı render edilir (tek karta manuel tıklama)
   }
 
   // 3. Hiç yetkili modül yoksa — kullanıcının tüm modül erişimleri kapatılmış.
