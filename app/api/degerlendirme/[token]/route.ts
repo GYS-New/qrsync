@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isValidPhoneNumber } from 'libphonenumber-js/min'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getRequestMeta } from '@/lib/device/getRequestMeta'
 import { auditLog } from '@/lib/audit/log'
@@ -102,14 +103,20 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ ok: false, error: 'Geçerli bir değerlendirme puanı seçin (1-5)' }, { status: 400 })
   }
 
-  // GSM opsiyonel — verilirse en az 10 rakam içermeli (uluslararası
-  // format için sadece rakam sayısı; format serbest, mask yok).
+  // GSM opsiyonel — verilirse libphonenumber-js ile format dogrulamasi.
+  // Uluslararasi ('+' ile baslar) veya TR default (05..., 5...). '1234567890',
+  // '0000000000' gibi gecersiz format sekilleri reddedilir. SMS OTP degil.
   let gsmClean: string | null = null
   if (typeof gsm === 'string' && gsm.trim()) {
     const raw = gsm.trim()
-    const digits = raw.replace(/\D/g, '')
-    if (digits.length < 10) {
-      return NextResponse.json({ ok: false, error: 'GSM numarası en az 10 rakam içermeli' }, { status: 400 })
+    let valid = false
+    try {
+      valid = isValidPhoneNumber(raw, 'TR')
+    } catch {
+      valid = false
+    }
+    if (!valid) {
+      return NextResponse.json({ ok: false, error: 'Geçerli bir cep telefonu numarası girin' }, { status: 400 })
     }
     gsmClean = raw.slice(0, 40)  // aşırı uzun payload'a karşı kalkan
   }

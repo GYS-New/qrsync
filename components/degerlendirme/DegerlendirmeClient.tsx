@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { isValidPhoneNumber } from 'libphonenumber-js/min'
 
 type Durum = 'yukleniyor' | 'form' | 'gonderildi' | 'hata'
 type Dil = 'tr' | 'en'
@@ -38,7 +39,7 @@ const I18N = {
     errorTitle: 'Erişim Sağlanamadı',
     ratingRequired: 'Lütfen bir puan seçin',
     photoFailed: 'Görsel yüklenemedi',
-    gsmInvalid: 'GSM numarası en az 10 rakam içermeli',
+    gsmInvalid: 'Geçerli bir cep telefonu numarası girin (örn: 0532 123 45 67 veya +49 176 12345678)',
     // Dusuk puan bilgilendirme popup (yildiz <= 3)
     dusukPuanTitle: 'Değerlendirmeniz İçin Teşekkür Ederiz',
     dusukPuanMsg: 'Şikayetinizi inceleyerek gerekli önlemleri alacağız. Bizlere iletişim bilgilerinizi bırakmanız durumunda geri bildirimde bulunabiliriz.',
@@ -75,7 +76,7 @@ const I18N = {
     errorTitle: 'Access Denied',
     ratingRequired: 'Please select a rating',
     photoFailed: 'Image upload failed',
-    gsmInvalid: 'Phone must contain at least 10 digits',
+    gsmInvalid: 'Please enter a valid phone number (e.g. 0532 123 45 67 or +49 176 12345678)',
     // Low rating popup (stars <= 3)
     dusukPuanTitle: 'Thank You for Your Feedback',
     dusukPuanMsg: 'We will review your concerns and take the necessary actions. If you leave your contact information, we can follow up with you.',
@@ -166,14 +167,20 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
   //   4) gercek POST (submitActual).
   function gonder() {
     if (!yildiz) { alert(L.ratingRequired); return }
-    if (gsm.trim() && gsm.replace(/\D/g, '').length < 10) {
-      alert(L.gsmInvalid); return
+    // Telefon dogrulama — libphonenumber-js ile format kontrolu (SMS OTP degil).
+    // '+' ile basliyorsa uluslararasi parse, degilse TR default.
+    // '1234567890', '0000000000', '5555555555' gibi gecersiz sekiller reddedilir.
+    const gsmT = gsm.trim()
+    if (gsmT) {
+      try {
+        if (!isValidPhoneNumber(gsmT, 'TR')) { alert(L.gsmInvalid); return }
+      } catch { alert(L.gsmInvalid); return }
     }
     if (yildiz <= 3 && !dusukPuanOnayVerdi) {
       setShowDusukPuanPopup(true)
       return
     }
-    if (gsm.trim() && !kvkkOnaylandi) {
+    if (gsmT && !kvkkOnaylandi) {
       setShowKvkkPopup(true)
       return
     }
