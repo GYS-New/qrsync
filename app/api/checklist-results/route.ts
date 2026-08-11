@@ -390,10 +390,24 @@ export async function POST(req: NextRequest) {
       sonucId = yeni.id
     }
 
-    // ── Şablon maddelerini çek (validasyon için) ─────────────────────────
-    const { data: sablonMaddeler } = await admin.from('checklist_sablon_maddeleri')
-      .select('id,zorunlu_cevap,gorsel_gerekli')
-      .in('id', maddeler.map(m => m.madde_id))
+    // ── Şablon maddelerini çek + mevcut kayitlar (validasyon icin) ────────
+    // Not: mevcut sonuc_maddeleri validation ONCESI cekiliyor — 'gorsel_gerekli'
+    // kontrolunde mevcut kayittaki gorseli de sayabilmek icin (edit senaryosu).
+    const [sablonRes, mevcutRes] = await Promise.all([
+      admin.from('checklist_sablon_maddeleri')
+        .select('id,baslik,zorunlu_cevap,gorsel_gerekli')
+        .in('id', maddeler.map(m => m.madde_id)),
+      admin.from('checklist_sonuc_maddeleri')
+        .select('madde_id,gorsel_url').eq('sonuc_id', sonucId),
+    ])
+    const sablonMaddeler = sablonRes.data
+    const mevcutCevaplar = mevcutRes.data
+
+    // Mevcut kayitlardaki gorseller (edit senaryosunda korunur)
+    const gorselMap = new Map<string, string | null>()
+    for (const mc of mevcutCevaplar ?? []) {
+      if (mc.gorsel_url) gorselMap.set(mc.madde_id, mc.gorsel_url)
+    }
 
     if (sablonMaddeler) {
       const cevapMap = new Map(maddeler.map(m => [m.madde_id, m]))
@@ -403,15 +417,18 @@ export async function POST(req: NextRequest) {
         if (sm.zorunlu_cevap !== false && !dolu) {
           return NextResponse.json({ error: 'Zorunlu alanlar eksik', validation: true }, { status: 422 })
         }
+        // Gorsel zorunlu ise: client'tan gelen VEYA mevcut kayittaki URL olmali
+        if (sm.gorsel_gerekli === true) {
+          const gorselUrl = cevap?.gorsel_url || gorselMap.get(sm.id)
+          if (!gorselUrl) {
+            return NextResponse.json({
+              error: `Zorunlu fotoğraf yüklenmemiş: "${sm.baslik}"`,
+              validation: true,
+              madde_id: sm.id,
+            }, { status: 422 })
+          }
+        }
       }
-    }
-
-    // ── Mevcut gorsel_url'leri koru, diğerlerini sil ─────────────────────
-    const { data: mevcutCevaplar } = await admin.from('checklist_sonuc_maddeleri')
-      .select('madde_id,gorsel_url').eq('sonuc_id', sonucId)
-    const gorselMap = new Map<string, string | null>()
-    for (const mc of mevcutCevaplar ?? []) {
-      if (mc.gorsel_url) gorselMap.set(mc.madde_id, mc.gorsel_url)
     }
 
     await admin.from('checklist_sonuc_maddeleri').delete().eq('sonuc_id', sonucId)
