@@ -114,38 +114,76 @@ export async function POST(req: Request) {
       webCeklistAktif = p != null ? !!p : (f != null ? !!f : true)
     }
 
-    // ── Çeklist sonuçlarını kaydet ───────────────────────────────────────────
-    if (webCeklistAktif && sablon_id && maddeler?.length) {
-      const payload: any = {
-        lokasyon_id,
-        sablon_id,
-        template_version: template_version ?? 1,
-        kanal,
-        kullanici_id: me.id,
-      }
-      if (kaynak === 'gorevler')        payload.gorev_id        = gorev_id
-      else                               payload.canli_gorev_id  = gorev_id
+    // ── Çeklist sonuçlarını kaydet + ZORUNLU ALAN + GÖRSEL VALIDASYON ────────
+    // Bu blok atlanirsa gorev cheklist kaydetmeden TAMAMLANDI olur —
+    // 'webCeklistAktif && sablon_id' varsa cheklist zorunludur; maddeler bos
+    // gonderilse bile sablonun zorunlu maddeleri validate edilir.
+    if (webCeklistAktif && sablon_id) {
+      // Sablonun maddelerini cek (validation icin — cevap eksikse hata)
+      const { data: sablonMaddeler } = await admin
+        .from('checklist_sablon_maddeleri')
+        .select('id,baslik,zorunlu_cevap,gorsel_gerekli')
+        .eq('sablon_id', sablon_id)
+        .order('sira_no', { ascending: true })
 
-      const { data: sonucRow, error: sonucErr } = await admin
-        .from('checklist_sonuc_basliklari').insert(payload).select('id').single()
-      if (sonucErr || !sonucRow) {
-        console.error('[scan/tamamla] checklist sonuc insert error:', sonucErr)
-        return NextResponse.json({ ok: false, error: 'Çeklist başlığı oluşturulamadı: ' + (sonucErr?.message ?? '') }, { status: 500 })
-      } else {
-        const itemPayload = maddeler.map((m: any) => ({
+      if (sablonMaddeler && sablonMaddeler.length > 0) {
+        const cevapMap = new Map(
+          (maddeler ?? []).map((m: any) => [m.madde_id, m]),
+        )
+        for (const sm of sablonMaddeler) {
+          const cevap: any = cevapMap.get(sm.id)
+          const dolu = !!(cevap?.secenek_degeri || cevap?.aciklama)
+          if (sm.zorunlu_cevap !== false && !dolu) {
+            return NextResponse.json({
+              ok: false,
+              error: `Zorunlu alan eksik: "${sm.baslik}"`,
+              validation: true,
+              madde_id: sm.id,
+            }, { status: 422 })
+          }
+          if (sm.gorsel_gerekli === true && !cevap?.gorsel_url) {
+            return NextResponse.json({
+              ok: false,
+              error: `Zorunlu fotoğraf eksik: "${sm.baslik}"`,
+              validation: true,
+              madde_id: sm.id,
+            }, { status: 422 })
+          }
+        }
+
+        // Validation gecti — cheklist sonuclarini kaydet
+        const payload: any = {
+          lokasyon_id,
+          sablon_id,
+          template_version: template_version ?? 1,
+          kanal,
+          kullanici_id: me.id,
+        }
+        if (kaynak === 'gorevler')        payload.gorev_id        = gorev_id
+        else                               payload.canli_gorev_id  = gorev_id
+
+        const { data: sonucRow, error: sonucErr } = await admin
+          .from('checklist_sonuc_basliklari').insert(payload).select('id').single()
+        if (sonucErr || !sonucRow) {
+          console.error('[scan/tamamla] checklist sonuc insert error:', sonucErr)
+          return NextResponse.json({ ok: false, error: 'Çeklist başlığı oluşturulamadı: ' + (sonucErr?.message ?? '') }, { status: 500 })
+        }
+
+        const itemPayload = (maddeler ?? []).map((m: any) => ({
           sonuc_id:       sonucRow.id,
           madde_id:       m.madde_id,
           secenek_degeri: m.secenek_degeri || null,
           aciklama:       m.aciklama?.trim() || null,
           gorsel_url:     m.gorsel_url || null,
         }))
-        const { error: itemErr } = await admin.from('checklist_sonuc_maddeleri').insert(itemPayload)
-        if (itemErr) {
-          // ROLLBACK: madde insert fail olursa başlık da silinmeli — yetim/maddesiz başlık
-          // birikmesini engeller (gorev-tamamla ve SIM ile aynı pattern)
-          console.error('[scan/tamamla] madde insert error, başlık rollback:', itemErr)
-          await admin.from('checklist_sonuc_basliklari').delete().eq('id', sonucRow.id)
-          return NextResponse.json({ ok: false, error: 'Çeklist maddeleri kaydedilemedi: ' + itemErr.message }, { status: 500 })
+        if (itemPayload.length > 0) {
+          const { error: itemErr } = await admin.from('checklist_sonuc_maddeleri').insert(itemPayload)
+          if (itemErr) {
+            // ROLLBACK: madde insert fail olursa başlık da silinmeli
+            console.error('[scan/tamamla] madde insert error, başlık rollback:', itemErr)
+            await admin.from('checklist_sonuc_basliklari').delete().eq('id', sonucRow.id)
+            return NextResponse.json({ ok: false, error: 'Çeklist maddeleri kaydedilemedi: ' + itemErr.message }, { status: 500 })
+          }
         }
       }
     }
