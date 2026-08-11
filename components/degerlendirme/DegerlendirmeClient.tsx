@@ -187,10 +187,15 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
     submitActual()
   }
 
-  async function submitActual() {
+  // kvkkOverride: React state closure bug'i icin. setKvkkOnaylandi(true) sonrasi
+  // setTimeout ile submitActual cagrildiginda `kvkkOnaylandi` state hala false
+  // gorunuyor (closure eski render'in state'ini yakaladi). Kullaninci Popup B'de
+  // 'Kabul' verdiyse kvkkKabulEt() submitActual(true) cagirir — explicit override.
+  async function submitActual(kvkkOverride?: boolean) {
     setGonderiyor(true)
     try {
       const gsmT = gsm.trim()
+      const kvkkEffective = kvkkOverride ?? kvkkOnaylandi
       const res = await fetch(`/api/degerlendirme/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,7 +206,7 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
           gsm: gsmT || null,
           gorsel_url: gorselUrl,
           // KVKK onay: telefon paylasildi VE kullanici Popup B'de 'Kabul' verdi
-          kvkk_onay: gsmT ? kvkkOnaylandi : false,
+          kvkk_onay: gsmT ? kvkkEffective : false,
         }),
       })
       const json = await res.json()
@@ -239,10 +244,12 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
   }
 
   // Popup B "Kabul Ediyorum" -> KVKK onay + popup kapa + gonder
+  // NOT: submitActual(true) explicit -- setKvkkOnaylandi(true) async oldugu icin
+  // closure bug: submitActual icindeki `kvkkOnaylandi` hala eski (false) olur.
   function kvkkKabulEt() {
     setKvkkOnaylandi(true)
     setShowKvkkPopup(false)
-    setTimeout(() => submitActual(), 0)
+    setTimeout(() => submitActual(true), 0)
   }
 
   // Popup B "Vazgec" -> popup kapa (form acik kalir)
