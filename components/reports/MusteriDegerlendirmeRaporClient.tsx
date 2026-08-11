@@ -746,9 +746,9 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                       </td>
                       <td style={{ fontWeight: 600, color: '#111827' }}>{k.lokasyon_tanim}</td>
                       <td><YildizRow yildiz={k.yildiz} /></td>
-                      <td style={{ maxWidth: 280, color: '#334155' }}>
+                      <td style={{ maxWidth: 360, color: '#334155' }}>
                         {k.yorum ? (
-                          <span title={k.yorum} style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
+                          <span title={k.yorum} style={{ display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden', whiteSpace: 'pre-wrap' }}>
                             {k.yorum}
                           </span>
                         ) : <span style={{ color: '#cbd5e1' }}>—</span>}

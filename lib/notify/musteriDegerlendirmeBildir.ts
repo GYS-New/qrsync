@@ -134,7 +134,10 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
     const title = dusuk
       ? `⚠️ Düşük Puan (${p.yildiz}/5)`
       : `Yeni Değerlendirme (${p.yildiz}/5)`
-    const yorumKisa = p.yorum ? (p.yorum.length > 80 ? p.yorum.slice(0, 77) + '...' : p.yorum) : ''
+    // Bildirim mesaj limiti: 300 karakter. FCM push body limiti (Android ~500,
+    // iOS ~200 alert body ama collapsed subtitle uzunca destekler). Web toast'ta
+    // uzun mesaj olabilir. Kullanici geri bildirim: 80 cok kisa idi.
+    const yorumKisa = p.yorum ? (p.yorum.length > 300 ? p.yorum.slice(0, 297) + '...' : p.yorum) : ''
     const body = `${lokYol} • ${yildizStr}${yorumKisa ? ` — "${yorumKisa}"` : ''}`
     const channel = dusuk ? 'gorev_uyari' : 'default'
 
