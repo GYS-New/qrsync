@@ -39,6 +39,16 @@ const I18N = {
     ratingRequired: 'Lütfen bir puan seçin',
     photoFailed: 'Görsel yüklenemedi',
     gsmInvalid: 'GSM numarası en az 10 rakam içermeli',
+    // Dusuk puan bilgilendirme popup (yildiz <= 3)
+    dusukPuanTitle: 'Değerlendirmeniz İçin Teşekkür Ederiz',
+    dusukPuanMsg: 'Şikayetinizi inceleyerek gerekli önlemleri alacağız. Bizlere iletişim bilgilerinizi bırakmanız durumunda geri bildirimde bulunabiliriz.',
+    dusukPuanSend: 'Gönder',
+    dusukPuanBack: 'Geri Dönüş İstiyorum',
+    // KVKK onay popup (telefon paylasildiginda)
+    kvkkTitle: 'KVKK Gizlilik Onayı',
+    kvkkMsg: 'Paylaştığınız cep telefonu numarası, yalnızca değerlendirmenizle ilgili geri dönüş sağlamak amacıyla kullanılacak; üçüncü kişilerle paylaşılmayacak ve reklam/pazarlama amacıyla işlenmeyecektir. Verileriniz 6698 sayılı KVKK kapsamında saklanır ve talebiniz hâlinde silinir. Devam etmek için gizlilik şartlarını kabul ettiğinizi onaylayınız.',
+    kvkkAccept: 'Kabul Ediyorum ve Gönder',
+    kvkkCancel: 'Vazgeç',
   },
   en: {
     subtitle: 'Share your service feedback',
@@ -66,6 +76,16 @@ const I18N = {
     ratingRequired: 'Please select a rating',
     photoFailed: 'Image upload failed',
     gsmInvalid: 'Phone must contain at least 10 digits',
+    // Low rating popup (stars <= 3)
+    dusukPuanTitle: 'Thank You for Your Feedback',
+    dusukPuanMsg: 'We will review your concerns and take the necessary actions. If you leave your contact information, we can follow up with you.',
+    dusukPuanSend: 'Send',
+    dusukPuanBack: 'I Want a Follow-Up',
+    // KVKK consent popup (when phone is shared)
+    kvkkTitle: 'Privacy Consent',
+    kvkkMsg: 'The phone number you provide will be used only to follow up on your feedback; it will not be shared with third parties or used for marketing purposes. Your data is stored in accordance with data protection regulations and will be deleted upon your request. Please confirm that you accept the privacy terms to continue.',
+    kvkkAccept: 'Accept and Send',
+    kvkkCancel: 'Cancel',
   },
 } as const
 
@@ -93,7 +113,16 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
   const [gorselUrl, setGorselUrl]     = useState<string | null>(null)
   const [gorselYuk, setGorselYuk]     = useState(false)
   const [gonderiyor, setGonderiyor]   = useState(false)
+  // Dusuk puan bilgilendirme popup
+  const [showDusukPuanPopup, setShowDusukPuanPopup] = useState(false)
+  const [dusukPuanOnayVerdi, setDusukPuanOnayVerdi] = useState(false)
+  // KVKK onay popup (telefon dolu iken)
+  const [showKvkkPopup, setShowKvkkPopup] = useState(false)
+  const [kvkkOnaylandi, setKvkkOnaylandi] = useState(false)
+  // GSM input vurgulama (geri donus istendiginde 2 saniye highlight)
+  const [gsmHighlight, setGsmHighlight] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const gsmRef = useRef<HTMLInputElement>(null)
   const L = I18N[dil]
 
   // Dil tercihini mount sonrası ayarla (hydration mismatch olmasın diye)
@@ -129,12 +158,29 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
     setGorselYuk(false)
   }
 
-  async function gonder() {
+  // Gonder butonuna basildiginda calisan orchestrator: validate + popup akisi.
+  // Akis:
+  //   1) validate
+  //   2) yildiz <= 3 && dusuk-puan-popup henuz gosterilmedi -> Popup A ac; dur.
+  //   3) telefon dolu && kvkk henuz onaylanmadi -> Popup B ac; dur.
+  //   4) gercek POST (submitActual).
+  function gonder() {
     if (!yildiz) { alert(L.ratingRequired); return }
-    // GSM opsiyonel; verildiyse min 10 rakam
     if (gsm.trim() && gsm.replace(/\D/g, '').length < 10) {
       alert(L.gsmInvalid); return
     }
+    if (yildiz <= 3 && !dusukPuanOnayVerdi) {
+      setShowDusukPuanPopup(true)
+      return
+    }
+    if (gsm.trim() && !kvkkOnaylandi) {
+      setShowKvkkPopup(true)
+      return
+    }
+    submitActual()
+  }
+
+  async function submitActual() {
     setGonderiyor(true)
     try {
       const res = await fetch(`/api/degerlendirme/${token}`, {
@@ -153,6 +199,45 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
       setDurum('gonderildi')
     } catch (e: any) { alert(e.message ?? 'Gönderilemedi') }
     setGonderiyor(false)
+  }
+
+  // Popup A "Gonder" -> onay ver + popup kapa + akisa devam
+  function dusukPuanPopupGonder() {
+    setDusukPuanOnayVerdi(true)
+    setShowDusukPuanPopup(false)
+    // Onay verildikten sonra normal akisa donuyoruz: telefon dolu ise KVKK
+    setTimeout(() => {
+      if (gsm.trim() && !kvkkOnaylandi) {
+        setShowKvkkPopup(true)
+      } else {
+        submitActual()
+      }
+    }, 0)
+  }
+
+  // Popup A "Geri Donus" -> onay ver (tekrar acilmasin) + popup kapa +
+  // telefon input'una odaklan + gorsel vurgu
+  function dusukPuanPopupGeriDonus() {
+    setDusukPuanOnayVerdi(true)
+    setShowDusukPuanPopup(false)
+    setGsmHighlight(true)
+    setTimeout(() => {
+      gsmRef.current?.focus()
+      gsmRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
+    setTimeout(() => setGsmHighlight(false), 4000)
+  }
+
+  // Popup B "Kabul Ediyorum" -> KVKK onay + popup kapa + gonder
+  function kvkkKabulEt() {
+    setKvkkOnaylandi(true)
+    setShowKvkkPopup(false)
+    setTimeout(() => submitActual(), 0)
+  }
+
+  // Popup B "Vazgec" -> popup kapa (form acik kalir)
+  function kvkkVazgec() {
+    setShowKvkkPopup(false)
   }
 
   const S = {
@@ -292,9 +377,28 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
           {/* GSM */}
           <div>
             <span style={S.label}>{L.gsmLabel} <span style={{ fontWeight: 400, color: '#94a3b8' }}>({L.optional})</span></span>
-            <input style={S.input} type="tel" placeholder={L.gsmPlaceholder}
-              inputMode="tel" autoComplete="tel"
-              value={gsm} onChange={e => setGsm(e.target.value)} maxLength={40} />
+            <input
+              ref={gsmRef}
+              style={{
+                ...S.input,
+                ...(gsmHighlight
+                  ? {
+                      borderColor: '#f59e0b',
+                      borderWidth: 2,
+                      background: '#fffbeb',
+                      boxShadow: '0 0 0 4px rgba(245, 158, 11, 0.20)',
+                      transition: 'all 0.3s ease',
+                    }
+                  : {}),
+              }}
+              type="tel"
+              placeholder={L.gsmPlaceholder}
+              inputMode="tel"
+              autoComplete="tel"
+              value={gsm}
+              onChange={e => setGsm(e.target.value)}
+              maxLength={40}
+            />
           </div>
 
           {/* Görsel */}
@@ -325,6 +429,100 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
 
         </div>
       </div>
+
+      {/* Popup A — Dusuk puan bilgilendirme (yildiz <= 3) */}
+      {showDusukPuanPopup && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16, zIndex: 1000,
+        }}>
+          <div style={{
+            width: '100%', maxWidth: 420, background: '#fff',
+            borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{ background: '#f59e0b', padding: '16px 20px', color: '#fff' }}>
+              <div style={{ fontSize: 28, marginBottom: 4 }}>💬</div>
+              <div style={{ fontSize: 17, fontWeight: 800 }}>{L.dusukPuanTitle}</div>
+            </div>
+            <div style={{ padding: '18px 20px 20px', color: '#334155', fontSize: 14, lineHeight: 1.6 }}>
+              {L.dusukPuanMsg}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 20px' }}>
+              <button
+                type="button"
+                onClick={dusukPuanPopupGonder}
+                style={{
+                  padding: 12, borderRadius: 10, border: 'none',
+                  background: '#1f2937', color: '#fff', fontSize: 15, fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {L.dusukPuanSend}
+              </button>
+              <button
+                type="button"
+                onClick={dusukPuanPopupGeriDonus}
+                style={{
+                  padding: 12, borderRadius: 10, border: '1.5px solid #f59e0b',
+                  background: '#fff', color: '#b45309', fontSize: 15, fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {L.dusukPuanBack}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup B — KVKK onay (telefon paylasildiginda) */}
+      {showKvkkPopup && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16, zIndex: 1000,
+        }}>
+          <div style={{
+            width: '100%', maxWidth: 440, background: '#fff',
+            borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{ background: '#0369a1', padding: '16px 20px', color: '#fff' }}>
+              <div style={{ fontSize: 28, marginBottom: 4 }}>🔒</div>
+              <div style={{ fontSize: 17, fontWeight: 800 }}>{L.kvkkTitle}</div>
+            </div>
+            <div style={{ padding: '18px 20px 20px', color: '#334155', fontSize: 13.5, lineHeight: 1.6, maxHeight: '40vh', overflowY: 'auto' }}>
+              {L.kvkkMsg}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px 20px' }}>
+              <button
+                type="button"
+                onClick={kvkkKabulEt}
+                disabled={gonderiyor}
+                style={{
+                  padding: 12, borderRadius: 10, border: 'none',
+                  background: '#0369a1', color: '#fff', fontSize: 15, fontWeight: 700,
+                  cursor: gonderiyor ? 'not-allowed' : 'pointer', opacity: gonderiyor ? 0.6 : 1,
+                }}
+              >
+                {gonderiyor ? L.submitting : L.kvkkAccept}
+              </button>
+              <button
+                type="button"
+                onClick={kvkkVazgec}
+                disabled={gonderiyor}
+                style={{
+                  padding: 12, borderRadius: 10, border: '1.5px solid #cbd5e1',
+                  background: '#fff', color: '#475569', fontSize: 15, fontWeight: 600,
+                  cursor: gonderiyor ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {L.kvkkCancel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
