@@ -82,6 +82,8 @@ export async function GET(req: NextRequest) {
       yildiz:            r.yildiz,
       yorum:             r.yorum,
       ad_soyad:          r.ad_soyad,
+      gsm:               r.gsm ?? null,
+      kvkk_onay:         r.kvkk_onay === true,
       gorsel_url:        r.gorsel_url,
       olusturma_tarihi:  r.olusturma_tarihi,
       arsivlendi:        segment === 'arsiv',
@@ -129,7 +131,7 @@ export async function GET(req: NextRequest) {
 
   // ── Birleşik mod: hem tablo hem arşiv ──────────────────────────────────
   if (birlesik) {
-    const selectCols = `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gorsel_url, olusturma_tarihi, arsivleme_tarihi`
+    const selectCols = `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gsm, kvkk_onay, gorsel_url, olusturma_tarihi, arsivleme_tarihi`
 
     let qTablo = admin.from('musteri_degerlendirmeleri').select(selectCols + ', arsivlendi')
       .eq('firma_id', firmaId).order('olusturma_tarihi', { ascending: false })
@@ -170,9 +172,9 @@ export async function GET(req: NextRequest) {
     .from(tableName)
     .select(
       arsivlendi
-        ? `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gorsel_url,
+        ? `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gsm, kvkk_onay, gorsel_url,
            olusturma_tarihi, arsivleme_tarihi`
-        : `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gorsel_url,
+        : `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gsm, kvkk_onay, gorsel_url,
            olusturma_tarihi, arsivlendi, arsivleme_tarihi`
     )
     .eq('firma_id', firmaId)

@@ -23,6 +23,8 @@ interface Kayit {
   yildiz: number
   yorum: string | null
   ad_soyad: string | null
+  gsm: string | null
+  kvkk_onay: boolean
   gorsel_url: string | null
   olusturma_tarihi: string
   aksiyon?: Aksiyon | null
@@ -411,6 +413,8 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       { header: 'Etiket',                key: 'etiket',   width: 12 },
       { header: 'Yorum',                 key: 'yorum',    width: 48 },
       { header: 'Ad Soyad',              key: 'ad',       width: 18 },
+      { header: 'Telefon',               key: 'telefon',  width: 18 },
+      { header: 'KVKK Onay',             key: 'kvkk',     width: 12 },
       { header: 'Değerlendirme Görseli', key: 'gorsel',   width: 18 },
       { header: 'Aksiyon',               key: 'aksiyon',  width: 48 },
     ]
@@ -445,6 +449,8 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
         etiket: YILDIZ_ETIKET[k.yildiz],
         yorum: k.yorum ?? '',
         ad: k.ad_soyad ?? '',
+        telefon: k.gsm ?? '',
+        kvkk: k.gsm ? (k.kvkk_onay ? 'Onaylandı' : 'Onaysız') : '—',
         gorsel: '',
         aksiyon: k.aksiyon?.aksiyon_metni ?? '',
       }
@@ -532,12 +538,17 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       const aksiyonGorselCell = aksiyonGorseller.length === 0
         ? '—'
         : aksiyonGorseller.map((u, i) => linkHtml(u, `Görsel ${i + 1}`)).join('<br>')
+      const kvkkCell = k.gsm
+        ? (k.kvkk_onay ? '<span style="color:#166534;font-weight:700">✓ Onaylandı</span>' : '<span style="color:#92400e;font-weight:700">! Onaysız</span>')
+        : '—'
       return `<tr>
         <td>${esc(new Date(k.olusturma_tarihi).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }))}</td>
         <td>${esc(k.lokasyon_tanim)}</td>
         <td>${'★'.repeat(k.yildiz)} ${esc(YILDIZ_ETIKET[k.yildiz])}</td>
         <td>${esc(k.yorum ?? '—')}</td>
         <td>${esc(k.ad_soyad ?? '—')}</td>
+        <td style="font-family:ui-monospace,monospace">${esc(k.gsm ?? '—')}</td>
+        <td style="text-align:center">${kvkkCell}</td>
         <td>${gorselCell}</td>
         <td>${aksiyonMetni}</td>
         <td>${aksiyonGorselCell}</td>
@@ -572,13 +583,15 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
       ${ozetHtml}
       <table>
         <thead><tr>
-          <th style="width:9%">Tarih</th>
-          <th style="width:11%">Lokasyon</th>
-          <th style="width:8%">Puan</th>
-          <th style="width:20%">Yorum</th>
-          <th style="width:9%">Ad Soyad</th>
-          <th style="width:9%">Görsel</th>
-          <th style="width:22%">Aksiyon</th>
+          <th style="width:8%">Tarih</th>
+          <th style="width:10%">Lokasyon</th>
+          <th style="width:7%">Puan</th>
+          <th style="width:16%">Yorum</th>
+          <th style="width:8%">Ad Soyad</th>
+          <th style="width:8%">Telefon</th>
+          <th style="width:5%">KVKK</th>
+          <th style="width:8%">Görsel</th>
+          <th style="width:18%">Aksiyon</th>
           <th style="width:12%">Aksiyon Görselleri</th>
         </tr></thead>
         <tbody>${rows}</tbody>
@@ -726,6 +739,8 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                     <th>Puan</th>
                     <th>Yorum</th>
                     <th>Ad Soyad</th>
+                    <th>Telefon</th>
+                    <th style={{ textAlign: 'center' }}>KVKK</th>
                     <th>Fotoğraf</th>
                     <th style={{ textAlign: 'center' }}>Aksiyon</th>
                     {filtreMod && <th>Kaynak</th>}
@@ -737,7 +752,7 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                     const dusukPuan = k.yildiz <= 3
                     const aksiyonVar = !!k.aksiyon
                     const acik = acikAksiyonId === k.id
-                    const colSpan = 7 + (filtreMod ? 1 : 0) + ((yetkiler.duzenleyebilir || yetkiler.silebilir) ? 1 : 0)
+                    const colSpan = 9 + (filtreMod ? 1 : 0) + ((yetkiler.duzenleyebilir || yetkiler.silebilir) ? 1 : 0)
                     return (
                       <React.Fragment key={k.id}>
                     <tr style={{ background: acik ? '#fafbff' : undefined }}>
@@ -754,6 +769,24 @@ export default function MusteriDegerlendirmeRaporClient({ base, isSA, initialFir
                         ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                       </td>
                       <td style={{ color: k.ad_soyad ? '#111827' : '#cbd5e1' }}>{k.ad_soyad || '—'}</td>
+                      <td style={{ color: k.gsm ? '#111827' : '#cbd5e1', whiteSpace: 'nowrap', fontFamily: 'ui-monospace, monospace', fontSize: 12.5 }}>
+                        {k.gsm ? (
+                          <a href={`tel:${k.gsm}`} style={{ color: '#0369a1', textDecoration: 'none' }} title={`Ara: ${k.gsm}`}>
+                            {k.gsm}
+                          </a>
+                        ) : '—'}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {k.gsm ? (
+                          k.kvkk_onay ? (
+                            <span title="KVKK gizlilik şartları kabul edildi (Popup B onayı)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: '#dcfce7', color: '#166534', fontSize: 14, fontWeight: 900 }}>✓</span>
+                          ) : (
+                            <span title="KVKK onayı yok (eski kayıt veya bypass)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: '#fef3c7', color: '#92400e', fontSize: 14, fontWeight: 900 }}>!</span>
+                          )
+                        ) : (
+                          <span style={{ color: '#cbd5e1' }} title="Telefon paylaşılmadı, KVKK onayı gerekmez">—</span>
+                        )}
+                      </td>
                       <td>
                         {k.gorsel_url ? (
                           <button onClick={() => setGorselModal(k.gorsel_url!)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>

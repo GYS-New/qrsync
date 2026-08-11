@@ -190,6 +190,7 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
   async function submitActual() {
     setGonderiyor(true)
     try {
+      const gsmT = gsm.trim()
       const res = await fetch(`/api/degerlendirme/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -197,8 +198,10 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
           yildiz,
           yorum: yorum.trim() || null,
           ad_soyad: adSoyad.trim() || null,
-          gsm: gsm.trim() || null,
+          gsm: gsmT || null,
           gorsel_url: gorselUrl,
+          // KVKK onay: telefon paylasildi VE kullanici Popup B'de 'Kabul' verdi
+          kvkk_onay: gsmT ? kvkkOnaylandi : false,
         }),
       })
       const json = await res.json()

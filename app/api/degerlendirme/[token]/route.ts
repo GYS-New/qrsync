@@ -97,7 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ ok: false, error: 'Geçersiz istek' }, { status: 400 })
   }
 
-  const { yildiz, yorum, ad_soyad, gsm, gorsel_url } = body
+  const { yildiz, yorum, ad_soyad, gsm, gorsel_url, kvkk_onay } = body
 
   if (!yildiz || yildiz < 1 || yildiz > 5) {
     return NextResponse.json({ ok: false, error: 'Geçerli bir değerlendirme puanı seçin (1-5)' }, { status: 400 })
@@ -120,6 +120,9 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     }
     gsmClean = raw.slice(0, 40)  // aşırı uzun payload'a karşı kalkan
   }
+
+  // KVKK onay: sadece telefon paylasilmis ise anlamli. Telefon yoksa false.
+  const kvkkOnayBool: boolean = gsmClean !== null && kvkk_onay === true
 
   const { lok, kanal } = await lokasyonBul(admin, params.token)
   if (!lok?.aktif) return NextResponse.json({ ok: false, error: 'Lokasyon bulunamadı' }, { status: 404 })
@@ -202,6 +205,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     gorsel_url:       gorsel_url       || null,
     ip_adresi:        ip,
     user_agent:       ua,
+    kvkk_onay:        kvkkOnayBool,
   })
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
