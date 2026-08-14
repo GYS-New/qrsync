@@ -95,6 +95,21 @@ export async function POST(req: Request) {
       })
     }
 
+    // Heartbeat — cron_log'a her calismada log at (sistem-kontrol false positive engellenir)
+    // Icinde is olmasa bile calistigini gostermek icin. Diger cron'lar da ayni patern.
+    try {
+      await admin.from('cron_log').insert({
+        tip: 'personel_destek',
+        sonuc: {
+          heartbeat: true,
+          ok: true,
+          ayar_sayisi: sonuclar.length,
+          toplam_tamamlanan: toplamTamamlanan,
+          proje_filtre: projeIdFiltre,
+        } as any,
+      })
+    } catch (e) { console.error('[PERSONEL-DESTEK] cron_log hata:', e) }
+
     return NextResponse.json({ ok: true, sonuclar }, { headers: CORS })
   } catch (e: any) {
     console.error('[PERSONEL-DESTEK] Hata:', e)

@@ -116,21 +116,33 @@ function raporla(ad: string, sorunlar: SorunDetayi[], okOzet: string, metrikler?
 async function kontrolArsivleme(admin: any, nowMs: number): Promise<SistemRaporu> {
   const sorunlar: SorunDetayi[] = []
   const yirmidortSaatOnce = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
+  // Arsiv cron her 6 saatte 1 calisir → bir gorev arsive tasinmadan once
+  // durum_degisim_tarihi 24h + 6h period = 30h olabilir. 30h esigi race condition
+  // engeller (sistem-kontrol arsiv cron ile ayni saatte calisiyor).
+  const otuzSaatOnce = new Date(nowMs - 30 * 60 * 60 * 1000).toISOString()
   const yediSaatOnce = new Date(nowMs - 7 * 60 * 60 * 1000).toISOString()
 
-  // Anomali 1: 24+ saatlik TAMAMLANDI/IPTAL canli_gorevler'de bekliyor (geç arşivleme)
+  // Anomali 1: 30+ saatlik TAMAMLANDI/IPTAL canli_gorevler'de bekliyor (cron gercekten duraksamis)
   const { count: gecArsiv } = await admin
     .from('canli_gorevler')
     .select('id', { count: 'exact', head: true })
     .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'IPTAL'])
-    .lt('durum_degisim_tarihi', yirmidortSaatOnce)
+    .lt('durum_degisim_tarihi', otuzSaatOnce)
   if ((gecArsiv ?? 0) > 0) {
     sorunlar.push({
       kod: 'ARSIV_GEC',
-      mesaj: `${gecArsiv} görev 24+ saattir arşive taşınmamış (cron duraksamış)`,
+      mesaj: `${gecArsiv} görev 30+ saattir arşive taşınmamış (cron duraksamış)`,
       adet: gecArsiv ?? 0,
     })
   }
+
+  // Bilgi metrigi: 24-30h arasi arsivlenmemis (normal cron dongusu bekliyor)
+  const { count: bekleyenNormal } = await admin
+    .from('canli_gorevler')
+    .select('id', { count: 'exact', head: true })
+    .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN', 'IPTAL'])
+    .lt('durum_degisim_tarihi', yirmidortSaatOnce)
+    .gte('durum_degisim_tarihi', otuzSaatOnce)
 
   // Anomali 2: ACIK/BEKLEMEDE/ISLEMDE durumlu arşive geçmiş (yanlış durum arşivlendi)
   const { count: acikArsiv } = await admin
@@ -167,6 +179,7 @@ async function kontrolArsivleme(admin: any, nowMs: number): Promise<SistemRaporu
 
   const metrikler = {
     gec_arsiv: gecArsiv ?? 0,
+    bekleyen_normal_donguye: bekleyenNormal ?? 0,
     yanlis_durum: acikArsiv ?? 0,
     erken_arsiv: erkenArsiv ?? 0,
     son_7h_arsiv_akisi: sonArsivAkisi ?? 0,
