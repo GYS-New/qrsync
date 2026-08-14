@@ -1271,7 +1271,7 @@ function CeklistArsivSekme({
   const [kanaliF,    setKanaliF]    = useState('')
   const [fromD,      setFromD]      = useState('')
   const [toD,        setToD]        = useState('')
-  const [modal,      setModal]      = useState<{ id: string } | null>(null)
+  const [modal,      setModal]      = useState<{ id: string; taskType: 'canli_gorevler' | 'gorevler' } | null>(null)
   const [ckSayfa,    setCkSayfa]    = useState(1)
   const CK_PER_PAGE = 50
 
@@ -1642,7 +1642,10 @@ function CeklistArsivSekme({
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
                         {/* Çeklist Detayı */}
                         <button
-                          onClick={() => setModal({ id: r.gorev_id })}
+                          onClick={() => setModal({
+                            id: r.canli_gorev_id || r.gorev_id,
+                            taskType: r.canli_gorev_id ? 'canli_gorevler' : 'gorevler',
+                          })}
                           title="Çeklist Detayı"
                           disabled={busy}
                           style={{
@@ -1703,7 +1706,7 @@ function CeklistArsivSekme({
       {modal && (
         <ChecklistModal
           taskId={modal.id}
-          taskType="canli_gorevler"
+          taskType={modal.taskType}
           onKapat={() => setModal(null)}
         />
       )}
