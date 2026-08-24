@@ -38,12 +38,14 @@ export async function sendFCMToUser(
     const devices: { fcm_token: string; ses_kanali?: string }[] = await res.json()
 
     // Alıcı kullanıcı bilgisi — push_bildirim_log için (firma, proje, isim)
+    // + bildirim_susturulmus (TA icin SA tarafindan kapatilabilir)
     let aliciFirmaId: string | null = null
     let aliciProjeId: string | null = null
     let aliciIsim: string | null = null
+    let aliciSusturulmus = false
     try {
       const uRes = await fetch(
-        `${supabaseUrl}/rest/v1/users?id=eq.${userId}&select=isim_soyisim,firma_id,proje_id`,
+        `${supabaseUrl}/rest/v1/users?id=eq.${userId}&select=isim_soyisim,firma_id,proje_id,bildirim_susturulmus`,
         { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
       )
       const uArr = await uRes.json()
@@ -51,6 +53,7 @@ export async function sendFCMToUser(
         aliciFirmaId = uArr[0].firma_id ?? null
         aliciProjeId = uArr[0].proje_id ?? null
         aliciIsim = uArr[0].isim_soyisim ?? null
+        aliciSusturulmus = uArr[0].bildirim_susturulmus === true
       }
     } catch {}
 
@@ -87,6 +90,15 @@ export async function sendFCMToUser(
 
     if (!devices?.length) {
       await logPush(false, 'Aktif cihaz yok')
+      return
+    }
+
+    // Bildirim sustur: SA tarafindan TA rolu icin aktif edilmis. Push atlanir,
+    // log'a "susturuldu" kaydi yazilir (kanit + gorunurluk icin). Web bildirim
+    // (bildirimler tablosu) helper'larda ayri insert oluyor — kullanici listede
+    // gorebilir; sadece FCM+real-time popup kesilir.
+    if (aliciSusturulmus) {
+      await logPush(false, 'Bildirim susturulmus (kullanici ayari)')
       return
     }
 

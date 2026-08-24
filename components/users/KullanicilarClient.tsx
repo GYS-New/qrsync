@@ -375,6 +375,30 @@ export default function KullanicilarClient({
   function showErr(msg: string) { toast({ type: 'error', title: 'Hata', message: msg }) }
   function showOk(msg: string)  { toast({ type: 'success', title: 'Başarılı', message: msg }) }
 
+  // TA bildirim susturma — SA/TA satirdan toggle eder. Bildirim yine bildirimler
+  // tablosuna yazilir (listede gorunur) ama FCM push atlanir + KritikUyariModal
+  // popup acmaz.
+  const [bildirimSusturBusy, setBildirimSusturBusy] = useState<Set<string>>(new Set())
+  async function toggleBildirimSustur(u: any) {
+    const yeni = !(u as any).bildirim_susturulmus
+    setBildirimSusturBusy(prev => { const n = new Set(prev); n.add(u.id); return n })
+    try {
+      const res = await fetch(`/api/users/${u.id}/bildirim-sustur`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ susturulmus: yeni }),
+      })
+      const json = await res.json()
+      if (!res.ok) { showErr(json.error ?? 'Bildirim ayari degistirilemedi'); return }
+      setUsers(prev => prev.map(x => x.id === u.id ? ({ ...x, bildirim_susturulmus: yeni } as any) : x))
+      showOk(yeni ? 'Bildirimler susturuldu' : 'Bildirimler açıldı')
+    } catch (e: any) {
+      showErr(e?.message ?? 'Hata')
+    } finally {
+      setBildirimSusturBusy(prev => { const n = new Set(prev); n.delete(u.id); return n })
+    }
+  }
+
   async function refresh() {
     const myReq = ++reqId.current
     setLoading(true)
@@ -1023,6 +1047,20 @@ export default function KullanicilarClient({
                       {isSA && u.rol === 'tenant_admin' && (
                         <RowActionButton variant="base" onClick={() => openTaProjeModal(u)}>
                           🗂 Projeler ({taProjeSayilari[u.id] ?? 0})
+                        </RowActionButton>
+                      )}
+                      {/* SA/TA: TA satırı için bildirim sustur toggle. Endpoint tarafi
+                          yetki+rol dogrular (TA sadece kendi firmasindaki TA'yi ayarlayabilir). */}
+                      {u.rol === 'tenant_admin' && (isSA || isTA) && (
+                        <RowActionButton
+                          variant={(u as any).bildirim_susturulmus ? 'danger' : 'base'}
+                          onClick={() => toggleBildirimSustur(u)}
+                          disabled={bildirimSusturBusy.has(u.id)}
+                          title={(u as any).bildirim_susturulmus
+                            ? 'Bildirimler susturulmus — listede kalir, push+popup yok. Aciklamak icin tikla'
+                            : 'Bildirimleri sustur (listede kalir, push+popup yok)'}
+                        >
+                          {(u as any).bildirim_susturulmus ? '🔕 Susturuldu' : '🔕 Sustur'}
                         </RowActionButton>
                       )}
                       <RowActionButton variant="base" onClick={() => { setTarget(u); setNewPass(''); setOpenPass(true) }}>Şifre</RowActionButton>

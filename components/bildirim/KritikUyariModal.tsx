@@ -25,18 +25,29 @@ export default function KritikUyariModal() {
   const supabase = useMemo(() => createClient(), [])
   const [aktif, setAktif] = useState<Kritik | null>(null)
   const [meId, setMeId] = useState<string | null>(null)
+  const [susturulmus, setSusturulmus] = useState<boolean | null>(null)
   const [kapatiliyor, setKapatiliyor] = useState(false)
 
   useEffect(() => {
     let active = true
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (active) setMeId(user?.id ?? null)
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!active) return
+      setMeId(user?.id ?? null)
+      // Kullanicinin bildirim_susturulmus ayarini oku — susturulmus ise polling
+      // baslamayacak, modal hic acilmayacak. Bildirim listede kalir.
+      if (user?.id) {
+        const { data } = await supabase
+          .from('users').select('bildirim_susturulmus').eq('id', user.id).maybeSingle()
+        if (active) setSusturulmus((data as any)?.bildirim_susturulmus === true)
+      }
     })
     return () => { active = false }
   }, [supabase])
 
   useEffect(() => {
     if (!meId) return
+    // Susturulmus kullanici veya susturulmus ayari henuz yuklenmemis ise polling baslatma
+    if (susturulmus !== false) return
     let active = true
 
     async function kontrol() {
@@ -59,7 +70,7 @@ export default function KritikUyariModal() {
     kontrol()
     const t = setInterval(kontrol, 20000)
     return () => { active = false; clearInterval(t) }
-  }, [meId, supabase, aktif])
+  }, [meId, supabase, aktif, susturulmus])
 
   async function anladim() {
     if (!aktif) return
