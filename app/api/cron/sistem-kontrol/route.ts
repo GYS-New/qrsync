@@ -177,12 +177,42 @@ async function kontrolArsivleme(admin: any, nowMs: number): Promise<SistemRaporu
     .select('id', { count: 'exact', head: true })
     .gte('arsivleme_tarihi', yediSaatOnce)
 
+  // Anomali 4: KOLON DRIFT — son 7 gunun arsivlenen kayitlarinda vardiya_gunu
+  // NULL orani anormal yuksekse arsiv RPC yeni bir kolon eklenirken guncellenmemis
+  // demektir. Bu pattern zaten 2 kez patladi (Mayis 11 + Agustos 24 fixleri).
+  // Rapor Merkezi vardiya_gunu ile filtreliyor → NULL kayitlar sessizce kayboluyor.
+  // Esik %5: normal operasyonda 0 olmali, kolon drift olunca %90+ ciker.
+  const yediGunOnce = new Date(nowMs - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const { count: son7gToplamArsiv } = await admin
+    .from('canli_gorevler_arsiv')
+    .select('id', { count: 'exact', head: true })
+    .gte('arsivleme_tarihi', yediGunOnce)
+  const { count: son7gVardiyaNull } = await admin
+    .from('canli_gorevler_arsiv')
+    .select('id', { count: 'exact', head: true })
+    .gte('arsivleme_tarihi', yediGunOnce)
+    .is('vardiya_gunu', null)
+  const nullOran = (son7gToplamArsiv ?? 0) > 0
+    ? Math.round(((son7gVardiyaNull ?? 0) / (son7gToplamArsiv ?? 1)) * 100)
+    : 0
+  // Esik: 100+ kayit uzerinde %5 (kucuk sample'da yanlis alarm engellenir)
+  if ((son7gToplamArsiv ?? 0) >= 100 && nullOran >= 5) {
+    sorunlar.push({
+      kod: 'ARSIV_VARDIYA_GUNU_DRIFT',
+      mesaj: `Son 7 gun arsivlenen kayitlarin %${nullOran}'inde vardiya_gunu=NULL (${son7gVardiyaNull}/${son7gToplamArsiv}). Arsiv RPC kolon drift olabilir — raporlar bu kayitlari gostermez.`,
+      adet: son7gVardiyaNull ?? 0,
+    })
+  }
+
   const metrikler = {
     gec_arsiv: gecArsiv ?? 0,
     bekleyen_normal_donguye: bekleyenNormal ?? 0,
     yanlis_durum: acikArsiv ?? 0,
     erken_arsiv: erkenArsiv ?? 0,
     son_7h_arsiv_akisi: sonArsivAkisi ?? 0,
+    son_7g_toplam_arsiv: son7gToplamArsiv ?? 0,
+    son_7g_vardiya_null: son7gVardiyaNull ?? 0,
+    vardiya_null_yuzde: nullOran,
   }
 
   if (sorunlar.length > 0) return raporla('Arşivleme', sorunlar, '', metrikler)
