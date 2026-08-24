@@ -11,6 +11,10 @@
  *     (users.rol='musteri' + users.proje_id = proje) — proje müşterisi rapor
  *     tüketicisidir; kendi verdiği anonim QR değerlendirmesi olmaz
  *     (2026-07-28 eklendi, BURAK SEMKİN vakası).
+ *     Lokasyon kısıtı: kullanici_lokasyon_yetkileri'nde kaydı YOKSA tüm-proje
+ *     bildirim alır (fallback); VARSA sadece o üst lokasyonlara yetkili ise
+ *     bildirim alır (UI: "U ve M rolleri hangi üst lokasyonların verilerine
+ *     erişebilir" ekranı ile hizalı, 2026-08-14).
  *
  * İki kanal:
  *   - Web in-app: bildirimler tablosuna 'musteri_degerlendirme' tipinde kayıt
@@ -104,6 +108,8 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
 
     // 4) Projeye atanmış müşteri rolü kullanıcıları (proje müşterisi = rapor
     //    tüketici, ör. tesis sahibi tarafındaki temsilci).
+    // Lokasyon kısıtı: yetki kaydı YOKSA proje geneli (tüm-erişim fallback);
+    // VARSA sadece bu üst lokasyona yetkili olanlar.
     let musteriList: { id: string }[] = []
     if (lokasyonProjeId) {
       const { data: aktifMusteri } = await admin
@@ -112,7 +118,30 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
         .eq('proje_id', lokasyonProjeId)
         .eq('rol', 'musteri')
         .eq('aktif', true)
-      musteriList = (aktifMusteri ?? []) as any
+      const tumMusteriIds = (aktifMusteri ?? []).map((u: any) => u.id)
+
+      if (tumMusteriIds.length && ustLokasyonId) {
+        const { data: musteriYetkileri } = await admin
+          .from('kullanici_lokasyon_yetkileri')
+          .select('user_id, ust_lokasyon_id')
+          .in('user_id', tumMusteriIds)
+
+        const yetkiKaydiOlanlar = new Set(
+          (musteriYetkileri ?? []).map((y: any) => y.user_id as string),
+        )
+        const buUstYetkilileri = new Set(
+          (musteriYetkileri ?? [])
+            .filter((y: any) => y.ust_lokasyon_id === ustLokasyonId)
+            .map((y: any) => y.user_id as string),
+        )
+
+        musteriList = tumMusteriIds
+          .filter((uid: string) => !yetkiKaydiOlanlar.has(uid) || buUstYetkilileri.has(uid))
+          .map((uid: string) => ({ id: uid }))
+      } else {
+        // ustLokasyonId yok (RPC null) — lokasyon filtresi anlamlı değil, tüm proje müşterileri
+        musteriList = tumMusteriIds.map((uid: string) => ({ id: uid }))
+      }
     }
 
     const aliciIds = Array.from(new Set([
