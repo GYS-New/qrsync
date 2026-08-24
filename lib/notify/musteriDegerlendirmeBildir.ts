@@ -1,6 +1,9 @@
 /**
  * Müşteri değerlendirmesi geldiğinde ilgili yetkililere FCM push + web bildirim.
  *
+ * Pasif proje kontrolü: Lokasyonun projesi `aktif=false` ise bildirim gönderilmez
+ * (proje operasyonel değil; QR değerlendirme kaydı yine oluşur ama bildirim atılmaz).
+ *
  * Bildirim alıcıları (kuralı) — mig 098 sonrası proje-scope'lu:
  *   - Lokasyonun ait olduğu PROJEYE atanmış TA'lar (tenant_admin_projeler junction)
  *     · Firma-wide TA'lar değil; sadece projeyi görüntüleme yetkisi olanlar
@@ -43,6 +46,15 @@ export async function musteriDegerlendirmeBildir(p: BildirimParam): Promise<void
     const { data: lokRow } = await admin
       .from('lokasyonlar').select('proje_id').eq('id', p.lokasyonId).maybeSingle()
     const lokasyonProjeId = (lokRow as any)?.proje_id ?? null
+
+    // Pasif proje kontrolü — pasif projede QR yine değerlendirme alabilir ama
+    // ilgili yetkililere bildirim atma (proje operasyonel değil).
+    // Projesiz lokasyon (legacy) durumunda check atlanır.
+    if (lokasyonProjeId) {
+      const { data: projeAktifRow } = await admin
+        .from('projeler').select('aktif').eq('id', lokasyonProjeId).maybeSingle()
+      if ((projeAktifRow as any)?.aktif === false) return
+    }
 
     const { data: ustLokId } = await admin.rpc('get_ust_lokasyon_id', { p_lok_id: p.lokasyonId })
     const ustLokasyonId = ustLokId as string | null
