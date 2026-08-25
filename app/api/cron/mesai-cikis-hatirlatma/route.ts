@@ -96,6 +96,18 @@ export async function POST(req: NextRequest) {
     // Vardiya bitisi henuz gelmedi
     if (gecenDk < 15) { atlanan++; continue }
 
+    // GUVENLIK: Personel en az 4 saat calisti mi? Vardiya yanlis tahmin
+    // edilmis olabilir. Ornek: 14:30 giris, sistem V2 (bitis 16:00) sandi ama
+    // personel V3 (16:00-24:00) icin 1.5 saat erken geldi. Bu durumda 16:15'te
+    // "cikis unutuldu" push atmak yanlis olur. Cikis unutma davranisi ancak
+    // gercek bir vardiya suresi (min 4 saat) calistiktan sonra anlamli.
+    const girisMs = new Date(m.giris_saati).getTime()
+    const calismaDk = Math.floor((now - girisMs) / 60000)
+    if (calismaDk < 4 * 60) {
+      atlanan++
+      continue
+    }
+
     // Personel "devam ediyorum" dedi → hicbirsey yapma
     if (m.cikis_devam_flag) { atlanan++; continue }
 
