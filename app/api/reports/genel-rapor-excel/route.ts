@@ -119,11 +119,13 @@ export async function GET(request: Request) {
     }
 
     // Sablondaki departman adlarina gore hücreleri doldur.
-    // GUVENLIK: header cell'de departman adi YOK veya eslesme yoksa hicbir yere
-    // yazma. REVIZE template'te (25.08.2026) departman tablosu chart'a
-    // donusturuldu; slot cell'leri ozet bloklarinin merge alanlarina dustugu
-    // icin 0 yazmak "Ekstra Dahil Tamamlanan" label/value'sunu overwrite
-    // ediyordu.
+    // KURAL: header cell'de departman adi VARSA yaz (agg yoksa 0 yaz —
+    // rapor donemi icinde o departmana veri yok anlaminda).
+    // header BOS veya "ÖZET" ise ATLA — REVIZE tek template'te (25.08.2026)
+    // departman tablosu chart'a donusturuldu, slot cell'leri "ÖZET" merge
+    // alanlarina dustu (Y15/V15/S15 üzerinden). 0 yazmak "Ekstra Dahil
+    // Tamamlanan" label/value'sunu overwrite ediyordu. Tumu template'te
+    // (departman tablosu var) header adi gercek → normal yazim devam eder.
     const centerAlign: any = { horizontal: 'center', vertical: 'middle' }
     for (const slot of departmanSlotlari) {
       const headerCell = wsOzet.getCell(slot.header)
@@ -133,13 +135,15 @@ export async function GET(request: Request) {
         : rawHeader)
       if (!headerName || headerName === 'ÖZET') continue
       const agg = departmanAgg.get(headerName)
-      if (!agg) continue
+      const [hedef, tamamlanan, sapma] = agg
+        ? [agg.hedef, agg.tamamlanan, agg.sapma]
+        : [0, 0, 0]
       const cellH = wsOzet.getCell(slot.hedef)
       const cellT = wsOzet.getCell(slot.tamamlanan)
       const cellS = wsOzet.getCell(slot.sapma)
-      cellH.value = agg.hedef;      cellH.alignment = centerAlign
-      cellT.value = agg.tamamlanan; cellT.alignment = centerAlign
-      cellS.value = agg.sapma;      cellS.alignment = centerAlign
+      cellH.value = hedef;      cellH.alignment = centerAlign
+      cellT.value = tamamlanan; cellT.alignment = centerAlign
+      cellS.value = sapma;      cellS.alignment = centerAlign
     }
 
     // ── Grup Metrikleri ──────────────────────────────────────────────────
