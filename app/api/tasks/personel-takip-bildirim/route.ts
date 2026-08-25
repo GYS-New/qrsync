@@ -43,18 +43,9 @@ export async function POST(req: NextRequest) {
     if (p.personel_takip_bildirim_dk != null) projeOverride.set(p.id, p.personel_takip_bildirim_dk)
   }
 
-  // TA kullanıcıları (3. bildirimde web bildirim gönderilecek)
-  const taMap = new Map<string, string[]>() // firma_id → [ta_user_id]
-  const { data: taUsers } = await admin
-    .from('users')
-    .select('id,firma_id')
-    .eq('rol', 'tenant_admin')
-    .eq('aktif', true)
-  for (const u of taUsers ?? []) {
-    const arr = taMap.get(u.firma_id) ?? []
-    arr.push(u.id)
-    taMap.set(u.firma_id, arr)
-  }
+  // TA otomatik alici KALDIRILDI (25.08.2026). Simdi sadece
+  // personel_takip_alicilar tablosunda seciliye giden. Bir TA da bildirim almak
+  // isterse ilgili ust_lokasyon veya "proje geneli" satirinda kendini eklemeli.
 
   for (const firma of firmalar ?? []) {
     const firmaDk = firma.personel_takip_bildirim_dk
@@ -123,11 +114,14 @@ export async function POST(req: NextRequest) {
       try {
         await sendFCMToUser(mesai.user_id, title, body, 'gorev_uyari')
 
-        // 3. bildirimde TA + üst lokasyon bazlı alıcılara web bildirimi gönder
+        // 3. bildirimde alicilara web bildirim gonder.
+        // KAYNAKLAR (birlesim):
+        //   a) Personelin ust_lokasyon'una atanmis alicilar (varsa)
+        //   b) Projeye atanmis "proje geneli" alicilar (ust_lokasyon_id NULL)
+        //      → Ust_lokasyon'a personel baglanmayan projelerde (Canakkale) tek yol
+        // TA otomatik alici KALDIRILDI — TA'lar da alici listesinden secilmeli.
         if (bildirimNo >= 3) {
-          const taIds = taMap.get(firma.id) ?? []
-
-          // Personelin üst lokasyonuna göre alıcıları bul
+          // (a) Personelin ust_lokasyon'una atanmis alicilar
           const { data: personelRow } = await admin.from('users').select('ust_lokasyon_id').eq('id', mesai.user_id).single()
           const ustLokId = (personelRow as any)?.ust_lokasyon_id
           let lokAlicilar: string[] = []
@@ -138,7 +132,20 @@ export async function POST(req: NextRequest) {
             lokAlicilar = (aliciRows ?? []).map((r: any) => r.alici_user_id)
           }
 
-          const tumAlicilar = [...new Set([...taIds, ...lokAlicilar])]
+          // (b) Projeye atanmis "proje geneli" alicilar (ust_lokasyon_id NULL)
+          let projeGeneliAlicilar: string[] = []
+          {
+            let aQ = admin.from('personel_takip_alicilar')
+              .select('alici_user_id')
+              .eq('firma_id', firma.id)
+              .is('ust_lokasyon_id', null)
+            if (mesai.proje_id) aQ = (aQ as any).eq('proje_id', mesai.proje_id)
+            else aQ = (aQ as any).is('proje_id', null)
+            const { data: aliciRows } = await aQ
+            projeGeneliAlicilar = (aliciRows ?? []).map((r: any) => r.alici_user_id)
+          }
+
+          const tumAlicilar = [...new Set([...lokAlicilar, ...projeGeneliAlicilar])]
 
           for (const aliciId of tumAlicilar) {
             await admin.from('bildirimler').insert({

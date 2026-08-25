@@ -54,11 +54,15 @@ const BOOL_DEFAULTS: Record<string, boolean> = {
 }
 const ALL_DEFAULTS: AllValues = { ...NUM_DEFAULTS, ...BOOL_DEFAULTS, ...NULLABLE_DEFAULTS }
 
-/** Üst lokasyon bazlı bildirim alıcıları bileşeni */
+/** Üst lokasyon bazlı bildirim alıcıları bileşeni.
+ *  Ek olarak "Proje Geneli" satiri: personelleri sabit ust_lokasyon'a atanmayan
+ *  projeler icin (ornek: Canakkale) tum personel icin uygulanir. */
+const PROJE_GENELI_ID = '__PROJE_GENELI__'  // sentinel: NULL ust_lokasyon_id
+
 function LokasyonBazliBildirimAlicilar({ firmaId, projeId, kullanicilar }: { firmaId: string; projeId?: string | null; kullanicilar: { id: string; isim_soyisim: string }[] }) {
   const { toast } = useToast()
   const [ustLoklar, setUstLoklar] = useState<{ id: string; tanim: string }[]>([])
-  const [aliciMap, setAliciMap] = useState<Record<string, string[]>>({}) // ust_lok_id → [user_id]
+  const [aliciMap, setAliciMap] = useState<Record<string, string[]>>({}) // ust_lok_id | PROJE_GENELI_ID → [user_id]
   const [savingLok, setSavingLok] = useState<string | null>(null)
 
   // Üst lokasyonlar + mevcut eşleştirmeler
@@ -75,8 +79,9 @@ function LokasyonBazliBildirimAlicilar({ firmaId, projeId, kullanicilar }: { fir
       setUstLoklar(lokList)
       const map: Record<string, string[]> = {}
       for (const a of (Array.isArray(alicilar) ? alicilar : [])) {
-        if (!map[a.ust_lokasyon_id]) map[a.ust_lokasyon_id] = []
-        map[a.ust_lokasyon_id].push(a.alici_user_id)
+        const key = a.ust_lokasyon_id ?? PROJE_GENELI_ID
+        if (!map[key]) map[key] = []
+        map[key].push(a.alici_user_id)
       }
       setAliciMap(map)
     }).catch(() => {})
@@ -87,7 +92,12 @@ function LokasyonBazliBildirimAlicilar({ firmaId, projeId, kullanicilar }: { fir
     try {
       const res = await fetch('/api/sistem-ayarlari/personel-takip-alicilar', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firmaId, projeId, ust_lokasyon_id: lokId, alici_user_ids: aliciMap[lokId] ?? [] }),
+        body: JSON.stringify({
+          firmaId,
+          projeId,
+          ust_lokasyon_id: lokId === PROJE_GENELI_ID ? null : lokId,
+          alici_user_ids: aliciMap[lokId] ?? [],
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
@@ -96,20 +106,28 @@ function LokasyonBazliBildirimAlicilar({ firmaId, projeId, kullanicilar }: { fir
     setSavingLok(null)
   }
 
-  if (!ustLoklar.length) return null
+  // Proje geneli satirini her zaman goster + ust lokasyonlar
+  const tumSatirlar = [
+    { id: PROJE_GENELI_ID, tanim: '🌐 Proje Geneli (Tüm Personel)', isProjeGeneli: true },
+    ...ustLoklar.map(l => ({ ...l, isProjeGeneli: false })),
+  ]
 
   return (
     <div style={{ marginTop: 14 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4 }}>3. Bildirim Alıcıları (Üst Lokasyon Bazlı)</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4 }}>3. Bildirim Alıcıları</div>
       <div style={{ fontSize: 12, color: T.textSoft, marginBottom: 10 }}>
-        Her üst lokasyonun personeli için 3. hatırlatmada bildirim alacak kişiyi belirleyin. TA otomatik alır.
+        3. hatırlatmada bildirim alacak kişileri belirleyin. <strong>"Proje Geneli"</strong> tüm proje personelini kapsar
+        (üst lokasyona atanmayan projeler için kullanın). <strong>Üst Lokasyon</strong> bazlı satırlar sadece o üst
+        lokasyonun personeli içindir. İkisi birlikte çalışır — hiçbir satır otomatik değildir, TA dahil.
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {ustLoklar.map(lok => {
+        {tumSatirlar.map(lok => {
           const seciliIds = aliciMap[lok.id] ?? []
+          const rowBg = (lok as any).isProjeGeneli ? '#eff6ff' : T.grayLight
+          const rowBorder = (lok as any).isProjeGeneli ? '#93c5fd' : T.border
           return (
-            <div key={lok.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: T.grayLight, borderRadius: 8, border: `1px solid ${T.border}` }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: T.text, minWidth: 120 }}>{lok.tanim}</span>
+            <div key={lok.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: rowBg, borderRadius: 8, border: `1px solid ${rowBorder}` }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: T.text, minWidth: 180 }}>{lok.tanim}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, flexWrap: 'wrap' }}>
                 {/* Seçili alıcılar chip */}
                 {seciliIds.map(uid => {

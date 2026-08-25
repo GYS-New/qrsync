@@ -22,7 +22,12 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data ?? [])
 }
 
-/** POST — alıcı ekle/güncelle (üst lokasyon bazlı) */
+/** POST — alıcı ekle/güncelle (üst lokasyon bazlı VEYA proje geneli)
+ *
+ * ust_lokasyon_id NULL → proje geneli: bu proje'nin tum personeli icin uygulanir.
+ * Personelleri sabit ust_lokasyon'a atanmayan projeler (ornek: Canakkale) icin
+ * kullanilir. Uygulama: cron 3. bildirimde ust_lokasyon-based + proje-geneli
+ * alicilari birlestirir. */
 export async function POST(req: NextRequest) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -34,14 +39,16 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { firmaId, projeId, ust_lokasyon_id, alici_user_ids } = body
-  if (!firmaId || !ust_lokasyon_id) return NextResponse.json({ error: 'firmaId ve ust_lokasyon_id gerekli' }, { status: 400 })
+  if (!firmaId) return NextResponse.json({ error: 'firmaId gerekli' }, { status: 400 })
 
+  const ustLokId = ust_lokasyon_id ?? null  // NULL = proje geneli
   const admin = createAdminClient()
 
-  // Mevcut eşleştirmeleri sil
-  let delQ = admin.from('personel_takip_alicilar').delete().eq('firma_id', firmaId).eq('ust_lokasyon_id', ust_lokasyon_id)
+  // Mevcut eslestirmeleri sil (ust_lokasyon_id NULL veya belli olsun)
+  let delQ = admin.from('personel_takip_alicilar').delete().eq('firma_id', firmaId)
+  delQ = ustLokId ? (delQ as any).eq('ust_lokasyon_id', ustLokId) : (delQ as any).is('ust_lokasyon_id', null)
   if (projeId) delQ = (delQ as any).eq('proje_id', projeId)
-  else delQ = delQ.is('proje_id', null)
+  else delQ = (delQ as any).is('proje_id', null)
   await delQ
 
   // Yenilerini ekle
@@ -50,7 +57,7 @@ export async function POST(req: NextRequest) {
     const rows = ids.map((uid: string) => ({
       firma_id: firmaId,
       proje_id: projeId ?? null,
-      ust_lokasyon_id,
+      ust_lokasyon_id: ustLokId,
       alici_user_id: uid,
     }))
     const { error } = await admin.from('personel_takip_alicilar').insert(rows)
