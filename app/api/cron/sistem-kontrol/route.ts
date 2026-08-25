@@ -423,11 +423,36 @@ async function kontrolPersonelDestek(admin: any, nowMs: number): Promise<SistemR
     })
   }
 
+  // Anomali 4: 24+ saatir cikis_saati NULL mesai kayitlari (mesai-cikis-hatirlatma
+  // cron duraksadi VEYA otomatik kapama basarisiz oldu). Bu pattern eski
+  // "personel is cikis unutmasi" sorununu goze cikarir. Normal isleyisde 30
+  // dk sonra otomatik kapama yapilir, 24+ saat kalirsa cron ariza.
+  const { count: acikMesaiEski } = await admin
+    .from('personel_mesai_kayitlari')
+    .select('id', { count: 'exact', head: true })
+    .is('cikis_saati', null)
+    .lt('giris_saati', birGunOnce)
+    .eq('arsivlendi', false)
+  if ((acikMesaiEski ?? 0) > 5) {
+    sorunlar.push({
+      kod: 'MESAI_ACIK_ESKI',
+      mesaj: `${acikMesaiEski} personel mesai kaydi 24+ saatir acik (cikis_saati NULL) — cikis hatirlatma cron duraksamis olabilir`,
+      adet: acikMesaiEski ?? 0,
+    })
+  } else if ((acikMesaiEski ?? 0) > 0) {
+    sorunlar.push({
+      kod: 'MESAI_ACIK_AZ',
+      mesaj: `${acikMesaiEski} eski acik mesai var (izlenmeli)`,
+      adet: acikMesaiEski ?? 0,
+    })
+  }
+
   const metrikler = {
     eski_beklemede: eskiBeklemede ?? 0,
     eski_islemde: eskiIslemde ?? 0,
     aktif_ayar: aktifAyar ?? 0,
     log_24h: pdLogCount ?? 0,
+    acik_mesai_eski: acikMesaiEski ?? 0,
   }
 
   if (sorunlar.length > 0) return raporla('Personel Destek', sorunlar, '', metrikler)
