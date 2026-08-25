@@ -186,6 +186,8 @@ export async function GET(request: Request) {
       totRow.font = { bold: true }
 
       // Row 3+: detay
+      // NOT: g.basariOrani ve g.genelOran zaten "%N" formatinda string
+      // (genel-rapor-data.ts:710 vs). Ekstra `%` prefix "%%" cift isaret uretiyordu.
       data.grupMetrikleri.forEach((g, i) => {
         const row = wsGrup.getRow(3 + i)
         row.getCell(1).value  = i + 1
@@ -198,8 +200,8 @@ export async function GET(request: Request) {
         row.getCell(8).value  = g.ekstra ?? 0
         row.getCell(9).value  = g.sapma
         row.getCell(10).value = g.kayip
-        row.getCell(11).value = `%${g.basariOrani}`
-        row.getCell(12).value = `%${g.genelOran}`
+        row.getCell(11).value = g.basariOrani
+        row.getCell(12).value = g.genelOran
       })
     }
 
