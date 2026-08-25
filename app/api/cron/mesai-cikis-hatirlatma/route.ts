@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     // Vardiya bitisi henuz gelmedi
     if (gecenDk < 15) { atlanan++; continue }
 
-    // GUVENLIK: Personel en az 4 saat calisti mi? Vardiya yanlis tahmin
+    // GUVENLIK 1: Personel en az 4 saat calisti mi? Vardiya yanlis tahmin
     // edilmis olabilir. Ornek: 14:30 giris, sistem V2 (bitis 16:00) sandi ama
     // personel V3 (16:00-24:00) icin 1.5 saat erken geldi. Bu durumda 16:15'te
     // "cikis unutuldu" push atmak yanlis olur. Cikis unutma davranisi ancak
@@ -104,6 +104,22 @@ export async function POST(req: NextRequest) {
     const girisMs = new Date(m.giris_saati).getTime()
     const calismaDk = Math.floor((now - girisMs) / 60000)
     if (calismaDk < 4 * 60) {
+      atlanan++
+      continue
+    }
+
+    // GUVENLIK 2: Personel son 30 dk icinde gorev basladi/tamamladi mi?
+    // Aktifse "hala calisiyor" demek — vardiya tahmini dogru olsa bile personel
+    // fazla mesai yapiyor olabilir. Push VE otomatik kapama atla, sonraki
+    // cron dongusunde tekrar denenir (30 dk hareketsizlik gerekli).
+    const otuzDkOnce = new Date(now - 30 * 60 * 1000).toISOString()
+    const { count: aktivite } = await admin
+      .from('canli_gorevler')
+      .select('id', { count: 'exact', head: true })
+      .eq('atanan_kullanici_id', m.user_id)
+      .gte('durum_degisim_tarihi', otuzDkOnce)
+      .in('durum', ['ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
+    if ((aktivite ?? 0) > 0) {
       atlanan++
       continue
     }
