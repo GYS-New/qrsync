@@ -232,9 +232,10 @@ export async function GET(request: Request) {
     })
 
     // ── Frekans Dışı ─────────────────────────────────────────────────────
+    // NOT: GEREKCE kolonu sablonda kaldirildi (25.08.2026 revize) — mapper 8 kolon.
     fillDetaySheet('Frekans Dışı', data.frekansDisiGorevler, (f) => [
       f.sn, f.ustLokasyon, f.grupTanimi, f.lokasyonTanimi, f.aciklama,
-      f.tarihSaat, f.gorevSuresi, f.personel, f.gerekce || '',
+      f.tarihSaat, f.gorevSuresi, f.personel,
     ])
 
     // ── Export ───────────────────────────────────────────────────────────
