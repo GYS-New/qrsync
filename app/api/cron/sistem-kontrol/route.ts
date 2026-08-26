@@ -423,6 +423,47 @@ async function kontrolPersonelDestek(admin: any, nowMs: number): Promise<SistemR
     })
   }
 
+  // Anomali 5: PD cron SESSIZCE basarisiz — pg_cron endpoint'i cagirdi ama
+  // response gelmedi (deploy penceresi, HTTP timeout vs). Sonuc: PD dokunmadi,
+  // BEKLEMEDE gorevler ZAMANI_GECMIS'e gecti.
+  // Kriter: Son 4 saatte proje bazinda:
+  //   - Toplu ZAMANI_GECMIS gecisi var (>= 5 gorev tek anda), kanal=null
+  //   - Ama o zaman diliminde o proje icin cron_log tip='personel_destek' yok
+  // Ornek (26.08.2026): Canakkale V2 icin 14 MALKARA gorevi 18:00'de ZAMANI_GECMIS
+  // oldu, PD cron 16:30'da cagrildi ama endpoint yanit vermedi.
+  const dortSaatOnce = new Date(nowMs - 4 * 60 * 60 * 1000).toISOString()
+  const { data: sonZamaniGecmis } = await admin
+    .from('canli_gorevler')
+    .select('proje_id, durum_degisim_tarihi')
+    .eq('durum', 'ZAMANI_GECMIS')
+    .is('son_tamamlama_kanali', null)
+    .gte('durum_degisim_tarihi', dortSaatOnce)
+  const zgProjeMap = new Map<string, number>()
+  for (const g of (sonZamaniGecmis ?? []) as any[]) {
+    if (!g.proje_id) continue
+    zgProjeMap.set(g.proje_id, (zgProjeMap.get(g.proje_id) ?? 0) + 1)
+  }
+  const pdSessizProjeler: { proje_id: string; adet: number }[] = []
+  for (const [projeId, adet] of zgProjeMap) {
+    if (adet < 5) continue  // en az 5 gorev tek ZG gecisi (spam engeli)
+    // O proje icin son 4 saatte PD cron log var mi?
+    const { count: pdVar } = await admin
+      .from('cron_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('tip', 'personel_destek')
+      .filter('sonuc->>proje_filtre', 'eq', projeId)
+      .gte('tarih', dortSaatOnce)
+    if ((pdVar ?? 0) === 0) pdSessizProjeler.push({ proje_id: projeId, adet })
+  }
+  if (pdSessizProjeler.length > 0) {
+    const detay = pdSessizProjeler.map(p => `${p.adet} gorev (proje ${p.proje_id.slice(0, 8)})`).join(', ')
+    sorunlar.push({
+      kod: 'PD_SESSIZ_HATA',
+      mesaj: `PD cron endpoint yanit vermedi — son 4 saatte proje bazinda ZAMANI_GECMIS birikimi: ${detay}. pg_cron tetiklendi ama response yok (deploy penceresi olabilir).`,
+      adet: pdSessizProjeler.reduce((s, p) => s + p.adet, 0),
+    })
+  }
+
   // Anomali 4: 24+ saatir cikis_saati NULL mesai kayitlari (mesai-cikis-hatirlatma
   // cron duraksadi VEYA otomatik kapama basarisiz oldu). Bu pattern eski
   // "personel is cikis unutmasi" sorununu goze cikarir. Normal isleyisde 30
