@@ -48,7 +48,10 @@ export async function GET(req: NextRequest) {
   const aktif = sp.get('aktif')
 
   let q = admin.from('araclar').select('*').eq('firma_id', firmaId).order('plaka')
-  if (projeId) q = q.eq('proje_id', projeId)
+  // SA firma-level erisim: proje filtresini yok say (araclar cogu zaman tek
+  // projede tanimli — SA'nin GYS'de secili farkli projesi yuzunden listenin
+  // bos gorunmesi engellenir). Diger roller mevcut davranis: proje bazli filtre.
+  if (projeId && !isSA) q = q.eq('proje_id', projeId)
   if (aktif === 'true') q = q.eq('aktif', true)
   if (aktif === 'false') q = q.eq('aktif', false)
 
