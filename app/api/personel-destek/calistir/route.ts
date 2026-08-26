@@ -61,28 +61,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, mesaj: 'Aktif destek yok', sonuclar: [] }, { headers: CORS })
     }
 
-    for (const ayar of ayarlar) {
-      // Proje vardiya bitiş penceresi kontrolü — bitiş 30-45 dk önce mi?
-      // Pencerede değilse skip (mig 094: her proje kendi vardiya saatleriyle).
-      const pencereSonuc = await vardiyaBitisPenceresinde(admin, ayar.firma_id, ayar.proje_id)
-      if (!pencereSonuc.icerideMi) {
-        sonuclar.push({
+    // PARALEL isleme (26.08.2026): Onceki sirali dongu 22 gorevi 51 sn'de
+    // isleyip MALKARA'ya sira gelmeden HTTP timeout kesiyordu (Canakkale V2
+    // 14 gorev kayip vakasi). Her ayar bagimsiz ust lokasyon — race yok.
+    // Promise.all ile tum ayarlar paralel islenir, ~7 sn'de biter.
+    const ayarSonuclari = await Promise.all(ayarlar.map(async (ayar) => {
+      try {
+        const pencereSonuc = await vardiyaBitisPenceresinde(admin, ayar.firma_id, ayar.proje_id)
+        if (!pencereSonuc.icerideMi) {
+          return {
+            ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id,
+            ust_lokasyon_id: ayar.ust_lokasyon_id,
+            tamamlanan: 0, mesaj: 'penceredeDegil',
+            ...pencereSonuc.debug,
+          }
+        }
+        const result = await destekCalistir(admin, ayar, pencereSonuc.vardiyaBitisIso!)
+        return {
           ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id,
           ust_lokasyon_id: ayar.ust_lokasyon_id,
-          tamamlanan: 0, mesaj: 'penceredeDegil',
-          ...pencereSonuc.debug,
-        })
-        continue
+          vardiya_bitis_dk: pencereSonuc.bitisDkOnce, ...result,
+        }
+      } catch (e: any) {
+        // Bir ayar hata verirse digerleri etkilenmez (izole)
+        console.error(`[PD] Ayar hata: ${ayar.id}`, e?.message)
+        return {
+          ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id,
+          ust_lokasyon_id: ayar.ust_lokasyon_id,
+          tamamlanan: 0, mesaj: 'hata', error: e?.message,
+        }
       }
-      // Vardiya bitiş anını destekCalistir'a geçir → tamamlanma_tarihi
-      // bu ana çekilir, görev kendi vardiya gününe raporlanır
-      const result = await destekCalistir(admin, ayar, pencereSonuc.vardiyaBitisIso!)
-      sonuclar.push({
-        ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id,
-        ust_lokasyon_id: ayar.ust_lokasyon_id,
-        vardiya_bitis_dk: pencereSonuc.bitisDkOnce, ...result,
-      })
-    }
+    }))
+    sonuclar.push(...ayarSonuclari)
 
     // Audit — tamamlanan görev varsa logla
     const toplamTamamlanan = sonuclar.reduce((s: number, r: any) => s + (r.tamamlanan ?? 0), 0)
