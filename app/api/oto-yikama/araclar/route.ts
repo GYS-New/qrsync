@@ -73,9 +73,10 @@ export async function POST(req: NextRequest) {
   if (!kullaniciAd) return NextResponse.json({ ok: false, error: 'Kullanıcı adı soyadı gerekli' }, { status: 400 })
   if (!departman) return NextResponse.json({ ok: false, error: 'Departman gerekli' }, { status: 400 })
   if (!body.firma_id) return NextResponse.json({ ok: false, error: 'firma_id gerekli' }, { status: 400 })
-  const isSA = ['super_admin', 'alt_super_admin'].includes(auth.me.rol)
-  if (!isSA && body.firma_id !== auth.me.firma_id) {
-    return NextResponse.json({ ok: false, error: 'Bu firmaya erişim yok' }, { status: 403 })
+  const { canEditOtoYikama } = await import('@/lib/oto-yikama/canEdit')
+  const yetkili = await canEditOtoYikama(admin as any, auth.me as any, body.firma_id)
+  if (!yetkili) {
+    return NextResponse.json({ ok: false, error: 'Bu islem icin yetkiniz yok' }, { status: 403 })
   }
   const modulErr = await assertOtoYikamaAktif(admin, body.firma_id); if (modulErr) return modulErr
 

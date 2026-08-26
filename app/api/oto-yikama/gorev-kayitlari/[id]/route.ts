@@ -70,8 +70,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const rec = await loadGorev(params.id)
   if (!rec) return NextResponse.json({ ok: false, error: 'Oto Yıkama görevi bulunamadı' }, { status: 404 })
-  if (auth.me.rol === 'tenant_admin' && rec.gorev.firma_id !== auth.me.firma_id) {
-    return NextResponse.json({ ok: false, error: 'Bu görev sizin firmanıza ait değil' }, { status: 403 })
+  const { canEditOtoYikama } = await import('@/lib/oto-yikama/canEdit')
+  const yetkili = await canEditOtoYikama(createAdminClient() as any, auth.me as any, rec.gorev.firma_id)
+  if (!yetkili) {
+    return NextResponse.json({ ok: false, error: 'Bu islem icin yetkiniz yok' }, { status: 403 })
   }
 
   const body = await req.json().catch(() => ({} as any))
@@ -264,8 +266,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const rec = await loadGorev(params.id)
   if (!rec) return NextResponse.json({ ok: false, error: 'Oto Yıkama görevi bulunamadı' }, { status: 404 })
-  if (auth.me.rol === 'tenant_admin' && rec.gorev.firma_id !== auth.me.firma_id) {
-    return NextResponse.json({ ok: false, error: 'Bu görev sizin firmanıza ait değil' }, { status: 403 })
+  const { canEditOtoYikama } = await import('@/lib/oto-yikama/canEdit')
+  const yetkili = await canEditOtoYikama(createAdminClient() as any, auth.me as any, rec.gorev.firma_id)
+  if (!yetkili) {
+    return NextResponse.json({ ok: false, error: 'Bu islem icin yetkiniz yok' }, { status: 403 })
   }
 
   const admin = createAdminClient()

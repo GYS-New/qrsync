@@ -20,8 +20,10 @@ export default async function OtoYikamaGorevKayitlariPage() {
   let canEdit = false
 
   if (firmaId) {
-    // Düzenleme/silme yetkisi: SA + TA
-    canEdit = ['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)
+    // Duzenleme/silme yetkisi: SA/TA + ust lokasyon yetkili TU (26.08.2026)
+    // Yetki-siz TU'lar salt-okur. Detay: lib/oto-yikama/canEdit.ts
+    const { canEditOtoYikama } = await import('@/lib/oto-yikama/canEdit')
+    canEdit = await canEditOtoYikama(admin as any, me as any, firmaId)
 
     // Oto Yıkama istasyonları (lokasyon edit modal'ı için dropdown — alt lokasyonlar)
     const otoUstIds = await getOtoYikamaLokasyonIds(admin as any, firmaId)
