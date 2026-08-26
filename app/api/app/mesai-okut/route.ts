@@ -163,16 +163,23 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── 5. TR bugün ───────────────────────────────────────────────────────────
+    // ── 5. TR bugün ve dün (V3 sarkan mesai icin) ────────────────────────────
+    // BUG FIX 26.08.2026: Onceki kod sadece kayit_tarihi=bugun arıyordu.
+    // V3 calisani (16:00-24:00) 25.08 17:00 giris (kayit=25.08), 26.08 00:10
+    // cikis QR okuttugunda sistem 26.08 kayit aradiği icin bulamiyor:
+    //   - CIKIS ise: "Acik kayit yok" 409 hatasi
+    //   - GIRIS ise: yeni kayit acar (25.08 NULL kalir, cift kayit)
+    // Fix: son 2 TR gunundeki (bugun VEYA dun) acik kaydi da yakala.
     const bugun  = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
     const simdi  = new Date().toISOString()
+    const dun    = new Date(Date.now() + 3 * 3600 * 1000 - 24 * 3600 * 1000).toISOString().slice(0, 10)
 
-    // ── 6. Bugünkü en son açık kayıt ─────────────────────────────────────────
+    // ── 6. Son 2 TR gunundeki en son acik kayit ─────────────────────────────
     let mevQ = admin
       .from('personel_mesai_kayitlari')
-      .select('id, giris_saati, cikis_saati')
+      .select('id, kayit_tarihi, giris_saati, cikis_saati')
       .eq('user_id', userId)
-      .eq('kayit_tarihi', bugun)
+      .in('kayit_tarihi', [bugun, dun])
       .is('cikis_saati', null)
       .order('giris_saati', { ascending: false })
       .limit(1)
