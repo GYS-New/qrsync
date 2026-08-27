@@ -73,6 +73,20 @@ function saat(iso: string | null) {
   return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
 }
 
+// TR gunu farkli ise "27.08 08:15" formati (sarkan V3 icin cikis)
+function saatIleTarih(iso: string | null, refIso: string | null) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  const trSaat = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' })
+  if (!refIso) return trSaat
+  const refGun = new Date(refIso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
+  const gun    = d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
+  if (gun === refGun) return trSaat
+  // Ertesi gun ise "+1 08:15" (kompakt), farkli tarih ise "27.08 08:15"
+  const kisa = d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Istanbul' })
+  return `${kisa} ${trSaat}`
+}
+
 function sure(giris: string | null, cikis: string | null) {
   if (!giris) return '—'
   const bitis = cikis ? new Date(cikis) : new Date()
@@ -80,6 +94,24 @@ function sure(giris: string | null, cikis: string | null) {
   const s     = Math.floor(dk / 60)
   const m     = dk % 60
   return `${s}s ${m}dk`
+}
+
+function sureDakika(giris: string | null, cikis: string | null): number {
+  if (!giris) return 0
+  const bitis = cikis ? new Date(cikis) : new Date()
+  return Math.max(0, Math.floor((bitis.getTime() - new Date(giris).getTime()) / 60000))
+}
+
+// giris_saati'nden vardiya no tahmin (default 3 vardiya, tolerans 30 dk)
+function vardiyaNo(giris: string | null): number | null {
+  if (!giris) return null
+  const trTime = new Date(giris).toLocaleTimeString('en-GB', { timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit' })
+  const [h, m] = trTime.split(':').map(Number)
+  const dk = h * 60 + m
+  // Tolerans 30 dk once vardiya baslangicina
+  if (dk >= 15 * 60 + 30) return 3  // 15:30 sonrasi V3
+  if (dk >= 7 * 60 + 30)  return 2  // 07:30 sonrasi V2
+  return 1  // 00:00-07:29 V1
 }
 
 function tarihFormatla(kayitTarihi: string) {
@@ -159,6 +191,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   const [filtreArama,     setFiltreArama]     = useState('')
   const [filtreLokasyon,  setFiltreLokasyon]  = useState('')
   const [filtreDurum,     setFiltreDurum]     = useState<'' | 'aktif' | 'pasif'>('')
+  const [filtreVardiya,   setFiltreVardiya]   = useState<'' | '1' | '2' | '3'>('')
   const [kayitListe,      setKayitListe]      = useState<MesaiKayit[]>([])
   const [lokMap,          setLokMap]          = useState<Record<string, string>>({})
   const [kayitLoading,    setKayitLoading]    = useState(false)
@@ -175,7 +208,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   const [arsivAktif,    setArsivAktif]    = useState(false)
 
   const filtreAktif       = !!(filtreBaslangic || filtreBitis)
-  const aktifFiltreSayisi = [filtreBaslangic, filtreBitis, filtreLokasyon, filtreDurum].filter(Boolean).length
+  const aktifFiltreSayisi = [filtreBaslangic, filtreBitis, filtreLokasyon, filtreDurum, filtreVardiya].filter(Boolean).length
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -234,7 +267,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   }
 
   function filtreyiTemizle() {
-    setFiltreBaslangic(''); setFiltreBitis(''); setFiltreArama(''); setFiltreLokasyon(''); setFiltreDurum(''); setKayitListe([])
+    setFiltreBaslangic(''); setFiltreBitis(''); setFiltreArama(''); setFiltreLokasyon(''); setFiltreDurum(''); setFiltreVardiya(''); setKayitListe([])
     setArsivAktif(false); setArsivData([]); setArsivTotal(0); setArsivSayfa(1)
     yukle()
   }
@@ -311,13 +344,32 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
         if (filtreLokasyon && (k as any).ust_lokasyon_id !== filtreLokasyon) return false
         if (filtreDurum === 'aktif' && !k.aktif) return false
         if (filtreDurum === 'pasif' && k.aktif) return false
+        if (filtreVardiya) {
+          const vNo = vardiyaNo(k.giris_saati)
+          if (vNo !== Number(filtreVardiya)) return false
+        }
         return true
       })
       .sort((a, b) => {
         if (a.kayit_tarihi !== b.kayit_tarihi) return b.kayit_tarihi.localeCompare(a.kayit_tarihi)
         return (a.isim_soyisim ?? '').localeCompare(b.isim_soyisim ?? '', 'tr')
       })
-  }, [kayitListe, filtreArama, filtreLokasyon, filtreDurum, yetkiliUstLokIds])
+  }, [kayitListe, filtreArama, filtreLokasyon, filtreDurum, filtreVardiya, yetkiliUstLokIds])
+
+  // Filtreli listenin ozet metrikleri
+  const kayitOzeti = useMemo(() => {
+    const toplamDk = siraliKayitlar.reduce((s, k) => s + sureDakika(k.giris_saati, k.cikis_saati), 0)
+    const tamamKayit = siraliKayitlar.filter(k => k.cikis_saati).length
+    const ortDk = tamamKayit > 0 ? Math.floor(toplamDk / tamamKayit) : 0
+    const eksikCikis = siraliKayitlar.filter(k => !k.cikis_saati).length
+    const fmtDk = (dk: number) => `${Math.floor(dk / 60)}s ${dk % 60}dk`
+    return {
+      toplamKayit: siraliKayitlar.length,
+      toplamSaat: fmtDk(toplamDk),
+      ortalamaSaat: tamamKayit > 0 ? fmtDk(ortDk) : '—',
+      eksikCikis,
+    }
+  }, [siraliKayitlar])
 
   // Sayfalama
   const aktifListe = filtreAktif ? siraliKayitlar : siraliListe
@@ -342,18 +394,25 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
       ws.columns = [
         { header: 'Personel', key: 'isim', width: 24 }, { header: 'Email', key: 'email', width: 28 },
         { header: 'Üst Lokasyon', key: 'lok', width: 20 }, { header: 'Rol', key: 'rol', width: 14 },
-        { header: 'Tarih', key: 'tarih', width: 14 }, { header: 'Durum', key: 'durum', width: 12 },
-        { header: 'İş Başı', key: 'giris', width: 12 }, { header: 'İş Bitimi', key: 'cikis', width: 12 },
+        { header: 'Tarih', key: 'tarih', width: 14 }, { header: 'Vardiya', key: 'vardiya', width: 10 },
+        { header: 'Durum', key: 'durum', width: 12 },
+        { header: 'İş Başı', key: 'giris', width: 12 }, { header: 'İş Bitimi', key: 'cikis', width: 14 },
         { header: 'Çalışma Süresi', key: 'sure', width: 16 },
       ]
-      siraliKayitlar.forEach(k => ws.addRow({
-        isim: k.isim_soyisim, email: k.email,
-        lok: (k as any).ust_lokasyon_id ? lokMap[(k as any).ust_lokasyon_id] ?? '' : '',
-        rol: ROL_BADGE[k.rol]?.label ?? k.rol,
-        tarih: tarihFormatla(k.kayit_tarihi), durum: k.aktif ? 'Aktif' : 'Pasif',
-        giris: saat(k.giris_saati), cikis: saat(k.cikis_saati),
-        sure: sure(k.giris_saati, k.cikis_saati),
-      }))
+      siraliKayitlar.forEach(k => {
+        const vNo = vardiyaNo(k.giris_saati)
+        ws.addRow({
+          isim: k.isim_soyisim, email: k.email,
+          lok: (k as any).ust_lokasyon_id ? lokMap[(k as any).ust_lokasyon_id] ?? '' : '',
+          rol: ROL_BADGE[k.rol]?.label ?? k.rol,
+          tarih: tarihFormatla(k.kayit_tarihi),
+          vardiya: vNo ? `${vNo}. Vardiya` : '',
+          durum: k.aktif ? 'Aktif' : 'Pasif',
+          giris: saat(k.giris_saati),
+          cikis: saatIleTarih(k.cikis_saati, k.giris_saati),
+          sure: sure(k.giris_saati, k.cikis_saati),
+        })
+      })
     } else {
       ws.columns = [
         { header: 'Personel', key: 'isim', width: 24 }, { header: 'Email', key: 'email', width: 28 },
@@ -601,21 +660,40 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                     <input type="date" value={filtreBitis} onChange={e => setFiltreBitis(e.target.value)}
                       style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }} />
                   </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Vardiya</div>
+                    <select value={filtreVardiya} onChange={e => setFiltreVardiya(e.target.value as any)}
+                      style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff', minWidth: 160 }}>
+                      <option value="">Tüm Vardiyalar</option>
+                      <option value="1">1. Vardiya (00:00–08:00)</option>
+                      <option value="2">2. Vardiya (08:00–16:00)</option>
+                      <option value="3">3. Vardiya (16:00–24:00)</option>
+                    </select>
+                  </div>
                   <button onClick={filtreleUygula} disabled={kayitLoading}
                     style={{ height: 32, padding: '0 16px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Filter size={12} /> {kayitLoading ? 'Yükleniyor…' : 'Uygula'}
                   </button>
-                  {filtreAktif && !arsivAktif && (
-                    <button onClick={() => { setArsivAktif(true); setArsivSayfa(1); arsivYukle(1) }}
-                      style={{ height: 32, padding: '0 14px', borderRadius: 8, border: '1px solid #6b7280', background: '#f9fafb', color: '#374151', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Archive size={12} /> Arşivden Çek
-                    </button>
-                  )}
                   {filtreAktif && (
                     <button onClick={filtreyiTemizle}
                       style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                       <X size={12} /> Temizle
                     </button>
+                  )}
+                  <div style={{ marginLeft: 'auto', fontSize: 11, color: '#64748b', fontStyle: 'italic', maxWidth: 300 }}>
+                    Geçmiş tarih otomatik olarak arşiv kayıtlarını da içerir.
+                  </div>
+                </div>
+              )}
+
+              {/* Filtre modu ozet metrikleri */}
+              {filtreAktif && siraliKayitlar.length > 0 && (
+                <div style={{ padding: '10px 18px', background: '#eff6ff', borderBottom: '1px solid #dbeafe', display: 'flex', gap: 20, flexWrap: 'wrap', fontSize: 12 }}>
+                  <span><strong style={{ color: '#1e40af' }}>Toplam Kayıt:</strong> {kayitOzeti.toplamKayit}</span>
+                  <span><strong style={{ color: '#1e40af' }}>Toplam Çalışma:</strong> {kayitOzeti.toplamSaat}</span>
+                  <span><strong style={{ color: '#1e40af' }}>Ortalama:</strong> {kayitOzeti.ortalamaSaat}</span>
+                  {kayitOzeti.eksikCikis > 0 && (
+                    <span style={{ color: '#dc2626' }}><strong>⚠ Eksik Çıkış:</strong> {kayitOzeti.eksikCikis}</span>
                   )}
                 </div>
               )}
@@ -655,7 +733,10 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                               <td style={{ fontWeight: 600, color: tc }}>{tarihFormatla(k.kayit_tarihi)}</td>
                               <td>{durumBadge(k.aktif)}</td>
                               <td style={{ fontWeight: 600, color: k.giris_saati ? tc : '#cbd5e1' }}>{saat(k.giris_saati)}</td>
-                              <td style={{ color: k.cikis_saati ? tc : '#cbd5e1' }}>{saat(k.cikis_saati)}</td>
+                              <td style={{ color: k.cikis_saati ? tc : '#cbd5e1', whiteSpace: 'nowrap' }}
+                                title={k.cikis_saati ? new Date(k.cikis_saati).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }) : ''}>
+                                {saatIleTarih(k.cikis_saati, k.giris_saati)}
+                              </td>
                               <td style={{ color: dim ? '#cbd5e1' : '#475569' }}>{sure(k.giris_saati, k.cikis_saati)}</td>
                             </tr>
                           )
@@ -716,54 +797,9 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
               )}
             </div>
 
-            {/* ── ARŞİV BÖLÜMÜ ── */}
-            {arsivAktif && (
-              <div className="verde-card" style={{ overflow: 'hidden', marginTop: 12 }}>
-                <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Archive size={14} color="#6b7280" />
-                  <span style={{ fontWeight: 800, fontSize: 14, color: '#6b7280' }}>Arşiv Kayıtları</span>
-                  <span style={{ fontSize: 12, color: '#94a3b8' }}>({arsivTotal} kayıt)</span>
-                  {arsivLoading && <RefreshCw size={14} style={{ ...spinning, color: '#6b7280' }} />}
-                </div>
-                <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 400 }}>
-                  <table className="verde-table">
-                    <thead><tr>
-                      <th>Personel</th><th>Email</th><th>Tarih</th>
-                      <th>İş Başı</th><th>İş Bitimi</th><th>Çalışma Süresi</th>
-                    </tr></thead>
-                    <tbody>
-                      {arsivData.length === 0 ? (
-                        <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-                          {arsivLoading ? 'Yükleniyor...' : 'Arşiv kaydı bulunamadı.'}
-                        </td></tr>
-                      ) : arsivData.map((r: any) => (
-                        <tr key={r.id} style={{ background: '#f8fafc' }}>
-                          <td style={{ fontWeight: 600, fontSize: 13 }}>{r.isim_soyisim ?? '—'}</td>
-                          <td style={{ color: '#64748b', fontSize: 12 }}>{r.email ?? '—'}</td>
-                          <td style={{ fontWeight: 600 }}>{r.kayit_tarihi ? tarihFormatla(r.kayit_tarihi) : '—'}</td>
-                          <td style={{ fontWeight: 600 }}>{saat(r.giris_saati)}</td>
-                          <td>{saat(r.cikis_saati)}</td>
-                          <td>{sure(r.giris_saati, r.cikis_saati)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {arsivTotal > 50 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 18px', borderTop: '1px solid #f3f4f6' }}>
-                    <button onClick={() => { const p = 1; setArsivSayfa(p); arsivYukle(p) }} disabled={arsivSayfa === 1 || arsivLoading}
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa === 1 ? 0.4 : 1 }}>«</button>
-                    <button onClick={() => { const p = Math.max(1, arsivSayfa - 1); setArsivSayfa(p); arsivYukle(p) }} disabled={arsivSayfa === 1 || arsivLoading}
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa === 1 ? 0.4 : 1 }}>‹ Önceki</button>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{arsivSayfa} / {Math.ceil(arsivTotal / 50)}</span>
-                    <button onClick={() => { const p = Math.min(Math.ceil(arsivTotal / 50), arsivSayfa + 1); setArsivSayfa(p); arsivYukle(p) }} disabled={arsivSayfa >= Math.ceil(arsivTotal / 50) || arsivLoading}
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa >= Math.ceil(arsivTotal / 50) ? 0.4 : 1 }}>Sonraki ›</button>
-                    <button onClick={() => { const p = Math.ceil(arsivTotal / 50); setArsivSayfa(p); arsivYukle(p) }} disabled={arsivSayfa >= Math.ceil(arsivTotal / 50) || arsivLoading}
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: arsivSayfa >= Math.ceil(arsivTotal / 50) ? 0.4 : 1 }}>»</button>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Arsiv bolumu kaldirildi (26.08.2026): /api/mesai/liste endpoint'i
+                zaten hem canli hem arsiv kayitlarini birlikte donuyor. Ayri
+                buton yerine tarih filtresi otomatik arsive de bakar. */}
 
             {personelTakibiAktif && kpi && kpi.pasif > 0 && !filtreAktif && (
               <div style={{ fontSize: 12.5, color: '#dc2626', background: '#fef2f2', padding: '8px 14px', borderRadius: 8, border: '1px solid #fecaca' }}>
