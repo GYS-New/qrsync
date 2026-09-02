@@ -6,6 +6,7 @@ import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
 import { ekstraMukerrer5dkKontrol } from '@/lib/tasks/ekstraLokasyonKontrol'
 import { vardiyaGunuHesapla, type VardiyaAyar } from '@/lib/gorev/vardiyaGunu'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
+import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -52,6 +53,10 @@ export async function POST(req: Request) {
     }
 
     const { user_id: userId, firma_id: firmaId, proje_id: personelProjeId } = tokenData
+
+    // PT aktif projede acik mesai zorunlulugu (02.09.2026 fix)
+    const mesaiHata = await mesaiVePasifKontrol(admin, userId)
+    if (mesaiHata) return NextResponse.json(mesaiHata, { status: mesaiHata.status, headers: CORS })
 
     const { data: userData } = await admin.from('users').select('aktif').eq('id', userId).single()
     if (!userData || userData.aktif === false) {

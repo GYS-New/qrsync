@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { auditLog } from '@/lib/audit/log'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 import { iptalSebepKontrol } from '@/lib/validation/iptalSebep'
+import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,13 +36,9 @@ export async function POST(req: Request) {
 
     const { user_id: userId, firma_id: firmaId } = tokenData
 
-    const { data: userData } = await admin.from('users').select('aktif').eq('id', userId).single()
-    if (!userData || userData.aktif === false) {
-      return NextResponse.json(
-        { ok: false, error: 'Pasif durumdasınız! Lütfen sistem yöneticiniz ile iletişime geçin.', code: 'USER_PASIF' },
-        { status: 403, headers: CORS }
-      )
-    }
+    // PT aktif projede acik mesai + pasif kullanici kontrolu (02.09.2026 fix)
+    const mesaiHata = await mesaiVePasifKontrol(admin, userId)
+    if (mesaiHata) return NextResponse.json(mesaiHata, { status: mesaiHata.status, headers: CORS })
 
     let body: any
     try { body = await req.json() } catch {

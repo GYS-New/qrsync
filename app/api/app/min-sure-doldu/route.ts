@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendFCMToUser } from '@/lib/fcm-sender'
 
@@ -28,6 +29,9 @@ async function getAuthUser(req: Request) {
 export async function POST(req: Request) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
+
+  const mesaiHata = await mesaiVePasifKontrol(createAdminClient(), user.id)
+  if (mesaiHata) return NextResponse.json(mesaiHata, { status: mesaiHata.status, headers: CORS_HEADERS })
 
   try {
     const body = await req.json()

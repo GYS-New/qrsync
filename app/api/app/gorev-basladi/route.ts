@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendFCMToUser } from '@/lib/fcm-sender'
+import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -28,6 +29,11 @@ async function getAuthUser(req: Request) {
 export async function POST(req: Request) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401, headers: CORS_HEADERS })
+
+  // PT aktif projede acik mesai zorunlulugu (02.09.2026 fix — 7 mobil endpoint
+  // bu kontrolu yapmiyordu, personel mesai olmadan gorev basladiabiliyordu)
+  const mesaiHata = await mesaiVePasifKontrol(createAdminClient(), user.id)
+  if (mesaiHata) return NextResponse.json(mesaiHata, { status: mesaiHata.status, headers: CORS_HEADERS })
 
   try {
     const body = await req.json()
