@@ -55,6 +55,7 @@ async function handle(req: Request) {
   sistemler.push(await kontrolOfflineMod(admin, nowMs))
   sistemler.push(await kontrolVeriButunlugu(admin, nowMs))
   sistemler.push(await kontrolGorevUretimi(admin, nowMs))
+  sistemler.push(await kontrolPersonelTakipBildirim(admin, nowMs))
 
   const toplamSorun = sistemler.filter(s => s.durum === 'SORUN').length
   const toplamOk = sistemler.filter(s => s.durum === 'OK').length
@@ -943,4 +944,98 @@ async function kontrolOfflineMod(admin: any, nowMs: number): Promise<SistemRapor
     return raporla('Offline Mod', [], `Son 7 günde ${toplamOffline} offline kayıt tutarlı (son 24h: ${offlineSon24h ?? 0}, son 1h: ${offlineSon1h ?? 0})`, metrikler)
   }
   return raporla('Offline Mod', [], '', metrikler, 'Son 7 günde offline kayıt yok — mobil henüz aktif kullanmıyor')
+}
+
+/* ────────────────────────── PERSONEL TAKİP BİLDİRİM ────────────────────────── */
+
+/**
+ * 3-bildirim cron false positive kontrolü.
+ *
+ * 02.09.2026 vakasi: cron .eq('atanan_kullanici_id', user_id) yaparken
+ * frekansiyel gorevlerde bu kolon NULL — dolayisiyla "gorev baslatilmis"
+ * kontrolu asla true donmuyordu. Sonuc: gorev yapan 7 personele bos yere
+ * bildirim atildi, 3. bildirimde ust lokasyon alicilara "personel calismiyor"
+ * uyarisi da gitti. Fix: atanan OR baslatan + gorevler tablosu + TR offset.
+ *
+ * Bu kontrol regression amaci: son 30 dk icinde bildirim gonderilen (sayaç
+ * artmıs) her personelin BUGUN gerçekten hiç görev başlatmamış olması gerekir.
+ * Aksi halde false positive = cron mantık hatası.
+ */
+async function kontrolPersonelTakipBildirim(admin: any, nowMs: number): Promise<SistemRaporu> {
+  const sorunlar: SorunDetayi[] = []
+
+  const otuzDkOnce = new Date(nowMs - 30 * 60 * 1000).toISOString()
+  const bugunTR = new Date(nowMs + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const bugunTR00 = `${bugunTR}T00:00:00+03:00`
+
+  // Son 30 dk'da bildirim atilmis kisiler (bildirim_sayaci > 0 ve son_bildirim_tarihi taze)
+  const { data: bildirimAlanlar } = await admin
+    .from('personel_mesai_kayitlari')
+    .select('user_id, bildirim_sayaci, son_bildirim_tarihi')
+    .gt('bildirim_sayaci', 0)
+    .gte('son_bildirim_tarihi', otuzDkOnce)
+    .eq('kayit_tarihi', bugunTR)
+    .limit(500)
+
+  const userIds = [...new Set((bildirimAlanlar ?? []).map((r: any) => r.user_id))]
+
+  let falsePositive = 0
+  const falsePositiveIsimler: string[] = []
+
+  if (userIds.length > 0) {
+    // Her bir user icin bugun baslatmis oldugu gorev sayisi (canli + spesifik)
+    const [canliRes, spesifikRes] = await Promise.all([
+      admin.from('canli_gorevler')
+        .select('baslatan_kullanici_id, atanan_kullanici_id')
+        .in('durum', ['ISLEMDE', 'TAMAMLANDI'])
+        .gte('baslatilma_tarihi', bugunTR00)
+        .limit(5000),
+      admin.from('gorevler')
+        .select('baslatan_kullanici_id, atanan_kullanici_id')
+        .in('durum', ['ISLEMDE', 'TAMAMLANDI'])
+        .gte('baslatilma_tarihi', bugunTR00)
+        .limit(5000),
+    ])
+
+    const baslatmisSet = new Set<string>()
+    for (const r of (canliRes.data ?? []) as any[]) {
+      if (r.baslatan_kullanici_id) baslatmisSet.add(r.baslatan_kullanici_id)
+      if (r.atanan_kullanici_id) baslatmisSet.add(r.atanan_kullanici_id)
+    }
+    for (const r of (spesifikRes.data ?? []) as any[]) {
+      if (r.baslatan_kullanici_id) baslatmisSet.add(r.baslatan_kullanici_id)
+      if (r.atanan_kullanici_id) baslatmisSet.add(r.atanan_kullanici_id)
+    }
+
+    const fpIds = userIds.filter(uid => baslatmisSet.has(uid as string))
+    falsePositive = fpIds.length
+
+    if (falsePositive > 0) {
+      const { data: isimler } = await admin
+        .from('users')
+        .select('isim_soyisim')
+        .in('id', fpIds.slice(0, 10))
+      falsePositiveIsimler.push(...(isimler ?? []).map((u: any) => u.isim_soyisim))
+    }
+  }
+
+  if (falsePositive > 0) {
+    sorunlar.push({
+      kod: 'PT_BILDIRIM_FALSE_POSITIVE',
+      mesaj: `${falsePositive} personele son 30 dk'da bildirim atilmis fakat bugun gorev baslatmislar (${falsePositiveIsimler.slice(0, 5).join(', ')}${falsePositiveIsimler.length > 5 ? '...' : ''}). Cron false positive uretiyor.`,
+      adet: falsePositive,
+    })
+  }
+
+  const metrikler = {
+    son_30dk_bildirim_alan: userIds.length,
+    false_positive: falsePositive,
+    ornek_isimler: falsePositiveIsimler.slice(0, 5),
+  }
+
+  if (sorunlar.length > 0) return raporla('Personel Takip Bildirim', sorunlar, '', metrikler)
+  if (userIds.length === 0) {
+    return raporla('Personel Takip Bildirim', [], '', metrikler, 'Son 30 dk icinde bildirim gonderilmemis — kontrol edilecek veri yok')
+  }
+  return raporla('Personel Takip Bildirim', [], `Son 30 dk icinde ${userIds.length} personele bildirim atildi, hicbiri false positive degil (gerekci bildirimler)`, metrikler)
 }
