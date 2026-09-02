@@ -26,12 +26,15 @@ export async function POST(req: NextRequest) {
   const bugun = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
   let toplam = 0
 
-  // Aktif firmalar (personel takip bildirimi açık olanlar)
+  // Aktif firmalar (filtre KALDIRILDI 02.09.2026 fix)
+  // Onceki: .gt('personel_takip_bildirim_dk', 0) — firma seviyesi 0 ise proje
+  // override'i devreye giremiyordu. Canakkale/ATALIAN vakasi: firma_dk=0 ama
+  // proje_dk=30 idi; firma sorguya girmediginden ADEM ATLI'ya 6+ saat bildirim
+  // atilmadi.
   const { data: firmalar } = await admin
     .from('firmalar')
     .select('id,personel_takip_bildirim_dk')
     .eq('aktif', true)
-    .gt('personel_takip_bildirim_dk', 0)
 
   // Proje override'ları
   const { data: projeler } = await admin
@@ -48,8 +51,7 @@ export async function POST(req: NextRequest) {
   // isterse ilgili ust_lokasyon veya "proje geneli" satirinda kendini eklemeli.
 
   for (const firma of firmalar ?? []) {
-    const firmaDk = firma.personel_takip_bildirim_dk
-    if (!firmaDk || firmaDk <= 0) continue
+    const firmaDk = firma.personel_takip_bildirim_dk ?? 0
 
     // Bugün mesaide olan personeller (giris var, cikis yok)
     const { data: mesaiKayitlari } = await admin
@@ -63,13 +65,15 @@ export async function POST(req: NextRequest) {
     for (const mesai of mesaiKayitlari ?? []) {
       if (!mesai.giris_saati || !mesai.user_id) continue
 
-      // Efektif bildirim süresi
-      let bildirimDk = firmaDk
-      if (mesai.proje_id && projeOverride.has(mesai.proje_id)) {
-        const pDk = projeOverride.get(mesai.proje_id)!
-        if (pDk <= 0) continue // proje bazında kapalı
-        bildirimDk = pDk
-      }
+      // Efektif bildirim süresi: proje override > firma default
+      // Ikisi de 0 ise atla (bildirim kapali).
+      const projeDk = mesai.proje_id && projeOverride.has(mesai.proje_id)
+        ? projeOverride.get(mesai.proje_id)!
+        : null
+      const bildirimDk = projeDk != null && projeDk > 0
+        ? projeDk
+        : (firmaDk > 0 ? firmaDk : 0)
+      if (bildirimDk <= 0) continue  // hem firma hem proje kapali
 
       const girisSaat = new Date(mesai.giris_saati).getTime()
       const gecenDk = Math.floor((now - girisSaat) / 60000)
