@@ -192,6 +192,7 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
   const [filtreLokasyon,  setFiltreLokasyon]  = useState('')
   const [filtreDurum,     setFiltreDurum]     = useState<'' | 'aktif' | 'pasif'>('')
   const [filtreVardiya,   setFiltreVardiya]   = useState<'' | '1' | '2' | '3'>('')
+  const [filtreGorunum,   setFiltreGorunum]   = useState<'detay' | 'ozet'>('detay')
   const [kayitListe,      setKayitListe]      = useState<MesaiKayit[]>([])
   const [lokMap,          setLokMap]          = useState<Record<string, string>>({})
   const [kayitLoading,    setKayitLoading]    = useState(false)
@@ -362,13 +363,65 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
     const tamamKayit = siraliKayitlar.filter(k => k.cikis_saati).length
     const ortDk = tamamKayit > 0 ? Math.floor(toplamDk / tamamKayit) : 0
     const eksikCikis = siraliKayitlar.filter(k => !k.cikis_saati).length
+    const farkliPersonel = new Set(siraliKayitlar.map(k => k.user_id)).size
     const fmtDk = (dk: number) => `${Math.floor(dk / 60)}s ${dk % 60}dk`
     return {
       toplamKayit: siraliKayitlar.length,
       toplamSaat: fmtDk(toplamDk),
       ortalamaSaat: tamamKayit > 0 ? fmtDk(ortDk) : '—',
       eksikCikis,
+      farkliPersonel,
     }
+  }, [siraliKayitlar])
+
+  // Personel bazli aggregated ozet (personelOzeti gorunumu icin)
+  type PersonelOzet = {
+    user_id: string
+    isim_soyisim: string
+    email: string
+    ust_lokasyon_id: string | null
+    toplamGun: number
+    vardiya1Gun: number
+    vardiya2Gun: number
+    vardiya3Gun: number
+    toplamDk: number
+    ortalamaDk: number
+    eksikCikis: number
+    ilkTarih: string | null
+    sonTarih: string | null
+  }
+  const personelOzeti = useMemo<PersonelOzet[]>(() => {
+    const map = new Map<string, PersonelOzet>()
+    for (const k of siraliKayitlar) {
+      if (!k.user_id) continue
+      let p = map.get(k.user_id)
+      if (!p) {
+        p = {
+          user_id: k.user_id,
+          isim_soyisim: k.isim_soyisim ?? '—',
+          email: k.email ?? '',
+          ust_lokasyon_id: (k as any).ust_lokasyon_id ?? null,
+          toplamGun: 0, vardiya1Gun: 0, vardiya2Gun: 0, vardiya3Gun: 0,
+          toplamDk: 0, ortalamaDk: 0, eksikCikis: 0,
+          ilkTarih: null, sonTarih: null,
+        }
+        map.set(k.user_id, p)
+      }
+      p.toplamGun += 1
+      const vNo = vardiyaNo(k.giris_saati)
+      if (vNo === 1) p.vardiya1Gun += 1
+      else if (vNo === 2) p.vardiya2Gun += 1
+      else if (vNo === 3) p.vardiya3Gun += 1
+      p.toplamDk += sureDakika(k.giris_saati, k.cikis_saati)
+      if (!k.cikis_saati) p.eksikCikis += 1
+      if (!p.ilkTarih || k.kayit_tarihi < p.ilkTarih) p.ilkTarih = k.kayit_tarihi
+      if (!p.sonTarih || k.kayit_tarihi > p.sonTarih) p.sonTarih = k.kayit_tarihi
+    }
+    for (const p of map.values()) {
+      const tamamKayit = p.toplamGun - p.eksikCikis
+      p.ortalamaDk = tamamKayit > 0 ? Math.floor(p.toplamDk / tamamKayit) : 0
+    }
+    return [...map.values()].sort((a, b) => b.toplamDk - a.toplamDk)
   }, [siraliKayitlar])
 
   // Sayfalama
@@ -390,6 +443,38 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
     const ws = wb.addWorksheet('Personel Takibi')
+    // Ozet gorunumu excel formati
+    if (filtreAktif && filtreGorunum === 'ozet') {
+      ws.columns = [
+        { header: 'Personel', key: 'isim', width: 24 }, { header: 'Email', key: 'email', width: 28 },
+        { header: 'Toplam Gün', key: 'gun', width: 12 },
+        { header: '1. Vardiya (Gün)', key: 'v1', width: 15 },
+        { header: '2. Vardiya (Gün)', key: 'v2', width: 15 },
+        { header: '3. Vardiya (Gün)', key: 'v3', width: 15 },
+        { header: 'Toplam Çalışma', key: 'toplam', width: 16 },
+        { header: 'Ortalama/Gün', key: 'ort', width: 14 },
+        { header: 'Eksik Çıkış', key: 'eksik', width: 12 },
+        { header: 'İlk Kayıt', key: 'ilk', width: 12 }, { header: 'Son Kayıt', key: 'son', width: 12 },
+      ]
+      const fmt = (dk: number) => `${Math.floor(dk / 60)}s ${String(dk % 60).padStart(2, '0')}dk`
+      personelOzeti.forEach(p => ws.addRow({
+        isim: p.isim_soyisim, email: p.email,
+        gun: p.toplamGun, v1: p.vardiya1Gun, v2: p.vardiya2Gun, v3: p.vardiya3Gun,
+        toplam: fmt(p.toplamDk), ort: fmt(p.ortalamaDk),
+        eksik: p.eksikCikis,
+        ilk: p.ilkTarih ? tarihFormatla(p.ilkTarih) : '',
+        son: p.sonTarih ? tarihFormatla(p.sonTarih) : '',
+      }))
+      const hr = ws.getRow(1)
+      hr.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      hr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } }
+      const buf = await wb.xlsx.writeBuffer()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+      a.download = `personel-ozeti-${filtreBaslangic || 'tum'}-${filtreBitis || 'bugun'}.xlsx`
+      a.click(); URL.revokeObjectURL(a.href)
+      return
+    }
     if (filtreAktif) {
       ws.columns = [
         { header: 'Personel', key: 'isim', width: 24 }, { header: 'Email', key: 'email', width: 28 },
@@ -680,18 +765,40 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                       <X size={12} /> Temizle
                     </button>
                   )}
-                  <div style={{ marginLeft: 'auto', fontSize: 11, color: '#64748b', fontStyle: 'italic', maxWidth: 300 }}>
-                    Geçmiş tarih otomatik olarak arşiv kayıtlarını da içerir.
-                  </div>
+                  {/* Gorunum toggle: Detay / Personel Ozeti */}
+                  {filtreAktif && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fff', padding: 2, borderRadius: 8, border: '1px solid #e2e8f0', marginLeft: 'auto' }}>
+                      <button onClick={() => setFiltreGorunum('detay')}
+                        style={{ padding: '5px 10px', borderRadius: 6, border: 'none',
+                          background: filtreGorunum === 'detay' ? '#0f172a' : 'transparent',
+                          color: filtreGorunum === 'detay' ? '#fff' : '#475569',
+                          fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                        Detay Kayıt
+                      </button>
+                      <button onClick={() => setFiltreGorunum('ozet')}
+                        style={{ padding: '5px 10px', borderRadius: 6, border: 'none',
+                          background: filtreGorunum === 'ozet' ? '#0f172a' : 'transparent',
+                          color: filtreGorunum === 'ozet' ? '#fff' : '#475569',
+                          fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                        📊 Personel Özeti
+                      </button>
+                    </div>
+                  )}
+                  {!filtreAktif && (
+                    <div style={{ marginLeft: 'auto', fontSize: 11, color: '#64748b', fontStyle: 'italic', maxWidth: 300 }}>
+                      Geçmiş tarih otomatik olarak arşiv kayıtlarını da içerir.
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Filtre modu ozet metrikleri */}
               {filtreAktif && siraliKayitlar.length > 0 && (
                 <div style={{ padding: '10px 18px', background: '#eff6ff', borderBottom: '1px solid #dbeafe', display: 'flex', gap: 20, flexWrap: 'wrap', fontSize: 12 }}>
-                  <span><strong style={{ color: '#1e40af' }}>Toplam Kayıt:</strong> {kayitOzeti.toplamKayit}</span>
+                  <span><strong style={{ color: '#1e40af' }}>Farklı Personel:</strong> {kayitOzeti.farkliPersonel}</span>
+                  <span><strong style={{ color: '#1e40af' }}>Toplam Mesai:</strong> {kayitOzeti.toplamKayit}</span>
                   <span><strong style={{ color: '#1e40af' }}>Toplam Çalışma:</strong> {kayitOzeti.toplamSaat}</span>
-                  <span><strong style={{ color: '#1e40af' }}>Ortalama:</strong> {kayitOzeti.ortalamaSaat}</span>
+                  <span><strong style={{ color: '#1e40af' }}>Kayıt Ortalaması:</strong> {kayitOzeti.ortalamaSaat}</span>
                   {kayitOzeti.eksikCikis > 0 && (
                     <span style={{ color: '#dc2626' }}><strong>⚠ Eksik Çıkış:</strong> {kayitOzeti.eksikCikis}</span>
                   )}
@@ -707,9 +814,62 @@ export default function PersonelTakibiClient({ base, isSA, initialFirmaId, initi
                 <div style={{ padding: 40, textAlign: 'center' }}>
                   <RefreshCw size={22} style={{ ...spinning, color: '#1f2937', display: 'block', margin: '0 auto 10px' }} />
                 </div>
+              ) : filtreAktif && filtreGorunum === 'ozet' ? (
+                /* ── PERSONEL OZETI gorunumu (aggregated) ── */
+                personelOzeti.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+                    Seçilen tarih aralığında kayıt yok
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
+                    <table className="verde-table">
+                      <thead><tr>
+                        <th>Personel</th>
+                        <th style={{ textAlign: 'center' }}>Toplam Gün</th>
+                        <th style={{ textAlign: 'center' }}>1. Vardiya</th>
+                        <th style={{ textAlign: 'center' }}>2. Vardiya</th>
+                        <th style={{ textAlign: 'center' }}>3. Vardiya</th>
+                        <th style={{ textAlign: 'right' }}>Toplam Çalışma</th>
+                        <th style={{ textAlign: 'right' }}>Ortalama/Gün</th>
+                        <th style={{ textAlign: 'center' }}>Eksik Çıkış</th>
+                        <th>İlk / Son Kayıt</th>
+                      </tr></thead>
+                      <tbody>
+                        {personelOzeti.map((p) => {
+                          const fmt = (dk: number) => `${Math.floor(dk / 60)}s ${String(dk % 60).padStart(2, '0')}dk`
+                          const vBadge = (adet: number, renk: string) => adet > 0
+                            ? <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, background: renk + '22', color: renk }}>{adet}</span>
+                            : <span style={{ color: '#cbd5e1' }}>—</span>
+                          return (
+                            <tr key={p.user_id}>
+                              <td>
+                                <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.isim_soyisim}</div>
+                                <div style={{ fontSize: 11, color: '#94a3b8' }}>{p.email}</div>
+                              </td>
+                              <td style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{p.toplamGun}</td>
+                              <td style={{ textAlign: 'center' }}>{vBadge(p.vardiya1Gun, '#7c3aed')}</td>
+                              <td style={{ textAlign: 'center' }}>{vBadge(p.vardiya2Gun, '#0ea5e9')}</td>
+                              <td style={{ textAlign: 'center' }}>{vBadge(p.vardiya3Gun, '#f59e0b')}</td>
+                              <td style={{ textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: '#166534' }}>{fmt(p.toplamDk)}</td>
+                              <td style={{ textAlign: 'right', fontFamily: 'ui-monospace, monospace', color: '#475569' }}>{fmt(p.ortalamaDk)}</td>
+                              <td style={{ textAlign: 'center' }}>
+                                {p.eksikCikis > 0
+                                  ? <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, background: '#fee2e2', color: '#991b1b' }}>{p.eksikCikis}</span>
+                                  : <span style={{ color: '#cbd5e1' }}>—</span>}
+                              </td>
+                              <td style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>
+                                {p.ilkTarih ? tarihFormatla(p.ilkTarih) : '—'} → {p.sonTarih ? tarihFormatla(p.sonTarih) : '—'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
               ) : filtreAktif ? (
 
-                /* ── Filtre modu tablosu (verde-table) ── */
+                /* ── Filtre modu tablosu (verde-table) — DETAY ── */
                 sayfaRows.length === 0 ? (
                   <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
                     {siraliKayitlar.length === 0 ? 'Seçilen tarih aralığında kayıt bulunamadı' : 'Filtre sonucu boş'}
