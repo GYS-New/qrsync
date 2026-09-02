@@ -23,16 +23,18 @@ export async function mesaiVePasifKontrol(admin: any, userId: string): Promise<K
   // SA/TA mesai kontrolünden muaf
   if (['super_admin', 'alt_super_admin', 'tenant_admin'].includes(user.rol)) return null
 
-  // 2. PT aktif mi? Proje varsa proje seviyesi, yoksa firma seviyesi.
-  // Onceki: sadece proje seviyesi bakiliyordu, proje_id NULL personel muaf oluyordu.
-  // Bug (02.09.2026): 115 personel PT aktif projede proje_id NULL oldugu icin
-  // mesai olmadan gorev yapabiliyordu. Firma-level fallback eklendi.
+  // 2. PT aktif mi? Proje varsa SADECE proje seviyesine bak.
+  // Firma seviyesi fallback yalniz proje_id NULL ise devreye girer.
+  //
+  // 02.09.2026-a: proje_id NULL personelleri kacirdik → firma fallback eklendi.
+  // 02.09.2026-b: bu fallback yanlisikla "proje pasif → firma aktif" senaryosunda
+  //   proje pasif OYAK RENAULT personellerini mesai zorunlu hale getirdi.
+  //   Duzeltme: firma fallback SADECE proje_id NULL iken.
   let ptAktif = false
   if (user.proje_id) {
     const { data: proje } = await admin.from('projeler').select('personel_takibi_aktif').eq('id', user.proje_id).single()
     ptAktif = proje?.personel_takibi_aktif === true
-  }
-  if (!ptAktif && user.firma_id) {
+  } else if (user.firma_id) {
     const { data: firma } = await admin.from('firmalar').select('personel_takibi_aktif').eq('id', user.firma_id).single()
     ptAktif = firma?.personel_takibi_aktif === true
   }
