@@ -33,17 +33,19 @@ export async function POST(req: NextRequest) {
   // atilmadi.
   const { data: firmalar } = await admin
     .from('firmalar')
-    .select('id,personel_takip_bildirim_dk')
+    .select('id,personel_takip_bildirim_dk,personel_takibi_aktif')
     .eq('aktif', true)
 
-  // Proje override'ları
+  // Proje override'ları + personel_takibi_aktif flag
   const { data: projeler } = await admin
     .from('projeler')
-    .select('id,firma_id,personel_takip_bildirim_dk')
+    .select('id,firma_id,personel_takip_bildirim_dk,personel_takibi_aktif')
     .eq('aktif', true)
   const projeOverride = new Map<string, number>()
+  const projePtAktif = new Map<string, boolean>()
   for (const p of projeler ?? []) {
     if (p.personel_takip_bildirim_dk != null) projeOverride.set(p.id, p.personel_takip_bildirim_dk)
+    projePtAktif.set(p.id, p.personel_takibi_aktif === true)
   }
 
   // TA otomatik alici KALDIRILDI (25.08.2026). Simdi sadece
@@ -64,6 +66,15 @@ export async function POST(req: NextRequest) {
 
     for (const mesai of mesaiKayitlari ?? []) {
       if (!mesai.giris_saati || !mesai.user_id) continue
+
+      // PT aktif mi? Proje varsa SADECE proje flag'ine bak (mesai/kontrolEt.ts
+      // ile ayni mantik). Proje PT pasif ise firma-level bildirim atma.
+      // OYAK RENAULT vakasi: proje PT pasif, firma PT aktif → bildirim atmamali.
+      if (mesai.proje_id) {
+        if (projePtAktif.get(mesai.proje_id) !== true) continue
+      } else {
+        if (firma.personel_takibi_aktif !== true) continue
+      }
 
       // Efektif bildirim süresi: proje override > firma default
       // Ikisi de 0 ise atla (bildirim kapali).
