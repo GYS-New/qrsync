@@ -84,16 +84,31 @@ export async function POST(req: NextRequest) {
       if (beklenenSayac <= mevcutSayac) continue
 
       // Bu personel bugün görev başlatmış mı?
-      const { count: baslatilan } = await admin
-        .from('canli_gorevler')
-        .select('id', { count: 'exact', head: true })
-        .eq('firma_id', firma.id)
-        .eq('atanan_kullanici_id', mesai.user_id)
-        .in('durum', ['ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
-        .gte('baslatilma_tarihi', `${bugun}T00:00:00`)
+      // Frekansiyel gorevlerde atanan_kullanici_id NULL, dolu olan baslatan_kullanici_id.
+      // Spesifik gorevler ayri tabloda (gorevler). Ikisi de kontrol edilmeli.
+      // Bugun sınırı TR gunu 00:00 → UTC olarak +03:00 offset ile yazilmali,
+      // aksi halde TR 00:00-03:00 arasi gorevler dahil edilmiyor.
+      const bugunTR00 = `${bugun}T00:00:00+03:00`
+      const [canliRes, spesifikRes] = await Promise.all([
+        admin
+          .from('canli_gorevler')
+          .select('id', { count: 'exact', head: true })
+          .eq('firma_id', firma.id)
+          .or(`atanan_kullanici_id.eq.${mesai.user_id},baslatan_kullanici_id.eq.${mesai.user_id}`)
+          .in('durum', ['ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
+          .gte('baslatilma_tarihi', bugunTR00),
+        admin
+          .from('gorevler')
+          .select('id', { count: 'exact', head: true })
+          .eq('firma_id', firma.id)
+          .or(`atanan_kullanici_id.eq.${mesai.user_id},baslatan_kullanici_id.eq.${mesai.user_id}`)
+          .in('durum', ['ISLEMDE', 'TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN'])
+          .gte('baslatilma_tarihi', bugunTR00),
+      ])
+      const baslatilan = (canliRes.count ?? 0) + (spesifikRes.count ?? 0)
 
       // Görev başlatılmışsa bildirim gönderme
-      if ((baslatilan ?? 0) > 0) continue
+      if (baslatilan > 0) continue
 
       const bildirimNo = mevcutSayac + 1
       const gecenStr = gecenDk >= 60
@@ -156,7 +171,7 @@ export async function POST(req: NextRequest) {
               alici_id: aliciId,
               baslik: '🚨 Personel Görev Yapmıyor',
               mesaj: `${isim} iş başı yaptı (${gecenStr} önce) ancak henüz görev başlatmadı.`,
-              tip: 'personel_takip',
+              tip: 'kritik_uyari',
               okundu: false,
             })
           }
