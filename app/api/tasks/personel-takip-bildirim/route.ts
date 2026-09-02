@@ -166,11 +166,13 @@ export async function POST(req: NextRequest) {
 
           const tumAlicilar = [...new Set([...lokAlicilar, ...projeGeneliAlicilar])]
 
+          const aliciBaslik = '🚨 Personel Görev Yapmıyor'
+          const aliciMesaj = `${isim} iş başı yaptı (${gecenStr} önce) ancak henüz görev başlatmadı.`
           for (const aliciId of tumAlicilar) {
             const { error: insErr } = await admin.from('bildirimler').insert({
               alici_id: aliciId,
-              baslik: '🚨 Personel Görev Yapmıyor',
-              mesaj: `${isim} iş başı yaptı (${gecenStr} önce) ancak henüz görev başlatmadı.`,
+              baslik: aliciBaslik,
+              mesaj: aliciMesaj,
               tip: 'kritik_uyari',
               okundu: false,
             })
@@ -178,6 +180,14 @@ export async function POST(req: NextRequest) {
             // sessiz fail olur. 02.09.2026 vakasi: enum hatasi sessizce yutuldu,
             // sayac 3'e cikti ama alicilara bildirim gitmedi. Fail'de throw.
             if (insErr) throw new Error(`Alici bildirim insert fail (${aliciId}): ${insErr.message}`)
+
+            // Telefon push (FCM) — DB kaydi yaninda alicinin telefonuna da bildirim.
+            // FCM sessizce fail olabilir (device_token yok/pasif); throw etmez.
+            try {
+              await sendFCMToUser(aliciId, aliciBaslik, aliciMesaj, 'gorev_uyari')
+            } catch (fcmErr: any) {
+              console.error(`[personel-takip] alici FCM fail (${aliciId}):`, fcmErr?.message)
+            }
           }
         }
 
