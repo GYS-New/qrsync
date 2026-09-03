@@ -166,7 +166,7 @@ export default function SistemAyarlariClient({ meId, base, initialBloklar, lokas
           firmalar={isSA ? firmalar : []}
         />
       )}
-      {aktifTab === 'simulasyon' && firmaId && <SimulasyonPanel firmaId={firmaId} projeId={projeId ?? null} lokasyonlar={lokasyonlar as any} />}
+      {aktifTab === 'simulasyon' && firmaId && <SimulasyonPanel firmaId={firmaId} projeId={projeId ?? null} lokasyonlar={lokasyonlar as any} isSA={isSA} />}
       {aktifTab === 'personel-destek' && firmaId && <PersonelDestekPanel firmaId={firmaId} projeId={projeId ?? null} lokasyonlar={lokasyonlar as any} />}
       {aktifTab === 'uygulama' && isSA && <UygulamaAyarlariPanel />}
       {aktifTab === 'mobil' && isSA && <MobilAyarlariPanel />}
@@ -1089,7 +1089,7 @@ function EmptyTab({ label }: { label: string }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // SİMÜLASYON MODU PANELİ (Grup bazlı + şifre korumalı)
 // ═══════════════════════════════════════════════════════════════════════════════
-function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; projeId: string | null; lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[] }) {
+function SimulasyonPanel({ firmaId, projeId, lokasyonlar, isSA = false }: { firmaId: string; projeId: string | null; lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[]; isSA?: boolean }) {
   const [yetkili, setYetkili] = useState(false)
   const [sifreGirdi, setSifreGirdi] = useState('')
   const [sifreHata, setSifreHata] = useState(false)
@@ -1136,10 +1136,11 @@ function SimulasyonPanel({ firmaId, projeId, lokasyonlar }: { firmaId: string; p
     )
   }
 
-  return <SimulasyonIcerik firmaId={firmaId} projeId={projeId} lokasyonlar={lokasyonlar} />
+  return <SimulasyonIcerik firmaId={firmaId} projeId={projeId} lokasyonlar={lokasyonlar} isSA={isSA} />
 }
 
-function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; projeId: string | null; lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[] }) {
+function SimulasyonIcerik({ firmaId, projeId, lokasyonlar, isSA = false }: { firmaId: string; projeId: string | null; lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[]; isSA?: boolean }) {
+  const [altTab, setAltTab] = useState<'ayarlar' | 'tamamlamalar'>('ayarlar')
   const [ayarlar, setAyarlar] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -1322,8 +1323,40 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
 
   const formAcik = !!yeniUstLok
 
+  // Alt-sekme bar (Ayarlar / Tamamlamalar) — SA'ya ozel Tamamlamalar sekmesi
+  const AltSekmeBar = (
+    <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid #e5e7eb' }}>
+      {([
+        { key: 'ayarlar' as const, label: 'Ayarlar' },
+        ...(isSA ? [{ key: 'tamamlamalar' as const, label: 'SİM Tamamlamaları' }] : []),
+      ]).map(t => (
+        <button key={t.key} onClick={() => setAltTab(t.key)}
+          style={{
+            padding: '8px 16px', fontSize: 13,
+            fontWeight: altTab === t.key ? 700 : 500,
+            color: altTab === t.key ? '#111827' : '#6b7280',
+            background: 'none', border: 'none',
+            borderBottom: altTab === t.key ? '2px solid #111827' : '2px solid transparent',
+            marginBottom: -1, cursor: 'pointer',
+          }}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
+
+  if (altTab === 'tamamlamalar' && isSA) {
+    return (
+      <div>
+        {AltSekmeBar}
+        <SimulasyonTamamlamalar firmaId={firmaId} projeId={projeId} lokasyonlar={lokasyonlar} />
+      </div>
+    )
+  }
+
   return (
     <div style={{ border: anyAktif ? '2px solid #ef4444' : '2px solid #e5e7eb', borderRadius: 14, padding: '28px 32px', position: 'relative', background: '#fff', transition: 'border-color .3s', boxShadow: anyAktif ? '0 0 30px rgba(239,68,68,0.08)' : 'none' }}>
+      {AltSekmeBar}
 
       {/* Aktif göstergesi — pulsating */}
       {anyAktif && (
@@ -1570,6 +1603,133 @@ function SimulasyonIcerik({ firmaId, projeId, lokasyonlar }: { firmaId: string; 
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// ═══════════════════════════ SIM Tamamlamalar (SA-only) ═══════════════════════════
+function SimulasyonTamamlamalar({ firmaId, projeId, lokasyonlar }: { firmaId: string; projeId: string | null; lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[] }) {
+  const bugun = new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10)
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [ustLokId, setUstLokId] = useState('')
+  const [startDate, setStartDate] = useState(bugun)
+  const [endDate, setEndDate] = useState(bugun)
+  const [error, setError] = useState<string | null>(null)
+
+  const ustLokasyonlar = lokasyonlar.filter(l => !l.parent_id).sort((a, b) => a.tanim.localeCompare(b.tanim, 'tr'))
+
+  async function yukle() {
+    setLoading(true); setError(null)
+    try {
+      const p = new URLSearchParams()
+      if (firmaId) p.set('firma_id', firmaId)
+      if (projeId) p.set('proje_id', projeId)
+      if (ustLokId) p.set('ust_lokasyon_id', ustLokId)
+      if (startDate) p.set('start_date', startDate)
+      if (endDate) p.set('end_date', endDate)
+      const res = await fetch(`/api/simulasyon/tamamlamalar?${p}`)
+      const json = await res.json()
+      if (json.ok) setRows(json.data ?? [])
+      else setError(json.error ?? 'Veri alinamadi')
+    } catch (e: any) { setError(e?.message ?? 'Hata') }
+    setLoading(false)
+  }
+
+  useEffect(() => { yukle() }, [firmaId, projeId, ustLokId, startDate, endDate])
+
+  const fmtDate = (iso: string | null) => {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    return d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', dateStyle: 'short', timeStyle: 'short' })
+  }
+  const fmtSure = (sn: number | null) => {
+    if (sn == null) return '—'
+    if (sn < 60) return `${sn} sn`
+    const dk = Math.floor(sn / 60); const kalan = sn % 60
+    return kalan > 0 ? `${dk} dk ${kalan} sn` : `${dk} dk`
+  }
+
+  const inp: React.CSSProperties = { height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff' }
+  const th: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', fontSize: 12, fontWeight: 700, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }
+  const td: React.CSSProperties = { padding: '9px 12px', fontSize: 13, color: '#111827', borderBottom: '1px solid #f1f5f9' }
+
+  return (
+    <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '20px 24px', background: '#fff' }}>
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', marginBottom: 4 }}>SİM Tamamlamaları</div>
+      <div style={{ fontSize: 12.5, color: '#6b7280', marginBottom: 18 }}>
+        Simülasyon motoru tarafından tamamlanmış / iptal edilmiş görevler (SA'ya özel).
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'end' }}>
+        <div>
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Üst Lokasyon</div>
+          <select value={ustLokId} onChange={e => setUstLokId(e.target.value)} style={{ ...inp, minWidth: 200 }}>
+            <option value="">Tümü</option>
+            {ustLokasyonlar.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Başlangıç</div>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inp} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Bitiş</div>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inp} />
+        </div>
+        <button onClick={yukle} style={{ height: 34, padding: '0 16px', borderRadius: 8, border: 'none', background: '#111827', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+          Yenile
+        </button>
+        <div style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280' }}>
+          {loading ? 'Yükleniyor…' : `${rows.length} kayıt`}
+        </div>
+      </div>
+
+      {error && <div style={{ padding: 12, background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{error}</div>}
+
+      <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'auto', maxHeight: 600 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={th}>Tarih</th>
+              <th style={th}>Üst Lokasyon</th>
+              <th style={th}>Lokasyon</th>
+              <th style={th}>Görev</th>
+              <th style={th}>Başlatan</th>
+              <th style={th}>Tamamlayan</th>
+              <th style={th}>Süre</th>
+              <th style={th}>Durum</th>
+              <th style={th}>Kanal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && !loading && (
+              <tr><td colSpan={9} style={{ ...td, textAlign: 'center', color: '#6b7280', padding: 24 }}>
+                Bu aralıkta SİM tamamlaması bulunamadı.
+              </td></tr>
+            )}
+            {rows.map(r => (
+              <tr key={r.id}>
+                <td style={td}>{fmtDate(r.tamamlanma_tarihi)}</td>
+                <td style={td}>{r.ust_lokasyon ?? '—'}</td>
+                <td style={td}>{r.lokasyon ?? '—'}</td>
+                <td style={td}>{r.tanim ?? '—'}</td>
+                <td style={td}>{r.baslatan ?? '—'}</td>
+                <td style={td}>{r.tamamlayan ?? '—'}</td>
+                <td style={td}>{fmtSure(r.tamamlanma_suresi_saniye)}</td>
+                <td style={td}>
+                  <span style={{
+                    display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                    background: r.durum === 'TAMAMLANDI' ? '#dcfce7' : '#fee2e2',
+                    color:      r.durum === 'TAMAMLANDI' ? '#166534' : '#991b1b',
+                  }}>{r.durum}</span>
+                </td>
+                <td style={td}>{r.kanal ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
