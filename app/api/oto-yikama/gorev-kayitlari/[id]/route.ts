@@ -150,15 +150,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (yeniLok) {
     const { data: lok } = await admin
       .from('lokasyonlar')
-      .select('id, firma_id, aktif, parent_id, parent:lokasyonlar!parent_id(oto_yikama_lokasyon)')
+      .select('id, firma_id, aktif, parent_id')
       .eq('id', yeniLok)
       .single()
     if (!lok || lok.firma_id !== rec.gorev.firma_id) {
       return NextResponse.json({ ok: false, error: 'Lokasyon firmaya ait değil' }, { status: 400 })
     }
     if (!lok.aktif) return NextResponse.json({ ok: false, error: 'Lokasyon pasif' }, { status: 400 })
-    const parentOto = (lok.parent as any)?.oto_yikama_lokasyon === true
-    if (!parentOto) {
+    // Self-ref FK embed guvenilir degil — parent'i ayri sorguyla kontrol et
+    if (!lok.parent_id) {
+      return NextResponse.json({ ok: false, error: 'Seçilen lokasyon bir Oto Yıkama istasyonu değil' }, { status: 400 })
+    }
+    const { data: parentLok } = await admin
+      .from('lokasyonlar')
+      .select('oto_yikama_lokasyon')
+      .eq('id', lok.parent_id)
+      .maybeSingle()
+    if (!parentLok || (parentLok as any).oto_yikama_lokasyon !== true) {
       return NextResponse.json({ ok: false, error: 'Seçilen lokasyon bir Oto Yıkama istasyonu değil' }, { status: 400 })
     }
   }

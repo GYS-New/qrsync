@@ -91,12 +91,20 @@ export async function POST(req: NextRequest) {
 
   const { data: lok } = await admin
     .from('lokasyonlar')
-    .select('id, firma_id, parent_id, aktif, parent:lokasyonlar!parent_id(oto_yikama_lokasyon)')
+    .select('id, firma_id, parent_id, aktif')
     .eq('id', lokasyonId).maybeSingle()
   if (!lok || (lok as any).firma_id !== firmaId || (lok as any).aktif === false) {
     return NextResponse.json({ ok: false, error: 'Lokasyon bulunamadı veya pasif' }, { status: 400 })
   }
-  if (!(lok as any).parent_id || !(((lok as any).parent as any)?.oto_yikama_lokasyon)) {
+  // Self-ref FK'de Supabase-js embed guvenilir degil — parent'i ayri sorguyla al.
+  if (!(lok as any).parent_id) {
+    return NextResponse.json({ ok: false, error: 'Seçilen lokasyon bir Oto Yıkama istasyonu değil' }, { status: 400 })
+  }
+  const { data: parentLok } = await admin
+    .from('lokasyonlar')
+    .select('oto_yikama_lokasyon, aktif')
+    .eq('id', (lok as any).parent_id).maybeSingle()
+  if (!parentLok || (parentLok as any).oto_yikama_lokasyon !== true) {
     return NextResponse.json({ ok: false, error: 'Seçilen lokasyon bir Oto Yıkama istasyonu değil' }, { status: 400 })
   }
 
