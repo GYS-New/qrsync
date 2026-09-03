@@ -55,18 +55,17 @@ export default async function OtoYikamaGorevKayitlariPage() {
       .order('hedef_tarih', { ascending: false })
       .limit(2000)
 
-    // B) Tanımsız plaka onay bekleyen metadata'ları (arac_id NULL). Bunlar
-    // 'arac!inner' filter'ı yüzünden A'ya girmiyor. Firma filter'ı sonra
-    // gorevler tarafında uygulanacak.
-    const { data: metaOnayBekleyen } = await admin
+    // B) arac_id NULL olan tum metadata'lar (mobil ONAY_BEKLIYOR + web ekstra
+    // manuel plaka ONAYSIZ). arac!inner filter'i A'ya girmesini engelliyor.
+    // Firma filter'i sonra gorevMap uzerinden uygulanacak (line ~106).
+    const { data: metaAracsiz } = await admin
       .from('oto_yikama_gorev_metadata')
       .select('gorev_id, arac_id, plaka_snapshot, hedef_tarih, ekstra, km, notlar, onay_durumu')
-      .eq('onay_durumu', 'ONAY_BEKLIYOR')
       .is('arac_id', null)
       .order('hedef_tarih', { ascending: false })
       .limit(500)
 
-    const metaArr = [...((metaAll ?? []) as any[]), ...((metaOnayBekleyen ?? []) as any[])]
+    const metaArr = [...((metaAll ?? []) as any[]), ...((metaAracsiz ?? []) as any[])]
     const allGorevIds = metaArr.map(m => m.gorev_id).filter(Boolean) as string[]
 
     // Aracmap embed'den doldur — ayri sorguya gerek yok
