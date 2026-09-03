@@ -6,6 +6,7 @@ import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
 import { minSureKontrol } from '@/lib/tasks/minSureKontrol'
 import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
+import { simulasyonluLokasyonKontrol } from '@/lib/simulasyon/lokasyonKontrol'
 import { lokasyonEkstraFrekansDropdown } from '@/lib/scan/bugunTamamlananlar'
 import { auditLog } from '@/lib/audit/log'
 
@@ -66,6 +67,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const fpHata = checkFirmaProje(context, user)
     if (fpHata) return NextResponse.json(fpHata, { status: 403, headers: CORS_HEADERS })
 
+    // SIM aktif lokasyon kontrolu — personel bu alanlarda islem yapmasin
+    const simHata = await simulasyonluLokasyonKontrol(supabase, context.lokasyon?.id)
+    if (simHata) return NextResponse.json(simHata, { status: simHata.status, headers: CORS_HEADERS })
+
     // Ekstra frekansiyel modal dropdown'u:
     //   bugun_tamamlananlar → bugün (TR) o lokasyonda tamamlanmış kural-tabanlı tanımlar
     //   lokasyon_kurallari  → lokasyonun aktif frekans kuralları (bugün hiç iş yapılmamış olsa da dropdown dolu)
@@ -97,6 +102,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
     // Firma/Proje kontrolü
     const fpHata2 = checkFirmaProje(context, user)
     if (fpHata2) return NextResponse.json(fpHata2, { status: 403, headers: CORS_HEADERS })
+
+    // SIM aktif lokasyon kontrolu — personel bu alanlarda islem yapmasin
+    const simHata2 = await simulasyonluLokasyonKontrol(supabase, context.lokasyon?.id)
+    if (simHata2) return NextResponse.json(simHata2, { status: simHata2.status, headers: CORS_HEADERS })
 
     // ── action: 'basla' → görevi sadece başlat, tamamlama ───────────────────
     if (action === 'basla' && selectedTaskId) {

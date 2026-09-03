@@ -5,6 +5,7 @@ import { completeTask } from '@/lib/tasks/completeTask'
 import { ardisikBaslatmaKontrol } from '@/lib/tasks/ardisikKontrol'
 import { devamEdenGorevKontrol } from '@/lib/tasks/devamEdenGorevKontrol'
 import { mesaiVePasifKontrol } from '@/lib/mesai/kontrolEt'
+import { simulasyonluLokasyonKontrol } from '@/lib/simulasyon/lokasyonKontrol'
 import { lokasyonEkstraFrekansDropdown } from '@/lib/scan/bugunTamamlananlar'
 
 async function getAuthUser(req: Request) {
@@ -48,6 +49,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const fpHata = checkFirmaProje(context, user)
     if (fpHata) return NextResponse.json(fpHata, { status: 403 })
 
+    // SIM aktif lokasyon kontrolu
+    const simHata = await simulasyonluLokasyonKontrol(supabase, context.lokasyon?.id)
+    if (simHata) return NextResponse.json(simHata, { status: simHata.status })
+
     // Ekstra frekansiyel modal dropdown'u (bugun_tamamlananlar + lokasyon_kurallari)
     const { bugun_tamamlananlar, lokasyon_kurallari } = context.lokasyon?.id
       ? await lokasyonEkstraFrekansDropdown(supabase, context.lokasyon.id)
@@ -76,9 +81,14 @@ export async function POST(req: Request, { params }: { params: { token: string }
     if (action === 'basla' && selectedTaskId) {
       const tablo = selectedTaskType === 'canli_gorevler' ? 'canli_gorevler' : 'gorevler'
       const nowIso = new Date().toISOString()
-      const { data: gorev } = await supabase.from(tablo).select('id,baslatilma_tarihi,firma_id,proje_id').eq('id', selectedTaskId).maybeSingle()
+      const { data: gorev } = await supabase.from(tablo).select('id,baslatilma_tarihi,firma_id,proje_id,lokasyon_id').eq('id', selectedTaskId).maybeSingle()
       if (gorev?.baslatilma_tarihi) {
         return NextResponse.json({ ok: true, baslatilma_tarihi: gorev.baslatilma_tarihi, mesaj: 'Zaten başlatılmış' })
+      }
+      // SIM aktif lokasyon kontrolu
+      if (gorev) {
+        const simHataBasla = await simulasyonluLokasyonKontrol(supabase, (gorev as any).lokasyon_id)
+        if (simHataBasla) return NextResponse.json(simHataBasla, { status: simHataBasla.status })
       }
       // Devam eden başka bir görev var mı? (Aynı kullanıcının başka ISLEMDE görevi)
       if (gorev) {
@@ -109,6 +119,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
     // Firma/Proje kontrolü
     const fpHata2 = checkFirmaProje(context, user)
     if (fpHata2) return NextResponse.json(fpHata2, { status: 403 })
+
+    // SIM aktif lokasyon kontrolu
+    const simHata2 = await simulasyonluLokasyonKontrol(supabase, context.lokasyon?.id)
+    if (simHata2) return NextResponse.json(simHata2, { status: simHata2.status })
 
     let task = context.tasks.find((t) => t.id === selectedTaskId && t.taskType === selectedTaskType)
     if (!task && selectedTaskId && !selectedTaskType) {
