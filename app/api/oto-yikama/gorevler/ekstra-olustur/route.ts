@@ -159,6 +159,10 @@ export async function POST(req: NextRequest) {
   }
 
   // INSERT — gorev + metadata
+  // Mobil tanimsiz-baslat ile ayni davranis: durum=ISLEMDE + baslatilma_tarihi=NOW.
+  // Boylece TAMAMLANDI'ya cevrildiginde gercek sure (bitis - baslangic) hesaplanir.
+  // Onceki ACIK davranisinda ACIK→TAMAMLANDI direkt gecisi sureyi 0'a sifirliyordu.
+  const nowIso = new Date().toISOString()
   const { data: insertedGorev, error: gorevErr } = await admin
     .from('gorevler')
     .insert({
@@ -166,7 +170,10 @@ export async function POST(req: NextRequest) {
       tanim: `Oto Yıkama - ${plakaFinal} (Ekstra)`,
       lokasyon_id: lokasyonId,
       atanan_kullanici_id: null,
-      durum: 'ACIK',
+      durum: 'ISLEMDE',
+      baslatilma_tarihi: nowIso,
+      baslatan_kullanici_id: me.id,
+      durum_degisim_tarihi: nowIso,
       olusturan_id: me.id,
     })
     .select('id')
