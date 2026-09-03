@@ -175,6 +175,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: gorevErr?.message ?? 'Görev oluşturulamadı' }, { status: 500 })
   }
 
+  // Onay durumu: kayitli arac + PLAKASIZ → ONAYSIZ (onay gereksiz).
+  // Kayitsiz manuel plaka → ONAY_BEKLIYOR (mobil tanimsiz-baslat ile ayni akis).
+  const kayitsizManuelPlaka = aracIdFinal === null && plakaFinal !== 'PLAKASIZ'
+  const metaOnay: 'ONAYSIZ' | 'ONAY_BEKLIYOR' = kayitsizManuelPlaka ? 'ONAY_BEKLIYOR' : 'ONAYSIZ'
+
   const { error: metaErr } = await admin
     .from('oto_yikama_gorev_metadata')
     .insert({
@@ -183,10 +188,55 @@ export async function POST(req: NextRequest) {
       plaka_snapshot: plakaFinal,
       hedef_tarih: bugun,
       ekstra: true,
+      onay_durumu: metaOnay,
     })
   if (metaErr) {
     await admin.from('gorevler').delete().eq('id', insertedGorev.id)
     return NextResponse.json({ ok: false, error: `metadata: ${metaErr.message}` }, { status: 500 })
+  }
+
+  // Amire bildirim — SADECE kayitsiz manuel plaka icin (mobil ile ayni).
+  // Bildirim basarisiz olsa da islem devam eder; sessiz try/catch.
+  let amirBildirildi = false
+  if (kayitsizManuelPlaka) {
+    const { data: firma } = await admin
+      .from('firmalar')
+      .select('oto_yikama_onay_yetkilisi_id')
+      .eq('id', firmaId)
+      .maybeSingle()
+    const amirId = (firma as any)?.oto_yikama_onay_yetkilisi_id as string | null
+    if (amirId) {
+      amirBildirildi = true
+      ;(async () => {
+        try {
+          const [{ data: olusturan }, { data: lokFull }] = await Promise.all([
+            admin.from('users').select('isim_soyisim').eq('id', me.id).maybeSingle(),
+            admin.from('lokasyonlar').select('tanim').eq('id', lokasyonId).maybeSingle(),
+          ])
+          const olusturanAd = (olusturan as any)?.isim_soyisim ?? 'Yönetici'
+          const istasyonAd = (lokFull as any)?.tanim ?? 'Bilinmeyen istasyon'
+          const baslik = 'Tanımsız plaka onayı bekliyor (Web)'
+          const mesaj = [
+            `Plaka: ${plakaFinal}`,
+            `Oluşturan: ${olusturanAd}`,
+            `İstasyon: ${istasyonAd}`,
+            `Web'den ekstra görev — TAMAMLANDI olduğunda onay için hazır olacak`,
+            `#gorev:${insertedGorev.id}`,
+          ].join('\n')
+
+          await admin.from('bildirimler').insert({
+            alici_id: amirId,
+            baslik,
+            mesaj,
+            tip: 'oto_yikama_onay',
+          })
+          const { sendFCMToUser } = await import('@/lib/fcm-sender')
+          await sendFCMToUser(amirId, baslik, `${plakaFinal} — ${olusturanAd}`, 'gorev_uyari')
+        } catch (err) {
+          console.warn('[ekstra-olustur] amir bildirim gonderilemedi:', err)
+        }
+      })()
+    }
   }
 
   void admin.from('audit_log').insert({
@@ -200,8 +250,16 @@ export async function POST(req: NextRequest) {
       lokasyon_id: lokasyonId,
       kanal: 'WEB',
       kaynak: aracIdFinal ? 'tanimli_arac' : (plakaFinal === 'PLAKASIZ' ? 'plakasiz' : 'manuel_plaka'),
+      onay_durumu: metaOnay,
+      amir_bildirildi: amirBildirildi,
     },
   })
 
-  return NextResponse.json({ ok: true, gorev_id: insertedGorev.id, plaka: plakaFinal })
+  return NextResponse.json({
+    ok: true,
+    gorev_id: insertedGorev.id,
+    plaka: plakaFinal,
+    onay_durumu: metaOnay,
+    amir_bildirildi: amirBildirildi,
+  })
 }
