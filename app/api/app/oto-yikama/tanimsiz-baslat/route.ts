@@ -167,19 +167,24 @@ export async function POST(req: Request) {
           { status: 400, headers: CORS },
         )
       }
-      // Ayni plaka icin AKTIF (ONAY_BEKLIYOR) kayit var mi?
+      // Ayni plaka icin AKTIF (bitmemis) kayit var mi?
+      // Onceki: sadece onay_durumu=ONAY_BEKLIYOR bakiyordu — ama TAMAMLANDI/IPTAL
+      // olan gorev de amir onaylayana dek ONAY_BEKLIYOR kaliyor. Sonuc: mobil ayni
+      // plakayi bir daha okuttugunda hep 409 aldi, oysa yikama bitmisti.
+      // Simdi: sadece gorev durumu aktif ise (ISLEMDE/ACIK/HAZIR) engelle.
       const { data: bekleyen } = await admin
         .from('oto_yikama_gorev_metadata')
-        .select('gorev_id, plaka_snapshot')
+        .select('gorev_id, plaka_snapshot, gorev:gorevler!inner(durum)')
         .eq('onay_durumu', 'ONAY_BEKLIYOR')
         .eq('plaka_snapshot', plaka)
+        .in('gorev.durum', ['ISLEMDE', 'ACIK', 'HAZIR'])
         .limit(1)
       if ((bekleyen ?? []).length > 0) {
         return NextResponse.json(
           {
             ok: false,
             code: 'AYNI_PLAKA_ONAY_BEKLIYOR',
-            error: `${plaka} plakası için zaten onay bekleyen bir yıkama var`,
+            error: `${plaka} plakası için zaten aktif bir yıkama var`,
           },
           { status: 409, headers: CORS },
         )
