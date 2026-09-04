@@ -374,9 +374,14 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
   let tamamlamaSayaci = 0 // ADIM 1 sayacı
 
   // ── ADIM 1: ISLEMDE görevlerden süresi dolanları tamamla ──
+  // KAPASITE KONTROLU KALDIRILDI (2026-09-04): ISLEMDE gorevler tamamlanma
+  // zamanina geldiginde kapasite sansi beklemeden bitirilir. Aksi halde:
+  // - Personel kilidi acilmadigi icin diger gorevler basla-tilmiyor.
+  // - Gorev hedefinin 15-20 kati sure geciyor (ornek: hedef 10 dk, 180 dk kiliti).
+  // - Grup hedefine ulasilmadigi halde SIM yavaslamis gorunuyor.
+  // Baslatma tarafinda kapasite kontrolu korundu — o taraf zaten sabit tempoya bagli.
   for (const gorev of islemdeGorevler) {
     if (tamamlananSayi + tamamlananAdet >= hedefMax) break
-    if (tamamlamaSayaci >= tamamlamaKapasite) break
     if (!gorev.baslatilma_tarihi) continue
 
     const baslatmaMs = new Date(gorev.baslatilma_tarihi).getTime()
