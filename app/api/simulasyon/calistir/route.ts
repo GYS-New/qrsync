@@ -125,8 +125,30 @@ export async function POST(req: Request) {
         ((tumIslemde ?? []) as any[]).map(r => r.baslatan_kullanici_id),
       )
 
+      // Cooldown: ayni personel gorevi bitirdikten sonra 4 dk beklemeden yeni
+      // gorev alamaz. Firma capinda bugunki son SIM tamamlama/iptal zamanini
+      // cek — dun gecen tamamlamalar zaten 4 dk'yi asmis olur.
+      const cooldownSinir = new Date(Date.now() - 4 * 60 * 1000).toISOString()
+      const bugunBaslangicIso = new Date(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' }) + 'T00:00:00+03:00').toISOString()
+      const { data: sonTamamlamalar } = await admin
+        .from('canli_gorevler')
+        .select('baslatan_kullanici_id, tamamlanma_tarihi')
+        .eq('firma_id', ayar.firma_id)
+        .eq('simule_tamamlandi', true)
+        .in('durum', ['TAMAMLANDI', 'IPTAL'])
+        .gte('tamamlanma_tarihi', bugunBaslangicIso)
+        .gte('tamamlanma_tarihi', cooldownSinir)
+        .not('baslatan_kullanici_id', 'is', null)
+      const personelCooldownFirma = new Map<string, number>()
+      for (const r of ((sonTamamlamalar ?? []) as any[])) {
+        const uid = r.baslatan_kullanici_id as string
+        const ts = new Date(r.tamamlanma_tarihi).getTime()
+        const mevcut = personelCooldownFirma.get(uid) ?? 0
+        if (ts > mevcut) personelCooldownFirma.set(uid, ts)
+      }
+
       for (const ga of grupAyarlari) {
-        const result = await grupSimulasyonCalistir(admin, ayar, ga, kuralAtamalar, mesgulPersonellerFirma)
+        const result = await grupSimulasyonCalistir(admin, ayar, ga, kuralAtamalar, mesgulPersonellerFirma, personelCooldownFirma)
         sonuclar.push({ ayar_id: ayar.id, firma_id: ayar.firma_id, proje_id: ayar.proje_id, grup_id: ga.grup_id, ...result })
       }
     }
@@ -228,7 +250,9 @@ function kuralPersonelSec(kuralAtamalar: Map<string, PersonelBilgi[]>, kuralId: 
   return cinsiyetliPersonelSec(havuz, lokTanim, exclude)
 }
 
-async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kuralAtamalar: Map<string, PersonelBilgi[]>, mesgulPersonellerFirma?: Set<string>) {
+const COOLDOWN_MS = 4 * 60 * 1000  // Ayni personel icin ardisik gorev cooldown
+
+async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kuralAtamalar: Map<string, PersonelBilgi[]>, mesgulPersonellerFirma?: Set<string>, personelCooldownFirma?: Map<string, number>) {
   const { firma_id } = ayar
   const { grup_id, hedef_oran, vardiya_suresi_saat } = grupAyar
   const bugun = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
@@ -432,6 +456,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
       }) as any).eq('id', gorev.id).eq('durum', 'ISLEMDE')
       await personelAktiviteGuncelle(admin, personelId)
       mesgulPersoneller.delete(personelId)  // Görev kapandı → personel serbest
+      personelCooldownFirma?.set(personelId, Date.now())  // 4 dk cooldown baslar
       iptalAdet++; tamamlamaSayaci++
       continue
     }
@@ -447,6 +472,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
       },
     }) as any).eq('id', gorev.id).eq('durum', 'ISLEMDE')
     mesgulPersoneller.delete(personelId)  // Görev TAMAMLANDI → personel serbest
+    personelCooldownFirma?.set(personelId, Date.now())  // 4 dk cooldown baslar
 
     if (lok?.checklist_sablon_id) {
       await simuleCeklistTamamla(admin, gorev.id, lok.checklist_sablon_id, gorev.lokasyon_id, personelId)
@@ -487,7 +513,20 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
       // ACIK görevi başlatacak personel: kurala atanmışlardan, ŞU AN MEŞGUL OLMAYAN
       // birini cinsiyet+random ile seç. Atama yoksa veya tüm aday meşgulse atla.
       // (Doğal akış: bir personel aynı anda iki görev yürütemez.)
-      const personelId = kuralPersonelSec(kuralAtamalar, gorev.kural_id, lok?.tanim ?? '', mesgulPersoneller)
+      // + Cooldown: son gorevini bitirdikten sonra 4 dk beklemeden yeni gorev alamaz
+      // (dogal: kisi bir yikama bitirir bitirmez saniye icinde digerine gecmez).
+      const havuz = kuralAtamalar.get(gorev.kural_id)
+      let effectiveExclude = mesgulPersoneller
+      if (havuz && personelCooldownFirma) {
+        const cooldownAsimiSiniri = Date.now() - COOLDOWN_MS
+        const bekleyenler = new Set<string>(mesgulPersoneller)
+        for (const p of havuz) {
+          const sonBitis = personelCooldownFirma.get(p.id) ?? 0
+          if (sonBitis > cooldownAsimiSiniri) bekleyenler.add(p.id)
+        }
+        effectiveExclude = bekleyenler
+      }
+      const personelId = kuralPersonelSec(kuralAtamalar, gorev.kural_id, lok?.tanim ?? '', effectiveExclude)
       if (!personelId) continue
 
       // %1 iptal olasılığı
@@ -506,6 +545,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
         }) as any).eq('id', gorev.id).eq('durum', 'ACIK')
         await personelAktiviteGuncelle(admin, personelId)
         // İptal anında zaten bir göreve başlatılmadı; meşgul listesini değiştirmeye gerek yok.
+        personelCooldownFirma?.set(personelId, Date.now())  // 4 dk cooldown baslar
         iptalAdet++
         continue
       }
@@ -554,6 +594,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
         // SG pasif: anlık başlatıp tamamladı. Aynı cron turunda bu personeli
         // başka göreve atamamak için set'e ekle (sonraki turda yine müsait).
         mesgulPersoneller.add(personelId)
+        personelCooldownFirma?.set(personelId, Date.now())  // 4 dk cooldown baslar
         tamamlananAdet++
       }
     }
