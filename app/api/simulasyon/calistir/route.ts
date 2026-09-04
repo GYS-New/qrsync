@@ -250,7 +250,12 @@ function kuralPersonelSec(kuralAtamalar: Map<string, PersonelBilgi[]>, kuralId: 
   return cinsiyetliPersonelSec(havuz, lokTanim, exclude)
 }
 
-const COOLDOWN_MS = 4 * 60 * 1000  // Ayni personel icin ardisik gorev cooldown
+// Ayni personelin ardisik gorevleri arasinda fiziksel gecis suresi.
+// Personel bir alanda isi bitirir bitirmez saniye icinde baska alanda gorev
+// baslayamaz — arac/malzeme toplama + bir sonraki lokasyona ulasma suresi
+// icin makul bir bekleme. Bu SIM'in "gercek personel gibi davranma"
+// felsefesinin bir parcasi.
+const COOLDOWN_MS = 4 * 60 * 1000
 
 async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kuralAtamalar: Map<string, PersonelBilgi[]>, mesgulPersonellerFirma?: Set<string>, personelCooldownFirma?: Map<string, number>) {
   const { firma_id } = ayar
