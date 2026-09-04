@@ -348,12 +348,14 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
   // Fix: ADIM 1 ve ADIM 2 için bağımsız iki kapasite.
   //   SG aktif grupta  → her cron: 1 tamamlama + 1 başlatma (pipeline, x2 işlem, net ×1 throughput)
   //   SG pasif grupta  → ADIM 1 boş (ISLEMDE hiç olmaz), ADIM 2'de direkt tamamlama (x1 işlem)
-  const tamamlamaKapasite = rollKapasite()
-  const baslatmaKapasite  = rollKapasite()
-
-  if (tamamlamaKapasite <= 0 && baslatmaKapasite <= 0) {
-    return { tamamlanan: 0, baslatilan: 0, iptal: 0, mesaj: 'Bu cron turunda sıra gelmedi', toplam: toplamGorev, hedef_max: hedefMax, vardiya_hedef: vardiyaHedefMax, vardiya_tamamlanan: vardiyaTamamlanan, kalan_dk: kalanDk, gorev_per_dk: gorevPerDk }
-  }
+  // Kapasite sanslari ARTIK KULLANILMIYOR (2026-09-04). Onceden ADIM 1 (tamamlama)
+  // ve ADIM 2 (baslatma) bu sanslarla sinirliydi — kucuk gruplarda gorev_per_dk<1
+  // oldugunda turda max 1 iş yapiliyordu, personel bos beklerken kilit olusuyordu.
+  // Kullanici karari: musait personel varsa hepsi paralel calissin, aynı kişinin
+  // 2 gorevi olamaz kuralı korunsun (mesgulPersoneller set bunu zaten sagliyor),
+  // grup hedefMax sınırı korunur (asimli iş yok).
+  const tamamlamaKapasite = rollKapasite()  // metrik/log icin
+  const baslatmaKapasite  = rollKapasite()  // metrik/log icin
 
   let tamamlananAdet = 0
   let baslatmaAdet = 0
@@ -455,8 +457,11 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
   }
 
   // ── ADIM 2: ACIK görevleri başlat veya direkt tamamla ────────────────
-  if (baslatmaKapasite > 0 && acikGorevler.length > 0 && (tamamlananSayi + tamamlananAdet) < hedefMax) {
-    // Farklı lokasyonlardan dengeli seç (round-robin)
+  // KAPASITE KISITI KALDIRILDI (2026-09-04): musait personel varsa tum ACIK
+  // gorevler paralel baslatilir. `mesgulPersoneller` set aynı kişinin 2 gorev
+  // yapmasini engeller. hedefMax dongude her turda kontrol edilir.
+  if (acikGorevler.length > 0 && (tamamlananSayi + tamamlananAdet) < hedefMax) {
+    // Farklı lokasyonlardan dengeli sırala (round-robin) — tum acik gorevler dahil
     const lokGruplari = new Map<string, any[]>()
     for (const g of acikGorevler) {
       const arr = lokGruplari.get(g.lokasyon_id) ?? []
@@ -466,7 +471,7 @@ async function grupSimulasyonCalistir(admin: any, ayar: any, grupAyar: any, kura
     const lokKeys = [...lokGruplari.keys()].sort(() => Math.random() - 0.5)
     const secilen: any[] = []
     let idx = 0
-    while (secilen.length < baslatmaKapasite && idx < acikGorevler.length) {
+    while (idx < acikGorevler.length) {
       const key = lokKeys[idx % lokKeys.length]
       const grp = lokGruplari.get(key)
       if (grp && grp.length > 0) {
