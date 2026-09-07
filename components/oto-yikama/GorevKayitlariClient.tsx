@@ -144,9 +144,9 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
 
   const [arama, setArama] = useState('')
   const [filtre, setFiltre] = useState<DurumFilter>('TUMU')
-  // Hedef tarih aralığı
-  const [hedefBas, setHedefBas] = useState('')
-  const [hedefBit, setHedefBit] = useState('')
+  // Hedef tarih araligi — default bugun (kullanici kararla: sayfa bugunlu acilsin)
+  const [hedefBas, setHedefBas] = useState(bugun)
+  const [hedefBit, setHedefBit] = useState(bugun)
   // Tamamlanma tarihi aralığı
   const [tamamBas, setTamamBas] = useState('')
   const [tamamBit, setTamamBit] = useState('')
@@ -240,13 +240,29 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
     }).map(({ k }) => k)
   }, [kayitlarTuretilmis, arama, filtre, istasyonId, tamamlayanId, departmanFilter, yikamaGunuFilter, hedefBas, hedefBit, tamamBas, tamamBit])
 
-  const filtreAktif = filtre !== 'TUMU' || !!arama || !!istasyonId || !!tamamlayanId || !!departmanFilter || yikamaGunuFilter !== '' || !!hedefBas || !!hedefBit || !!tamamBas || !!tamamBit
+  // Hedef tarih default bugun'de ise filtre "aktif" sayilmaz — Temizle butonu
+  // sadece kullanici bir sey degistirdiginde gorunur.
+  const hedefTarihiDegisti = hedefBas !== bugun || hedefBit !== bugun
+  const filtreAktif = filtre !== 'TUMU' || !!arama || !!istasyonId || !!tamamlayanId || !!departmanFilter || yikamaGunuFilter !== '' || hedefTarihiDegisti || !!tamamBas || !!tamamBit
 
   function temizleFiltre() {
     setFiltre('TUMU'); setArama(''); setIstasyonId(''); setTamamlayanId('')
     setDepartmanFilter(''); setYikamaGunuFilter('')
-    setHedefBas(''); setHedefBit(''); setTamamBas(''); setTamamBit('')
+    // Hedef tarih varsayilan bugun'e doner — filtre "temiz" durum = bugunlu liste
+    setHedefBas(bugun); setHedefBit(bugun); setTamamBas(''); setTamamBit('')
   }
+
+  // Yikama tarihi hizli secim yardimcilari
+  function tarihKaydir(gunSayisi: number) {
+    const iso = new Date(Date.parse(bugun) + gunSayisi * 86400000).toISOString().slice(0, 10)
+    setHedefBas(iso); setHedefBit(iso)
+  }
+  function tarihAralik(gunSayisi: number) {
+    const bit = bugun
+    const bas = new Date(Date.parse(bugun) - (gunSayisi - 1) * 86400000).toISOString().slice(0, 10)
+    setHedefBas(bas); setHedefBit(bit)
+  }
+  function tarihTumu() { setHedefBas(''); setHedefBit('') }
 
   function exportCsv() {
     const headers = ['Plaka', 'İstasyon', 'Yıkama Günü', 'Durum', 'Ekstra', 'Oluşturma', 'Başlatma', 'Tamamlanma', 'Süre (sn)', 'KM', 'Oluşturan', 'İşlem Yapan', 'Açıklama / Sebep']
@@ -428,13 +444,29 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
             <option value="0">Plansız</option>
           </select>
         </FilterField>
-        <FilterField label="Yıkama Günü">
-          <div style={{ display: 'flex', gap: 4 }}>
-            <input type="date" value={hedefBas} onChange={e => setHedefBas(e.target.value)}
-              style={{ flex: 1, padding: '4px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
-            <span style={{ alignSelf: 'center', fontSize: 11, color: T.textSoft }}>→</span>
-            <input type="date" value={hedefBit} onChange={e => setHedefBit(e.target.value)}
-              style={{ flex: 1, padding: '4px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
+        <FilterField label="Yıkama Tarihi">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <input type="date" value={hedefBas} onChange={e => setHedefBas(e.target.value)}
+                style={{ flex: 1, padding: '4px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
+              <span style={{ alignSelf: 'center', fontSize: 11, color: T.textSoft }}>→</span>
+              <input type="date" value={hedefBit} onChange={e => setHedefBit(e.target.value)}
+                style={{ flex: 1, padding: '4px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              {[
+                { label: 'Bugün', fn: () => tarihKaydir(0) },
+                { label: 'Dün', fn: () => tarihKaydir(-1) },
+                { label: '7 gün', fn: () => tarihAralik(7) },
+                { label: '30 gün', fn: () => tarihAralik(30) },
+                { label: 'Tümü', fn: tarihTumu },
+              ].map(b => (
+                <button key={b.label} type="button" onClick={b.fn}
+                  style={{ padding: '2px 6px', fontSize: 10.5, border: `1px solid ${T.border}`, borderRadius: 4, background: '#fff', cursor: 'pointer', color: T.textSoft, fontWeight: 600 }}>
+                  {b.label}
+                </button>
+              ))}
+            </div>
           </div>
         </FilterField>
         <FilterField label="Tamamlanma Tarihi">
