@@ -168,61 +168,21 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
     return kayitlar.map(k => ({ k, gd: turetilenDurum(k, bugun) }))
   }, [kayitlar, bugun])
 
-  // KPI sayıları
-  const sayilar = useMemo(() => {
-    let hazir = 0, acik = 0, islemde = 0, tamam = 0, iptal = 0, yapilamadi = 0
-    let plansiz = 0, ekstraTanimsiz = 0, onayBekleyen = 0
-    for (const { k, gd } of kayitlarTuretilmis) {
-      if (gd === 'HAZIR')         hazir++
-      if (gd === 'ACIK')          acik++
-      if (gd === 'ISLEMDE')       islemde++
-      if (gd === 'TAMAMLANDI')    tamam++
-      if (gd === 'IPTAL')         iptal++
-      if (gd === 'YAPILAMADI')    yapilamadi++
-      if (gd === 'ONAY_BEKLIYOR') onayBekleyen++
-      // Kategori sayimlari (durumdan bagimsiz):
-      // • Ekstra (tanimsiz plaka) = onay bekleyen + onaylanmis
-      // • Plansiz = kayitli plaka manuel yikama (ekstra=true & tanimsiz degil)
-      if (isEkstraTanimsizKayit(k)) ekstraTanimsiz++
-      else if (k.ekstra)            plansiz++
-    }
-    return {
-      toplam: kayitlar.length,
-      hazir, acik, islemde, tamam, iptal, yapilamadi,
-      onayBekleyen,
-      ekstra: plansiz,           // 'ekstra' alan adi geriye uyum icin (Plansiz pill)
-      ekstraTanimsiz,            // yeni: tanimsiz plaka akisindaki tumu
-    }
-  }, [kayitlarTuretilmis, kayitlar.length])
-
-  // Filtre dropdown'ları için unique departman listesi (kayıtlardan toplanır)
-  const departmanlar = useMemo(() => {
-    const s = new Set<string>()
-    for (const k of kayitlar) if (k.departman) s.add(k.departman)
-    return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
-  }, [kayitlar])
-
-  const filtrelenmis = useMemo(() => {
+  // KPI kapsami: durum filtresi HARIC tum diger filtreler uygulanmis alt-liste.
+  // Hem KPI sayilarini besler (secili tarih/istasyon/etc kapsaminda), hem
+  // tablo filtrelemesinin baslangic kumesi olur. Boylece KPI'lar filtreye
+  // gore revize olur (kullanici bildirimi 2026-09-04).
+  const kpiKapsami = useMemo(() => {
     const ara = arama.trim().toUpperCase()
     const ygFiltre = yikamaGunuFilter === '' ? null : Number(yikamaGunuFilter)
-
-    return kayitlarTuretilmis.filter(({ k, gd }) => {
-      // 'EKSTRA' pill = Plansiz (kayitli plaka manuel), tanimsiz haric
-      if (filtre === 'EKSTRA' && (!k.ekstra || isEkstraTanimsizKayit(k))) return false
-      // 'EKSTRA_TANIMSIZ' pill = tanimsiz plaka akisi (onay bekliyor + onaylanmis)
-      if (filtre === 'EKSTRA_TANIMSIZ' && !isEkstraTanimsizKayit(k)) return false
-      if (filtre !== 'TUMU' && filtre !== 'EKSTRA' && filtre !== 'EKSTRA_TANIMSIZ' && filtre !== gd) return false
+    return kayitlarTuretilmis.filter(({ k }) => {
       if (istasyonId && k.lokasyon_id !== istasyonId) return false
       if (tamamlayanId && k.tamamlayan_id !== tamamlayanId) return false
       if (departmanFilter && k.departman !== departmanFilter) return false
       if (ygFiltre !== null) {
         const yg = k.yikama_gunleri ?? []
-        if (ygFiltre === 0) {
-          // 0 = "günsüz"
-          if (yg.length > 0) return false
-        } else {
-          if (!yg.includes(ygFiltre)) return false
-        }
+        if (ygFiltre === 0) { if (yg.length > 0) return false }
+        else { if (!yg.includes(ygFiltre)) return false }
       }
       if (hedefBas && (!k.hedef_tarih || k.hedef_tarih < hedefBas)) return false
       if (hedefBit && (!k.hedef_tarih || k.hedef_tarih > hedefBit)) return false
@@ -237,8 +197,49 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
         if (!hay.includes(ara)) return false
       }
       return true
+    })
+  }, [kayitlarTuretilmis, arama, istasyonId, tamamlayanId, departmanFilter, yikamaGunuFilter, hedefBas, hedefBit, tamamBas, tamamBit])
+
+  // KPI sayıları (kpiKapsami uzerinden — durum haric filtreler dahil)
+  const sayilar = useMemo(() => {
+    let hazir = 0, acik = 0, islemde = 0, tamam = 0, iptal = 0, yapilamadi = 0
+    let plansiz = 0, ekstraTanimsiz = 0, onayBekleyen = 0
+    for (const { k, gd } of kpiKapsami) {
+      if (gd === 'HAZIR')         hazir++
+      if (gd === 'ACIK')          acik++
+      if (gd === 'ISLEMDE')       islemde++
+      if (gd === 'TAMAMLANDI')    tamam++
+      if (gd === 'IPTAL')         iptal++
+      if (gd === 'YAPILAMADI')    yapilamadi++
+      if (gd === 'ONAY_BEKLIYOR') onayBekleyen++
+      if (isEkstraTanimsizKayit(k)) ekstraTanimsiz++
+      else if (k.ekstra)            plansiz++
+    }
+    return {
+      toplam: kpiKapsami.length,
+      hazir, acik, islemde, tamam, iptal, yapilamadi,
+      onayBekleyen,
+      ekstra: plansiz,
+      ekstraTanimsiz,
+    }
+  }, [kpiKapsami])
+
+  // Filtre dropdown'ları için unique departman listesi (kayıtlardan toplanır)
+  const departmanlar = useMemo(() => {
+    const s = new Set<string>()
+    for (const k of kayitlar) if (k.departman) s.add(k.departman)
+    return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
+  }, [kayitlar])
+
+  // Tabloda gorunecek: KPI kapsamindan durum filtresini uygula
+  const filtrelenmis = useMemo(() => {
+    return kpiKapsami.filter(({ k, gd }) => {
+      if (filtre === 'EKSTRA' && (!k.ekstra || isEkstraTanimsizKayit(k))) return false
+      if (filtre === 'EKSTRA_TANIMSIZ' && !isEkstraTanimsizKayit(k)) return false
+      if (filtre !== 'TUMU' && filtre !== 'EKSTRA' && filtre !== 'EKSTRA_TANIMSIZ' && filtre !== gd) return false
+      return true
     }).map(({ k }) => k)
-  }, [kayitlarTuretilmis, arama, filtre, istasyonId, tamamlayanId, departmanFilter, yikamaGunuFilter, hedefBas, hedefBit, tamamBas, tamamBit])
+  }, [kpiKapsami, filtre])
 
   // Hedef tarih default bugun'de ise filtre "aktif" sayilmaz — Temizle butonu
   // sadece kullanici bir sey degistirdiginde gorunur.
