@@ -61,7 +61,7 @@ const T = {
 type GoruntuDurum = 'HAZIR' | 'ACIK' | 'ISLEMDE' | 'TAMAMLANDI' | 'IPTAL' | 'YAPILAMADI' | 'ONAY_BEKLIYOR' | 'DIGER'
 // EKSTRA_TANIMSIZ pill/filter = tanimsiz plaka akisi (onay bekliyor + onaylanmis)
 // EKSTRA pill/filter = kayitli plaka manuel plansiz yikama (ekstra=true & onay_durumu='ONAYSIZ')
-type DurumFilter = 'TUMU' | GoruntuDurum | 'EKSTRA' | 'EKSTRA_TANIMSIZ'
+type DurumFilter = 'TUMU' | GoruntuDurum | 'EKSTRA' | 'EKSTRA_TANIMSIZ' | 'PLANLI'
 
 function isEkstraTanimsizKayit(k: GorevKaydi): boolean {
   return k.onay_durumu === 'ONAY_BEKLIYOR' || k.onay_durumu === 'ONAYLANDI'
@@ -205,6 +205,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
   const sayilar = useMemo(() => {
     let hazir = 0, acik = 0, islemde = 0, tamam = 0, iptal = 0, yapilamadi = 0
     let plansiz = 0, ekstraTanimsiz = 0, onayBekleyen = 0
+    let planli = 0
     for (const { k, gd } of kpiKapsami) {
       if (gd === 'HAZIR')         hazir++
       if (gd === 'ACIK')          acik++
@@ -213,13 +214,20 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
       if (gd === 'IPTAL')         iptal++
       if (gd === 'YAPILAMADI')    yapilamadi++
       if (gd === 'ONAY_BEKLIYOR') onayBekleyen++
+      // Kaynak-tipi kategorileri (durumdan bagimsiz, toplama esdeger):
+      //   PLANLI     = ekstra=false (yikama gunu takvimine gore uretilmis)
+      //   PLANSIZ    = ekstra=true + kayitli plaka (manuel plansiz yikama)
+      //   EKSTRA_T   = ekstra=true + arac_id NULL (tanimsiz plaka onay akisi)
+      // Toplam = PLANLI + PLANSIZ + EKSTRA_T
       if (isEkstraTanimsizKayit(k)) ekstraTanimsiz++
       else if (k.ekstra)            plansiz++
+      else                          planli++
     }
     return {
       toplam: kpiKapsami.length,
       hazir, acik, islemde, tamam, iptal, yapilamadi,
       onayBekleyen,
+      planli,
       ekstra: plansiz,
       ekstraTanimsiz,
     }
@@ -237,7 +245,8 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
     return kpiKapsami.filter(({ k, gd }) => {
       if (filtre === 'EKSTRA' && (!k.ekstra || isEkstraTanimsizKayit(k))) return false
       if (filtre === 'EKSTRA_TANIMSIZ' && !isEkstraTanimsizKayit(k)) return false
-      if (filtre !== 'TUMU' && filtre !== 'EKSTRA' && filtre !== 'EKSTRA_TANIMSIZ' && filtre !== gd) return false
+      if (filtre === 'PLANLI' && (k.ekstra || isEkstraTanimsizKayit(k))) return false
+      if (filtre !== 'TUMU' && filtre !== 'EKSTRA' && filtre !== 'EKSTRA_TANIMSIZ' && filtre !== 'PLANLI' && filtre !== gd) return false
       return true
     }).map(({ k }) => k)
   }, [kpiKapsami, filtre])
@@ -380,24 +389,24 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
         </div>
         <KpiPil renk={T.text}      etiket="toplam"     sayi={sayilar.toplam}   active={filtre === 'TUMU'}
                 onClick={() => setFiltre('TUMU')} />
-        <KpiPil renk={'#475569'}   etiket="hazır"      sayi={sayilar.hazir}    active={filtre === 'HAZIR'}
-                onClick={() => setFiltre(filtre === 'HAZIR' ? 'TUMU' : 'HAZIR')} />
+        <KpiPil renk={'#0f766e'}   etiket="planlı"     sayi={sayilar.planli}   active={filtre === 'PLANLI'}
+                onClick={() => setFiltre(filtre === 'PLANLI' ? 'TUMU' : 'PLANLI')} />
+        <KpiPil renk={T.purple}    etiket="plansız"    sayi={sayilar.ekstra}   active={filtre === 'EKSTRA'}
+                onClick={() => setFiltre(filtre === 'EKSTRA' ? 'TUMU' : 'EKSTRA')} />
+        <KpiPil renk={'#0891b2'}   etiket="ekstra"     sayi={sayilar.ekstraTanimsiz} active={filtre === 'EKSTRA_TANIMSIZ'}
+                onClick={() => setFiltre(filtre === 'EKSTRA_TANIMSIZ' ? 'TUMU' : 'EKSTRA_TANIMSIZ')} />
         <KpiPil renk={T.amber}     etiket="açık"        sayi={sayilar.acik}     active={filtre === 'ACIK'}
                 onClick={() => setFiltre(filtre === 'ACIK' ? 'TUMU' : 'ACIK')} />
         <KpiPil renk={T.blue}      etiket="işlemde"    sayi={sayilar.islemde}  active={filtre === 'ISLEMDE'}
                 onClick={() => setFiltre(filtre === 'ISLEMDE' ? 'TUMU' : 'ISLEMDE')} />
         <KpiPil renk={'#0891b2'}   etiket="onay bekleyen" sayi={sayilar.onayBekleyen} active={filtre === 'ONAY_BEKLIYOR'}
                 onClick={() => setFiltre(filtre === 'ONAY_BEKLIYOR' ? 'TUMU' : 'ONAY_BEKLIYOR')} />
-        <KpiPil renk={'#0891b2'}   etiket="ekstra"     sayi={sayilar.ekstraTanimsiz} active={filtre === 'EKSTRA_TANIMSIZ'}
-                onClick={() => setFiltre(filtre === 'EKSTRA_TANIMSIZ' ? 'TUMU' : 'EKSTRA_TANIMSIZ')} />
         <KpiPil renk={T.green}     etiket="tamamlandı" sayi={sayilar.tamam}    active={filtre === 'TAMAMLANDI'}
                 onClick={() => setFiltre(filtre === 'TAMAMLANDI' ? 'TUMU' : 'TAMAMLANDI')} />
         <KpiPil renk={T.red}       etiket="iptal"      sayi={sayilar.iptal}    active={filtre === 'IPTAL'}
                 onClick={() => setFiltre(filtre === 'IPTAL' ? 'TUMU' : 'IPTAL')} />
         <KpiPil renk={'#991b1b'}   etiket="yapılamadı" sayi={sayilar.yapilamadi} active={filtre === 'YAPILAMADI'}
                 onClick={() => setFiltre(filtre === 'YAPILAMADI' ? 'TUMU' : 'YAPILAMADI')} />
-        <KpiPil renk={T.purple}    etiket="plansız"    sayi={sayilar.ekstra}   active={filtre === 'EKSTRA'}
-                onClick={() => setFiltre(filtre === 'EKSTRA' ? 'TUMU' : 'EKSTRA')} />
       </div>
 
       {/* FİLTRE PANELİ — ana satır (Arama · İstasyon · Yıkama Tarihi) + Gelişmiş toggle */}
