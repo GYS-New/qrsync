@@ -144,6 +144,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
 
   const [arama, setArama] = useState('')
   const [filtre, setFiltre] = useState<DurumFilter>('TUMU')
+  const [gelismisAcik, setGelismisAcik] = useState(false)
   // Hedef tarih araligi — default bugun (kullanici kararla: sayfa bugunlu acilsin)
   const [hedefBas, setHedefBas] = useState(bugun)
   const [hedefBit, setHedefBit] = useState(bugun)
@@ -399,101 +400,98 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                 onClick={() => setFiltre(filtre === 'EKSTRA' ? 'TUMU' : 'EKSTRA')} />
       </div>
 
-      {/* FİLTRE PANELİ */}
-      <div style={{ padding: '12px 18px', borderBottom: `1px solid ${T.border}`, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-        <FilterField label="Arama">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f9fafb', border: `1px solid ${T.border}`, borderRadius: 6, padding: '4px 8px' }}>
-            <Search size={13} color={T.textSoft} />
-            <input value={arama} onChange={e => setArama(e.target.value)}
-              placeholder="Plaka, istasyon, kişi…"
-              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12.5, minWidth: 0 }} />
-            {arama && <X size={12} color={T.textSoft} onClick={() => setArama('')} style={{ cursor: 'pointer' }} />}
-          </div>
-        </FilterField>
-        <FilterField label="İstasyon">
-          <select value={istasyonId} onChange={e => setIstasyonId(e.target.value)}
-            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
-            <option value="">Tümü</option>
-            {istasyonlar.map(i => <option key={i.id} value={i.id}>{i.tanim}</option>)}
-          </select>
-        </FilterField>
-        <FilterField label="İşlem Yapan">
-          <select value={tamamlayanId} onChange={e => setTamamlayanId(e.target.value)}
-            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
-            <option value="">Tümü</option>
-            {tamamlayanlar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
-          </select>
-        </FilterField>
-        <FilterField label="Departman">
-          <select value={departmanFilter} onChange={e => setDepartmanFilter(e.target.value)}
-            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
-            <option value="">Tümü</option>
-            {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-        </FilterField>
-        <FilterField label="Yıkama Günü">
-          <select value={yikamaGunuFilter} onChange={e => setYikamaGunuFilter(e.target.value)}
-            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
-            <option value="">Tümü</option>
-            <option value="1">Pazartesi</option>
-            <option value="2">Salı</option>
-            <option value="3">Çarşamba</option>
-            <option value="4">Perşembe</option>
-            <option value="5">Cuma</option>
-            <option value="6">Cumartesi</option>
-            <option value="7">Pazar</option>
-            <option value="0">Plansız</option>
-          </select>
-        </FilterField>
-        <FilterField label="Yıkama Tarihi">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ display: 'flex', gap: 4 }}>
+      {/* FİLTRE PANELİ — ana satır (Arama · İstasyon · Yıkama Tarihi) + Gelişmiş toggle */}
+      <div style={{ padding: '12px 18px', borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 2fr) minmax(180px, 1fr) minmax(320px, 1.6fr) auto', gap: 12, alignItems: 'end' }}>
+          <FilterField label="Arama">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f9fafb', border: `1px solid ${T.border}`, borderRadius: 6, padding: '6px 10px' }}>
+              <Search size={14} color={T.textSoft} />
+              <input value={arama} onChange={e => setArama(e.target.value)}
+                placeholder="Plaka, istasyon, kişi, departman…"
+                style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, minWidth: 0 }} />
+              {arama && <X size={13} color={T.textSoft} onClick={() => setArama('')} style={{ cursor: 'pointer' }} />}
+            </div>
+          </FilterField>
+          <FilterField label="İstasyon">
+            <select value={istasyonId} onChange={e => setIstasyonId(e.target.value)}
+              style={{ width: '100%', padding: '7px 10px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+              <option value="">Tümü</option>
+              {istasyonlar.map(i => <option key={i.id} value={i.id}>{i.tanim}</option>)}
+            </select>
+          </FilterField>
+          <FilterField label="Yıkama Tarihi">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <input type="date" value={hedefBas} onChange={e => setHedefBas(e.target.value)}
-                style={{ flex: 1, padding: '4px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
-              <span style={{ alignSelf: 'center', fontSize: 11, color: T.textSoft }}>→</span>
+                style={{ width: 130, padding: '6px 8px', fontSize: 12.5, border: `1px solid ${T.border}`, borderRadius: 6 }} />
+              <span style={{ fontSize: 12, color: T.textSoft }}>→</span>
               <input type="date" value={hedefBit} onChange={e => setHedefBit(e.target.value)}
-                style={{ flex: 1, padding: '4px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
+                style={{ width: 130, padding: '6px 8px', fontSize: 12.5, border: `1px solid ${T.border}`, borderRadius: 6 }} />
+              <div style={{ display: 'flex', gap: 3, marginLeft: 4 }}>
+                {[
+                  { label: 'Bugün', fn: () => tarihKaydir(0) },
+                  { label: 'Dün',   fn: () => tarihKaydir(-1) },
+                  { label: '7g',    fn: () => tarihAralik(7) },
+                  { label: '30g',   fn: () => tarihAralik(30) },
+                  { label: 'Tümü',  fn: tarihTumu },
+                ].map(b => (
+                  <button key={b.label} type="button" onClick={b.fn}
+                    style={{ padding: '4px 7px', fontSize: 11, border: `1px solid ${T.border}`, borderRadius: 5, background: '#fff', cursor: 'pointer', color: T.textSoft, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    {b.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-              {[
-                { label: 'Bugün', fn: () => tarihKaydir(0) },
-                { label: 'Dün', fn: () => tarihKaydir(-1) },
-                { label: '7 gün', fn: () => tarihAralik(7) },
-                { label: '30 gün', fn: () => tarihAralik(30) },
-                { label: 'Tümü', fn: tarihTumu },
-              ].map(b => (
-                <button key={b.label} type="button" onClick={b.fn}
-                  style={{ padding: '2px 6px', fontSize: 10.5, border: `1px solid ${T.border}`, borderRadius: 4, background: '#fff', cursor: 'pointer', color: T.textSoft, fontWeight: 600 }}>
-                  {b.label}
-                </button>
-              ))}
-            </div>
+          </FilterField>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="button" onClick={() => setGelismisAcik(!gelismisAcik)}
+              style={{ padding: '7px 12px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, background: gelismisAcik ? '#f1f5f9' : '#fff', cursor: 'pointer', color: T.text, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+              Gelişmiş {gelismisAcik ? '▴' : '▾'}
+            </button>
           </div>
-        </FilterField>
-        <FilterField label="Tamamlanma Tarihi">
-          <div style={{ display: 'flex', gap: 4 }}>
-            <input type="date" value={tamamBas} onChange={e => setTamamBas(e.target.value)}
-              style={{ flex: 1, padding: '4px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
-            <span style={{ alignSelf: 'center', fontSize: 11, color: T.textSoft }}>→</span>
-            <input type="date" value={tamamBit} onChange={e => setTamamBit(e.target.value)}
-              style={{ flex: 1, padding: '4px 6px', fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 5 }} />
+        </div>
+
+        {/* Gelişmiş filtreler — toggle ile açılır */}
+        {gelismisAcik && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px dashed ${T.border}`, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+            <FilterField label="İşlem Yapan">
+              <select value={tamamlayanId} onChange={e => setTamamlayanId(e.target.value)}
+                style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+                <option value="">Tümü</option>
+                {tamamlayanlar.map(u => <option key={u.id} value={u.id}>{u.isim_soyisim}</option>)}
+              </select>
+            </FilterField>
+            <FilterField label="Departman">
+              <select value={departmanFilter} onChange={e => setDepartmanFilter(e.target.value)}
+                style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+                <option value="">Tümü</option>
+                {departmanlar.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </FilterField>
+            <FilterField label="Yıkama Günü (haftalık)">
+              <select value={yikamaGunuFilter} onChange={e => setYikamaGunuFilter(e.target.value)}
+                style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
+                <option value="">Tümü</option>
+                <option value="1">Pazartesi</option>
+                <option value="2">Salı</option>
+                <option value="3">Çarşamba</option>
+                <option value="4">Perşembe</option>
+                <option value="5">Cuma</option>
+                <option value="6">Cumartesi</option>
+                <option value="7">Pazar</option>
+                <option value="0">Plansız</option>
+              </select>
+            </FilterField>
+            <FilterField label="Tamamlanma Tarihi">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <input type="date" value={tamamBas} onChange={e => setTamamBas(e.target.value)}
+                  style={{ flex: 1, padding: '6px 6px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 5 }} />
+                <span style={{ fontSize: 11, color: T.textSoft }}>→</span>
+                <input type="date" value={tamamBit} onChange={e => setTamamBit(e.target.value)}
+                  style={{ flex: 1, padding: '6px 6px', fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 5 }} />
+              </div>
+            </FilterField>
           </div>
-        </FilterField>
-        <FilterField label="Durum">
-          <select value={filtre} onChange={e => setFiltre(e.target.value as DurumFilter)}
-            style={{ width: '100%', padding: '6px 9px', fontSize: 13, border: `1px solid ${T.border}`, borderRadius: 6, background: '#fff' }}>
-            <option value="TUMU">Tümü</option>
-            <option value="HAZIR">Hazır</option>
-            <option value="ACIK">Açık</option>
-            <option value="ISLEMDE">İşlemde</option>
-            <option value="ONAY_BEKLIYOR">Onay Bekliyor</option>
-            <option value="EKSTRA_TANIMSIZ">Ekstra (Tanımsız Plaka)</option>
-            <option value="TAMAMLANDI">Tamamlandı</option>
-            <option value="IPTAL">İptal</option>
-            <option value="YAPILAMADI">Yapılamadı</option>
-            <option value="EKSTRA">Plansız</option>
-          </select>
-        </FilterField>
+        )}
       </div>
 
       <div style={{ padding: '8px 18px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: T.textSoft }}>
