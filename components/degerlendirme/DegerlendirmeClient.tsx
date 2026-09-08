@@ -10,12 +10,18 @@ interface LokasyonInfo {
   id: string
   tanim: string
   ust_tanim: string | null
+  son_temizlik: string | null  // ISO tarih — bu lokasyondaki en son TAMAMLANDI zamani
 }
 
 // Çeviriler — tek nokta, kolay bakım. Yeni dil eklemek için buraya ekle.
 const I18N = {
   tr: {
     subtitle: 'Hizmet değerlendirmenizi paylaşın',
+    sonTemizlikPrefix: 'Bu alan',
+    sonTemizlikSuffix: 'önce temizlenmiştir',
+    sonTemizlikAzOnce: 'Bu alan az önce temizlenmiştir',
+    sonTemizlikYok: 'Bu alan için henüz temizlik kaydı yok',
+    birim: { gun: 'gün', saat: 'saat', dk: 'dk' },
     ratingLabel: 'Değerlendirme Puanı',
     ratingLevels: ['', 'Çok Kötü', 'Kötü', 'Orta', 'İyi', 'Mükemmel'],
     commentLabel: 'Yorumunuz',
@@ -53,6 +59,11 @@ const I18N = {
   },
   en: {
     subtitle: 'Share your service feedback',
+    sonTemizlikPrefix: 'This area was last cleaned',
+    sonTemizlikSuffix: 'ago',
+    sonTemizlikAzOnce: 'This area was just cleaned',
+    sonTemizlikYok: 'No cleaning record yet for this area',
+    birim: { gun: 'd', saat: 'h', dk: 'min' },
     ratingLabel: 'Rating',
     ratingLevels: ['', 'Very Bad', 'Bad', 'Average', 'Good', 'Excellent'],
     commentLabel: 'Your Comment',
@@ -91,6 +102,23 @@ const I18N = {
 } as const
 
 const DIL_KEY = 'iogys.degerlendirme.dil'
+
+// "X gun Y saat Z dk once" formatinda insan-okur zaman farki.
+// 0 olan birimler atlanir (ornek: 0 gun 0 saat 19 dk → "19 dk once").
+function sonTemizlikMetni(sonTemizlikIso: string | null, L: typeof I18N['tr'] | typeof I18N['en']): string | null {
+  if (!sonTemizlikIso) return L.sonTemizlikYok
+  const fark = Date.now() - new Date(sonTemizlikIso).getTime()
+  if (fark < 60_000) return L.sonTemizlikAzOnce
+  const toplamDk = Math.floor(fark / 60_000)
+  const gun = Math.floor(toplamDk / 1440)
+  const saat = Math.floor((toplamDk % 1440) / 60)
+  const dk = toplamDk % 60
+  const parts: string[] = []
+  if (gun > 0)  parts.push(`${gun} ${L.birim.gun}`)
+  if (saat > 0) parts.push(`${saat} ${L.birim.saat}`)
+  if (dk > 0)   parts.push(`${dk} ${L.birim.dk}`)
+  return `${L.sonTemizlikPrefix} ${parts.join(' ')} ${L.sonTemizlikSuffix}`
+}
 
 function ilkDil(): Dil {
   if (typeof window === 'undefined') return 'tr'
@@ -344,6 +372,27 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em', paddingRight: 108 }}>{firmaAdi}</div>
           <div style={{ fontSize: 21, fontWeight: 900, lineHeight: 1.2, paddingRight: 108 }}>{lokasyon?.tanim}</div>
           {lokasyon?.ust_tanim && <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>{lokasyon.ust_tanim}</div>}
+          {lokasyon && (() => {
+            const metin = sonTemizlikMetni(lokasyon.son_temizlik, L)
+            if (!metin) return null
+            return (
+              <div style={{
+                marginTop: 10,
+                padding: '7px 12px',
+                background: 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: 8,
+                fontSize: 12.5,
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}>
+                <span aria-hidden>🧽</span>
+                <span>{metin}</span>
+              </div>
+            )
+          })()}
           <div style={{ marginTop: 8, fontSize: 13.5, opacity: 0.85 }}>{L.subtitle}</div>
         </div>
 
