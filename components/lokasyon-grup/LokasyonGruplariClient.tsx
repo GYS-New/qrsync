@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -97,6 +97,7 @@ export default function LokasyonGruplariClient({
   const [q, setQ] = useState('')
   const [expandedGroups,   setExpandedGroups]   = useState<Set<string>>(new Set())
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+  const [aktifSekme,       setAktifSekme]       = useState<'gruplar' | 'detay'>('gruplar')
 
   const locMap = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations])
 
@@ -254,6 +255,31 @@ export default function LokasyonGruplariClient({
         </button>
       </div>
 
+      {/* SEKME BAR — GRUPLAR / DETAY */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e5e7eb', marginBottom: 20 }}>
+        {([
+          { key: 'gruplar' as const, label: 'GRUPLAR' },
+          { key: 'detay' as const,   label: 'DETAY' },
+        ]).map(t => (
+          <button key={t.key} onClick={() => setAktifSekme(t.key)}
+            style={{
+              padding: '10px 20px', fontSize: 13.5,
+              fontWeight: aktifSekme === t.key ? 800 : 600,
+              color: aktifSekme === t.key ? '#111827' : '#6b7280',
+              background: 'none', border: 'none',
+              borderBottom: aktifSekme === t.key ? '2px solid #111827' : '2px solid transparent',
+              marginBottom: -2, cursor: 'pointer', letterSpacing: 0.3,
+            }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {aktifSekme === 'detay' && (
+        <DetayMatris groupsFlat={groupsFlat} topLocations={topLocations} />
+      )}
+
+      {aktifSekme === 'gruplar' && (
       <div style={{ display: 'grid', gridTemplateColumns: (readonly || !yetki.ekleyebilir) ? '1fr' : 'minmax(320px, 380px) 1fr', gap: 20, alignItems: 'start' }}>
 
         {/* SOL: FORM — sadece readonly olmayanlarda */}
@@ -449,6 +475,110 @@ export default function LokasyonGruplariClient({
           ))}
           </div>
         </div>
+      </div>
+      )}
+    </div>
+  )
+}
+
+// ═══════════════ DETAY sekmesi: Grup adi × Ust lokasyon matrisi ═══════════════
+function DetayMatris({
+  groupsFlat,
+  topLocations,
+}: {
+  groupsFlat: Array<{ id: string; ad: string; ust_lokasyon_id?: string | null }>
+  topLocations: Array<{ id: string; tanim: string }>
+}) {
+  // Sadece bir grubun bagli oldugu ust lokasyonlari kolon olarak goster
+  const kolonlar = useMemo(() => {
+    const kullanilan = new Set<string>()
+    for (const g of groupsFlat) if (g.ust_lokasyon_id) kullanilan.add(g.ust_lokasyon_id)
+    return topLocations.filter(t => kullanilan.has(t.id))
+  }, [groupsFlat, topLocations])
+
+  // Grup adi -> hangi ust lokasyonlarda var (set)
+  const gruplar = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    for (const g of groupsFlat) {
+      if (!g.ust_lokasyon_id) continue
+      const norm = (g.ad ?? '').trim().toUpperCase()
+      if (!norm) continue
+      const set = map.get(norm) ?? new Set<string>()
+      set.add(g.ust_lokasyon_id)
+      map.set(norm, set)
+    }
+    return [...map.entries()]
+      .map(([ad, ustSet]) => ({ ad, ustSet, kapsam: ustSet.size }))
+      // Kapsam desc (herkeste var üstte), aynıysa alfabetik
+      .sort((a, b) => b.kapsam - a.kapsam || a.ad.localeCompare(b.ad, 'tr'))
+  }, [groupsFlat])
+
+  const th: CSSProperties = { padding: '10px 12px', fontSize: 12, fontWeight: 800, color: '#374151', background: '#f4f8f4', borderBottom: '2px solid #d1d5db', textAlign: 'center', whiteSpace: 'nowrap' }
+  const thGrup: CSSProperties = { ...th, textAlign: 'left', position: 'sticky', left: 0, zIndex: 2, background: '#f4f8f4', minWidth: 200 }
+  const td: CSSProperties = { padding: '10px 12px', fontSize: 13, textAlign: 'center', borderBottom: '1px solid #f3f4f6' }
+  const tdGrup: CSSProperties = { ...td, textAlign: 'left', fontWeight: 700, color: '#111827', position: 'sticky', left: 0, background: '#fff', borderRight: '1px solid #e5e7eb' }
+
+  if (kolonlar.length === 0 || gruplar.length === 0) {
+    return (
+      <div className="verde-card" style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+        Bu firma/proje icin gruplandirma bulunamadi.
+      </div>
+    )
+  }
+
+  return (
+    <div className="verde-card" style={{ padding: '16px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 900, color: '#111827' }}>GRUP × ÜST LOKASYON MATRİSİ</div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+            {gruplar.length} grup adı × {kolonlar.length} üst lokasyon · Yeşil ✓ = grup bu üst lokasyonda mevcut
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 11.5 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 16, height: 16, borderRadius: 4, background: '#dcfce7', border: '1px solid #86efac', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#166534', fontWeight: 800 }}>✓</span>
+            <span style={{ color: '#6b7280' }}>Var</span>
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 16, height: 16, borderRadius: 4, background: '#f3f4f6', border: '1px solid #e5e7eb', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontWeight: 700 }}>—</span>
+            <span style={{ color: '#6b7280' }}>Yok</span>
+          </span>
+        </div>
+      </div>
+
+      <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 10 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={thGrup}>Grup</th>
+              {kolonlar.map(k => <th key={k.id} style={th}>{k.tanim}</th>)}
+              <th style={{ ...th, background: '#e5e7eb' }}>Kapsam</th>
+            </tr>
+          </thead>
+          <tbody>
+            {gruplar.map(g => (
+              <tr key={g.ad} style={{ transition: 'background .1s' }}>
+                <td style={tdGrup}>{g.ad}</td>
+                {kolonlar.map(k => {
+                  const var_ = g.ustSet.has(k.id)
+                  return (
+                    <td key={k.id} style={td}>
+                      {var_ ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 5, background: '#dcfce7', border: '1px solid #86efac', color: '#166534', fontWeight: 800 }}>✓</span>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 5, background: '#f9fafb', border: '1px solid #e5e7eb', color: '#9ca3af', fontWeight: 700 }}>—</span>
+                      )}
+                    </td>
+                  )
+                })}
+                <td style={{ ...td, fontWeight: 800, color: g.kapsam === kolonlar.length ? '#059669' : '#374151', background: '#fafafa' }}>
+                  {g.kapsam}/{kolonlar.length}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )
