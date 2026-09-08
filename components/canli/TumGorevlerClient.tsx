@@ -1093,12 +1093,45 @@ async function del() {
   // Arşiv satırları — _source ile işaretli, ana tabloya merge edilir
   const arsivDisplayRows = useMemo(() => arsivRows.map(r => ({ ...r, _source: 'arsiv' as const })), [arsivRows])
 
+  // Arsiv satirlarina da client-side filtreleri uygula.
+  // Backend /api/arsiv/frekansiyel `atanan_id`, `durum`, `lokasyon_id`, `from/to`
+  // filtrelerini destekliyor ama "İşlemi Yapan" (actor) icin server-side filtre
+  // yok — client'ta uygulanmali. Yoksa "SONA MEMIŞ" secili olsa da baska
+  // personellerin arsiv gorevleri karisir (2026-09-04 kullanici bildirimi).
+  const filteredArsivRows = useMemo(() => {
+    if (!actor && !vardiyaAralik && !q.trim()) return arsivDisplayRows
+    const s = q.trim().toLowerCase()
+    return arsivDisplayRows.filter((g: any) => {
+      if (actor && getIslemiYapan(g, { meId, meName, kullanicilar, actorAdMap }) !== actor) return false
+      if (vardiyaAralik) {
+        if (!g.aktif_olma_tarihi) return false
+        const hm = new Date(g.aktif_olma_tarihi).toLocaleTimeString('en-GB', {
+          timeZone: 'Europe/Istanbul', hour12: false, hour: '2-digit', minute: '2-digit',
+        })
+        const [h, m] = hm.split(':').map(Number)
+        if (!Number.isFinite(h) || !Number.isFinite(m)) return false
+        const dk = h * 60 + m
+        const { basMin, bitMin } = vardiyaAralik
+        const icinde = bitMin <= 24 * 60 ? (dk >= basMin && dk < bitMin) : (dk >= basMin || dk < (bitMin - 24 * 60))
+        if (!icinde) return false
+      }
+      if (s) {
+        const hay = [
+          g.tanim ?? '', g.lokasyonlar?.tanim ?? '',
+          getIslemiYapan(g, { meId, meName, kullanicilar, actorAdMap }) ?? '',
+        ].join(' ').toLowerCase()
+        if (!hay.includes(s)) return false
+      }
+      return true
+    })
+  }, [arsivDisplayRows, actor, vardiyaAralik, q, meId, meName, kullanicilar, actorAdMap])
+
   // combinedRows = aktif tablo + arşiv (Uygula sonrası arşiv yüklendiyse)
   // Aktif görevler önce, arşiv görevleri arşiv_tarihi DESC sırada altına eklenir.
   const combinedRows = useMemo(() => {
-    if (!arsivAktif || arsivDisplayRows.length === 0) return tabloRows
-    return [...tabloRows, ...arsivDisplayRows]
-  }, [tabloRows, arsivDisplayRows, arsivAktif])
+    if (!arsivAktif || filteredArsivRows.length === 0) return tabloRows
+    return [...tabloRows, ...filteredArsivRows]
+  }, [tabloRows, filteredArsivRows, arsivAktif])
 
   // Sayfalama (tablo)
   const PAGE_SIZE = 50
