@@ -78,17 +78,24 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('lokasyon_grup_muafiyetleri')
-    .upsert({
+    .insert({
       firma_id: firmaId,
       proje_id: projeId,
       ust_lokasyon_id: ustLokId,
       grup_adi: grupAdi,
       olusturan_id: a.user.id,
-    }, { onConflict: 'firma_id,proje_id,ust_lokasyon_id,grup_adi', ignoreDuplicates: false })
+    })
     .select('id')
     .maybeSingle()
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  // Idempotent: kayit zaten varsa (unique_violation 23505) OK don.
+  // Not: onConflict/upsert kullanilamiyor cunku UNIQUE INDEX expression'li
+  // (COALESCE(proje_id, ...)) ve PostgreSQL ON CONFLICT sadece gercek
+  // UNIQUE CONSTRAINT ile calisir.
+  if (error) {
+    if ((error as any).code === '23505') return NextResponse.json({ ok: true, id: null, mesaj: 'zaten muaf' })
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  }
   return NextResponse.json({ ok: true, id: (data as any)?.id ?? null })
 }
 
