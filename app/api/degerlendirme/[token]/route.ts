@@ -83,21 +83,26 @@ export async function GET(_: NextRequest, { params }: { params: { token: string 
   // Bu lokasyonun son temizlenme (TAMAMLANDI) zamani — 4 kaynak (canli, spesifik,
   // ve arsiv karsiliklari). En yeni olan alinir. Musteriye "X once temizlendi"
   // bilgisi vermek icin.
-  const kaynaklar = [
-    admin.from('canli_gorevler').select('tamamlanma_tarihi').eq('lokasyon_id', lok.id).eq('durum', 'TAMAMLANDI').order('tamamlanma_tarihi', { ascending: false }).limit(1).maybeSingle(),
-    admin.from('gorevler').select('tamamlanma_tarihi').eq('lokasyon_id', lok.id).eq('durum', 'TAMAMLANDI').order('tamamlanma_tarihi', { ascending: false }).limit(1).maybeSingle(),
-  ]
-  // Arsiv tablolari opsiyonel — hata olursa yut (tablo yoksa)
-  const arsivKaynaklar = [
-    admin.from('canli_gorevler_arsiv').select('tamamlanma_tarihi').eq('lokasyon_id', lok.id).eq('durum', 'TAMAMLANDI').order('tamamlanma_tarihi', { ascending: false }).limit(1).maybeSingle().then((r: any) => r).catch(() => ({ data: null })),
-    admin.from('gorevler_arsiv').select('tamamlanma_tarihi').eq('lokasyon_id', lok.id).eq('durum', 'TAMAMLANDI').order('tamamlanma_tarihi', { ascending: false }).limit(1).maybeSingle().then((r: any) => r).catch(() => ({ data: null })),
-  ]
-  const sonuclar = await Promise.all([...kaynaklar, ...arsivKaynaklar])
-  const tarihler = sonuclar
-    .map((r: any) => r?.data?.tamamlanma_tarihi)
-    .filter((t: any): t is string => typeof t === 'string' && t.length > 0)
-  const sonTemizlik = tarihler.length > 0
-    ? tarihler.reduce((max, t) => t > max ? t : max)
+  async function sonTamamlanma(tablo: string): Promise<string | null> {
+    try {
+      const { data } = await admin.from(tablo)
+        .select('tamamlanma_tarihi')
+        .eq('lokasyon_id', lok.id)
+        .eq('durum', 'TAMAMLANDI')
+        .order('tamamlanma_tarihi', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      return (data as any)?.tamamlanma_tarihi ?? null
+    } catch { return null }
+  }
+  const tarihler = (await Promise.all([
+    sonTamamlanma('canli_gorevler'),
+    sonTamamlanma('gorevler'),
+    sonTamamlanma('canli_gorevler_arsiv'),
+    sonTamamlanma('gorevler_arsiv'),
+  ])).filter((t): t is string => typeof t === 'string' && t.length > 0)
+  const sonTemizlik: string | null = tarihler.length > 0
+    ? tarihler.reduce((max: string, t: string) => t > max ? t : max)
     : null
 
   return NextResponse.json({
