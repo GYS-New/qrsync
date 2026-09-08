@@ -1492,9 +1492,13 @@ async function del() {
                 })()}
                 {personelAtamaAktif && <td style={{ color: isArsiv ? '#64748b' : '#4b5563', paddingRight: 22 }}>{g.atanan?.isim_soyisim ?? '—'}</td>}
                 <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13, paddingLeft: 22 }}>{g.aktif_olma_tarihi ? formatDateTime(g.aktif_olma_tarihi) : '—'}</td>
-                {/* İşlem Tarihi — sadece tarih kısmı (DD.MM.YYYY) */}
+                {/* İşlem Tarihi — görevin fiili tamamlanma/iptal günü.
+                    Arşiv kayıtlarında da arsiv_tarihi (cron taşıma zamani)
+                    yerine durum_degisim_tarihi (TAMAMLANDI/IPTAL fiili zamani)
+                    gösterilir. Ancak durum_degisim_tarihi NULL ise (nadir)
+                    fallback olarak arsiv_tarihi'ye düş. */}
                 <td style={{ color: isArsiv ? '#94a3b8' : '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>
-                  {formatTarihTR(isArsiv ? (g.arsiv_tarihi ?? g.durum_degisim_tarihi) : g.durum_degisim_tarihi)}
+                  {formatTarihTR(g.durum_degisim_tarihi ?? (isArsiv ? g.arsiv_tarihi : null))}
                 </td>
                 {/* İşlem Saatleri (proje ayarına bağlı) */}
                 {islemSureleriAktif && (
