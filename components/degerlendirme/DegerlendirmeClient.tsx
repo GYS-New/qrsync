@@ -104,15 +104,15 @@ const I18N = {
 const DIL_KEY = 'iogys.degerlendirme.dil'
 
 // Vurgu seviyesi — 30 dk icinde temizlendi ise "taze" vurgu.
-type SonTemizlikTon = 'yok' | 'taze' | 'normal'
+type SonTemizlikTon = 'taze' | 'normal'
 
 // "X gun Y saat Z dk once" formatinda insan-okur zaman farki.
 // 0 olan birimler atlanir (ornek: 0 gun 0 saat 19 dk → "19 dk once").
-function sonTemizlikBilgi(sonTemizlikIso: string | null, L: typeof I18N['tr'] | typeof I18N['en']): { metin: string; ton: SonTemizlikTon } {
-  if (!sonTemizlikIso) return { metin: L.sonTemizlikYok, ton: 'yok' }
+// Kayit yoksa null doner — cip hic gorunmez (ozellik devre disi).
+function sonTemizlikBilgi(sonTemizlikIso: string | null, L: typeof I18N['tr'] | typeof I18N['en']): { metin: string; ton: SonTemizlikTon } | null {
+  if (!sonTemizlikIso) return null
   const fark = Date.now() - new Date(sonTemizlikIso).getTime()
   const toplamDk = Math.floor(fark / 60_000)
-  // < 30 dk → "az once temizlendi" — degerlendirme oncesi musteri bilsin diye vurgulu
   const ton: SonTemizlikTon = toplamDk < 30 ? 'taze' : 'normal'
   if (fark < 60_000) return { metin: L.sonTemizlikAzOnce, ton }
   const gun = Math.floor(toplamDk / 1440)
@@ -378,8 +378,9 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
           <div style={{ fontSize: 21, fontWeight: 900, lineHeight: 1.2, paddingRight: 108 }}>{lokasyon?.tanim}</div>
           {lokasyon?.ust_tanim && <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>{lokasyon.ust_tanim}</div>}
           {lokasyon && (() => {
-            const { metin, ton } = sonTemizlikBilgi(lokasyon.son_temizlik, L)
-            if (!metin) return null
+            const bilgi = sonTemizlikBilgi(lokasyon.son_temizlik, L)
+            if (!bilgi) return null  // Kayit yoksa cip hic gorunmez
+            const { metin, ton } = bilgi
             // Taze temizlik (< 30 dk) icin belirgin yesil vurgu — musteri "cok
             // yakin zamanda temizlendi" bilgisiyle degerlendirme yapsin.
             const stil = ton === 'taze' ? {
