@@ -103,13 +103,18 @@ const I18N = {
 
 const DIL_KEY = 'iogys.degerlendirme.dil'
 
+// Vurgu seviyesi — 30 dk icinde temizlendi ise "taze" vurgu.
+type SonTemizlikTon = 'yok' | 'taze' | 'normal'
+
 // "X gun Y saat Z dk once" formatinda insan-okur zaman farki.
 // 0 olan birimler atlanir (ornek: 0 gun 0 saat 19 dk → "19 dk once").
-function sonTemizlikMetni(sonTemizlikIso: string | null, L: typeof I18N['tr'] | typeof I18N['en']): string | null {
-  if (!sonTemizlikIso) return L.sonTemizlikYok
+function sonTemizlikBilgi(sonTemizlikIso: string | null, L: typeof I18N['tr'] | typeof I18N['en']): { metin: string; ton: SonTemizlikTon } {
+  if (!sonTemizlikIso) return { metin: L.sonTemizlikYok, ton: 'yok' }
   const fark = Date.now() - new Date(sonTemizlikIso).getTime()
-  if (fark < 60_000) return L.sonTemizlikAzOnce
   const toplamDk = Math.floor(fark / 60_000)
+  // < 30 dk → "az once temizlendi" — degerlendirme oncesi musteri bilsin diye vurgulu
+  const ton: SonTemizlikTon = toplamDk < 30 ? 'taze' : 'normal'
+  if (fark < 60_000) return { metin: L.sonTemizlikAzOnce, ton }
   const gun = Math.floor(toplamDk / 1440)
   const saat = Math.floor((toplamDk % 1440) / 60)
   const dk = toplamDk % 60
@@ -117,7 +122,7 @@ function sonTemizlikMetni(sonTemizlikIso: string | null, L: typeof I18N['tr'] | 
   if (gun > 0)  parts.push(`${gun} ${L.birim.gun}`)
   if (saat > 0) parts.push(`${saat} ${L.birim.saat}`)
   if (dk > 0)   parts.push(`${dk} ${L.birim.dk}`)
-  return `${L.sonTemizlikPrefix} ${parts.join(' ')} ${L.sonTemizlikSuffix}`
+  return { metin: `${L.sonTemizlikPrefix} ${parts.join(' ')} ${L.sonTemizlikSuffix}`, ton }
 }
 
 function ilkDil(): Dil {
@@ -373,22 +378,33 @@ export default function DegerlendirmeClient({ token }: { token: string }) {
           <div style={{ fontSize: 21, fontWeight: 900, lineHeight: 1.2, paddingRight: 108 }}>{lokasyon?.tanim}</div>
           {lokasyon?.ust_tanim && <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>{lokasyon.ust_tanim}</div>}
           {lokasyon && (() => {
-            const metin = sonTemizlikMetni(lokasyon.son_temizlik, L)
+            const { metin, ton } = sonTemizlikBilgi(lokasyon.son_temizlik, L)
             if (!metin) return null
+            // Taze temizlik (< 30 dk) icin belirgin yesil vurgu — musteri "cok
+            // yakin zamanda temizlendi" bilgisiyle degerlendirme yapsin.
+            const stil = ton === 'taze' ? {
+              background: '#22c55e',
+              border: '1px solid #16a34a',
+              color: '#fff',
+              boxShadow: '0 2px 8px rgba(34,197,94,0.35)',
+            } : {
+              background: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              color: 'inherit',
+            }
             return (
               <div style={{
                 marginTop: 10,
-                padding: '7px 12px',
-                background: 'rgba(255,255,255,0.15)',
-                border: '1px solid rgba(255,255,255,0.25)',
+                padding: '8px 13px',
                 borderRadius: 8,
                 fontSize: 12.5,
-                fontWeight: 600,
+                fontWeight: 700,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6,
+                gap: 7,
+                ...stil,
               }}>
-                <span aria-hidden>🧽</span>
+                <span aria-hidden>{ton === 'taze' ? '✨' : '🧽'}</span>
                 <span>{metin}</span>
               </div>
             )
