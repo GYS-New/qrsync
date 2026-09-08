@@ -276,7 +276,13 @@ export default function LokasyonGruplariClient({
       </div>
 
       {aktifSekme === 'detay' && (
-        <DetayMatris groupsFlat={groupsFlat} topLocations={topLocations} />
+        <DetayMatris
+          groupsFlat={groupsFlat}
+          topLocations={topLocations}
+          firmaId={firmaId ?? null}
+          projeId={projeId ?? null}
+          canEdit={!readonly && (yetki.duzenleyebilir || yetki.ekleyebilir)}
+        />
       )}
 
       {aktifSekme === 'gruplar' && (
@@ -482,13 +488,43 @@ export default function LokasyonGruplariClient({
 }
 
 // ═══════════════ DETAY sekmesi: Grup adi × Ust lokasyon matrisi ═══════════════
+type Muafiyet = { id: string; ust_lokasyon_id: string; grup_adi: string }
+
 function DetayMatris({
   groupsFlat,
   topLocations,
+  firmaId,
+  projeId,
+  canEdit,
 }: {
   groupsFlat: Array<{ id: string; ad: string; ust_lokasyon_id?: string | null }>
   topLocations: Array<{ id: string; tanim: string }>
+  firmaId: string | null
+  projeId: string | null
+  canEdit: boolean
 }) {
+  const [muafiyetler, setMuafiyetler] = useState<Muafiyet[]>([])
+  const [loading, setLoading] = useState(false)
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!firmaId) return
+    setLoading(true)
+    const p = new URLSearchParams({ firma_id: firmaId })
+    if (projeId) p.set('proje_id', projeId)
+    fetch(`/api/lokasyon-grup-muafiyet?${p}`)
+      .then(r => r.json())
+      .then(j => { if (j.ok) setMuafiyetler(j.data ?? []) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [firmaId, projeId])
+
+  const muafiyetSet = useMemo(() => {
+    const s = new Set<string>()
+    for (const m of muafiyetler) s.add(`${m.ust_lokasyon_id}::${m.grup_adi}`)
+    return s
+  }, [muafiyetler])
+
   // Sadece bir grubun bagli oldugu ust lokasyonlari kolon olarak goster
   const kolonlar = useMemo(() => {
     const kullanilan = new Set<string>()
@@ -501,7 +537,7 @@ function DetayMatris({
     const map = new Map<string, Set<string>>()
     for (const g of groupsFlat) {
       if (!g.ust_lokasyon_id) continue
-      const norm = (g.ad ?? '').trim().toUpperCase()
+      const norm = (g.ad ?? '').trim().toLocaleUpperCase('tr')
       if (!norm) continue
       const set = map.get(norm) ?? new Set<string>()
       set.add(g.ust_lokasyon_id)
@@ -509,9 +545,33 @@ function DetayMatris({
     }
     return [...map.entries()]
       .map(([ad, ustSet]) => ({ ad, ustSet, kapsam: ustSet.size }))
-      // Kapsam desc (herkeste var üstte), aynıysa alfabetik
       .sort((a, b) => b.kapsam - a.kapsam || a.ad.localeCompare(b.ad, 'tr'))
   }, [groupsFlat])
+
+  async function toggleMuafiyet(ustLokId: string, grupAdi: string, aktifMuaf: boolean) {
+    if (!firmaId || !canEdit) return
+    const key = `${ustLokId}::${grupAdi}`
+    setBusyKey(key)
+    try {
+      const method = aktifMuaf ? 'DELETE' : 'POST'
+      const body = { firma_id: firmaId, proje_id: projeId, ust_lokasyon_id: ustLokId, grup_adi: grupAdi }
+      const res = await fetch('/api/lokasyon-grup-muafiyet', {
+        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      const j = await res.json()
+      if (!res.ok || !j.ok) throw new Error(j.error ?? 'Islem basarisiz')
+      // Local state update
+      if (aktifMuaf) {
+        setMuafiyetler(prev => prev.filter(m => !(m.ust_lokasyon_id === ustLokId && m.grup_adi === grupAdi)))
+      } else {
+        setMuafiyetler(prev => [...prev, { id: j.id ?? crypto.randomUUID(), ust_lokasyon_id: ustLokId, grup_adi: grupAdi }])
+      }
+    } catch (err: any) {
+      alert(err?.message ?? 'Islem basarisiz')
+    } finally {
+      setBusyKey(null)
+    }
+  }
 
   const th: CSSProperties = { padding: '10px 12px', fontSize: 12, fontWeight: 800, color: '#374151', background: '#f4f8f4', borderBottom: '2px solid #d1d5db', textAlign: 'center', whiteSpace: 'nowrap' }
   const thGrup: CSSProperties = { ...th, textAlign: 'left', position: 'sticky', left: 0, zIndex: 2, background: '#f4f8f4', minWidth: 200 }
@@ -532,10 +592,12 @@ function DetayMatris({
         <div>
           <div style={{ fontSize: 15, fontWeight: 900, color: '#111827' }}>GRUP × ÜST LOKASYON MATRİSİ</div>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-            {gruplar.length} grup adı × {kolonlar.length} üst lokasyon · Yeşil ✓ = grup bu üst lokasyonda mevcut
+            {gruplar.length} grup adı × {kolonlar.length} üst lokasyon
+            {canEdit && ' · Boş hücreye tıklayarak "muaf" işaretleyebilirsiniz'}
+            {loading && ' · Muafiyetler yükleniyor…'}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 11.5 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 11.5, flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span style={{ width: 16, height: 16, borderRadius: 4, background: '#dcfce7', border: '1px solid #86efac', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#166534', fontWeight: 800 }}>✓</span>
             <span style={{ color: '#6b7280' }}>Var</span>
@@ -543,6 +605,10 @@ function DetayMatris({
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span style={{ width: 16, height: 16, borderRadius: 4, background: '#f3f4f6', border: '1px solid #e5e7eb', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontWeight: 700 }}>—</span>
             <span style={{ color: '#6b7280' }}>Yok</span>
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 16, height: 16, borderRadius: 4, background: '#fef3c7', border: '1px solid #fbbf24', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#92400e', fontWeight: 800 }}>⊘</span>
+            <span style={{ color: '#6b7280' }}>Muaf (kasten yok)</span>
           </span>
         </div>
       </div>
@@ -557,26 +623,54 @@ function DetayMatris({
             </tr>
           </thead>
           <tbody>
-            {gruplar.map(g => (
-              <tr key={g.ad} style={{ transition: 'background .1s' }}>
-                <td style={tdGrup}>{g.ad}</td>
-                {kolonlar.map(k => {
-                  const var_ = g.ustSet.has(k.id)
-                  return (
-                    <td key={k.id} style={td}>
-                      {var_ ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 5, background: '#dcfce7', border: '1px solid #86efac', color: '#166534', fontWeight: 800 }}>✓</span>
-                      ) : (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 5, background: '#f9fafb', border: '1px solid #e5e7eb', color: '#9ca3af', fontWeight: 700 }}>—</span>
-                      )}
-                    </td>
-                  )
-                })}
-                <td style={{ ...td, fontWeight: 800, color: g.kapsam === kolonlar.length ? '#059669' : '#374151', background: '#fafafa' }}>
-                  {g.kapsam}/{kolonlar.length}
-                </td>
-              </tr>
-            ))}
+            {gruplar.map(g => {
+              // Kapsam hesabinda muaf hucreleri "beklenen" olarak hariç tut
+              const beklenenKolon = kolonlar.filter(k => !muafiyetSet.has(`${k.id}::${g.ad}`))
+              const kapsam = beklenenKolon.filter(k => g.ustSet.has(k.id)).length
+              const beklenen = beklenenKolon.length
+              return (
+                <tr key={g.ad}>
+                  <td style={tdGrup}>{g.ad}</td>
+                  {kolonlar.map(k => {
+                    const var_ = g.ustSet.has(k.id)
+                    const muaf = muafiyetSet.has(`${k.id}::${g.ad}`)
+                    const key = `${k.id}::${g.ad}`
+                    const busy = busyKey === key
+                    // Var olan hucre tiklanamaz (grup zaten mevcut, muaf olamaz)
+                    // Muaf/yok hucreleri sadece canEdit ile tiklanabilir
+                    const tiklanabilir = canEdit && !var_ && !busy
+                    return (
+                      <td key={k.id} style={td}>
+                        {var_ ? (
+                          <span title="Grup mevcut" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 5, background: '#dcfce7', border: '1px solid #86efac', color: '#166534', fontWeight: 800 }}>✓</span>
+                        ) : muaf ? (
+                          <button
+                            type="button"
+                            disabled={!tiklanabilir}
+                            onClick={() => toggleMuafiyet(k.id, g.ad, true)}
+                            title={canEdit ? 'Muaf kaldırmak için tıkla' : 'Muaf'}
+                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 5, background: '#fef3c7', border: '1px solid #fbbf24', color: '#92400e', fontWeight: 800, cursor: tiklanabilir ? 'pointer' : 'default', opacity: busy ? 0.4 : 1 }}>
+                            ⊘
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={!tiklanabilir}
+                            onClick={() => toggleMuafiyet(k.id, g.ad, false)}
+                            title={canEdit ? 'Muaf işaretle' : '—'}
+                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 5, background: '#f9fafb', border: '1px solid #e5e7eb', color: '#9ca3af', fontWeight: 700, cursor: tiklanabilir ? 'pointer' : 'default', opacity: busy ? 0.4 : 1 }}>
+                            —
+                          </button>
+                        )}
+                      </td>
+                    )
+                  })}
+                  <td style={{ ...td, fontWeight: 800, color: kapsam === beklenen ? '#059669' : '#374151', background: '#fafafa' }}>
+                    {kapsam}/{beklenen}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
