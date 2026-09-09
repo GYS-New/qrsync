@@ -40,8 +40,15 @@ export async function GET(request: Request) {
     })
 
     const toplamHedef       = data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0) || data.toplamGorev
-    const toplamGerceklesen = data.toplamTamamlanan + data.toplamSapma
-    const genelOran         = toplamHedef > 0 ? Math.round(toplamGerceklesen / toplamHedef * 100) : 0
+    const toplamEks         = data.toplamEkstra ?? 0
+    // Tamamlanan: sadece kural — Web ile ayni format (2026-09-09).
+    const toplamTamKural    = data.toplamTamamlanan - toplamEks
+    const toplamGerceklesen = toplamTamKural + data.toplamSapma + toplamEks
+    // Kusuratli TR yuzde format.
+    const fmtPct = (v: number, t: number) =>
+      t > 0 ? `%${(v / t * 100).toFixed(2).replace('.', ',')}` : '%0,00'
+    const genelOran     = fmtPct(toplamGerceklesen, toplamHedef)
+    const genelBasariStr = fmtPct(toplamGerceklesen, toplamHedef)
 
     const css = `
       * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -71,13 +78,13 @@ export async function GET(request: Request) {
     const kpiCards = `
       <div class="kpi-grid">
         <div class="kpi"><div class="label">Hedef Frekans</div><div class="value">${toplamHedef}</div></div>
-        <div class="kpi"><div class="label">Tamamlanan</div><div class="value">${data.toplamTamamlanan}</div></div>
-        <div class="kpi"><div class="label">Sapma</div><div class="value">${data.toplamSapma}</div></div>
-        <div class="kpi"><div class="label">Kayıp</div><div class="value">${data.toplamKayip}</div></div>
-        <div class="kpi"><div class="label">Ekstra</div><div class="value">${data.toplamEkstra ?? data.frekansDisiGorevler.length}</div></div>
         <div class="kpi"><div class="label">Gerçekleşen</div><div class="value">${toplamGerceklesen}</div></div>
-        <div class="kpi"><div class="label">Başarı</div><div class="value">%${data.genelBasari}</div></div>
-        <div class="kpi"><div class="label">Genel Oran</div><div class="value">%${genelOran}</div></div>
+        <div class="kpi"><div class="label">Tamamlanan</div><div class="value">${toplamTamKural}</div></div>
+        <div class="kpi"><div class="label">Sapma (Zamanında Yapılamayan)</div><div class="value">${data.toplamSapma}</div></div>
+        <div class="kpi"><div class="label">Frekans Dışı</div><div class="value">${toplamEks}</div></div>
+        <div class="kpi"><div class="label">Kayıp</div><div class="value">${data.toplamKayip}</div></div>
+        <div class="kpi"><div class="label">Başarı</div><div class="value">${genelBasariStr}</div></div>
+        <div class="kpi"><div class="label">Genel Oran</div><div class="value">${genelOran}</div></div>
       </div>
     `
 
@@ -109,11 +116,13 @@ export async function GET(request: Request) {
     <table>
       <thead><tr>
         <th>SN</th><th>Grup</th><th>Üst Lok.</th><th>Lokasyon</th><th>V.Frekans</th>
-        <th>Hedef</th><th>Tamam.</th><th>Ekstra</th><th>Sapma</th><th>Kayıp</th><th>Başarı</th><th>Genel</th>
+        <th>Hedef</th><th>Tamam.</th><th>Frekans Dışı</th><th>Sapma</th><th>Kayıp</th><th>Başarı</th><th>Genel</th>
       </tr></thead>
       <tbody>${tableRows(data.grupMetrikleri.map((g, i) => [
+        // basariOrani/genelOran zaten backend'de "%81,03" formatinda geliyor —
+        // ekstra "%" prefix EKLEMEYIN (onceki bug: %%81 goruniyordu).
         i + 1, g.grup, g.ustLokasyon, g.lokasyon, g.gunlukFrekans,
-        g.hedef, g.tamamlanan, g.ekstra ?? 0, g.sapma, g.kayip, `%${g.basariOrani}`, `%${g.genelOran}`,
+        g.hedef, g.tamamlanan, g.ekstra ?? 0, g.sapma, g.kayip, g.basariOrani, g.genelOran,
       ]))}</tbody>
     </table>
   </div>

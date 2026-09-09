@@ -1,5 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
+
+// Yuzde format — 2 decimal + TR virgul. Web tarafi ile ayni format (2026-09-09).
+// t <= 0 durumunda "%0,00" doner.
+function fmtPctTR(v: number, t: number): string {
+  if (!t || t <= 0) return '%0,00'
+  return `%${(v / t * 100).toFixed(2).replace('.', ',')}`
+}
 import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliUserIds'
 import { getOtoYikamaLokasyonIds } from '@/lib/yetki/getOtoYikamaLokasyonIds'
 import { getEfektifAyar } from '@/lib/ayarlar/getEfektifAyar'
@@ -702,12 +709,11 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
       ? Array.from(taninCounts.entries()).sort((a, b) => b[1] - a[1])[0][0] : ''
     // Başarı = (kural tamamlanan + ekstra) / hedef → ekstra başarıyı ARTIRIR, hedefi değiştirmez
     const gerceklesen = tamamlanan + ekstra
-    const basariOran = hedef > 0 ? Math.round((gerceklesen / hedef) * 100) : 0
-    const genelOran  = hedef > 0 ? Math.round(((gerceklesen + sapma) / hedef) * 100) : 0
     return {
       grup: grupAd, ustLokasyon, lokasyon: lokTanim, gorevTanimi,
       gunlukFrekans, kuralSayisi, hedef, tamamlanan, sapma, kayip, ekstra,
-      basariOrani: `%${basariOran}`, genelOran: `%${genelOran}`,
+      basariOrani: fmtPctTR(gerceklesen, hedef),
+      genelOran:   fmtPctTR(gerceklesen + sapma, hedef),
     }
   }
 
@@ -760,8 +766,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
           grup: gm.grup, ustLokasyon: 'Tümü', lokasyon: 'Tümü',
           gorevTanimi: m.gorevTanimi || gm.gorevTanimi,
           gunlukFrekans: yG, kuralSayisi: yKS, hedef: yH, tamamlanan: yT, sapma: yS, kayip: yK, ekstra: yE,
-          basariOrani: `%${yH > 0 ? Math.round(yGer / yH * 100) : 0}`,
-          genelOran:   `%${yH > 0 ? Math.round((yGer + yS) / yH * 100) : 0}`,
+          basariOrani: fmtPctTR(yGer, yH),
+          genelOran:   fmtPctTR(yGer + yS, yH),
         })
       }
     }
@@ -803,8 +809,8 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
         sapma,
         kayip,
         ekstra,
-        basariOrani: `%${hedef > 0 ? Math.round((gerceklesen / hedef) * 100) : 0}`,
-        genelOran:   `%${hedef > 0 ? Math.round(((gerceklesen + sapma) / hedef) * 100) : 0}`,
+        basariOrani: fmtPctTR(gerceklesen, hedef),
+        genelOran:   fmtPctTR(gerceklesen + sapma, hedef),
         gorevTanimi: '',
       })
     }

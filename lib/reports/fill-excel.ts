@@ -41,11 +41,19 @@ export async function fillGenelRaporExcel(data: GenelRaporData): Promise<Buffer>
 
   const gruplar      = data.grupMetrikleri
   const toplam       = data.toplamGorev
-  const toplamTam    = data.toplamTamamlanan
+  // Tamamlanan: sadece kural-uretimli (ekstra haric) — Web ile birebir uyum
+  // (2026-09-09). Her kriter kendi degerini gosterir, ic ice toplama yok.
+  const toplamEks    = data.toplamEkstra ?? 0
+  const toplamTam    = data.toplamTamamlanan - toplamEks
   const toplamSap    = data.toplamSapma
   const toplamKay    = data.toplamKayip
-  const genelBasari  = data.genelBasari
-  const toplamGercek = toplamTam + toplamSap
+  // Gerceklesen = kural tam + sapma + ekstra (matematiksel olarak eski
+  // formulle ayni: toplamTamamlanan + toplamSapma).
+  const toplamGercek = toplamTam + toplamSap + toplamEks
+  // Kusuratli yuzde format — Web ile ayni.
+  const fmtPct = (v: number, t: number) =>
+    t > 0 ? `%${(v / t * 100).toFixed(2).replace('.', ',')}` : '%0,00'
+  const genelBasariStr = fmtPct(toplamGercek, toplam)
 
   /* ═══════════════════════════════════════════════════════════
      GİRİŞ SAYFASI
@@ -92,7 +100,7 @@ export async function fillGenelRaporExcel(data: GenelRaporData): Promise<Buffer>
     toplamGercek,
     toplamSap,
     toplamKay,
-    `%${genelBasari}`,
+    genelBasariStr,
   ]
   for (let i = 0; i < frekVals.length; i++) {
     writeCell(wsGiris, 12 + i, 37, frekVals[i], "center")
@@ -100,15 +108,13 @@ export async function fillGenelRaporExcel(data: GenelRaporData): Promise<Buffer>
 
   // FREKANS SAPMALARI değerleri — AZ(52) sütunu, satır 12'den
   // Grafik kaynağı: Giriş!$AZ$12:$AZ$13
-  const sapmaPct = toplam > 0 ? Math.round((toplamSap / toplam) * 100) : 0
-  const sapmaVals: ExcelJS.CellValue[] = [toplam, toplamSap, `%${sapmaPct}`]
+  const sapmaVals: ExcelJS.CellValue[] = [toplam, toplamSap, fmtPct(toplamSap, toplam)]
   for (let i = 0; i < sapmaVals.length; i++) {
     writeCell(wsGiris, 12 + i, 52, sapmaVals[i], "center")
   }
 
   // KAYIP FREKANS GÖSTERGELERİ değerleri — BN(66) sütunu, satır 12'den
-  const kayipPct = toplam > 0 ? Math.round((toplamKay / toplam) * 100) : 0
-  const kayipVals: ExcelJS.CellValue[] = [toplam, toplamKay, `%${kayipPct}`]
+  const kayipVals: ExcelJS.CellValue[] = [toplam, toplamKay, fmtPct(toplamKay, toplam)]
   for (let i = 0; i < kayipVals.length; i++) {
     writeCell(wsGiris, 12 + i, 66, kayipVals[i], "center")
   }
