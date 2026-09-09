@@ -1090,12 +1090,17 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1.6fr) minmax(0, 1fr)', gap: 20, alignItems: 'flex-start', minWidth: 0 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Genel Dağılım</div>
-                      <PieChart size={280} pctBase={toplamHedef} slices={[
-                        { label: 'Tamamlanan',   value: data.toplamTamamlanan - data.toplamEkstra, color: T.greenMid },
-                        { label: SAPMA_LABEL,    value: data.toplamSapma,      color: T.amber },
-                        { label: 'Frekans Dışı', value: data.toplamEkstra,     color: T.gray },
-                        { label: 'Kayıp',        value: data.toplamKayip,      color: T.red },
-                      ]} />
+                      <PieChart
+                        size={280}
+                        pctBase={toplamHedef}
+                        centerValue={`%${ozetData.genelOran}`}
+                        centerLabel="Başarı"
+                        slices={[
+                          { label: 'Tamamlanan',   value: data.toplamTamamlanan - data.toplamEkstra, color: T.greenMid },
+                          { label: SAPMA_LABEL,    value: data.toplamSapma,      color: T.amber },
+                          { label: 'Frekans Dışı', value: data.toplamEkstra,     color: T.gray },
+                          { label: 'Kayıp',        value: data.toplamKayip,      color: T.red },
+                        ]} />
                     </div>
                     {(() => {
                       const grupTam = ozetData.grupBazli
