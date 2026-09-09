@@ -194,7 +194,7 @@ function BarChart({ data, valueKey, labelKey, color, orientation = 'horizontal' 
 }
 
 // ── Donut grafik (halka) — hover tooltip ─────────────────────────
-function PieChart({ slices, size = 120 }: { slices: { label: string; value: number; color: string }[]; size?: number }) {
+function PieChart({ slices, size = 120, centerValue, centerLabel }: { slices: { label: string; value: number; color: string }[]; size?: number; centerValue?: string; centerLabel?: string }) {
   const total = slices.reduce((s, x) => s + x.value, 0)
   if (!total) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
   const cx = 50, cy = 50, R = 42, r = 26
@@ -238,8 +238,8 @@ function PieChart({ slices, size = 120 }: { slices: { label: string; value: numb
           )}
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-          <span style={{ fontSize: size * 0.14, fontWeight: 900, color: T.text, lineHeight: 1 }}>%{mainPct}</span>
-          <span style={{ fontSize: size * 0.06, color: T.textSoft, fontWeight: 600 }}>{arcs[0]?.label ?? ''}</span>
+          <span style={{ fontSize: size * 0.14, fontWeight: 900, color: T.text, lineHeight: 1 }}>{centerValue ?? `%${mainPct}`}</span>
+          <span style={{ fontSize: size * 0.06, color: T.textSoft, fontWeight: 600 }}>{centerLabel ?? arcs[0]?.label ?? ''}</span>
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -387,12 +387,13 @@ function DetayLoader({ label }: { label: string }) {
 // Departman Analizi kartı içindeki tek bir üst lokasyon grafiği — 3 dikey bar
 // (Tamamlandı / Sapma / Kayıp), hedefe referans yükseklik. expanded=true ise
 // daha uzun çubuklar (tek üst lokasyon filtresi seçildiğinde).
-function DepartmanGraph({ d, expanded = false }: { d: DepartmanMetrik; expanded?: boolean }) {
+function DepartmanGraph({ d, expanded = false, ekstra = 0 }: { d: DepartmanMetrik; expanded?: boolean; ekstra?: number }) {
   const max = d.hedef || 1
   const bars = [
     { label: 'Tamamlandı', value: d.tamamlanan, color: T.greenMid },
     { label: 'Sapma',      value: d.sapma,      color: T.amber },
     { label: 'Kayıp',      value: d.kayip,      color: T.red },
+    ...(ekstra > 0 ? [{ label: 'Frekans Dışı', value: ekstra, color: T.gray }] : []),
   ]
   const H = expanded ? 280 : 180
   return (
@@ -930,9 +931,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                         {[
-                          { label: 'Tamamlanan', value: data.toplamTamamlanan, pct: toplamHedef > 0 ? Math.round(data.toplamTamamlanan / toplamHedef * 100) : 0, color: T.greenMid },
-                          { label: 'Sapma',      value: data.toplamSapma,      pct: toplamHedef > 0 ? Math.round(data.toplamSapma / toplamHedef * 100) : 0, color: T.amber },
-                          { label: 'Kayıp',      value: data.toplamKayip,      pct: toplamHedef > 0 ? Math.round(data.toplamKayip / toplamHedef * 100) : 0, color: T.red },
+                          { label: 'Tamamlanan',   value: data.toplamTamamlanan, pct: toplamHedef > 0 ? Math.round(data.toplamTamamlanan / toplamHedef * 100) : 0, color: T.greenMid },
+                          { label: 'Sapma',        value: data.toplamSapma,      pct: toplamHedef > 0 ? Math.round(data.toplamSapma / toplamHedef * 100) : 0, color: T.amber },
+                          { label: 'Kayıp',        value: data.toplamKayip,      pct: toplamHedef > 0 ? Math.round(data.toplamKayip / toplamHedef * 100) : 0, color: T.red },
+                          { label: 'Frekans Dışı', value: data.toplamEkstra,     pct: toplamHedef > 0 ? Math.round(data.toplamEkstra / toplamHedef * 100) : 0, color: T.gray },
                         ].map(s => (
                           <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: T.textSoft }}>
                             <div style={{ width: 10, height: 10, borderRadius: 2, background: s.color }} />
@@ -1008,19 +1010,23 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                         const basari = pctOf(tam + sap, d.hedef)
                         return (
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, alignItems: 'stretch' }}>
-                            <DepartmanGraph d={d} expanded />
+                            <DepartmanGraph d={d} expanded ekstra={eks} />
                             <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginBottom: 12 }}>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Genel Dağılım</div>
-                                <span title="Donut Tamamlanan/Sapma/Kayıp/Frekans Dışı ayrımını gösterir. &#10;Kırılım: hedef içi (Tamamlanan+Sapma+Kayıp) + hedef dışı (Frekans Dışı ekstra)."
+                                <span title="Donut ortasindaki % = BASARI = (Tamamlanan + Sapma) / Hedef. Ust KPI Genel Oran ile ayni formul. Dilimler kirilim: Tamamlandi (sadece kural), Sapma, Kayip, Frekans Disi (ekstra)."
                                   style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 13, height: 13, borderRadius: '50%', background: T.textSoft + '22', color: T.textSoft, fontSize: 9, fontWeight: 900, cursor: 'help' }}>i</span>
                               </div>
-                              <PieChart size={200} slices={[
-                                { label: 'Tamamlandı',   value: tam - eks,   color: T.greenMid },
-                                { label: 'Sapma',        value: sap,         color: T.amber },
-                                { label: 'Kayıp',        value: kay,         color: T.red },
-                                { label: 'Frekans Dışı', value: eks,         color: T.gray },
-                              ]} />
+                              <PieChart
+                                size={200}
+                                centerValue={`%${basari}`}
+                                centerLabel="Başarı"
+                                slices={[
+                                  { label: 'Tamamlandı',   value: tam - eks,   color: T.greenMid },
+                                  { label: 'Sapma',        value: sap,         color: T.amber },
+                                  { label: 'Kayıp',        value: kay,         color: T.red },
+                                  { label: 'Frekans Dışı', value: eks,         color: T.gray },
+                                ]} />
                             </div>
                             <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 18px', minWidth: 0 }}>
                               <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Özet</div>
