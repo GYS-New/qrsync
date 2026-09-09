@@ -194,11 +194,15 @@ function BarChart({ data, valueKey, labelKey, color, orientation = 'horizontal' 
 }
 
 // ── Donut grafik (halka) — hover tooltip ─────────────────────────
-function PieChart({ slices, size = 120, centerValue, centerLabel }: { slices: { label: string; value: number; color: string }[]; size?: number; centerValue?: string; centerLabel?: string }) {
+function PieChart({ slices, size = 120, centerValue, centerLabel, pctBase }: { slices: { label: string; value: number; color: string }[]; size?: number; centerValue?: string; centerLabel?: string; pctBase?: number }) {
   const total = slices.reduce((s, x) => s + x.value, 0)
   if (!total) return <div style={{ color: T.textSoft, fontSize: 13, padding: '24px 0', textAlign: 'center' }}>Veri yok</div>
   const cx = 50, cy = 50, R = 42, r = 26
   let angle = -Math.PI / 2
+  // Donut dilim BUYUKLUGU her zaman total'e gore (geometri). Ancak lejant/tooltip
+  // YUZDESI istege bagli olarak baska bir referansa (pctBase, ornek: hedef) gore
+  // gosterilebilir — diger KPI/ozet ile tutarli olmasi icin.
+  const pctRef = pctBase && pctBase > 0 ? pctBase : total
   const arcs = slices.filter(s => s.value > 0).map(s => {
     const a = (s.value / total) * Math.PI * 2
     const ox1 = cx + R * Math.cos(angle), oy1 = cy + R * Math.sin(angle)
@@ -208,7 +212,7 @@ function PieChart({ slices, size = 120, centerValue, centerLabel }: { slices: { 
     const ix2 = cx + r * Math.cos(angle), iy2 = cy + r * Math.sin(angle)
     const large = a > Math.PI ? 1 : 0
     const d = `M${ox1.toFixed(2)},${oy1.toFixed(2)} A${R},${R} 0 ${large} 1 ${ox2.toFixed(2)},${oy2.toFixed(2)} L${ix2.toFixed(2)},${iy2.toFixed(2)} A${r},${r} 0 ${large} 0 ${ix1.toFixed(2)},${iy1.toFixed(2)} Z`
-    return { d, color: s.color, label: s.label, value: s.value, pct: Math.round(s.value / total * 100) }
+    return { d, color: s.color, label: s.label, value: s.value, pct: Math.round(s.value / pctRef * 100) }
   })
   const mainPct = arcs.length > 0 ? arcs[0].pct : 0
   return (
@@ -389,11 +393,13 @@ function DetayLoader({ label }: { label: string }) {
 // daha uzun çubuklar (tek üst lokasyon filtresi seçildiğinde).
 function DepartmanGraph({ d, expanded = false, ekstra = 0 }: { d: DepartmanMetrik; expanded?: boolean; ekstra?: number }) {
   const max = d.hedef || 1
+  // Sira: Tamamlandi → Sapma → Frekans Disi → Kayip (en sag).
+  // Kayip en sagda = "toplamdan dusen" oldugu gorsel olarak belli olur.
   const bars = [
-    { label: 'Tamamlandı', value: d.tamamlanan, color: T.greenMid },
-    { label: 'Sapma',      value: d.sapma,      color: T.amber },
-    { label: 'Kayıp',      value: d.kayip,      color: T.red },
-    ...(ekstra > 0 ? [{ label: 'Frekans Dışı', value: ekstra, color: T.gray }] : []),
+    { label: 'Tamamlandı',                              value: d.tamamlanan, color: T.greenMid },
+    { label: 'Sapma',                                    value: d.sapma,      color: T.amber },
+    ...(ekstra > 0 ? [{ label: 'Frekans Dışı',           value: ekstra,       color: T.gray }] : []),
+    { label: 'Kayıp',                                    value: d.kayip,      color: T.red },
   ]
   const H = expanded ? 280 : 180
   return (
@@ -859,10 +865,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                     tooltip="SADECE kural-üretimli (planlı) tamamlanan görevler. Frekans Dışı (ekstra) tamamlanan bu sayıya dahil değildir — ayrı KPI'da." />
                   <KpiCard label="Sapma"        value={data.toplamSapma}                   color={T.amber}   Icon={AlertTriangle} pct={`%${sapmaPct}`}
                     tooltip="ZAMANINDA_YAPILAMAYAN durumdaki kural görevleri (geç başlatılıp tamamlanan). Yüzde: Sapma / Hedef." />
-                  <KpiCard label="Kayıp"        value={data.toplamKayip}                   color={T.red}     Icon={XCircle}       pct={`%${kayipPct}`}
-                    tooltip="Hiç dokunulmamış kural görevleri: ZAMANI_GECMIS, IPTAL, SILINDI, BEKLEMEDE. Yüzde: Kayıp / Hedef." />
                   <KpiCard label="Frekans Dışı" value={data.toplamEkstra}    color={T.gray}    Icon={Activity}      pct={`%${frekansPct}`}
-                    tooltip="Plan dışı (kural_id=NULL) ek olarak tamamlanan görevler. Hedefe dahil değildir; Tamamlanan KPI'ı içine sayılır." />
+                    tooltip="Plan dışı (kural_id=NULL) ek olarak tamamlanan görevler. Hedefe dahil değildir. Tamamlanan KPI'a dahil DEĞİL — ayrı kriter." />
+                  <KpiCard label="Kayıp"        value={data.toplamKayip}                   color={T.red}     Icon={XCircle}       pct={`%${kayipPct}`}
+                    tooltip="Hiç dokunulmamış kural görevleri: ZAMANI_GECMIS, IPTAL, SILINDI, BEKLEMEDE. Toplam orandan düşülen kısım. Yüzde: Kayıp / Hedef." />
                   <KpiCard label="Rapor Dönemi" value={`${data.gunSayisi} gün`}            color={T.blueMid} Icon={Clock}         sub={raporBaslangic && raporBitis ? `${raporBaslangic} – ${raporBitis}` : 'Tüm dönem'}
                     tooltip="Seçili tarih aralığının kapsadığı toplam gün sayısı (başlangıç ve bitiş dahil)." />
                 </div>
@@ -935,11 +941,11 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                         {[
-                          // Tamamlanan sadece kural (ekstra haric) — her kriter kendi degerini gosterir.
+                          // Sira: Tam → Sap → F.Disi → Kayip (en sag).
                           { label: 'Tamamlanan',   value: data.toplamTamamlanan - data.toplamEkstra, pct: toplamHedef > 0 ? Math.round((data.toplamTamamlanan - data.toplamEkstra) / toplamHedef * 100) : 0, color: T.greenMid },
                           { label: 'Sapma',        value: data.toplamSapma,      pct: toplamHedef > 0 ? Math.round(data.toplamSapma / toplamHedef * 100) : 0, color: T.amber },
-                          { label: 'Kayıp',        value: data.toplamKayip,      pct: toplamHedef > 0 ? Math.round(data.toplamKayip / toplamHedef * 100) : 0, color: T.red },
                           { label: 'Frekans Dışı', value: data.toplamEkstra,     pct: toplamHedef > 0 ? Math.round(data.toplamEkstra / toplamHedef * 100) : 0, color: T.gray },
+                          { label: 'Kayıp',        value: data.toplamKayip,      pct: toplamHedef > 0 ? Math.round(data.toplamKayip / toplamHedef * 100) : 0, color: T.red },
                         ].map(s => (
                           <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: T.textSoft }}>
                             <div style={{ width: 10, height: 10, borderRadius: 2, background: s.color }} />
@@ -952,13 +958,13 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   {/* 6 stat grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 10 }}>
                     {[
-                      { label: 'Hedef Frekans',  value: toplamHedef,                   color: T.blue,    bg: T.blueLight,    tooltip: 'Kural-üretimli (planlı) görev sayısı.' },
-                      { label: 'Tamamlanan',      value: data.toplamTamamlanan,         color: T.green,   bg: T.greenLight,   tooltip: 'Kural Tamamlanan + Frekans Dışı (ekstra) Tamamlanan.' },
-                      { label: 'Gerçekleşen',     value: ozetData.toplamGerceklesen,    color: T.greenMid,bg: '#f9fafb',      tooltip: 'Tamamlanan + Sapma. Kayıp dahil değildir (hiç dokunulmamış).' },
-                      { label: 'Sapma',           value: data.toplamSapma,              color: T.amber,   bg: T.amberLight,   tooltip: 'ZAMANINDA_YAPILAMAYAN: geç başlatılıp tamamlanan kural görevleri.' },
-                      { label: 'Kayıp',           value: data.toplamKayip,              color: T.red,     bg: T.redLight,     tooltip: 'Hiç dokunulmamış: ZAMANI_GECMIS, IPTAL, SILINDI, BEKLEMEDE.' },
-                      { label: 'Frekans Dışı',    value: data.toplamEkstra, color: T.gray,  bg: T.grayLight,                  tooltip: 'Plan dışı (kural_id=NULL) ek olarak tamamlanan görevler. Hedefe dahil değildir.' },
-                      { label: 'Rapor Dönemi',    value: `${data.gunSayisi} gün`,       color: T.gray,    bg: T.grayLight,    tooltip: 'Seçili tarih aralığının kapsadığı gün sayısı.' },
+                      { label: 'Hedef Frekans',  value: toplamHedef,                                              color: T.blue,    bg: T.blueLight,    tooltip: 'Kural-üretimli (planlı) görev sayısı.' },
+                      { label: 'Tamamlanan',      value: data.toplamTamamlanan - data.toplamEkstra,                color: T.green,   bg: T.greenLight,   tooltip: 'SADECE kural-üretimli (planlı) tamamlanan görevler. Frekans Dışı ayrı KPI\'da.' },
+                      { label: 'Gerçekleşen',     value: ozetData.toplamGerceklesen,                               color: T.greenMid,bg: '#f9fafb',      tooltip: 'Tamamlanan + Sapma + Frekans Dışı. Kayıp dahil değildir (hiç dokunulmamış).' },
+                      { label: 'Sapma',           value: data.toplamSapma,                                         color: T.amber,   bg: T.amberLight,   tooltip: 'ZAMANINDA_YAPILAMAYAN: geç başlatılıp tamamlanan kural görevleri.' },
+                      { label: 'Frekans Dışı',    value: data.toplamEkstra,                                        color: T.gray,    bg: T.grayLight,    tooltip: 'Plan dışı (kural_id=NULL) ek olarak tamamlanan görevler. Hedefe dahil değildir.' },
+                      { label: 'Kayıp',           value: data.toplamKayip,                                         color: T.red,     bg: T.redLight,     tooltip: 'Hiç dokunulmamış: ZAMANI_GECMIS, IPTAL, SILINDI, BEKLEMEDE. Toplam orandan düşülen kısım.' },
+                      { label: 'Rapor Dönemi',    value: `${data.gunSayisi} gün`,                                  color: T.gray,    bg: T.grayLight,    tooltip: 'Seçili tarih aralığının kapsadığı gün sayısı.' },
                     ].map(s => (
                       <div key={s.label} style={{ padding: '10px 12px', background: s.bg, borderRadius: 8, textAlign: 'center', border: `1px solid ${T.border}` }}>
                         <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
@@ -1025,11 +1031,12 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                                 size={200}
                                 centerValue={`%${basari}`}
                                 centerLabel="Başarı"
+                                pctBase={d.hedef}
                                 slices={[
                                   { label: 'Tamamlandı',   value: tam,   color: T.greenMid },
                                   { label: 'Sapma',        value: sap,   color: T.amber },
-                                  { label: 'Kayıp',        value: kay,   color: T.red },
                                   { label: 'Frekans Dışı', value: eks,   color: T.gray },
+                                  { label: 'Kayıp',        value: kay,   color: T.red },
                                 ]} />
                             </div>
                             <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 18px', minWidth: 0 }}>
@@ -1037,8 +1044,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                               <OzetRow label="Hedef Frekans" value={d.hedef} color={T.blue} bold />
                               <OzetRow label="Tamamlanan"    value={tam} sub={`%${pctOf(tam, d.hedef)}`} color={T.green} />
                               <OzetRow label="Sapma"         value={sap} sub={`%${pctOf(sap, d.hedef)}`} color={T.amber} />
-                              <OzetRow label="Kayıp"         value={kay} sub={`%${pctOf(kay, d.hedef)}`} color={T.red} />
                               <OzetRow label="Frekans Dışı"  value={eks} sub={`%${pctOf(eks, d.hedef)}`} color={T.gray} />
+                              <OzetRow label="Kayıp"         value={kay} sub={`%${pctOf(kay, d.hedef)}`} color={T.red} />
                               <div title="Başarı = (Tamamlanan + Sapma) / Hedef. &#10;Ust KPI 'Genel Oran' ile aynı formül. &#10;Tamamlanan burada 'ekstra dahil' — kural üretimli + frekans dışı yapılan. &#10;Sapma başarıya sayılır (yapıldı ama geç). Kayıp başarıdan düşer."
                                 style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: basari >= 80 ? '#dcfce7' : basari >= 50 ? T.amberLight : T.redLight, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'help' }}>
                                 <span style={{ fontSize: 12, fontWeight: 700, color: basari >= 80 ? T.green : basari >= 50 ? T.amber : T.red, textTransform: 'uppercase' as const, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
