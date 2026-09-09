@@ -84,6 +84,9 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
   const { toast } = useToast()
   const toastRef = useRef(toast); toastRef.current = toast
 
+  // Sekme sistemi (2026-09-09): Genel (mevcut) + Mesai Takipli (yeni)
+  const [aktifSekme, setAktifSekme] = useState<'genel' | 'mesaili'>('genel')
+
   // Üst filtreler (server'a gider)
   const [tarihBaslangic, setTarihBaslangic] = useState(gunOnceISO(30))
   const [tarihBitis, setTarihBitis] = useState(bugunISO())
@@ -273,6 +276,39 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
 
       <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14, height: 'calc(100vh - 60px)', minHeight: 0 }}>
 
+        {/* SEKME BAR — Genel / Mesai Takipli */}
+        <div style={{ display: 'flex', gap: 4, borderBottom: `2px solid ${T.border}`, marginBottom: -4 }}>
+          {([
+            { key: 'genel' as const,    label: 'GENEL' },
+            { key: 'mesaili' as const,  label: 'MESAİ TAKİPLİ' },
+          ]).map(t => (
+            <button key={t.key} onClick={() => setAktifSekme(t.key)}
+              style={{
+                padding: '10px 20px', fontSize: 13.5,
+                fontWeight: aktifSekme === t.key ? 800 : 600,
+                color: aktifSekme === t.key ? T.text : T.textSoft,
+                background: 'none', border: 'none',
+                borderBottom: aktifSekme === t.key ? `2px solid ${T.text}` : '2px solid transparent',
+                marginBottom: -2, cursor: 'pointer', letterSpacing: 0.3,
+              }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {aktifSekme === 'mesaili' && (
+          <MesaiTakipliBolum
+            firmaId={firmaId ?? null}
+            projeId={projeId ?? null}
+            tarihBaslangic={tarihBaslangic}
+            tarihBitis={tarihBitis}
+            setTarihBaslangic={setTarihBaslangic}
+            setTarihBitis={setTarihBitis}
+          />
+        )}
+
+        {aktifSekme === 'genel' && <>
+
         {/* ─── Üst filtre bandı ─────────────────────────────────────────────── */}
         <div className="verde-card" style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr) auto auto auto', gap: 10, alignItems: 'end' }}>
           <label style={lbl}>
@@ -456,6 +492,7 @@ export default function PersonelDegerlendirmeClient({ base, isSA, tenantFirmaId,
             </div>
           )}
         </div>
+        </>}
       </div>
 
       <style>{`@keyframes pdr-spin { to { transform: rotate(360deg) } }`}</style>
@@ -524,5 +561,322 @@ function KpiKart({ Icon, label, value, color }: { Icon: any; label: string; valu
         <div style={{ fontSize: 20, fontWeight: 900, color: T.text, lineHeight: 1.1 }}>{value}</div>
       </div>
     </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MESAİ TAKİPLİ BÖLÜM (2026-09-09)
+// PT aktif projelerde: gün gün, vardiya vardiya, kim kaç saat çalışmış ve
+// çalıştığı sürece kaç adet + ne kadar süre görev yapmış.
+// ═══════════════════════════════════════════════════════════════════════════
+type MesaiRow = {
+  personel_id: string
+  isim_soyisim: string
+  ust_lokasyon_id: string | null
+  ust_lokasyon_adi: string | null
+  kayit_tarihi: string
+  vardiya_no: number | null
+  vardiya_baslangic: string | null
+  vardiya_bitis: string | null
+  giris_saati: string
+  cikis_saati: string | null
+  calisma_sure_saniye: number | null
+  gorev_sayi: number
+  gorev_toplam_sure_saniye: number
+}
+type MesaiMeta = {
+  tarih_baslangic: string
+  tarih_bitis: string
+  ust_lokasyonlar: { id: string; tanim: string }[]
+  personeller: { id: string; isim_soyisim: string; ust_lokasyon_id: string | null }[]
+  vardiyalar: { no: number; baslangic: string; bitis: string }[]
+  pt_aktif_proje_var: boolean
+}
+
+function MesaiTakipliBolum({ firmaId, projeId, tarihBaslangic, tarihBitis, setTarihBaslangic, setTarihBitis }: {
+  firmaId: string | null
+  projeId: string | null
+  tarihBaslangic: string
+  tarihBitis: string
+  setTarihBaslangic: (v: string) => void
+  setTarihBitis: (v: string) => void
+}) {
+  const { toast } = useToast()
+  const toastRef = useRef(toast); toastRef.current = toast
+
+  const [ustLokFilter, setUstLokFilter] = useState('')
+  const [personelFilter, setPersonelFilter] = useState('')
+  const [vardiyaFilter, setVardiyaFilter] = useState('')
+
+  const [rows, setRows] = useState<MesaiRow[]>([])
+  const [meta, setMeta] = useState<MesaiMeta | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const yukle = useCallback(async () => {
+    if (!firmaId) { setRows([]); setMeta(null); return }
+    setLoading(true)
+    try {
+      const p = new URLSearchParams({ firma_id: firmaId, tarih_baslangic: tarihBaslangic, tarih_bitis: tarihBitis })
+      if (projeId) p.set('proje_id', projeId)
+      if (ustLokFilter) p.set('ust_lokasyon_id', ustLokFilter)
+      if (personelFilter) p.set('personel_id', personelFilter)
+      if (vardiyaFilter) p.set('vardiya_no', vardiyaFilter)
+      const res = await fetch(`/api/raporlar/personel-mesai-takipli?${p}`, { cache: 'no-store' })
+      const json = await res.json()
+      if (!json.ok) {
+        toastRef.current({ type: 'error', title: 'Mesai Takipli', message: json.error ?? 'Yüklenemedi' })
+        setRows([]); setMeta(null)
+      } else {
+        setRows(json.data ?? [])
+        setMeta(json.meta ?? null)
+      }
+    } catch {
+      toastRef.current({ type: 'error', title: 'Mesai Takipli', message: 'Bağlantı hatası' })
+      setRows([]); setMeta(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [firmaId, projeId, tarihBaslangic, tarihBitis, ustLokFilter, personelFilter, vardiyaFilter])
+
+  useEffect(() => { yukle() }, [yukle])
+
+  // Ust lokasyon değişince personel seçimini sıfırla — cascade
+  useEffect(() => { setPersonelFilter('') }, [ustLokFilter])
+
+  const personelDropdown = useMemo(() => {
+    if (!meta) return [] as MesaiMeta['personeller']
+    if (!ustLokFilter) return meta.personeller
+    return meta.personeller.filter(p => p.ust_lokasyon_id === ustLokFilter)
+  }, [meta, ustLokFilter])
+
+  // Özet — toplam çalışma / görev
+  const ozet = useMemo(() => {
+    const toplamCalisma = rows.reduce((s, r) => s + (r.calisma_sure_saniye ?? 0), 0)
+    const toplamGorev = rows.reduce((s, r) => s + r.gorev_sayi, 0)
+    const toplamGorevSure = rows.reduce((s, r) => s + r.gorev_toplam_sure_saniye, 0)
+    const aktifKayit = rows.filter(r => r.cikis_saati).length
+    return {
+      toplamKayit: rows.length,
+      aktifKayit,
+      toplamCalisma,
+      toplamGorev,
+      toplamGorevSure,
+    }
+  }, [rows])
+
+  async function exportExcel() {
+    if (rows.length === 0) return
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook(); wb.creator = 'İOGYS'
+    const ws = wb.addWorksheet('Mesai Takipli')
+    ws.columns = [
+      { header: '#', key: 'sira', width: 6 },
+      { header: 'Personel', key: 'isim', width: 28 },
+      { header: 'Üst Lokasyon', key: 'ust', width: 18 },
+      { header: 'Tarih', key: 'tarih', width: 12 },
+      { header: 'Vardiya', key: 'vardiya', width: 14 },
+      { header: 'Giriş', key: 'giris', width: 10 },
+      { header: 'Çıkış', key: 'cikis', width: 10 },
+      { header: 'Çalışma Süresi', key: 'calisma', width: 16 },
+      { header: 'Görev Sayısı', key: 'gorev', width: 14 },
+      { header: 'Toplam Görev Süresi', key: 'gorevSure', width: 20 },
+    ]
+    ws.getRow(1).font = { bold: true }
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } }
+
+    const saatDk = (iso: string | null) => {
+      if (!iso) return ''
+      return new Date(iso).toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' })
+    }
+
+    rows.forEach((r, i) => {
+      ws.addRow({
+        sira: i + 1,
+        isim: r.isim_soyisim,
+        ust: r.ust_lokasyon_adi ?? '',
+        tarih: r.kayit_tarihi,
+        vardiya: r.vardiya_no ? `V${r.vardiya_no} (${r.vardiya_baslangic}–${r.vardiya_bitis})` : '—',
+        giris: saatDk(r.giris_saati),
+        cikis: saatDk(r.cikis_saati),
+        calisma: fmtSure(r.calisma_sure_saniye),
+        gorev: r.gorev_sayi,
+        gorevSure: fmtSure(r.gorev_toplam_sure_saniye),
+      })
+    })
+
+    const buf = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mesai-takipli_${tarihBaslangic}_${tarihBitis}.xlsx`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  function exportCSV() {
+    if (rows.length === 0) return
+    const saatDk = (iso: string | null) => {
+      if (!iso) return ''
+      return new Date(iso).toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' })
+    }
+    const header = ['#', 'Personel', 'Üst Lokasyon', 'Tarih', 'Vardiya', 'Giriş', 'Çıkış', 'Çalışma Süresi (sn)', 'Görev Sayısı', 'Toplam Görev Süresi (sn)']
+    const lines = [header.join(';')]
+    rows.forEach((r, i) => {
+      lines.push([
+        String(i + 1),
+        `"${r.isim_soyisim.replace(/"/g, '""')}"`,
+        `"${(r.ust_lokasyon_adi ?? '').replace(/"/g, '""')}"`,
+        r.kayit_tarihi,
+        r.vardiya_no ? `V${r.vardiya_no}` : '',
+        saatDk(r.giris_saati),
+        saatDk(r.cikis_saati),
+        r.calisma_sure_saniye != null ? String(r.calisma_sure_saniye) : '',
+        String(r.gorev_sayi),
+        String(r.gorev_toplam_sure_saniye),
+      ].join(';'))
+    })
+    const csv = '﻿' + lines.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mesai-takipli_${tarihBaslangic}_${tarihBitis}.csv`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const ptAktif = meta?.pt_aktif_proje_var === true
+  const saatDk = (iso: string | null) => {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' })
+  }
+
+  return (
+    <>
+      {/* ─── Üst filtre bandı ─────────────────────────────────────────────── */}
+      <div className="verde-card" style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr) auto auto auto', gap: 10, alignItems: 'end' }}>
+        <label style={lbl}>
+          <span style={lblTxt}>Başlangıç</span>
+          <input type="date" value={tarihBaslangic} onChange={e => setTarihBaslangic(e.target.value)} style={inp} />
+        </label>
+        <label style={lbl}>
+          <span style={lblTxt}>Bitiş</span>
+          <input type="date" value={tarihBitis} onChange={e => setTarihBitis(e.target.value)} style={inp} />
+        </label>
+        <label style={lbl}>
+          <span style={lblTxt}>Vardiya</span>
+          <select value={vardiyaFilter} onChange={e => setVardiyaFilter(e.target.value)} style={inp}>
+            <option value="">Tümü</option>
+            {(meta?.vardiyalar ?? []).map(v => (
+              <option key={v.no} value={String(v.no)}>{`V${v.no} (${v.baslangic}–${v.bitis})`}</option>
+            ))}
+          </select>
+        </label>
+        <label style={lbl}>
+          <span style={lblTxt}>Üst Lokasyon</span>
+          <select value={ustLokFilter} onChange={e => setUstLokFilter(e.target.value)} style={inp}>
+            <option value="">Tümü</option>
+            {(meta?.ust_lokasyonlar ?? []).map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+          </select>
+        </label>
+        <label style={lbl}>
+          <span style={lblTxt}>Personel</span>
+          <select value={personelFilter} onChange={e => setPersonelFilter(e.target.value)} style={inp}>
+            <option value="">Tümü</option>
+            {personelDropdown.map(p => <option key={p.id} value={p.id}>{p.isim_soyisim}</option>)}
+          </select>
+        </label>
+        <button onClick={yukle} disabled={loading}
+          style={{ height: 34, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.text, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: loading ? 0.6 : 1 }}>
+          <RefreshCw size={14} style={loading ? { animation: 'pdr-spin 0.9s linear infinite' } : undefined} />
+          Yenile
+        </button>
+        <button onClick={exportExcel} disabled={rows.length === 0}
+          style={{ height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: rows.length === 0 ? 0.5 : 1 }}>
+          <Download size={14} /> Excel
+        </button>
+        <button onClick={exportCSV} disabled={rows.length === 0}
+          style={{ height: 34, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.text, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: rows.length === 0 ? 0.5 : 1 }}>
+          <Download size={14} /> CSV
+        </button>
+      </div>
+
+      {/* ─── PT aktif değil uyarısı ─────────────────────────────────────── */}
+      {meta && !ptAktif && (
+        <div style={{ padding: '14px 18px', background: T.amberLight, border: `1px solid ${T.amber}44`, borderRadius: 10, fontSize: 13, color: T.amber, lineHeight: 1.5 }}>
+          <strong>Personel Takibi bu {projeId ? 'projede' : 'firmada'} aktif değil.</strong>{' '}
+          Bu sekme sadece PT aktif projeler için mesai kayıtlarını gösterir. Yine de aşağıda bu tarih aralığında bulunan mesai kayıtları listelenmiştir.
+        </div>
+      )}
+
+      {/* ─── Özet kartları ───────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+        <KpiKart Icon={Users} label="Toplam Kayıt" value={String(ozet.toplamKayit)} color={T.gray} />
+        <KpiKart Icon={Users} label="Çıkış Yapılmış" value={String(ozet.aktifKayit)} color={T.green} />
+        <KpiKart Icon={MapPin} label="Toplam Çalışma" value={fmtSure(ozet.toplamCalisma)} color={T.blue} />
+        <KpiKart Icon={Filter} label="Toplam Görev" value={String(ozet.toplamGorev)} color={T.purple} />
+        <KpiKart Icon={Filter} label="Toplam Görev Süresi" value={fmtSure(ozet.toplamGorevSure)} color={T.amber} />
+      </div>
+
+      {/* ─── Tablo ──────────────────────────────────────────────────────── */}
+      <div className="verde-card" style={{ padding: 0, overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {loading ? (
+          <div style={{ padding: 60, textAlign: 'center', color: T.textSoft, fontSize: 14 }}>Yükleniyor…</div>
+        ) : rows.length === 0 ? (
+          <div style={{ padding: 60, textAlign: 'center', color: T.textSoft, fontSize: 14 }}>
+            {firmaId ? 'Bu kriterlerle eşleşen mesai kaydı yok.' : 'Lütfen bir firma seçin.'}
+          </div>
+        ) : (
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${T.border}` }}>
+                  <th style={thSticky}>#</th>
+                  <th style={thSticky}>Personel</th>
+                  <th style={thSticky}>Üst Lokasyon</th>
+                  <th style={thSticky}>Tarih</th>
+                  <th style={thSticky}>Vardiya</th>
+                  <th style={{ ...thSticky, textAlign: 'right' }}>Giriş</th>
+                  <th style={{ ...thSticky, textAlign: 'right' }}>Çıkış</th>
+                  <th style={{ ...thSticky, textAlign: 'right' }}>Çalışma Süresi</th>
+                  <th style={{ ...thSticky, textAlign: 'right' }}>Görev Sayısı</th>
+                  <th style={{ ...thSticky, textAlign: 'right' }}>Toplam Görev Süresi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const bg = i % 2 === 0 ? '#fff' : '#fafafa'
+                  const tarihTR = new Date(r.kayit_tarihi + 'T12:00:00').toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', weekday: 'short' })
+                  return (
+                    <tr key={`${r.personel_id}-${r.kayit_tarihi}-${r.giris_saati}`}
+                        style={{ borderBottom: `1px solid ${T.border}`, background: bg }}>
+                      <td style={tdS}>{i + 1}</td>
+                      <td style={{ ...tdS, fontWeight: 700 }}>{r.isim_soyisim}</td>
+                      <td style={tdS}>{r.ust_lokasyon_adi || <span style={{ color: T.textSoft, fontStyle: 'italic' }}>—</span>}</td>
+                      <td style={tdS}>{tarihTR}</td>
+                      <td style={tdS}>
+                        {r.vardiya_no ? (
+                          <Badge text={`V${r.vardiya_no} (${r.vardiya_baslangic}–${r.vardiya_bitis})`} bg={T.blueLight} fg={T.blue} />
+                        ) : (
+                          <span style={{ color: T.textSoft, fontStyle: 'italic' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ ...tdS, textAlign: 'right', fontWeight: 600 }}>{saatDk(r.giris_saati)}</td>
+                      <td style={{ ...tdS, textAlign: 'right', fontWeight: 600, color: r.cikis_saati ? T.text : T.textSoft }}>
+                        {r.cikis_saati ? saatDk(r.cikis_saati) : <span style={{ fontStyle: 'italic' }}>devam ediyor</span>}
+                      </td>
+                      <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: T.blue }}>{fmtSure(r.calisma_sure_saniye)}</td>
+                      <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: r.gorev_sayi > 0 ? T.green : T.textSoft }}>{r.gorev_sayi}</td>
+                      <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, color: r.gorev_toplam_sure_saniye > 0 ? T.amber : T.textSoft }}>{fmtSure(r.gorev_toplam_sure_saniye)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
