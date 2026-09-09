@@ -92,7 +92,7 @@ export async function fillGenelRaporExcel(data: GenelRaporData): Promise<Buffer>
     writeCell(wsGiris, r, 22, g.genelOran,   "center")
   }
 
-  // FREKANS GÖSTERGELERİ değerleri — AK(37) sütunu, satır 12'den
+  // FREKANS GÖSTERGELERİ değerleri — AK(37) sütunu, satır 12'den (eski chart data)
   // Toplam | Tamamlanmış | Gerçekleşen | Sapma | Kayıp | Başarı%
   const frekVals: ExcelJS.CellValue[] = [
     toplam,
@@ -105,6 +105,19 @@ export async function fillGenelRaporExcel(data: GenelRaporData): Promise<Buffer>
   for (let i = 0; i < frekVals.length; i++) {
     writeCell(wsGiris, 12 + i, 37, frekVals[i], "center")
   }
+
+  // METRİK-DEĞER TABLOSU (B kolonu, satır 11-18) — YENİ TEMPLATE LAYOUT
+  // Ust KPI card'lar (D11, I11, N11, S11, X11) ve OZET kutusu (Z17,Z19,Z21,Z25)
+  // formullerle B11-B18'e bagli. Web ile birebir tutarlilik icin bu hucreleri
+  // dogrudan doldur (2026-09-09).
+  writeCell(wsGiris, 11, 2, toplam)                              // B11 Hedef Frekans
+  writeCell(wsGiris, 12, 2, toplamTam)                           // B12 Tamamlanan (kural)
+  writeCell(wsGiris, 13, 2, toplamEks)                           // B13 Ekstra (Frekans Dışı)
+  writeCell(wsGiris, 14, 2, toplamGercek)                        // B14 Gerçekleşen
+  writeCell(wsGiris, 15, 2, toplamSap)                           // B15 Sapma
+  writeCell(wsGiris, 16, 2, toplamKay)                           // B16 Kayıp
+  writeCell(wsGiris, 17, 2, fmtPct(toplamTam, toplam))           // B17 Başarı Oranı = Tam/Hedef
+  writeCell(wsGiris, 18, 2, genelBasariStr)                      // B18 Genel Oran = Gerç/Hedef
 
   // FREKANS SAPMALARI değerleri — AZ(52) sütunu, satır 12'den
   // Grafik kaynağı: Giriş!$AZ$12:$AZ$13
