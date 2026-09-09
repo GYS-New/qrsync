@@ -995,32 +995,41 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                       <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 14 }}>Departman Analizi</div>
                       {ustLokasyonId ? (() => {
                         const d = filtreli[0]
-                        // Basari = (Tamamlanan + Sapma) / Hedef.
-                        // Sapma = ZAMANINDA_YAPILAMAYAN = "yapildi ama gec".
-                        // Kayip = hic yapilmadi.  Formul: (Tam+Sap)/Hedef = %100 - Kayip%.
-                        const basari = pctOf(d.tamamlanan + d.sapma, d.hedef)
+                        // Tek departman filtresinde ust KPI ile birebir uyum:
+                        // data.toplam... alanlarini kullan (ekstra dahil tamamlanan
+                        // + frekans disi). Boylece departman ozet ile ustteki
+                        // Genel Performans ayni sonuclari verir.
+                        const tam = data.toplamTamamlanan
+                        const sap = data.toplamSapma
+                        const kay = data.toplamKayip
+                        const eks = data.toplamEkstra
+                        // Basari = (Tamamlanan + Sapma) / Hedef. Ust KPI'daki
+                        // "Genel Oran" ile ayni formul.
+                        const basari = pctOf(tam + sap, d.hedef)
                         return (
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, alignItems: 'stretch' }}>
                             <DepartmanGraph d={d} expanded />
                             <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginBottom: 12 }}>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Genel Dağılım</div>
-                                <span title="Donut'taki yüzde 'gerçekleşen' içindeki paydır. &#10;Tamamlandı % = Tamamlanan / (Tamamlanan + Sapma + Kayıp). &#10;Bu 'dokunulan işlerin kalitesi'ni gösterir, hedefe göre başarı değil."
+                                <span title="Donut Tamamlanan/Sapma/Kayıp/Frekans Dışı ayrımını gösterir. &#10;Kırılım: hedef içi (Tamamlanan+Sapma+Kayıp) + hedef dışı (Frekans Dışı ekstra)."
                                   style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 13, height: 13, borderRadius: '50%', background: T.textSoft + '22', color: T.textSoft, fontSize: 9, fontWeight: 900, cursor: 'help' }}>i</span>
                               </div>
                               <PieChart size={200} slices={[
-                                { label: 'Tamamlandı', value: d.tamamlanan, color: T.greenMid },
-                                { label: 'Sapma',      value: d.sapma,      color: T.amber },
-                                { label: 'Kayıp',      value: d.kayip,      color: T.red },
+                                { label: 'Tamamlandı',   value: tam - eks,   color: T.greenMid },
+                                { label: 'Sapma',        value: sap,         color: T.amber },
+                                { label: 'Kayıp',        value: kay,         color: T.red },
+                                { label: 'Frekans Dışı', value: eks,         color: T.gray },
                               ]} />
                             </div>
                             <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 18px', minWidth: 0 }}>
                               <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Özet</div>
                               <OzetRow label="Hedef Frekans" value={d.hedef} color={T.blue} bold />
-                              <OzetRow label="Tamamlanan" value={d.tamamlanan} sub={`%${pctOf(d.tamamlanan, d.hedef)}`} color={T.green} />
-                              <OzetRow label="Sapma"      value={d.sapma}      sub={`%${pctOf(d.sapma, d.hedef)}`}      color={T.amber} />
-                              <OzetRow label="Kayıp"      value={d.kayip}      sub={`%${pctOf(d.kayip, d.hedef)}`}      color={T.red} />
-                              <div title="Başarı = (Tamamlanan + Sapma) / Hedef. &#10;Sapma = geç yapıldı ama yapıldı; başarıya sayılır. &#10;Kayıp = hiç dokunulmadı; başarıdan düşer. &#10;Bu departman/grup özetinde 'ekstra' tamamlananlar dahil edilmez (grup hedefi yok)."
+                              <OzetRow label="Tamamlanan"    value={tam} sub={`%${pctOf(tam, d.hedef)}`} color={T.green} />
+                              <OzetRow label="Sapma"         value={sap} sub={`%${pctOf(sap, d.hedef)}`} color={T.amber} />
+                              <OzetRow label="Kayıp"         value={kay} sub={`%${pctOf(kay, d.hedef)}`} color={T.red} />
+                              <OzetRow label="Frekans Dışı"  value={eks} sub={`%${pctOf(eks, d.hedef)}`} color={T.gray} />
+                              <div title="Başarı = (Tamamlanan + Sapma) / Hedef. &#10;Ust KPI 'Genel Oran' ile aynı formül. &#10;Tamamlanan burada 'ekstra dahil' — kural üretimli + frekans dışı yapılan. &#10;Sapma başarıya sayılır (yapıldı ama geç). Kayıp başarıdan düşer."
                                 style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: basari >= 80 ? '#dcfce7' : basari >= 50 ? T.amberLight : T.redLight, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'help' }}>
                                 <span style={{ fontSize: 12, fontWeight: 700, color: basari >= 80 ? T.green : basari >= 50 ? T.amber : T.red, textTransform: 'uppercase' as const, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                   Başarı
