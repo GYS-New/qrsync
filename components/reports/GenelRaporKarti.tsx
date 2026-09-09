@@ -146,11 +146,11 @@ function BarChart({ data, valueKey, labelKey, color, orientation = 'horizontal' 
         {data.map((d, i) => {
           const val = Number(d[valueKey]) || 0
           const pct = (val / max) * 100
-          const totalPct = total > 0 ? Math.round(val / total * 100) : 0
+          const totalPctFmt = fmtPct(val, total)
           const label = String(d[labelKey] ?? '')
           const kisaLabel = kisalt(label, 28)
           return (
-            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, height: '100%', justifyContent: 'flex-end', position: 'relative' }} title={`${label}: ${val} (%${totalPct})`}>
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, height: '100%', justifyContent: 'flex-end', position: 'relative' }} title={`${label}: ${val} (${totalPctFmt})`}>
               <div style={{ fontSize: 11.5, fontWeight: 800, color: T.text, marginBottom: 4, whiteSpace: 'nowrap' }}>{val}</div>
               <div style={{
                 width: '78%', height: `${Math.max(pct, 2)}%`, minHeight: 2,
@@ -176,11 +176,11 @@ function BarChart({ data, valueKey, labelKey, color, orientation = 'horizontal' 
       {data.map((d, i) => {
         const val = Number(d[valueKey]) || 0
         const pct = (val / max) * 100
-        const totalPct = total > 0 ? Math.round(val / total * 100) : 0
+        const totalPctFmt = fmtPct(val, total)
         const label = String(d[labelKey] ?? '')
         const kisaLabel = kisalt(label, 30)
         return (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }} title={`${label}: ${val} (%${totalPct})`}>
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }} title={`${label}: ${val} (${totalPctFmt})`}>
             <div style={{ width: 200, fontSize: 12.5, fontWeight: 600, color: T.text, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>{kisaLabel}</div>
             <div style={{ flex: 1, height: 28, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
               <div style={{ height: '100%', width: `${Math.max(pct, 2)}%`, background: `linear-gradient(90deg, ${barClr}99, ${barClr})`, borderRadius: 6, transition: 'width 0.5s ease' }} />
@@ -256,7 +256,7 @@ function PieChart({ slices, size = 120, centerValue, centerLabel, pctBase }: { s
           )}
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-          <span style={{ fontSize: size * 0.14, fontWeight: 900, color: T.text, lineHeight: 1 }}>{centerValue ?? fmtPctRaw(mainPct)}</span>
+          <span style={{ fontSize: size * 0.14, fontWeight: 900, color: T.text, lineHeight: 1 }}>{centerValue ?? `%${Math.round(mainPct)}`}</span>
           <span style={{ fontSize: size * 0.06, color: T.textSoft, fontWeight: 600 }}>{centerLabel ?? arcs[0]?.label ?? ''}</span>
         </div>
       </div>
@@ -1041,7 +1041,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                               </div>
                               <PieChart
                                 size={200}
-                                centerValue={fmtPctRaw(basariNum)}
+                                centerValue={`%${Math.round(basariNum)}`}
                                 centerLabel="Başarı"
                                 pctBase={d.hedef}
                                 slices={[
@@ -1090,10 +1090,11 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1.6fr) minmax(0, 1fr)', gap: 20, alignItems: 'flex-start', minWidth: 0 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Genel Dağılım</div>
-                      <PieChart size={280} slices={[
-                        { label: 'Tamamlanan', value: data.toplamTamamlanan, color: T.greenMid },
-                        { label: 'Sapma',      value: data.toplamSapma,      color: T.amber },
-                        { label: 'Kayıp',      value: data.toplamKayip,      color: T.red },
+                      <PieChart size={280} pctBase={toplamHedef} slices={[
+                        { label: 'Tamamlanan',   value: data.toplamTamamlanan - data.toplamEkstra, color: T.greenMid },
+                        { label: SAPMA_LABEL,    value: data.toplamSapma,      color: T.amber },
+                        { label: 'Frekans Dışı', value: data.toplamEkstra,     color: T.gray },
+                        { label: 'Kayıp',        value: data.toplamKayip,      color: T.red },
                       ]} />
                     </div>
                     {(() => {
@@ -1139,7 +1140,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                           <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Toplam Atanan Dağılımı</div>
                           <PieChart size={200} slices={[
                             { label: 'Tamamlanan', value: topTam, color: T.greenMid },
-                            { label: 'Sapma',      value: topSap, color: T.amber },
+                            { label: SAPMA_LABEL,  value: topSap, color: T.amber },
                             { label: 'Kayıp',      value: topKay, color: T.red },
                           ]} />
                         </div>
@@ -1155,14 +1156,14 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 {/* ── 2. Sapma Frekanslar: 1/3 pasta | 1/3 bar | 1/3 sıralı liste ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>{SAPMA_LABEL} Frekansları</div>
                     <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.amberLight, color: T.amber, flexShrink: 0 }}>{data.toplamSapma} kayıt</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1.6fr) minmax(0, 1fr)', gap: 20, alignItems: 'flex-start', minWidth: 0 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: T.textSoft, marginBottom: 10, textTransform: 'uppercase' as const }}>Hedef / Sapma Oranı</div>
                       <PieChart size={280} slices={[
-                        { label: 'Sapma',       value: data.toplamSapma,                                       color: T.amber },
+                        { label: SAPMA_LABEL,   value: data.toplamSapma,                                       color: T.amber },
                         { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamSapma),            color: '#e2e8f0' },
                       ]} />
                     </div>
@@ -1294,9 +1295,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 }
                 return [...agg.values()].map(g => {
                   const ger = g.tamamlanan + (g.ekstra ?? 0)
-                  const bas = g.hedef > 0 ? Math.round(ger / g.hedef * 100) : 0
-                  const gen = g.hedef > 0 ? Math.round((ger + g.sapma) / g.hedef * 100) : 0
-                  return { ...g, basariOrani: `%${bas}`, genelOran: `%${gen}` }
+                  return { ...g, basariOrani: fmtPct(ger, g.hedef), genelOran: fmtPct(ger + g.sapma, g.hedef) }
                 })
               })()
               return (
@@ -1316,19 +1315,17 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                   const tKay    = grupMetrikleriDisplay.reduce((s, g) => s + g.kayip, 0)
                   const tEks    = grupMetrikleriDisplay.reduce((s, g) => s + (g.ekstra ?? 0), 0)
                   const tGer    = tTam + tEks
-                  const tBas    = tHedef > 0 ? Math.round(tGer / tHedef * 100) : 0
-                  const tGenel  = tHedef > 0 ? Math.round((tGer + tSap) / tHedef * 100) : 0
                   return (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px,1fr))', gap: 8, marginBottom: 14, padding: '10px 12px', background: T.greenLight, borderRadius: 8, border: `1px solid #bbf7d0` }}>
                       {[
-                        { label: 'Vardiya Frekans', value: tGunluk, color: T.blue },
-                        { label: 'Hedef',          value: tHedef,  color: T.blue },
-                        { label: 'Tamamlanan',     value: tTam,    color: T.green },
-                        { label: 'Ekstra',         value: tEks,    color: T.blueMid },
-                        { label: 'Sapma',          value: tSap,    color: T.amber },
-                        { label: 'Kayıp',          value: tKay,    color: T.red },
-                        { label: 'Başarı',         value: `%${tBas}`, color: T.green },
-                        { label: 'Genel Oran',     value: `%${tGenel}`, color: T.gray },
+                        { label: 'Vardiya Frekans', value: tGunluk,                 color: T.blue },
+                        { label: 'Hedef',          value: tHedef,                   color: T.blue },
+                        { label: 'Tamamlanan',     value: tTam,                     color: T.green },
+                        { label: 'Frekans Dışı',   value: tEks,                     color: T.blueMid },
+                        { label: SAPMA_LABEL,      value: tSap,                     color: T.amber },
+                        { label: 'Kayıp',          value: tKay,                     color: T.red },
+                        { label: 'Başarı',         value: fmtPct(tGer, tHedef),     color: T.green },
+                        { label: 'Genel Oran',     value: fmtPct(tGer + tSap, tHedef), color: T.gray },
                       ].map(s => (
                         <div key={s.label} style={{ textAlign: 'center' }}>
                           <div style={{ fontSize: 16, fontWeight: 900, color: s.color }}>{s.value}</div>
