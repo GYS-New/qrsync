@@ -843,16 +843,20 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
           <>
             {/* KPI kartlar */}
             {(() => {
+              // Tamamlanan artik SADECE kural (ekstra haric). Kullanici karari
+              // (2026-09-09): her kriter kendi degerini gostersin, ic ice
+              // toplama olmasin. Ekstra 'Frekans Disi' kartinda ayri.
+              const tamamlananKural = data.toplamTamamlanan - data.toplamEkstra
               const sapmaPct  = toplamHedef > 0 ? Math.round(data.toplamSapma  / toplamHedef * 100) : 0
               const kayipPct  = toplamHedef > 0 ? Math.round(data.toplamKayip  / toplamHedef * 100) : 0
-              const tamPct    = toplamHedef > 0 ? Math.round(data.toplamTamamlanan / toplamHedef * 100) : 0
+              const tamPct    = toplamHedef > 0 ? Math.round(tamamlananKural / toplamHedef * 100) : 0
               const frekansPct = toplamHedef > 0 ? Math.round(data.toplamEkstra / toplamHedef * 100) : 0
               return (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))', gap: 10 }}>
                   <KpiCard label="Hedef"        value={toplamHedef}                        color={T.blue}    Icon={Target}
                     tooltip="Kural-üretimli (planlı) görev sayısı. Duruma bakılmaz — periyodik kurallar bu kadar görev oluşturmuş." />
-                  <KpiCard label="Tamamlanan"   value={data.toplamTamamlanan}              color={T.green}   Icon={CheckCircle}   pct={`%${tamPct}`}
-                    tooltip="Kural tamamlanan + Frekans Dışı (ekstra) tamamlanan. Yüzde: Tamamlanan / Hedef (ekstra dahil olduğu için %100'ü geçebilir)." />
+                  <KpiCard label="Tamamlanan"   value={tamamlananKural}                    color={T.green}   Icon={CheckCircle}   pct={`%${tamPct}`}
+                    tooltip="SADECE kural-üretimli (planlı) tamamlanan görevler. Frekans Dışı (ekstra) tamamlanan bu sayıya dahil değildir — ayrı KPI'da." />
                   <KpiCard label="Sapma"        value={data.toplamSapma}                   color={T.amber}   Icon={AlertTriangle} pct={`%${sapmaPct}`}
                     tooltip="ZAMANINDA_YAPILAMAYAN durumdaki kural görevleri (geç başlatılıp tamamlanan). Yüzde: Sapma / Hedef." />
                   <KpiCard label="Kayıp"        value={data.toplamKayip}                   color={T.red}     Icon={XCircle}       pct={`%${kayipPct}`}
@@ -931,7 +935,8 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                         {[
-                          { label: 'Tamamlanan',   value: data.toplamTamamlanan, pct: toplamHedef > 0 ? Math.round(data.toplamTamamlanan / toplamHedef * 100) : 0, color: T.greenMid },
+                          // Tamamlanan sadece kural (ekstra haric) — her kriter kendi degerini gosterir.
+                          { label: 'Tamamlanan',   value: data.toplamTamamlanan - data.toplamEkstra, pct: toplamHedef > 0 ? Math.round((data.toplamTamamlanan - data.toplamEkstra) / toplamHedef * 100) : 0, color: T.greenMid },
                           { label: 'Sapma',        value: data.toplamSapma,      pct: toplamHedef > 0 ? Math.round(data.toplamSapma / toplamHedef * 100) : 0, color: T.amber },
                           { label: 'Kayıp',        value: data.toplamKayip,      pct: toplamHedef > 0 ? Math.round(data.toplamKayip / toplamHedef * 100) : 0, color: T.red },
                           { label: 'Frekans Dışı', value: data.toplamEkstra,     pct: toplamHedef > 0 ? Math.round(data.toplamEkstra / toplamHedef * 100) : 0, color: T.gray },
@@ -998,16 +1003,15 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                       {ustLokasyonId ? (() => {
                         const d = filtreli[0]
                         // Tek departman filtresinde ust KPI ile birebir uyum:
-                        // data.toplam... alanlarini kullan (ekstra dahil tamamlanan
-                        // + frekans disi). Boylece departman ozet ile ustteki
-                        // Genel Performans ayni sonuclari verir.
-                        const tam = data.toplamTamamlanan
+                        // Her kriter kendi degerini gosterir — tamamlanan
+                        // sadece kural (ekstra haric), frekans disi ayri.
+                        const eks = data.toplamEkstra
+                        const tam = data.toplamTamamlanan - eks  // sadece kural
                         const sap = data.toplamSapma
                         const kay = data.toplamKayip
-                        const eks = data.toplamEkstra
-                        // Basari = (Tamamlanan + Sapma) / Hedef. Ust KPI'daki
-                        // "Genel Oran" ile ayni formul.
-                        const basari = pctOf(tam + sap, d.hedef)
+                        // Basari = (kural tam + sapma + ekstra) / hedef = gerceklesen / hedef.
+                        // Ust KPI 'Genel Oran' ile ayni formul, %100'u gecebilir.
+                        const basari = pctOf(tam + sap + eks, d.hedef)
                         return (
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, alignItems: 'stretch' }}>
                             <DepartmanGraph d={d} expanded ekstra={eks} />
@@ -1022,10 +1026,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                                 centerValue={`%${basari}`}
                                 centerLabel="Başarı"
                                 slices={[
-                                  { label: 'Tamamlandı',   value: tam - eks,   color: T.greenMid },
-                                  { label: 'Sapma',        value: sap,         color: T.amber },
-                                  { label: 'Kayıp',        value: kay,         color: T.red },
-                                  { label: 'Frekans Dışı', value: eks,         color: T.gray },
+                                  { label: 'Tamamlandı',   value: tam,   color: T.greenMid },
+                                  { label: 'Sapma',        value: sap,   color: T.amber },
+                                  { label: 'Kayıp',        value: kay,   color: T.red },
+                                  { label: 'Frekans Dışı', value: eks,   color: T.gray },
                                 ]} />
                             </div>
                             <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 18px', minWidth: 0 }}>
