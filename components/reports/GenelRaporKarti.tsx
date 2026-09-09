@@ -995,7 +995,10 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                       <div style={{ fontSize: 12, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 14 }}>Departman Analizi</div>
                       {ustLokasyonId ? (() => {
                         const d = filtreli[0]
-                        const basari = pctOf(d.tamamlanan, d.hedef)
+                        // Basari = (Tamamlanan + Sapma) / Hedef.
+                        // Sapma = ZAMANINDA_YAPILAMAYAN = "yapildi ama gec".
+                        // Kayip = hic yapilmadi.  Formul: (Tam+Sap)/Hedef = %100 - Kayip%.
+                        const basari = pctOf(d.tamamlanan + d.sapma, d.hedef)
                         return (
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, alignItems: 'stretch' }}>
                             <DepartmanGraph d={d} expanded />
@@ -1017,7 +1020,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                               <OzetRow label="Tamamlanan" value={d.tamamlanan} sub={`%${pctOf(d.tamamlanan, d.hedef)}`} color={T.green} />
                               <OzetRow label="Sapma"      value={d.sapma}      sub={`%${pctOf(d.sapma, d.hedef)}`}      color={T.amber} />
                               <OzetRow label="Kayıp"      value={d.kayip}      sub={`%${pctOf(d.kayip, d.hedef)}`}      color={T.red} />
-                              <div title="Başarı = Tamamlanan (sadece kural-üretimli) / Hedef. &#10;Bu departman/grup özetinde 'ekstra' tamamlananlar dahil edilmez (çünkü grup hedefi yok). &#10;Üstteki KPI'daki Tamamlanan sayısından farkı tam burada — ekstra görevler 'Frekans Dışı' KPI'ında."
+                              <div title="Başarı = (Tamamlanan + Sapma) / Hedef. &#10;Sapma = geç yapıldı ama yapıldı; başarıya sayılır. &#10;Kayıp = hiç dokunulmadı; başarıdan düşer. &#10;Bu departman/grup özetinde 'ekstra' tamamlananlar dahil edilmez (grup hedefi yok)."
                                 style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: basari >= 80 ? '#dcfce7' : basari >= 50 ? T.amberLight : T.redLight, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'help' }}>
                                 <span style={{ fontSize: 12, fontWeight: 700, color: basari >= 80 ? T.green : basari >= 50 ? T.amber : T.red, textTransform: 'uppercase' as const, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                   Başarı
