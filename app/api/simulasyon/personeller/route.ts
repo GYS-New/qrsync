@@ -7,7 +7,8 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 401 })
 
   const { data: me } = await supabase.from('users').select('rol,firma_id').eq('id', user.id).single()
-  if (!me || !['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) {
+  // 2026-09-09: Simulasyon Modu SA/AA-only
+  if (!me || !['super_admin', 'alt_super_admin'].includes(me.rol)) {
     return NextResponse.json({ ok: false, error: 'Yetkisiz' }, { status: 403 })
   }
 

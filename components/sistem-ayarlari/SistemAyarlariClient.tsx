@@ -27,7 +27,7 @@ const BASE_TABS: { key: Tab; label: string; saOnly?: boolean }[] = [
   { key: 'gorev-sureleri', label: 'Görev Süreleri'   },
   { key: 'yetkiler',       label: 'Kullanıcı Yetkileri' },
   { key: 'modul-yetkileri', label: 'Modül Yetkileri' },
-  { key: 'simulasyon',     label: 'Simülasyon Modu'  },
+  { key: 'simulasyon',     label: 'Simülasyon Modu', saOnly: true  },
   { key: 'personel-destek', label: 'Personel Görev Desteği' },
   { key: 'uygulama',       label: 'Uygulama Ayarları', saOnly: true },
   { key: 'mobil',          label: 'Mobil Ayarlar', saOnly: true },

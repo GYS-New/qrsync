@@ -6,7 +6,8 @@ async function yetkiKontrol(supabase: any) {
   if (!user) return null
   const { data: me } = await supabase.from('users').select('rol,firma_id').eq('id', user.id).single()
   if (!me) return null
-  if (!['super_admin', 'alt_super_admin', 'tenant_admin'].includes(me.rol)) return null
+  // 2026-09-09: Simulasyon Modu SA/AA-only. Tenant admin/user tetikleyemez.
+  if (!['super_admin', 'alt_super_admin'].includes(me.rol)) return null
   return { ...me, userId: user.id }
 }
 
