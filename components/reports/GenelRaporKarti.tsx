@@ -193,9 +193,9 @@ function BarChart({ data, valueKey, labelKey, color, orientation = 'horizontal' 
   )
 }
 
-// Sapma etiketi — kullanici bildirimi (2026-09-09): "Sapma"nın ne demek
-// olduğunu bilmeyen kullanıcılar için her yerde parantez içi açıklama.
-const SAPMA_LABEL = 'Sapma (Zamanında Yapılamayan)'
+// Sapma etiketi — kullanici bildirimi (2026-09-09 revize): sadece "Sapma".
+// Onceki "Sapma (Zamanında Yapılamayan)" ibaresi kaldirildi.
+const SAPMA_LABEL = 'Sapma'
 
 // Yuzde format — 2 decimal + TR virgul. Kullanicinin istegine gore hep .XX
 // gorunur (%80,00 bile). t <= 0 durumunda "%0,00".
@@ -1161,7 +1161,7 @@ export default function GenelRaporKarti({ base, isSA, tenantFirmaId, projeId }: 
                 {/* ── 2. Sapma Frekanslar: 1/3 pasta | 1/3 bar | 1/3 sıralı liste ── */}
                 <div className="verde-card" style={{ padding: '16px 20px', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>{SAPMA_LABEL} Frekansları</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Sapma Frekanslar</div>
                     <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: T.amberLight, color: T.amber, flexShrink: 0 }}>{data.toplamSapma} kayıt</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1.6fr) minmax(0, 1fr)', gap: 20, alignItems: 'flex-start', minWidth: 0 }}>

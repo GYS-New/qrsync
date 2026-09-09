@@ -80,7 +80,7 @@ export async function GET(request: Request) {
         <div class="kpi"><div class="label">Hedef Frekans</div><div class="value">${toplamHedef}</div></div>
         <div class="kpi"><div class="label">Gerçekleşen</div><div class="value">${toplamGerceklesen}</div></div>
         <div class="kpi"><div class="label">Tamamlanan</div><div class="value">${toplamTamKural}</div></div>
-        <div class="kpi"><div class="label">Sapma (Zamanında Yapılamayan)</div><div class="value">${data.toplamSapma}</div></div>
+        <div class="kpi"><div class="label">Sapma</div><div class="value">${data.toplamSapma}</div></div>
         <div class="kpi"><div class="label">Frekans Dışı</div><div class="value">${toplamEks}</div></div>
         <div class="kpi"><div class="label">Kayıp</div><div class="value">${data.toplamKayip}</div></div>
         <div class="kpi"><div class="label">Başarı</div><div class="value">${genelBasariStr}</div></div>
