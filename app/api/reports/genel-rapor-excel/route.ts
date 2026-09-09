@@ -44,14 +44,22 @@ export async function GET(request: Request) {
       vardiya: (p.get('vardiya') as any) || 'all',
     })
 
-    const toplamHedef       = data.grupMetrikleri.reduce((s, g) => s + g.hedef, 0) || data.toplamGorev
-    const toplamTamamlanan  = data.toplamTamamlanan
+    // Web ile birebir uyum (2026-09-09):
+    // Hedef = data.toplamGorev (Web KPI ile ayni). Onceden grupMetrikleri
+    // toplamiydi, bu bazi gorevleri disari birakabiliyor.
+    // Tamamlanan = SADECE kural (data.toplamTamamlanan - ekstra).
+    // Gerceklesen = kural tam + sapma + ekstra (matematiksel: eski + ekstra).
+    const toplamHedef       = data.toplamGorev
+    const toplamEkstra      = data.toplamEkstra ?? data.frekansDisiGorevler.length
+    const toplamTamamlanan  = data.toplamTamamlanan - toplamEkstra  // kural
     const toplamSapma       = data.toplamSapma
     const toplamKayip       = data.toplamKayip
-    const toplamEkstra      = data.toplamEkstra ?? data.frekansDisiGorevler.length
-    const toplamGerceklesen = toplamTamamlanan + toplamSapma
-    const genelOran         = toplamHedef > 0 ? Math.round(toplamGerceklesen / toplamHedef * 100) : 0
-    const basari            = data.genelBasari ?? 0
+    const toplamGerceklesen = toplamTamamlanan + toplamSapma + toplamEkstra
+    // Kusuratli TR yuzde format — Web ile ayni.
+    const fmtPct = (v: number, t: number) =>
+      t > 0 ? `%${(v / t * 100).toFixed(2).replace('.', ',')}` : '%0,00'
+    const basari    = fmtPct(toplamTamamlanan, toplamHedef)         // Basari = Tam/Hedef
+    const genelOran = fmtPct(toplamGerceklesen, toplamHedef)        // Genel Oran = Gerc/Hedef
 
     // Şablonu filtreye göre seç
     const templateFile = ustLokasyonId
@@ -83,8 +91,8 @@ export async function GET(request: Request) {
     wsOzet.getCell('B14').value = fmt(toplamGerceklesen)
     wsOzet.getCell('B15').value = fmt(toplamSapma)
     wsOzet.getCell('B16').value = fmt(toplamKayip)
-    wsOzet.getCell('B17').value = pct(basari)
-    wsOzet.getCell('B18').value = pct(genelOran)
+    wsOzet.getCell('B17').value = basari      // Basari = Tam/Hedef (kusuratli TR)
+    wsOzet.getCell('B18').value = genelOran   // Genel Oran = Gerc/Hedef (kusuratli TR)
 
     // ── Departman Analizi Tablosu (Row 17: sablonda D17-AA17 arasi) ─────
     // Sablonda row 15'te departman adlari, row 16'da Hedef/Tamamlanan/Sapma
@@ -168,8 +176,6 @@ export async function GET(request: Request) {
       const tSap    = data.grupMetrikleri.reduce((s, g) => s + g.sapma, 0)
       const tKay    = data.grupMetrikleri.reduce((s, g) => s + g.kayip, 0)
       const tGer    = tTam + tEks
-      const tBas    = tHedef > 0 ? Math.round(tGer / tHedef * 100) : 0
-      const tGenel  = tHedef > 0 ? Math.round((tGer + tSap) / tHedef * 100) : 0
       const totRow  = wsGrup.getRow(2)
       totRow.getCell(1).value  = '—'
       totRow.getCell(2).value  = 'TOPLAM'
@@ -181,8 +187,8 @@ export async function GET(request: Request) {
       totRow.getCell(8).value  = tEks
       totRow.getCell(9).value  = tSap
       totRow.getCell(10).value = tKay
-      totRow.getCell(11).value = `%${tBas}`
-      totRow.getCell(12).value = `%${tGenel}`
+      totRow.getCell(11).value = fmtPct(tGer, tHedef)          // Basari — kusuratli
+      totRow.getCell(12).value = fmtPct(tGer + tSap, tHedef)   // Genel Oran — kusuratli
       totRow.font = { bold: true }
 
       // Row 3+: detay
