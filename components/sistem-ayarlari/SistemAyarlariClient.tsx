@@ -1090,9 +1090,14 @@ function EmptyTab({ label }: { label: string }) {
 // SİMÜLASYON MODU PANELİ (Grup bazlı + şifre korumalı)
 // ═══════════════════════════════════════════════════════════════════════════════
 function SimulasyonPanel({ firmaId, projeId, lokasyonlar, isSA = false }: { firmaId: string; projeId: string | null; lokasyonlar: { id: string; tanim: string; parent_id?: string | null }[]; isSA?: boolean }) {
-  const [yetkili, setYetkili] = useState(false)
+  // SA/AA icin sifre koruma bypass — zaten oturum acik ve rol yeterli.
+  // Ayrica /api/auth/verify-password (server-side signInWithPassword) SSR/PKCE
+  // ile bazen tutarsiz calisiyordu (2026-09-09: kullanici dogru sifre yazsa
+  // bile "Sifre hatali" donuyordu). Rol tabanli yetki daha guvenilir.
+  const [yetkili, setYetkili] = useState(isSA)
   const [sifreGirdi, setSifreGirdi] = useState('')
   const [sifreHata, setSifreHata] = useState(false)
+  useEffect(() => { if (isSA) setYetkili(true) }, [isSA])
 
   // Şifre doğrulama
   async function sifreDogrula() {
