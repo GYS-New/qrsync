@@ -205,6 +205,44 @@ async function kontrolArsivleme(admin: any, nowMs: number): Promise<SistemRaporu
     })
   }
 
+  // Anomali 5: MESAI ARSIV KOLON DRIFT — Eylul 2026'da tespit edildi.
+  // Canli tablosuna yeni kolon eklenince arsiv tablosunda o kolon yoksa insert
+  // PGRST204 ile sessizce fail eder + delete gene calisir + KAYIP VERI.
+  // Semptom: canli'da 30+ saatlik arsivlenmemis mesai kayitlari birikir
+  // (cron her seferinde ayni satirlar uzerinden gecer ve delete edemez —
+  // aslinda insert basarisiz iken delete de olmaz artik migration 111 sonrasi;
+  // eski davranista kayitlar direkt siliniyordu). Bu check her iki senaryoyu
+  // da yakalar: bugün canlida hic eski kayit olmamali (24h cutoff).
+  const { count: eskiMesai } = await admin
+    .from('personel_mesai_kayitlari')
+    .select('id', { count: 'exact', head: true })
+    .eq('arsivlendi', false)
+    .lt('kayit_tarihi', new Date(nowMs - 30 * 60 * 60 * 1000).toISOString().slice(0, 10))
+  if ((eskiMesai ?? 0) > 0) {
+    sorunlar.push({
+      kod: 'MESAI_ARSIV_DRIFT',
+      mesaj: `${eskiMesai} mesai kaydi 30+ saattir arsive tasinmamis. Kolon drift ya da cron duraksamasi olabilir.`,
+      adet: eskiMesai ?? 0,
+    })
+  }
+
+  // Anomali 6: MESAI ARSIV INSERT HATASI — son 24 saatte sistem_alerts'e
+  // "arsivle_cron_mesai" kaynakli kritik alert dustuyse mesai arsivleme
+  // bozuk demektir (cron insert error yakalayip alert yaziyor).
+  const birGunOnceIso = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
+  const { count: mesaiAlertSayisi } = await admin
+    .from('sistem_alerts')
+    .select('id', { count: 'exact', head: true })
+    .eq('kaynak', 'arsivle_cron_mesai')
+    .gte('tarih', birGunOnceIso)
+  if ((mesaiAlertSayisi ?? 0) > 0) {
+    sorunlar.push({
+      kod: 'MESAI_ARSIV_INSERT_FAIL',
+      mesaj: `Son 24 saatte ${mesaiAlertSayisi} kez mesai arsivleme insert hatasi loglandi. sistem_alerts'i incele.`,
+      adet: mesaiAlertSayisi ?? 0,
+    })
+  }
+
   const metrikler = {
     gec_arsiv: gecArsiv ?? 0,
     bekleyen_normal_donguye: bekleyenNormal ?? 0,
@@ -214,6 +252,8 @@ async function kontrolArsivleme(admin: any, nowMs: number): Promise<SistemRaporu
     son_7g_toplam_arsiv: son7gToplamArsiv ?? 0,
     son_7g_vardiya_null: son7gVardiyaNull ?? 0,
     vardiya_null_yuzde: nullOran,
+    eski_mesai_bekleyen: eskiMesai ?? 0,
+    mesai_arsiv_alert_24h: mesaiAlertSayisi ?? 0,
   }
 
   if (sorunlar.length > 0) return raporla('Arşivleme', sorunlar, '', metrikler)

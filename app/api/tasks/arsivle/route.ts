@@ -80,15 +80,48 @@ export async function POST(req: NextRequest) {
       const cutoffFreq     = new Date(now - s.frekansiyel * 3600000).toISOString()
 
       // ── 1. PERSONEL MESAİ ──────────────────────────────────────────
+      // KRITIK: insert() sonrasi error KONTROLU zorunlu. Kolon drift olursa
+      // (canlida olan bir kolon arsivde yoksa) insert PGRST204 ile fail eder;
+      // eger kontrol edilmezse delete() gene calisir ve KAYITLAR KAYBOLUR.
+      // Bkz. migration 111 — Eylul 2026'da bu bug tesbit edildi.
       try {
         let q = admin.from('personel_mesai_kayitlari').select('*')
           .eq('firma_id', s.firmaId).eq('arsivlendi', false).lt('kayit_tarihi', cutoffMesai).limit(5000)
         if (s.projeId) q = (q as any).eq('proje_id', s.projeId)
         const { data: rows } = await q
         if (rows?.length) {
-          await admin.from('personel_mesai_kayitlari_arsiv').insert(rows.map(x => ({ ...x, arsivleme_tarihi: new Date().toISOString() })))
-          await admin.from('personel_mesai_kayitlari').delete().in('id', rows.map(x => x.id))
-          r.personel = rows.length
+          const { error: insErr } = await admin.from('personel_mesai_kayitlari_arsiv')
+            .insert(rows.map(x => ({ ...x, arsivleme_tarihi: new Date().toISOString() })))
+          if (insErr) {
+            // Insert basarisiz — asla delete etme! Kayit canlida kalir.
+            r.personel_err = `insert_failed: ${insErr.message}`
+            await admin.from('audit_log').insert({
+              tip: 'arsivle', tablo: 'personel_mesai_kayitlari',
+              satir_sayisi: rows.length, basarili: false,
+              hata_mesaji: insErr.message,
+              firma_id: s.firmaId, proje_id: s.projeId || null,
+              detay: { sample_ids: rows.slice(0, 3).map(x => x.id) },
+            })
+            await admin.from('sistem_alerts').insert({
+              seviye: 'kritik',
+              baslik: 'Mesai Arsivleme Basarisiz',
+              mesaj: `${rows.length} mesai kaydi arsive tasinamadi. Hata: ${insErr.message}`,
+              firma_id: s.firmaId, kaynak: 'arsivle_cron_mesai',
+              detay: { total: rows.length, hata: insErr.message },
+            })
+          } else {
+            const { error: delErr } = await admin.from('personel_mesai_kayitlari').delete().in('id', rows.map(x => x.id))
+            if (delErr) {
+              r.personel_err = `delete_failed: ${delErr.message}`
+            } else {
+              r.personel = rows.length
+              await admin.from('audit_log').insert({
+                tip: 'arsivle', tablo: 'personel_mesai_kayitlari',
+                satir_sayisi: rows.length, basarili: true,
+                firma_id: s.firmaId, proje_id: s.projeId || null,
+              })
+            }
+          }
         }
       } catch (e: any) { r.personel_err = e.message }
 
@@ -118,9 +151,20 @@ export async function POST(req: NextRequest) {
             }))
             await admin.from('musteri_degerlendirme_aksiyonlari_arsiv').insert(arsivAksiyonRows)
           }
-          await admin.from('musteri_degerlendirmeleri_arsiv').insert(yeni.map(x => ({ ...x, arsivleme_tarihi: new Date().toISOString() })))
-          await admin.from('musteri_degerlendirmeleri').delete().in('id', yeniIds)
-          moved += yeni.length
+          const { error: insErr } = await admin.from('musteri_degerlendirmeleri_arsiv')
+            .insert(yeni.map(x => ({ ...x, arsivleme_tarihi: new Date().toISOString() })))
+          if (insErr) {
+            r.musteri_err = `insert_failed: ${insErr.message}`
+            await admin.from('sistem_alerts').insert({
+              seviye: 'kritik', baslik: 'Musteri Degerlendirme Arsivleme Basarisiz',
+              mesaj: `${yeni.length} degerlendirme arsive tasinamadi. Hata: ${insErr.message}`,
+              firma_id: s.firmaId, kaynak: 'arsivle_cron_musteri',
+              detay: { total: yeni.length, hata: insErr.message },
+            })
+          } else {
+            await admin.from('musteri_degerlendirmeleri').delete().in('id', yeniIds)
+            moved += yeni.length
+          }
         }
         // Soft arşivler temizle (zaten arsivlendi=true olan kayıtlar — duplicate temizleme)
         let sq = admin.from('musteri_degerlendirmeleri').select('id').eq('firma_id', s.firmaId).eq('arsivlendi', true).limit(5000)
@@ -182,9 +226,20 @@ export async function POST(req: NextRequest) {
             })))
             await admin.from('checklist_sonuc_basliklari').delete().in('id', bIds)
           }
-          await admin.from('gorevler_arsiv').insert(gorevler.map(g => ({ ...g, arsivleme_tarihi: new Date().toISOString() })))
-          await admin.from('gorevler').delete().in('id', ids)
-          r.spesifik = ids.length
+          const { error: gInsErr } = await admin.from('gorevler_arsiv')
+            .insert(gorevler.map(g => ({ ...g, arsivleme_tarihi: new Date().toISOString() })))
+          if (gInsErr) {
+            r.spesifik_err = `insert_failed: ${gInsErr.message}`
+            await admin.from('sistem_alerts').insert({
+              seviye: 'kritik', baslik: 'Spesifik Gorev Arsivleme Basarisiz',
+              mesaj: `${gorevler.length} gorev arsive tasinamadi. Hata: ${gInsErr.message}`,
+              firma_id: s.firmaId, kaynak: 'arsivle_cron_spesifik',
+              detay: { total: gorevler.length, hata: gInsErr.message },
+            })
+          } else {
+            await admin.from('gorevler').delete().in('id', ids)
+            r.spesifik = ids.length
+          }
         }
       } catch (e: any) { r.spesifik_err = e.message }
 
