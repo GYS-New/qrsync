@@ -139,6 +139,7 @@ export async function GET(req: NextRequest) {
     .select('id, tanim')
     .eq('firma_id', firmaId)
     .is('parent_id', null)
+  if (projeId) ustLokQ = (ustLokQ as any).eq('proje_id', projeId)
   if (yetkiliUstLokIds) ustLokQ = (ustLokQ as any).in('id', yetkiliUstLokIds)
   const { data: ustLokRows } = await ustLokQ.order('tanim', { ascending: true })
 
