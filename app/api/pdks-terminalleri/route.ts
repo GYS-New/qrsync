@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
   let q = admin.from('pdks_terminalleri')
-    .select('id, terminal_key, ad, firma_id, proje_id, aktif, cihaz_id, son_gorulme, olusturma_tarihi')
+    .select('id, terminal_key, ad, tip, firma_id, proje_id, aktif, cihaz_id, son_gorulme, olusturma_tarihi')
     .eq('firma_id', firmaId)
     .order('olusturma_tarihi', { ascending: false })
   if (projeId) q = q.eq('proje_id', projeId)
@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
   const firmaId = isSA ? body?.firma_id : me.firma_id
   const projeId = body?.proje_id
   const ad = typeof body?.ad === 'string' ? body.ad.trim() : ''
+  const tip = ['GIRIS', 'CIKIS', 'TOGGLE'].includes(body?.tip) ? body.tip : 'TOGGLE'
   if (!firmaId || !projeId || !ad) {
     return NextResponse.json({ ok: false, error: 'firma_id, proje_id, ad gerekli' }, { status: 400 })
   }
@@ -88,8 +89,8 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await admin.from('pdks_terminalleri').insert({
     terminal_key: terminalKey,
-    ad, firma_id: firmaId, proje_id: projeId, aktif: true,
-  }).select('id, terminal_key, ad').single()
+    ad, tip, firma_id: firmaId, proje_id: projeId, aktif: true,
+  }).select('id, terminal_key, ad, tip').single()
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 

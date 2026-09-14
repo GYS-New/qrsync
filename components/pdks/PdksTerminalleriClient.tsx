@@ -9,10 +9,12 @@ import { RefreshCw, Plus, Trash2, Copy, Power, KeyRound } from 'lucide-react'
 
 interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null }
 
+type Tip = 'GIRIS' | 'CIKIS' | 'TOGGLE'
 type Row = {
   id: string
   terminal_key: string
   ad: string
+  tip: Tip
   firma_id: string
   proje_id: string
   proje_adi: string
@@ -20,6 +22,22 @@ type Row = {
   cihaz_id: string | null
   son_gorulme: string | null
   olusturma_tarihi: string
+}
+
+const TIP_LABEL: Record<Tip, string> = {
+  GIRIS: 'Sadece GİRİŞ',
+  CIKIS: 'Sadece ÇIKIŞ',
+  TOGGLE: 'Giriş+Çıkış (Toggle)',
+}
+const TIP_KISA: Record<Tip, string> = {
+  GIRIS: 'GİRİŞ',
+  CIKIS: 'ÇIKIŞ',
+  TOGGLE: 'TOGGLE',
+}
+const TIP_RENK: Record<Tip, { bg: string; fg: string }> = {
+  GIRIS:  { bg: '#dcfce7', fg: '#16a34a' },
+  CIKIS:  { bg: '#fee2e2', fg: '#dc2626' },
+  TOGGLE: { bg: '#eff6ff', fg: '#1d4ed8' },
 }
 
 const T = {
@@ -49,6 +67,7 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
   const [ekleAcik, setEkleAcik] = useState(false)
   const [yeniAd, setYeniAd] = useState('')
   const [yeniProjeId, setYeniProjeId] = useState('')
+  const [yeniTip, setYeniTip] = useState<Tip>('TOGGLE')
 
   const yukle = useCallback(async () => {
     if (!firmaId) { setRows([]); return }
@@ -88,7 +107,7 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
     }
     const res = await fetch('/api/pdks-terminalleri', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firma_id: firmaId, proje_id: yeniProjeId, ad: yeniAd.trim() }),
+      body: JSON.stringify({ firma_id: firmaId, proje_id: yeniProjeId, ad: yeniAd.trim(), tip: yeniTip }),
     })
     const json = await res.json()
     if (!json.ok) {
@@ -96,7 +115,7 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
       return
     }
     toastRef.current({ type: 'success', title: 'Terminal eklendi', message: `terminal_key: ${json.data?.terminal_key}` })
-    setEkleAcik(false); setYeniAd(''); setYeniProjeId('')
+    setEkleAcik(false); setYeniAd(''); setYeniProjeId(''); setYeniTip('TOGGLE')
     yukle()
   }
 
@@ -176,26 +195,40 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
         </div>
 
         {ekleAcik && (
-          <div className="verde-card" style={{ padding: 14, display: 'grid', gridTemplateColumns: '2fr 1fr auto auto', gap: 10, alignItems: 'end' }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Terminal Adi</span>
-              <input value={yeniAd} onChange={e => setYeniAd(e.target.value)} placeholder="ör. A Blok Ana Giris" style={inp} />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Proje</span>
-              <select value={yeniProjeId} onChange={e => setYeniProjeId(e.target.value)} style={inp}>
-                <option value="">Seç…</option>
-                {projeler.map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}
-              </select>
-            </label>
-            <button onClick={ekle}
-              style={{ height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: T.green, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              Kaydet
-            </button>
-            <button onClick={() => { setEkleAcik(false); setYeniAd(''); setYeniProjeId('') }}
-              style={{ height: 34, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.text, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              Vazgeç
-            </button>
+          <div className="verde-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr auto auto', gap: 10, alignItems: 'end' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Terminal Adi</span>
+                <input value={yeniAd} onChange={e => setYeniAd(e.target.value)} placeholder="ör. A Blok Ana Giris" style={inp} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Proje</span>
+                <select value={yeniProjeId} onChange={e => setYeniProjeId(e.target.value)} style={inp}>
+                  <option value="">Seç…</option>
+                  {projeler.map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}
+                </select>
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Tip</span>
+                <select value={yeniTip} onChange={e => setYeniTip(e.target.value as Tip)} style={inp}>
+                  <option value="TOGGLE">Giriş+Çıkış (Toggle) — tek tablet</option>
+                  <option value="GIRIS">Sadece GİRİŞ — iş başı tableti</option>
+                  <option value="CIKIS">Sadece ÇIKIŞ — iş bitişi tableti</option>
+                </select>
+              </label>
+              <button onClick={ekle}
+                style={{ height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: T.green, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                Kaydet
+              </button>
+              <button onClick={() => { setEkleAcik(false); setYeniAd(''); setYeniProjeId(''); setYeniTip('TOGGLE') }}
+                style={{ height: 34, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.text, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                Vazgeç
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: T.textSoft, lineHeight: 1.5, background: T.grayLight, padding: 10, borderRadius: 8 }}>
+              <strong>Tip seçimi:</strong> <em>Toggle</em> = tek tablet açık kayıt yoksa giriş, varsa çıkış yapar (TOGG'a uygun). {' '}
+              <em>Sadece GİRİŞ / Sadece ÇIKIŞ</em> = klasik çift QR alışkanlığı — bir tablet girişe, bir tablet çıkışa konur (Çanakkale gibi).
+            </div>
           </div>
         )}
 
@@ -213,6 +246,7 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
                   <tr style={{ borderBottom: `2px solid ${T.border}`, background: T.grayLight }}>
                     <Th>Terminal</Th>
                     <Th>Proje</Th>
+                    <Th>Tip</Th>
                     <Th>Anahtar</Th>
                     <Th>Bağlı Cihaz</Th>
                     <Th>Son Görülme</Th>
@@ -225,6 +259,12 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
                     <tr key={r.id} style={{ borderBottom: `1px solid ${T.border}`, background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                       <Td><span style={{ fontWeight: 700 }}>{r.ad}</span></Td>
                       <Td>{r.proje_adi || <span style={{ color: T.textSoft, fontStyle: 'italic' }}>—</span>}</Td>
+                      <Td>
+                        <span title={TIP_LABEL[r.tip]} style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: 700,
+                          background: TIP_RENK[r.tip].bg, color: TIP_RENK[r.tip].fg }}>
+                          {TIP_KISA[r.tip]}
+                        </span>
+                      </Td>
                       <Td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <code style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, background: T.grayLight, padding: '2px 6px', borderRadius: 4 }}>{r.terminal_key}</code>

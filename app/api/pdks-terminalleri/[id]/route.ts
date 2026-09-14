@@ -37,6 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const guncelle: any = { guncelleme_tarihi: new Date().toISOString() }
   if (typeof body?.aktif === 'boolean') guncelle.aktif = body.aktif
   if (typeof body?.ad === 'string' && body.ad.trim()) guncelle.ad = body.ad.trim()
+  if (['GIRIS', 'CIKIS', 'TOGGLE'].includes(body?.tip)) guncelle.tip = body.tip
   // Pasiflestirmede token da iptal edilsin
   if (guncelle.aktif === false) guncelle.terminal_token = null
 

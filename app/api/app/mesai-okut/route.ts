@@ -119,7 +119,7 @@ export async function POST(req: Request) {
       // Terminal aktif mi?
       const { data: terminal } = await admin
         .from('pdks_terminalleri')
-        .select('id, firma_id, proje_id, aktif')
+        .select('id, firma_id, proje_id, aktif, tip')
         .eq('id', terminalId)
         .maybeSingle()
 
@@ -155,11 +155,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: kulErr.message }, { status: 500, headers: CORS })
       }
 
+      // Terminal tipi: GIRIS = sadece giris, CIKIS = sadece cikis, TOGGLE = ikisi
       qr = {
         id: null,
         firma_id: terminal.firma_id,
         proje_id: terminal.proje_id,
-        tip: 'TOGGLE',
+        tip: (terminal as any).tip as 'GIRIS' | 'CIKIS' | 'TOGGLE',
         aktif: true,
       }
       pdksTerminalId = terminalId

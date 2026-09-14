@@ -40,7 +40,7 @@ export async function GET(req: Request) {
 
     const { data: terminal } = await admin
       .from('pdks_terminalleri')
-      .select('id, ad, firma_id, proje_id, aktif')
+      .select('id, ad, firma_id, proje_id, aktif, tip')
       .eq('terminal_token', terminalToken)
       .maybeSingle()
 
@@ -100,6 +100,7 @@ export async function GET(req: Request) {
         ad: terminal.ad,
         firma_adi: (firma as any)?.firma_adi ?? '',
         proje_adi: (proje as any)?.ad ?? '',
+        tip: (terminal as any).tip,  // 'GIRIS' | 'CIKIS' | 'TOGGLE'
       },
       tokenlar,
     }, { headers: CORS })
