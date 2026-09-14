@@ -3,12 +3,22 @@
  * PDKS Tablet — ileri tarihli token paketi.
  *
  * Header: X-Terminal-Token
+ * Query:
+ *   ?dakika=<n>       (opsiyonel) — paket uzunlugu. Default 30, max 1440 (24 saat).
+ *                     Tablet offline dayaniklilik icin (vardiya boyu ~720 dk).
  *
  * Basari (200): { ok:true, sunucu_zamani, pencere_saniye, paket_baslangic,
- *                 paket_bitis, terminal: { ad, firma_adi, proje_adi }, tokenlar: [...] }
+ *                 paket_bitis, terminal: { ad, firma_adi, proje_adi, tip },
+ *                 tokenlar_kompakt: [...] }
  * Hata   (200): { ok:false, kod, hata }
  *
- * Amac: tabletin interneti ~10-20 dk kesilse bile QR donmeye devam etsin.
+ * KOMPAKT GOVDE (14.09.2026 — bug 314eaedb):
+ *   Once token basina objede token + gecerli_baslangic + gecerli_bitis vardi
+ *   (~145 byte/token). Pencereler bitisik ve paket_baslangic'e hizali → damgalar
+ *   turetilebilir. Yeni response'ta yalnizca `tokenlar_kompakt: string[]` var.
+ *   Kural: i. token = paket_baslangic + i × pencere_saniye anında baslar,
+ *   bir pencere gecerlidir. 12 saatlik pakette gövde 204 KB → 65 KB.
+ *   Mobil ekip her iki semayi da destekliyor.
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -21,6 +31,8 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-Terminal-Token',
 }
+
+const PAKET_MAX_DAKIKA = 1440  // ust sinir: 24 saat
 
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: CORS })
@@ -57,6 +69,12 @@ export async function GET(req: Request) {
       )
     }
 
+    // Paket uzunlugu — istemci ?dakika ile talep eder, backend max ile kirpar
+    const url = new URL(req.url)
+    const dakikaRaw = url.searchParams.get('dakika')
+    const dakikaTalep = dakikaRaw ? Math.max(1, parseInt(dakikaRaw, 10) || 0) : PAKET_DAKIKA
+    const paketDakika = Math.min(dakikaTalep, PAKET_MAX_DAKIKA)
+
     // Son gorulme + firma/proje adi
     const [{ data: firma }, { data: proje }] = await Promise.all([
       admin.from('firmalar').select('firma_adi').eq('id', terminal.firma_id).maybeSingle(),
@@ -68,26 +86,18 @@ export async function GET(req: Request) {
       .update({ son_gorulme: new Date().toISOString() })
       .eq('id', terminal.id)
 
-    // Paket olustur: pencere_saniye 30, paket 30 dk => 60 token
+    // Paket olustur
     const nowMs = Date.now()
     const pencereMs = PENCERE_SANIYE * 1000
-    const paketToken = Math.floor((PAKET_DAKIKA * 60 * 1000) / pencereMs)
+    const paketToken = Math.floor((paketDakika * 60 * 1000) / pencereMs)
     const basPencere = pencereNoBul(nowMs)
-    // Paketin ilk penceresi = mevcut pencere (tablette zaman kaymasi olsa dahi
-    // en yakin gecerli token buradan gelir)
     const basMs = basPencere * pencereMs
 
-    const tokenlar = []
+    // Kompakt gövde: sadece token string'i. Damgalar tabletin tarafında türetilir:
+    //   i. token = paket_baslangic + i × pencere_saniye × 1000 anında geçerli.
+    const tokenlar_kompakt: string[] = []
     for (let i = 0; i < paketToken; i++) {
-      const pencereNo = basPencere + i
-      const gecerliBaslangic = pencereNo * pencereMs
-      const gecerliBitis = gecerliBaslangic + pencereMs
-      const token = tokenUret(terminal.id, pencereNo, gecerliBitis)
-      tokenlar.push({
-        token,
-        gecerli_baslangic: new Date(gecerliBaslangic).toISOString(),
-        gecerli_bitis: new Date(gecerliBitis).toISOString(),
-      })
+      tokenlar_kompakt.push(tokenUret(terminal.id, basPencere + i))
     }
 
     return NextResponse.json({
@@ -96,13 +106,14 @@ export async function GET(req: Request) {
       pencere_saniye: PENCERE_SANIYE,
       paket_baslangic: new Date(basMs).toISOString(),
       paket_bitis: new Date(basMs + paketToken * pencereMs).toISOString(),
+      paket_dakika: paketDakika,
       terminal: {
         ad: terminal.ad,
         firma_adi: (firma as any)?.firma_adi ?? '',
         proje_adi: (proje as any)?.ad ?? '',
         tip: (terminal as any).tip,  // 'GIRIS' | 'CIKIS' | 'TOGGLE'
       },
-      tokenlar,
+      tokenlar_kompakt,
     }, { headers: CORS })
   } catch (err: any) {
     return NextResponse.json(

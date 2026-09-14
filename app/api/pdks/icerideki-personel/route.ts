@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
     const { data: terminal } = await admin
       .from('pdks_terminalleri')
-      .select('id, proje_id, firma_id, aktif')
+      .select('id, proje_id, firma_id, aktif, son_gorulme')
       .eq('terminal_token', terminalToken)
       .maybeSingle()
 
@@ -60,6 +60,16 @@ export async function GET(req: Request) {
         { ok: false, kod: 'TERMINAL_PASIF', hata: 'Bu tablet pasif durumda.' },
         { headers: CORS },
       )
+    }
+
+    // son_gorulme guncelle — sadece 60 sn'den eski ise (yazma yukunu azalt).
+    // Tablet 8 sn'de bir cagirir → dakikada 1 kez update yeter. Bkz. bug 141242b9.
+    const sonGorulmeYas = terminal.son_gorulme ? Date.now() - new Date(terminal.son_gorulme).getTime() : Infinity
+    if (sonGorulmeYas > 60000) {
+      admin.from('pdks_terminalleri')
+        .update({ son_gorulme: new Date().toISOString() })
+        .eq('id', terminal.id)
+        .then(() => {})  // fire-and-forget, response'u geciktirmesin
     }
 
     // Acik mesai kayitlari — terminalin projesi
