@@ -16,6 +16,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { rotasyonTokenMi, tokenCoz, pencereNoBul, PENCERE_SANIYE, sha256 } from '@/lib/pdks/token'
 
 export const runtime = 'nodejs'
 
@@ -86,21 +87,100 @@ export async function POST(req: Request) {
     }
 
     // ── 3. Mesai QR/NFC kaydını bul ───────────────────────────────────────────
-    const { data: qrByToken } = await admin
-      .from('mesai_qr_kodlari')
-      .select('id, firma_id, proje_id, tip, aktif')
-      .eq('token', mesaiToken)
-      .maybeSingle()
+    // Once rotasyon token mi? (bkz. migration 112, /api/pdks/*)
+    // Rotasyon token'i sabit QR TIP'i (GIRIS/CIKIS) yerine TOGGLE davranisi
+    // yapar: acik kayit yoksa giris, varsa cikis. Spec §1.
+    let qr: { id: string | null; firma_id: string; proje_id: string | null; tip: 'GIRIS' | 'CIKIS' | 'TOGGLE'; aktif: boolean } | null = null
+    let pdksTerminalId: string | null = null
 
-    const { data: qrByNfc } = !qrByToken
-      ? await admin
-          .from('mesai_qr_kodlari')
-          .select('id, firma_id, proje_id, tip, aktif')
-          .eq('nfc_token', mesaiToken)
-          .maybeSingle()
-      : { data: null }
+    if (rotasyonTokenMi(mesaiToken)) {
+      const cozum = tokenCoz(mesaiToken)
+      if (!cozum.ok) {
+        return NextResponse.json(
+          { ok: false, error: 'Gecersiz QR kodu', code: 'QR_GECERSIZ' },
+          { status: 400, headers: CORS },
+        )
+      }
 
-    const qr = qrByToken ?? qrByNfc
+      const { terminalId, pencereNo, expMs } = cozum.icerik
+
+      // Zaman toleransi: ±1 pencere (30 sn). Spec §4.1
+      const nowMs = Date.now()
+      const nowPencere = pencereNoBul(nowMs)
+      const fark = Math.abs(nowPencere - pencereNo)
+      // expMs de kontrol edilir — cift emniyet
+      if (fark > 1 || nowMs > expMs + PENCERE_SANIYE * 1000) {
+        return NextResponse.json(
+          { ok: false, code: 'QR_SURESI_DOLDU', error: 'QR kodunun suresi doldu. Ekrandaki yeni kodu okutun.' },
+          { status: 403, headers: CORS },
+        )
+      }
+
+      // Terminal aktif mi?
+      const { data: terminal } = await admin
+        .from('pdks_terminalleri')
+        .select('id, firma_id, proje_id, aktif')
+        .eq('id', terminalId)
+        .maybeSingle()
+
+      if (!terminal) {
+        return NextResponse.json(
+          { ok: false, code: 'TERMINAL_GECERSIZ', error: 'Terminal bulunamadi.' },
+          { status: 404, headers: CORS },
+        )
+      }
+      if (!terminal.aktif) {
+        return NextResponse.json(
+          { ok: false, code: 'TERMINAL_PASIF', error: 'Bu tablet pasif durumda.' },
+          { status: 403, headers: CORS },
+        )
+      }
+
+      // ⭐ TEK KULLANIM (spec §4.3, secim (a) — herkes icin token basina tek)
+      // Ayni token ikinci kez kabul edilmez. Atomik: unique constraint ile
+      // 23505 yakalarsak QR_KULLANILDI.
+      const tokenHash = sha256(mesaiToken)
+      const { error: kulErr } = await admin
+        .from('pdks_kullanilan_tokenlar')
+        .insert({ token_hash: tokenHash, terminal_id: terminalId, user_id: userId })
+
+      if (kulErr) {
+        // 23505 = unique_violation
+        if ((kulErr as any).code === '23505') {
+          return NextResponse.json(
+            { ok: false, code: 'QR_KULLANILDI', error: 'Bu QR kodu kullanildi. Ekrandaki yeni kodu okutun.' },
+            { status: 409, headers: CORS },
+          )
+        }
+        return NextResponse.json({ ok: false, error: kulErr.message }, { status: 500, headers: CORS })
+      }
+
+      qr = {
+        id: null,
+        firma_id: terminal.firma_id,
+        proje_id: terminal.proje_id,
+        tip: 'TOGGLE',
+        aktif: true,
+      }
+      pdksTerminalId = terminalId
+    } else {
+      // Sabit QR/NFC arama (mevcut davranis)
+      const { data: qrByToken } = await admin
+        .from('mesai_qr_kodlari')
+        .select('id, firma_id, proje_id, tip, aktif')
+        .eq('token', mesaiToken)
+        .maybeSingle()
+
+      const { data: qrByNfc } = !qrByToken
+        ? await admin
+            .from('mesai_qr_kodlari')
+            .select('id, firma_id, proje_id, tip, aktif')
+            .eq('nfc_token', mesaiToken)
+            .maybeSingle()
+        : { data: null }
+
+      qr = (qrByToken ?? qrByNfc) as typeof qr
+    }
 
     if (!qr) {
       return NextResponse.json(
@@ -189,8 +269,17 @@ export async function POST(req: Request) {
     const { data: mevcutList } = await mevQ
     const mevcut = mevcutList?.[0] ?? null
 
+    // TOGGLE (rotasyon token): mevcut acik kayit varsa CIKIS, yoksa GIRIS
+    const efektifTip: 'GIRIS' | 'CIKIS' = qr.tip === 'TOGGLE'
+      ? (mevcut && !mevcut.cikis_saati ? 'CIKIS' : 'GIRIS')
+      : qr.tip
+
+    // Rotasyon (tablet) kaynakli mesai kaydinda giris_tipi='TABLET' etiketle
+    const girisTipi = pdksTerminalId ? 'TABLET' : 'MOBIL'
+    const cikisTipi = pdksTerminalId ? 'TABLET' : 'MOBIL'
+
     // ── 7. Giriş ─────────────────────────────────────────────────────────────
-    if (qr.tip === 'GIRIS') {
+    if (efektifTip === 'GIRIS') {
       if (mevcut && !mevcut.cikis_saati) {
         return NextResponse.json(
           { ok: false, error: 'Bugün için zaten iş başı yapıldı', durum: 'zaten_acik' },
@@ -203,7 +292,8 @@ export async function POST(req: Request) {
         proje_id:     qr.proje_id ?? null,
         kayit_tarihi: bugun,
         giris_saati:  simdi,
-        giris_tipi:   'MOBIL',
+        giris_tipi:   girisTipi,
+        pdks_terminal_id: pdksTerminalId,
       }).select('id, kayit_tarihi, giris_saati').single()
       if (error) {
         return NextResponse.json({ ok: false, error: error.message }, { status: 500, headers: CORS })
@@ -228,7 +318,7 @@ export async function POST(req: Request) {
     }
 
     // ── 8. Çıkış ─────────────────────────────────────────────────────────────
-    if (qr.tip === 'CIKIS') {
+    if (efektifTip === 'CIKIS') {
       if (!mevcut || mevcut.cikis_saati) {
         return NextResponse.json(
           { ok: false, error: 'Açık iş başı kaydı bulunamadı', durum: 'kayit_yok' },
@@ -237,7 +327,7 @@ export async function POST(req: Request) {
       }
       const { error } = await admin
         .from('personel_mesai_kayitlari')
-        .update({ cikis_saati: simdi, cikis_tipi: 'MOBIL' })
+        .update({ cikis_saati: simdi, cikis_tipi: cikisTipi })
         .eq('id', mevcut.id)
       if (error) {
         return NextResponse.json({ ok: false, error: error.message }, { status: 500, headers: CORS })

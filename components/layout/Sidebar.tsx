@@ -43,6 +43,7 @@ function getNav(base: string, rol: UserRole, otoYikamaAktif: boolean): NavGroup[
         { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
         { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
         { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
+        { label: 'PDKS Terminalleri', href: `${base}/dashboard/pdks-terminalleri`, icon: '📱' },
         { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
         { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
         { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
@@ -60,6 +61,7 @@ function getNav(base: string, rol: UserRole, otoYikamaAktif: boolean): NavGroup[
           { label: 'Frekansiyel Görevler', href: `${base}/dashboard/canli-islemler/tum-gorevler`, icon: '⚡' },
           { label: 'Checklist Şablonları', href: `${base}/dashboard/checklist-sablonlari`, icon: '🧾' },
           { label: 'Personel Takibi', href: `${base}/dashboard/personel-takibi`, icon: '🧭' },
+          { label: 'PDKS Terminalleri', href: `${base}/dashboard/pdks-terminalleri`, icon: '📱' },
           { label: 'Birim Fiyatlar', href: `${base}/dashboard/birim-fiyatlar`, icon: '💰' },
           { label: 'Raporlar', href: `${base}/dashboard/raporlar`, icon: '📊' },
           { label: 'Arşiv', href: `${base}/dashboard/arsiv`, icon: '🗃️' },
@@ -626,6 +628,8 @@ export default function Sidebar({ user, firma, projeAdi: projeAdiProp, projeLogo
             if (item.href.includes('/birim-fiyatlar')) return birimFiyatAktif
             // personel-takibi: sadece aktif proje'de personel_takibi_aktif=true ise göster
             if (item.href.includes('/personel-takibi')) return personelTakibiAktif
+            // pdks-terminalleri: PT aktifse goster (ayni koşul)
+            if (item.href.includes('/pdks-terminalleri')) return personelTakibiAktif
             // push-log: manuel_push_aktif ayarına göre (proje varsa proje, yoksa firma)
             if (item.href.includes('/push-log')) return manuelPushAktif
             return true
