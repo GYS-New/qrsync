@@ -16,7 +16,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { rotasyonTokenMi, tokenCoz, pencereNoBul, PENCERE_SANIYE, sha256 } from '@/lib/pdks/token'
+import { rotasyonTokenMi, tokenCoz, pencereNoBul, sha256 } from '@/lib/pdks/token'
 
 export const runtime = 'nodejs'
 
@@ -102,14 +102,14 @@ export async function POST(req: Request) {
         )
       }
 
-      const { terminalId, pencereNo, expMs } = cozum.icerik
+      const { terminalId, pencereNo } = cozum.icerik
 
       // Zaman toleransi: ±1 pencere (30 sn). Spec §4.1
-      const nowMs = Date.now()
-      const nowPencere = pencereNoBul(nowMs)
+      // Token yeni formatta expMs payload'da yok — pencere_no'dan turetiliyor,
+      // yani sadece pencere farki kontrolu yeterli.
+      const nowPencere = pencereNoBul(Date.now())
       const fark = Math.abs(nowPencere - pencereNo)
-      // expMs de kontrol edilir — cift emniyet
-      if (fark > 1 || nowMs > expMs + PENCERE_SANIYE * 1000) {
+      if (fark > 1) {
         return NextResponse.json(
           { ok: false, code: 'QR_SURESI_DOLDU', error: 'QR kodunun suresi doldu. Ekrandaki yeni kodu okutun.' },
           { status: 403, headers: CORS },
