@@ -90,7 +90,9 @@ export async function GET(req: NextRequest) {
 
   let rows: any[] = []
   if (gorevIds.length > 0) {
-    // Rapor tüm durumları içerir (TAMAMLANDI/ACIK/ISLEMDE/IPTAL/YAPILAMADI/HAZIR)
+    // Web raporu ile birebir uyum: SADECE TAMAMLANDI gorevler. Onceden filtre
+    // yoktu ve KPI'lar 841 gibi TAMAMLANDI-olmayan durumları da sayıyordu →
+    // Web (519) ile Excel (841) tutarsizligi.
     // .in('id', N-UUIDs) URL'yi sisirir; 500+ UUID Cloudflare 8KB HTTP
     // request-line limitini asar. 100'luk chunk (100 UUID ~3.7KB — guvenli marj).
     const gorevlerAll: any[] = []
@@ -103,6 +105,7 @@ export async function GET(req: NextRequest) {
           lokasyon:lokasyon_id (tanim, parent_id, ust:parent_id (tanim))`)
         .in('id', slice)
         .eq('firma_id', firmaId)
+        .eq('durum', 'TAMAMLANDI')
       if (personelId) gQ = gQ.eq('islemi_yapan_id', personelId)
       const { data } = await gQ
       if (data && data.length > 0) gorevlerAll.push(...data)
