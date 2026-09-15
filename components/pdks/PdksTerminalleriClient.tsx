@@ -5,7 +5,7 @@ import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 import { useToast } from '@/components/ui/ToastProvider'
-import { RefreshCw, Plus, Trash2, Copy, Power, KeyRound } from 'lucide-react'
+import { RefreshCw, Plus, Trash2, Copy, Power, KeyRound, Settings, X } from 'lucide-react'
 
 interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null }
 
@@ -22,6 +22,12 @@ type Row = {
   cihaz_id: string | null
   son_gorulme: string | null
   olusturma_tarihi: string
+  pin: string
+  ad_kisalt: boolean
+  ses_acik: boolean
+  ses_duzey: 1 | 2 | 3
+  pilde_kis: boolean
+  liste_gizle: boolean
 }
 
 const TIP_LABEL: Record<Tip, string> = {
@@ -68,6 +74,10 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
   const [yeniAd, setYeniAd] = useState('')
   const [yeniProjeId, setYeniProjeId] = useState('')
   const [yeniTip, setYeniTip] = useState<Tip>('TOGGLE')
+  // Ayar duzenleme modali (spec: 1f5941ca)
+  const [ayarSatiri, setAyarSatiri] = useState<Row | null>(null)
+  const [ayarDegisim, setAyarDegisim] = useState<Partial<Row>>({})
+  const [ayarKaydediyor, setAyarKaydediyor] = useState(false)
 
   const yukle = useCallback(async () => {
     if (!firmaId) { setRows([]); return }
@@ -117,6 +127,44 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
     toastRef.current({ type: 'success', title: 'Terminal eklendi', message: `terminal_key: ${json.data?.terminal_key}` })
     setEkleAcik(false); setYeniAd(''); setYeniProjeId(''); setYeniTip('TOGGLE')
     yukle()
+  }
+
+  function ayarlariAc(r: Row) {
+    setAyarSatiri(r)
+    setAyarDegisim({
+      pin: r.pin,
+      ad_kisalt: r.ad_kisalt,
+      ses_acik: r.ses_acik,
+      ses_duzey: r.ses_duzey,
+      pilde_kis: r.pilde_kis,
+      liste_gizle: r.liste_gizle,
+    })
+  }
+
+  async function ayarlariKaydet() {
+    if (!ayarSatiri) return
+    const body: any = {}
+    if (typeof ayarDegisim.pin === 'string' && /^\d{4}$/.test(ayarDegisim.pin)) body.pin = ayarDegisim.pin
+    else { toastRef.current({ type: 'error', title: 'PDKS', message: 'PIN 4 haneli olmalı' }); return }
+    body.ad_kisalt = !!ayarDegisim.ad_kisalt
+    body.ses_acik  = !!ayarDegisim.ses_acik
+    body.ses_duzey = [1, 2, 3].includes(ayarDegisim.ses_duzey as any) ? ayarDegisim.ses_duzey : 3
+    body.pilde_kis = !!ayarDegisim.pilde_kis
+    body.liste_gizle = !!ayarDegisim.liste_gizle
+    setAyarKaydediyor(true)
+    try {
+      const res = await fetch(`/api/pdks-terminalleri/${ayarSatiri.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!json.ok) toastRef.current({ type: 'error', title: 'PDKS', message: json.error })
+      else {
+        toastRef.current({ type: 'success', title: 'Ayarlar kaydedildi', message: 'Tablet ~10 sn içinde yeni ayarları uygular.' })
+        setAyarSatiri(null)
+        yukle()
+      }
+    } finally { setAyarKaydediyor(false) }
   }
 
   async function aktifDegistir(row: Row) {
@@ -294,6 +342,11 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
                             style={{ height: 30, padding: '0 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: r.aktif ? T.amber : T.green, fontSize: 12, fontWeight: 700 }}>
                             <Power size={13} /> {r.aktif ? 'Pasifleştir' : 'Aktifleştir'}
                           </button>
+                          <button onClick={() => ayarlariAc(r)}
+                            title="Tablet ayarlarını düzenle (PIN, ses, KVKK)"
+                            style={{ height: 30, padding: '0 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: T.gray, fontSize: 12, fontWeight: 700 }}>
+                            <Settings size={13} /> Ayarlar
+                          </button>
                           <button onClick={() => keyYenile(r)}
                             title="Anahtarı yenile (mevcut bağlantı kesilir)"
                             style={{ height: 30, padding: '0 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: T.blue, fontSize: 12, fontWeight: 700 }}>
@@ -314,8 +367,86 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
           )}
         </div>
       </div>
+      {/* AYARLAR MODALI (spec: 1f5941ca) */}
+      {ayarSatiri && (
+        <div onClick={() => !ayarKaydediyor && setAyarSatiri(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 12, padding: 24, width: 480, maxWidth: '92vw', boxShadow: '0 20px 60px rgba(0,0,0,0.35)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Settings size={18} color={T.gray} />
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>Tablet Ayarları</h3>
+              </div>
+              <button onClick={() => setAyarSatiri(null)} disabled={ayarKaydediyor}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4, borderRadius: 6, color: T.textSoft }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ fontSize: 12.5, color: T.textSoft, marginBottom: 16 }}>
+              <strong>{ayarSatiri.ad}</strong> · Panelden yapılan değişiklikler tablete ~10 sn içinde yansır.
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>PIN (4 hane) — tablet ayarlar ekranı</span>
+                <input type="text" inputMode="numeric" pattern="\d{4}" maxLength={4}
+                  value={ayarDegisim.pin ?? ''}
+                  onChange={e => setAyarDegisim({ ...ayarDegisim, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                  style={{ ...inp, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.3em', textAlign: 'center', fontSize: 16 }} />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Ses Düzeyi</span>
+                <select value={ayarDegisim.ses_duzey ?? 3}
+                  onChange={e => setAyarDegisim({ ...ayarDegisim, ses_duzey: Number(e.target.value) as 1 | 2 | 3 })}
+                  style={inp}>
+                  <option value={1}>1 — düşük</option>
+                  <option value={2}>2 — orta</option>
+                  <option value={3}>3 — alarm kanalı + tavan</option>
+                </select>
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <ToggleSwitch label="Ses açık (okutma bipi)" value={!!ayarDegisim.ses_acik}
+                  onChange={v => setAyarDegisim({ ...ayarDegisim, ses_acik: v })} />
+                <ToggleSwitch label="Pil kıs — %35 altı" value={!!ayarDegisim.pilde_kis}
+                  onChange={v => setAyarDegisim({ ...ayarDegisim, pilde_kis: v })} />
+                <ToggleSwitch label='Ad kısalt (KVKK) — "Ahmet Y."' value={!!ayarDegisim.ad_kisalt}
+                  onChange={v => setAyarDegisim({ ...ayarDegisim, ad_kisalt: v })} />
+                <ToggleSwitch label="Listeyi gizle (sıkı KVKK)" value={!!ayarDegisim.liste_gizle}
+                  onChange={v => setAyarDegisim({ ...ayarDegisim, liste_gizle: v })} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
+              <button onClick={() => setAyarSatiri(null)} disabled={ayarKaydediyor}
+                style={{ height: 36, padding: '0 16px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.text, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                Vazgeç
+              </button>
+              <button onClick={ayarlariKaydet} disabled={ayarKaydediyor}
+                style={{ height: 36, padding: '0 18px', borderRadius: 8, border: 'none', background: T.green, color: '#fff', fontWeight: 700, fontSize: 13, cursor: ayarKaydediyor ? 'wait' : 'pointer', opacity: ayarKaydediyor ? 0.7 : 1 }}>
+                {ayarKaydediyor ? 'Kaydediliyor…' : 'Kaydet'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`@keyframes pdks-spin { to { transform: rotate(360deg) } }`}</style>
     </div>
+  )
+}
+
+function ToggleSwitch({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: value ? T.greenLight : '#fff' }}>
+      <div style={{ position: 'relative', width: 34, height: 20, borderRadius: 999, background: value ? T.green : '#cbd5e1', transition: 'background 0.15s', flexShrink: 0 }}>
+        <div style={{ position: 'absolute', top: 2, left: value ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 600, color: T.text, lineHeight: 1.3 }}>{label}</span>
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)} style={{ display: 'none' }} />
+    </label>
   )
 }
 

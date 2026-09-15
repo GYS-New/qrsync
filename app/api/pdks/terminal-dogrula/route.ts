@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
     const { data: terminal } = await admin
       .from('pdks_terminalleri')
-      .select('id, ad, firma_id, proje_id, aktif, cihaz_id, terminal_token, tip')
+      .select('id, ad, firma_id, proje_id, aktif, cihaz_id, terminal_token, tip, pin, ad_kisalt, ses_acik, ses_duzey, pilde_kis, liste_gizle')
       .eq('terminal_key', terminalKey)
       .maybeSingle()
 
@@ -97,6 +97,14 @@ export async function POST(req: Request) {
         firma_adi: (firma as any)?.firma_adi ?? '',
         proje_adi: (proje as any)?.ad ?? '',
         tip: (terminal as any).tip,  // 'GIRIS' | 'CIKIS' | 'TOGGLE'
+      },
+      ayarlar: {
+        pin: (terminal as any).pin,
+        ad_kisalt: (terminal as any).ad_kisalt,
+        ses_acik: (terminal as any).ses_acik,
+        ses_duzey: (terminal as any).ses_duzey,
+        pilde_kis: (terminal as any).pilde_kis,
+        liste_gizle: (terminal as any).liste_gizle,
       },
     }, { headers: CORS })
   } catch (err: any) {

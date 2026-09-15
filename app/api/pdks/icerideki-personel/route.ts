@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
     const { data: terminal } = await admin
       .from('pdks_terminalleri')
-      .select('id, proje_id, firma_id, aktif, son_gorulme')
+      .select('id, proje_id, firma_id, aktif, son_gorulme, pin, ad_kisalt, ses_acik, ses_duzey, pilde_kis, liste_gizle')
       .eq('terminal_token', terminalToken)
       .maybeSingle()
 
@@ -70,6 +70,23 @@ export async function GET(req: Request) {
         .update({ son_gorulme: new Date().toISOString() })
         .eq('id', terminal.id)
         .then(() => {})  // fire-and-forget, response'u geciktirmesin
+    }
+
+    // liste_gizle=true ise (siki KVKK) hic sorgu bile yapma, bos liste don
+    if ((terminal as any).liste_gizle === true) {
+      return NextResponse.json({
+        ok: true,
+        sunucu_zamani: new Date().toISOString(),
+        personel: [],
+        ayarlar: {
+          pin: (terminal as any).pin,
+          ad_kisalt: (terminal as any).ad_kisalt,
+          ses_acik: (terminal as any).ses_acik,
+          ses_duzey: (terminal as any).ses_duzey,
+          pilde_kis: (terminal as any).pilde_kis,
+          liste_gizle: true,
+        },
+      }, { headers: CORS })
     }
 
     // Acik mesai kayitlari — terminalin projesi
@@ -106,6 +123,14 @@ export async function GET(req: Request) {
       ok: true,
       sunucu_zamani: new Date().toISOString(),
       personel,
+      ayarlar: {
+        pin: (terminal as any).pin,
+        ad_kisalt: (terminal as any).ad_kisalt,
+        ses_acik: (terminal as any).ses_acik,
+        ses_duzey: (terminal as any).ses_duzey,
+        pilde_kis: (terminal as any).pilde_kis,
+        liste_gizle: (terminal as any).liste_gizle,
+      },
     }, { headers: CORS })
   } catch (err: any) {
     return NextResponse.json(

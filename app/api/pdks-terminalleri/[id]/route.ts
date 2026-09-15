@@ -38,8 +38,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (typeof body?.aktif === 'boolean') guncelle.aktif = body.aktif
   if (typeof body?.ad === 'string' && body.ad.trim()) guncelle.ad = body.ad.trim()
   if (['GIRIS', 'CIKIS', 'TOGGLE'].includes(body?.tip)) guncelle.tip = body.tip
-  // Pasiflestirmede token da iptal edilsin
-  if (guncelle.aktif === false) guncelle.terminal_token = null
+
+  // Tablet ayarlari (spec: 1f5941ca) — panelden yonetilir, tablet response'lardan alir
+  if (typeof body?.pin === 'string' && /^\d{4}$/.test(body.pin)) guncelle.pin = body.pin
+  if (typeof body?.ad_kisalt === 'boolean')   guncelle.ad_kisalt = body.ad_kisalt
+  if (typeof body?.ses_acik === 'boolean')    guncelle.ses_acik = body.ses_acik
+  if ([1, 2, 3].includes(body?.ses_duzey))    guncelle.ses_duzey = body.ses_duzey
+  if (typeof body?.pilde_kis === 'boolean')   guncelle.pilde_kis = body.pilde_kis
+  if (typeof body?.liste_gizle === 'boolean') guncelle.liste_gizle = body.liste_gizle
+
+  // NOT: Pasiflestirmede terminal_token'i ARTIK IPTAL ETMIYORUZ (spec: 8f9cff11).
+  // Sebep: sahada test edildi — token iptal edilince tablet TERMINAL_GECERSIZ
+  // aliyor ve kurulum ekranina duşuyor, biri fiziksel olarak gidip anahtari
+  // yeniden yazmak zorunda kaliyor. aktif=false yeterli — tablet TERMINAL_PASIF
+  // aliyor, ekrani "pasif" durumuna geciyor, aktif olunca 15 sn icinde geri
+  // doner. Token'i gercekten iptal etmek gerekirse "Anahtar Yenile" var.
 
   const { error } = await admin.from('pdks_terminalleri').update(guncelle).eq('id', params.id)
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
