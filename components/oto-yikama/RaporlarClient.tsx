@@ -509,12 +509,12 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
               </div>
             </div>
 
-            {/* Donutlar tek kart — Planlı/Plansız + İstasyon (yan yana), PDF'ten gizli */}
-            <div className="verde-card pdf-card pdf-hide" style={{ padding: 12, gridColumn: '1 / -1' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            {/* Donutlar tek kart — 3 sutun: Kategori / İstasyon / Kullanici. PDF'ten gizli */}
+            <div className="verde-card pdf-card pdf-hide" style={{ padding: 14, gridColumn: '1 / -1' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
                 <div>
                   <Baslik>Planlı / Plansız / Kayıtsız Dağılımı</Baslik>
-                  <div style={{ height: 220 }}>
+                  <div style={{ height: 260 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Tooltip />
@@ -523,7 +523,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                           { name: 'Planlı', value: agg.planli },
                           { name: 'Plansız', value: agg.ekstra },
                           { name: 'Kayıtsız', value: agg.ekstra_onay_bekleyen ?? 0 },
-                        ]} dataKey="value" nameKey="name" innerRadius={42} outerRadius={75} paddingAngle={2}
+                        ]} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}
                           label={(e: any) => `${e.name} (${e.value})`}>
                           <Cell fill={T.green} />
                           <Cell fill={T.amber} />
@@ -535,13 +535,13 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                 </div>
                 <div>
                   <Baslik>İstasyon Dağılımı</Baslik>
-                  <div style={{ height: 220 }}>
+                  <div style={{ height: 260 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Tooltip />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                         <Pie data={agg.lokasyon_dagilim} dataKey="adet" nameKey="lokasyon"
-                          innerRadius={42} outerRadius={75} paddingAngle={2}
+                          innerRadius={50} outerRadius={90} paddingAngle={2}
                           label={(e: any) => `${e.adet}`}>
                           {agg.lokasyon_dagilim.map((_, i) => (
                             <Cell key={i} fill={RENKLER[i % RENKLER.length]} />
@@ -549,6 +549,28 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                         </Pie>
                       </PieChart>
                     </ResponsiveContainer>
+                  </div>
+                </div>
+                <div>
+                  <Baslik>Kullanıcı Dağılımı</Baslik>
+                  <div style={{ height: 260 }}>
+                    {agg.personel_top && agg.personel_top.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Tooltip />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Pie data={agg.personel_top} dataKey="adet" nameKey="personel"
+                            innerRadius={50} outerRadius={90} paddingAngle={2}
+                            label={(e: any) => `${e.adet}`}>
+                            {agg.personel_top.map((_, i) => (
+                              <Cell key={i} fill={RENKLER[i % RENKLER.length]} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: T.textSoft, fontSize: 12 }}>Veri yok</div>
+                    )}
                   </div>
                 </div>
               </div>
