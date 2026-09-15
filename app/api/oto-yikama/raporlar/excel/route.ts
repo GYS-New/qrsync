@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
           ekstra: !!(m as any).ekstra,
           onay_durumu: (m as any).onay_durumu as string | undefined,
           tip: ((m as any).onay_durumu === 'ONAY_BEKLIYOR' || (m as any).onay_durumu === 'ONAYLANDI')
-            ? 'Ekstra'
+            ? 'Kayıtsız'
             : ((m as any).ekstra ? 'Plansız' : 'Planlı'),
           durum: g.durum as string,
           km: (m as any).km ?? null,
@@ -272,7 +272,7 @@ export async function GET(req: NextRequest) {
     ['Toplam Yıkama', toplam],
     ['Planlı Yıkama', planli],
     ['Plansız Yıkama', ekstra],
-    ['Ekstra Yıkama', ekstraOnayBekleyen],
+    ['Kayıtsız Yıkama', ekstraOnayBekleyen],
     ['Farklı Plaka', plakaMap.size],
     ['Personel', personelMap.size],
     ['Toplam Süre', fmtSure(toplamSure)],

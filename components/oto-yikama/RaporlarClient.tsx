@@ -349,7 +349,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
           <Kpi label="Toplam Yıkama" deger={agg.toplam} renk={T.blue} hedef={agg.hedef} />
           <Kpi label="Planlı" deger={agg.planli} renk={T.green} hedef={agg.hedef} />
           <Kpi label="Plansız" deger={agg.ekstra} renk={T.amber} hedef={agg.hedef} />
-          <Kpi label="Ekstra" deger={agg.ekstra_onay_bekleyen ?? 0} renk="#0891b2" hedef={agg.hedef} />
+          <Kpi label="Kayıtsız" deger={agg.ekstra_onay_bekleyen ?? 0} renk="#0891b2" hedef={agg.hedef} />
           <Kpi label="Personel" deger={agg.personel_sayisi} renk={T.text} />
           <Kpi label="Toplam Süre" deger={fmtSure(agg.toplam_sure_saniye)} renk={T.text} kucuk />
           <Kpi label="Ortalama Süre" deger={fmtSure(agg.ortalama_sure_saniye)} renk={T.text} kucuk />
@@ -397,8 +397,8 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                 const chartData = isSaatlik ? saatlikData : gunlukData
                 const xKey = isSaatlik ? 'saat' : 'x'
                 const baslik = isSaatlik
-                  ? 'Saatlik Yıkama Trendi — 08:00 – 18:00 (Planlı / Plansız / Ekstra)'
-                  : 'Günlük Yıkama Trendi — Seçilen Aralık (Planlı / Plansız / Ekstra)'
+                  ? 'Saatlik Yıkama Trendi — 08:00 – 18:00 (Planlı / Plansız / Kayıtsız)'
+                  : 'Günlük Yıkama Trendi — Seçilen Aralık (Planlı / Plansız / Kayıtsız)'
                 return <>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <Baslik>{baslik}</Baslik>
@@ -451,7 +451,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                     </div>
                     <div style={{ height: 220 }}>
                       <div style={{ fontSize: 11.5, fontWeight: 700, color: '#0891b2', marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        🔵 Ekstra
+                        🔵 Kayıtsız
                       </div>
                       <ResponsiveContainer width="100%" height="92%">
                         <BarChart data={chartData} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
@@ -459,7 +459,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
                           <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                           <Tooltip />
-                          <Bar dataKey="ekstra" name="Ekstra" fill="#0891b2" radius={[5, 5, 0, 0]} maxBarSize={28} />
+                          <Bar dataKey="ekstra" name="Kayıtsız" fill="#0891b2" radius={[5, 5, 0, 0]} maxBarSize={28} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -513,7 +513,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
             <div className="verde-card pdf-card pdf-hide" style={{ padding: 12, gridColumn: '1 / -1' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
-                  <Baslik>Planlı / Plansız / Ekstra Dağılımı</Baslik>
+                  <Baslik>Planlı / Plansız / Kayıtsız Dağılımı</Baslik>
                   <div style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -522,7 +522,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                         <Pie data={[
                           { name: 'Planlı', value: agg.planli },
                           { name: 'Plansız', value: agg.ekstra },
-                          { name: 'Ekstra', value: agg.ekstra_onay_bekleyen ?? 0 },
+                          { name: 'Kayıtsız', value: agg.ekstra_onay_bekleyen ?? 0 },
                         ]} dataKey="value" nameKey="name" innerRadius={42} outerRadius={75} paddingAngle={2}
                           label={(e: any) => `${e.name} (${e.value})`}>
                           <Cell fill={T.green} />
@@ -599,7 +599,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                       </td>
                       <td>
                         {(r.onay_durumu === 'ONAY_BEKLIYOR' || r.onay_durumu === 'ONAYLANDI') ? (
-                          <span style={{ padding: '3px 9px', borderRadius: 999, background: '#cffafe', color: '#0891b2', fontSize: 12, fontWeight: 700 }}>Ekstra</span>
+                          <span style={{ padding: '3px 9px', borderRadius: 999, background: '#cffafe', color: '#0891b2', fontSize: 12, fontWeight: 700 }}>Kayıtsız</span>
                         ) : r.ekstra ? (
                           <span style={{ padding: '3px 9px', borderRadius: 999, background: T.amberLight, color: T.amber, fontSize: 12, fontWeight: 700 }}>Plansız</span>
                         ) : (

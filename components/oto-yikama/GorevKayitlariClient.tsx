@@ -393,7 +393,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                 onClick={() => setFiltre(filtre === 'PLANLI' ? 'TUMU' : 'PLANLI')} />
         <KpiPil renk={T.purple}    etiket="plansız"    sayi={sayilar.ekstra}   active={filtre === 'EKSTRA'}
                 onClick={() => setFiltre(filtre === 'EKSTRA' ? 'TUMU' : 'EKSTRA')} />
-        <KpiPil renk={'#0891b2'}   etiket="ekstra"     sayi={sayilar.ekstraTanimsiz} active={filtre === 'EKSTRA_TANIMSIZ'}
+        <KpiPil renk={'#0891b2'}   etiket="kayıtsız"   sayi={sayilar.ekstraTanimsiz} active={filtre === 'EKSTRA_TANIMSIZ'}
                 onClick={() => setFiltre(filtre === 'EKSTRA_TANIMSIZ' ? 'TUMU' : 'EKSTRA_TANIMSIZ')} />
         <KpiPil renk={T.amber}     etiket="açık"        sayi={sayilar.acik}     active={filtre === 'ACIK'}
                 onClick={() => setFiltre(filtre === 'ACIK' ? 'TUMU' : 'ACIK')} />
@@ -550,7 +550,7 @@ export default function GorevKayitlariClient({ firmaId, kayitlar, istasyonlar, t
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: '0.03em' }}>{k.plaka}</span>
                         {(k.onay_durumu === 'ONAY_BEKLIYOR' || k.onay_durumu === 'ONAYLANDI') ? (
-                          <span style={{ padding: '1px 5px', borderRadius: 999, background: '#cffafe', color: '#0891b2', fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>EKSTRA</span>
+                          <span style={{ padding: '1px 5px', borderRadius: 999, background: '#cffafe', color: '#0891b2', fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>KAYITSIZ</span>
                         ) : k.ekstra ? (
                           <span style={{ padding: '1px 5px', borderRadius: 999, background: T.purpleLight, color: T.purple, fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', lineHeight: 1.4 }}>PLANSIZ</span>
                         ) : null}

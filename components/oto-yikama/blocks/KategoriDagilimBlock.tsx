@@ -21,7 +21,7 @@ export default function KategoriDagilimBlock({
     { label: 'Toplam Tamamlanan',  value: toplamTamamlanan,  color: '#0f172a' },
     { label: 'Planlı Tamamlanan',  value: planliTamamlanan,  color: '#16a34a' },
     { label: 'Plansız Tamamlanan', value: plansizTamamlanan, color: '#d97706' },
-    { label: 'Ekstra Tamamlanan',  value: ekstraTamamlanan,  color: '#0891b2' },
+    { label: 'Kayıtsız Tamamlanan', value: ekstraTamamlanan, color: '#0891b2' },
   ]
   const max = Math.max(1, ...rows.map(r => r.value))
 

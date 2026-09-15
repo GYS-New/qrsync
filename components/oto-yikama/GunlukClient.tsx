@@ -203,7 +203,7 @@ export default function GunlukClient({ firmaId }: { firmaId: string }) {
     { key: 'TUMU',          label: 'Toplam',        val: sayilar.toplam,        bg: 'transparent', vColor: '#111827', lColor: '#6b7280' },
     { key: 'PLANLI',        label: 'Planlı',        val: sayilar.planli,        bg: '#f5f3ff',     vColor: '#6d28d9', lColor: '#5B21B6' },
     { key: 'PLANSIZ',       label: 'Plansız',       val: sayilar.plansiz,       bg: '#fff7ed',     vColor: '#c2410c', lColor: '#9A3412' },
-    { key: 'EKSTRA',        label: 'Ekstra',        val: sayilar.ekstra,        bg: '#ecfeff',     vColor: '#0e7490', lColor: '#155e75' },
+    { key: 'EKSTRA',        label: 'Kayıtsız',      val: sayilar.ekstra,        bg: '#ecfeff',     vColor: '#0e7490', lColor: '#155e75' },
     { key: 'ONAY_BEKLIYOR', label: 'Onay Bekleyen', val: sayilar.ONAY_BEKLIYOR, bg: '#fef3c7',     vColor: '#a16207', lColor: '#854D0E' },
   ]
   const durumKartlari: Kart[] = [
