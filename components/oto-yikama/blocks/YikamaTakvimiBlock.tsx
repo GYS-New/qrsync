@@ -71,17 +71,31 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
       .lte('tarih', bitisTarih),
   ])
 
-  // Gerçek görev key seti (arac_id|tarih) — tahminden bunları çıkar
+  // 5 kategori — Hedef / Toplam / Planli / Plansiz / Kayitsiz.
+  //   Hedef    = ekstra=false satirlar (durumdan bagimsiz) + tahmin
+  //   Planli   = ekstra=false + TAMAMLANDI
+  //   Plansiz  = ekstra=true + onay_durumu='ONAYSIZ' + TAMAMLANDI
+  //   Kayitsiz = onay_durumu IN ('ONAY_BEKLIYOR','ONAYLANDI') + TAMAMLANDI
+  //   Toplam   = Planli + Plansiz + Kayitsiz
+  type GunSayac = { hedef: number; planli: number; plansiz: number; kayitsiz: number; toplam: number }
+  const bosSayac = (): GunSayac => ({ hedef: 0, planli: 0, plansiz: 0, kayitsiz: 0, toplam: 0 })
+
   const gercekKeySet = new Set<string>()
-  const sayac = new Map<string, { tamamlanan: number; planli: number }>()
+  const sayac = new Map<string, GunSayac>()
   for (const r of (rows ?? []) as any[]) {
     if (r.arac_id) gercekKeySet.add(`${r.hedef_tarih}|${r.arac_id}`)
-    // Planli tanimi: ekstra=false AND onay_durumu != 'ONAY_BEKLIYOR'
-    const isPlanli = r.ekstra === false && r.onay_durumu !== 'ONAY_BEKLIYOR'
-    if (!isPlanli) continue
-    const e = sayac.get(r.hedef_tarih) ?? { tamamlanan: 0, planli: 0 }
-    if (r.gorev?.durum === 'TAMAMLANDI') e.tamamlanan++
-    e.planli++  // gerçek planli görev
+    const isEkstra = r.ekstra === true
+    const isKayitsiz = r.onay_durumu === 'ONAY_BEKLIYOR' || r.onay_durumu === 'ONAYLANDI'
+    const isTamamlandi = r.gorev?.durum === 'TAMAMLANDI'
+
+    const e = sayac.get(r.hedef_tarih) ?? bosSayac()
+    if (!isEkstra && !isKayitsiz) {
+      e.hedef++
+      if (isTamamlandi) e.planli++
+    } else if (isTamamlandi) {
+      if (isKayitsiz) e.kayitsiz++
+      else e.plansiz++
+    }
     sayac.set(r.hedef_tarih, e)
   }
 
@@ -91,25 +105,34 @@ export default async function YikamaTakvimiBlock({ firmaId }: { firmaId: string 
     skipSet.add(`${s.tarih}|${s.arac_id}`)
   }
 
-  // 4) Tahmini plan — gerçek olmayan günler/araçlar için (haftanın tamamı)
+  // Tahmini plan — sadece Hedef'e eklenir (gercek gorev yok, tamamlanan yok)
   const tahminAraclar = (araclar ?? []) as TahminArac[]
   const tahminler = aralikPlanTahmin(tahminAraclar, baslangicTarih, bitisTarih)
   for (const t of tahminler) {
     const key = `${t.tarih}|${t.arac_id}`
-    if (gercekKeySet.has(key)) continue   // gerçek görev varsa atla
-    if (skipSet.has(key)) continue         // kullanıcı iptal etmiş — atla
-    const e = sayac.get(t.tarih) ?? { tamamlanan: 0, planli: 0 }
-    e.planli++
+    if (gercekKeySet.has(key)) continue
+    if (skipSet.has(key)) continue
+    const e = sayac.get(t.tarih) ?? bosSayac()
+    e.hedef++
     sayac.set(t.tarih, e)
   }
 
+  // Toplam turet
+  for (const [k, v] of sayac.entries()) {
+    v.toplam = v.planli + v.plansiz + v.kayitsiz
+    sayac.set(k, v)
+  }
+
   const chartData = gunler.map(g => {
-    const v = sayac.get(g.tarih) ?? { tamamlanan: 0, planli: 0 }
+    const v = sayac.get(g.tarih) ?? bosSayac()
     return {
       etiketKisa: g.gunAdi,
       tarih: g.etiket,
-      Planlanan:  v.planli,
-      Tamamlanan: v.tamamlanan,
+      Hedef:    v.hedef,
+      Toplam:   v.toplam,
+      Planli:   v.planli,
+      Plansiz:  v.plansiz,
+      Kayitsiz: v.kayitsiz,
       isToday: g.isToday,
     }
   })
