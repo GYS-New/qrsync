@@ -88,6 +88,12 @@ function fmtSure(saniye: number | null | undefined): string {
   if (h > 0) return `${h} sa ${m} dk`
   return `${m} dk ${s} sn`
 }
+/** "2026-08-15" → "15.08" — gunluk trend X ekseni icin kompakt etiket */
+function fmtGunKisa(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
+  const [, ay, gun] = iso.split('-')
+  return `${gun}.${ay}`
+}
 function dateMinus(d: number): string {
   const ms = Date.now() - d * 24 * 3600 * 1000
   return new Date(ms).toISOString().slice(0, 10)
@@ -110,6 +116,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
   const [tip, setTip] = useState<'' | 'planli' | 'ekstra'>('')
   const [arama, setArama] = useState('')
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
+  const [trendMode, setTrendMode] = useState<'saatlik' | 'gunluk'>('saatlik')
   const printRef = useRef<HTMLDivElement | null>(null)
 
   async function yukle() {
@@ -373,53 +380,92 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
         <>
           {/* GRAFİKLER GRID */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            {/* Saatlik trend — 3 grafik: Planlı / Plansız / Ekstra (08:00-18:00 TR) */}
+            {/* Yikama Trendi — 3 grafik: Planlı / Plansız / Ekstra.
+                Sag ust togglebar: SAATLIK (08:00-18:00) | GUNLUK (secilen aralik icin gun-gun) */}
             <div className="verde-card pdf-card pdf-hide" style={{ padding: 12, gridColumn: '1 / -1' }}>
-              <Baslik>Saatlik Yıkama Trendi — 08:00 – 18:00 (Planlı / Plansız / Ekstra)</Baslik>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-                <div style={{ height: 220 }}>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: T.green, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    🟢 Planlı (Cron)
+              {(() => {
+                const isSaatlik = trendMode === 'saatlik'
+                // Gunluk trend'te: planli=planli, ekstra=plansiz (backend geriye uyum),
+                // ekstra_tanimsiz=ekstra. Kolonlari saatlik ile ayni isimle mapleyelim.
+                const gunlukData = (agg.gunluk_trend ?? []).map(g => ({
+                  x: fmtGunKisa(g.tarih),
+                  planli: g.planli,
+                  plansiz: g.ekstra,
+                  ekstra: g.ekstra_tanimsiz ?? 0,
+                }))
+                const saatlikData = agg.saatlik_trend
+                const chartData = isSaatlik ? saatlikData : gunlukData
+                const xKey = isSaatlik ? 'saat' : 'x'
+                const baslik = isSaatlik
+                  ? 'Saatlik Yıkama Trendi — 08:00 – 18:00 (Planlı / Plansız / Ekstra)'
+                  : 'Günlük Yıkama Trendi — Seçilen Aralık (Planlı / Plansız / Ekstra)'
+                return <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Baslik>{baslik}</Baslik>
+                    <div style={{ display: 'inline-flex', border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+                      {(['saatlik', 'gunluk'] as const).map(mode => {
+                        const active = trendMode === mode
+                        return (
+                          <button key={mode} onClick={() => setTrendMode(mode)}
+                            style={{
+                              padding: '5px 12px', fontSize: 11.5, fontWeight: 700,
+                              border: 'none', cursor: 'pointer',
+                              background: active ? T.blue : 'transparent',
+                              color: active ? '#fff' : T.textSoft,
+                              textTransform: 'uppercase', letterSpacing: '0.04em',
+                            }}>
+                            {mode === 'saatlik' ? 'Saatlik' : 'Günlük'}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                  <ResponsiveContainer width="100%" height="92%">
-                    <BarChart data={agg.saatlik_trend} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Bar dataKey="planli" name="Planlı" fill={T.green} radius={[5, 5, 0, 0]} maxBarSize={28} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div style={{ height: 220 }}>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: T.amber, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    🟡 Plansız
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                    <div style={{ height: 220 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: T.green, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        🟢 Planlı (Cron)
+                      </div>
+                      <ResponsiveContainer width="100%" height="92%">
+                        <BarChart data={chartData} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                          <Tooltip />
+                          <Bar dataKey="planli" name="Planlı" fill={T.green} radius={[5, 5, 0, 0]} maxBarSize={28} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div style={{ height: 220 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: T.amber, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        🟡 Plansız
+                      </div>
+                      <ResponsiveContainer width="100%" height="92%">
+                        <BarChart data={chartData} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                          <Tooltip />
+                          <Bar dataKey="plansiz" name="Plansız" fill={T.amber} radius={[5, 5, 0, 0]} maxBarSize={28} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div style={{ height: 220 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: '#0891b2', marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        🔵 Ekstra
+                      </div>
+                      <ResponsiveContainer width="100%" height="92%">
+                        <BarChart data={chartData} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                          <Tooltip />
+                          <Bar dataKey="ekstra" name="Ekstra" fill="#0891b2" radius={[5, 5, 0, 0]} maxBarSize={28} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
-                  <ResponsiveContainer width="100%" height="92%">
-                    <BarChart data={agg.saatlik_trend} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Bar dataKey="plansiz" name="Plansız" fill={T.amber} radius={[5, 5, 0, 0]} maxBarSize={28} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div style={{ height: 220 }}>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: '#0891b2', marginBottom: 4, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    🔵 Ekstra
-                  </div>
-                  <ResponsiveContainer width="100%" height="92%">
-                    <BarChart data={agg.saatlik_trend} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Bar dataKey="ekstra" name="Ekstra" fill="#0891b2" radius={[5, 5, 0, 0]} maxBarSize={28} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+                </>
+              })()}
             </div>
 
             {/* İstasyon + Plaka top — tek kart içinde 2 kolon, PDF'ten gizli */}
