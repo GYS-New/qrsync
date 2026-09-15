@@ -5,7 +5,8 @@ import Topbar from '@/components/layout/Topbar'
 import { useFirma } from '@/components/layout/FirmaContext'
 import { useProje } from '@/components/projeler/ProjeContext'
 import { useToast } from '@/components/ui/ToastProvider'
-import { RefreshCw, Plus, Trash2, Copy, Power, KeyRound, Settings, X } from 'lucide-react'
+import { RefreshCw, Plus, Trash2, Copy, Power, KeyRound, Settings, X, BookOpen, AlertTriangle } from 'lucide-react'
+import KurulumRehberiModal from '@/components/pdks/KurulumRehberiModal'
 
 interface Props { base: string; isSA: boolean; tenantFirmaId?: string | null }
 
@@ -83,6 +84,10 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
   const [ayarSatiri, setAyarSatiri] = useState<Row | null>(null)
   const [ayarDegisim, setAyarDegisim] = useState<Partial<Row>>({})
   const [ayarKaydediyor, setAyarKaydediyor] = useState(false)
+  // Kurulum rehberi (spec: 4ea67b82)
+  const [rehberAcik, setRehberAcik] = useState(false)
+  // Yeni terminal olusturuldu sonrasi anahtar+rehber modali
+  const [yeniAnahtar, setYeniAnahtar] = useState<{ ad: string; terminal_key: string } | null>(null)
 
   const yukle = useCallback(async () => {
     if (!firmaId) { setRows([]); return }
@@ -129,7 +134,8 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
       toastRef.current({ type: 'error', title: 'PDKS', message: json.error ?? 'Eklenemedi' })
       return
     }
-    toastRef.current({ type: 'success', title: 'Terminal eklendi', message: `terminal_key: ${json.data?.terminal_key}` })
+    // Anahtar + rehber modalı — spec 4ea67b82 (elden ele geçen .txt yerine panelden)
+    setYeniAnahtar({ ad: yeniAd.trim(), terminal_key: json.data?.terminal_key ?? '' })
     setEkleAcik(false); setYeniAd(''); setYeniProjeId(''); setYeniTip('TOGGLE')
     yukle()
   }
@@ -252,6 +258,11 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
             Tesis girisine tablet konur; tablet her ~30 sn'de yeni QR gosterir. Terminal olusturunca
             <strong> anahtar</strong> uretilir — bu anahtari tablete elle girin, ilk baglanti oldugunda tablet kilitlenir.
           </div>
+          <button onClick={() => setRehberAcik(true)}
+            style={{ height: 34, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.blue, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            title="Kurulum Rehberi">
+            <BookOpen size={14} /> Kurulum Rehberi
+          </button>
           <button onClick={yukle} disabled={loading}
             style={{ height: 34, padding: '0 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.text, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: loading ? 0.6 : 1 }}>
             <RefreshCw size={14} style={loading ? { animation: 'pdks-spin 0.9s linear infinite' } : undefined} />
@@ -525,6 +536,60 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
           </div>
         </div>
       )}
+
+      {/* YENI TERMINAL ANAHTAR + REHBER MODALI (spec 4ea67b82) */}
+      {yeniAnahtar && (
+        <div onClick={() => setYeniAnahtar(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 999 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 12, padding: 24, width: 520, maxWidth: '92vw', boxShadow: '0 20px 60px rgba(0,0,0,0.35)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 20 }}>🔑</span>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>Terminal Oluşturuldu</h3>
+              </div>
+              <button onClick={() => setYeniAnahtar(null)}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4, borderRadius: 6, color: T.textSoft }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: 13, color: T.textSoft, marginBottom: 14 }}>
+              <strong style={{ color: T.text }}>{yeniAnahtar.ad}</strong> için terminal anahtarı üretildi. Tablet kurulumunda 5. adımda bu anahtar girilecek.
+            </div>
+
+            <div style={{ background: T.grayLight, border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 20px', textAlign: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase', marginBottom: 8 }}>Terminal Anahtarı</div>
+              <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 22, fontWeight: 800, color: T.text, letterSpacing: '0.15em' }}>
+                {yeniAnahtar.terminal_key}
+              </div>
+              <button onClick={() => kopyala(yeniAnahtar.terminal_key)}
+                style={{ marginTop: 12, height: 30, padding: '0 12px', borderRadius: 6, border: `1px solid ${T.border}`, background: '#fff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: T.text }}>
+                <Copy size={13} /> Kopyala
+              </button>
+            </div>
+
+            <div style={{ background: T.amberLight, border: `1px solid ${T.amber}44`, borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: T.amber, marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 8, lineHeight: 1.5 }}>
+              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>Bu anahtar <strong>yalnız BİR tablete</strong> tanımlanır. İkinci bir tablete girmeye çalışırsanız "başka bir cihaza tanımlı" hatası alırsınız. Başka cihaza taşıma için "Anahtar Yenile" kullanın.</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setYeniAnahtar(null)}
+                style={{ height: 36, padding: '0 16px', borderRadius: 8, border: `1px solid ${T.border}`, background: '#fff', color: T.text, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                Tamam
+              </button>
+              <button onClick={() => { setRehberAcik(true) }}
+                style={{ height: 36, padding: '0 18px', borderRadius: 8, border: 'none', background: T.blue, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <BookOpen size={14} /> Kurulum Rehberini Aç
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KURULUM REHBERİ MODALI (spec 4ea67b82) */}
+      <KurulumRehberiModal acik={rehberAcik} onKapat={() => setRehberAcik(false)} isSA={isSA} />
 
       <style>{`@keyframes pdks-spin { to { transform: rotate(360deg) } }`}</style>
     </div>
