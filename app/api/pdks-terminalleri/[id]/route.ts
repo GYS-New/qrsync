@@ -47,6 +47,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (typeof body?.pilde_kis === 'boolean')   guncelle.pilde_kis = body.pilde_kis
   if (typeof body?.liste_gizle === 'boolean') guncelle.liste_gizle = body.liste_gizle
 
+  // Ek ayarlar (spec: 03276f48)
+  if ([15, 30, 60].includes(body?.pencere_saniye)) guncelle.pencere_saniye = body.pencere_saniye
+  const nInt = (v: any, min: number, max: number) => typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max
+  if (nInt(body?.paket_dakika, 60, 1440))    guncelle.paket_dakika = body.paket_dakika
+  if (nInt(body?.liste_poll_sn, 3, 120))     guncelle.liste_poll_sn = body.liste_poll_sn
+  if (nInt(body?.vurgu_sn, 3, 60))           guncelle.vurgu_sn = body.vurgu_sn
+  if (nInt(body?.cikis_goster_sn, 2, 60))    guncelle.cikis_goster_sn = body.cikis_goster_sn
+
   // NOT: Pasiflestirmede terminal_token'i ARTIK IPTAL ETMIYORUZ (spec: 8f9cff11).
   // Sebep: sahada test edildi — token iptal edilince tablet TERMINAL_GECERSIZ
   // aliyor ve kurulum ekranina duşuyor, biri fiziksel olarak gidip anahtari

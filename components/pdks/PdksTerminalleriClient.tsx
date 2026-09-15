@@ -28,6 +28,11 @@ type Row = {
   ses_duzey: 1 | 2 | 3
   pilde_kis: boolean
   liste_gizle: boolean
+  pencere_saniye: 15 | 30 | 60
+  paket_dakika: number
+  liste_poll_sn: number
+  vurgu_sn: number
+  cikis_goster_sn: number
 }
 
 const TIP_LABEL: Record<Tip, string> = {
@@ -138,7 +143,18 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
       ses_duzey: r.ses_duzey,
       pilde_kis: r.pilde_kis,
       liste_gizle: r.liste_gizle,
+      pencere_saniye: r.pencere_saniye,
+      paket_dakika: r.paket_dakika,
+      liste_poll_sn: r.liste_poll_sn,
+      vurgu_sn: r.vurgu_sn,
+      cikis_goster_sn: r.cikis_goster_sn,
     })
+  }
+
+  function nRange(v: any, min: number, max: number, def: number): number {
+    const n = Number(v)
+    if (!Number.isFinite(n)) return def
+    return Math.max(min, Math.min(max, Math.round(n)))
   }
 
   async function ayarlariKaydet() {
@@ -151,6 +167,11 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
     body.ses_duzey = [1, 2, 3].includes(ayarDegisim.ses_duzey as any) ? ayarDegisim.ses_duzey : 3
     body.pilde_kis = !!ayarDegisim.pilde_kis
     body.liste_gizle = !!ayarDegisim.liste_gizle
+    body.pencere_saniye = [15, 30, 60].includes(ayarDegisim.pencere_saniye as any) ? ayarDegisim.pencere_saniye : 30
+    body.paket_dakika    = nRange(ayarDegisim.paket_dakika, 60, 1440, 720)
+    body.liste_poll_sn   = nRange(ayarDegisim.liste_poll_sn, 3, 120, 8)
+    body.vurgu_sn        = nRange(ayarDegisim.vurgu_sn, 3, 60, 12)
+    body.cikis_goster_sn = nRange(ayarDegisim.cikis_goster_sn, 2, 60, 6)
     setAyarKaydediyor(true)
     try {
       const res = await fetch(`/api/pdks-terminalleri/${ayarSatiri.id}`, {
@@ -387,35 +408,107 @@ export default function PdksTerminalleriClient({ base, isSA, tenantFirmaId }: Pr
               <strong>{ayarSatiri.ad}</strong> · Panelden yapılan değişiklikler tablete ~10 sn içinde yansır.
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>PIN (4 hane) — tablet ayarlar ekranı</span>
-                <input type="text" inputMode="numeric" pattern="\d{4}" maxLength={4}
-                  value={ayarDegisim.pin ?? ''}
-                  onChange={e => setAyarDegisim({ ...ayarDegisim, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                  style={{ ...inp, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.3em', textAlign: 'center', fontSize: 16 }} />
-              </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {/* GRUP 1: QR + Paket (backend'i etkiler) */}
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: T.gray, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                  QR Rotasyon
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>QR Geçerlilik Süresi</span>
+                    <select value={ayarDegisim.pencere_saniye ?? 30}
+                      onChange={e => setAyarDegisim({ ...ayarDegisim, pencere_saniye: Number(e.target.value) as 15 | 30 | 60 })}
+                      style={inp}>
+                      <option value={15}>15 sn (sıkı)</option>
+                      <option value={30}>30 sn (varsayılan)</option>
+                      <option value={60}>60 sn (geniş)</option>
+                    </select>
+                    <span style={{ fontSize: 10.5, color: T.textSoft, lineHeight: 1.4 }}>Her QR ne kadar süre geçerli kalacak. Kısa = güvenli, uzun = sıra oluşmaz.</span>
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Paket Dakika (60-1440)</span>
+                    <input type="number" min={60} max={1440}
+                      value={ayarDegisim.paket_dakika ?? 720}
+                      onChange={e => setAyarDegisim({ ...ayarDegisim, paket_dakika: Number(e.target.value) })}
+                      style={inp} />
+                    <span style={{ fontSize: 10.5, color: T.textSoft, lineHeight: 1.4 }}>İnternet kesildiğinde QR üretimi ne kadar süre devam etsin (dakika). Vardiya boyu için 720 yeterli.</span>
+                  </label>
+                </div>
+                {ayarDegisim.pencere_saniye === 15 && (ayarDegisim.paket_dakika ?? 720) > 720 && (
+                  <div style={{ marginTop: 8, padding: '8px 12px', background: T.amberLight, border: `1px solid ${T.amber}44`, borderRadius: 6, fontSize: 11.5, color: T.amber }}>
+                    ⚠ 15 sn pencere + {ayarDegisim.paket_dakika} dk paket = büyük token dizisi. Paket dakikayı düşürmek önerilir.
+                  </div>
+                )}
+              </div>
 
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Ses Düzeyi</span>
-                <select value={ayarDegisim.ses_duzey ?? 3}
-                  onChange={e => setAyarDegisim({ ...ayarDegisim, ses_duzey: Number(e.target.value) as 1 | 2 | 3 })}
-                  style={inp}>
-                  <option value={1}>1 — düşük</option>
-                  <option value={2}>2 — orta</option>
-                  <option value={3}>3 — alarm kanalı + tavan</option>
-                </select>
-              </label>
+              {/* GRUP 2: Yerel tablet ayarlari */}
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: T.gray, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                  Tablet Yerel Ayarları
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>PIN (4 hane)</span>
+                    <input type="text" inputMode="numeric" pattern="\d{4}" maxLength={4}
+                      value={ayarDegisim.pin ?? ''}
+                      onChange={e => setAyarDegisim({ ...ayarDegisim, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                      style={{ ...inp, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.3em', textAlign: 'center', fontSize: 16 }} />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Ses Düzeyi</span>
+                    <select value={ayarDegisim.ses_duzey ?? 3}
+                      onChange={e => setAyarDegisim({ ...ayarDegisim, ses_duzey: Number(e.target.value) as 1 | 2 | 3 })}
+                      style={inp}>
+                      <option value={1}>1 — düşük</option>
+                      <option value={2}>2 — orta</option>
+                      <option value={3}>3 — alarm kanalı + tavan</option>
+                    </select>
+                  </label>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+                  <ToggleSwitch label="Ses açık (okutma bipi)" value={!!ayarDegisim.ses_acik}
+                    onChange={v => setAyarDegisim({ ...ayarDegisim, ses_acik: v })} />
+                  <ToggleSwitch label="Pil kıs — %35 altı" value={!!ayarDegisim.pilde_kis}
+                    onChange={v => setAyarDegisim({ ...ayarDegisim, pilde_kis: v })} />
+                  <ToggleSwitch label='Ad kısalt (KVKK) — "Ahmet Y."' value={!!ayarDegisim.ad_kisalt}
+                    onChange={v => setAyarDegisim({ ...ayarDegisim, ad_kisalt: v })} />
+                  <ToggleSwitch label="Listeyi gizle (sıkı KVKK)" value={!!ayarDegisim.liste_gizle}
+                    onChange={v => setAyarDegisim({ ...ayarDegisim, liste_gizle: v })} />
+                </div>
+              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <ToggleSwitch label="Ses açık (okutma bipi)" value={!!ayarDegisim.ses_acik}
-                  onChange={v => setAyarDegisim({ ...ayarDegisim, ses_acik: v })} />
-                <ToggleSwitch label="Pil kıs — %35 altı" value={!!ayarDegisim.pilde_kis}
-                  onChange={v => setAyarDegisim({ ...ayarDegisim, pilde_kis: v })} />
-                <ToggleSwitch label='Ad kısalt (KVKK) — "Ahmet Y."' value={!!ayarDegisim.ad_kisalt}
-                  onChange={v => setAyarDegisim({ ...ayarDegisim, ad_kisalt: v })} />
-                <ToggleSwitch label="Listeyi gizle (sıkı KVKK)" value={!!ayarDegisim.liste_gizle}
-                  onChange={v => setAyarDegisim({ ...ayarDegisim, liste_gizle: v })} />
+              {/* GRUP 3: Liste davranisi */}
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: T.gray, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                  İçeridekiler Listesi
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Poll (3-120)</span>
+                    <input type="number" min={3} max={120}
+                      value={ayarDegisim.liste_poll_sn ?? 8}
+                      onChange={e => setAyarDegisim({ ...ayarDegisim, liste_poll_sn: Number(e.target.value) })}
+                      style={inp} />
+                    <span style={{ fontSize: 10, color: T.textSoft }}>Liste kaç sn'de bir yenilensin.</span>
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Vurgu (3-60)</span>
+                    <input type="number" min={3} max={60}
+                      value={ayarDegisim.vurgu_sn ?? 12}
+                      onChange={e => setAyarDegisim({ ...ayarDegisim, vurgu_sn: Number(e.target.value) })}
+                      style={inp} />
+                    <span style={{ fontSize: 10, color: T.textSoft }}>Yeni okutan isim kaç sn yanıp sönsün.</span>
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: T.textSoft, textTransform: 'uppercase' }}>Çıkış Göster (2-60)</span>
+                    <input type="number" min={2} max={60}
+                      value={ayarDegisim.cikis_goster_sn ?? 6}
+                      onChange={e => setAyarDegisim({ ...ayarDegisim, cikis_goster_sn: Number(e.target.value) })}
+                      style={inp} />
+                    <span style={{ fontSize: 10, color: T.textSoft }}>Çıkan personel kaç sn listede kalsın.</span>
+                  </label>
+                </div>
               </div>
             </div>
 

@@ -104,22 +104,11 @@ export async function POST(req: Request) {
 
       const { terminalId, pencereNo } = cozum.icerik
 
-      // Zaman toleransi: ±1 pencere (30 sn). Spec §4.1
-      // Token yeni formatta expMs payload'da yok — pencere_no'dan turetiliyor,
-      // yani sadece pencere farki kontrolu yeterli.
-      const nowPencere = pencereNoBul(Date.now())
-      const fark = Math.abs(nowPencere - pencereNo)
-      if (fark > 1) {
-        return NextResponse.json(
-          { ok: false, code: 'QR_SURESI_DOLDU', error: 'QR kodunun suresi doldu. Ekrandaki yeni kodu okutun.' },
-          { status: 403, headers: CORS },
-        )
-      }
-
-      // Terminal aktif mi?
+      // Terminal aktif mi? — pencere_saniye terminal-bazli oldugu icin ONCE
+      // terminali bulup ondan sonra pencere kontrolu yapmaliyiz.
       const { data: terminal } = await admin
         .from('pdks_terminalleri')
-        .select('id, firma_id, proje_id, aktif, tip')
+        .select('id, firma_id, proje_id, aktif, tip, pencere_saniye')
         .eq('id', terminalId)
         .maybeSingle()
 
@@ -132,6 +121,17 @@ export async function POST(req: Request) {
       if (!terminal.aktif) {
         return NextResponse.json(
           { ok: false, code: 'TERMINAL_PASIF', error: 'Bu tablet pasif durumda.' },
+          { status: 403, headers: CORS },
+        )
+      }
+
+      // Zaman toleransi: ±1 pencere (terminal.pencere_saniye).
+      const terminalPencereSn = (terminal as any).pencere_saniye ?? 30
+      const nowPencere = pencereNoBul(Date.now(), terminalPencereSn)
+      const fark = Math.abs(nowPencere - pencereNo)
+      if (fark > 1) {
+        return NextResponse.json(
+          { ok: false, code: 'QR_SURESI_DOLDU', error: 'QR kodunun suresi doldu. Ekrandaki yeni kodu okutun.' },
           { status: 403, headers: CORS },
         )
       }

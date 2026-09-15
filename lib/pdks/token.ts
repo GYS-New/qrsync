@@ -109,7 +109,9 @@ export function tokenCoz(token: string): TokenCozumSonuc {
 
     const terminalId = bytesToUuid(payload.subarray(0, 16))
     const pencereNo = payload.readUInt32BE(16)
-    const expMs = (pencereNo + 1) * PENCERE_SANIYE * 1000  // pencere bitisi (turetilir)
+    // expMs terminal.pencere_saniye ile turetilir — bu helper artik hesaplamıyor.
+    // Mesai-okut zaten expMs kullanmiyor (yalnizca pencere farki kontrolu).
+    const expMs = 0
 
     return { ok: true, icerik: { terminalId, pencereNo, expMs } }
   } catch {
@@ -117,9 +119,13 @@ export function tokenCoz(token: string): TokenCozumSonuc {
   }
 }
 
-/** Zaman (ms) icin ait oldugu pencere numarasi. */
-export function pencereNoBul(zamanMs: number): number {
-  return Math.floor(zamanMs / (PENCERE_SANIYE * 1000))
+/**
+ * Zaman (ms) icin ait oldugu pencere numarasi.
+ * pencereSaniye parametresi verilmezse env default (PENCERE_SANIYE) kullanilir.
+ * Terminal-bazli pencere_saniye desteklendi (migration 116).
+ */
+export function pencereNoBul(zamanMs: number, pencereSaniye: number = PENCERE_SANIYE): number {
+  return Math.floor(zamanMs / (pencereSaniye * 1000))
 }
 
 /** Rotasyon token'ini string olarak taniyalim (tokenler `.` icerir + 42 karakter). */

@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
   let q = admin.from('pdks_terminalleri')
-    .select('id, terminal_key, ad, tip, firma_id, proje_id, aktif, cihaz_id, son_gorulme, olusturma_tarihi, pin, ad_kisalt, ses_acik, ses_duzey, pilde_kis, liste_gizle')
+    .select('id, terminal_key, ad, tip, firma_id, proje_id, aktif, cihaz_id, son_gorulme, olusturma_tarihi, pin, ad_kisalt, ses_acik, ses_duzey, pilde_kis, liste_gizle, pencere_saniye, paket_dakika, liste_poll_sn, vurgu_sn, cikis_goster_sn')
     .eq('firma_id', firmaId)
     .order('olusturma_tarihi', { ascending: false })
   if (projeId) q = q.eq('proje_id', projeId)

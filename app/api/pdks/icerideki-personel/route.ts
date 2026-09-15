@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
     const { data: terminal } = await admin
       .from('pdks_terminalleri')
-      .select('id, proje_id, firma_id, aktif, son_gorulme, pin, ad_kisalt, ses_acik, ses_duzey, pilde_kis, liste_gizle')
+      .select('id, proje_id, firma_id, aktif, son_gorulme, pin, ad_kisalt, ses_acik, ses_duzey, pilde_kis, liste_gizle, paket_dakika, liste_poll_sn, vurgu_sn, cikis_goster_sn')
       .eq('terminal_token', terminalToken)
       .maybeSingle()
 
@@ -85,6 +85,10 @@ export async function GET(req: Request) {
           ses_duzey: (terminal as any).ses_duzey,
           pilde_kis: (terminal as any).pilde_kis,
           liste_gizle: true,
+          paket_dakika: (terminal as any).paket_dakika,
+          liste_poll_sn: (terminal as any).liste_poll_sn,
+          vurgu_sn: (terminal as any).vurgu_sn,
+          cikis_goster_sn: (terminal as any).cikis_goster_sn,
         },
       }, { headers: CORS })
     }
@@ -130,6 +134,10 @@ export async function GET(req: Request) {
         ses_duzey: (terminal as any).ses_duzey,
         pilde_kis: (terminal as any).pilde_kis,
         liste_gizle: (terminal as any).liste_gizle,
+        paket_dakika: (terminal as any).paket_dakika,
+        liste_poll_sn: (terminal as any).liste_poll_sn,
+        vurgu_sn: (terminal as any).vurgu_sn,
+        cikis_goster_sn: (terminal as any).cikis_goster_sn,
       },
     }, { headers: CORS })
   } catch (err: any) {
