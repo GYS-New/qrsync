@@ -378,21 +378,19 @@ const getLocPath = useMemo(() => {
   let alive = true
   async function loadLocs() {
     if (!firmaId) return
-    let q = supabase
-      .from('lokasyonlar')
-      .select('id,tanim,parent_id')
-      .eq('firma_id', firmaId)
-      .eq('aktif', true)
-    if (projeId) q = (q as any).eq('proje_id', projeId)
-    const { data, error } = await q
-
-    if (error) {
-      console.error('Lokasyonlar yüklenemedi', error)
+    // Server-side yetki filtresi + oto-yikama izolasyonu (aksi halde U/M
+    // rolleri tum ust lokasyonlari dropdown'da goruyor — bkz. 2ce0091).
+    const p = new URLSearchParams({ firma_id: firmaId })
+    if (projeId) p.set('proje_id', projeId)
+    const res = await fetch(`/api/lokasyonlar/yetkili?${p}`, { cache: 'no-store' })
+    const json = await res.json()
+    if (!json.ok) {
+      console.error('Lokasyonlar yüklenemedi', json.error)
       return
     }
     if (!alive) return
     const map: Record<string, { tanim: string; parent_id: string | null }> = {}
-    ;(data ?? []).forEach((l: any) => {
+    ;(json.data ?? []).forEach((l: any) => {
       map[l.id] = { tanim: l.tanim, parent_id: l.parent_id }
     })
     setLocMap(map)
