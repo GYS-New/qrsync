@@ -333,26 +333,22 @@ const getLocUstAlt = (lokasyonId: string | null | undefined, fallbackName?: stri
   let alive = true
   async function loadLocs() {
     if (!firmaId) return
-    let q = supabase
-      .from('lokasyonlar')
-      .select('id,tanim,parent_id,oto_yikama_lokasyon')
-      .eq('firma_id', firmaId)
-      .eq('aktif', true)
-    // Proje seçiliyse sadece o projenin lokasyonlarını göster
-    if (projeId) q = (q as any).eq('proje_id', projeId)
-
-    const { data, error } = await q
-
-    if (error) {
-      console.error('Lokasyonlar yüklenemedi', error)
+    // U/M yetki filtresi + oto-yikama izolasyonu server-side yapiliyor
+    // (getYetkiliLokasyonIds RLS harici cunku ust_lokasyon_yetkileri modelı).
+    // Onceki client-side sorgu yetki filtresi UYGULAMIYORDU → dropdown TUM
+    // ust lokasyonlari gosteriyordu (bug: SASI yetkisi olan kullanici BOYA/
+    // MONTAJ vs. de gorüyordu).
+    const p = new URLSearchParams({ firma_id: firmaId })
+    if (projeId) p.set('proje_id', projeId)
+    const res = await fetch(`/api/lokasyonlar/yetkili?${p}`, { cache: 'no-store' })
+    const json = await res.json()
+    if (!json.ok) {
+      console.error('Lokasyonlar yüklenemedi', json.error)
       return
     }
     if (!alive) return
-    // Modül izolasyonu: Oto Yıkama lokasyonlarını çıkar
-    const { filterOutOtoYikama } = await import('@/lib/yetki/clientOtoYikamaFilter')
-    const filtreliLok = filterOutOtoYikama((data ?? []) as any)
     const map: Record<string, { tanim: string; parent_id: string | null }> = {}
-    filtreliLok.forEach((l: any) => {
+    ;(json.data ?? []).forEach((l: any) => {
       map[l.id] = { tanim: l.tanim, parent_id: l.parent_id }
     })
     setLocMap(map)
