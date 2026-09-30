@@ -208,13 +208,21 @@ export async function GET(req: NextRequest) {
   const iptalTasks = [...liveIpt, ...arsivIpt]
 
   // ── 5. Cihaz eşleşme ───────────────────────────────────────────────────────
-  const { data: deviceRows } = await admin
-    .from('device_tokens')
-    .select('user_id')
-    .in('user_id', personelIds)
-    .eq('aktif', true)
-    .not('fcm_token', 'is', null)
-  const eslesenSet = new Set((deviceRows ?? []).map((r: any) => r.user_id))
+  // .in('user_id', N-UUIDs) URL'yi sisirir; ~400 personelde 16KB → Cloudflare
+  // 8KB HTTP request-line limitini asar → sessizce bos doner ve HERKES
+  // "Eslesmemis" gorunur. 100'luk chunk (100 UUID ~3.7KB — guvenli marj).
+  const eslesenSet = new Set<string>()
+  const CHUNK = 100
+  for (let i = 0; i < personelIds.length; i += CHUNK) {
+    const slice = personelIds.slice(i, i + CHUNK)
+    const { data: deviceRows } = await admin
+      .from('device_tokens')
+      .select('user_id')
+      .in('user_id', slice)
+      .eq('aktif', true)
+      .not('fcm_token', 'is', null)
+    for (const r of (deviceRows ?? []) as any[]) eslesenSet.add(r.user_id)
+  }
 
   // ── 6. Vardiya yardımcıları ────────────────────────────────────────────────
   // TR-saat (dakika cinsinden, gün-içi: 0..1439)
