@@ -295,17 +295,28 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
       .select('id,firma_id,ad,aciklama,ust_lokasyon_id,kayit_tarihi')
       .order('ad')
     if (lgFirmaId) grpQ = grpQ.eq('firma_id', lgFirmaId)
+    if (filters.projeId) grpQ = (grpQ as any).eq('proje_id', filters.projeId)
+    // U/M yetki filtresi: sadece yetkili ust_lokasyon'a bagli gruplari goster
+    if (filters.yetkiliLokIds) grpQ = grpQ.in('ust_lokasyon_id', filters.yetkiliLokIds)
 
     const { data: grpList, error: grpErr } = await grpQ
     if (grpErr) throw new Error(grpErr.message)
 
     const locIds: string[] = []
     const grpLocMap: Record<string, string[]> = {}
-    const { data: members } = await admin.from('lokasyon_grup_uyeleri').select('grup_id,lokasyon_id')
-    for (const m of members ?? []) {
-      if (!grpLocMap[m.grup_id]) grpLocMap[m.grup_id] = []
-      grpLocMap[m.grup_id].push(m.lokasyon_id)
-      locIds.push(m.lokasyon_id)
+    // Uye sorgusunu SADECE listelenen gruplar icin cek — hem yetki hem proje
+    // filtresi (grup) via yukaridaki filtre ile dolayli uygulanmis olur.
+    const listelenenGrupIds = (grpList ?? []).map((g: any) => g.id)
+    if (listelenenGrupIds.length > 0) {
+      const { data: members } = await admin
+        .from('lokasyon_grup_uyeleri')
+        .select('grup_id,lokasyon_id')
+        .in('grup_id', listelenenGrupIds)
+      for (const m of members ?? []) {
+        if (!grpLocMap[m.grup_id]) grpLocMap[m.grup_id] = []
+        grpLocMap[m.grup_id].push(m.lokasyon_id)
+        locIds.push(m.lokasyon_id)
+      }
     }
 
     // Lokasyon isimleri
@@ -322,10 +333,12 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
       return parts.join(' / ')
     }
 
-    // Görev istatistikleri
+    // Görev istatistikleri — proje ve yetki filtresi de uygulansin
     const gorevler = await fetchAll(() => {
       let q = admin.from('canli_gorevler').select('lokasyon_id,durum')
       if (lgFirmaId) q = q.eq('firma_id', lgFirmaId)
+      if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+      if (filters.yetkiliLokIds) q = q.in('lokasyon_id', filters.yetkiliLokIds)
       if (filters.dateFrom) q = q.gte('aktif_olma_tarihi', new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString())
       if (filters.dateTo) q = q.lte('aktif_olma_tarihi', new Date(filters.dateTo + 'T23:59:59+03:00').toISOString())
       return q
