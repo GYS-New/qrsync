@@ -4,7 +4,8 @@ import { buildXlsxBuffer } from '@/lib/import-export/xlsx'
 import { getReportDefinition, type ReportKey } from '@/lib/reports/config'
 import { buildReportData } from '@/lib/reports/data'
 import { buildSimplePdf } from '@/lib/reports/pdf'
-import { getYetkiliLokasyonIds } from '@/lib/yetki/getLokasyonYetki'
+import { getYetkiliLokasyonIds, getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
+import { createAdminClient } from '@/lib/supabase/server'
 
 function slugify(value: string) {
   return value
@@ -41,6 +42,7 @@ export async function GET(request: Request) {
     const dateTo = searchParams.get('dateTo')
     const requestedFirmaId = searchParams.get('firmaId')
     const projeId = searchParams.get('projeId') || null
+    const ustLokasyonId = searchParams.get('ustLokasyonId') || null
 
     const def = getReportDefinition(report)
     if (!def) return NextResponse.json({ error: 'Geçersiz rapor tipi.' }, { status: 400 })
@@ -56,6 +58,31 @@ export async function GET(request: Request) {
 
     const isUM = me.rol === 'tenant_user' || me.rol === 'musteri'
     const yetkiliLokIds = isUM && firmaId ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
+    // Ust lokasyon yetki listesi (U/M icin, ust_lokasyon_id bazli filtreler icin)
+    const yetkiliUstLokIds = isUM ? await getLokasyonYetki(supabase) : null
+
+    // Manuel secilen ust lokasyonun TUM alt ID'lerini BFS ile hesapla
+    // (raporlarda lokasyon_id filtresi icin — locations, live_tasks, manual_tasks)
+    let ustLokasyonAltIds: string[] | null = null
+    if (ustLokasyonId && firmaId) {
+      const admin = createAdminClient()
+      let q = admin.from('lokasyonlar').select('id, parent_id').eq('firma_id', firmaId)
+      if (projeId) q = (q as any).eq('proje_id', projeId)
+      const { data: loks } = await q
+      if (loks) {
+        const set = new Set<string>([ustLokasyonId])
+        const queue = [ustLokasyonId]
+        while (queue.length > 0) {
+          const cur = queue.shift()!
+          for (const l of loks) {
+            if (l.parent_id === cur && !set.has(l.id)) {
+              set.add(l.id); queue.push(l.id)
+            }
+          }
+        }
+        ustLokasyonAltIds = [...set]
+      }
+    }
 
     const data = await buildReportData(def.key, selectedColumns.length ? selectedColumns : def.columns.map((c) => c.key), {
       firmaId,
@@ -63,6 +90,9 @@ export async function GET(request: Request) {
       dateFrom,
       dateTo,
       yetkiliLokIds,
+      yetkiliUstLokIds,
+      ustLokasyonId,
+      ustLokasyonAltIds,
     })
 
     const filenameBase = slugify(def.title)

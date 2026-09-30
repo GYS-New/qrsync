@@ -7,7 +7,10 @@ export type ReportFilters = {
   projeId?: string | null
   dateFrom?: string | null
   dateTo?: string | null
-  yetkiliLokIds?: string[] | null
+  yetkiliLokIds?: string[] | null       // rol bazli: ust+alt tumu (lokasyon_id icin)
+  yetkiliUstLokIds?: string[] | null    // rol bazli: SADECE ust lokasyon ID'leri (ust_lokasyon_id icin)
+  ustLokasyonId?: string | null         // SA/TA/manuel secim (tek ust lokasyon)
+  ustLokasyonAltIds?: string[] | null   // secilen ust lokasyonun TUM alt ID'leri (BFS ile hesaplanmis)
 }
 
 export type PreparedReport = {
@@ -102,6 +105,7 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     if (filters.firmaId) query = query.eq('firma_id', filters.firmaId)
     if (filters.projeId) query = (query as any).eq('proje_id', filters.projeId)
     if (filters.yetkiliLokIds) query = query.in('id', filters.yetkiliLokIds)
+    if (filters.ustLokasyonAltIds) query = query.in('id', filters.ustLokasyonAltIds)
     const { data, error } = await query
     if (error) throw new Error(error.message)
     const locs = data ?? []
@@ -142,11 +146,16 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
   if (reportKey === 'users') {
     let query = admin
       .from('users')
-.select('id,firma_id,isim_soyisim,email,telefon,rol,aktif,kayit_tarihi')
+      .select('id,firma_id,isim_soyisim,email,telefon,rol,aktif,ust_lokasyon_id,kayit_tarihi')
       .in('rol', ['tenant_admin', 'tenant_user'])
       .order('kayit_tarihi', { ascending: false })
     if (filters.firmaId) query = query.eq('firma_id', filters.firmaId)
     if (filters.projeId) query = (query as any).eq('proje_id', filters.projeId)
+    // Ust lokasyon bazli filtreleme:
+    //   yetkiliUstLokIds: U/M rol sinirlamasi (MONTAJ yetkilisi BOYA personelini gormesin)
+    //   ustLokasyonId: SA/TA manuel secim
+    if (filters.yetkiliUstLokIds) query = (query as any).in('ust_lokasyon_id', filters.yetkiliUstLokIds)
+    if (filters.ustLokasyonId) query = (query as any).eq('ust_lokasyon_id', filters.ustLokasyonId)
     const { data, error } = await query
     if (error) throw new Error(error.message)
     rows = (data ?? []).map((row: any) => ({
@@ -170,6 +179,7 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
         if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
         if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
         if (filters.yetkiliLokIds) q = q.in('lokasyon_id', filters.yetkiliLokIds)
+        if (filters.ustLokasyonAltIds) q = q.in('lokasyon_id', filters.ustLokasyonAltIds)
         return q
       }),
       fetchAll(() => {
@@ -177,6 +187,7 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
         if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
         if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
         if (filters.yetkiliLokIds) q = q.in('lokasyon_id', filters.yetkiliLokIds)
+        if (filters.ustLokasyonAltIds) q = q.in('lokasyon_id', filters.ustLokasyonAltIds)
         return q
       }),
     ])
@@ -224,6 +235,7 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     if (filters.firmaId) query = query.eq('firma_id', filters.firmaId)
     if (filters.projeId) query = (query as any).eq('proje_id', filters.projeId)
     if (filters.yetkiliLokIds) query = query.in('lokasyon_id', filters.yetkiliLokIds)
+    if (filters.ustLokasyonAltIds) query = query.in('lokasyon_id', filters.ustLokasyonAltIds)
     const { data, error } = await query
     if (error) throw new Error(error.message)
     const filtered = (data ?? []).filter((row: any) => withinRange(row.olusturma_tarihi, filters.dateFrom, filters.dateTo))
@@ -297,7 +309,8 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     if (lgFirmaId) grpQ = grpQ.eq('firma_id', lgFirmaId)
     if (filters.projeId) grpQ = (grpQ as any).eq('proje_id', filters.projeId)
     // U/M yetki filtresi: sadece yetkili ust_lokasyon'a bagli gruplari goster
-    if (filters.yetkiliLokIds) grpQ = grpQ.in('ust_lokasyon_id', filters.yetkiliLokIds)
+    if (filters.yetkiliUstLokIds) grpQ = grpQ.in('ust_lokasyon_id', filters.yetkiliUstLokIds)
+    if (filters.ustLokasyonId) grpQ = grpQ.eq('ust_lokasyon_id', filters.ustLokasyonId)
 
     const { data: grpList, error: grpErr } = await grpQ
     if (grpErr) throw new Error(grpErr.message)

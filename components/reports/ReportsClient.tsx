@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouteLoading } from '@/components/ui/RouteLoadingProvider'
 import Topbar from '@/components/layout/Topbar'
 import Button from '@/components/ui/Button'
@@ -14,11 +14,13 @@ function ReportCard({
   firmaId,
   isSA,
   projeId,
+  ustLokasyonId,
 }: {
   report: (typeof REPORT_DEFINITIONS)[number]
   firmaId: string | null
   isSA: boolean
   projeId?: string | null
+  ustLokasyonId?: string | null
 }) {
   const { toast } = useToast()
   const [columns, setColumns] = useState<string[]>(report.columns.map((c) => c.key))
@@ -43,6 +45,7 @@ function ReportCard({
       params.set('columns', columns.join(','))
       if (firmaId) params.set('firmaId', firmaId)
       if (projeId) params.set('projeId', projeId)
+      if (ustLokasyonId) params.set('ustLokasyonId', ustLokasyonId)
       if (report.supportsDateRange && dateFrom) params.set('dateFrom', dateFrom)
       if (report.supportsDateRange && dateTo) params.set('dateTo', dateTo)
 
@@ -180,6 +183,29 @@ export default function ReportsClient({
   const { firmaId: saFirmaId, firmalar: saFirmalar } = useFirma()
   const firmaId = isSA ? saFirmaId : (initialFirmaId ?? null)
 
+  // Ust lokasyon filtresi (spec: 17.09) — MONTAJ yetkilisi BOYA personelini gormesin
+  const [ustLokList, setUstLokList] = useState<{ id: string; tanim: string }[]>([])
+  const [ustLokasyonId, setUstLokasyonId] = useState<string>('')
+
+  useEffect(() => {
+    setUstLokasyonId('')
+    if (!firmaId) { setUstLokList([]); return }
+    const p = new URLSearchParams({ firma_id: firmaId })
+    if (projeId) p.set('proje_id', projeId)
+    fetch(`/api/lokasyonlar/yetkili?${p}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(j => {
+        if (!j?.ok) { setUstLokList([]); return }
+        // Sadece root'lar (parent_id NULL) = ust lokasyonlar
+        const roots = (j.data ?? [])
+          .filter((l: any) => l.parent_id == null)
+          .sort((a: any, b: any) => (a.tanim ?? '').localeCompare(b.tanim ?? '', 'tr'))
+          .map((l: any) => ({ id: l.id, tanim: l.tanim }))
+        setUstLokList(roots)
+      })
+      .catch(() => setUstLokList([]))
+  }, [firmaId, projeId])
+
   const firmaLabel = useMemo(() => {
     if (!isSA) return firmaAdi ?? 'Firma'
     const current = saFirmalar?.find((item) => item.id === firmaId)
@@ -207,6 +233,16 @@ export default function ReportsClient({
               <Download size={16} color="#374151" />
               <span style={{ fontSize: 13.5, fontWeight: 700, color: '#374151' }}>{firmaLabel}</span>
             </div>
+            {ustLokList.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#4b5563', textTransform: 'uppercase' }}>Üst Lokasyon</label>
+                <select value={ustLokasyonId} onChange={e => setUstLokasyonId(e.target.value)}
+                  style={{ height: 38, padding: '0 10px', borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', fontSize: 13.5, fontWeight: 600, minWidth: 180 }}>
+                  <option value="">Tümü</option>
+                  {ustLokList.map(l => <option key={l.id} value={l.id}>{l.tanim}</option>)}
+                </select>
+              </div>
+            )}
             <Button
               type="button"
               onClick={() => {
@@ -223,7 +259,7 @@ export default function ReportsClient({
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 18 }}>
           {REPORT_DEFINITIONS.map((report) => (
-            <ReportCard key={report.key} report={report} firmaId={firmaId} isSA={isSA} projeId={projeId} />
+            <ReportCard key={report.key} report={report} firmaId={firmaId} isSA={isSA} projeId={projeId} ustLokasyonId={ustLokasyonId || null} />
           ))}
         </div>
       </div>
