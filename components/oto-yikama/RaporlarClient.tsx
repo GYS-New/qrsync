@@ -376,12 +376,24 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
               <option key={p.id} value={p.id}>{p.ad}</option>
             ))}
           </select>
-          <select value={plaka} onChange={e => setPlaka(e.target.value)} style={inp}>
-            <option value="">Plaka (Tümü)</option>
-            {filterMeta.plakalar.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
+          {/* Plaka arama + listeden secim (datalist). 500+ plakada select yerine
+              type-ahead UX. Bos deger = Tumu. Sag ustte × ile temizle. */}
+          <div style={{ position: 'relative' }}>
+            <input list="rapor-plaka-dl" value={plaka}
+              onChange={e => setPlaka(e.target.value.toUpperCase())}
+              placeholder={`Plaka ara (Tümü) · ${filterMeta.plakalar.length}`}
+              style={{ ...inp, paddingRight: plaka ? 28 : 10, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.02em' }} />
+            {plaka && (
+              <button type="button" onClick={() => setPlaka('')}
+                title="Temizle"
+                style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#e5e7eb', color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, lineHeight: 1, padding: 0 }}>
+                ×
+              </button>
+            )}
+            <datalist id="rapor-plaka-dl">
+              {filterMeta.plakalar.map(p => <option key={p} value={p} />)}
+            </datalist>
+          </div>
           <select value={tip} onChange={e => setTip(e.target.value as any)} style={inp}>
             <option value="">Tip (Tümü)</option>
             <option value="planli">Planlı</option>
