@@ -154,6 +154,93 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
     )
   }, [data, arama])
 
+  // Arama varsa grafik agregasyonlari da aramaList uzerinden yeniden hesaplanir.
+  // Hedef DEGISMEZ — planlanmis gorev sayisi (durumdan bagimsiz), API'den
+  // geldigi gibi kalir; arama bu sayiyi anlamsiz kilacagi icin eski deger kullanilir.
+  const effectiveAgg: Agg | null = useMemo(() => {
+    if (!agg) return null
+    if (!arama.trim()) return agg
+
+    const isTanimsiz = (r: Row) => r.onay_durumu === 'ONAY_BEKLIYOR' || r.onay_durumu === 'ONAYLANDI'
+    const rows = aramaList
+
+    // Saatlik trend (08:00-18:00 TR saati, baslatilma_tarihi bazli)
+    const SAATLER = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    const saatMap = new Map<number, { planli: number; plansiz: number; ekstra: number }>()
+    for (const s of SAATLER) saatMap.set(s, { planli: 0, plansiz: 0, ekstra: 0 })
+    for (const r of rows) {
+      if (!r.baslatilma_tarihi) continue
+      const trSaat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Istanbul', hour: '2-digit', hour12: false }).format(new Date(r.baslatilma_tarihi))
+      const saat = parseInt(trSaat, 10)
+      if (!Number.isFinite(saat) || saat < 8 || saat > 18) continue
+      const b = saatMap.get(saat)!
+      if (isTanimsiz(r)) b.ekstra++
+      else if (r.ekstra) b.plansiz++
+      else b.planli++
+    }
+    const saatlik_trend = SAATLER.map(s => ({
+      saat: `${String(s).padStart(2, '0')}:00`,
+      planli: saatMap.get(s)!.planli,
+      plansiz: saatMap.get(s)!.plansiz,
+      ekstra: saatMap.get(s)!.ekstra,
+    }))
+
+    // Gunluk trend (hedef_tarih bazli)
+    const gunMap = new Map<string, { planli: number; ekstra: number; ekstra_tanimsiz: number }>()
+    for (const r of rows) {
+      const t = r.hedef_tarih
+      const e = gunMap.get(t) ?? { planli: 0, ekstra: 0, ekstra_tanimsiz: 0 }
+      if (isTanimsiz(r)) e.ekstra_tanimsiz++
+      else if (r.ekstra) e.ekstra++
+      else e.planli++
+      gunMap.set(t, e)
+    }
+    const gunluk_trend = Array.from(gunMap.entries())
+      .map(([tarih, v]) => ({ tarih, planli: v.planli, ekstra: v.ekstra, ekstra_tanimsiz: v.ekstra_tanimsiz, toplam: v.planli + v.ekstra + v.ekstra_tanimsiz }))
+      .sort((a, b) => a.tarih.localeCompare(b.tarih))
+
+    // Personel top 10
+    const kisiMap = new Map<string, { ad: string; adet: number }>()
+    for (const r of rows) {
+      if (!r.personel_id) continue
+      const e = kisiMap.get(r.personel_id) ?? { ad: r.personel, adet: 0 }
+      e.adet++
+      kisiMap.set(r.personel_id, e)
+    }
+    const personel_top = Array.from(kisiMap.entries())
+      .map(([id, v]) => ({ personel_id: id, personel: v.ad, adet: v.adet }))
+      .sort((a, b) => b.adet - a.adet).slice(0, 10)
+
+    // Plaka top 10
+    const plkMap = new Map<string, number>()
+    for (const r of rows) plkMap.set(r.plaka, (plkMap.get(r.plaka) ?? 0) + 1)
+    const plaka_top = Array.from(plkMap.entries())
+      .map(([plaka, adet]) => ({ plaka, adet }))
+      .sort((a, b) => b.adet - a.adet).slice(0, 10)
+
+    // Lokasyon dagilim
+    const lokMap = new Map<string, number>()
+    for (const r of rows) lokMap.set(r.lokasyon, (lokMap.get(r.lokasyon) ?? 0) + 1)
+    const lokasyon_dagilim = Array.from(lokMap.entries())
+      .map(([lokasyon, adet]) => ({ lokasyon, adet }))
+      .sort((a, b) => b.adet - a.adet)
+
+    const toplam_sure_saniye = rows.reduce((s, r) => s + (r.tamamlanma_suresi_saniye ?? 0), 0)
+
+    return {
+      ...agg,  // hedef aramaya bagimsiz — eski deger korunur
+      toplam: rows.length,
+      planli: rows.filter(r => !r.ekstra).length,
+      ekstra: rows.filter(r => r.ekstra && !isTanimsiz(r)).length,
+      ekstra_onay_bekleyen: rows.filter(r => isTanimsiz(r)).length,
+      personel_sayisi: new Set(rows.map(r => r.personel_id).filter(Boolean)).size,
+      plaka_sayisi: new Set(rows.map(r => r.plaka).filter(Boolean)).size,
+      toplam_sure_saniye,
+      ortalama_sure_saniye: rows.length > 0 ? Math.round(toplam_sure_saniye / rows.length) : 0,
+      gunluk_trend, saatlik_trend, personel_top, plaka_top, lokasyon_dagilim,
+    }
+  }, [agg, arama, aramaList])
+
   function hizliTarih(gun: number) {
     setBaslangic(dateMinus(gun - 1))
     setBitis(today())
@@ -343,16 +430,16 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
       </div>
 
       {/* KPI KARTLARI */}
-      {agg && (
+      {effectiveAgg && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-          <Kpi label="Hedef" deger={agg.hedef} renk={T.purple} />
-          <Kpi label="Toplam Yıkama" deger={agg.toplam} renk={T.blue} hedef={agg.hedef} />
-          <Kpi label="Planlı" deger={agg.planli} renk={T.green} hedef={agg.hedef} />
-          <Kpi label="Plansız" deger={agg.ekstra} renk={T.amber} hedef={agg.hedef} />
-          <Kpi label="Kayıtsız" deger={agg.ekstra_onay_bekleyen ?? 0} renk="#0891b2" hedef={agg.hedef} />
-          <Kpi label="Personel" deger={agg.personel_sayisi} renk={T.text} />
-          <Kpi label="Toplam Süre" deger={fmtSure(agg.toplam_sure_saniye)} renk={T.text} kucuk />
-          <Kpi label="Ortalama Süre" deger={fmtSure(agg.ortalama_sure_saniye)} renk={T.text} kucuk />
+          <Kpi label="Hedef" deger={effectiveAgg.hedef} renk={T.purple} />
+          <Kpi label="Toplam Yıkama" deger={effectiveAgg.toplam} renk={T.blue} hedef={effectiveAgg.hedef} />
+          <Kpi label="Planlı" deger={effectiveAgg.planli} renk={T.green} hedef={effectiveAgg.hedef} />
+          <Kpi label="Plansız" deger={effectiveAgg.ekstra} renk={T.amber} hedef={effectiveAgg.hedef} />
+          <Kpi label="Kayıtsız" deger={effectiveAgg.ekstra_onay_bekleyen ?? 0} renk="#0891b2" hedef={effectiveAgg.hedef} />
+          <Kpi label="Personel" deger={effectiveAgg.personel_sayisi} renk={T.text} />
+          <Kpi label="Toplam Süre" deger={fmtSure(effectiveAgg.toplam_sure_saniye)} renk={T.text} kucuk />
+          <Kpi label="Ortalama Süre" deger={fmtSure(effectiveAgg.ortalama_sure_saniye)} renk={T.text} kucuk />
         </div>
       )}
 
@@ -372,7 +459,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
         </div>
       )}
 
-      {loading && data.length === 0 ? null : !agg || agg.toplam === 0 ? (
+      {loading && data.length === 0 ? null : !effectiveAgg || effectiveAgg.toplam === 0 ? (
         <div className="verde-card" style={{ padding: 60, textAlign: 'center', color: T.textSoft }}>
           Bu kriterlere uygun yıkama kaydı yok.
         </div>
@@ -387,13 +474,13 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                 const isSaatlik = trendMode === 'saatlik'
                 // Gunluk trend'te: planli=planli, ekstra=plansiz (backend geriye uyum),
                 // ekstra_tanimsiz=ekstra. Kolonlari saatlik ile ayni isimle mapleyelim.
-                const gunlukData = (agg.gunluk_trend ?? []).map(g => ({
+                const gunlukData = (effectiveAgg.gunluk_trend ?? []).map(g => ({
                   x: fmtGunKisa(g.tarih),
                   planli: g.planli,
                   plansiz: g.ekstra,
                   ekstra: g.ekstra_tanimsiz ?? 0,
                 }))
-                const saatlikData = agg.saatlik_trend
+                const saatlikData = effectiveAgg.saatlik_trend
                 const chartData = isSaatlik ? saatlikData : gunlukData
                 const xKey = isSaatlik ? 'saat' : 'x'
                 const baslik = isSaatlik
@@ -475,7 +562,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                   <Baslik>İstasyon Bazlı Yıkama (Top 10)</Baslik>
                   <div style={{ height: 200 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={agg.lokasyon_dagilim.slice(0, 10)} layout="vertical" margin={{ top: 4, right: 18, left: 110, bottom: 4 }}>
+                      <BarChart data={effectiveAgg.lokasyon_dagilim.slice(0, 10)} layout="vertical" margin={{ top: 4, right: 18, left: 110, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fontWeight: 600 }} />
                         <YAxis type="category" dataKey="lokasyon" interval={0}
@@ -495,7 +582,7 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                   <Baslik>Plaka Bazlı Yıkama (Top 10)</Baslik>
                   <div style={{ height: 200 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={agg.plaka_top} layout="vertical" margin={{ top: 4, right: 18, left: 90, bottom: 4 }}>
+                      <BarChart data={effectiveAgg.plaka_top} layout="vertical" margin={{ top: 4, right: 18, left: 90, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fontWeight: 600 }} />
                         <YAxis type="category" dataKey="plaka" interval={0}
@@ -520,9 +607,9 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                         <Tooltip />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                         <Pie data={[
-                          { name: 'Planlı', value: agg.planli },
-                          { name: 'Plansız', value: agg.ekstra },
-                          { name: 'Kayıtsız', value: agg.ekstra_onay_bekleyen ?? 0 },
+                          { name: 'Planlı', value: effectiveAgg.planli },
+                          { name: 'Plansız', value: effectiveAgg.ekstra },
+                          { name: 'Kayıtsız', value: effectiveAgg.ekstra_onay_bekleyen ?? 0 },
                         ]} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}
                           label={(e: any) => `${e.name} (${e.value})`}>
                           <Cell fill={T.green} />
@@ -540,10 +627,10 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                       <PieChart>
                         <Tooltip />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Pie data={agg.lokasyon_dagilim} dataKey="adet" nameKey="lokasyon"
+                        <Pie data={effectiveAgg.lokasyon_dagilim} dataKey="adet" nameKey="lokasyon"
                           innerRadius={50} outerRadius={90} paddingAngle={2}
                           label={(e: any) => `${e.adet}`}>
-                          {agg.lokasyon_dagilim.map((_, i) => (
+                          {effectiveAgg.lokasyon_dagilim.map((_, i) => (
                             <Cell key={i} fill={RENKLER[i % RENKLER.length]} />
                           ))}
                         </Pie>
@@ -554,15 +641,15 @@ export default function RaporlarClient({ firmaId }: { firmaId: string }) {
                 <div>
                   <Baslik>Kullanıcı Dağılımı</Baslik>
                   <div style={{ height: 260 }}>
-                    {agg.personel_top && agg.personel_top.length > 0 ? (
+                    {effectiveAgg.personel_top && effectiveAgg.personel_top.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Tooltip />
                           <Legend wrapperStyle={{ fontSize: 11 }} />
-                          <Pie data={agg.personel_top} dataKey="adet" nameKey="personel"
+                          <Pie data={effectiveAgg.personel_top} dataKey="adet" nameKey="personel"
                             innerRadius={50} outerRadius={90} paddingAngle={2}
                             label={(e: any) => `${e.adet}`}>
-                            {agg.personel_top.map((_, i) => (
+                            {effectiveAgg.personel_top.map((_, i) => (
                               <Cell key={i} fill={RENKLER[i % RENKLER.length]} />
                             ))}
                           </Pie>
