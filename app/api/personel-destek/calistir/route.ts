@@ -24,6 +24,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 import { gorevDurumPayload } from '@/lib/gorev/durum-degistir'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 
@@ -235,12 +236,15 @@ async function destekCalistir(admin: any, ayar: any, vardiyaBitisIso: string) {
   // raporlanır (raporlar tamamlanma_tarihi'ne baksa bile doğru güne yazar).
   const vardiyaBitisMs = new Date(vardiyaBitisIso).getTime()
 
-  // Üst lokasyonun tüm alt lokasyonlarını BFS ile bul
-  const { data: tumLokasyonlar } = await admin
+  // Üst lokasyonun tüm alt lokasyonlarını BFS ile bul — fetchAll ile 1000-row cap'i as
+  // (buyuk firmada agacin yarisi gorunmeyince PD cron'u eksik calisirdi).
+  const tumLokasyonlar = await fetchAll<any>(() => admin
     .from('lokasyonlar')
     .select('id, parent_id, tanim, checklist_sablon_id, sureli_gorev_aktif, min_sure_dakika, hedef_sure_dakika')
     .eq('firma_id', firma_id)
-  if (!tumLokasyonlar) return { tamamlanan: 0, mesaj: 'Lokasyon yok' }
+    .order('id', { ascending: true })
+  )
+  if (!tumLokasyonlar.length) return { tamamlanan: 0, mesaj: 'Lokasyon yok' }
 
   const altLokIds = new Set<string>([ust_lokasyon_id])
   const queue = [ust_lokasyon_id]
@@ -267,16 +271,22 @@ async function destekCalistir(admin: any, ayar: any, vardiyaBitisIso: string) {
   const yirmiDortSaatOnceUTC = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const simdiUTC = new Date().toISOString()
 
-  const { data: gorevler } = await admin
-    .from('canli_gorevler')
-    .select('id, durum, lokasyon_id, tanim, aktif_olma_tarihi, baslatilma_tarihi, atanan_kullanici_id')
-    .eq('firma_id', firma_id)
-    .in('lokasyon_id', lokIds)
-    .eq('durum', 'BEKLEMEDE')
-    .gte('aktif_olma_tarihi', yirmiDortSaatOnceUTC)
-    .lte('aktif_olma_tarihi', simdiUTC)
-
-  const bekleyenGorevler = gorevler ?? []
+  // CHUNK-AWARE: lokIds buyuk ust lokasyon icin 500+ olabilir -> URL overflow
+  const bekleyenGorevler: any[] = []
+  const seenG = new Set<string>()
+  for (let i = 0; i < lokIds.length; i += 100) {
+    const { data } = await admin
+      .from('canli_gorevler')
+      .select('id, durum, lokasyon_id, tanim, aktif_olma_tarihi, baslatilma_tarihi, atanan_kullanici_id')
+      .eq('firma_id', firma_id)
+      .in('lokasyon_id', lokIds.slice(i, i + 100))
+      .eq('durum', 'BEKLEMEDE')
+      .gte('aktif_olma_tarihi', yirmiDortSaatOnceUTC)
+      .lte('aktif_olma_tarihi', simdiUTC)
+    for (const g of (data ?? [])) {
+      if (!seenG.has(g.id)) { seenG.add(g.id); bekleyenGorevler.push(g) }
+    }
+  }
   if (bekleyenGorevler.length === 0) return { tamamlanan: 0, mesaj: 'Bekleyen görev yok' }
 
   // hedef_oran: BEKLEMEDE görev sayısının %X'i tamamlanır
