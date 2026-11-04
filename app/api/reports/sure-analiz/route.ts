@@ -272,12 +272,27 @@ export async function GET(req: Request) {
     const gizliOtoIds = await getOtoYikamaLokasyonIds(admin as any, firmaId)
     const gizliFilterArg = gizliOtoIds.size > 0 ? `(${[...gizliOtoIds].join(',')})` : null
 
-    // Lokasyon ve kullanıcı map'leri
-    let loksQ = admin.from('lokasyonlar').select('id,tanim,parent_id,hedef_sure_dakika').eq('firma_id', firmaId)
-    if (projeId) loksQ = (loksQ as any).eq('proje_id', projeId)
-    if (yetkiliLokIds) loksQ = loksQ.in('id', yetkiliLokIds)
-    if (gizliFilterArg) loksQ = (loksQ as any).not('id', 'in', gizliFilterArg)
-    const { data: loks } = await loksQ
+    // CHUNK-AWARE: musteri yetkiliLokIds binlerce UUID -> URL overflow -> fetch failed.
+    const buildLoksQ = (slice: string[] | null) => {
+      let q = admin.from('lokasyonlar').select('id,tanim,parent_id,hedef_sure_dakika').eq('firma_id', firmaId)
+      if (projeId) q = (q as any).eq('proje_id', projeId)
+      if (slice) q = q.in('id', slice)
+      if (gizliFilterArg) q = (q as any).not('id', 'in', gizliFilterArg)
+      return q
+    }
+    let loks: any[] = []
+    if (!yetkiliLokIds) {
+      const { data } = await buildLoksQ(null)
+      loks = data ?? []
+    } else {
+      const seen = new Set<string>()
+      for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+        const { data } = await buildLoksQ(yetkiliLokIds.slice(i, i + 100))
+        for (const r of (data ?? [])) {
+          if (!seen.has(r.id)) { seen.add(r.id); loks.push(r) }
+        }
+      }
+    }
     const { data: users } = await admin.from('users').select('id,isim_soyisim').eq('firma_id', firmaId)
 
     // Üst > Alt > Alt-Alt tam yolu oluşturan yardımcı fonksiyon
@@ -303,16 +318,34 @@ export async function GET(req: Request) {
     const SEL_SPEC  = 'id,firma_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,atanan_kullanici_id,islemi_yapan_id'
 
     // ── Frekansiyel: aktif + arşiv ──────────────────────────────────────────
-    // Tarih filtresi vardiya_gunu üzerinden (sarkan V1 sahibi günde sayılır)
-    let qFreqA = admin.from('canli_gorevler').select(SEL_FREQ).eq('firma_id', firmaId)
-    let qFreqB = admin.from('canli_gorevler_arsiv').select(SEL_FREQ).eq('firma_id', firmaId)
-    if (projeId) { qFreqA = (qFreqA as any).eq('proje_id', projeId); qFreqB = (qFreqB as any).eq('proje_id', projeId) }
-    if (yetkiliLokIds) { qFreqA = qFreqA.in('lokasyon_id', yetkiliLokIds); qFreqB = qFreqB.in('lokasyon_id', yetkiliLokIds) }
-    if (gizliFilterArg) { qFreqA = (qFreqA as any).not('lokasyon_id', 'in', gizliFilterArg); qFreqB = (qFreqB as any).not('lokasyon_id', 'in', gizliFilterArg) }
-    if (baslangic) { qFreqA = qFreqA.gte('vardiya_gunu', baslangic); qFreqB = qFreqB.gte('vardiya_gunu', baslangic) }
-    if (bitis)     { qFreqA = qFreqA.lte('vardiya_gunu', bitis);     qFreqB = qFreqB.lte('vardiya_gunu', bitis)     }
+    // CHUNK-AWARE: Tarih filtresi vardiya_gunu üzerinden (sarkan V1 sahibi günde sayılır)
+    const buildFreqQ = (table: string, slice: string[] | null) => {
+      let q: any = admin.from(table).select(SEL_FREQ).eq('firma_id', firmaId)
+      if (projeId) q = q.eq('proje_id', projeId)
+      if (slice) q = q.in('lokasyon_id', slice)
+      if (gizliFilterArg) q = q.not('lokasyon_id', 'in', gizliFilterArg)
+      if (baslangic) q = q.gte('vardiya_gunu', baslangic)
+      if (bitis)     q = q.lte('vardiya_gunu', bitis)
+      return q
+    }
+    const lokChunks: (string[] | null)[] = !yetkiliLokIds || yetkiliLokIds.length === 0
+      ? [null]
+      : yetkiliLokIds.length <= 100
+        ? [yetkiliLokIds]
+        : Array.from({ length: Math.ceil(yetkiliLokIds.length / 100) }, (_, i) => yetkiliLokIds!.slice(i * 100, (i + 1) * 100))
 
-    const [freqA, freqB] = await Promise.all([fetchAll(() => qFreqA), fetchAll(() => qFreqB)])
+    async function fetchFreqChunked(table: string): Promise<any[]> {
+      const out: any[] = []
+      for (const slice of lokChunks) {
+        const rows = await fetchAll<any>(() => buildFreqQ(table, slice))
+        out.push(...rows)
+      }
+      return out
+    }
+    const [freqA, freqB] = await Promise.all([
+      fetchFreqChunked('canli_gorevler'),
+      fetchFreqChunked('canli_gorevler_arsiv'),
+    ])
     const freqMap = new Map<string, any>()
     for (const r of freqB) freqMap.set(r.id, r)
     for (const r of freqA) freqMap.set(r.id, r)
@@ -321,11 +354,22 @@ export async function GET(req: Request) {
     // ── Spesifik görevler ───────────────────────────────────────────────────
     // Spesifik görevler vardiya bazlı değil — tamamlanma/olusturma TR günü ile filtre.
     // gorevler_normal view: Oto Yıkama görevleri spesifik süre analizine dahil olmaz.
-    let qSpec = admin.from('gorevler_normal').select(SEL_SPEC).eq('firma_id', firmaId)
-    if (projeId) qSpec = (qSpec as any).eq('proje_id', projeId)
-    if (yetkiliLokIds) qSpec = qSpec.in('lokasyon_id', yetkiliLokIds)
-    if (gizliFilterArg) qSpec = (qSpec as any).not('lokasyon_id', 'in', gizliFilterArg)
-    const { data: specRaw } = await qSpec
+    const buildSpecQ = (slice: string[] | null) => {
+      let q: any = admin.from('gorevler_normal').select(SEL_SPEC).eq('firma_id', firmaId)
+      if (projeId) q = q.eq('proje_id', projeId)
+      if (slice) q = q.in('lokasyon_id', slice)
+      if (gizliFilterArg) q = q.not('lokasyon_id', 'in', gizliFilterArg)
+      return q
+    }
+    const specRawAll: any[] = []
+    const specSeen = new Set<string>()
+    for (const slice of lokChunks) {
+      const { data } = await buildSpecQ(slice)
+      for (const r of (data ?? [])) {
+        if (!specSeen.has(r.id)) { specSeen.add(r.id); specRawAll.push(r) }
+      }
+    }
+    const specRaw: any[] = specRawAll
     const specTum = (specRaw ?? []).filter((g: any) =>
       !baslangic && !bitis ? true : withinRange(g.tamamlanma_tarihi ?? g.olusturma_tarihi, baslangic, bitis)
     )

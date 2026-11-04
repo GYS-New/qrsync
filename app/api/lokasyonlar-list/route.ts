@@ -29,18 +29,37 @@ export async function GET(request: Request) {
       : null
 
     const admin = createAdminClient()
-    let query = admin
-      .from('lokasyonlar')
-      .select('id,tanim,parent_id,sureli_gorev_aktif,oto_yikama_lokasyon')
-      .eq('aktif', true)
-      .order('tanim', { ascending: true })
+    const buildQuery = (slice: string[] | null) => {
+      let q = admin
+        .from('lokasyonlar')
+        .select('id,tanim,parent_id,sureli_gorev_aktif,oto_yikama_lokasyon')
+        .eq('aktif', true)
+        .order('tanim', { ascending: true })
+      if (firmaId) q = q.eq('firma_id', firmaId)
+      if (projeId) q = (q as any).eq('proje_id', projeId)
+      if (slice) q = q.in('id', slice)
+      return q
+    }
 
-    if (firmaId) query = query.eq('firma_id', firmaId)
-    if (projeId) query = (query as any).eq('proje_id', projeId)
-    if (yetkiliLokIds) query = query.in('id', yetkiliLokIds)
-
-    const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    // CHUNK-AWARE: musteri rolu tum ust lokasyonlara yetkili olunca
+    // yetkiliLokIds binlerce UUID -> URL overflow -> fetch fail. 100'luk slice.
+    let data: any[] = []
+    if (!yetkiliLokIds || yetkiliLokIds.length === 0) {
+      const { data: d, error } = await buildQuery(null)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      data = d ?? []
+    } else {
+      const seen = new Set<string>()
+      for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+        const slice = yetkiliLokIds.slice(i, i + 100)
+        const { data: d, error } = await buildQuery(slice)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+        for (const r of (d ?? [])) {
+          if (!seen.has(r.id)) { seen.add(r.id); data.push(r) }
+        }
+      }
+      data.sort((a: any, b: any) => (a.tanim ?? '').localeCompare(b.tanim ?? '', 'tr'))
+    }
 
     // Modül izolasyonu: Oto Yıkama lokasyonları GYS UI'da hiçbir rol için
     // gösterilmez (üst lokasyon dropdown'u dahil). İstisna: kullanıcı yetkilendirme

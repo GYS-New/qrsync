@@ -80,17 +80,22 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
     gf(() => supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true })
       .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN']).eq('vardiya_gunu', bugunVG)),
 
-    // [6] Kullanıcılar toplam (proje + lokasyon yetki filtreli)
-    (() => {
-      let uq = supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true)
-      if (firmaId) uq = uq.eq('firma_id', firmaId)
-      if (projeId) uq = (uq as any).eq('proje_id', projeId)
-      if (yetkiliLokIds?.length) uq = (uq as any).in('ust_lokasyon_id', yetkiliLokIds)
-      return uq
+    // [6] Kullanıcılar toplam (proje + lokasyon yetki filtreli) — chunk-aware
+    (async () => {
+      let total = 0
+      for (const slice of chunks) {
+        let uq = supabase.from('users').select('*', { count: 'exact', head: true }).eq('aktif', true)
+        if (firmaId) uq = uq.eq('firma_id', firmaId)
+        if (projeId) uq = (uq as any).eq('proje_id', projeId)
+        if (slice) uq = (uq as any).in('ust_lokasyon_id', slice)
+        const { count, error } = await uq
+        if (error) throw error
+        total += (count ?? 0)
+      }
+      return { count: total }
     })(),
     // [7] Online kullanıcılar (SİM + gerçek — firma + proje + üst lokasyon filtreli).
-    // Online Kullanıcılar bloğu /api/online-users aynı pattern uyguluyor → KPI ile blok
-    // tutarlı kalsın diye yetkiliLokIds (users.ust_lokasyon_id) filtresi de uygulanır.
+    // Chunk-aware: slice basina filteredUsers cekilip merge edilir.
     (async () => {
       let oq = supabase.from('device_tokens').select('user_id').eq('aktif', true)
         .gte('son_kullanim', new Date(Date.now() - 10 * 60 * 1000).toISOString())
@@ -98,18 +103,40 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
       const { data: dtRows } = await oq
       if (!dtRows?.length) return { data: [] }
       const onlineUserIds = [...new Set(dtRows.map((r: any) => r.user_id))]
-      // Proje veya üst lokasyon filtresi varsa users tablosundan süz
-      if (projeId || (yetkiliLokIds && yetkiliLokIds.length > 0)) {
-        let uq = supabase.from('users').select('id').in('id', onlineUserIds).eq('aktif', true)
-        if (projeId) uq = (uq as any).eq('proje_id', projeId)
-        if (yetkiliLokIds && yetkiliLokIds.length > 0) uq = (uq as any).in('ust_lokasyon_id', yetkiliLokIds)
-        const { data: filteredUsers } = await uq
-        return { data: (filteredUsers ?? []).map((u: any) => ({ user_id: u.id })) }
+      // Proje veya üst lokasyon filtresi yoksa device_tokens'in kendisi yeter.
+      if (!projeId && (!yetkiliLokIds || yetkiliLokIds.length === 0)) {
+        return { data: dtRows }
       }
-      return { data: dtRows }
+      // onlineUserIds de chunklanmali (buyuk firmalarda >100 olabilir).
+      const userIdChunks = onlineUserIds.length <= 100
+        ? [onlineUserIds]
+        : Array.from({ length: Math.ceil(onlineUserIds.length / 100) }, (_, i) => onlineUserIds.slice(i * 100, (i + 1) * 100))
+      const merged: any[] = []
+      for (const userSlice of userIdChunks) {
+        for (const lokSlice of chunks) {
+          let uq = supabase.from('users').select('id').in('id', userSlice).eq('aktif', true)
+          if (projeId) uq = (uq as any).eq('proje_id', projeId)
+          if (lokSlice) uq = (uq as any).in('ust_lokasyon_id', lokSlice)
+          const { data: filteredUsers } = await uq
+          if (filteredUsers) merged.push(...filteredUsers.map((u: any) => ({ user_id: u.id })))
+        }
+      }
+      return { data: merged }
     })(),
-    // [8] Lokasyonlar toplam (proje + lokasyon yetki filtreli)
-    (() => { let lq = supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true); if (firmaId) lq = lq.eq('firma_id', firmaId); if (projeId) lq = (lq as any).eq('proje_id', projeId); if (yetkiliLokIds && yetkiliLokIds.length > 0) lq = lq.in('id', yetkiliLokIds); return lq })(),
+    // [8] Lokasyonlar toplam (proje + lokasyon yetki filtreli) — chunk-aware
+    (async () => {
+      let total = 0
+      for (const slice of chunks) {
+        let lq = supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true)
+        if (firmaId) lq = lq.eq('firma_id', firmaId)
+        if (projeId) lq = (lq as any).eq('proje_id', projeId)
+        if (slice) lq = lq.in('id', slice)
+        const { count, error } = await lq
+        if (error) throw error
+        total += (count ?? 0)
+      }
+      return { count: total }
+    })(),
     // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar, vardiya_gunu üzerinden)
     // Chunk-aware: her slice icin select, sonuclari birlestir (data field).
     (async () => {

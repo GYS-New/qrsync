@@ -31,26 +31,45 @@ export default async function ULokasyonGruplariPage() {
   const yetkiliUstLokIds = await getLokasyonYetki(supabase)
   const yetkiliLokIds = await getYetkiliLokasyonIds(supabase, firmaId, projeId)
 
-  let groupQ = admin.from('lokasyon_gruplari')
-    .select('id,firma_id,ad,aciklama,aktif,kayit_tarihi,guncelleme_tarihi,kayit_yapan_id,ust_lokasyon_id')
-    .eq('firma_id', firmaId).order('ad')
-  if (projeId) groupQ = (groupQ as any).eq('proje_id', projeId)
-  if (yetkiliUstLokIds) groupQ = groupQ.in('ust_lokasyon_id', yetkiliUstLokIds)
+  // CHUNK-AWARE helpers: musteri yetkiliLokIds binlerce UUID -> URL overflow -> fetch failed.
+  const buildGroupQ = (slice: string[] | null) => {
+    let q = admin.from('lokasyon_gruplari')
+      .select('id,firma_id,ad,aciklama,aktif,kayit_tarihi,guncelleme_tarihi,kayit_yapan_id,ust_lokasyon_id')
+      .eq('firma_id', firmaId).order('ad')
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (slice) q = q.in('ust_lokasyon_id', slice)
+    return q
+  }
+  const buildLocQ = (slice: string[] | null) => {
+    let q = admin.from('lokasyonlar')
+      .select('id,firma_id,parent_id,tanim,aktif,kayit_tarihi')
+      .eq('firma_id', firmaId).eq('aktif', true).order('kayit_tarihi', { ascending: true })
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (slice) q = q.in('id', slice)
+    return q
+  }
 
-  let locQ = admin.from('lokasyonlar')
-    .select('id,firma_id,parent_id,tanim,aktif,kayit_tarihi')
-    .eq('firma_id', firmaId).eq('aktif', true).order('kayit_tarihi', { ascending: true })
-  if (projeId) locQ = (locQ as any).eq('proje_id', projeId)
-  if (yetkiliLokIds) locQ = locQ.in('id', yetkiliLokIds)
+  async function chunkedFetch<T = any>(ids: string[] | null, build: (slice: string[] | null) => any): Promise<T[]> {
+    if (!ids) { const { data } = await build(null); return (data ?? []) as T[] }
+    if (ids.length === 0) return []
+    const seen = new Set<string>()
+    const out: T[] = []
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data } = await build(ids.slice(i, i + 100))
+      for (const r of (data ?? [])) {
+        if ((r as any)?.id && !seen.has((r as any).id)) { seen.add((r as any).id); out.push(r) }
+      }
+    }
+    return out
+  }
 
-  const [groupsRes, membersRes, locationsRes] = await Promise.all([
-    groupQ,
+  const [groups, membersRes, locationsRaw] = await Promise.all([
+    chunkedFetch<any>(yetkiliUstLokIds, buildGroupQ),
     admin.from('lokasyon_grup_uyeleri').select('grup_id,lokasyon_id'),
-    locQ,
+    chunkedFetch<any>(yetkiliLokIds, buildLocQ),
   ])
 
-  const groups = groupsRes.data ?? []
-  let locations = locationsRes.data ?? []
+  let locations = locationsRaw
 
   // Oto Yıkama modülü şu an SA-only — U/M için bu lokasyonları gizle
   const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)

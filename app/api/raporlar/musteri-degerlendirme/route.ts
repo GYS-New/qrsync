@@ -129,37 +129,58 @@ export async function GET(req: NextRequest) {
     return map
   }
 
+  // CHUNK-AWARE helper: yetkiliLokIds binlerce UUID -> URL overflow -> fetch failed.
+  async function fetchChunked(table: string, selectStr: string): Promise<any[]> {
+    const build = (slice: string[] | null) => {
+      let q: any = admin.from(table).select(selectStr)
+        .eq('firma_id', firmaId).order('olusturma_tarihi', { ascending: false })
+      if (projeId)   q = q.eq('proje_id', projeId)
+      if (baslangic) q = q.gte('olusturma_tarihi', baslangic)
+      if (bitis)     q = q.lte('olusturma_tarihi', bitis + 'T23:59:59')
+      if (slice)     q = q.in('lokasyon_id', slice)
+      return q
+    }
+    if (!yetkiliLokIds) {
+      const { data, error } = await build(null)
+      if (error) throw error
+      return data ?? []
+    }
+    const seen = new Set<string>()
+    const out: any[] = []
+    for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+      const { data, error } = await build(yetkiliLokIds.slice(i, i + 100))
+      if (error) throw error
+      for (const r of (data ?? [])) {
+        if (!seen.has(r.id)) { seen.add(r.id); out.push(r) }
+      }
+    }
+    out.sort((a: any, b: any) => (b.olusturma_tarihi ?? '').localeCompare(a.olusturma_tarihi ?? ''))
+    return out
+  }
+
   // ── Birleşik mod: hem tablo hem arşiv ──────────────────────────────────
   if (birlesik) {
     const selectCols = `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gsm, kvkk_onay, gorsel_url, olusturma_tarihi, arsivleme_tarihi`
 
-    let qTablo = admin.from('musteri_degerlendirmeleri').select(selectCols + ', arsivlendi')
-      .eq('firma_id', firmaId).order('olusturma_tarihi', { ascending: false })
-    if (projeId)   qTablo = (qTablo as any).eq('proje_id', projeId)
-    if (baslangic) qTablo = (qTablo as any).gte('olusturma_tarihi', baslangic)
-    if (bitis)     qTablo = (qTablo as any).lte('olusturma_tarihi', bitis + 'T23:59:59')
-    if (yetkiliLokIds) qTablo = (qTablo as any).in('lokasyon_id', yetkiliLokIds)
-
-    let qArsiv = admin.from('musteri_degerlendirmeleri_arsiv').select(selectCols)
-      .eq('firma_id', firmaId).order('olusturma_tarihi', { ascending: false })
-    if (projeId)   qArsiv = (qArsiv as any).eq('proje_id', projeId)
-    if (baslangic) qArsiv = (qArsiv as any).gte('olusturma_tarihi', baslangic)
-    if (bitis)     qArsiv = (qArsiv as any).lte('olusturma_tarihi', bitis + 'T23:59:59')
-    if (yetkiliLokIds) qArsiv = (qArsiv as any).in('lokasyon_id', yetkiliLokIds)
-
-    const [resTablo, resArsiv] = await Promise.all([qTablo, qArsiv])
-    if (resTablo.error) return NextResponse.json({ ok: false, error: resTablo.error.message }, { status: 500 })
-    if (resArsiv.error) return NextResponse.json({ ok: false, error: resArsiv.error.message }, { status: 500 })
+    let resTabloData: any[], resArsivData: any[]
+    try {
+      ;[resTabloData, resArsivData] = await Promise.all([
+        fetchChunked('musteri_degerlendirmeleri', selectCols + ', arsivlendi'),
+        fetchChunked('musteri_degerlendirmeleri_arsiv', selectCols),
+      ])
+    } catch (e: any) {
+      return NextResponse.json({ ok: false, error: e?.message ?? 'Veri alınamadı' }, { status: 500 })
+    }
 
     const tumIds = [
-      ...(resTablo.data ?? []).map((r: any) => r.id),
-      ...(resArsiv.data ?? []).map((r: any) => r.id),
+      ...resTabloData.map((r: any) => r.id),
+      ...resArsivData.map((r: any) => r.id),
     ]
     const aksiyonMap = await fetchAksiyonMap(tumIds)
 
     const all = [
-      ...(resTablo.data ?? []).map((r: any) => mapRow(r, 'tablo', aksiyonMap.get(r.id))),
-      ...(resArsiv.data ?? []).map((r: any) => mapRow(r, 'arsiv', aksiyonMap.get(r.id))),
+      ...resTabloData.map((r: any) => mapRow(r, 'tablo', aksiyonMap.get(r.id))),
+      ...resArsivData.map((r: any) => mapRow(r, 'arsiv', aksiyonMap.get(r.id))),
     ].sort((a, b) => new Date(b.olusturma_tarihi).getTime() - new Date(a.olusturma_tarihi).getTime())
 
     return NextResponse.json({ ok: true, data: all, yetkiler: { duzenleyebilir: yetkiler.duzenleyebilir, silebilir: yetkiler.silebilir } })
@@ -167,26 +188,18 @@ export async function GET(req: NextRequest) {
 
   // ── Tekli mod (mevcut davranış) ────────────────────────────────────────
   const tableName = arsivlendi ? 'musteri_degerlendirmeleri_arsiv' : 'musteri_degerlendirmeleri'
+  const selectStr = arsivlendi
+    ? `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gsm, kvkk_onay, gorsel_url,
+       olusturma_tarihi, arsivleme_tarihi`
+    : `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gsm, kvkk_onay, gorsel_url,
+       olusturma_tarihi, arsivlendi, arsivleme_tarihi`
 
-  let q = admin
-    .from(tableName)
-    .select(
-      arsivlendi
-        ? `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gsm, kvkk_onay, gorsel_url,
-           olusturma_tarihi, arsivleme_tarihi`
-        : `id, lokasyon_id, kanal, yildiz, yorum, ad_soyad, gsm, kvkk_onay, gorsel_url,
-           olusturma_tarihi, arsivlendi, arsivleme_tarihi`
-    )
-    .eq('firma_id', firmaId)
-    .order('olusturma_tarihi', { ascending: false })
-
-  if (projeId)   q = (q as any).eq('proje_id', projeId)
-  if (baslangic) q = (q as any).gte('olusturma_tarihi', baslangic)
-  if (bitis)     q = (q as any).lte('olusturma_tarihi', bitis + 'T23:59:59')
-  if (yetkiliLokIds) q = (q as any).in('lokasyon_id', yetkiliLokIds)
-
-  const { data, error } = await q
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  let data: any[]
+  try {
+    data = await fetchChunked(tableName, selectStr)
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? 'Veri alınamadı' }, { status: 500 })
+  }
 
   const segment = arsivlendi ? 'arsiv' : 'tablo'
   const aksiyonMap = await fetchAksiyonMap((data ?? []).map((r: any) => r.id))

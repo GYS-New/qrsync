@@ -43,24 +43,59 @@ export default async function UTumGorevlerPage() {
 
   const sel = '*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)'
 
-  const gorevler = await fetchAll(() => {
+  // CHUNK-AWARE: musteri rolu tum ust lokasyonlara yetkili olunca
+  // yetkiliLokIds binlerce UUID -> URL 74KB -> Cloudflare 8KB reject -> fetch failed.
+  const buildGorevQ = (slice: string[] | null) => {
     let q = supabase.from('canli_gorevler').select(sel)
       .eq('firma_id', firmaId)
       .order('aktif_olma_tarihi', { ascending: false })
     if (projeId) q = (q as any).eq('proje_id', projeId)
-    if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
+    if (slice) q = q.in('lokasyon_id', slice)
     if (gizliFilterArg) q = (q as any).not('lokasyon_id', 'in', gizliFilterArg)
     return q
-  })
+  }
+  let gorevler: any[]
+  if (!yetkiliLokIds) {
+    gorevler = await fetchAll(() => buildGorevQ(null))
+  } else {
+    const seen = new Set<string>()
+    gorevler = []
+    for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+      const slice = yetkiliLokIds.slice(i, i + 100)
+      const chunk = await fetchAll<any>(() => buildGorevQ(slice))
+      for (const g of chunk) {
+        if (!seen.has(g.id)) { seen.add(g.id); gorevler.push(g) }
+      }
+    }
+    gorevler.sort((a: any, b: any) => (b.aktif_olma_tarihi ?? '').localeCompare(a.aktif_olma_tarihi ?? ''))
+  }
 
-  let lokQ = supabase
-    .from('lokasyonlar').select('id,tanim,parent_id,checklist_sablon_id')
-    .eq('firma_id', firmaId).eq('aktif', true).order('tanim')
-  if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
-  if (yetkiliLokIds) lokQ = lokQ.in('id', yetkiliLokIds)
-  if (gizliFilterArg) lokQ = (lokQ as any).not('id', 'in', gizliFilterArg)
-
-  const { data: lokasyonlar } = await lokQ
+  const buildLokQ = (slice: string[] | null) => {
+    let q = supabase
+      .from('lokasyonlar').select('id,tanim,parent_id,checklist_sablon_id')
+      .eq('firma_id', firmaId).eq('aktif', true).order('tanim')
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (slice) q = q.in('id', slice)
+    if (gizliFilterArg) q = (q as any).not('id', 'in', gizliFilterArg)
+    return q
+  }
+  let lokasyonlar: any[] | null = null
+  if (!yetkiliLokIds) {
+    const { data } = await buildLokQ(null)
+    lokasyonlar = data ?? []
+  } else {
+    const seen = new Set<string>()
+    const out: any[] = []
+    for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+      const slice = yetkiliLokIds.slice(i, i + 100)
+      const { data } = await buildLokQ(slice)
+      for (const r of (data ?? [])) {
+        if (!seen.has(r.id)) { seen.add(r.id); out.push(r) }
+      }
+    }
+    out.sort((a: any, b: any) => (a.tanim ?? '').localeCompare(b.tanim ?? '', 'tr'))
+    lokasyonlar = out
+  }
   let kulQ = supabase.from('users').select('id,isim_soyisim').eq('firma_id', firmaId).eq('aktif', true)
   if (projeId) kulQ = (kulQ as any).eq('proje_id', projeId)
   const { data: kullanicilar } = await kulQ.order('isim_soyisim')
