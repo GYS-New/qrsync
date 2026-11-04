@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 function fmt(v: string | null | undefined) {
   if (!v) return '—'
@@ -282,39 +283,49 @@ export async function DELETE(req: NextRequest) {
 
     const admin = createAdminClient()
 
-    // 1. Firmaya ait lokasyon ID'leri
-    let lokQ = admin.from('lokasyonlar').select('id').eq('firma_id', firmaId)
-    if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
-    const { data: loks, error: lokErr } = await lokQ
-    if (lokErr) throw lokErr
-    const lokIds = (loks ?? []).map((l: any) => l.id)
+    // 1. Firmaya ait lokasyon ID'leri — fetchAll ile 1000-row cap'i as.
+    const loks = await fetchAll<any>(() => {
+      let q = admin.from('lokasyonlar').select('id').eq('firma_id', firmaId).order('id', { ascending: true })
+      if (projeId) q = (q as any).eq('proje_id', projeId)
+      return q
+    })
+    const lokIds = loks.map((l: any) => l.id)
     if (!lokIds.length) return NextResponse.json({ ok: true, silinen: 0 })
 
-    // 2. Silinecek başlık ID'leri — kayit_tarihi filtresi (liste ile aynı mantık)
-    let sbQ = admin.from('checklist_sonuc_basliklari')
-      .select('id')
-      .in('lokasyon_id', lokIds)
-    if (from) sbQ = (sbQ as any).gte('kayit_tarihi', from)
-    if (to)   sbQ = (sbQ as any).lte('kayit_tarihi', to)
-
-    const { data: basliklar, error: sbErr } = await sbQ
-    if (sbErr) throw sbErr
-    const baslikIds = (basliklar ?? []).map((b: any) => b.id)
+    // 2. Silinecek başlık ID'leri — CHUNK-AWARE (buyuk firmada 2000+ lokasyon).
+    const baslikIds: string[] = []
+    const seenB = new Set<string>()
+    for (let i = 0; i < lokIds.length; i += 100) {
+      let sbQ: any = admin.from('checklist_sonuc_basliklari')
+        .select('id')
+        .in('lokasyon_id', lokIds.slice(i, i + 100))
+      if (from) sbQ = sbQ.gte('kayit_tarihi', from)
+      if (to)   sbQ = sbQ.lte('kayit_tarihi', to)
+      const { data, error: sbErr } = await sbQ
+      if (sbErr) throw sbErr
+      for (const b of (data ?? [])) {
+        if (!seenB.has(b.id)) { seenB.add(b.id); baslikIds.push(b.id) }
+      }
+    }
     if (!baslikIds.length) return NextResponse.json({ ok: true, silinen: 0 })
 
-    // 3. Alt tablo önce sil (foreign key)
-    const { error: maddeErr } = await admin
-      .from('checklist_sonuc_maddeleri')
-      .delete()
-      .in('sonuc_id', baslikIds)
-    if (maddeErr) throw maddeErr
+    // 3. Alt tablo önce sil (foreign key) — CHUNK-AWARE
+    for (let i = 0; i < baslikIds.length; i += 100) {
+      const { error: maddeErr } = await admin
+        .from('checklist_sonuc_maddeleri')
+        .delete()
+        .in('sonuc_id', baslikIds.slice(i, i + 100))
+      if (maddeErr) throw maddeErr
+    }
 
-    // 4. Üst tabloyu sil
-    const { error: silErr } = await admin
-      .from('checklist_sonuc_basliklari')
-      .delete()
-      .in('id', baslikIds)
-    if (silErr) throw silErr
+    // 4. Üst tabloyu sil — CHUNK-AWARE
+    for (let i = 0; i < baslikIds.length; i += 100) {
+      const { error: silErr } = await admin
+        .from('checklist_sonuc_basliklari')
+        .delete()
+        .in('id', baslikIds.slice(i, i + 100))
+      if (silErr) throw silErr
+    }
 
     return NextResponse.json({ ok: true, silinen: baslikIds.length })
   } catch (err: any) {
