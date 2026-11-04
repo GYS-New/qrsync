@@ -2,6 +2,30 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetchAll'
 import { getReportDefinition, type ReportKey } from './config'
 
+/**
+ * CHUNK-AWARE: musteri rolu tum ust lokasyonlara yetkili olunca
+ * yetkiliLokIds binlerce UUID -> .in(col, ids) URL overflow -> fetch failed.
+ * 100'luk slice'larla sorgulayip ID-bazli dedup ile merge eder. ids yoksa
+ * tek sorgu calistirir (fetchAll ile paginate).
+ */
+async function fetchAllChunkedLok<T extends { id: string } = any>(
+  ids: string[] | null | undefined,
+  buildQ: (slice: string[] | null) => any,
+): Promise<T[]> {
+  if (!ids || ids.length === 0) {
+    return await fetchAll<T>(() => buildQ(null))
+  }
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (let i = 0; i < ids.length; i += 100) {
+    const rows = await fetchAll<T>(() => buildQ(ids.slice(i, i + 100)))
+    for (const r of rows) {
+      if (!seen.has(r.id)) { seen.add(r.id); out.push(r) }
+    }
+  }
+  return out
+}
+
 export type ReportFilters = {
   firmaId?: string | null
   projeId?: string | null
@@ -98,17 +122,18 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
   let rows: Record<string, string>[] = []
 
   if (reportKey === 'locations') {
-    let query = admin
-      .from('lokasyonlar')
-      .select('id,firma_id,tanim,parent_id,aciklama,aktif,qr_veri,qr_id,nfc_token,checklist_sablon_id,sureli_gorev_aktif,atanan_kullanici_id,kayit_tarihi')
-      .order('kayit_tarihi', { ascending: true })
-    if (filters.firmaId) query = query.eq('firma_id', filters.firmaId)
-    if (filters.projeId) query = (query as any).eq('proje_id', filters.projeId)
-    if (filters.yetkiliLokIds) query = query.in('id', filters.yetkiliLokIds)
-    if (filters.ustLokasyonAltIds) query = query.in('id', filters.ustLokasyonAltIds)
-    const { data, error } = await query
-    if (error) throw new Error(error.message)
-    const locs = data ?? []
+    // CHUNK-AWARE + fetchAll pagination: 1000-row cap + URL overflow her ikisi birden.
+    const locLokIds = filters.yetkiliLokIds ?? filters.ustLokasyonAltIds ?? null
+    const locs = await fetchAllChunkedLok<any>(locLokIds, (slice) => {
+      let q: any = admin
+        .from('lokasyonlar')
+        .select('id,firma_id,tanim,parent_id,aciklama,aktif,qr_veri,qr_id,nfc_token,checklist_sablon_id,sureli_gorev_aktif,atanan_kullanici_id,kayit_tarihi')
+        .order('kayit_tarihi', { ascending: true })
+      if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+      if (filters.projeId) q = q.eq('proje_id', filters.projeId)
+      if (slice) q = q.in('id', slice)
+      return q
+    })
     const map = new Map<string, any>(locs.map((row: any) => [row.id, row]))
     const checklistIds = Array.from(new Set(locs.map((x: any) => x.checklist_sablon_id).filter(Boolean)))
     const userIds = Array.from(new Set(locs.map((x: any) => x.atanan_kullanici_id).filter(Boolean)))
@@ -172,24 +197,20 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
   if (reportKey === 'live_tasks') {
     const liveSelect = 'id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,aktif_olma_tarihi,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,baslatan_kullanici_id,tamamlayan_kullanici_id,islemi_yapan_id'
 
-    // Aktif tablo + arşiv tablosunu paralel çek, birleştir
+    // Aktif tablo + arşiv tablosunu paralel çek, birleştir (chunk-aware).
+    // Kaynaklar: yetkiliLokIds (U/M yetki scope) ve ustLokasyonAltIds (secili ust+torunlar).
+    // Her ikisi de buyuk olabilir -> ayri ayri chunk + merge + dedup.
+    const lokIdsForFilter = filters.yetkiliLokIds ?? filters.ustLokasyonAltIds ?? null
+    const buildLiveQ = (table: string, slice: string[] | null) => {
+      let q = (admin.from(table) as any).select(liveSelect).order('olusturma_tarihi', { ascending: false })
+      if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+      if (filters.projeId) q = q.eq('proje_id', filters.projeId)
+      if (slice) q = q.in('lokasyon_id', slice)
+      return q
+    }
     const [aktifData, arsivData] = await Promise.all([
-      fetchAll(() => {
-        let q = admin.from('canli_gorevler').select(liveSelect).order('olusturma_tarihi', { ascending: false })
-        if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
-        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
-        if (filters.yetkiliLokIds) q = q.in('lokasyon_id', filters.yetkiliLokIds)
-        if (filters.ustLokasyonAltIds) q = q.in('lokasyon_id', filters.ustLokasyonAltIds)
-        return q
-      }),
-      fetchAll(() => {
-        let q = admin.from('canli_gorevler_arsiv').select(liveSelect).order('olusturma_tarihi', { ascending: false })
-        if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
-        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
-        if (filters.yetkiliLokIds) q = q.in('lokasyon_id', filters.yetkiliLokIds)
-        if (filters.ustLokasyonAltIds) q = q.in('lokasyon_id', filters.ustLokasyonAltIds)
-        return q
-      }),
+      fetchAllChunkedLok<any>(lokIdsForFilter, (slice) => buildLiveQ('canli_gorevler', slice)),
+      fetchAllChunkedLok<any>(lokIdsForFilter, (slice) => buildLiveQ('canli_gorevler_arsiv', slice)),
     ])
 
     // id'ye göre deduplicate — aktif tablo öncelikli (daha güncel)
@@ -228,16 +249,17 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
 
   if (reportKey === 'manual_tasks') {
     // gorevler_normal view: Oto Yıkama görevleri spesifik raporlara dahil olmaz
-    let query = admin
-      .from('gorevler_normal')
-      .select('id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,olusturan_id,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,islemi_yapan_id')
-      .order('olusturma_tarihi', { ascending: false })
-    if (filters.firmaId) query = query.eq('firma_id', filters.firmaId)
-    if (filters.projeId) query = (query as any).eq('proje_id', filters.projeId)
-    if (filters.yetkiliLokIds) query = query.in('lokasyon_id', filters.yetkiliLokIds)
-    if (filters.ustLokasyonAltIds) query = query.in('lokasyon_id', filters.ustLokasyonAltIds)
-    const { data, error } = await query
-    if (error) throw new Error(error.message)
+    // CHUNK-AWARE: yetkiliLokIds/ustLokasyonAltIds buyuk olabilir -> URL overflow.
+    const mtLokIds = filters.yetkiliLokIds ?? filters.ustLokasyonAltIds ?? null
+    const data = await fetchAllChunkedLok<any>(mtLokIds, (slice) => {
+      let q: any = admin.from('gorevler_normal')
+        .select('id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,olusturan_id,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,islemi_yapan_id')
+        .order('olusturma_tarihi', { ascending: false })
+      if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+      if (filters.projeId) q = q.eq('proje_id', filters.projeId)
+      if (slice) q = q.in('lokasyon_id', slice)
+      return q
+    })
     const filtered = (data ?? []).filter((row: any) => withinRange(row.olusturma_tarihi, filters.dateFrom, filters.dateTo))
     const locIds = Array.from(new Set(filtered.map((x: any) => x.lokasyon_id).filter(Boolean)))
     const userIds = Array.from(new Set(filtered.flatMap((x: any) => [x.atanan_kullanici_id, x.olusturan_id, x.islemi_yapan_id]).filter(Boolean)))
@@ -332,10 +354,11 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
       }
     }
 
-    // Lokasyon isimleri
-    const { data: locList } = locIds.length
-      ? await admin.from('lokasyonlar').select('id,tanim,parent_id').in('id', locIds)
-      : { data: [] }
+    // Lokasyon isimleri — CHUNK-AWARE (locIds buyuk grup secilince 2000+ olabilir)
+    const uniqLocIds = Array.from(new Set(locIds))
+    const locList = uniqLocIds.length === 0
+      ? []
+      : await fetchAllChunkedLok<any>(uniqLocIds, (slice) => admin.from('lokasyonlar').select('id,tanim,parent_id').in('id', slice ?? uniqLocIds))
     const locMap2 = new Map((locList ?? []).map((l: any) => [l.id, l]))
 
     function pathOf2(id: string): string {
@@ -346,16 +369,28 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
       return parts.join(' / ')
     }
 
-    // Görev istatistikleri — proje ve yetki filtresi de uygulansin
-    const gorevler = await fetchAll(() => {
-      let q = admin.from('canli_gorevler').select('lokasyon_id,durum')
-      if (lgFirmaId) q = q.eq('firma_id', lgFirmaId)
-      if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
-      if (filters.yetkiliLokIds) q = q.in('lokasyon_id', filters.yetkiliLokIds)
-      if (filters.dateFrom) q = q.gte('aktif_olma_tarihi', new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString())
-      if (filters.dateTo) q = q.lte('aktif_olma_tarihi', new Date(filters.dateTo + 'T23:59:59+03:00').toISOString())
-      return q
-    })
+    // Görev istatistikleri — proje ve yetki filtresi de uygulansin.
+    // CHUNK-AWARE: yetkiliLokIds buyukse URL overflow. Burada id-dedup yerine
+    // raw concat yapiyoruz cunku ayni görev farkli chunk'larda cikamaz
+    // (bir satir tek lokasyon_id'ye sahip). Istatistik sayilar icin yeterli.
+    const gorevler: any[] = []
+    const gorevLokChunks: (string[] | null)[] = !filters.yetkiliLokIds || filters.yetkiliLokIds.length === 0
+      ? [null]
+      : filters.yetkiliLokIds.length <= 100
+        ? [filters.yetkiliLokIds]
+        : Array.from({ length: Math.ceil(filters.yetkiliLokIds.length / 100) }, (_, i) => filters.yetkiliLokIds!.slice(i * 100, (i + 1) * 100))
+    for (const slice of gorevLokChunks) {
+      const rows = await fetchAll(() => {
+        let q = admin.from('canli_gorevler').select('lokasyon_id,durum')
+        if (lgFirmaId) q = q.eq('firma_id', lgFirmaId)
+        if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+        if (slice) q = q.in('lokasyon_id', slice)
+        if (filters.dateFrom) q = q.gte('aktif_olma_tarihi', new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString())
+        if (filters.dateTo) q = q.lte('aktif_olma_tarihi', new Date(filters.dateTo + 'T23:59:59+03:00').toISOString())
+        return q
+      })
+      gorevler.push(...rows)
+    }
     const locGorevMap: Record<string, { toplam: number; tamamlanan: number }> = {}
     for (const g of gorevler) {
       if (!g.lokasyon_id) continue
