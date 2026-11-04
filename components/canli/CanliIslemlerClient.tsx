@@ -17,6 +17,50 @@ import { suankiVardiyaGunu, vardiyaGunuHesapla } from '@/lib/gorev/vardiyaGunu'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 import { fetchAll } from '@/lib/supabase/fetchAll'
 
+/**
+ * CHUNK-AWARE helper'lari: musteri rolu tum ust lokasyonlara yetkili olunca
+ * yetkiliLokIds 2000+ UUID -> .in(col, yetkili...) URL overflow -> fetch failed.
+ * 100'luk slice + fetchAll pagination + ID-bazli dedup ile merge.
+ */
+async function chunkedFetchAll<T extends { id: string } = any>(
+  yetkiliLokIds: string[] | null | undefined,
+  buildQ: (slice: string[] | null) => any,
+): Promise<T[]> {
+  if (!yetkiliLokIds || yetkiliLokIds.length === 0) {
+    return await fetchAll<T>(() => buildQ(null))
+  }
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+    const rows = await fetchAll<T>(() => buildQ(yetkiliLokIds.slice(i, i + 100)))
+    for (const r of rows) {
+      if (r?.id && !seen.has(r.id)) { seen.add(r.id); out.push(r) }
+    }
+  }
+  return out
+}
+// Direct (pagination YOK) query sonucu chunk'lanir — { data, error } native shape doner.
+async function chunkedDirect<T extends { id: string } = any>(
+  yetkiliLokIds: string[] | null | undefined,
+  buildQ: (slice: string[] | null) => any,
+): Promise<{ data: T[]; error: any }> {
+  if (!yetkiliLokIds || yetkiliLokIds.length === 0) {
+    const r = await buildQ(null)
+    return { data: (r.data ?? []) as T[], error: r.error ?? null }
+  }
+  const seen = new Set<string>()
+  const out: T[] = []
+  let lastError: any = null
+  for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+    const r = await buildQ(yetkiliLokIds.slice(i, i + 100))
+    if (r.error) lastError = r.error
+    for (const row of (r.data ?? []) as any[]) {
+      if (row?.id && !seen.has(row.id)) { seen.add(row.id); out.push(row) }
+    }
+  }
+  return { data: out, error: lastError }
+}
+
 // ── Tarih/saat formatlama yardımcıları (TR — Europe/Istanbul) ────────────
 function formatTarihTR(value?: string | null): string {
   if (!value) return '—'
@@ -505,14 +549,14 @@ useEffect(() => {
     // Bugunku gorev sayisi 1000+ olabilir (bkz ATALIAN 2026-07-09 = 1533).
     // Aksi halde vardiya ozet KPI'lari eksik sayim gosterir.
     try {
-      const data = await fetchAll<any>(() => {
+      const data = await chunkedFetchAll<any>(yetkiliLokIds, (slice) => {
         let q = supabase
           .from('canli_gorevler')
           .select('id,durum,aktif_olma_tarihi,vardiya_gunu')
           .eq('firma_id', firmaId)
           .eq('vardiya_gunu', trDate)
         if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
-        if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
+        if (slice) q = q.in('lokasyon_id', slice)
         return q
       })
       setBugunGorevler(data)
@@ -584,20 +628,23 @@ useEffect(() => {
     if (!firmaId) return
 
     const sinceISO = computeSinceISO()
-    let q = supabase
-      .from('canli_gorevler')
-      .select('*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)')
-      .eq('firma_id', firmaId)
-      .gte('aktif_olma_tarihi', sinceISO)
-      .order('durum_degisim_tarihi', { ascending: false })
-      .limit(500)
-
-    // TA için "SILINDI" listeden kaldırılır
-    if (isTA) q = q.neq('durum', 'SILINDI')
-    if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
-    if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
-
-    const { data } = await q
+    const { data: rawData } = await chunkedDirect<any>(yetkiliLokIds, (slice) => {
+      let q = supabase
+        .from('canli_gorevler')
+        .select('*,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim),tamamlayan:users!tamamlayan_kullanici_id(isim_soyisim),iptalEden:users!iptal_eden_id(isim_soyisim)')
+        .eq('firma_id', firmaId)
+        .gte('aktif_olma_tarihi', sinceISO)
+        .order('durum_degisim_tarihi', { ascending: false })
+        .limit(500)
+      if (isTA) q = q.neq('durum', 'SILINDI')
+      if (projeId) q = (q as any).or(`proje_id.eq.${projeId},proje_id.is.null`)
+      if (slice) q = q.in('lokasyon_id', slice)
+      return q
+    })
+    // limit 500 chunk sonrasi re-sort + slice ile global top-500 garantile
+    const data = rawData
+      .sort((a: any, b: any) => (b.durum_degisim_tarihi ?? '').localeCompare(a.durum_degisim_tarihi ?? ''))
+      .slice(0, 500)
 
     if (data) {
       setBrowseGorevler(data)
@@ -635,64 +682,94 @@ useEffect(() => {
     // 500'ü aşan firmalarda, durum_degisim_tarihi sıralamasında alta düşen
     // BEKLEMEDE/IPTAL kayıtları listeden kayboluyor, ama KPI'da sayılıyordu —
     // kullanıcı kart üzerine basınca "Bu filtrede görev yok" görüyordu.
-    let liveQ = supabase
-      .from('canli_gorevler')
-      .select(liveSelect)
-      .eq('firma_id', firmaId)
-      .not('durum', 'in', '(HAZIR,ACIK)')
-      .gte('aktif_olma_tarihi', liveSinceISO)
-      .order('durum_degisim_tarihi', { ascending: false })
-      .limit(10000)
-
-    if (projeId) liveQ = liveQ.eq('proje_id', projeId)
-    if (yetkiliLokIds) liveQ = liveQ.in('lokasyon_id', yetkiliLokIds)
+    // CHUNK-AWARE queries — each uses chunkedDirect pattern
+    const liveBuilder = (slice: string[] | null) => {
+      let q = supabase
+        .from('canli_gorevler')
+        .select(liveSelect)
+        .eq('firma_id', firmaId)
+        .not('durum', 'in', '(HAZIR,ACIK)')
+        .gte('aktif_olma_tarihi', liveSinceISO)
+        .order('durum_degisim_tarihi', { ascending: false })
+        .limit(10000)
+      if (projeId) q = q.eq('proje_id', projeId)
+      if (slice) q = q.in('lokasyon_id', slice)
+      return q
+    }
 
     // Spesifik görevler (gorevler tablosu) de canlı akışa dahil — kullanıcı
     // manuel ISLEMDE/TAMAMLANDI/IPTAL yaptığında veya mobil çalışırken görünsün.
-    // canli_gorevler ile aynı filtre + zaman aralığı.
     const spesifikSelect =
       'id,firma_id,proje_id,lokasyon_id,tanim,durum,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,durum_degisim_tarihi,islemi_yapan_id,olusturan_id,atanan_kullanici_id,tamamlanma_suresi_saniye,iptal_sebep,lokasyonlar(tanim),atanan:users!atanan_kullanici_id(isim_soyisim),islemi_yapan:users!islemi_yapan_id(isim_soyisim),olusturan:users!olusturan_id(isim_soyisim)'
-    let spesifikQ = supabase
-      .from('gorevler')
-      .select(spesifikSelect)
-      .eq('firma_id', firmaId)
-      .not('durum', 'in', '(ACIK)')
-      .gte('olusturma_tarihi', liveSinceISO)
-      .order('durum_degisim_tarihi', { ascending: false })
-      .limit(10000)
-    if (projeId) spesifikQ = spesifikQ.eq('proje_id', projeId)
-    if (yetkiliLokIds) spesifikQ = spesifikQ.in('lokasyon_id', yetkiliLokIds)
-    // Modul izolasyonu: Oto Yikama lokasyonlarindaki gorevler GYS canli akiş'ta gizli
-    if (gizliOtoYikamaLokIds && gizliOtoYikamaLokIds.length > 0) {
-      spesifikQ = (spesifikQ as any).not('lokasyon_id', 'in', `(${gizliOtoYikamaLokIds.join(',')})`)
+    const spesifikBuilder = (slice: string[] | null) => {
+      let q = supabase
+        .from('gorevler')
+        .select(spesifikSelect)
+        .eq('firma_id', firmaId)
+        .not('durum', 'in', '(ACIK)')
+        .gte('olusturma_tarihi', liveSinceISO)
+        .order('durum_degisim_tarihi', { ascending: false })
+        .limit(10000)
+      if (projeId) q = q.eq('proje_id', projeId)
+      if (slice) q = q.in('lokasyon_id', slice)
+      if (gizliOtoYikamaLokIds && gizliOtoYikamaLokIds.length > 0) {
+        q = (q as any).not('lokasyon_id', 'in', `(${gizliOtoYikamaLokIds.join(',')})`)
+      }
+      return q
     }
 
     // KPI için ayrı count sorgusu — durum + kural_id (ekstra görevleri ayırt etmek için)
-    let kpiQ = supabase
-      .from('canli_gorevler')
-      .select('durum, kural_id')
-      .eq('firma_id', firmaId)
-      .not('durum', 'in', '(HAZIR,ACIK)')
-      .gte('aktif_olma_tarihi', liveSinceISO)
-      .limit(10000)
-    if (projeId) kpiQ = kpiQ.eq('proje_id', projeId)
-    if (yetkiliLokIds) kpiQ = kpiQ.in('lokasyon_id', yetkiliLokIds)
-
-    // Spesifik görevler için KPI count (ekstra=null sayımı için kural_id null gönderilir)
-    let spesifikKpiQ = supabase
-      .from('gorevler')
-      .select('durum')
-      .eq('firma_id', firmaId)
-      .not('durum', 'in', '(ACIK)')
-      .gte('olusturma_tarihi', liveSinceISO)
-      .limit(10000)
-    if (projeId) spesifikKpiQ = spesifikKpiQ.eq('proje_id', projeId)
-    if (yetkiliLokIds) spesifikKpiQ = spesifikKpiQ.in('lokasyon_id', yetkiliLokIds)
-    if (gizliOtoYikamaLokIds && gizliOtoYikamaLokIds.length > 0) {
-      spesifikKpiQ = (spesifikKpiQ as any).not('lokasyon_id', 'in', `(${gizliOtoYikamaLokIds.join(',')})`)
+    // NOT: KPI sorgusunda ID yok (select durum+kural_id only). dedup yapamayiz;
+    // chunk'lari raw concat ediyoruz. Ayni row farkli chunk'ta gelmez cunku
+    // lokasyon_id tekil kolon.
+    const kpiBuilder = (slice: string[] | null) => {
+      let q = supabase
+        .from('canli_gorevler')
+        .select('durum, kural_id')
+        .eq('firma_id', firmaId)
+        .not('durum', 'in', '(HAZIR,ACIK)')
+        .gte('aktif_olma_tarihi', liveSinceISO)
+        .limit(10000)
+      if (projeId) q = q.eq('proje_id', projeId)
+      if (slice) q = q.in('lokasyon_id', slice)
+      return q
     }
 
-    const [res, spesifikRes, kpiRes, spesifikKpiRes] = await Promise.all([liveQ, spesifikQ, kpiQ, spesifikKpiQ])
+    const spesifikKpiBuilder = (slice: string[] | null) => {
+      let q = supabase
+        .from('gorevler')
+        .select('durum')
+        .eq('firma_id', firmaId)
+        .not('durum', 'in', '(ACIK)')
+        .gte('olusturma_tarihi', liveSinceISO)
+        .limit(10000)
+      if (projeId) q = q.eq('proje_id', projeId)
+      if (slice) q = q.in('lokasyon_id', slice)
+      if (gizliOtoYikamaLokIds && gizliOtoYikamaLokIds.length > 0) {
+        q = (q as any).not('lokasyon_id', 'in', `(${gizliOtoYikamaLokIds.join(',')})`)
+      }
+      return q
+    }
+
+    // KPI sorgulari ID'siz; manuel concat helper'i.
+    const runKpiChunked = async (buildFn: (s: string[] | null) => any) => {
+      if (!yetkiliLokIds || yetkiliLokIds.length === 0) return await buildFn(null)
+      const all: any[] = []
+      let lastErr: any = null
+      for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+        const r = await buildFn(yetkiliLokIds.slice(i, i + 100))
+        if (r.error) lastErr = r.error
+        if (r.data) all.push(...r.data)
+      }
+      return { data: all, error: lastErr }
+    }
+
+    const [res, spesifikRes, kpiRes, spesifikKpiRes] = await Promise.all([
+      chunkedDirect<any>(yetkiliLokIds, liveBuilder),
+      chunkedDirect<any>(yetkiliLokIds, spesifikBuilder),
+      runKpiChunked(kpiBuilder),
+      runKpiChunked(spesifikKpiBuilder),
+    ])
 
     if (kpiRes.error) {
       console.error('[LiveFlow] kpi error:', kpiRes.error)
@@ -708,19 +785,20 @@ useEffect(() => {
 
     if (res.error) {
       console.error('[LiveFlow] primary error:', res.error)
-      // Join hatası vs — basit fallback ile join'siz dene
-      let fallbackQ = supabase
-        .from('canli_gorevler')
-        .select('*')
-        .eq('firma_id', firmaId)
-        .not('durum', 'in', '(HAZIR,ACIK)')
-        .gte('aktif_olma_tarihi', liveSinceISO)
-        .order('durum_degisim_tarihi', { ascending: false })
-        .limit(10000)
-      if (projeId) fallbackQ = fallbackQ.eq('proje_id', projeId)
-      if (yetkiliLokIds) fallbackQ = fallbackQ.in('lokasyon_id', yetkiliLokIds)
-
-      const res2 = await fallbackQ
+      // Join hatası vs — basit fallback ile join'siz dene (chunk-aware)
+      const res2 = await chunkedDirect<any>(yetkiliLokIds, (slice) => {
+        let q = supabase
+          .from('canli_gorevler')
+          .select('*')
+          .eq('firma_id', firmaId)
+          .not('durum', 'in', '(HAZIR,ACIK)')
+          .gte('aktif_olma_tarihi', liveSinceISO)
+          .order('durum_degisim_tarihi', { ascending: false })
+          .limit(10000)
+        if (projeId) q = q.eq('proje_id', projeId)
+        if (slice) q = q.in('lokasyon_id', slice)
+        return q
+      })
 
       if (res2.error) {
         console.error('[LiveFlow] fallback error:', res2.error)
