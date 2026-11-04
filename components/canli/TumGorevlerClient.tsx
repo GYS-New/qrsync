@@ -887,22 +887,44 @@ async function del() {
     setArsivLoading(true)
     setArsivAktif(true)
     try {
-      const qp = new URLSearchParams({ firma_id: firmaId, page: '1', limit: String(ARSIV_FETCH_LIMIT) })
-      if (projeId) qp.set('proje_id', projeId)
-      // Üst lokasyon seçildiğinde tüm torunları kapsayan ID listesi gönder
-      // (backend tek lokasyon_id ile eq kontrolü yapıyor; descendant'ları yakalamak için 'in')
-      if (lokasyonSet && lokasyonSet.size > 0) qp.set('lokasyon_ids', [...lokasyonSet].join(','))
-      else if (lokasyonId) qp.set('lokasyon_id', lokasyonId)
-      if (atananId) qp.set('atanan_id', atananId)
-      if (durum) qp.set('durum', durum)
-      if (q.trim()) qp.set('q', q.trim())
-      if (from) qp.set('from', from)
-      if (to) qp.set('to', to)
-      if (vardiyaFilter !== 'all') qp.set('vardiya', vardiyaFilter)
-      const res = await fetch(`/api/arsiv/frekansiyel?${qp}`)
-      const j = await res.json()
-      setArsivRows(j.data ?? [])
-      setArsivTotal(j.total ?? 0)
+      // Buyuk ust lokasyon (200+ torun) seciliyse URL overflow olmasin diye POST kullan.
+      const lokasyonIdsArr = lokasyonSet && lokasyonSet.size > 0 ? [...lokasyonSet] : []
+      const usePost = lokasyonIdsArr.length > 150
+      if (usePost) {
+        const body = {
+          firma_id: firmaId,
+          proje_id: projeId ?? undefined,
+          page: 1,
+          limit: ARSIV_FETCH_LIMIT,
+          lokasyon_ids: lokasyonIdsArr,
+          lokasyon_id: lokasyonIdsArr.length === 0 ? (lokasyonId || undefined) : undefined,
+          atanan_id: atananId || undefined,
+          durum: durum || undefined,
+          q: q.trim() || undefined,
+          from: from || undefined,
+          to: to || undefined,
+          vardiya: vardiyaFilter !== 'all' ? vardiyaFilter : undefined,
+        }
+        const res = await fetch(`/api/arsiv/frekansiyel`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+        const j = await res.json()
+        setArsivRows(j.data ?? [])
+        setArsivTotal(j.total ?? 0)
+      } else {
+        const qp = new URLSearchParams({ firma_id: firmaId, page: '1', limit: String(ARSIV_FETCH_LIMIT) })
+        if (projeId) qp.set('proje_id', projeId)
+        if (lokasyonIdsArr.length > 0) qp.set('lokasyon_ids', lokasyonIdsArr.join(','))
+        else if (lokasyonId) qp.set('lokasyon_id', lokasyonId)
+        if (atananId) qp.set('atanan_id', atananId)
+        if (durum) qp.set('durum', durum)
+        if (q.trim()) qp.set('q', q.trim())
+        if (from) qp.set('from', from)
+        if (to) qp.set('to', to)
+        if (vardiyaFilter !== 'all') qp.set('vardiya', vardiyaFilter)
+        const res = await fetch(`/api/arsiv/frekansiyel?${qp}`)
+        const j = await res.json()
+        setArsivRows(j.data ?? [])
+        setArsivTotal(j.total ?? 0)
+      }
     } catch {} finally { setArsivLoading(false) }
   }
 

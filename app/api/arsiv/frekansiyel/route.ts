@@ -12,34 +12,27 @@ import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
  *   from, to (görevin aktif_olma_tarihi'nin TR günü — frontend tarih filtresiyle uyumlu),
  *   vardiya (v1/v2/v3 — aktif_olma_tarihi TR saatine göre)
  */
-export async function GET(req: NextRequest) {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+interface Params {
+  firmaId: string | null
+  projeId: string | null
+  page: number
+  limit: number
+  q: string
+  durum: string
+  neden: string
+  fromD: string
+  toD: string
+  vardiya: string
+  lokasyonId: string
+  lokasyonIds: string[]
+  atananId: string
+}
 
-  const p = req.nextUrl.searchParams
-  const firmaId = p.get('firma_id')
-  const projeId = p.get('proje_id')
-  const page = Math.max(1, parseInt(p.get('page') ?? '1'))
-  // Tüm Görevler sayfası tek tabloda merge edebilmek için yüksek limit ihtiyacı
-  // duyabilir (varsayılan 50, max 5000)
-  const limit = Math.min(5000, Math.max(10, parseInt(p.get('limit') ?? '50')))
-  const q = p.get('q')?.trim().toLowerCase() ?? ''
-  const durum = p.get('durum') ?? ''
-  const neden = p.get('neden') ?? ''
-  const fromD = p.get('from') ?? ''   // 'YYYY-MM-DD' (TR günü)
-  const toD = p.get('to') ?? ''       // 'YYYY-MM-DD' (TR günü)
-  const vardiya = p.get('vardiya') ?? 'all'  // all | v1 | v2 | v3
-  const lokasyonId = p.get('lokasyon_id') ?? ''
-  // Virgülle ayrılmış lokasyon ID listesi (üst lokasyon + tüm torunları için).
-  // Frontend "MONTAJ" gibi üst seviye seçildiğinde descendant set'ini iletir.
-  const lokasyonIdsRaw = p.get('lokasyon_ids') ?? ''
-  const lokasyonIds = lokasyonIdsRaw ? lokasyonIdsRaw.split(',').map(s => s.trim()).filter(Boolean) : []
-  const atananId = p.get('atanan_id') ?? ''
+async function handleRequest(params: Params): Promise<Response> {
+  const admin = createAdminClient()
+  const { firmaId, projeId, page, limit, q, durum, neden, fromD, toD, vardiya, lokasyonId, lokasyonIds, atananId } = params
 
   if (!firmaId) return NextResponse.json({ data: [], total: 0 })
-
-  const admin = createAdminClient()
 
   // Tarih filtresi: vardiya_gunu (date) — görevin "ait olduğu vardiya günü".
   // Sarkan V1 görevleri (örn 31 May 23:35 aktif, vardiya_gunu=1 Haz) kendi
@@ -160,4 +153,59 @@ export async function GET(req: NextRequest) {
   }))
 
   return NextResponse.json({ data: enriched, total, page, limit })
+}
+
+function parseGetParams(url: URL): Params {
+  const p = url.searchParams
+  const lokasyonIdsRaw = p.get('lokasyon_ids') ?? ''
+  return {
+    firmaId: p.get('firma_id'),
+    projeId: p.get('proje_id'),
+    page: Math.max(1, parseInt(p.get('page') ?? '1')),
+    limit: Math.min(5000, Math.max(10, parseInt(p.get('limit') ?? '50'))),
+    q: p.get('q')?.trim().toLowerCase() ?? '',
+    durum: p.get('durum') ?? '',
+    neden: p.get('neden') ?? '',
+    fromD: p.get('from') ?? '',
+    toD: p.get('to') ?? '',
+    vardiya: p.get('vardiya') ?? 'all',
+    lokasyonId: p.get('lokasyon_id') ?? '',
+    lokasyonIds: lokasyonIdsRaw ? lokasyonIdsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+    atananId: p.get('atanan_id') ?? '',
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+  return handleRequest(parseGetParams(req.nextUrl))
+}
+
+// POST icin ayni gorev: client body'de buyuk lokasyon_ids listesi gonderebilsin
+// (URL overflow olmadan). Response shape ve davranis GET ile birebir.
+export async function POST(req: NextRequest) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+  let body: any = {}
+  try { body = await req.json() } catch {}
+  const lokasyonIds = Array.isArray(body.lokasyon_ids) ? body.lokasyon_ids
+    : typeof body.lokasyon_ids === 'string' && body.lokasyon_ids ? body.lokasyon_ids.split(',').map((s: string) => s.trim()).filter(Boolean)
+    : []
+  return handleRequest({
+    firmaId: body.firma_id ?? null,
+    projeId: body.proje_id ?? null,
+    page: Math.max(1, parseInt(String(body.page ?? '1'))),
+    limit: Math.min(5000, Math.max(10, parseInt(String(body.limit ?? '50')))),
+    q: String(body.q ?? '').trim().toLowerCase(),
+    durum: body.durum ?? '',
+    neden: body.neden ?? '',
+    fromD: body.from ?? '',
+    toD: body.to ?? '',
+    vardiya: body.vardiya ?? 'all',
+    lokasyonId: body.lokasyon_id ?? '',
+    lokasyonIds,
+    atananId: body.atanan_id ?? '',
+  })
 }
