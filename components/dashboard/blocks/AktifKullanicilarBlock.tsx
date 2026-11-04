@@ -27,9 +27,11 @@ export default function AktifKullanicilarBlock({
     return arr
   }, [rows, limit])
 
-  // yetkiliLokIds bir Array, useEffect dependency için stable string'e çevir
+  // NOT: Yetkili lokasyon filtresi artik SERVER-SIDE hesaplaniyor (musteri
+  // ~2000 UUID'yi URL'ye yazarsak Cloudflare 8KB limit reject ediyordu).
+  // yetkiliLokIds prop'u sadece useEffect bagimliligi icin okunur, URL'ye gitmez.
   const yetkiliLokIdsKey = useMemo(
-    () => (yetkiliLokIds && yetkiliLokIds.length ? yetkiliLokIds.slice().sort().join(',') : ''),
+    () => (yetkiliLokIds && yetkiliLokIds.length ? String(yetkiliLokIds.length) : ''),
     [yetkiliLokIds]
   )
 
@@ -42,7 +44,6 @@ export default function AktifKullanicilarBlock({
         const qp = new URLSearchParams({ limit: String(limit) })
         if (firmaId) qp.set('firma', firmaId)
         if (projeId) qp.set('projeId', projeId)
-        if (yetkiliLokIdsKey) qp.set('lokIds', yetkiliLokIdsKey)
         const res = await fetch(`/api/online-users?${qp.toString()}`, { method: 'GET' })
         const json = await res.json()
         if (!alive) return

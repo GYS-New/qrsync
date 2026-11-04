@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getLokasyonYetki } from '@/lib/yetki/getLokasyonYetki'
 
 const ONLINE_WINDOW_SECONDS = 600 // 10 dakika
 
@@ -15,10 +16,12 @@ export async function GET(req: NextRequest) {
   const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit') ?? '6') || 6))
   const firmaParam = url.searchParams.get('firma')
   const projeId = url.searchParams.get('projeId') || null
-  // Üst lokasyon filtresi: virgülle ayrılmış lokasyon UUID listesi (genelde alt lokasyonlar)
-  // users.ust_lokasyon_id bu listede olan kullanıcılar gösterilir
-  const lokIdsRaw = url.searchParams.get('lokIds') || ''
-  const lokIds = lokIdsRaw ? lokIdsRaw.split(',').filter(Boolean) : []
+
+  // Yetki scope SERVER-SIDE hesaplanir (client lokIds URL param'i gonderemez;
+  // ~2000 UUID = ~74KB URL -> Cloudflare 8KB reject -> fetch fail).
+  // Musteri/tenant_user icin yetkili ust lokasyon ID listesi.
+  const isUM = me.rol === 'musteri' || me.rol === 'tenant_user'
+  const yetkiliUstLokIds = isUM ? await getLokasyonYetki(supabase) : null
 
   const since = new Date(Date.now() - ONLINE_WINDOW_SECONDS * 1000).toISOString()
   const admin = createAdminClient()
@@ -57,23 +60,38 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, users: [], since })
   }
 
-  // Tüm online user'ları filter et (proje + üst lokasyon) — sonra slice
-  let uQ = admin.from('users')
-    .select('id,isim_soyisim,rol,profil_foto,firma_id,ust_lokasyon_id')
-    .in('id', orderedUserIds)
-    .eq('aktif', true)
-  if (projeId) uQ = (uQ as any).eq('proje_id', projeId)
-  if (lokIds.length) uQ = (uQ as any).in('ust_lokasyon_id', lokIds)
-  const { data: users, error: uErr } = await uQ
-  if (uErr) {
-    return NextResponse.json({ ok: true, users: [], since, _error: uErr.message })
+  // CHUNK-AWARE: orderedUserIds + yetkiliUstLokIds cross product icin
+  // kombinasyonel chunk'lama (her ikisi de buyuk olabilir). Chunk size 100.
+  const userIdChunks = orderedUserIds.length <= 100
+    ? [orderedUserIds]
+    : Array.from({ length: Math.ceil(orderedUserIds.length / 100) }, (_, i) => orderedUserIds.slice(i * 100, (i + 1) * 100))
+  const lokChunks: (string[] | null)[] = !yetkiliUstLokIds || yetkiliUstLokIds.length === 0
+    ? [null]
+    : yetkiliUstLokIds.length <= 100
+      ? [yetkiliUstLokIds]
+      : Array.from({ length: Math.ceil(yetkiliUstLokIds.length / 100) }, (_, i) => yetkiliUstLokIds!.slice(i * 100, (i + 1) * 100))
+
+  const collected = new Map<string, any>()
+  for (const userSlice of userIdChunks) {
+    for (const lokSlice of lokChunks) {
+      let uQ = admin.from('users')
+        .select('id,isim_soyisim,rol,profil_foto,firma_id,ust_lokasyon_id')
+        .in('id', userSlice)
+        .eq('aktif', true)
+      if (projeId) uQ = (uQ as any).eq('proje_id', projeId)
+      if (lokSlice) uQ = (uQ as any).in('ust_lokasyon_id', lokSlice)
+      const { data, error } = await uQ
+      if (error) {
+        return NextResponse.json({ ok: true, users: [], since, _error: error.message })
+      }
+      for (const u of (data ?? [])) collected.set(u.id, u)
+    }
   }
 
   // Filter sonrası en güncel ilk N — orderedUserIds sırasına göre yeniden sırala
-  const userById = new Map((users ?? []).map((u: any) => [u.id, u]))
   const sorted: any[] = []
   for (const uid of orderedUserIds) {
-    const u = userById.get(uid)
+    const u = collected.get(uid)
     if (u) sorted.push(u)
     if (sorted.length >= limit) break
   }
