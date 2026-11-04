@@ -94,20 +94,46 @@ export async function GET(request: Request) {
       usersQuery = !firmaId ? usersBase : usersBase.eq('firma_id', firmaId)
     }
 
+    // CHUNK-AWARE helper: musteri yetkiliLokIds binlerce UUID -> URL overflow.
+    // Count query'lerini chunk basina sorup topluyoruz. Chunks disjoint = toplam dogru.
+    const chunkedCount = (
+      buildFn: (slice: string[] | null) => any,
+    ): Promise<{ count: number; error: any }> => (async () => {
+      if (!yetkiliLokIds || yetkiliLokIds.length === 0) {
+        const { count, error } = await buildFn(null)
+        return { count: count ?? 0, error }
+      }
+      let total = 0
+      for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+        const { count, error } = await buildFn(yetkiliLokIds.slice(i, i + 100))
+        if (error) return { count: 0, error }
+        total += (count ?? 0)
+      }
+      return { count: total, error: null }
+    })()
+
     if (effectiveProjeId) {
-      let tQ = supabase.from('gorevler_normal').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
-      let lQ = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
-      if (yetkiliLokIds) { tQ = tQ.in('lokasyon_id', yetkiliLokIds); lQ = lQ.in('lokasyon_id', yetkiliLokIds) }
-      tasksQuery = applyAcik(tQ); liveQuery = lQ
+      tasksQuery = chunkedCount((slice) => {
+        let q = supabase.from('gorevler_normal').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+        if (slice) q = q.in('lokasyon_id', slice)
+        return applyAcik(q)
+      })
+      liveQuery = chunkedCount((slice) => {
+        let q = supabase.from('canli_gorevler').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+        if (slice) q = q.in('lokasyon_id', slice)
+        return q
+      })
     } else {
       tasksQuery = applyAcik(!firmaId ? tasksBase : tasksBase.eq('firma_id', firmaId))
       liveQuery = !firmaId ? liveBase : liveBase.eq('firma_id', firmaId)
     }
 
     if (effectiveProjeId) {
-      let locQ = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
-      if (yetkiliLokIds) locQ = locQ.in('id', yetkiliLokIds)
-      locationsQuery = locQ
+      locationsQuery = chunkedCount((slice) => {
+        let q = supabase.from('lokasyonlar').select('id', { count: 'exact', head: true }).eq('proje_id', effectiveProjeId)
+        if (slice) q = q.in('id', slice)
+        return q
+      })
     } else {
       locationsQuery = !firmaId ? locationsBase : locationsBase.eq('firma_id', firmaId)
     }
