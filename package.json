@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "node server.js",
     "next-start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "lint:chunk": "bash scripts/check-chunked-in.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
