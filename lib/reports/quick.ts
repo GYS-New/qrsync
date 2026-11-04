@@ -178,23 +178,23 @@ function chartOrEmpty(config: QuickReportResponse['charts'][number]) {
 export async function buildQuickReport(type: QuickReportType, filters: Filters): Promise<QuickReportResponse> {
   const admin = createAdminClient()
 
-  let locQuery = admin.from('lokasyonlar').select('id,firma_id,tanim,parent_id,aktif')
+  // Buyuk firmalarda >1000 lokasyon olabilir -> default max_rows=1000 sessizce
+  // truncate ederdi. fetchAll ile paginate ediyoruz.
+  const locations = await fetchAll<any>(() => {
+    let q = admin.from('lokasyonlar').select('id,firma_id,tanim,parent_id,aktif').order('id', { ascending: true })
+    if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+    if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+    return q
+  })
   // Yöneticiler (SA, alt_super_admin, tenant_admin) raporda yer almaz — sadece saha personeli (U/M).
   // Üst lokasyon yetkilileri (örn. MUSTAFA YILDIZ, SİNAN KORKMAZ) ayrıca isYonetici() helper'ı ile
   // hesaplamalardan çıkarılır (bkz: getUstLokasyonYetkiliUserIds).
-  let userQuery = admin.from('users').select('id,firma_id,isim_soyisim,rol,aktif').in('rol', ['tenant_user', 'musteri'])
-  if (filters.firmaId) {
-    locQuery = locQuery.eq('firma_id', filters.firmaId)
-    userQuery = userQuery.eq('firma_id', filters.firmaId)
-  }
-  if (filters.projeId) {
-    locQuery = (locQuery as any).eq('proje_id', filters.projeId)
-    userQuery = (userQuery as any).eq('proje_id', filters.projeId)
-  }
-
-  const [{ data: locations, error: locError }, { data: users, error: userError }] = await Promise.all([locQuery, userQuery])
-  if (locError) throw new Error(locError.message)
-  if (userError) throw new Error(userError.message)
+  const users = await fetchAll<any>(() => {
+    let q = admin.from('users').select('id,firma_id,isim_soyisim,rol,aktif').in('rol', ['tenant_user', 'musteri']).order('id', { ascending: true })
+    if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+    if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+    return q
+  })
 
   const locsRaw = locations ?? []
   // Modül izolasyonu: Oto Yıkama lokasyonları rapor sonuçlarından dışlanır.
@@ -516,21 +516,33 @@ export async function buildQuickReport(type: QuickReportType, filters: Filters):
     const activeLocIds = activeGrpIds.flatMap((gid: string) => grpLocMap[gid] ?? [])
 
     // Görevleri çek — aktif + arşiv birleşimi, projeId filtreli
+    // CHUNK-AWARE: activeLocIds cok buyuk olabilir (cok grup secilince) -> URL overflow.
     const arsivCols = 'lokasyon_id,durum,aktif_olma_tarihi,firma_id'
-    let qAktifGrp = admin.from('canli_gorevler').select(arsivCols)
-    let qArsivGrp  = admin.from('canli_gorevler_arsiv').select(arsivCols)
-    if (filters.firmaId) { qAktifGrp = qAktifGrp.eq('firma_id', filters.firmaId); qArsivGrp = qArsivGrp.eq('firma_id', filters.firmaId) }
-    if (filters.projeId) { qAktifGrp = (qAktifGrp as any).eq('proje_id', filters.projeId); qArsivGrp = (qArsivGrp as any).eq('proje_id', filters.projeId) }
-    if (filters.dateFrom) { const v = new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString(); qAktifGrp = qAktifGrp.gte('aktif_olma_tarihi', v); qArsivGrp = qArsivGrp.gte('aktif_olma_tarihi', v) }
-    if (filters.dateTo)   { const v = new Date(filters.dateTo + 'T23:59:59+03:00').toISOString(); qAktifGrp = qAktifGrp.lte('aktif_olma_tarihi', v);   qArsivGrp = qArsivGrp.lte('aktif_olma_tarihi', v) }
-    if (activeLocIds.length > 0) {
-      qAktifGrp = qAktifGrp.in('lokasyon_id', activeLocIds)
-      qArsivGrp  = (qArsivGrp as any).in('lokasyon_id', activeLocIds)
+    const buildGrpQ = (table: 'canli_gorevler' | 'canli_gorevler_arsiv', slice: string[] | null) => {
+      let q: any = admin.from(table).select(arsivCols)
+      if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
+      if (filters.projeId) q = q.eq('proje_id', filters.projeId)
+      if (filters.dateFrom) { const v = new Date(filters.dateFrom + 'T00:00:00+03:00').toISOString(); q = q.gte('aktif_olma_tarihi', v) }
+      if (filters.dateTo)   { const v = new Date(filters.dateTo + 'T23:59:59+03:00').toISOString(); q = q.lte('aktif_olma_tarihi', v) }
+      if (slice) q = q.in('lokasyon_id', slice)
+      return q
     }
-
+    const grpChunks: (string[] | null)[] = activeLocIds.length === 0
+      ? [null]
+      : activeLocIds.length <= 100
+        ? [activeLocIds]
+        : Array.from({ length: Math.ceil(activeLocIds.length / 100) }, (_, i) => activeLocIds.slice(i * 100, (i + 1) * 100))
+    const fetchGrpAll = async (table: 'canli_gorevler' | 'canli_gorevler_arsiv'): Promise<any[]> => {
+      const out: any[] = []
+      for (const slice of grpChunks) {
+        const rows = await fetchAll<any>(() => buildGrpQ(table, slice))
+        out.push(...rows)
+      }
+      return out
+    }
     const [aktifGrp, arsivGrp] = await Promise.all([
-      fetchAll(() => qAktifGrp),
-      fetchAll(() => qArsivGrp),
+      fetchGrpAll('canli_gorevler'),
+      fetchGrpAll('canli_gorevler_arsiv'),
     ])
     const gorevler = [...arsivGrp, ...aktifGrp]
     const locGorevMap: Record<string, { toplam: number; tamamlanan: number }> = {}
