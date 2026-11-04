@@ -178,10 +178,11 @@ export async function POST(req: Request) {
     //     penceresi çalışır — snapshot boyutu makul kalır.
     //
     // Lokasyon kapsam filtresi:
-    //   yetkiKaydiVar → .in('lokasyon_id', yetkiliLokIds) (küçük liste)
+    //   yetkiKaydiVar → chunked IN lokasyon_id slice'lari (100'luk)
     //   yetki yok    → .eq('proje_id', personelProjeId) (tek eq — URL limit'i aşmaz)
-    // Neden: PostgREST .in() 400+ UUID'de URL limit'e (~8KB) takılır ve sessizce
-    // boş sonuç döner. Fallback'te 397 lokasyon bu limiti aşıyordu.
+    // Neden: PostgREST IN kolonu 400+ UUID'de URL limit'e (~8KB) takılır ve sessizce
+    // boş sonuç döner. Fallback'te 397 lokasyon bu limiti aşıyordu — sonrasinda
+    // chunk-aware pattern'e gecildi.
     let bekleyenGorevler: any[] = []
     let bekleyenCanli: any[] = []
 
@@ -193,69 +194,80 @@ export async function POST(req: Request) {
     const siradakiSinirIso = vardiyaBilgi?.bitisISO ?? new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
 
     if (yetkiliLokIds.length > 0) {
-      const [spesifikRes, canliRes] = await Promise.all([
-        // Spesifik görevler — vardiya bağımsız.
-        // NOT: gorevler tablosunda 'aktif_olma_tarihi' kolonu yok (yalnız
-        // canli_gorevler'de var). Spesifikler vardiya filtresine girmediği
-        // için olusturma_tarihi'ne göre filtrelenir (uzak gelecek görev varsa
-        // mobile'a düşmesin diye + siradakiSinirIso üst limiti).
-        (() => {
-          let q = admin.from('gorevler').select(`
-            id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, lokasyon_id,
-            lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
-          `)
+      // CHUNK-AWARE: musteri rolu tum ust lokasyonlara yetkili ise yetkiliLokIds
+      // binlerce UUID -> URL overflow. 100'luk slice + ID dedup merge.
+      const lokChunks: (string[] | null)[] = !yetkiKaydiVar
+        ? [null]
+        : yetkiliLokIds.length <= 100
+          ? [yetkiliLokIds]
+          : Array.from({ length: Math.ceil(yetkiliLokIds.length / 100) }, (_, i) => yetkiliLokIds.slice(i * 100, (i + 1) * 100))
+
+      const fetchGorevChunked = async (
+        table: 'gorevler' | 'canli_gorevler',
+        selectStr: string,
+        timeCol: 'olusturma_tarihi' | 'aktif_olma_tarihi',
+        vardiyaFilter: boolean,
+      ): Promise<any[]> => {
+        const seen = new Set<string>()
+        const out: any[] = []
+        for (const slice of lokChunks) {
+          let q: any = admin.from(table).select(selectStr)
             .eq('firma_id', firmaId)
             .in('durum', ['HAZIR', 'ACIK'])
-            .lte('olusturma_tarihi', siradakiSinirIso)
-            .order('olusturma_tarihi', { ascending: false })
-          q = yetkiKaydiVar
-            ? q.in('lokasyon_id', yetkiliLokIds)
-            : (personelProjeId ? (q as any).eq('proje_id', personelProjeId) : q)
-          return q
-        })(),
-
-        // Canlı görevler — PT aktifte vardiya içi, PT pasifte vardiya filtresi yok
-        (() => {
-          let q = admin.from('canli_gorevler').select(`
-            id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, lokasyon_id,
-            lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )
-          `)
-            .eq('firma_id', firmaId)
-            .in('durum', ['HAZIR', 'ACIK'])
-            .lte('aktif_olma_tarihi', siradakiSinirIso)
-            .order('aktif_olma_tarihi', { ascending: false })
-
-          q = yetkiKaydiVar
-            ? q.in('lokasyon_id', yetkiliLokIds)
-            : (personelProjeId ? (q as any).eq('proje_id', personelProjeId) : q)
-
-          if (vardiyaBilgi) {
-            // Vardiya pencere filtresi: aktif_olma_tarihi vardiya aralığında
+            .lte(timeCol, siradakiSinirIso)
+            .order(timeCol, { ascending: false })
+          if (slice) q = q.in('lokasyon_id', slice)
+          else if (personelProjeId) q = q.eq('proje_id', personelProjeId)
+          if (vardiyaFilter && vardiyaBilgi) {
             q = q.gte('aktif_olma_tarihi', vardiyaBilgi.baslangicISO)
                  .lt('aktif_olma_tarihi', vardiyaBilgi.bitisISO)
           }
-          return q
-        })(),
+          const { data } = await q
+          for (const r of (data ?? []) as any[]) {
+            if (r?.id && !seen.has(r.id)) { seen.add(r.id); out.push(r) }
+          }
+        }
+        return out
+      }
+
+      const spesifikSelect = `id, tanim, durum, olusturma_tarihi, baslatilma_tarihi, lokasyon_id,
+            lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )`
+      const canliSelect = `id, tanim, durum, aktif_olma_tarihi, baslatilma_tarihi, lokasyon_id,
+            lokasyonlar ( id, tanim, checklist_sablon_id, ust_tanim:parent_id(tanim) )`
+
+      const [spesifikData, canliData] = await Promise.all([
+        fetchGorevChunked('gorevler', spesifikSelect, 'olusturma_tarihi', false),
+        fetchGorevChunked('canli_gorevler', canliSelect, 'aktif_olma_tarihi', true),
       ])
 
-      bekleyenGorevler = (spesifikRes.data ?? []) as any[]
-      bekleyenCanli = (canliRes.data ?? []) as any[]
+      bekleyenGorevler = spesifikData
+      bekleyenCanli = canliData
     }
 
     // ── Lokasyon detayları (yetkili tüm lokasyonlar — ekstra görev için dahil) ──
     // Görev olmayan lokasyonları da kapsıyoruz: kullanıcı QR okuttuğunda "görev yok →
     // ekstra görev ekle" akışı için o lokasyonun kuralları lazım.
+    // CHUNK-AWARE: musteri yetki buyukse URL overflow.
     let lokasyonlar: any[] = []
     if (yetkiliLokIds.length > 0) {
-      let lokQ = admin
-        .from('lokasyonlar')
-        .select('id, tanim, parent_id, qr_veri, nfc_token, tamamlama_qr_zorunlu, sureli_gorev_aktif, min_sure_dakika, max_sure_dakika, hedef_sure_dakika, aktif, checklist_sablon_id')
-        .eq('aktif', true)
-      lokQ = yetkiKaydiVar
-        ? lokQ.in('id', yetkiliLokIds)
-        : (personelProjeId ? (lokQ as any).eq('proje_id', personelProjeId).eq('firma_id', firmaId) : lokQ)
-      const { data: lokRows } = await lokQ
-      lokasyonlar = (lokRows ?? []) as any[]
+      const seen = new Set<string>()
+      const lokChunksLok: (string[] | null)[] = !yetkiKaydiVar
+        ? [null]
+        : yetkiliLokIds.length <= 100
+          ? [yetkiliLokIds]
+          : Array.from({ length: Math.ceil(yetkiliLokIds.length / 100) }, (_, i) => yetkiliLokIds.slice(i * 100, (i + 1) * 100))
+      for (const slice of lokChunksLok) {
+        let lokQ: any = admin
+          .from('lokasyonlar')
+          .select('id, tanim, parent_id, qr_veri, nfc_token, tamamlama_qr_zorunlu, sureli_gorev_aktif, min_sure_dakika, max_sure_dakika, hedef_sure_dakika, aktif, checklist_sablon_id')
+          .eq('aktif', true)
+        if (slice) lokQ = lokQ.in('id', slice)
+        else if (personelProjeId) lokQ = lokQ.eq('proje_id', personelProjeId).eq('firma_id', firmaId)
+        const { data: lokRows } = await lokQ
+        for (const r of (lokRows ?? []) as any[]) {
+          if (r?.id && !seen.has(r.id)) { seen.add(r.id); lokasyonlar.push(r) }
+        }
+      }
     }
 
     // Parent tanım map (ust_tanim göstermek için)
@@ -281,18 +293,26 @@ export async function POST(req: Request) {
     // memory'de lokasyonIdSet ile filtrele. Yetki varken IN filter doğrudan çalışır.
     const kuralMap = new Map<string, Set<string>>()
     if (yetkiliLokIds.length > 0) {
-      let kuralQ = admin
-        .from('gorev_kurallari')
-        .select('tanim, lokasyon_id')
-        .eq('aktif', true)
-        .eq('firma_id', firmaId)
-      if (yetkiKaydiVar) {
-        kuralQ = kuralQ.in('lokasyon_id', yetkiliLokIds)
+      // CHUNK-AWARE: yetkiliLokIds buyukse URL overflow.
+      const lokChunksKural: (string[] | null)[] = !yetkiKaydiVar
+        ? [null]
+        : yetkiliLokIds.length <= 100
+          ? [yetkiliLokIds]
+          : Array.from({ length: Math.ceil(yetkiliLokIds.length / 100) }, (_, i) => yetkiliLokIds.slice(i * 100, (i + 1) * 100))
+      const allKuralRows: any[] = []
+      for (const slice of lokChunksKural) {
+        let kuralQ: any = admin
+          .from('gorev_kurallari')
+          .select('tanim, lokasyon_id')
+          .eq('aktif', true)
+          .eq('firma_id', firmaId)
+        if (slice) kuralQ = kuralQ.in('lokasyon_id', slice)
+        const { data } = await kuralQ
+        if (data) allKuralRows.push(...data)
       }
-      const { data: kuralRowsRaw } = await kuralQ
       const kuralRows = yetkiKaydiVar
-        ? (kuralRowsRaw ?? [])
-        : ((kuralRowsRaw ?? []) as any[]).filter((r: any) => lokasyonIdSet.has(r.lokasyon_id))
+        ? allKuralRows
+        : allKuralRows.filter((r: any) => lokasyonIdSet.has(r.lokasyon_id))
       for (const r of (kuralRows ?? []) as any[]) {
         const lid = r.lokasyon_id
         const t = typeof r.tanim === 'string' ? r.tanim.trim() : ''

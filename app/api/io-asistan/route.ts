@@ -1037,72 +1037,82 @@ async function executeTool(
         const limit = Math.min((input.limit as number) || 20, 100)
         const sadeceSay = input.sadece_say as boolean
 
-        if (sadeceSay) {
-          let q = supabase.from(tablo).select('id', { count: 'exact', head: true })
-          if (ctx.firmaId && !tabloFirmaIdsiz) {
-            // firmalar tablosu özel: id = firmaId (TA kendi firmasını görür)
-            q = isFirmalarTable ? q.eq('id', ctx.firmaId) : q.eq('firma_id', ctx.firmaId)
-          }
-          // TU/U için projeler tablosunda id = projeId scope'u uygula
-          if (isProjelerTable && !ctx.isSA && ctx.projeId) q = q.eq('id', ctx.projeId)
-          // U/M için lokasyonlar tablosu yetki scope'u
-          if (isLokasyonlarTable && yetkiliLokIds !== null) q = q.in('id', yetkiliLokIds)
-          if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
-          // Filtreleri uygula
-          const filtreler = (input.filtreler as Array<{ kolon: string; operator: string; deger: string }>) || []
+        // Filtreleri bir kez tanimla (hem count hem select icin)
+        const filtreler = (input.filtreler as Array<{ kolon: string; operator: string; deger: string }>) || []
+        const applyFiltreler = (qIn: any) => {
           for (const f of filtreler) {
             switch (f.operator) {
-              case 'eq': q = q.eq(f.kolon, f.deger); break
-              case 'neq': q = q.neq(f.kolon, f.deger); break
-              case 'gt': q = q.gt(f.kolon, f.deger); break
-              case 'gte': q = q.gte(f.kolon, f.deger); break
-              case 'lt': q = q.lt(f.kolon, f.deger); break
-              case 'lte': q = q.lte(f.kolon, f.deger); break
-              case 'like': q = q.like(f.kolon, f.deger); break
-              case 'ilike': q = q.ilike(f.kolon, f.deger); break
-              case 'is': q = q.is(f.kolon, f.deger === 'null' ? null : f.deger === 'true'); break
+              case 'eq': qIn = qIn.eq(f.kolon, f.deger); break
+              case 'neq': qIn = qIn.neq(f.kolon, f.deger); break
+              case 'gt': qIn = qIn.gt(f.kolon, f.deger); break
+              case 'gte': qIn = qIn.gte(f.kolon, f.deger); break
+              case 'lt': qIn = qIn.lt(f.kolon, f.deger); break
+              case 'lte': qIn = qIn.lte(f.kolon, f.deger); break
+              case 'like': qIn = qIn.like(f.kolon, f.deger); break
+              case 'ilike': qIn = qIn.ilike(f.kolon, f.deger); break
+              case 'is': qIn = qIn.is(f.kolon, f.deger === 'null' ? null : f.deger === 'true'); break
             }
           }
-          const { count, error } = await q
-          if (error) return `Hata: ${error.message}`
-          return `${tablo}${projeLabel}: ${count ?? 0} kayıt`
+          return qIn
         }
 
-        let q = supabase.from(tablo).select(selectCols).limit(limit)
-        if (ctx.firmaId && !tabloFirmaIdsiz) {
-          q = isFirmalarTable ? q.eq('id', ctx.firmaId) : q.eq('firma_id', ctx.firmaId)
-        }
-        // TU/U için projeler tablosunda id = projeId scope'u uygula
-        if (isProjelerTable && !ctx.isSA && ctx.projeId) q = q.eq('id', ctx.projeId)
-        // U/M için lokasyonlar tablosu yetki scope'u
-        if (isLokasyonlarTable && yetkiliLokIds !== null) q = q.in('id', yetkiliLokIds)
-        if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
+        // CHUNK-AWARE: isLokasyonlarTable + yetkiliLokIds buyukse (musteri rolu
+        // 2000+ UUID) URL overflow. 100'luk slice + count topla / data merge.
+        const needsChunk = isLokasyonlarTable && yetkiliLokIds !== null && yetkiliLokIds.length > 100
+        const lokChunks: (string[] | null)[] = !needsChunk
+          ? [isLokasyonlarTable && yetkiliLokIds !== null ? yetkiliLokIds : null]
+          : Array.from({ length: Math.ceil(yetkiliLokIds!.length / 100) }, (_, i) => yetkiliLokIds!.slice(i * 100, (i + 1) * 100))
 
-        // Filtreleri uygula
-        const filtreler = (input.filtreler as Array<{ kolon: string; operator: string; deger: string }>) || []
-        for (const f of filtreler) {
-          switch (f.operator) {
-            case 'eq': q = q.eq(f.kolon, f.deger); break
-            case 'neq': q = q.neq(f.kolon, f.deger); break
-            case 'gt': q = q.gt(f.kolon, f.deger); break
-            case 'gte': q = q.gte(f.kolon, f.deger); break
-            case 'lt': q = q.lt(f.kolon, f.deger); break
-            case 'lte': q = q.lte(f.kolon, f.deger); break
-            case 'like': q = q.like(f.kolon, f.deger); break
-            case 'ilike': q = q.ilike(f.kolon, f.deger); break
-            case 'is': q = q.is(f.kolon, f.deger === 'null' ? null : f.deger === 'true'); break
+        if (sadeceSay) {
+          let totalCount = 0
+          let lastErr: any = null
+          for (const slice of lokChunks) {
+            let q = supabase.from(tablo).select('id', { count: 'exact', head: true })
+            if (ctx.firmaId && !tabloFirmaIdsiz) {
+              q = isFirmalarTable ? q.eq('id', ctx.firmaId) : q.eq('firma_id', ctx.firmaId)
+            }
+            if (isProjelerTable && !ctx.isSA && ctx.projeId) q = q.eq('id', ctx.projeId)
+            if (slice) q = q.in('id', slice)
+            if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
+            q = applyFiltreler(q)
+            const { count, error } = await q
+            if (error) { lastErr = error; continue }
+            totalCount += (count ?? 0)
+          }
+          if (lastErr && totalCount === 0) return `Hata: ${lastErr.message}`
+          return `${tablo}${projeLabel}: ${totalCount} kayıt`
+        }
+
+        // Select varyanti: chunk basina limit, chunk sonrasi global limit.
+        const siralama = (input.siralama as string) || ''
+        const seenD = new Set<string>()
+        const mergedData: any[] = []
+        let lastErrD: any = null
+        for (const slice of lokChunks) {
+          let q = supabase.from(tablo).select(selectCols).limit(limit)
+          if (ctx.firmaId && !tabloFirmaIdsiz) {
+            q = isFirmalarTable ? q.eq('id', ctx.firmaId) : q.eq('firma_id', ctx.firmaId)
+          }
+          if (isProjelerTable && !ctx.isSA && ctx.projeId) q = q.eq('id', ctx.projeId)
+          if (slice) q = q.in('id', slice)
+          if (projeId && !tabloProjeIdsiz) q = q.eq('proje_id', projeId)
+          q = applyFiltreler(q)
+          if (siralama) {
+            const desc = siralama.startsWith('-')
+            const col = desc ? siralama.slice(1) : siralama
+            q = q.order(col, { ascending: !desc })
+          }
+          const { data: chunkData, error } = await q
+          if (error) { lastErrD = error; continue }
+          for (const row of (chunkData ?? []) as any[]) {
+            const rid = row?.id
+            if (rid && !seenD.has(rid)) { seenD.add(rid); mergedData.push(row) }
+            else if (!rid) mergedData.push(row)
           }
         }
-
-        // Sıralama
-        const siralama = (input.siralama as string) || ''
-        if (siralama) {
-          const desc = siralama.startsWith('-')
-          const col = desc ? siralama.slice(1) : siralama
-          q = q.order(col, { ascending: !desc })
-        }
-
-        const { data, error } = await q
+        // Global limit
+        const data = mergedData.slice(0, limit)
+        const error = lastErrD && mergedData.length === 0 ? lastErrD : null
         if (error) return `Hata: ${error.message}`
         if (!data?.length) return `${tablo}${projeLabel}: kayıt bulunamadı.`
         // Sonuçları okunabilir formata çevir
