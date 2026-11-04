@@ -213,13 +213,36 @@ export default function LokasyonlarClient({
 
   async function refresh(fid: string) {
     setLoading(true); setError('')
-    let lokQuery = supabase
-      .from('lokasyonlar')
-      .select('*')
-      .eq('firma_id', fid)
-      .order('kayit_tarihi', { ascending: true })
-    if (projeId) lokQuery = (lokQuery as any).eq('proje_id', projeId)
-    if (yetkiliLokIds) lokQuery = lokQuery.in('id', yetkiliLokIds)
+    // CHUNK-AWARE: musteri yetkiliLokIds 2000+ UUID -> URL overflow -> fetch failed
+    const runLokChunked = async (): Promise<{ data: any[]; error: any }> => {
+      const build = (slice: string[] | null) => {
+        let q = supabase
+          .from('lokasyonlar')
+          .select('*')
+          .eq('firma_id', fid)
+          .order('kayit_tarihi', { ascending: true })
+        if (projeId) q = (q as any).eq('proje_id', projeId)
+        if (slice) q = q.in('id', slice)
+        return q
+      }
+      if (!yetkiliLokIds || yetkiliLokIds.length === 0) {
+        const r = await build(null)
+        return { data: r.data ?? [], error: r.error ?? null }
+      }
+      const seen = new Set<string>()
+      const out: any[] = []
+      let lastErr: any = null
+      for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+        const r = await build(yetkiliLokIds.slice(i, i + 100))
+        if (r.error) lastErr = r.error
+        for (const row of (r.data ?? []) as any[]) {
+          if (row?.id && !seen.has(row.id)) { seen.add(row.id); out.push(row) }
+        }
+      }
+      out.sort((a, b) => (a.kayit_tarihi ?? '').localeCompare(b.kayit_tarihi ?? ''))
+      return { data: out, error: lastErr }
+    }
+
     let tplQuery = supabase
       .from('checklist_sablonlari')
       .select('id,baslik,aktif,firma_id')
@@ -228,7 +251,7 @@ export default function LokasyonlarClient({
       .order('baslik', { ascending: true })
     if (projeId) tplQuery = (tplQuery as any).eq('proje_id', projeId)
     const [locRes, tplRes] = await Promise.all([
-      lokQuery,
+      runLokChunked(),
       tplQuery,
     ])
     if (locRes.error) showError(locRes.error.message)

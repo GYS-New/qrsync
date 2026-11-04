@@ -16,6 +16,32 @@ import ChecklistModal from '@/components/checklist/ChecklistModal'
 import { useYetki } from '@/lib/yetki/useYetki'
 import { filterOutOtoYikama, getOtoYikamaIdSet } from '@/lib/yetki/clientOtoYikamaFilter'
 
+/**
+ * CHUNK-AWARE helper: yetkiliLokIds buyukse (musteri rolu) .in(col, ...)
+ * URL overflow olmasin diye 100'luk slice + dedup + merge.
+ * Native query sonucu {data, error} shape'ini doner.
+ */
+async function chunkedDirect<T extends { id: string } = any>(
+  yetkiliLokIds: string[] | null | undefined,
+  buildQ: (slice: string[] | null) => any,
+): Promise<{ data: T[]; error: any }> {
+  if (!yetkiliLokIds || yetkiliLokIds.length === 0) {
+    const r = await buildQ(null)
+    return { data: (r.data ?? []) as T[], error: r.error ?? null }
+  }
+  const seen = new Set<string>()
+  const out: T[] = []
+  let lastError: any = null
+  for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+    const r = await buildQ(yetkiliLokIds.slice(i, i + 100))
+    if (r.error) lastError = r.error
+    for (const row of (r.data ?? []) as any[]) {
+      if (row?.id && !seen.has(row.id)) { seen.add(row.id); out.push(row) }
+    }
+  }
+  return { data: out, error: lastError }
+}
+
 const DURUM_RENK: Record<string, string> = {
   ACIK: 'status-acik',
   ISLEMDE: 'status-islemde',
@@ -195,22 +221,32 @@ export default function GorevlerClient({
   async function refreshAll(fid: string) {
     setLoading(true); setError('')
     const sinir24s = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    // gorevler_normal view: yıkama görevleri hariç (Oto Yıkama için ayrı sayfa)
-    let gorevQuery = supabase.from('gorevler_normal').select(SEL)
-      .eq('firma_id', fid)
-      .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
-      .order('olusturma_tarihi', { ascending: false }).limit(200)
-    if (projeId) gorevQuery = (gorevQuery as any).eq('proje_id', projeId)
-    if (yetkiliLokIds) gorevQuery = gorevQuery.in('lokasyon_id', yetkiliLokIds)
-    // Modül izolasyonu: oto_yikama_lokasyon kolonunu da çek, sonuçta filtrele
-    let lokQuery = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id,oto_yikama_lokasyon')
-      .eq('firma_id', fid).eq('aktif', true).order('tanim')
-    if (projeId) lokQuery = (lokQuery as any).eq('proje_id', projeId)
-    if (yetkiliLokIds) lokQuery = lokQuery.in('id', yetkiliLokIds)
-    const [gRes, lRes, uRes] = await Promise.all([
-      gorevQuery, lokQuery,
+    // CHUNK-AWARE: gorev + lok sorgulari paralel chunked; users tek sorgu.
+    const [gorevRes, lokRes, uRes] = await Promise.all([
+      chunkedDirect<any>(yetkiliLokIds, (slice) => {
+        let q = supabase.from('gorevler_normal').select(SEL)
+          .eq('firma_id', fid)
+          .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24s})`)
+          .order('olusturma_tarihi', { ascending: false }).limit(200)
+        if (projeId) q = (q as any).eq('proje_id', projeId)
+        if (slice) q = q.in('lokasyon_id', slice)
+        return q
+      }),
+      chunkedDirect<any>(yetkiliLokIds, (slice) => {
+        let q = supabase.from('lokasyonlar').select('id,tanim,aktif,parent_id,checklist_sablon_id,oto_yikama_lokasyon')
+          .eq('firma_id', fid).eq('aktif', true).order('tanim')
+        if (projeId) q = (q as any).eq('proje_id', projeId)
+        if (slice) q = q.in('id', slice)
+        return q
+      }),
       (() => { let q = supabase.from('users').select('id,isim_soyisim,aktif').eq('firma_id', fid).eq('aktif', true).order('isim_soyisim'); if (projeId) q = (q as any).eq('proje_id', projeId); return q })(),
     ])
+    // chunk sonrasi re-sort/slice(200) — global top-200 garantile
+    const gResData = gorevRes.data
+      .sort((a: any, b: any) => (b.olusturma_tarihi ?? '').localeCompare(a.olusturma_tarihi ?? ''))
+      .slice(0, 200)
+    const gRes = { data: gResData, error: gorevRes.error }
+    const lRes = { data: lokRes.data, error: lokRes.error }
     if (gRes.error) showError(gRes.error.message)
     if (lRes.error) showError(lRes.error.message)
     if (uRes.error) showError(uRes.error.message)
@@ -235,25 +271,25 @@ export default function GorevlerClient({
     if (!firmaId) return
     setLoading(true); setError('')
 
-    // ── Ana tablo: gorevler_normal view (yıkama hariç) ─────────────────────────
-    let query = supabase.from('gorevler_normal').select(SEL).eq('firma_id', firmaId)
-    if (projeId) query = (query as any).eq('proje_id', projeId)
-    if (yetkiliLokIds) query = query.in('lokasyon_id', yetkiliLokIds)
+    // ── Ana tablo: gorevler_normal view (yıkama hariç) ─── CHUNK-AWARE
+    const { data: rawData, error: qErr } = await chunkedDirect<any>(yetkiliLokIds, (slice) => {
+      let q: any = supabase.from('gorevler_normal').select(SEL).eq('firma_id', firmaId)
+      if (projeId) q = q.eq('proje_id', projeId)
+      if (slice) q = q.in('lokasyon_id', slice)
+      if (filtreDurum) q = q.eq('durum', filtreDurum)
+      if (filtreSelectedLok) q = q.eq('lokasyon_id', filtreSelectedLok)
+      if (filtreAtananId)    q = q.eq('atanan_kullanici_id', filtreAtananId)
+      if (filtreOlusFrom)    q = q.gte('olusturma_tarihi', filtreOlusFrom)
+      if (filtreOlusTo)      q = q.lte('olusturma_tarihi', filtreOlusTo + 'T23:59:59')
+      if (filtreIslemFrom)   q = q.gte('durum_degisim_tarihi', filtreIslemFrom)
+      if (filtreIslemTo)     q = q.lte('durum_degisim_tarihi', filtreIslemTo + 'T23:59:59')
+      q = q.order('olusturma_tarihi', { ascending: false }).limit(500)
+      return q
+    })
+    const data = rawData
+      .sort((a: any, b: any) => (b.olusturma_tarihi ?? '').localeCompare(a.olusturma_tarihi ?? ''))
+      .slice(0, 500)
 
-    if (filtreDurum) {
-      query = (query as any).eq('durum', filtreDurum)
-    }
-
-    if (filtreSelectedLok) query = (query as any).eq('lokasyon_id', filtreSelectedLok)
-    if (filtreAtananId)    query = (query as any).eq('atanan_kullanici_id', filtreAtananId)
-    if (filtreOlusFrom)    query = (query as any).gte('olusturma_tarihi', filtreOlusFrom)
-    if (filtreOlusTo)      query = (query as any).lte('olusturma_tarihi', filtreOlusTo + 'T23:59:59')
-    if (filtreIslemFrom)   query = (query as any).gte('durum_degisim_tarihi', filtreIslemFrom)
-    if (filtreIslemTo)     query = (query as any).lte('durum_degisim_tarihi', filtreIslemTo + 'T23:59:59')
-
-    query = (query as any).order('olusturma_tarihi', { ascending: false }).limit(500)
-
-    const { data, error: qErr } = await query
     if (qErr) showError(qErr.message)
     else setGorevler(data ?? [])
     setLoading(false)
