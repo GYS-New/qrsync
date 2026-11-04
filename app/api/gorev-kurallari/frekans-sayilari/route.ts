@@ -80,21 +80,36 @@ export async function GET(req: NextRequest) {
   // Yetki filtresi (U/M için)
   const yetkiliLokIds = !isSA && !isTA ? await getYetkiliLokasyonIds(supabase, firmaId, projeId) : null
 
-  // Kuralları çek
-  let q = admin
-    .from('gorev_kurallari')
-    .select(`
-      id, tanim, lokasyon_id, aktif_olma_saati, frekans_tipi,
-      gunluk_frekans_sayisi, haftalik_frekans_sayisi, aktif_gunler, aktif,
-      lokasyon:lokasyon_id (id, tanim, parent_id, ust:parent_id (id, tanim))
-    `)
-    .eq('firma_id', firmaId)
-    .eq('aktif', true)
-  if (projeId) q = (q as any).eq('proje_id', projeId)
-  if (yetkiliLokIds) q = q.in('lokasyon_id', yetkiliLokIds)
-
-  const { data: rows, error } = await q
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  // Kuralları çek — CHUNK-AWARE (musteri yetkiliLokIds 2000+ UUID -> URL overflow)
+  const buildKuralQ = (slice: string[] | null) => {
+    let q = admin
+      .from('gorev_kurallari')
+      .select(`
+        id, tanim, lokasyon_id, aktif_olma_saati, frekans_tipi,
+        gunluk_frekans_sayisi, haftalik_frekans_sayisi, aktif_gunler, aktif,
+        lokasyon:lokasyon_id (id, tanim, parent_id, ust:parent_id (id, tanim))
+      `)
+      .eq('firma_id', firmaId)
+      .eq('aktif', true)
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (slice) q = q.in('lokasyon_id', slice)
+    return q
+  }
+  let rows: any[] = []
+  if (!yetkiliLokIds) {
+    const { data, error } = await buildKuralQ(null)
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    rows = data ?? []
+  } else {
+    const seen = new Set<string>()
+    for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+      const { data, error } = await buildKuralQ(yetkiliLokIds.slice(i, i + 100))
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      for (const r of (data ?? [])) {
+        if (!seen.has(r.id)) { seen.add(r.id); rows.push(r) }
+      }
+    }
+  }
 
   // Modül izolasyonu: Oto Yıkama lokasyonları + kuralları GYS UI'da gizli (tüm roller)
   const otoIds = await getOtoYikamaLokasyonIds(admin, firmaId)

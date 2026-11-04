@@ -1,21 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 import { auditLog } from '@/lib/audit/log'
 
-// Tüm alt lokasyon id'lerini DB'den recursive çeker
+// Tüm alt lokasyon id'lerini DB'den recursive çeker.
+// fetchAll ile 1000-row cap sessiz truncate'i aslindi (buyuk firmada agacin
+// yarisi gorunmeyip DELETE eksik calisiyordu).
 async function getAllDescendantIds(adminSb: ReturnType<typeof createAdminClient>, rootId: string, firmaId: string): Promise<string[]> {
-  const { data } = await adminSb
+  const data = await fetchAll<any>(() => adminSb
     .from('lokasyonlar')
     .select('id, parent_id')
     .eq('firma_id', firmaId)
+    .order('id', { ascending: true })
+  )
 
-  if (!data) return [rootId]
+  if (!data || data.length === 0) return [rootId]
 
   function collect(id: string): string[] {
-    const children = data!.filter(l => l.parent_id === id).map(l => l.id)
+    const children = data.filter((l: any) => l.parent_id === id).map((l: any) => l.id)
     return [id, ...children.flatMap(collect)]
   }
   return collect(rootId)
+}
+
+// CHUNK helper: tekrarlanan .in(col, ids) delete/select calgirilari icin.
+async function chunkedDelete(
+  qFactory: (slice: string[]) => any,
+  ids: string[],
+  errorPrefix: string,
+) {
+  for (let i = 0; i < ids.length; i += 100) {
+    const { error } = await qFactory(ids.slice(i, i + 100))
+    if (error) throw new Error(`${errorPrefix}: ${error.message}`)
+  }
+}
+async function chunkedSelect<T = any>(
+  qFactory: (slice: string[]) => any,
+  ids: string[],
+): Promise<T[]> {
+  const out: T[] = []
+  const seen = new Set<string>()
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data } = await qFactory(ids.slice(i, i + 100))
+    for (const r of (data ?? []) as any[]) {
+      if (r?.id && !seen.has(r.id)) { seen.add(r.id); out.push(r) }
+    }
+  }
+  return out
 }
 
 export async function DELETE(
@@ -61,40 +92,56 @@ export async function DELETE(
     // 4. Tüm alt lokasyonları bul
     const allIds = await getAllDescendantIds(adminSb, lokId, firmaId)
 
-    // 5. Çeklist kayıtlarını sil (aktif + arşiv)
-    const { data: baslikIds } = await adminSb
-      .from('checklist_sonuc_basliklari')
-      .select('id')
-      .in('lokasyon_id', allIds)
-    if (baslikIds?.length) {
+    // 5. Çeklist kayıtlarını sil (aktif + arşiv) — CHUNK-AWARE
+    const baslikIds = await chunkedSelect<{ id: string }>(
+      (slice) => adminSb.from('checklist_sonuc_basliklari').select('id').in('lokasyon_id', slice),
+      allIds,
+    )
+    if (baslikIds.length) {
       const ids = baslikIds.map((b: any) => b.id)
-      await adminSb.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', ids)
+      await chunkedDelete(
+        (slice) => adminSb.from('checklist_sonuc_maddeleri').delete().in('sonuc_id', slice),
+        ids,
+        'Çeklist maddeleri silinirken hata',
+      )
     }
-    await adminSb.from('checklist_sonuc_basliklari').delete().in('lokasyon_id', allIds)
+    await chunkedDelete(
+      (slice) => adminSb.from('checklist_sonuc_basliklari').delete().in('lokasyon_id', slice),
+      allIds,
+      'Çeklist başlıkları silinirken hata',
+    )
 
-    const { data: arsivBaslikIds } = await adminSb
-      .from('checklist_sonuc_basliklari_arsiv')
-      .select('id')
-      .in('lokasyon_id', allIds)
-    if (arsivBaslikIds?.length) {
+    const arsivBaslikIds = await chunkedSelect<{ id: string }>(
+      (slice) => adminSb.from('checklist_sonuc_basliklari_arsiv').select('id').in('lokasyon_id', slice),
+      allIds,
+    )
+    if (arsivBaslikIds.length) {
       const ids = arsivBaslikIds.map((b: any) => b.id)
-      await adminSb.from('checklist_sonuc_maddeleri_arsiv').delete().in('sonuc_id', ids)
+      await chunkedDelete(
+        (slice) => adminSb.from('checklist_sonuc_maddeleri_arsiv').delete().in('sonuc_id', slice),
+        ids,
+        'Arşiv çeklist maddeleri silinirken hata',
+      )
     }
-    await adminSb.from('checklist_sonuc_basliklari_arsiv').delete().in('lokasyon_id', allIds)
+    await chunkedDelete(
+      (slice) => adminSb.from('checklist_sonuc_basliklari_arsiv').delete().in('lokasyon_id', slice),
+      allIds,
+      'Arşiv çeklist başlıkları silinirken hata',
+    )
 
-    // 6. canli_gorevler sil
-    const { error: canliErr } = await adminSb
-      .from('canli_gorevler')
-      .delete()
-      .in('lokasyon_id', allIds)
-    if (canliErr) throw new Error('Canlı görevler silinirken hata: ' + canliErr.message)
+    // 6. canli_gorevler sil — CHUNK-AWARE
+    await chunkedDelete(
+      (slice) => adminSb.from('canli_gorevler').delete().in('lokasyon_id', slice),
+      allIds,
+      'Canlı görevler silinirken hata',
+    )
 
-    // 7. gorevler sil
-    const { error: gorevErr } = await adminSb
-      .from('gorevler')
-      .delete()
-      .in('lokasyon_id', allIds)
-    if (gorevErr) throw new Error('Görevler silinirken hata: ' + gorevErr.message)
+    // 7. gorevler sil — CHUNK-AWARE
+    await chunkedDelete(
+      (slice) => adminSb.from('gorevler').delete().in('lokasyon_id', slice),
+      allIds,
+      'Görevler silinirken hata',
+    )
 
     // 8. Lokasyonları leaf → root sırasıyla sil
     const leafFirst = [...allIds].reverse()
