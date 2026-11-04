@@ -47,20 +47,18 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
   }
 
   // gf(buildFn) — buildFn yeni query uretmeli; biz chunk'layip count topariz.
-  const gf = async (buildFn: () => any): Promise<{ status: 'fulfilled' | 'rejected'; value?: { count: number; data?: any[] }; reason?: any }> => {
-    try {
-      let total = 0
-      for (const slice of chunks) {
-        let q = applyFirmaProje(buildFn())
-        if (slice) q = (q as any).in('lokasyon_id', slice)
-        const { count, error } = await q
-        if (error) throw error
-        total += (count ?? 0)
-      }
-      return { status: 'fulfilled', value: { count: total } }
-    } catch (reason) {
-      return { status: 'rejected', reason }
+  // Promise.allSettled bu Promise'i {status, value: {count}} olarak wrap eder.
+  // Manuel {status, value} dönüş YAPMA; aksi halde cift sarilir → r.value.count undefined → 0.
+  const gf = async (buildFn: () => any): Promise<{ count: number; data?: any[] }> => {
+    let total = 0
+    for (const slice of chunks) {
+      let q = applyFirmaProje(buildFn())
+      if (slice) q = (q as any).in('lokasyon_id', slice)
+      const { count, error } = await q
+      if (error) throw error
+      total += (count ?? 0)
     }
+    return { count: total }
   }
   // Kullanıcı/Lokasyon: sadece firma filtresi
   const ff = (q: any) => firmaId ? q.eq('firma_id', firmaId) : q

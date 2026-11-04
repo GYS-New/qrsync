@@ -327,12 +327,16 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   let altLokTanim = ''
   let targetLokasyonIds: string[] | null = null
 
-  let lokQ = admin
-    .from('lokasyonlar')
-    .select('id,tanim,parent_id,firma_id,gunluk_frekans_sayisi')
-    .eq('firma_id', filters.firmaId)
-  if (filters.projeId) lokQ = (lokQ as any).eq('proje_id', filters.projeId)
-  const { data: lokasyonlar } = await lokQ
+  // Lokasyon listesi — fetchAll ile 1000-row cap'i as (buyuk firmalarda sessiz truncation olmasin).
+  const lokasyonlar = await fetchAll<any>(() => {
+    let q = admin
+      .from('lokasyonlar')
+      .select('id,tanim,parent_id,firma_id,gunluk_frekans_sayisi')
+      .eq('firma_id', filters.firmaId)
+      .order('id', { ascending: true })
+    if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+    return q
+  })
 
   // Oto Yıkama üst lokasyonları + tüm alt soyları bu rapordan hariç tutulur
   // (KPI, departman analizi, gruplar, görev listeleri, grafikler — hiçbiri Oto
@@ -437,20 +441,47 @@ export async function buildGenelRaporData(filters: GenelRaporFilters): Promise<G
   const SELECT_COLS = includeDetails ? SELECT_COLS_FULL : SELECT_COLS_MID
 
   // Tarih filtresi vardiya_gunu üzerinden (sarkan V1 görevleri kendi günlerinde gösterilir)
-  // aktif_olma_tarihi yerine vardiya_gunu (date) kullanıyoruz — saat shift'i gerekmez
-  function buildGorevQuery(table: string): any {
+  // aktif_olma_tarihi yerine vardiya_gunu (date) kullanıyoruz — saat shift'i gerekmez.
+  //
+  // CHUNK-AWARE: targetLokasyonIds binlerce UUID olabilir (musteri rolu tum ust
+  // lokasyonlara yetkili → ~2000 UUID × 37 char = 74KB URL → Cloudflare 8KB limit
+  // reject → "TypeError: fetch failed"). 100'luk slice'larla cagirip birlestiriyoruz.
+  function buildGorevQuery(table: string, lokSlice: string[] | null): any {
     let q: any = (admin.from(table) as any).select(SELECT_COLS).eq('firma_id', filters.firmaId)
     if (filters.projeId) q = q.eq('proje_id', filters.projeId)
-    if (targetLokasyonIds && targetLokasyonIds.length > 0) q = q.in('lokasyon_id', targetLokasyonIds)
+    if (lokSlice && lokSlice.length > 0) q = q.in('lokasyon_id', lokSlice)
     if (otoYikamaIds.size > 0) q = q.not('lokasyon_id', 'in', `(${[...otoYikamaIds].join(',')})`)
     if (filters.raporBaslangic) q = q.gte('vardiya_gunu', filters.raporBaslangic)
     if (filters.raporBitis)     q = q.lte('vardiya_gunu', filters.raporBitis)
     return q
   }
 
+  const LOK_CHUNK = 100
+  const lokChunks: (string[] | null)[] = !targetLokasyonIds || targetLokasyonIds.length === 0
+    ? [null]
+    : targetLokasyonIds.length <= LOK_CHUNK
+      ? [targetLokasyonIds]
+      : Array.from(
+          { length: Math.ceil(targetLokasyonIds.length / LOK_CHUNK) },
+          (_, i) => targetLokasyonIds!.slice(i * LOK_CHUNK, (i + 1) * LOK_CHUNK),
+        )
+
+  async function fetchGorevlerChunked(table: string): Promise<any[]> {
+    const all: any[] = []
+    const seen = new Set<string>()
+    for (const slice of lokChunks) {
+      const rows = await fetchAll<any>(() => buildGorevQuery(table, slice))
+      for (const r of rows) {
+        // Defansif dedupe — chunk sinirlari ayrik olmali ama guvenlik icin ID bazli set.
+        if (r?.id && !seen.has(r.id)) { seen.add(r.id); all.push(r) }
+      }
+    }
+    return all
+  }
+
   const [aktifGorevler, arsivGorevler] = await Promise.all([
-    fetchAll(() => buildGorevQuery('canli_gorevler')),
-    fetchAll(() => buildGorevQuery('canli_gorevler_arsiv')),
+    fetchGorevlerChunked('canli_gorevler'),
+    fetchGorevlerChunked('canli_gorevler_arsiv'),
   ])
 
   // Birleştir, çakışan id varsa aktif tablosu öncelikli

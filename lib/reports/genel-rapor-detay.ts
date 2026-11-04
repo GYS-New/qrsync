@@ -9,6 +9,7 @@
 // istenen N satır taşınır, JS tarafında full-table aggregation yapılmaz.
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 import { getEffectiveVardiya } from '@/lib/vardiya/getEffective'
 import {
   formatDate, formatTarihTR, formatGorevSaatleri, formatGorevSuresi,
@@ -94,11 +95,13 @@ export async function buildGenelRaporDetay(
 ): Promise<DetayResponse> {
   const admin = createAdminClient()
 
-  // 1. Lokasyon hiyerarşisi (filtre + ekran adı için)
-  let lokQ = admin.from('lokasyonlar').select('id,tanim,parent_id,firma_id').eq('firma_id', filters.firmaId)
-  if (filters.projeId) lokQ = (lokQ as any).eq('proje_id', filters.projeId)
-  const { data: lokasyonlar } = await lokQ
-  const lokMap = new Map<string, any>((lokasyonlar ?? []).map((l: any) => [l.id, l]))
+  // 1. Lokasyon hiyerarşisi (filtre + ekran adı için) — fetchAll ile 1000-row cap'i as.
+  const lokasyonlar = await fetchAll<any>(() => {
+    let q = admin.from('lokasyonlar').select('id,tanim,parent_id,firma_id').eq('firma_id', filters.firmaId).order('id', { ascending: true })
+    if (filters.projeId) q = (q as any).eq('proje_id', filters.projeId)
+    return q
+  })
+  const lokMap = new Map<string, any>(lokasyonlar.map((l: any) => [l.id, l]))
 
   // 2. Hedef lokasyon id seti (filtre uygulanmışsa)
   let targetLokIds: string[] | null = null
@@ -126,10 +129,13 @@ export async function buildGenelRaporDetay(
     case 'atanan':       durumFilter = null;                      kuralNotNull = true;  sortCol = 'olusturma_tarihi'; break
   }
 
-  function buildQ(table: string, withCount: boolean) {
+  // CHUNK-AWARE: targetLokIds binlerce UUID olabilir (musteri rolu tum ust
+  // lokasyonlara yetkili). URL overflow'dan kaçınmak icin 100'luk slice'larla
+  // sorgulayip merge ediyoruz. Chunks disjoint oldugundan count'lar toplanabilir.
+  function buildQ(table: string, lokSlice: string[] | null, withCount: boolean) {
     let q: any = admin.from(table).select(SELECT_COLS, withCount ? { count: 'exact' } : undefined).eq('firma_id', filters.firmaId)
     if (filters.projeId) q = q.eq('proje_id', filters.projeId)
-    if (targetLokIds && targetLokIds.length > 0) q = q.in('lokasyon_id', targetLokIds)
+    if (lokSlice && lokSlice.length > 0) q = q.in('lokasyon_id', lokSlice)
     if (filters.raporBaslangic) q = q.gte('vardiya_gunu', filters.raporBaslangic)
     if (filters.raporBitis)     q = q.lte('vardiya_gunu', filters.raporBitis)
     if (durumFilter) q = q.in('durum', durumFilter)
@@ -139,13 +145,36 @@ export async function buildGenelRaporDetay(
     return q
   }
 
+  const LOK_CHUNK = 100
+  const lokChunks: (string[] | null)[] = !targetLokIds || targetLokIds.length === 0
+    ? [null]
+    : targetLokIds.length <= LOK_CHUNK
+      ? [targetLokIds]
+      : Array.from(
+          { length: Math.ceil(targetLokIds.length / LOK_CHUNK) },
+          (_, i) => targetLokIds!.slice(i * LOK_CHUNK, (i + 1) * LOK_CHUNK),
+        )
+
+  async function fetchTableChunked(table: string): Promise<{ data: any[]; count: number }> {
+    let countTotal = 0
+    const rows: any[] = []
+    for (const slice of lokChunks) {
+      const r = await buildQ(table, slice, true)
+        .order(sortCol, { ascending: false, nullsFirst: false })
+        .range(0, offset + limit - 1)
+      countTotal += r.count ?? 0
+      if (r.data) rows.push(...r.data)
+    }
+    return { data: rows, count: countTotal }
+  }
+
   // 5. Terminal durumlar (tamamlanan/sapma/kayip/frekans_disi) çoğunlukla SADECE arşivde.
   //    Atanan ise hem aktif hem arşivde olabilir. Aktif tabloya tek ekstra sorgu maliyeti
   //    küçük olduğu için iki tabloyu da sorgulayıp merge ediyoruz. Aktif tarafı dar:
   //    çoğu projede <500 satır.
   const [aktifRes, arsivRes] = await Promise.all([
-    buildQ('canli_gorevler', true).order(sortCol, { ascending: false, nullsFirst: false }).range(0, offset + limit - 1),
-    buildQ('canli_gorevler_arsiv', true).order(sortCol, { ascending: false, nullsFirst: false }).range(0, offset + limit - 1),
+    fetchTableChunked('canli_gorevler'),
+    fetchTableChunked('canli_gorevler_arsiv'),
   ])
 
   const aktifCount = aktifRes.count ?? 0
