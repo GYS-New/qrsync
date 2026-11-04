@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 import { getUstLokasyonYetkiliUserIds } from '@/lib/yetki/getUstLokasyonYetkiliUserIds'
 
 function fmt(v: string | null | undefined) {
@@ -75,11 +76,13 @@ export async function GET(req: Request) {
       projeAdi = proje?.ad ?? ''
     }
 
-    // Lokasyonlar
-    let lokQ = admin.from('lokasyonlar').select('id,tanim,parent_id').eq('firma_id', firmaId).eq('aktif', true)
-    if (projeId) lokQ = (lokQ as any).eq('proje_id', projeId)
-    const { data: lokasyonlar } = await lokQ
-    const lokMap = new Map<string, any>((lokasyonlar ?? []).map((l: any) => [l.id, l]))
+    // Lokasyonlar — fetchAll ile 1000-row cap'i as (buyuk firmada hiyerarsi eksik gelmesin).
+    const lokasyonlar = await fetchAll<any>(() => {
+      let q = admin.from('lokasyonlar').select('id,tanim,parent_id').eq('firma_id', firmaId).eq('aktif', true).order('id', { ascending: true })
+      if (projeId) q = (q as any).eq('proje_id', projeId)
+      return q
+    })
+    const lokMap = new Map<string, any>(lokasyonlar.map((l: any) => [l.id, l]))
 
     // Hiyerarşik lokasyon filtresi: altAlt > alt > ust
     function getAllDescendants(rootId: string): string[] {
@@ -122,15 +125,30 @@ export async function GET(req: Request) {
     // Görevler (aktif tablo) — gorevler_normal view: yıkama görevleri hariç.
     // NOT: gorevler tablosunda iptal_eden_id / iptal_tarihi YOK (sadece canli_gorevler'de).
     // Spesifik görevlerde IPTAL eden = islemi_yapan_id, IPTAL tarihi = durum_degisim_tarihi.
-    let qAktif = admin.from('gorevler_normal')
-      .select('id,tanim,durum,lokasyon_id,atanan_kullanici_id,olusturan_id,islemi_yapan_id,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi,durum_sebep,iptal_sebep')
-      .eq('firma_id', firmaId)
-    if (projeId)     qAktif = (qAktif as any).eq('proje_id', projeId)
-    if (targetLokasyonIds) qAktif = (qAktif as any).in('lokasyon_id', targetLokasyonIds)
-    if (atananId)    qAktif = (qAktif as any).eq('atanan_kullanici_id', atananId)
-    if (durumFiltreRaw && durumFiltreRaw !== 'TUMU') qAktif = (qAktif as any).eq('durum', durumFiltreRaw)
-
-    const { data: aktif } = await qAktif
+    // CHUNK-AWARE: targetLokasyonIds buyuk ust lokasyon icin 2000+ olabilir -> URL overflow.
+    const buildAktifQ = (slice: string[] | null) => {
+      let q: any = admin.from('gorevler_normal')
+        .select('id,tanim,durum,lokasyon_id,atanan_kullanici_id,olusturan_id,islemi_yapan_id,olusturma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,durum_degisim_tarihi,durum_sebep,iptal_sebep')
+        .eq('firma_id', firmaId)
+      if (projeId)     q = q.eq('proje_id', projeId)
+      if (slice)       q = q.in('lokasyon_id', slice)
+      if (atananId)    q = q.eq('atanan_kullanici_id', atananId)
+      if (durumFiltreRaw && durumFiltreRaw !== 'TUMU') q = q.eq('durum', durumFiltreRaw)
+      return q
+    }
+    const aktif: any[] = []
+    if (!targetLokasyonIds || targetLokasyonIds.length === 0) {
+      const { data } = await buildAktifQ(null)
+      if (data) aktif.push(...data)
+    } else {
+      const seen = new Set<string>()
+      for (let i = 0; i < targetLokasyonIds.length; i += 100) {
+        const { data } = await buildAktifQ(targetLokasyonIds.slice(i, i + 100))
+        for (const r of (data ?? [])) {
+          if (!seen.has(r.id)) { seen.add(r.id); aktif.push(r) }
+        }
+      }
+    }
 
     // Filtreleme: tarih aralığı
     const tumGorevler = (aktif ?? []).filter((g: any) => {
