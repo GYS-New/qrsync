@@ -70,36 +70,71 @@ export default function CanliAkisIzlemeBlock({
   }, [])
 
   async function fetchLive() {
-    // İşlem yapılmış VEYA durum değişmiş görevleri getir
-    // islemi_yapan_id null olanları da dahil et — son durum değişimine göre sırala
-    let q = supabase
-      .from('canli_gorevler')
-      .select(selectCols)
-      .not('durum', 'in', '("HAZIR")')          // HAZIR olanları gizle (henüz işlem yok)
-      .order('durum_degisim_tarihi', { ascending: false, nullsFirst: false })
-      .limit(limit)
-    if (firmaId) q = q.eq('firma_id', firmaId)
-    if (projeId) q = (q as any).eq('proje_id', projeId)
-    if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)
+    // Chunk-aware sorgu: yetkiliLokIds buyukse (>100 UUID) 100'luk parcalara bol,
+    // her chunk'tan limit kadar cek, client-side merge+sort+slice yap. URL
+    // Cloudflare 8KB limitini asmaz.
+    const buildBase = (slice: string[] | null) => {
+      let q = supabase.from('canli_gorevler').select(selectCols)
+        .not('durum', 'in', '("HAZIR")')
+        .order('durum_degisim_tarihi', { ascending: false, nullsFirst: false })
+        .limit(limit)
+      if (firmaId) q = q.eq('firma_id', firmaId)
+      if (projeId) q = (q as any).eq('proje_id', projeId)
+      if (slice) q = (q as any).in('lokasyon_id', slice)
+      return q
+    }
 
-    const { data, error } = await q
+    const runWithLok = async (): Promise<any[] | null> => {
+      if (!yetkiliLokIds || yetkiliLokIds.length === 0) {
+        const { data, error } = await buildBase(null)
+        if (error) return null
+        return data ?? []
+      }
+      if (yetkiliLokIds.length <= 100) {
+        const { data, error } = await buildBase(yetkiliLokIds)
+        if (error) return null
+        return data ?? []
+      }
+      const out: any[] = []
+      for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+        const { data } = await buildBase(yetkiliLokIds.slice(i, i + 100))
+        if (data) out.push(...data)
+      }
+      return out
+    }
 
-    // Sütun yoksa olusturma_tarihi ile fallback
-    if (error) {
-      let q2 = supabase
-        .from('canli_gorevler')
-        .select(selectCols)
+    const data = await runWithLok()
+    if (data) {
+      // Client-side sort + limit (chunk'lardan gelen birlesik liste)
+      const sorted = [...data].sort((a: any, b: any) =>
+        (b.durum_degisim_tarihi ?? '').localeCompare(a.durum_degisim_tarihi ?? ''))
+      setRows(sorted.slice(0, limit))
+      return
+    }
+
+    // Fallback: olusturma_tarihi (sadece orijinal sorgu hata verdiginde)
+    const buildBase2 = (slice: string[] | null) => {
+      let q2 = supabase.from('canli_gorevler').select(selectCols)
         .order('olusturma_tarihi', { ascending: false })
         .limit(limit)
       if (firmaId) q2 = q2.eq('firma_id', firmaId)
       if (projeId) q2 = (q2 as any).eq('proje_id', projeId)
-      if (yetkiliLokIds?.length) q2 = (q2 as any).in('lokasyon_id', yetkiliLokIds)
-      const { data: d2 } = await q2
-      if (d2) setRows(d2 as any)
-      return
+      if (slice) q2 = (q2 as any).in('lokasyon_id', slice)
+      return q2
     }
-
-    if (data) setRows(data as any)
+    const out2: any[] = []
+    if (!yetkiliLokIds || yetkiliLokIds.length === 0) {
+      const { data: d2 } = await buildBase2(null)
+      if (d2) out2.push(...d2)
+    } else {
+      for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+        const { data: d2 } = await buildBase2(yetkiliLokIds.slice(i, i + 100))
+        if (d2) out2.push(...d2)
+      }
+    }
+    const sorted2 = out2.sort((a: any, b: any) =>
+      (b.olusturma_tarihi ?? '').localeCompare(a.olusturma_tarihi ?? ''))
+    setRows(sorted2.slice(0, limit) as any)
   }
 
   useEffect(() => {

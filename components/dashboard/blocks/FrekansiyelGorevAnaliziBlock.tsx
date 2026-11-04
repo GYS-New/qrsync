@@ -69,29 +69,40 @@ export default function FrekansiyelGorevAnaliziBlock({
 
   async function fetchCounts() {
     setLoading(true)
-    const ff = (q: any) => {
-      let r = firmaId ? q.eq('firma_id', firmaId) : q
-      if (projeId) r = r.eq('proje_id', projeId)
-      if (yetkiliLokIds?.length) r = r.in('lokasyon_id', yetkiliLokIds)
-      return r
-    }
     const bugunVG = suankiVardiyaGunu(vardiyaAyari)
     const rangeStartDate = getRangeStartDate(mode, bugunVG)
-    const base = (tablo: string, q?: any) =>
-      ff((q ?? supabase.from(tablo).select('*', { count: 'exact', head: true })).gte('vardiya_gunu', rangeStartDate))
 
-    // Canlı + Arşiv sorguları paralel çek
+    // Chunk-aware count: yetkiliLokIds buyukse (>100) URL asmasın diye slice'lara bol.
+    const chunks: (string[] | null)[] = !yetkiliLokIds || yetkiliLokIds.length === 0
+      ? [null]
+      : yetkiliLokIds.length <= 100
+        ? [yetkiliLokIds]
+        : Array.from({ length: Math.ceil(yetkiliLokIds.length / 100) }, (_, i) => yetkiliLokIds.slice(i * 100, (i + 1) * 100))
+
+    const chunkCount = async (tablo: 'canli_gorevler' | 'canli_gorevler_arsiv', durumFilter: (q: any) => any) => {
+      let total = 0
+      for (const slice of chunks) {
+        let q = durumFilter(supabase.from(tablo).select('*', { count: 'exact', head: true })).gte('vardiya_gunu', rangeStartDate)
+        if (firmaId) q = q.eq('firma_id', firmaId)
+        if (projeId) q = (q as any).eq('proje_id', projeId)
+        if (slice) q = (q as any).in('lokasyon_id', slice)
+        const { count } = await q
+        total += (count ?? 0)
+      }
+      return { count: total }
+    }
+
     const results = await Promise.allSettled([
       // Canlı
-      base('canli_gorevler', supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).neq('durum', 'IPTAL')),
-      base('canli_gorevler', supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI')),
-      base('canli_gorevler', supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'ZAMANINDA_YAPILAMAYAN')),
-      base('canli_gorevler', supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'BEKLEMEDE')),
+      chunkCount('canli_gorevler', (q) => q.neq('durum', 'IPTAL')),
+      chunkCount('canli_gorevler', (q) => q.eq('durum', 'TAMAMLANDI')),
+      chunkCount('canli_gorevler', (q) => q.eq('durum', 'ZAMANINDA_YAPILAMAYAN')),
+      chunkCount('canli_gorevler', (q) => q.eq('durum', 'BEKLEMEDE')),
       // Arşiv
-      base('canli_gorevler_arsiv', supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true }).neq('durum', 'IPTAL')),
-      base('canli_gorevler_arsiv', supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI')),
-      base('canli_gorevler_arsiv', supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true }).eq('durum', 'ZAMANINDA_YAPILAMAYAN')),
-      base('canli_gorevler_arsiv', supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true }).eq('durum', 'BEKLEMEDE')),
+      chunkCount('canli_gorevler_arsiv', (q) => q.neq('durum', 'IPTAL')),
+      chunkCount('canli_gorevler_arsiv', (q) => q.eq('durum', 'TAMAMLANDI')),
+      chunkCount('canli_gorevler_arsiv', (q) => q.eq('durum', 'ZAMANINDA_YAPILAMAYAN')),
+      chunkCount('canli_gorevler_arsiv', (q) => q.eq('durum', 'BEKLEMEDE')),
     ])
 
     const n = (r: PromiseSettledResult<any>) => r.status === 'fulfilled' ? (r.value?.count ?? 0) : 0

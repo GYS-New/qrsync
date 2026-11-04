@@ -36,26 +36,48 @@ export default async function GunlukPerformansBlock({
     bugunVG = suankiVardiyaGunu(Array.isArray(set) ? set : [])
   }
 
-  // Spesifik görevler (tek seferlik — vardiya kavramı yok, olusturma_tarihi korunur).
-  // gorevler_normal view'i Oto Yıkama görevlerini hariç tutar.
-  const buildQ1 = () => {
-    let q = supabase.from('gorevler_normal').select('durum').gte('olusturma_tarihi', today.toISOString())
-    if (firmaId) q = q.eq('firma_id', firmaId)
-    if (projeId) q = (q as any).eq('proje_id', projeId)
-    if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)
-    return q
+  // Chunk-aware sorgular (yetkiliLokIds buyukse URL asmasın).
+  const chunks = (() => {
+    if (!yetkiliLokIds || yetkiliLokIds.length === 0) return [null] as (string[] | null)[]
+    if (yetkiliLokIds.length <= 100) return [yetkiliLokIds] as (string[] | null)[]
+    const out: string[][] = []
+    for (let i = 0; i < yetkiliLokIds.length; i += 100) out.push(yetkiliLokIds.slice(i, i + 100))
+    return out as (string[] | null)[]
+  })()
+
+  // Spesifik görevler — gorevler_normal view'i Oto Yıkama hariç.
+  const fetchQ1 = async () => {
+    const out: any[] = []
+    for (const slice of chunks) {
+      const d = await fetchAll(() => {
+        let q = supabase.from('gorevler_normal').select('durum').gte('olusturma_tarihi', today.toISOString())
+        if (firmaId) q = q.eq('firma_id', firmaId)
+        if (projeId) q = (q as any).eq('proje_id', projeId)
+        if (slice) q = (q as any).in('lokasyon_id', slice)
+        return q
+      })
+      out.push(...d)
+    }
+    return out
   }
 
   // Frekansiyel görevler — vardiya_gunu üzerinden (sarkan V1 dahil)
-  const buildQ2 = () => {
-    let q = supabase.from('canli_gorevler').select('durum').eq('vardiya_gunu', bugunVG)
-    if (firmaId) q = q.eq('firma_id', firmaId)
-    if (projeId) q = (q as any).eq('proje_id', projeId)
-    if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)
-    return q
+  const fetchQ2 = async () => {
+    const out: any[] = []
+    for (const slice of chunks) {
+      const d = await fetchAll(() => {
+        let q = supabase.from('canli_gorevler').select('durum').eq('vardiya_gunu', bugunVG)
+        if (firmaId) q = q.eq('firma_id', firmaId)
+        if (projeId) q = (q as any).eq('proje_id', projeId)
+        if (slice) q = (q as any).in('lokasyon_id', slice)
+        return q
+      })
+      out.push(...d)
+    }
+    return out
   }
 
-  const [d1, d2] = await Promise.all([fetchAll(buildQ1), fetchAll(buildQ2)])
+  const [d1, d2] = await Promise.all([fetchQ1(), fetchQ2()])
 
   const counts: Record<string, number> = {}
   ;[...d1, ...d2].forEach((r: any) => {

@@ -26,19 +26,34 @@ export default async function AktifGorevlerBlock({ firmaId, projeId, yetkiliLokI
 }: DashboardBlockProps & { firmaId: string | null; projeId?: string | null; limit?: number }) {
   const supabase = createClient()
 
-  let q = supabase
-    .from('gorevler_normal')
-    .select('id,tanim,durum,olusturma_tarihi,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)')
-    .order('olusturma_tarihi', { ascending: false })
-    .limit(limit)
+  // Chunk-aware: yetkiliLokIds buyukse (musteri cok ust yetki) URL asmasın.
+  const buildQ = (slice: string[] | null) => {
+    let q = supabase
+      .from('gorevler_normal')
+      .select('id,tanim,durum,olusturma_tarihi,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)')
+      .order('olusturma_tarihi', { ascending: false })
+      .limit(limit)
+    if (firmaId) q = q.eq('firma_id', firmaId)
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (slice) q = (q as any).in('lokasyon_id', slice)
+    return q
+  }
 
-  if (firmaId) q = q.eq('firma_id', firmaId)
-  if (projeId) q = (q as any).eq('proje_id', projeId)
-  if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)
-
-  // SA: firma seçilmemişse tüm firmaların son görevlerini listeler.
-  const sonGorevler = (await q).data
-  const rows = sonGorevler ?? []
+  let rows: any[] = []
+  if (!yetkiliLokIds || yetkiliLokIds.length === 0) {
+    rows = (await buildQ(null)).data ?? []
+  } else if (yetkiliLokIds.length <= 100) {
+    rows = (await buildQ(yetkiliLokIds)).data ?? []
+  } else {
+    const collected: any[] = []
+    for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+      const { data } = await buildQ(yetkiliLokIds.slice(i, i + 100))
+      if (data) collected.push(...data)
+    }
+    rows = collected
+      .sort((a: any, b: any) => (b.olusturma_tarihi ?? '').localeCompare(a.olusturma_tarihi ?? ''))
+      .slice(0, limit)
+  }
   const padded = Array.from({ length: limit }).map((_, i) => rows[i] ?? null)
 
   return (

@@ -32,18 +32,36 @@ export default async function SonGorevlerBlock({ firmaId, projeId,
   // (arşive geçmesi gereken eski terminal kayıtlar listede görünmesin)
   const sinir24sIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  let q = supabase
-    .from('gorevler_normal')
-    .select('id,tanim,durum,olusturma_tarihi,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)')
-    .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24sIso})`)
-    .order('olusturma_tarihi', { ascending: false })
-    .limit(limit)
+  // Chunk-aware: yetkiliLokIds buyukse (musteri cok ust lokasyon yetkisi)
+  // tek .in() URL Cloudflare 8KB asar. 100'luk chunk + client-side sort+limit.
+  const buildQ = (slice: string[] | null) => {
+    let q = supabase
+      .from('gorevler_normal')
+      .select('id,tanim,durum,olusturma_tarihi,lokasyonlar(tanim),users!atanan_kullanici_id(isim_soyisim)')
+      .or(`durum.in.(ACIK,ISLEMDE),and(durum.eq.TAMAMLANDI,tamamlanma_tarihi.gt.${sinir24sIso})`)
+      .order('olusturma_tarihi', { ascending: false })
+      .limit(limit)
+    if (firmaId) q = q.eq('firma_id', firmaId)
+    if (projeId) q = (q as any).eq('proje_id', projeId)
+    if (slice) q = (q as any).in('lokasyon_id', slice)
+    return q
+  }
 
-  if (firmaId) q = q.eq('firma_id', firmaId)
-  if (projeId) q = (q as any).eq('proje_id', projeId)
-  if (yetkiliLokIds?.length) q = (q as any).in('lokasyon_id', yetkiliLokIds)
-
-  const rows = (await q).data ?? []
+  let rows: any[] = []
+  if (!yetkiliLokIds || yetkiliLokIds.length === 0) {
+    rows = (await buildQ(null)).data ?? []
+  } else if (yetkiliLokIds.length <= 100) {
+    rows = (await buildQ(yetkiliLokIds)).data ?? []
+  } else {
+    const collected: any[] = []
+    for (let i = 0; i < yetkiliLokIds.length; i += 100) {
+      const { data } = await buildQ(yetkiliLokIds.slice(i, i + 100))
+      if (data) collected.push(...data)
+    }
+    rows = collected
+      .sort((a: any, b: any) => (b.olusturma_tarihi ?? '').localeCompare(a.olusturma_tarihi ?? ''))
+      .slice(0, limit)
+  }
   const padded = Array.from({ length: limit }).map((_, i) => rows[i] ?? null)
 
   return (

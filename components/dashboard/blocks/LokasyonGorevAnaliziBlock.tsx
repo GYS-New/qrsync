@@ -59,22 +59,29 @@ export default function LokasyonGorevAnaliziBlock({
       const rangeStartDate = rangeStartDateFor(mode, bugunVG)
       const sel = `lokasyon_id,vardiya_gunu,lokasyonlar(tanim,parent_id,parent:parent_id(tanim))`
 
-      // Canlı — vardiya_gunu üzerinden (sarkan V1 dahil)
-      let qC = supabase.from('canli_gorevler').select(sel).gte('vardiya_gunu', rangeStartDate)
-      if (firmaId) qC = qC.eq('firma_id', firmaId)
-      if (projeId) qC = (qC as any).eq('proje_id', projeId)
-      if (yetkiliLokIds?.length) qC = (qC as any).in('lokasyon_id', yetkiliLokIds)
+      // Chunk-aware (yetkiliLokIds buyukse URL asmasın).
+      const chunks: (string[] | null)[] = !yetkiliLokIds || yetkiliLokIds.length === 0
+        ? [null]
+        : yetkiliLokIds.length <= 100
+          ? [yetkiliLokIds]
+          : Array.from({ length: Math.ceil(yetkiliLokIds.length / 100) }, (_, i) => yetkiliLokIds.slice(i * 100, (i + 1) * 100))
 
-      // Arşiv
-      let qA = supabase.from('canli_gorevler_arsiv').select(sel).gte('vardiya_gunu', rangeStartDate)
-      if (firmaId) qA = qA.eq('firma_id', firmaId)
-      if (projeId) qA = (qA as any).eq('proje_id', projeId)
-      if (yetkiliLokIds?.length) qA = (qA as any).in('lokasyon_id', yetkiliLokIds)
+      const runTbl = async (tbl: 'canli_gorevler' | 'canli_gorevler_arsiv') => {
+        const out: any[] = []
+        for (const slice of chunks) {
+          let q = supabase.from(tbl).select(sel).gte('vardiya_gunu', rangeStartDate)
+          if (firmaId) q = q.eq('firma_id', firmaId)
+          if (projeId) q = (q as any).eq('proje_id', projeId)
+          if (slice) q = (q as any).in('lokasyon_id', slice)
+          const { data } = await q.limit(5000)
+          if (data) out.push(...data)
+        }
+        return out
+      }
 
-      const [{ data: canli }, { data: arsiv }] = await Promise.all([
-        qC.limit(5000),
-        qA.limit(5000),
-      ])
+      const [canli, arsiv] = await Promise.all([runTbl('canli_gorevler'), runTbl('canli_gorevler_arsiv')])
+      const canliResp = { data: canli }, arsivResp = { data: arsiv }
+      void canliResp; void arsivResp
       if (lastReq.current !== reqId) return
 
       const agg: Record<string, Row> = {}

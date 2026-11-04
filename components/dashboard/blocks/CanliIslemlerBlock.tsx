@@ -32,31 +32,54 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
     bugunVG = suankiVardiyaGunu(Array.isArray(set) ? set : [])
   }
 
-  // Görev sorguları: firma + proje + lokasyon yetki filtresi
-  const gf = (q: any) => {
+  // Chunk-aware count: yetkiliLokIds buyukse (musteri cok ust yetki) 100'luk
+  // slice'larla count'u toplar. Query builder factory + .in('lokasyon_id', slice).
+  const chunks: (string[] | null)[] = !yetkiliLokIds || yetkiliLokIds.length === 0
+    ? [null]
+    : yetkiliLokIds.length <= 100
+      ? [yetkiliLokIds]
+      : Array.from({ length: Math.ceil(yetkiliLokIds.length / 100) }, (_, i) => yetkiliLokIds.slice(i * 100, (i + 1) * 100))
+
+  const applyFirmaProje = (q: any) => {
     let r = firmaId ? q.eq('firma_id', firmaId) : q
     if (projeId) r = r.eq('proje_id', projeId)
-    if (yetkiliLokIds && yetkiliLokIds.length > 0) r = r.in('lokasyon_id', yetkiliLokIds)
     return r
+  }
+
+  // gf(buildFn) — buildFn yeni query uretmeli; biz chunk'layip count topariz.
+  const gf = async (buildFn: () => any): Promise<{ status: 'fulfilled' | 'rejected'; value?: { count: number; data?: any[] }; reason?: any }> => {
+    try {
+      let total = 0
+      for (const slice of chunks) {
+        let q = applyFirmaProje(buildFn())
+        if (slice) q = (q as any).in('lokasyon_id', slice)
+        const { count, error } = await q
+        if (error) throw error
+        total += (count ?? 0)
+      }
+      return { status: 'fulfilled', value: { count: total } }
+    } catch (reason) {
+      return { status: 'rejected', reason }
+    }
   }
   // Kullanıcı/Lokasyon: sadece firma filtresi
   const ff = (q: any) => firmaId ? q.eq('firma_id', firmaId) : q
 
   const results = await Promise.allSettled([
     // [0] Spesifik toplam bugün — gorevler_normal view'i Oto Yıkama görevlerini hariç tutar
-    gf(supabase.from('gorevler_normal').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', todayISO)),
+    gf(() => supabase.from('gorevler_normal').select('*', { count: 'exact', head: true }).gte('olusturma_tarihi', todayISO)),
     // [1] Spesifik tamamlanan bugün
-    gf(supabase.from('gorevler_normal').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').gte('olusturma_tarihi', todayISO)),
+    gf(() => supabase.from('gorevler_normal').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').gte('olusturma_tarihi', todayISO)),
 
     // [2] Frekansiyel canlı toplam bugün — vardiya_gunu üzerinden (sarkan V1 dahil)
-    gf(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('vardiya_gunu', bugunVG)),
+    gf(() => supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('vardiya_gunu', bugunVG)),
     // [3] Frekansiyel canlı tamamlanan bugün
-    gf(supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').eq('vardiya_gunu', bugunVG)),
+    gf(() => supabase.from('canli_gorevler').select('*', { count: 'exact', head: true }).eq('durum', 'TAMAMLANDI').eq('vardiya_gunu', bugunVG)),
 
     // [4] Frekansiyel ARŞİV toplam bugün (arşive taşınanlar)
-    gf(supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true }).eq('vardiya_gunu', bugunVG)),
+    gf(() => supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true }).eq('vardiya_gunu', bugunVG)),
     // [5] Frekansiyel ARŞİV tamamlanan bugün
-    gf(supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true })
+    gf(() => supabase.from('canli_gorevler_arsiv').select('*', { count: 'exact', head: true })
       .in('durum', ['TAMAMLANDI', 'ZAMANINDA_YAPILAMAYAN']).eq('vardiya_gunu', bugunVG)),
 
     // [6] Kullanıcılar toplam (proje + lokasyon yetki filtreli)
@@ -90,9 +113,34 @@ export default async function CanliIslemlerBlock({ firmaId, projeId, isSuperAdmi
     // [8] Lokasyonlar toplam (proje + lokasyon yetki filtreli)
     (() => { let lq = supabase.from('lokasyonlar').select('*', { count: 'exact', head: true }).eq('aktif', true); if (firmaId) lq = lq.eq('firma_id', firmaId); if (projeId) lq = (lq as any).eq('proje_id', projeId); if (yetkiliLokIds && yetkiliLokIds.length > 0) lq = lq.in('id', yetkiliLokIds); return lq })(),
     // [9] Görevli lokasyonlar — frekansiyel (bugün tüm durumlar, vardiya_gunu üzerinden)
-    gf(supabase.from('canli_gorevler').select('lokasyon_id').eq('vardiya_gunu', bugunVG).limit(3000)),
+    // Chunk-aware: her slice icin select, sonuclari birlestir (data field).
+    (async () => {
+      try {
+        const all: any[] = []
+        for (const slice of chunks) {
+          let q = applyFirmaProje(supabase.from('canli_gorevler').select('lokasyon_id').eq('vardiya_gunu', bugunVG))
+          if (slice) q = (q as any).in('lokasyon_id', slice)
+          const { data, error } = await q.limit(3000)
+          if (error) throw error
+          if (data) all.push(...data)
+        }
+        return { data: all }
+      } catch (e) { throw e }
+    })(),
     // [10] Görevli lokasyonlar — spesifik (bugün tüm durumlar). gorevler_normal Oto Yıkama hariç.
-    gf(supabase.from('gorevler_normal').select('lokasyon_id').gte('olusturma_tarihi', todayISO).limit(3000)),
+    (async () => {
+      try {
+        const all: any[] = []
+        for (const slice of chunks) {
+          let q = applyFirmaProje(supabase.from('gorevler_normal').select('lokasyon_id').gte('olusturma_tarihi', todayISO))
+          if (slice) q = (q as any).in('lokasyon_id', slice)
+          const { data, error } = await q.limit(3000)
+          if (error) throw error
+          if (data) all.push(...data)
+        }
+        return { data: all }
+      } catch (e) { throw e }
+    })(),
   ])
 
   const n = (r: PromiseSettledResult<any>): number =>

@@ -71,45 +71,40 @@ export default function AktiviteGrafigiBlock({
     // satırlar (en güncel gün) overlap'te tekrar yakalanır → çift sayım.
     // Bug: Cuma piki 2× görünüyordu, sırasız range'in yan etkisi.
 
-    // Tamamlanan canlı görevler (frekansiyel)
-    const buildCanli = () => {
-      let q = supabase.from("canli_gorevler").select(`id,${groupCol}`)
-        .not("tamamlanma_tarihi", "is", null)
-        .gte(groupCol, rangeISO)
-        .order('id', { ascending: true })
-      if (firmaId) q = q.eq("firma_id", firmaId)
-      if (projeId) q = (q as any).eq("proje_id", projeId)
-      if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
-      return q
-    }
+    // Chunk-aware: yetkiliLokIds buyukse (musteri cok ust yetki) URL asmasın.
+    const chunks: (string[] | null)[] = !yetkiliLokIds || yetkiliLokIds.length === 0
+      ? [null]
+      : yetkiliLokIds.length <= 100
+        ? [yetkiliLokIds]
+        : Array.from({ length: Math.ceil(yetkiliLokIds.length / 100) }, (_, i) => yetkiliLokIds.slice(i * 100, (i + 1) * 100))
 
-    // Tamamlanan arşiv görevler
-    const buildArsiv = () => {
-      let q = supabase.from("canli_gorevler_arsiv").select(`id,${groupCol}`)
-        .not("tamamlanma_tarihi", "is", null)
-        .gte(groupCol, rangeISO)
-        .order('id', { ascending: true })
-      if (firmaId) q = q.eq("firma_id", firmaId)
-      if (projeId) q = (q as any).eq("proje_id", projeId)
-      if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
-      return q
-    }
-
-    // Tamamlanan spesifik görevler — gorevler_normal view Oto Yıkama'yı hariç tutar
-    const buildSpesifik = () => {
-      let q = supabase.from("gorevler_normal").select(`id,${groupCol}`)
-        .eq("durum", "TAMAMLANDI")
-        .not("tamamlanma_tarihi", "is", null)
-        .gte(groupCol, rangeISO)
-        .order('id', { ascending: true })
-      if (firmaId) q = q.eq("firma_id", firmaId)
-      if (projeId) q = (q as any).eq("proje_id", projeId)
-      if (yetkiliLokIds?.length) q = (q as any).in("lokasyon_id", yetkiliLokIds)
-      return q
+    const fetchChunked = async (
+      tablo: 'canli_gorevler' | 'canli_gorevler_arsiv' | 'gorevler_normal',
+      extraFilter?: (q: any) => any,
+    ) => {
+      const out: any[] = []
+      for (const slice of chunks) {
+        const build = () => {
+          let q = supabase.from(tablo).select(`id,${groupCol}`)
+            .not("tamamlanma_tarihi", "is", null)
+            .gte(groupCol, rangeISO)
+            .order('id', { ascending: true })
+          if (extraFilter) q = extraFilter(q)
+          if (firmaId) q = q.eq("firma_id", firmaId)
+          if (projeId) q = (q as any).eq("proje_id", projeId)
+          if (slice) q = (q as any).in("lokasyon_id", slice)
+          return q
+        }
+        const rows = await fetchAllPages(build)
+        out.push(...rows)
+      }
+      return out
     }
 
     const [canliRows, arsivRows, spesifikRows] = await Promise.all([
-      fetchAllPages(buildCanli), fetchAllPages(buildArsiv), fetchAllPages(buildSpesifik)
+      fetchChunked('canli_gorevler'),
+      fetchChunked('canli_gorevler_arsiv'),
+      fetchChunked('gorevler_normal', (q) => q.eq('durum', 'TAMAMLANDI')),
     ])
     // Defansif dedupe — pagination overlap veya farkli kaynaktan gelen
     // ayni ID'yi cift saymamak icin. Her tablo kendi ID universe'i ama
