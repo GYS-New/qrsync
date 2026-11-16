@@ -381,9 +381,13 @@ export async function GET(request: Request) {
     `
 
     // Sayfa 2 ek listeler: hedefe uygun gruplar | hedef altinda kalan gruplar
-    // Basari = (tamamlanan + sapma) / hedef * 100. hedef=0 olanlar dahil edilmez.
+    // Backend formulu (lib/reports/genel-rapor-data.ts:741):
+    //   gerceklesen = tamamlanan + ekstra (frekansDisi) — ekstra basariyi ARTIRIR
+    //   basariOrani = gerceklesen / hedef * 100
+    // Sapma GENEL orana girer (genelOran), basariya degil.
     type GrupAgg = { grup: string; hedef: number; tamamlanan: number; sapma: number; kayip: number; frekansDisi: number }
-    const basariPct = (g: GrupAgg) => g.hedef > 0 ? (g.tamamlanan + g.sapma) / g.hedef * 100 : 0
+    const gerceklesenOf = (g: GrupAgg) => g.tamamlanan + g.frekansDisi
+    const basariPct = (g: GrupAgg) => g.hedef > 0 ? gerceklesenOf(g) / g.hedef * 100 : 0
     const uygunGruplar = grupBazli
       .filter(g => g.hedef > 0 && basariPct(g) >= 100)
       .sort((a, b) => basariPct(b) - basariPct(a))
@@ -397,7 +401,7 @@ export async function GET(request: Request) {
       return `<tr>
         <td>${esc(g.grup)}</td>
         <td class="num">${g.hedef}</td>
-        <td class="num">${g.tamamlanan + g.sapma}</td>
+        <td class="num">${gerceklesenOf(g)}</td>
         <td class="num" style="color:${basariColor};font-weight:800">${bStr}</td>
       </tr>`
     }
