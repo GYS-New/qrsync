@@ -157,16 +157,9 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
 
   const { ip, ua } = getRequestMeta(req)
 
-  // ── EŞLEŞMİŞ CİHAZ KONTROLÜ ─────────────────────────────────────────────
-  // Aynı firmaya ait aktif bir device_token (mobile app paired), son 30 gün
-  // içinde IP VEYA User-Agent eşleşmesi varsa → bu cihaz çalışan cihazıdır.
-  //
-  // Çift kontrol: kullanıcı WiFi/mobil veri geçişi yaparak IP'yi
-  // değiştirse bile UA tipik olarak sabit (cihaz modeli + OS sürümü).
-  // Tek koşullu IP eşleşmesi bypass edilebiliyordu, UA fallback'i bunu
-  // kapatır. Eski tokenlarda son_ip/son_user_agent NULL — doğal olarak
-  // atlar. CGNAT/aynı cihaz modeli ortak ortamlarda yanlış-engellemeyi
-  // görebilmek için her block audit log'a yazılır.
+  // ── FAZ 1: EŞLEŞMİŞ CİHAZ KONTROLÜ (IP/UA) ───────────────────────────────
+  // getRequestMeta artık CF-Connecting-IP önceliklidir — gerçek client IP.
+  // Önce mevcut akış: aktif device_token + 30 gün IP veya UA eşleşmesi → BLOCK.
   if (ip || ua) {
     const pencereIso = new Date(Date.now() - ESLESME_PENCERESI_DK * 60 * 1000).toISOString()
     const baseQ = admin
@@ -176,14 +169,12 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       .eq('aktif', true)
       .gte('son_kullanim', pencereIso)
 
-    // Önce IP eşleşmesini dene (daha hızlı, daha specific)
     let paired: any = null
     let eslesmeYontemi: 'IP' | 'UA' | null = null
     if (ip) {
       const { data } = await baseQ.eq('son_ip', ip).limit(1).maybeSingle()
       if (data) { paired = data; eslesmeYontemi = 'IP' }
     }
-    // IP eşleşmediyse UA fallback'ini dene
     if (!paired && ua) {
       const { data } = await baseQ.eq('son_user_agent', ua).limit(1).maybeSingle()
       if (data) { paired = data; eslesmeYontemi = 'UA' }
@@ -215,6 +206,127 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
         code: 'CIHAZ_ESLESMIS',
       }, { status: 403 })
     }
+  }
+
+  // ── FAZ 2: KİMLİK EŞLEŞMESİ (ad_soyad / gsm users tablosuyla) ────────────
+  // Personel kendini belli ediyor → BLOCK. Placeholder telefonlar (55555...)
+  // ve tek-isim eşleşmeleri (örn "oktay") false-positive yaratabildiği için
+  // GSM exact match + ad_soyad normalize (case/space-insensitive) exact match.
+  const normAd = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+  const normTel = (s: string) => s.replace(/[^0-9]/g, '')
+  const PLACEHOLDER_TELS = new Set(['05555555555', '05550000000', '5555555555', '5550000000'])
+
+  const kimlikEslesen: { kaynak: 'GSM' | 'AD_SOYAD'; user_id: string; isim: string } | null = await (async () => {
+    // GSM eşleşmesi (placeholder değilse)
+    if (gsmClean) {
+      const gsmNormalized = normTel(gsmClean)
+      if (gsmNormalized.length >= 10 && !PLACEHOLDER_TELS.has(gsmNormalized)) {
+        const { data } = await admin
+          .from('users')
+          .select('id, isim_soyisim, telefon')
+          .eq('firma_id', lok.firma_id)
+          .eq('aktif', true)
+          .not('telefon', 'is', null)
+          .limit(500)
+        const match = (data ?? []).find((u: any) => normTel(u.telefon ?? '') === gsmNormalized)
+        if (match) return { kaynak: 'GSM', user_id: match.id, isim: match.isim_soyisim ?? '' }
+      }
+    }
+    // ad_soyad exact match (normalize)
+    const adRaw = (ad_soyad ?? '').toString().trim()
+    if (adRaw.length >= 3) {
+      const adNormalized = normAd(adRaw)
+      // Çok kısa tek-isimler (örn "Ali") false-positive yapar; iki kelime şartı.
+      if (adNormalized.includes(' ')) {
+        const { data } = await admin
+          .from('users')
+          .select('id, isim_soyisim')
+          .eq('firma_id', lok.firma_id)
+          .eq('aktif', true)
+          .not('isim_soyisim', 'is', null)
+          .limit(500)
+        const match = (data ?? []).find((u: any) => normAd(u.isim_soyisim ?? '') === adNormalized)
+        if (match) return { kaynak: 'AD_SOYAD', user_id: match.id, isim: match.isim_soyisim ?? '' }
+      }
+    }
+    return null
+  })()
+
+  if (kimlikEslesen) {
+    await auditLog({
+      tip: 'kimlik_eslesen_eval_block',
+      tablo: 'musteri_degerlendirmeleri',
+      firma_id: lok.firma_id,
+      proje_id: lok.proje_id ?? null,
+      detay: {
+        lokasyon_id: lok.id,
+        gelen_ip: ip,
+        gelen_ua: ua,
+        kaynak: kimlikEslesen.kaynak,
+        eslesen_user_id: kimlikEslesen.user_id,
+        eslesen_isim: kimlikEslesen.isim,
+        girilen_ad_soyad: ad_soyad ?? null,
+        girilen_gsm: gsmClean,
+      },
+    })
+    return NextResponse.json({
+      ok: false,
+      error: 'Belirtilen kimlik bilgileri firma personeline ait. Müşteri değerlendirmesi gönderilemez.',
+      code: 'KIMLIK_ESLESMIS',
+    }, { status: 403 })
+  }
+
+  // ── FAZ 2b: LOKASYON-PERSONEL SİNYALİ (soft — sadece audit) ──────────────
+  // Değerlendirme yapılan lokasyonun ÜST lokasyonunda aktif device_token'li
+  // personel çalışıyorsa → şüpheli (BLOCK DEĞİL, sadece audit_log'a işaretle).
+  // Müşteri raporda şüpheli badge görür, karar verir.
+  try {
+    // Lokasyonun ÜST lokasyonunu bul (root ancestor)
+    let ustLokId: string | null = lok.id
+    for (let i = 0; i < 10; i++) {
+      const { data: cur } = await admin.from('lokasyonlar').select('parent_id').eq('id', ustLokId!).maybeSingle()
+      if (!cur?.parent_id) break
+      ustLokId = cur.parent_id
+    }
+    if (ustLokId) {
+      // Bu üst lokasyona yetkili aktif device_token'li personel var mı?
+      const { data: users } = await admin
+        .from('users')
+        .select('id, isim_soyisim')
+        .eq('firma_id', lok.firma_id)
+        .eq('aktif', true)
+        .eq('ust_lokasyon_id', ustLokId)
+        .limit(1)
+      if (users && users.length > 0) {
+        const uIds = users.map((u: any) => u.id)
+        const { data: dts } = await admin
+          .from('device_tokens')
+          .select('user_id')
+          .eq('aktif', true)
+          .in('user_id', uIds)
+          .limit(1)
+        if (dts && dts.length > 0) {
+          await auditLog({
+            tip: 'lokasyon_personelli_eval_suspheli',
+            tablo: 'musteri_degerlendirmeleri',
+            firma_id: lok.firma_id,
+            proje_id: lok.proje_id ?? null,
+            detay: {
+              lokasyon_id: lok.id,
+              ust_lokasyon_id: ustLokId,
+              gelen_ip: ip,
+              gelen_ua: ua,
+              girilen_ad_soyad: ad_soyad ?? null,
+              girilen_gsm: gsmClean,
+              not: 'Bu üst lokasyonda aktif device_token\'li personel çalışıyor — değerlendirme şüpheli olabilir.',
+            },
+          })
+          // Not: block etmiyoruz — sadece şüpheli log. Gerçek müşteri gelmiş olabilir.
+        }
+      }
+    }
+  } catch {
+    // Audit sinyali — başarısız olursa akış kesilmez
   }
 
   const { error } = await admin.from('musteri_degerlendirmeleri').insert({
