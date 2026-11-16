@@ -255,6 +255,19 @@ export async function GET(request: Request) {
       tbody tr:nth-child(even) { background: #F8FAFC; }
       tbody tr { page-break-inside: avoid; }
       .num { text-align: right; }
+
+      /* Sayfa 2 ek iki sutun: hedefe uygun | altinda */
+      .grup-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+      .grup-col { min-width: 0; }
+      .grup-col-head { display: flex; justify-content: space-between; align-items: center; font-size: 9px; font-weight: 800; padding: 5px 10px; border-radius: 4px; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .grup-col-head.uygun { background: #dcfce7; color: #065f46; border-left: 4px solid #10b981; }
+      .grup-col-head.altinda { background: #fee2e2; color: #991b1b; border-left: 4px solid #ef4444; }
+      .grup-col-head .count { padding: 1px 8px; border-radius: 999px; background: #ffffff; font-size: 8px; color: #111827; }
+      table.grup-mini { font-size: 7.5px; }
+      table.grup-mini thead { background: #475569; }
+      table.grup-mini thead th { padding: 3px 5px; font-size: 7px; }
+      table.grup-mini tbody td { padding: 3px 5px; }
+      .empty-row { text-align: center; color: #9ca3af; font-style: italic; padding: 10px; }
     `
 
     const metaInline = `
@@ -367,7 +380,29 @@ export async function GET(request: Request) {
       </div>
     `
 
-    // Sayfa 2: Grup Metrikleri tablosu
+    // Sayfa 2 ek listeler: hedefe uygun gruplar | hedef altinda kalan gruplar
+    // Basari = (tamamlanan + sapma) / hedef * 100. hedef=0 olanlar dahil edilmez.
+    type GrupAgg = { grup: string; hedef: number; tamamlanan: number; sapma: number; kayip: number; frekansDisi: number }
+    const basariPct = (g: GrupAgg) => g.hedef > 0 ? (g.tamamlanan + g.sapma) / g.hedef * 100 : 0
+    const uygunGruplar = grupBazli
+      .filter(g => g.hedef > 0 && basariPct(g) >= 100)
+      .sort((a, b) => basariPct(b) - basariPct(a))
+    const altindaGruplar = grupBazli
+      .filter(g => g.hedef > 0 && basariPct(g) < 100)
+      .sort((a, b) => basariPct(a) - basariPct(b))
+
+    const grupMiniRow = (g: GrupAgg, basariColor: string) => {
+      const b = basariPct(g)
+      const bStr = `%${b.toFixed(2).replace('.', ',')}`
+      return `<tr>
+        <td>${esc(g.grup)}</td>
+        <td class="num">${g.hedef}</td>
+        <td class="num">${g.tamamlanan + g.sapma}</td>
+        <td class="num" style="color:${basariColor};font-weight:800">${bStr}</td>
+      </tr>`
+    }
+
+    // Sayfa 2: Grup Metrikleri tablosu + alt iki liste (hedefe uygun | altinda)
     const grupMetrikleriTable = `
       <div class="page">
         <div class="grup-head">Grup Metrikleri — ${esc(data.firmaAdi || '—')} · ${esc(data.projeAdi || '—')} · ${esc(data.raporTarihLabel || '—')}</div>
@@ -385,6 +420,35 @@ export async function GET(request: Request) {
             <td class="num">${esc(g.basariOrani)}</td><td class="num">${esc(g.genelOran)}</td>
           </tr>`).join('')}</tbody>
         </table>
+
+        <div class="grup-split">
+          <div class="grup-col">
+            <div class="grup-col-head uygun">
+              <span>FREKANS HEDEFİNE UYGUN GRUPLAR</span>
+              <span class="count">${uygunGruplar.length}</span>
+            </div>
+            <table class="grup-mini">
+              <thead><tr><th>GRUP</th><th class="num">HEDEF</th><th class="num">GERÇEK.</th><th class="num">BAŞARI</th></tr></thead>
+              <tbody>${uygunGruplar.length === 0
+                ? `<tr><td colspan="4" class="empty-row">Bu aralıkta hedefi karşılayan grup yok</td></tr>`
+                : uygunGruplar.map(g => grupMiniRow(g, '#10b981')).join('')
+              }</tbody>
+            </table>
+          </div>
+          <div class="grup-col">
+            <div class="grup-col-head altinda">
+              <span>FREKANS HEDEFİN ALTINDA KALAN GRUPLAR</span>
+              <span class="count">${altindaGruplar.length}</span>
+            </div>
+            <table class="grup-mini">
+              <thead><tr><th>GRUP</th><th class="num">HEDEF</th><th class="num">GERÇEK.</th><th class="num">BAŞARI</th></tr></thead>
+              <tbody>${altindaGruplar.length === 0
+                ? `<tr><td colspan="4" class="empty-row">Tüm gruplar hedefi karşıladı</td></tr>`
+                : altindaGruplar.map(g => grupMiniRow(g, '#ef4444')).join('')
+              }</tbody>
+            </table>
+          </div>
+        </div>
       </div>
     `
 
