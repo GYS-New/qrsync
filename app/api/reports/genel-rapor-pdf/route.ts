@@ -173,84 +173,84 @@ export async function GET(request: Request) {
     const genelOranNum = toplamHedef > 0 ? (toplamGerceklesen / toplamHedef * 100) : 0
 
     const css = `
-      @page { size: A4 landscape; margin: 6mm; }
+      @page { size: A4 landscape; margin: 7mm; }
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Inter', -apple-system, sans-serif; color: #111827; font-size: 8px; line-height: 1.2; }
+      body { font-family: 'Inter', -apple-system, sans-serif; color: #111827; font-size: 9.5px; line-height: 1.25; }
       .page { page-break-after: always; }
       .page:last-child { page-break-after: auto; }
-      .page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1.5px solid #1A5C2A; }
-      .page-head .title { font-size: 11px; font-weight: 800; color: #0F1A0F; }
-      .page-head .meta-inline { font-size: 7px; color: #475569; }
+      .page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; padding-bottom: 5px; border-bottom: 2px solid #1A5C2A; }
+      .page-head .title { font-size: 13px; font-weight: 800; color: #0F1A0F; }
+      .page-head .meta-inline { font-size: 8.5px; color: #475569; }
       .page-head .meta-inline b { color: #0F1A0F; }
 
-      /* Block 1: Genel Performans */
-      .b1 { display: grid; grid-template-columns: 150px 1fr; gap: 8px; align-items: center; margin-bottom: 4px; }
-      .b1-oran-big { text-align: center; padding: 3px 6px; background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 5px; }
-      .b1-oran-big .val { font-size: 22px; font-weight: 900; color: ${genelOranNum >= 80 ? '#10b981' : genelOranNum >= 50 ? '#f59e0b' : '#ef4444'}; line-height: 1; }
-      .b1-oran-big .lbl { font-size: 6.5px; color: #6b7280; font-weight: 600; margin-top: 1px; text-transform: uppercase; letter-spacing: 0.04em; }
-      .b1-right { display: flex; flex-direction: column; gap: 3px; }
-      .b1-head { display: flex; justify-content: space-between; font-size: 7px; }
+      /* Block 1: Genel Performans — rahat yuksek */
+      .b1 { display: grid; grid-template-columns: 180px 1fr; gap: 10px; align-items: center; margin-bottom: 8px; }
+      .b1-oran-big { text-align: center; padding: 10px 8px; background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 7px; }
+      .b1-oran-big .val { font-size: 32px; font-weight: 900; color: ${genelOranNum >= 80 ? '#10b981' : genelOranNum >= 50 ? '#f59e0b' : '#ef4444'}; line-height: 1; }
+      .b1-oran-big .lbl { font-size: 8px; color: #6b7280; font-weight: 700; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+      .b1-right { display: flex; flex-direction: column; gap: 5px; }
+      .b1-head { display: flex; justify-content: space-between; align-items: center; font-size: 8.5px; }
       .b1-head b { color: #0F1A0F; }
-      .b1-bar { height: 10px; background: #f3f4f6; border-radius: 2px; overflow: hidden; display: flex; }
+      .b1-bar { height: 14px; background: #f3f4f6; border-radius: 3px; overflow: hidden; display: flex; }
       .b1-bar > div { height: 100%; }
       .b1-tam { background: #10b981; }
       .b1-sap { background: #f59e0b; }
       .b1-eks { background: #9ca3af; }
       .b1-kay { background: #ef4444; }
-      .b1-kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 1px; }
-      .kpi { background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 3px; padding: 3px 4px; text-align: center; }
-      .kpi .label { font-size: 6px; color: #6b7280; text-transform: uppercase; font-weight: 600; }
-      .kpi .value { font-size: 10px; font-weight: 900; color: #111827; margin-top: 1px; }
+      .b1-kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 3px; }
+      .kpi { background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 5px; padding: 7px 6px; text-align: center; }
+      .kpi .label { font-size: 7.5px; color: #6b7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.03em; }
+      .kpi .value { font-size: 15px; font-weight: 900; color: #111827; margin-top: 3px; }
       .kpi.sap { background: #FEF3C7; border-color: #FDE68A; } .kpi.sap .value { color: #D97706; }
       .kpi.kay { background: #FEE2E2; border-color: #FECACA; } .kpi.kay .value { color: #DC2626; }
       .kpi.eks { background: #F3F4F6; }
 
       /* Block 2: Departman Analizi */
-      .b2-title { font-size: 8px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin: 5px 0 2px; }
-      .dep-grid { display: grid; gap: 2px; }
-      .dep-card { border: 1px solid #e5e7eb; border-radius: 3px; padding: 2px 3px; background: #ffffff; min-width: 0; }
-      .dep-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1px; min-width: 0; }
-      .dep-name { font-size: 6.5px; font-weight: 800; color: #111827; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-      .dep-hedef { font-size: 6px; color: #6b7280; font-weight: 700; flex-shrink: 0; margin-left: 2px; }
-      .dep-bars { display: flex; flex-direction: column; gap: 1px; }
-      .dep-row { display: grid; grid-template-columns: 8px 1fr 20px; gap: 2px; align-items: center; font-size: 6px; }
-      .dep-lbl { color: #6b7280; font-weight: 700; }
-      .dep-track { height: 4px; background: #f3f4f6; border-radius: 1px; overflow: hidden; }
+      .b2-title { font-size: 10px; font-weight: 800; color: #0F1A0F; text-transform: uppercase; letter-spacing: 0.06em; margin: 8px 0 4px; padding-bottom: 3px; border-bottom: 1px solid #e5e7eb; }
+      .dep-grid { display: grid; gap: 4px; }
+      .dep-card { border: 1px solid #e5e7eb; border-radius: 4px; padding: 4px 5px; background: #ffffff; min-width: 0; }
+      .dep-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; min-width: 0; }
+      .dep-name { font-size: 7.5px; font-weight: 800; color: #111827; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+      .dep-hedef { font-size: 7px; color: #6b7280; font-weight: 700; flex-shrink: 0; margin-left: 2px; }
+      .dep-bars { display: flex; flex-direction: column; gap: 2px; }
+      .dep-row { display: grid; grid-template-columns: 9px 1fr 24px; gap: 3px; align-items: center; font-size: 7px; }
+      .dep-lbl { color: #6b7280; font-weight: 800; }
+      .dep-track { height: 6px; background: #f3f4f6; border-radius: 2px; overflow: hidden; }
       .dep-fill { height: 100%; }
       .dep-fill.tam { background: #10b981; }
       .dep-fill.sap { background: #f59e0b; }
       .dep-fill.kay { background: #ef4444; }
-      .dep-v { font-size: 6px; font-weight: 700; color: #374151; text-align: right; }
-      .dep-foot { margin-top: 1px; text-align: right; font-size: 6.5px; color: #1A5C2A; font-weight: 900; }
+      .dep-v { font-size: 7px; font-weight: 800; color: #374151; text-align: right; }
+      .dep-foot { margin-top: 3px; text-align: right; font-size: 8px; color: #1A5C2A; font-weight: 900; }
 
       /* Alt 3 blok: alt alta, her biri donut + 2-sütun bar list */
-      .freq-block { border: 1px solid #e5e7eb; border-radius: 4px; padding: 4px 6px; background: #ffffff; margin-top: 4px; }
-      .freq-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #e5e7eb; }
-      .freq-head .h3 { font-size: 8.5px; font-weight: 800; color: #111827; text-transform: uppercase; letter-spacing: 0.04em; }
-      .freq-head .count { font-size: 7px; font-weight: 700; color: #6b7280; padding: 1px 6px; border-radius: 999px; background: #F3F4F6; }
-      /* Body: donut(90px) | bars(2 column grid) */
-      .freq-body { display: grid; grid-template-columns: 110px 1fr; gap: 6px; align-items: flex-start; }
+      .freq-block { border: 1px solid #e5e7eb; border-radius: 5px; padding: 6px 10px; background: #ffffff; margin-top: 6px; }
+      .freq-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; padding-bottom: 3px; border-bottom: 1px solid #e5e7eb; }
+      .freq-head .h3 { font-size: 10px; font-weight: 800; color: #111827; text-transform: uppercase; letter-spacing: 0.05em; }
+      .freq-head .count { font-size: 8px; font-weight: 700; color: #6b7280; padding: 2px 8px; border-radius: 999px; background: #F3F4F6; }
+      /* Body: donut(130px) | bars(2 column grid) */
+      .freq-body { display: grid; grid-template-columns: 140px 1fr; gap: 10px; align-items: flex-start; }
       .freq-donut { display: flex; flex-direction: column; align-items: center; }
-      .freq-donut-legend { margin-top: 2px; display: flex; flex-direction: column; gap: 0.5px; font-size: 6.5px; width: 100%; }
-      .freq-donut-legend .ll { display: flex; justify-content: space-between; gap: 3px; }
-      .freq-donut-legend .sq { display: inline-block; width: 6px; height: 6px; border-radius: 1px; margin-right: 2px; vertical-align: middle; }
+      .freq-donut-legend { margin-top: 5px; display: flex; flex-direction: column; gap: 1.5px; font-size: 7.5px; width: 100%; }
+      .freq-donut-legend .ll { display: flex; justify-content: space-between; gap: 4px; }
+      .freq-donut-legend .sq { display: inline-block; width: 7px; height: 7px; border-radius: 1px; margin-right: 3px; vertical-align: middle; }
       .freq-donut-legend .nm { color: #475569; font-weight: 600; }
       .freq-donut-legend .vl { color: #111827; font-weight: 800; }
       /* Bar list: 2-column grid to compress height */
-      .freq-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
-      .bar-row { display: grid; grid-template-columns: 85px 1fr 28px; gap: 3px; align-items: center; font-size: 6.5px; }
+      .freq-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 18px; }
+      .bar-row { display: grid; grid-template-columns: 110px 1fr 34px; gap: 5px; align-items: center; font-size: 8px; }
       .bar-label { color: #475569; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
-      .bar-track { height: 5px; background: #f3f4f6; border-radius: 2px; overflow: hidden; }
-      .bar-fill { height: 100%; border-radius: 2px; }
-      .bar-val { font-size: 7px; font-weight: 800; color: #111827; text-align: right; }
-      .empty { color: #9ca3af; font-size: 7px; font-style: italic; padding: 3px; }
+      .bar-track { height: 7px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
+      .bar-fill { height: 100%; border-radius: 3px; }
+      .bar-val { font-size: 8.5px; font-weight: 800; color: #111827; text-align: right; }
+      .empty { color: #9ca3af; font-size: 8px; font-style: italic; padding: 5px; }
 
       /* Sayfa 2: Grup Metrikleri tablosu */
-      .grup-head { font-size: 11px; font-weight: 800; color: #0F1A0F; margin-bottom: 5px; padding-bottom: 3px; border-bottom: 1.5px solid #1A5C2A; }
-      table { width: 100%; border-collapse: collapse; font-size: 7.5px; }
+      .grup-head { font-size: 13px; font-weight: 800; color: #0F1A0F; margin-bottom: 7px; padding-bottom: 5px; border-bottom: 2px solid #1A5C2A; }
+      table { width: 100%; border-collapse: collapse; font-size: 8.5px; }
       thead { background: #1A5C2A; color: white; }
-      thead th { font-weight: 700; font-size: 7px; text-transform: uppercase; letter-spacing: 0.3px; padding: 4px 5px; text-align: left; }
-      tbody td { padding: 3px 5px; border-bottom: 1px solid #e5e7eb; }
+      thead th { font-weight: 700; font-size: 8px; text-transform: uppercase; letter-spacing: 0.3px; padding: 5px 6px; text-align: left; }
+      tbody td { padding: 4px 6px; border-bottom: 1px solid #e5e7eb; }
       tbody tr:nth-child(even) { background: #F8FAFC; }
       tbody tr { page-break-inside: avoid; }
       .num { text-align: right; }
@@ -320,7 +320,7 @@ export async function GET(request: Request) {
         </div>
         <div class="freq-body">
           <div class="freq-donut">
-            ${svgDonut(100, freqPieSlices, `%${basariNum}`, 'Başarı')}
+            ${svgDonut(130, freqPieSlices, `%${basariNum}`, 'Başarı')}
             <div class="freq-donut-legend">${donutLegendRows(freqPieSlices, toplamHedef)}</div>
           </div>
           <div class="freq-bars">${barList(grupBazli.map(g => ({ label: g.grup, value: g.tamamlanan })), '#10b981')}</div>
@@ -336,7 +336,7 @@ export async function GET(request: Request) {
         </div>
         <div class="freq-body">
           <div class="freq-donut">
-            ${svgDonut(100, sapmaPieSlices, `%${sapmaNum}`, 'Sapma')}
+            ${svgDonut(130, sapmaPieSlices, `%${sapmaNum}`, 'Sapma')}
             <div class="freq-donut-legend">
               <div class="ll"><span class="nm"><span class="sq" style="background:#f59e0b"></span>Sapma</span><span class="vl">${data.toplamSapma}</span></div>
               <div class="ll"><span class="nm"><span class="sq" style="background:#f3f4f6;border:1px solid #d1d5db"></span>Hedef Kalan</span><span class="vl">${Math.max(0, toplamHedef - data.toplamSapma)}</span></div>
@@ -355,7 +355,7 @@ export async function GET(request: Request) {
         </div>
         <div class="freq-body">
           <div class="freq-donut">
-            ${svgDonut(100, kayipPieSlices, `%${kayipNum}`, 'Kayıp')}
+            ${svgDonut(130, kayipPieSlices, `%${kayipNum}`, 'Kayıp')}
             <div class="freq-donut-legend">
               <div class="ll"><span class="nm"><span class="sq" style="background:#ef4444"></span>Kayıp</span><span class="vl">${data.toplamKayip}</span></div>
               <div class="ll"><span class="nm"><span class="sq" style="background:#f3f4f6;border:1px solid #d1d5db"></span>Hedef Kalan</span><span class="vl">${Math.max(0, toplamHedef - data.toplamKayip)}</span></div>
