@@ -1,13 +1,15 @@
 /**
  * GET /api/reports/genel-rapor-pdf?firmaId=...
  *
- * Server-side HTML template + Puppeteer → A4 LANDSCAPE PDF.
- * İÇERİK: Özet & Grafikler sekmesinin 5 bloğu, tek sayfa yatay A4:
- *   1. Genel Performans Özeti (ust strip)
- *   2. Departman Analizi (orta strip)
- *   3. Frekans Dağılımı | Sapma Frekanslar | Kayıp Frekanslar (alt 3 sutun)
- * Detay listeler (Tamamlanan/Sapma/Kayıp/Frekans Dışı gorev tablolari) yok —
- * tam liste icin Excel İndir.
+ * Server-side HTML template + Puppeteer → A4 LANDSCAPE PDF, iki sayfa:
+ *   Sayfa 1 (5 blok alt alta):
+ *     1. Genel Performans Özeti
+ *     2. Departman Analizi
+ *     3. Frekans Dağılımı & Grup Bazlı Tamamlanan
+ *     4. Sapma Frekanslar
+ *     5. Kayıp Frekanslar
+ *   Sayfa 2: Grup Metrikleri tablosu (yatay, compact)
+ * Detay görev listeleri yok — tam liste için Excel İndir.
  */
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -63,13 +65,12 @@ function svgDonut(size: number, slices: { label: string; value: number; color: s
   </svg>`
 }
 
-// Yatay cubuk listesi: [{label, value}] sayilarina gore relative bar + rakam.
-function barList(items: { label: string; value: number }[], color: string, maxRows = 20): string {
+// Yatay cubuk listesi. Gruplari relative bar + rakam ile tek-sutun olarak basar.
+function barList(items: { label: string; value: number }[], color: string): string {
   if (items.length === 0) return `<div class="empty">Veri yok</div>`
   const sorted = [...items].sort((a, b) => b.value - a.value)
   const max = Math.max(...sorted.map(x => x.value), 1)
-  const visible = sorted.slice(0, maxRows)
-  return visible.map(it => `
+  return sorted.map(it => `
     <div class="bar-row">
       <span class="bar-label">${esc(it.label)}</span>
       <div class="bar-track"><div class="bar-fill" style="width:${(it.value / max * 100).toFixed(1)}%;background:${color}"></div></div>
@@ -109,7 +110,6 @@ export async function GET(request: Request) {
     const firmaId = p.get('firmaId')
     if (!firmaId) return NextResponse.json({ error: 'Firma ID gerekli' }, { status: 400 })
 
-    // includeDetails false: detay satirlari (gorev listeleri) cekilmez; agg'ler hesaplanir.
     const data = await buildGenelRaporData({
       firmaId,
       projeId:          p.get('projeId')          || null,
@@ -134,7 +134,7 @@ export async function GET(request: Request) {
 
     const departmanlar = data.ozetAgg?.departmanMetrikleri ?? []
 
-    // Grup bazli agg (ayni isimli gruplari birlestir — frontend ozetData.grupBazli ile ayni formul)
+    // Grup bazli agg — frontend ozetData.grupBazli ile ayni formul
     const grupAgg = new Map<string, { tamamlanan: number; hedef: number; sapma: number; kayip: number; frekansDisi: number }>()
     for (const g of data.grupMetrikleri) {
       const ex = grupAgg.get(g.grup) ?? { tamamlanan: 0, hedef: 0, sapma: 0, kayip: 0, frekansDisi: 0 }
@@ -148,27 +148,24 @@ export async function GET(request: Request) {
     }
     const grupBazli = [...grupAgg.entries()].map(([grup, v]) => ({ grup, ...v }))
 
-    // Pie slices (frekans dagilimi: ust blok ile uyumlu)
+    // Pie slices
     const freqPieSlices = [
       { label: 'Tamamlanan',   value: toplamTamKural,   color: '#10b981' },
       { label: 'Sapma',        value: data.toplamSapma, color: '#f59e0b' },
       { label: 'Frekans Dışı', value: toplamEks,        color: '#9ca3af' },
       { label: 'Kayıp',        value: data.toplamKayip, color: '#ef4444' },
     ]
-    // Sapma pie (hedef karşılığı iki dilim)
     const sapmaNum = toplamHedef > 0 ? Math.round(data.toplamSapma / toplamHedef * 100) : 0
     const sapmaPieSlices = [
       { label: 'Sapma',       value: data.toplamSapma,            color: '#f59e0b' },
       { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamSapma), color: '#f3f4f6' },
     ]
-    // Kayip pie
     const kayipNum = toplamHedef > 0 ? Math.round(data.toplamKayip / toplamHedef * 100) : 0
     const kayipPieSlices = [
       { label: 'Kayıp',       value: data.toplamKayip,            color: '#ef4444' },
       { label: 'Hedef Kalan', value: Math.max(0, toplamHedef - data.toplamKayip), color: '#f3f4f6' },
     ]
 
-    // Genel Oran bar segmentleri
     const gobTamPct = toplamHedef > 0 ? (toplamTamKural / toplamHedef * 100) : 0
     const gobSapPct = toplamHedef > 0 ? (data.toplamSapma / toplamHedef * 100) : 0
     const gobEksPct = toplamHedef > 0 ? (toplamEks / toplamHedef * 100) : 0
@@ -178,76 +175,85 @@ export async function GET(request: Request) {
     const css = `
       @page { size: A4 landscape; margin: 6mm; }
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Inter', -apple-system, sans-serif; color: #111827; font-size: 8.5px; line-height: 1.25; }
-      .page { width: 100%; }
-      .page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1.5px solid #1A5C2A; }
-      .page-head .title { font-size: 12px; font-weight: 800; color: #0F1A0F; }
-      .page-head .meta-inline { font-size: 7.5px; color: #475569; }
+      body { font-family: 'Inter', -apple-system, sans-serif; color: #111827; font-size: 8px; line-height: 1.2; }
+      .page { page-break-after: always; }
+      .page:last-child { page-break-after: auto; }
+      .page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1.5px solid #1A5C2A; }
+      .page-head .title { font-size: 11px; font-weight: 800; color: #0F1A0F; }
+      .page-head .meta-inline { font-size: 7px; color: #475569; }
       .page-head .meta-inline b { color: #0F1A0F; }
 
-      .block { margin-bottom: 5px; }
-      .block-title { font-size: 8.5px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-
       /* Block 1: Genel Performans */
-      .b1 { display: grid; grid-template-columns: 180px 1fr; gap: 10px; align-items: center; }
-      .b1-oran-big { text-align: center; padding: 4px 8px; background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 6px; }
-      .b1-oran-big .val { font-size: 26px; font-weight: 900; color: ${genelOranNum >= 80 ? '#10b981' : genelOranNum >= 50 ? '#f59e0b' : '#ef4444'}; line-height: 1; }
-      .b1-oran-big .lbl { font-size: 7.5px; color: #6b7280; font-weight: 600; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
-      .b1-right { display: flex; flex-direction: column; gap: 4px; }
-      .b1-head { display: flex; justify-content: space-between; font-size: 8px; }
+      .b1 { display: grid; grid-template-columns: 150px 1fr; gap: 8px; align-items: center; margin-bottom: 4px; }
+      .b1-oran-big { text-align: center; padding: 3px 6px; background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 5px; }
+      .b1-oran-big .val { font-size: 22px; font-weight: 900; color: ${genelOranNum >= 80 ? '#10b981' : genelOranNum >= 50 ? '#f59e0b' : '#ef4444'}; line-height: 1; }
+      .b1-oran-big .lbl { font-size: 6.5px; color: #6b7280; font-weight: 600; margin-top: 1px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .b1-right { display: flex; flex-direction: column; gap: 3px; }
+      .b1-head { display: flex; justify-content: space-between; font-size: 7px; }
       .b1-head b { color: #0F1A0F; }
-      .b1-bar { height: 12px; background: #f3f4f6; border-radius: 3px; overflow: hidden; display: flex; }
+      .b1-bar { height: 10px; background: #f3f4f6; border-radius: 2px; overflow: hidden; display: flex; }
       .b1-bar > div { height: 100%; }
       .b1-tam { background: #10b981; }
       .b1-sap { background: #f59e0b; }
       .b1-eks { background: #9ca3af; }
       .b1-kay { background: #ef4444; }
-      .b1-kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 2px; }
-      .kpi { background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 4px; padding: 4px 6px; text-align: center; }
-      .kpi .label { font-size: 7px; color: #6b7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.2px; }
-      .kpi .value { font-size: 12px; font-weight: 900; color: #111827; margin-top: 2px; }
+      .b1-kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 1px; }
+      .kpi { background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 3px; padding: 3px 4px; text-align: center; }
+      .kpi .label { font-size: 6px; color: #6b7280; text-transform: uppercase; font-weight: 600; }
+      .kpi .value { font-size: 10px; font-weight: 900; color: #111827; margin-top: 1px; }
       .kpi.sap { background: #FEF3C7; border-color: #FDE68A; } .kpi.sap .value { color: #D97706; }
       .kpi.kay { background: #FEE2E2; border-color: #FECACA; } .kpi.kay .value { color: #DC2626; }
       .kpi.eks { background: #F3F4F6; }
 
       /* Block 2: Departman Analizi */
-      .dep-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
-      .dep-card { border: 1px solid #e5e7eb; border-radius: 4px; padding: 3px 4px; background: #ffffff; min-width: 0; }
-      .dep-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; min-width: 0; }
-      .dep-name { font-size: 7px; font-weight: 800; color: #111827; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-      .dep-hedef { font-size: 6.5px; color: #6b7280; font-weight: 700; flex-shrink: 0; margin-left: 2px; }
+      .b2-title { font-size: 8px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin: 5px 0 2px; }
+      .dep-grid { display: grid; gap: 2px; }
+      .dep-card { border: 1px solid #e5e7eb; border-radius: 3px; padding: 2px 3px; background: #ffffff; min-width: 0; }
+      .dep-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1px; min-width: 0; }
+      .dep-name { font-size: 6.5px; font-weight: 800; color: #111827; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+      .dep-hedef { font-size: 6px; color: #6b7280; font-weight: 700; flex-shrink: 0; margin-left: 2px; }
       .dep-bars { display: flex; flex-direction: column; gap: 1px; }
-      .dep-row { display: grid; grid-template-columns: 8px 1fr 22px; gap: 2px; align-items: center; font-size: 6.5px; }
-      .dep-lbl { color: #6b7280; font-weight: 700; font-size: 6.5px; }
-      .dep-track { height: 5px; background: #f3f4f6; border-radius: 2px; overflow: hidden; }
-      .dep-fill { height: 100%; border-radius: 2px; }
+      .dep-row { display: grid; grid-template-columns: 8px 1fr 20px; gap: 2px; align-items: center; font-size: 6px; }
+      .dep-lbl { color: #6b7280; font-weight: 700; }
+      .dep-track { height: 4px; background: #f3f4f6; border-radius: 1px; overflow: hidden; }
+      .dep-fill { height: 100%; }
       .dep-fill.tam { background: #10b981; }
       .dep-fill.sap { background: #f59e0b; }
       .dep-fill.kay { background: #ef4444; }
-      .dep-v { font-size: 6.5px; font-weight: 700; color: #374151; text-align: right; }
-      .dep-foot { margin-top: 2px; text-align: right; font-size: 6.5px; color: #1A5C2A; font-weight: 900; }
+      .dep-v { font-size: 6px; font-weight: 700; color: #374151; text-align: right; }
+      .dep-foot { margin-top: 1px; text-align: right; font-size: 6.5px; color: #1A5C2A; font-weight: 900; }
 
-      /* Block 3/4/5: Üçlü grid, her biri donut + bar list */
-      .triple { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-      .b-card { border: 1px solid #e5e7eb; border-radius: 4px; padding: 5px 7px; background: #ffffff; min-width: 0; }
-      .b-card h3 { font-size: 9px; font-weight: 800; color: #111827; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; }
-      .b-card h3 .count { font-size: 7.5px; font-weight: 700; color: #6b7280; padding: 1px 6px; border-radius: 999px; background: #F3F4F6; }
-      .b-body { display: grid; grid-template-columns: 90px 1fr; gap: 6px; align-items: flex-start; }
-      .b-body .donut { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-      .b-body .donut-legend { margin-top: 4px; display: flex; flex-direction: column; gap: 1px; font-size: 6.5px; width: 100%; }
-      .b-body .donut-legend .ll { display: flex; justify-content: space-between; gap: 3px; }
-      .b-body .donut-legend .sq { display: inline-block; width: 6px; height: 6px; border-radius: 1px; margin-right: 2px; vertical-align: middle; }
-      .b-body .donut-legend .nm { color: #475569; font-weight: 600; }
-      .b-body .donut-legend .vl { color: #111827; font-weight: 800; }
-
-      /* Bar list */
-      .bars { display: flex; flex-direction: column; gap: 1.5px; max-height: 240px; overflow: hidden; }
-      .bar-row { display: grid; grid-template-columns: 95px 1fr 28px; gap: 4px; align-items: center; font-size: 7px; }
+      /* Alt 3 blok: alt alta, her biri donut + 2-sütun bar list */
+      .freq-block { border: 1px solid #e5e7eb; border-radius: 4px; padding: 4px 6px; background: #ffffff; margin-top: 4px; }
+      .freq-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #e5e7eb; }
+      .freq-head .h3 { font-size: 8.5px; font-weight: 800; color: #111827; text-transform: uppercase; letter-spacing: 0.04em; }
+      .freq-head .count { font-size: 7px; font-weight: 700; color: #6b7280; padding: 1px 6px; border-radius: 999px; background: #F3F4F6; }
+      /* Body: donut(90px) | bars(2 column grid) */
+      .freq-body { display: grid; grid-template-columns: 110px 1fr; gap: 6px; align-items: flex-start; }
+      .freq-donut { display: flex; flex-direction: column; align-items: center; }
+      .freq-donut-legend { margin-top: 2px; display: flex; flex-direction: column; gap: 0.5px; font-size: 6.5px; width: 100%; }
+      .freq-donut-legend .ll { display: flex; justify-content: space-between; gap: 3px; }
+      .freq-donut-legend .sq { display: inline-block; width: 6px; height: 6px; border-radius: 1px; margin-right: 2px; vertical-align: middle; }
+      .freq-donut-legend .nm { color: #475569; font-weight: 600; }
+      .freq-donut-legend .vl { color: #111827; font-weight: 800; }
+      /* Bar list: 2-column grid to compress height */
+      .freq-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+      .bar-row { display: grid; grid-template-columns: 85px 1fr 28px; gap: 3px; align-items: center; font-size: 6.5px; }
       .bar-label { color: #475569; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
-      .bar-track { height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
-      .bar-fill { height: 100%; border-radius: 3px; }
-      .bar-val { font-size: 7.5px; font-weight: 800; color: #111827; text-align: right; }
-      .empty { color: #9ca3af; font-size: 7px; font-style: italic; padding: 4px; }
+      .bar-track { height: 5px; background: #f3f4f6; border-radius: 2px; overflow: hidden; }
+      .bar-fill { height: 100%; border-radius: 2px; }
+      .bar-val { font-size: 7px; font-weight: 800; color: #111827; text-align: right; }
+      .empty { color: #9ca3af; font-size: 7px; font-style: italic; padding: 3px; }
+
+      /* Sayfa 2: Grup Metrikleri tablosu */
+      .grup-head { font-size: 11px; font-weight: 800; color: #0F1A0F; margin-bottom: 5px; padding-bottom: 3px; border-bottom: 1.5px solid #1A5C2A; }
+      table { width: 100%; border-collapse: collapse; font-size: 7.5px; }
+      thead { background: #1A5C2A; color: white; }
+      thead th { font-weight: 700; font-size: 7px; text-transform: uppercase; letter-spacing: 0.3px; padding: 4px 5px; text-align: left; }
+      tbody td { padding: 3px 5px; border-bottom: 1px solid #e5e7eb; }
+      tbody tr:nth-child(even) { background: #F8FAFC; }
+      tbody tr { page-break-inside: avoid; }
+      .num { text-align: right; }
     `
 
     const metaInline = `
@@ -257,100 +263,127 @@ export async function GET(request: Request) {
     `
 
     const block1 = `
-      <div class="block">
-        <div class="b1">
-          <div class="b1-oran-big">
-            <div class="val">${genelOran}</div>
-            <div class="lbl">Genel Oran</div>
+      <div class="b1">
+        <div class="b1-oran-big">
+          <div class="val">${genelOran}</div>
+          <div class="lbl">Genel Oran</div>
+        </div>
+        <div class="b1-right">
+          <div class="b1-head">
+            <span><b>${toplamGerceklesen}</b> gerçekleşen</span>
+            <span style="display:inline-flex;gap:6px;font-size:7px">
+              <span style="color:#10b981"><b>${toplamTamKural}</b> Tamamlanan ${fmtPct(toplamTamKural, toplamHedef)}</span>
+              <span style="color:#f59e0b"><b>${data.toplamSapma}</b> Sapma ${fmtPct(data.toplamSapma, toplamHedef)}</span>
+              <span style="color:#6b7280"><b>${toplamEks}</b> Frekans Dışı ${fmtPct(toplamEks, toplamHedef)}</span>
+              <span style="color:#ef4444"><b>${data.toplamKayip}</b> Kayıp ${fmtPct(data.toplamKayip, toplamHedef)}</span>
+            </span>
+            <span><b>${toplamHedef}</b> hedef</span>
           </div>
-          <div class="b1-right">
-            <div class="b1-head">
-              <span><b>${toplamGerceklesen}</b> gerçekleşen</span>
-              <span style="display:inline-flex;gap:8px;font-size:7.5px">
-                <span style="color:#10b981"><b>${toplamTamKural}</b> Tamamlanan ${fmtPct(toplamTamKural, toplamHedef)}</span>
-                <span style="color:#f59e0b"><b>${data.toplamSapma}</b> Sapma ${fmtPct(data.toplamSapma, toplamHedef)}</span>
-                <span style="color:#6b7280"><b>${toplamEks}</b> Frekans Dışı ${fmtPct(toplamEks, toplamHedef)}</span>
-                <span style="color:#ef4444"><b>${data.toplamKayip}</b> Kayıp ${fmtPct(data.toplamKayip, toplamHedef)}</span>
-              </span>
-              <span><b>${toplamHedef}</b> hedef</span>
-            </div>
-            <div class="b1-bar">
-              <div class="b1-tam" style="width:${gobTamPct.toFixed(2)}%"></div>
-              <div class="b1-sap" style="width:${gobSapPct.toFixed(2)}%"></div>
-              <div class="b1-eks" style="width:${gobEksPct.toFixed(2)}%"></div>
-              <div class="b1-kay" style="width:${gobKayPct.toFixed(2)}%"></div>
-            </div>
-            <div class="b1-kpis">
-              <div class="kpi"><div class="label">Hedef</div><div class="value">${toplamHedef}</div></div>
-              <div class="kpi"><div class="label">Gerçekleşen</div><div class="value">${toplamGerceklesen}</div></div>
-              <div class="kpi"><div class="label">Tamamlanan</div><div class="value" style="color:#10b981">${toplamTamKural}</div></div>
-              <div class="kpi sap"><div class="label">Sapma</div><div class="value">${data.toplamSapma}</div></div>
-              <div class="kpi eks"><div class="label">Frekans Dışı</div><div class="value">${toplamEks}</div></div>
-              <div class="kpi kay"><div class="label">Kayıp</div><div class="value">${data.toplamKayip}</div></div>
-              <div class="kpi"><div class="label">Rapor Dönemi</div><div class="value">${data.gunSayisi} gün</div></div>
-            </div>
+          <div class="b1-bar">
+            <div class="b1-tam" style="width:${gobTamPct.toFixed(2)}%"></div>
+            <div class="b1-sap" style="width:${gobSapPct.toFixed(2)}%"></div>
+            <div class="b1-eks" style="width:${gobEksPct.toFixed(2)}%"></div>
+            <div class="b1-kay" style="width:${gobKayPct.toFixed(2)}%"></div>
+          </div>
+          <div class="b1-kpis">
+            <div class="kpi"><div class="label">Hedef</div><div class="value">${toplamHedef}</div></div>
+            <div class="kpi"><div class="label">Gerçekleşen</div><div class="value">${toplamGerceklesen}</div></div>
+            <div class="kpi"><div class="label">Tamamlanan</div><div class="value" style="color:#10b981">${toplamTamKural}</div></div>
+            <div class="kpi sap"><div class="label">Sapma</div><div class="value">${data.toplamSapma}</div></div>
+            <div class="kpi eks"><div class="label">Frekans Dışı</div><div class="value">${toplamEks}</div></div>
+            <div class="kpi kay"><div class="label">Kayıp</div><div class="value">${data.toplamKayip}</div></div>
+            <div class="kpi"><div class="label">Rapor Dönemi</div><div class="value">${data.gunSayisi} gün</div></div>
           </div>
         </div>
       </div>
     `
 
+    // Departman Analizi: kolonlar departman sayisina gore dinamik (min 8, max 14)
+    const depCols = Math.min(Math.max(departmanlar.length, 8), 14)
     const block2 = `
-      <div class="block">
-        <div class="block-title">Departman Analizi</div>
-        <div class="dep-grid" style="grid-template-columns:repeat(${Math.min(Math.max(departmanlar.length, 1), 12)}, 1fr)">
-          ${departmanlar.length === 0 ? `<div class="empty">Veri yok</div>` : departmanlar.map(departmanCard).join('')}
-        </div>
+      <div class="b2-title">Departman Analizi</div>
+      <div class="dep-grid" style="grid-template-columns:repeat(${depCols}, 1fr)">
+        ${departmanlar.length === 0 ? `<div class="empty">Veri yok</div>` : departmanlar.map(departmanCard).join('')}
       </div>
     `
 
-    // Alt 3 sutun — her bir bloga ortak yardimci
-    const donutLegend = (slices: { label: string; value: number; color: string }[], total: number) => slices.map(s => {
+    const donutLegendRows = (slices: { label: string; value: number; color: string }[], total: number) => slices.map(s => {
       const pct = total > 0 ? `%${(Math.max(0, s.value) / total * 100).toFixed(1)}` : '%0'
       return `<div class="ll"><span class="nm"><span class="sq" style="background:${s.color}"></span>${esc(s.label)}</span><span class="vl">${s.value} <span style="color:#9ca3af">(${pct})</span></span></div>`
     }).join('')
 
     const block3 = `
-      <div class="b-card">
-        <h3>Frekans Dağılımı & Grup Bazlı Tamamlanan <span class="count">${grupBazli.length}</span></h3>
-        <div class="b-body">
-          <div class="donut">
-            ${svgDonut(90, freqPieSlices, `%${basariNum}`, 'Başarı')}
-            <div class="donut-legend">${donutLegend(freqPieSlices, toplamHedef)}</div>
+      <div class="freq-block">
+        <div class="freq-head">
+          <span class="h3">Frekans Dağılımı & Grup Bazlı Tamamlanan</span>
+          <span class="count">${grupBazli.length} grup</span>
+        </div>
+        <div class="freq-body">
+          <div class="freq-donut">
+            ${svgDonut(100, freqPieSlices, `%${basariNum}`, 'Başarı')}
+            <div class="freq-donut-legend">${donutLegendRows(freqPieSlices, toplamHedef)}</div>
           </div>
-          <div class="bars">${barList(grupBazli.map(g => ({ label: g.grup, value: g.tamamlanan })), '#10b981')}</div>
+          <div class="freq-bars">${barList(grupBazli.map(g => ({ label: g.grup, value: g.tamamlanan })), '#10b981')}</div>
         </div>
       </div>
     `
 
     const block4 = `
-      <div class="b-card">
-        <h3>Sapma Frekanslar <span class="count">${data.toplamSapma} kayıt</span></h3>
-        <div class="b-body">
-          <div class="donut">
-            ${svgDonut(90, sapmaPieSlices, `%${sapmaNum}`, 'Sapma')}
-            <div class="donut-legend">
+      <div class="freq-block">
+        <div class="freq-head">
+          <span class="h3">Sapma Frekanslar</span>
+          <span class="count">${data.toplamSapma} kayıt</span>
+        </div>
+        <div class="freq-body">
+          <div class="freq-donut">
+            ${svgDonut(100, sapmaPieSlices, `%${sapmaNum}`, 'Sapma')}
+            <div class="freq-donut-legend">
               <div class="ll"><span class="nm"><span class="sq" style="background:#f59e0b"></span>Sapma</span><span class="vl">${data.toplamSapma}</span></div>
               <div class="ll"><span class="nm"><span class="sq" style="background:#f3f4f6;border:1px solid #d1d5db"></span>Hedef Kalan</span><span class="vl">${Math.max(0, toplamHedef - data.toplamSapma)}</span></div>
             </div>
           </div>
-          <div class="bars">${barList(grupBazli.filter(g => g.sapma > 0).map(g => ({ label: g.grup, value: g.sapma })), '#f59e0b')}</div>
+          <div class="freq-bars">${barList(grupBazli.filter(g => g.sapma > 0).map(g => ({ label: g.grup, value: g.sapma })), '#f59e0b')}</div>
         </div>
       </div>
     `
 
     const block5 = `
-      <div class="b-card">
-        <h3>Kayıp Frekanslar <span class="count">${data.toplamKayip} kayıt</span></h3>
-        <div class="b-body">
-          <div class="donut">
-            ${svgDonut(90, kayipPieSlices, `%${kayipNum}`, 'Kayıp')}
-            <div class="donut-legend">
+      <div class="freq-block">
+        <div class="freq-head">
+          <span class="h3">Kayıp Frekanslar</span>
+          <span class="count">${data.toplamKayip} kayıt</span>
+        </div>
+        <div class="freq-body">
+          <div class="freq-donut">
+            ${svgDonut(100, kayipPieSlices, `%${kayipNum}`, 'Kayıp')}
+            <div class="freq-donut-legend">
               <div class="ll"><span class="nm"><span class="sq" style="background:#ef4444"></span>Kayıp</span><span class="vl">${data.toplamKayip}</span></div>
               <div class="ll"><span class="nm"><span class="sq" style="background:#f3f4f6;border:1px solid #d1d5db"></span>Hedef Kalan</span><span class="vl">${Math.max(0, toplamHedef - data.toplamKayip)}</span></div>
             </div>
           </div>
-          <div class="bars">${barList(grupBazli.filter(g => g.kayip > 0).map(g => ({ label: g.grup, value: g.kayip })), '#ef4444')}</div>
+          <div class="freq-bars">${barList(grupBazli.filter(g => g.kayip > 0).map(g => ({ label: g.grup, value: g.kayip })), '#ef4444')}</div>
         </div>
+      </div>
+    `
+
+    // Sayfa 2: Grup Metrikleri tablosu
+    const grupMetrikleriTable = `
+      <div class="page">
+        <div class="grup-head">Grup Metrikleri — ${esc(data.firmaAdi || '—')} · ${esc(data.projeAdi || '—')} · ${esc(data.raporTarihLabel || '—')}</div>
+        <table>
+          <thead><tr>
+            <th>SN</th><th>Grup</th><th>Üst Lokasyon</th><th>Lokasyon</th>
+            <th class="num">V.Frekans</th><th class="num">Hedef</th><th class="num">Tamamlanan</th>
+            <th class="num">Frekans Dışı</th><th class="num">Sapma</th><th class="num">Kayıp</th>
+            <th class="num">Başarı</th><th class="num">Genel</th>
+          </tr></thead>
+          <tbody>${data.grupMetrikleri.map((g, i) => `<tr>
+            <td>${i + 1}</td><td>${esc(g.grup)}</td><td>${esc(g.ustLokasyon)}</td><td>${esc(g.lokasyon)}</td>
+            <td class="num">${esc(g.gunlukFrekans)}</td><td class="num">${g.hedef}</td><td class="num">${g.tamamlanan}</td>
+            <td class="num">${g.ekstra ?? 0}</td><td class="num">${g.sapma}</td><td class="num">${g.kayip}</td>
+            <td class="num">${esc(g.basariOrani)}</td><td class="num">${esc(g.genelOran)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
       </div>
     `
 
@@ -364,12 +397,11 @@ export async function GET(request: Request) {
     </div>
     ${block1}
     ${block2}
-    <div class="triple">
-      ${block3}
-      ${block4}
-      ${block5}
-    </div>
+    ${block3}
+    ${block4}
+    ${block5}
   </div>
+  ${grupMetrikleriTable}
 </body></html>`
 
     const puppeteer = (await import('puppeteer')).default
