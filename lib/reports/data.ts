@@ -227,16 +227,16 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
 
     // DB'de filtreli — ekstra JS filtresi gereksiz
     const filtered = Array.from(mergedMap.values())
-    const locIds = Array.from(new Set(filtered.map((x: any) => x.lokasyon_id).filter(Boolean)))
-    const userIds = Array.from(new Set(filtered.flatMap((x: any) => [x.atanan_kullanici_id, x.baslatan_kullanici_id, x.tamamlayan_kullanici_id, x.islemi_yapan_id]).filter(Boolean)))
-    const [locRes, userRes] = await Promise.all([
-      locIds.length ? admin.from('lokasyonlar').select('id,tanim').in('id', locIds) : Promise.resolve({ data: [], error: null } as any),
-      userIds.length ? admin.from('users').select('id,isim_soyisim').in('id', userIds) : Promise.resolve({ data: [], error: null } as any),
+    const locIds = Array.from(new Set(filtered.map((x: any) => x.lokasyon_id).filter(Boolean))) as string[]
+    const userIds = Array.from(new Set(filtered.flatMap((x: any) => [x.atanan_kullanici_id, x.baslatan_kullanici_id, x.tamamlayan_kullanici_id, x.islemi_yapan_id]).filter(Boolean))) as string[]
+    // CHUNK-AWARE enrichment: 1 aylik raporda locIds 400+ UUID oluyor -> URL overflow.
+    // 100'luk slice ile fetch + ID bazli dedup.
+    const [locData, userData] = await Promise.all([
+      fetchAllChunkedLok<any>(locIds, (slice) => admin.from('lokasyonlar').select('id,tanim').in('id', slice ?? locIds)),
+      fetchAllChunkedLok<any>(userIds, (slice) => admin.from('users').select('id,isim_soyisim').in('id', slice ?? userIds)),
     ])
-    if (locRes.error) throw new Error(locRes.error.message)
-    if (userRes.error) throw new Error(userRes.error.message)
-    const locMap = new Map<string, string>((locRes.data ?? []).map((x: any) => [x.id, x.tanim ?? '']))
-    const userMap = new Map<string, string>((userRes.data ?? []).map((x: any) => [x.id, x.isim_soyisim ?? '']))
+    const locMap = new Map<string, string>(locData.map((x: any) => [x.id, x.tanim ?? '']))
+    const userMap = new Map<string, string>(userData.map((x: any) => [x.id, x.isim_soyisim ?? '']))
 
     rows = filtered.map((row: any) => ({
       firma: firmaMap.get(row.firma_id) ?? '-',
@@ -275,16 +275,15 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     })
     // DB'de filtreli — ekstra JS filtresi gereksiz
     const filtered = (data ?? [])
-    const locIds = Array.from(new Set(filtered.map((x: any) => x.lokasyon_id).filter(Boolean)))
-    const userIds = Array.from(new Set(filtered.flatMap((x: any) => [x.atanan_kullanici_id, x.olusturan_id, x.islemi_yapan_id]).filter(Boolean)))
-    const [locRes, userRes] = await Promise.all([
-      locIds.length ? admin.from('lokasyonlar').select('id,tanim').in('id', locIds) : Promise.resolve({ data: [], error: null } as any),
-      userIds.length ? admin.from('users').select('id,isim_soyisim').in('id', userIds) : Promise.resolve({ data: [], error: null } as any),
+    const locIds = Array.from(new Set(filtered.map((x: any) => x.lokasyon_id).filter(Boolean))) as string[]
+    const userIds = Array.from(new Set(filtered.flatMap((x: any) => [x.atanan_kullanici_id, x.olusturan_id, x.islemi_yapan_id]).filter(Boolean))) as string[]
+    // CHUNK-AWARE enrichment (ayni URL overflow sorunu)
+    const [locData, userData] = await Promise.all([
+      fetchAllChunkedLok<any>(locIds, (slice) => admin.from('lokasyonlar').select('id,tanim').in('id', slice ?? locIds)),
+      fetchAllChunkedLok<any>(userIds, (slice) => admin.from('users').select('id,isim_soyisim').in('id', slice ?? userIds)),
     ])
-    if (locRes.error) throw new Error(locRes.error.message)
-    if (userRes.error) throw new Error(userRes.error.message)
-    const locMap = new Map<string, string>((locRes.data ?? []).map((x: any) => [x.id, x.tanim ?? '']))
-    const userMap = new Map<string, string>((userRes.data ?? []).map((x: any) => [x.id, x.isim_soyisim ?? '']))
+    const locMap = new Map<string, string>(locData.map((x: any) => [x.id, x.tanim ?? '']))
+    const userMap = new Map<string, string>(userData.map((x: any) => [x.id, x.isim_soyisim ?? '']))
 
     rows = filtered.map((row: any) => ({
       firma: firmaMap.get(row.firma_id) ?? '-',
