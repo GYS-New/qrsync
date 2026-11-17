@@ -31,9 +31,46 @@ function ReportCard({
   const allSelected = columns.length === report.columns.length
   const selectedCountLabel = `${columns.length}/${report.columns.length} alan seçildi`
 
+  // Tarih kisiti: supportsDateRange raporlarinda max 31 gun (buyuk veride
+  // backend/fetch zaman asimi + Puppeteer memory sorunu yaratiyor).
+  const MAX_RANGE_GUN = 31
+  // dateFrom secildiginde dateTo'nun ust siniri
+  const dateToMax = useMemo(() => {
+    if (!dateFrom) return ''
+    const d = new Date(dateFrom + 'T00:00:00')
+    d.setDate(d.getDate() + MAX_RANGE_GUN - 1)
+    return d.toISOString().slice(0, 10)
+  }, [dateFrom])
+  // dateTo secildiginde dateFrom'un alt siniri
+  const dateFromMin = useMemo(() => {
+    if (!dateTo) return ''
+    const d = new Date(dateTo + 'T00:00:00')
+    d.setDate(d.getDate() - MAX_RANGE_GUN + 1)
+    return d.toISOString().slice(0, 10)
+  }, [dateTo])
+  // Secili tarihler arasi gun farki (null ise tarih eksik)
+  const rangeGun: number | null = useMemo(() => {
+    if (!dateFrom || !dateTo) return null
+    const a = new Date(dateFrom + 'T00:00:00').getTime()
+    const b = new Date(dateTo + 'T00:00:00').getTime()
+    return Math.round((b - a) / (24 * 60 * 60 * 1000)) + 1
+  }, [dateFrom, dateTo])
+
+  const tarihHatasi: string | null = (() => {
+    if (!report.supportsDateRange) return null
+    if (!dateFrom || !dateTo) return 'Başlangıç ve bitiş tarihi seçilmeli.'
+    if (new Date(dateTo) < new Date(dateFrom)) return 'Bitiş tarihi başlangıçtan önce olamaz.'
+    if (rangeGun && rangeGun > MAX_RANGE_GUN) return `En fazla ${MAX_RANGE_GUN} günlük aralık seçilebilir (şu an ${rangeGun} gün).`
+    return null
+  })()
+
   async function exportReport(format: 'excel' | 'pdf') {
     if (!columns.length) {
       toast({ type: 'error', title: 'Eksik seçim', message: 'En az bir sütun seçmelisiniz.' })
+      return
+    }
+    if (tarihHatasi) {
+      toast({ type: 'error', title: 'Tarih hatası', message: tarihHatasi })
       return
     }
 
@@ -85,14 +122,36 @@ function ReportCard({
       </div>
 
       {report.supportsDateRange ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
-          <div>
-            <label className="verde-label">Başlangıç Tarihi</label>
-            <input type="date" className="verde-input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+            <div>
+              <label className="verde-label">Başlangıç Tarihi *</label>
+              <input
+                type="date"
+                className="verde-input"
+                value={dateFrom}
+                min={dateFromMin || undefined}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="verde-label">Bitiş Tarihi *</label>
+              <input
+                type="date"
+                className="verde-input"
+                value={dateTo}
+                min={dateFrom || undefined}
+                max={dateToMax || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </div>
           </div>
-          <div>
-            <label className="verde-label">Bitiş Tarihi</label>
-            <input type="date" className="verde-input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <div style={{ marginTop: 6, fontSize: 12, color: tarihHatasi ? '#dc2626' : '#6b7280' }}>
+            {tarihHatasi
+              ? `⚠ ${tarihHatasi}`
+              : rangeGun
+                ? `Seçili aralık: ${rangeGun} gün (maksimum ${MAX_RANGE_GUN} gün)`
+                : `Zorunlu alan — en fazla ${MAX_RANGE_GUN} günlük aralık seçilebilir. Uzun tarih aralıkları veri yoğunluğu nedeniyle indirmede sorun çıkarır.`}
           </div>
         </div>
       ) : null}
@@ -150,11 +209,22 @@ function ReportCard({
           {isSA ? 'Süper Admin seçilen firma kapsamında rapor alır.' : 'Tenant Admin yalnızca kendi firmasının verisini raporlar.'}
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Button type="button" variant="ghost" onClick={() => exportReport('pdf')} disabled={!!loadingFormat}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => exportReport('pdf')}
+            disabled={!!loadingFormat || !!tarihHatasi}
+            title={tarihHatasi ?? undefined}
+          >
             <FileText size={16} style={{ marginRight: 8, display: 'inline-block' }} />
             {loadingFormat === 'pdf' ? 'PDF hazırlanıyor...' : 'PDF Rapor Ver'}
           </Button>
-          <Button type="button" onClick={() => exportReport('excel')} disabled={!!loadingFormat}>
+          <Button
+            type="button"
+            onClick={() => exportReport('excel')}
+            disabled={!!loadingFormat || !!tarihHatasi}
+            title={tarihHatasi ?? undefined}
+          >
             <FileSpreadsheet size={16} style={{ marginRight: 8, display: 'inline-block' }} />
             {loadingFormat === 'excel' ? 'Excel hazırlanıyor...' : 'Excel Rapor Ver'}
           </Button>
