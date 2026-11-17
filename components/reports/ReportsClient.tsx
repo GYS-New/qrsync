@@ -8,6 +8,7 @@ import { REPORT_DEFINITIONS } from '@/lib/reports/config'
 import { Download, FileText, FileSpreadsheet, Sparkles } from 'lucide-react'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useFirma } from '@/components/layout/FirmaContext'
+import { useProje } from '@/components/projeler/ProjeContext'
 
 function ReportCard({
   report,
@@ -253,6 +254,12 @@ export default function ReportsClient({
   const { firmaId: saFirmaId, firmalar: saFirmalar } = useFirma()
   const firmaId = isSA ? saFirmaId : (initialFirmaId ?? null)
 
+  // SA icin proje topbar'daki ProjeContext'ten okunur; TA/U icin SSR prop'u
+  // yeterli (TA aktifProje, U me.proje_id). Eski kod SA'ya projeId prop'u
+  // gecmiyordu -> SA Ham Veri tum projeleri indiriyordu.
+  const { aktifProje } = useProje()
+  const effectiveProjeId = isSA ? (aktifProje?.id ?? null) : (projeId ?? null)
+
   // Ust lokasyon filtresi (spec: 17.09) — MONTAJ yetkilisi BOYA personelini gormesin
   const [ustLokList, setUstLokList] = useState<{ id: string; tanim: string }[]>([])
   const [ustLokasyonId, setUstLokasyonId] = useState<string>('')
@@ -261,7 +268,7 @@ export default function ReportsClient({
     setUstLokasyonId('')
     if (!firmaId) { setUstLokList([]); return }
     const p = new URLSearchParams({ firma_id: firmaId })
-    if (projeId) p.set('proje_id', projeId)
+    if (effectiveProjeId) p.set('proje_id', effectiveProjeId)
     fetch(`/api/lokasyonlar/yetkili?${p}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(j => {
@@ -274,7 +281,7 @@ export default function ReportsClient({
         setUstLokList(roots)
       })
       .catch(() => setUstLokList([]))
-  }, [firmaId, projeId])
+  }, [firmaId, effectiveProjeId])
 
   const firmaLabel = useMemo(() => {
     if (!isSA) return firmaAdi ?? 'Firma'
@@ -329,7 +336,7 @@ export default function ReportsClient({
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 18 }}>
           {REPORT_DEFINITIONS.map((report) => (
-            <ReportCard key={report.key} report={report} firmaId={firmaId} isSA={isSA} projeId={projeId} ustLokasyonId={ustLokasyonId || null} />
+            <ReportCard key={report.key} report={report} firmaId={firmaId} isSA={isSA} projeId={effectiveProjeId} ustLokasyonId={ustLokasyonId || null} />
           ))}
         </div>
       </div>
