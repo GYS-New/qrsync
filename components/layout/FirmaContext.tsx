@@ -44,16 +44,26 @@ export function FirmaProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false
     function refetch(initial = false) {
+      // NOT: SSR cookie okur, LocalStorage'a erisemez. Yeni bilgisayarda cookie
+      // yoksa SSR firmaId=null ile render eder ("kullanici bulunamadi" bos liste).
+      // Client mount'ta cookie set edip router.refresh() ile SSR'i tetiklemeliyiz.
+      const cookieBefore = getCookie(COOKIE_KEY)
       fetch('/api/firmalar/liste', { cache: 'no-store' })
         .then(r => r.ok ? r.json() : [])
         .then((data: Firma[]) => {
           if (cancelled) return
           setFirmalar(data)
           try {
-            const saved = getCookie(COOKIE_KEY) ?? localStorage.getItem(STORAGE_KEY)
+            const saved = cookieBefore ?? localStorage.getItem(STORAGE_KEY)
             const savedAktif = saved && data.some(f => f.id === saved)
             if (savedAktif) {
               if (initial) setFirmaIdState(saved as string)
+              // Cookie bostu ama localStorage'da gecerli deger vardi (ozel durum):
+              // cookie'yi hemen yaz + refresh ki SSR gorebilsin.
+              if (!cookieBefore && saved) {
+                setCookie(COOKIE_KEY, saved)
+                if (initial) router.refresh()
+              }
             } else {
               // Saved firma artık listede yok (pasifleştirildi/silindi) → temizle
               // ve ilk aktif firmayı seç
@@ -62,6 +72,10 @@ export function FirmaProvider({ children }: { children: React.ReactNode }) {
               if (first) {
                 localStorage.setItem(STORAGE_KEY, first)
                 setCookie(COOKIE_KEY, first)
+                // SSR bu cookie'yi gormemisti — initial de olsa refresh gerek
+                // (yeni bilgisayar/browser senaryosu: cookieBefore yok, ilk firma
+                // otomatik secildi, SSR firmaId=null ile render etmisti).
+                if (!cookieBefore) router.refresh()
               } else {
                 localStorage.removeItem(STORAGE_KEY)
                 deleteCookie(COOKIE_KEY)
