@@ -200,12 +200,19 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     // Aktif tablo + arşiv tablosunu paralel çek, birleştir (chunk-aware).
     // Kaynaklar: yetkiliLokIds (U/M yetki scope) ve ustLokasyonAltIds (secili ust+torunlar).
     // Her ikisi de buyuk olabilir -> ayri ayri chunk + merge + dedup.
+    // Tarih filtresi SQL seviyesinde — eskiden tum veri cekilip JS'te withinRange
+    // ile filtreleniyordu; buyuk firmada aylar/yillar birikince 1 aylik rapor icin
+    // yuzbinlerce satir cekiliyordu -> timeout. gte/lte DB'de uygulaniyor artik.
     const lokIdsForFilter = filters.yetkiliLokIds ?? filters.ustLokasyonAltIds ?? null
+    const fromIso = filters.dateFrom ? `${filters.dateFrom}T00:00:00` : null
+    const toIso = filters.dateTo ? `${filters.dateTo}T23:59:59.999` : null
     const buildLiveQ = (table: string, slice: string[] | null) => {
       let q = (admin.from(table) as any).select(liveSelect).order('olusturma_tarihi', { ascending: false })
       if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
       if (filters.projeId) q = q.eq('proje_id', filters.projeId)
       if (slice) q = q.in('lokasyon_id', slice)
+      if (fromIso) q = q.gte('olusturma_tarihi', fromIso)
+      if (toIso)   q = q.lte('olusturma_tarihi', toIso)
       return q
     }
     const [aktifData, arsivData] = await Promise.all([
@@ -218,7 +225,8 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
     for (const r of arsivData) mergedMap.set(r.id, r)
     for (const r of aktifData) mergedMap.set(r.id, r)
 
-    const filtered = Array.from(mergedMap.values()).filter((row: any) => withinRange(row.olusturma_tarihi, filters.dateFrom, filters.dateTo))
+    // DB'de filtreli — ekstra JS filtresi gereksiz
+    const filtered = Array.from(mergedMap.values())
     const locIds = Array.from(new Set(filtered.map((x: any) => x.lokasyon_id).filter(Boolean)))
     const userIds = Array.from(new Set(filtered.flatMap((x: any) => [x.atanan_kullanici_id, x.baslatan_kullanici_id, x.tamamlayan_kullanici_id, x.islemi_yapan_id]).filter(Boolean)))
     const [locRes, userRes] = await Promise.all([
@@ -250,7 +258,10 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
   if (reportKey === 'manual_tasks') {
     // gorevler_normal view: Oto Yıkama görevleri spesifik raporlara dahil olmaz
     // CHUNK-AWARE: yetkiliLokIds/ustLokasyonAltIds buyuk olabilir -> URL overflow.
+    // Tarih filtresi SQL seviyesinde (eskiden JS'te withinRange ile filtreleniyordu).
     const mtLokIds = filters.yetkiliLokIds ?? filters.ustLokasyonAltIds ?? null
+    const mtFromIso = filters.dateFrom ? `${filters.dateFrom}T00:00:00` : null
+    const mtToIso = filters.dateTo ? `${filters.dateTo}T23:59:59.999` : null
     const data = await fetchAllChunkedLok<any>(mtLokIds, (slice) => {
       let q: any = admin.from('gorevler_normal')
         .select('id,firma_id,tanim,lokasyon_id,atanan_kullanici_id,durum,olusturan_id,olusturma_tarihi,baslatilma_tarihi,tamamlanma_tarihi,tamamlanma_suresi_saniye,islemi_yapan_id')
@@ -258,9 +269,12 @@ export async function buildReportData(reportKey: ReportKey, selectedColumns: str
       if (filters.firmaId) q = q.eq('firma_id', filters.firmaId)
       if (filters.projeId) q = q.eq('proje_id', filters.projeId)
       if (slice) q = q.in('lokasyon_id', slice)
+      if (mtFromIso) q = q.gte('olusturma_tarihi', mtFromIso)
+      if (mtToIso)   q = q.lte('olusturma_tarihi', mtToIso)
       return q
     })
-    const filtered = (data ?? []).filter((row: any) => withinRange(row.olusturma_tarihi, filters.dateFrom, filters.dateTo))
+    // DB'de filtreli — ekstra JS filtresi gereksiz
+    const filtered = (data ?? [])
     const locIds = Array.from(new Set(filtered.map((x: any) => x.lokasyon_id).filter(Boolean)))
     const userIds = Array.from(new Set(filtered.flatMap((x: any) => [x.atanan_kullanici_id, x.olusturan_id, x.islemi_yapan_id]).filter(Boolean)))
     const [locRes, userRes] = await Promise.all([
