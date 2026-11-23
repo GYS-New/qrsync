@@ -15,7 +15,6 @@
  */
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { fetchAll } from '@/lib/supabase/fetchAll'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -151,95 +150,51 @@ export async function GET(request: Request) {
     }
     if (!projeId) return NextResponse.json({ error: 'Proje bulunamadi' }, { status: 404 })
 
-    // ============ VERI TOPLAMA ============
-    // 6 ay = 180 gun. CRITICAL: Supabase default max_rows=1000 — her tablo icin
-    // fetchAll ile paginate etmezsek sadece 2000 satir (iki tablo x 1000) gorunur
-    // halbuki gercek sayi 180K+. Eski kod bu yuzden "2000 izlenen gorev"
-    // raporluyordu.
-    const since180 = new Date(Date.now() - 180 * 864e5).toISOString()
-    const SEL = 'durum, aktif_olma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, lokasyon_id, islemi_yapan_id'
-    const [freqAktifData, freqArsivData] = await Promise.all([
-      fetchAll<any>(() => admin.from('canli_gorevler').select(SEL).eq('proje_id', projeId).gte('aktif_olma_tarihi', since180).order('id', { ascending: true })),
-      fetchAll<any>(() => admin.from('canli_gorevler_arsiv').select(SEL).eq('proje_id', projeId).gte('aktif_olma_tarihi', since180).order('id', { ascending: true })),
-    ])
-    const freqAll = [...freqAktifData, ...freqArsivData]
-    const toplam = freqAll.length
-    const tamamlanan = freqAll.filter((g: any) => g.durum === 'TAMAMLANDI').length
-    const sapma = freqAll.filter((g: any) => g.durum === 'ZAMANINDA_YAPILAMAYAN').length
-    const kayipDurumlar = new Set(['ZAMANI_GECMIS', 'IPTAL', 'SILINDI', 'BEKLEMEDE', 'KAPATILDI'])
-    const kayip = freqAll.filter((g: any) => kayipDurumlar.has(g.durum)).length
-    const farkliLok = new Set(freqAll.map((g: any) => g.lokasyon_id).filter(Boolean)).size
-    const aktifPersonel = new Set(freqAll.map((g: any) => g.islemi_yapan_id).filter(Boolean)).size
-    const sureler = freqAll.filter((g: any) => g.durum === 'TAMAMLANDI' && g.tamamlanma_suresi_saniye && g.tamamlanma_suresi_saniye > 0 && g.tamamlanma_suresi_saniye < 86400).map((g: any) => g.tamamlanma_suresi_saniye)
-    sureler.sort((a: number, b: number) => a - b)
-    const medianSure = sureler[Math.floor(sureler.length / 2)] ?? 0
-    const ortSure = sureler.length > 0 ? Math.round(sureler.reduce((s: number, v: number) => s + v, 0) / sureler.length) : 0
+    // ============ VERI TOPLAMA — Tek RPC cagrisi ============
+    // Onceki yaklasim 188K satiri network'ten cekiyor + memory'de aggregate ediyordu
+    // -> Puppeteer bile baslamadan timeout. Postgres function 'marketing_vaka_veri'
+    // tum aggregate'leri DB'de yapip tek JSONB olarak doner (migration ile eklendi).
+    const { data: rpcData, error: rpcErr } = await admin.rpc('marketing_vaka_veri', { p_proje_id: projeId })
+    if (rpcErr) throw new Error(rpcErr.message)
+    const v: any = rpcData ?? {}
+
+    const toplam = v.toplam ?? 0
+    const tamamlanan = v.tamamlanan ?? 0
+    const sapma = v.sapma ?? 0
+    const kayip = v.kayip ?? 0
+    const farkliLok = v.farkli_lokasyon ?? 0
+    const aktifPersonel = v.aktif_personel ?? 0
+    const medianSure = v.median_sure ?? 0
+    const ortSure = v.ort_sure ?? 0
+    void ortSure
 
     const basariPct = toplam > 0 ? Math.round((tamamlanan + sapma) / toplam * 1000) / 10 : 0
     const kayipPct = toplam > 0 ? Math.round(kayip / toplam * 1000) / 10 : 0
     const yapildiSayisi = tamamlanan + sapma
 
-    // Aylik buyume
-    const aylikMap = new Map<string, { toplam: number; tam: number; sap: number; kay: number }>()
-    for (const g of freqAll) {
-      const d = new Date((g as any).aktif_olma_tarihi)
-      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
-      const m = aylikMap.get(key) ?? { toplam: 0, tam: 0, sap: 0, kay: 0 }
-      m.toplam++
-      if ((g as any).durum === 'TAMAMLANDI') m.tam++
-      else if ((g as any).durum === 'ZAMANINDA_YAPILAMAYAN') m.sap++
-      else if (kayipDurumlar.has((g as any).durum)) m.kay++
-      aylikMap.set(key, m)
-    }
-    const aylar = [...aylikMap.entries()].sort((a, b) => a[0].localeCompare(b[0]))
     const AY_ADLARI = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara']
     const monthLabel = (key: string) => {
       const [, m] = key.split('-')
-      return AY_ADLARI[parseInt(m, 10) - 1]
+      return AY_ADLARI[parseInt(m, 10) - 1] ?? key
     }
-    const aylikHacim = aylar.map(([k, v]) => ({ label: monthLabel(k), value: v.toplam }))
 
-    // Musteri degerlendirme trendi — ayni pagination fix
-    const [degAktifData, degArsivData] = await Promise.all([
-      fetchAll<any>(() => admin.from('musteri_degerlendirmeleri').select('yildiz, olusturma_tarihi').eq('proje_id', projeId).gte('olusturma_tarihi', since180).order('id', { ascending: true })),
-      fetchAll<any>(() => admin.from('musteri_degerlendirmeleri_arsiv').select('yildiz, olusturma_tarihi').eq('proje_id', projeId).gte('olusturma_tarihi', since180).order('id', { ascending: true })),
-    ])
-    const degAll = [...degAktifData, ...degArsivData]
-    const degToplam = degAll.length
-    const degAylikMap = new Map<string, { toplam: number; yildizToplam: number }>()
-    for (const d of degAll) {
-      const dt = new Date((d as any).olusturma_tarihi)
-      const key = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}`
-      const m = degAylikMap.get(key) ?? { toplam: 0, yildizToplam: 0 }
-      m.toplam++; m.yildizToplam += (d as any).yildiz ?? 0
-      degAylikMap.set(key, m)
-    }
-    const degAylar = [...degAylikMap.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-    const degYildizSerie = degAylar.map(([k, v]) => ({ label: monthLabel(k), value: v.toplam > 0 ? Math.round(v.yildizToplam / v.toplam * 100) / 100 : 0 }))
+    const aylikHacim: { label: string; value: number }[] =
+      (v.aylik ?? []).map((a: any) => ({ label: monthLabel(a.ay), value: Number(a.toplam) || 0 }))
 
-    // Personel adoption aylik
-    const persAylikMap = new Map<string, Set<string>>()
-    for (const g of freqAll) {
-      if ((g as any).durum !== 'TAMAMLANDI' || !(g as any).islemi_yapan_id) continue
-      const d = new Date((g as any).tamamlanma_tarihi ?? (g as any).aktif_olma_tarihi)
-      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
-      if (!persAylikMap.has(key)) persAylikMap.set(key, new Set())
-      persAylikMap.get(key)!.add((g as any).islemi_yapan_id)
-    }
-    const persSerie = [...persAylikMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([k, set]) => ({ label: monthLabel(k), value: set.size }))
+    const degToplam = v.deg_toplam ?? 0
+    const degYildizSerie: { label: string; value: number }[] =
+      (v.deg_aylik ?? []).map((a: any) => ({ label: monthLabel(a.ay), value: Number(a.yildiz_ort) || 0 }))
 
-    // 24-saat kapsama
-    const saatMap = new Map<number, number>()
-    for (const g of freqAll) {
-      if ((g as any).durum !== 'TAMAMLANDI' || !(g as any).tamamlanma_tarihi) continue
-      const trStr = new Date((g as any).tamamlanma_tarihi).toLocaleString('en-GB', { timeZone: 'Europe/Istanbul', hour12: false })
-      const hr = parseInt(trStr.slice(12, 14), 10)
-      if (!Number.isFinite(hr)) continue
-      saatMap.set(hr, (saatMap.get(hr) ?? 0) + 1)
-    }
-    const saatSerie: { label: string; value: number }[] = []
-    for (let h = 0; h < 24; h++) {
-      saatSerie.push({ label: String(h).padStart(2, '0'), value: saatMap.get(h) ?? 0 })
+    const persSerie: { label: string; value: number }[] =
+      (v.personel_adoption ?? []).map((a: any) => ({ label: monthLabel(a.ay), value: Number(a.pers) || 0 }))
+
+    // 24 saat: index 0-23 ile doldur, eksikleri 0
+    const saatSerie: { label: string; value: number }[] = Array.from({ length: 24 }, (_, h) => ({
+      label: String(h).padStart(2, '0'),
+      value: 0,
+    }))
+    for (const s of (v.saat_dagilimi ?? [])) {
+      const h = Number(s.saat); if (h >= 0 && h < 24) saatSerie[h].value = Number(s.c) || 0
     }
 
     // ============ HTML / PDF ============
