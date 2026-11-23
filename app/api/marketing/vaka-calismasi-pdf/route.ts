@@ -15,6 +15,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetchAll'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -151,20 +152,17 @@ export async function GET(request: Request) {
     if (!projeId) return NextResponse.json({ error: 'Proje bulunamadi' }, { status: 404 })
 
     // ============ VERI TOPLAMA ============
-    // 6 ay = 180 gun
-    const execSql = async (sql: string) => {
-      // RPC yok — doğrudan select; her metrik icin ayri sorgu
-    }
-    void execSql
-
-    // Toplam frek + spesifik
-    const [freqAktifRes, freqArsivRes] = await Promise.all([
-      admin.from('canli_gorevler').select('durum, aktif_olma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, lokasyon_id, islemi_yapan_id', { count: 'exact' })
-        .eq('proje_id', projeId).gte('aktif_olma_tarihi', new Date(Date.now() - 180 * 864e5).toISOString()),
-      admin.from('canli_gorevler_arsiv').select('durum, aktif_olma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, lokasyon_id, islemi_yapan_id', { count: 'exact' })
-        .eq('proje_id', projeId).gte('aktif_olma_tarihi', new Date(Date.now() - 180 * 864e5).toISOString()),
+    // 6 ay = 180 gun. CRITICAL: Supabase default max_rows=1000 — her tablo icin
+    // fetchAll ile paginate etmezsek sadece 2000 satir (iki tablo x 1000) gorunur
+    // halbuki gercek sayi 180K+. Eski kod bu yuzden "2000 izlenen gorev"
+    // raporluyordu.
+    const since180 = new Date(Date.now() - 180 * 864e5).toISOString()
+    const SEL = 'durum, aktif_olma_tarihi, tamamlanma_tarihi, tamamlanma_suresi_saniye, lokasyon_id, islemi_yapan_id'
+    const [freqAktifData, freqArsivData] = await Promise.all([
+      fetchAll<any>(() => admin.from('canli_gorevler').select(SEL).eq('proje_id', projeId).gte('aktif_olma_tarihi', since180).order('id', { ascending: true })),
+      fetchAll<any>(() => admin.from('canli_gorevler_arsiv').select(SEL).eq('proje_id', projeId).gte('aktif_olma_tarihi', since180).order('id', { ascending: true })),
     ])
-    const freqAll = [...(freqAktifRes.data ?? []), ...(freqArsivRes.data ?? [])]
+    const freqAll = [...freqAktifData, ...freqArsivData]
     const toplam = freqAll.length
     const tamamlanan = freqAll.filter((g: any) => g.durum === 'TAMAMLANDI').length
     const sapma = freqAll.filter((g: any) => g.durum === 'ZAMANINDA_YAPILAMAYAN').length
@@ -201,12 +199,12 @@ export async function GET(request: Request) {
     }
     const aylikHacim = aylar.map(([k, v]) => ({ label: monthLabel(k), value: v.toplam }))
 
-    // Musteri degerlendirme trendi
-    const [degAktifRes, degArsivRes] = await Promise.all([
-      admin.from('musteri_degerlendirmeleri').select('yildiz, olusturma_tarihi').eq('proje_id', projeId).gte('olusturma_tarihi', new Date(Date.now() - 180 * 864e5).toISOString()),
-      admin.from('musteri_degerlendirmeleri_arsiv').select('yildiz, olusturma_tarihi').eq('proje_id', projeId).gte('olusturma_tarihi', new Date(Date.now() - 180 * 864e5).toISOString()),
+    // Musteri degerlendirme trendi — ayni pagination fix
+    const [degAktifData, degArsivData] = await Promise.all([
+      fetchAll<any>(() => admin.from('musteri_degerlendirmeleri').select('yildiz, olusturma_tarihi').eq('proje_id', projeId).gte('olusturma_tarihi', since180).order('id', { ascending: true })),
+      fetchAll<any>(() => admin.from('musteri_degerlendirmeleri_arsiv').select('yildiz, olusturma_tarihi').eq('proje_id', projeId).gte('olusturma_tarihi', since180).order('id', { ascending: true })),
     ])
-    const degAll = [...(degAktifRes.data ?? []), ...(degArsivRes.data ?? [])]
+    const degAll = [...degAktifData, ...degArsivData]
     const degToplam = degAll.length
     const degAylikMap = new Map<string, { toplam: number; yildizToplam: number }>()
     for (const d of degAll) {
