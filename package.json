@@ -41,6 +41,7 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^6.10.1",
     "playwright": "^1.58.2",
+    "pptxgenjs": "^4.0.1",
     "puppeteer": "^24.39.1",
     "qrcode": "^1.5.4",
     "react": "^18",
