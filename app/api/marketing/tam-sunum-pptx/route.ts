@@ -1,94 +1,42 @@
 /**
  * GET /api/marketing/tam-sunum-pptx
  *
- * SA-only. Vaka calismasi + tanitim sunumu birlestirilmis TEK PPTX dosyasi.
- * 18 slayt, curated narrative (tanitim ilk, vaka icerigi aralara serpistirilmis).
+ * SA-only. GYS musteri tanitim sunumu — TAM EDITABLE PPTX.
+ * 18 slayt native pptxgenjs shape+text+chart ile insa edilir — her metin,
+ * her renk, her kutu PowerPoint'te duzenlenebilir. Grafikler native chart
+ * (bar/line), PowerPoint'te verisi bile duzenlenebilir.
  *
- * Teknik:
- *   1) Puppeteer ile HTML'i yukler, her <div class="page"> elementini ayri PNG screenshot
- *   2) pptxgenjs ile her PNG tam slayt olarak embed
- *   3) A4 landscape boyutunda PPTX (11.69 x 8.27 inch)
- *
- * Icerik kaynaklari: /api/marketing/vaka-calismasi-pdf + /api/marketing/tanitim-sunumu-pdf
- * Burada tek bir unified HTML olarak birlestirildi (code sync: bu dosyayi guncellerken
- * ilgili PDF endpoint'leri de ayni mantikla tutun — veya tersi).
+ * Icerik: vaka calismasi + tanitim sunumu birlestirilmis curated narrative.
+ * Veri: RPC marketing_vaka_veri (canli).
  */
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import PptxGenJS from 'pptxgenjs'
 
 export const runtime = 'nodejs'
-export const maxDuration = 120
-
-function esc(s: any): string {
-  return String(s ?? '').replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]!))
-}
+export const maxDuration = 90
 
 const nf = new Intl.NumberFormat('tr-TR')
 
-function icon(name: string, size = 36, color = '#10b981'): string {
-  const paths: Record<string, string> = {
-    qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="1.5"/>',
-    phone: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><circle cx="12" cy="18" r="1" fill="currentColor"/>',
-    chart: '<path d="M3 20h18"/><path d="M6 17V9M11 17V5M16 17v-6M21 17V8"/>',
-    star: '<path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L5.5 20l2-7L2 9h7z" fill="currentColor" fill-opacity="0.15"/>',
-    check: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
-    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
-    users: '<path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM2 20a8 8 0 0116 0"/>',
-    shield: '<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5l8-3z"/><path d="M9 12l2 2 4-4"/>',
-    bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" fill="currentColor" fill-opacity="0.15"/>',
-    bell: '<path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21h4"/>',
-    rocket: '<path d="M12 2c3 2 5 5 5 9l-5 2-5-2c0-4 2-7 5-9z"/><path d="M12 13l-3 7 3-2 3 2z"/>',
-  }
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[name] || paths.check}</svg>`
-}
-
-// SVG bar/line chart helper'lar
-function svgBar(width: number, height: number, items: { label: string; value: number; color?: string }[], maxValue?: number): string {
-  const padL = 70, padR = 30, padT = 10, padB = 24
-  const chartW = width - padL - padR, chartH = height - padT - padB
-  const barH = chartH / items.length * 0.7, gap = chartH / items.length * 0.3
-  const max = maxValue ?? Math.max(...items.map(i => i.value), 1)
-  let s = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`
-  for (let i = 0; i <= 4; i++) {
-    const x = padL + (chartW / 4) * i
-    s += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + chartH}" stroke="#e5e7eb" stroke-width="0.5"/>`
-    s += `<text x="${x}" y="${padT + chartH + 14}" font-size="9" fill="#9ca3af" text-anchor="middle">${nf.format(Math.round(max / 4 * i))}</text>`
-  }
-  items.forEach((it, i) => {
-    const y = padT + i * (barH + gap), w = (it.value / max) * chartW
-    s += `<text x="${padL - 6}" y="${y + barH / 2 + 3}" font-size="10" font-weight="700" fill="#374151" text-anchor="end">${esc(it.label)}</text>`
-    s += `<rect x="${padL}" y="${y}" width="${w.toFixed(1)}" height="${barH.toFixed(1)}" fill="${it.color ?? '#10b981'}" rx="3"/>`
-    s += `<text x="${padL + w + 4}" y="${y + barH / 2 + 3}" font-size="10" font-weight="800" fill="#111827">${nf.format(it.value)}</text>`
-  })
-  return s + `</svg>`
-}
-
-function svgLine(width: number, height: number, points: { label: string; value: number }[], color: string, yMax?: number): string {
-  const padL = 32, padR = 20, padT = 15, padB = 30
-  const chartW = width - padL - padR, chartH = height - padT - padB
-  const n = points.length, max = yMax ?? Math.max(...points.map(p => p.value), 1)
-  const stepX = n > 1 ? chartW / (n - 1) : 0
-  let path = '', coords: { x: number; y: number; label: string; value: number }[] = []
-  points.forEach((p, i) => {
-    const x = padL + i * stepX, y = padT + chartH - (p.value / max) * chartH
-    coords.push({ x, y, label: p.label, value: p.value })
-    path += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`)
-  })
-  let s = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`
-  for (let i = 0; i <= 4; i++) {
-    const y = padT + (chartH / 4) * i
-    s += `<line x1="${padL}" y1="${y}" x2="${padL + chartW}" y2="${y}" stroke="#f3f4f6" stroke-width="0.5"/>`
-    s += `<text x="${padL - 4}" y="${y + 3}" font-size="8" fill="#9ca3af" text-anchor="end">${nf.format(Math.round(max - (max / 4) * i))}</text>`
-  }
-  const area = path + ` L ${padL + (n - 1) * stepX} ${padT + chartH} L ${padL} ${padT + chartH} Z`
-  s += `<path d="${area}" fill="${color}" fill-opacity="0.12"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"/>`
-  coords.forEach(c => {
-    s += `<circle cx="${c.x}" cy="${c.y}" r="3.5" fill="${color}" stroke="#ffffff" stroke-width="1.5"/>`
-    s += `<text x="${c.x}" y="${c.y - 8}" font-size="9" font-weight="800" fill="${color}" text-anchor="middle">${c.value}</text>`
-    s += `<text x="${c.x}" y="${padT + chartH + 14}" font-size="8.5" fill="#6b7280" text-anchor="middle">${esc(c.label)}</text>`
-  })
-  return s + `</svg>`
+// Renk paleti (hex, # yok)
+const C = {
+  dark: '0F1A0F',
+  darkGreen: '1A5C2A',
+  green: '10B981',
+  greenMid: '065F46',
+  greenLight: 'DCFCE7',
+  greenPale: '86EFAC',
+  amber: 'F59E0B',
+  amberLight: 'FEF3C7',
+  amberDark: '92400E',
+  red: 'EF4444',
+  redLight: 'FEE2E2',
+  redDark: '991B1B',
+  gray: '6B7280',
+  grayLight: 'F8FAFC',
+  grayMid: '475569',
+  border: 'E5E7EB',
+  white: 'FFFFFF',
 }
 
 export async function GET(request: Request) {
@@ -109,7 +57,7 @@ export async function GET(request: Request) {
       projeId = proje?.id ?? null
     }
 
-    // Veri RPC'den
+    // ============ VERI ============
     let v: any = {}
     if (projeId) {
       const { data } = await admin.rpc('marketing_vaka_veri', { p_proje_id: projeId })
@@ -126,609 +74,728 @@ export async function GET(request: Request) {
     const basariPct = toplam > 0 ? Math.round((tamamlanan + sapma) / toplam * 1000) / 10 : 98
     const kayipPct = toplam > 0 ? Math.round(kayip / toplam * 1000) / 10 : 1.2
 
-    const AY_ADLARI = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara']
-    const monthLbl = (key: string) => AY_ADLARI[parseInt(key.split('-')[1] ?? '1', 10) - 1] ?? key
-    const aylikHacim: { label: string; value: number }[] = (v.aylik ?? []).map((a: any) => ({ label: monthLbl(a.ay), value: Number(a.toplam) || 0 }))
-    const degYildiz: { label: string; value: number }[] = (v.deg_aylik ?? []).map((a: any) => ({ label: monthLbl(a.ay), value: Number(a.yildiz_ort) || 0 }))
-    const persSerie: { label: string; value: number }[] = (v.personel_adoption ?? []).map((a: any) => ({ label: monthLbl(a.ay), value: Number(a.pers) || 0 }))
-    const saatSerie: { label: string; value: number }[] = Array.from({ length: 24 }, (_, h) => ({ label: String(h).padStart(2, '0'), value: 0 }))
-    for (const s of (v.saat_dagilimi ?? [])) { const h = Number(s.saat); if (h >= 0 && h < 24) saatSerie[h].value = Number(s.c) || 0 }
+    const AY = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara']
+    const monthLbl = (key: string) => AY[parseInt((key ?? '1-1').split('-')[1] ?? '1', 10) - 1] ?? key
+    const aylik: { ay: string; toplam: number }[] = (v.aylik ?? []).map((a: any) => ({ ay: monthLbl(a.ay), toplam: Number(a.toplam) || 0 }))
+    const degAylik: { ay: string; yildiz: number }[] = (v.deg_aylik ?? []).map((a: any) => ({ ay: monthLbl(a.ay), yildiz: Number(a.yildiz_ort) || 0 }))
+    const persAylik: { ay: string; pers: number }[] = (v.personel_adoption ?? []).map((a: any) => ({ ay: monthLbl(a.ay), pers: Number(a.pers) || 0 }))
+    const saatler: number[] = Array.from({ length: 24 }, () => 0)
+    for (const s of (v.saat_dagilimi ?? [])) { const h = Number(s.saat); if (h >= 0 && h < 24) saatler[h] = Number(s.c) || 0 }
 
     const tarih = new Date().toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: 'long', year: 'numeric' })
 
-    // CSS (her iki PDF'in stilleri birlestirildi)
-    const css = `
-      @page { size: A4 landscape; margin: 0; }
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif; color: #0F1A0F; font-size: 12px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
-      .page { width: 297mm; height: 210mm; page-break-after: always; padding: 16mm 20mm; position: relative; overflow: hidden; background: white; }
-      .page:last-child { page-break-after: auto; }
-
-      /* Kapak + CTA gradient */
-      .cover, .cta { background: linear-gradient(135deg, #0F1A0F 0%, #1A5C2A 65%, #10b981 100%); color: white; padding: 0; }
-      .cover-inner, .cta-inner { height: 100%; padding: 28mm 32mm; display: flex; flex-direction: column; justify-content: space-between; }
-      .cover .logo { display: inline-flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 900; }
-      .cover .logo .dot { width: 14px; height: 14px; background: #86efac; border-radius: 50%; }
-      .cover h1 { font-size: 56px; font-weight: 900; line-height: 1.02; margin-top: 28px; letter-spacing: -0.03em; }
-      .cover h1 .hl { color: #86efac; }
-      .cover .tagline { font-size: 20px; margin-top: 18px; opacity: 0.92; max-width: 220mm; }
-      .cover .pills { display: flex; gap: 12px; margin-top: 36px; flex-wrap: wrap; }
-      .cover .pill { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 8px 16px; font-size: 12px; font-weight: 700; }
-      .cover .foot, .cta .foot { font-size: 11px; opacity: 0.7; display: flex; justify-content: space-between; }
-
-      .cta h2 { font-size: 46px; font-weight: 900; line-height: 1.1; max-width: 220mm; letter-spacing: -0.02em; }
-      .cta h2 .hi { color: #86efac; }
-      .cta .lead { font-size: 15px; margin-top: 20px; max-width: 220mm; opacity: 0.92; }
-      .cta .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 36px; max-width: 200mm; }
-      .cta .card { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 16px 20px; }
-      .cta .card .v { font-size: 22px; font-weight: 900; color: #86efac; }
-      .cta .card .l { font-size: 11px; opacity: 0.85; margin-top: 4px; }
-      .cta .mini { font-size: 12px; letter-spacing: 0.15em; opacity: 0.75; margin-bottom: 20px; font-weight: 800; }
-
-      /* Standart sayfa header */
-      .ph { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; padding-bottom: 10px; border-bottom: 3px solid #10b981; }
-      .ph .tag { font-size: 10px; color: #10b981; font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase; }
-      .ph .num { font-size: 10px; color: #9ca3af; font-weight: 700; }
-      .ph h2 { font-size: 26px; font-weight: 900; line-height: 1.1; margin-top: 4px; letter-spacing: -0.02em; }
-      .ph .sub { font-size: 13px; color: #475569; margin-top: 6px; }
-      .pf { position: absolute; bottom: 10mm; left: 20mm; right: 20mm; font-size: 9px; color: #9ca3af; display: flex; justify-content: space-between; border-top: 1px solid #f3f4f6; padding-top: 6px; }
-
-      /* Problem */
-      .pain-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 14px; }
-      .pain { display: flex; gap: 14px; padding: 16px 18px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; }
-      .pain .em { width: 44px; height: 44px; background: #fee2e2; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 22px; }
-      .pain .t { font-size: 14px; font-weight: 800; color: #991b1b; }
-      .pain .d { font-size: 11.5px; color: #7f1d1d; margin-top: 4px; line-height: 1.45; }
-
-      /* Pillars */
-      .pillars { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 20px; }
-      .pillar { padding: 22px 24px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 14px; }
-      .pillar .ico { margin-bottom: 14px; }
-      .pillar .t { font-size: 17px; font-weight: 900; color: #065f46; }
-      .pillar .d { font-size: 12px; color: #065f46; margin-top: 6px; line-height: 1.55; opacity: 0.85; }
-
-      /* Flow */
-      .flow { display: grid; grid-template-columns: 1fr 24px 1fr 24px 1fr 24px 1fr; gap: 8px; align-items: stretch; margin-top: 30px; }
-      .fs { padding: 20px 18px; background: white; border: 2px solid #10b981; border-radius: 14px; text-align: center; }
-      .fs .n { display: inline-flex; width: 28px; height: 28px; background: #10b981; color: white; border-radius: 50%; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; margin-bottom: 10px; }
-      .fs .t { font-size: 14px; font-weight: 800; }
-      .fs .d { font-size: 11px; color: #475569; margin-top: 6px; }
-      .fa { display: flex; align-items: center; justify-content: center; font-size: 24px; color: #10b981; font-weight: 900; }
-
-      /* Feature (sol metin + sag mock) */
-      .feature { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; margin-top: 10px; }
-      .feature .badge { display: inline-flex; gap: 8px; background: #dcfce7; color: #065f46; padding: 6px 14px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }
-      .feature h3 { font-size: 22px; font-weight: 900; line-height: 1.15; margin-bottom: 10px; }
-      .feature .desc { font-size: 13px; color: #475569; line-height: 1.6; margin-bottom: 18px; }
-      .bl { display: flex; flex-direction: column; gap: 10px; }
-      .bl .it { display: flex; gap: 10px; align-items: start; }
-      .bl .it .ic { color: #10b981; font-weight: 900; font-size: 14px; margin-top: 2px; }
-      .bl .it .tx { font-size: 12px; line-height: 1.5; }
-      .bl .it .tx b { color: #065f46; }
-
-      .mock { background: #0F1A0F; border-radius: 14px; padding: 12px; }
-      .mock .bar { display: flex; gap: 6px; margin-bottom: 10px; }
-      .mock .bar span { width: 10px; height: 10px; border-radius: 50%; background: #475569; }
-      .mock .bar span:nth-child(1) { background: #ef4444; }
-      .mock .bar span:nth-child(2) { background: #f59e0b; }
-      .mock .bar span:nth-child(3) { background: #10b981; }
-      .mock .scr { background: white; border-radius: 8px; padding: 18px; min-height: 260px; }
-      .mock .title { font-size: 11px; font-weight: 900; margin-bottom: 12px; text-transform: uppercase; }
-      .mock .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
-      .mock .kpi { background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; text-align: center; }
-      .mock .kpi .v { font-size: 20px; font-weight: 900; }
-      .mock .kpi .l { font-size: 8px; color: #6b7280; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
-      .mock .row { display: flex; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid #f3f4f6; font-size: 10px; }
-      .mock .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-      .mock .dot.g { background: #10b981; } .mock .dot.a { background: #f59e0b; } .mock .dot.r { background: #ef4444; }
-
-      .mobile-frame { max-width: 220px; margin: 0 auto; background: #0F1A0F; border-radius: 28px; padding: 10px; }
-      .mobile-scr { background: white; border-radius: 20px; padding: 16px 14px; min-height: 340px; }
-      .mobile-scr .notch { width: 50px; height: 5px; background: #e5e7eb; border-radius: 3px; margin: 0 auto 16px; }
-      .mobile-scr .task { background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
-      .mobile-scr .task .t { font-size: 11px; font-weight: 800; }
-      .mobile-scr .task .meta { font-size: 9px; color: #6b7280; margin-top: 3px; }
-      .mobile-scr .task.done { background: #dcfce7; border-color: #86efac; }
-      .mobile-scr .btn { background: #10b981; color: white; text-align: center; padding: 10px; border-radius: 10px; font-size: 11px; font-weight: 800; margin-top: 12px; }
-
-      /* Hero KPI grid */
-      .hero { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 10px; }
-      .hc { background: #F8FAFC; border: 1px solid #e5e7eb; border-radius: 12px; padding: 22px; text-align: center; }
-      .hc.g { background: #dcfce7; border-color: #86efac; } .hc.g .v { color: #065f46; }
-      .hc.r { background: #fee2e2; border-color: #fecaca; } .hc.r .v { color: #991b1b; }
-      .hc.a { background: #fef3c7; border-color: #fde68a; } .hc.a .v { color: #92400e; }
-      .hc .v { font-size: 46px; font-weight: 900; line-height: 1; }
-      .hc .l { font-size: 12px; font-weight: 700; color: #475569; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
-      .hc .d { font-size: 10px; color: #6b7280; margin-top: 4px; }
-
-      /* Grafik 2'li */
-      .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-      .cb { background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 16px; }
-      .cb .t { font-size: 13px; font-weight: 800; margin-bottom: 4px; }
-      .cb .s { font-size: 10px; color: #6b7280; margin-bottom: 8px; }
-
-      /* 24h bars */
-      .hrs { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin-top: 8px; height: 100px; align-items: end; }
-      .hrs .b { background: linear-gradient(180deg, #10b981, #065f46); border-radius: 2px 2px 0 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
-      .hrs .b span { font-size: 7.5px; color: white; font-weight: 800; padding: 1px 0; }
-      .hrl { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin-top: 3px; }
-      .hrl span { font-size: 7.5px; color: #6b7280; text-align: center; font-weight: 600; }
-
-      /* Onc-son grid */
-      .vs { display: grid; grid-template-columns: 1fr 50px 1fr; gap: 10px; margin-top: 16px; }
-      .vs-c { padding: 14px 16px; border-radius: 10px; }
-      .vs-c.b { background: #fee2e2; border: 1px solid #fecaca; }
-      .vs-c.a { background: #dcfce7; border: 1px solid #86efac; }
-      .vs-h { font-size: 13px; font-weight: 900; margin-bottom: 8px; text-transform: uppercase; }
-      .vs-c.b .vs-h { color: #991b1b; } .vs-c.a .vs-h { color: #065f46; }
-      .vs-i { font-size: 11px; padding: 6px 0; border-top: 1px dashed rgba(0,0,0,0.12); }
-      .vs-i:first-of-type { border-top: 0; }
-      .vs-ar { display: flex; align-items: center; justify-content: center; font-size: 22px; color: #10b981; }
-
-      /* Avantaj grid */
-      .adv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
-      .adv-c { padding: 18px; background: white; border: 1px solid #e5e7eb; border-radius: 12px; }
-      .adv-c .h { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-      .adv-c .h .ib { width: 36px; height: 36px; background: #dcfce7; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-      .adv-c .h .t { font-size: 13px; font-weight: 900; }
-      .adv-c .d { font-size: 11px; color: #475569; line-height: 1.5; }
-
-      /* Onboarding steps */
-      .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
-      .step { padding: 24px; background: linear-gradient(135deg, white 0%, #F8FAFC 100%); border: 1px solid #e5e7eb; border-radius: 14px; text-align: center; position: relative; }
-      .step .n { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 15px; }
-      .step .t { font-size: 15px; font-weight: 900; margin-top: 10px; }
-      .step .d { font-size: 11px; color: #475569; margin-top: 8px; line-height: 1.55; }
-      .step .tm { margin-top: 12px; display: inline-block; background: #dcfce7; color: #065f46; padding: 4px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; }
-    `
-
-    const html = `<!DOCTYPE html>
-<html lang="tr"><head><meta charset="UTF-8"><title>GYS Sunumu</title><style>${css}</style></head>
-<body>
-
-  <!-- 1. KAPAK -->
-  <div class="page cover"><div class="cover-inner">
-    <div class="logo"><span class="dot"></span><span>GYS · Görev Yönetim Sistemi</span></div>
-    <div>
-      <h1>Sahadaki her işin<br/><span class="hl">dijital ispatı.</span></h1>
-      <div class="tagline">Temizlik, bakım ve operasyon ekiplerinizi QR + Mobil + Yönetici Paneli ile şeffaf, ölçülebilir ve ispat edilebilir hale getirin.</div>
-      <div class="pills">
-        <div class="pill">🏭 Sanayi tesisleri</div>
-        <div class="pill">🏢 Site yönetimi</div>
-        <div class="pill">🏨 AVM &amp; otel</div>
-        <div class="pill">🏥 Sağlık kuruluşları</div>
-      </div>
-    </div>
-    <div class="foot"><span>Müşteri Tanıtım Sunumu · 2026</span><span>${tarih}</span></div>
-  </div></div>
-
-  <!-- 2. PROBLEM -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Durum Tespiti</div><h2>Sahadaki ekibinizin bugün ne yaptığını biliyor musunuz?</h2><div class="sub">Dijital olmayan operasyonlarda 6 tipik sorun:</div></div><div class="num">02 / 18</div></div>
-    <div class="pain-grid">
-      <div class="pain"><div class="em">📋</div><div><div class="t">Kağıt pano, kaybolan evrak</div><div class="d">Süpervizör imzalar, fiziksel evrak kaybolur, tahrif edilir. İş yapıldı mı belli değil.</div></div></div>
-      <div class="pain"><div class="em">🤷</div><div><div class="t">Kaçan görevler fark edilmez</div><div class="d">Dijital öncesi tesislerde görev kayıp oranı <b>%10-20</b>. Hangi vardiya, hangi lokasyon — belli olmaz.</div></div></div>
-      <div class="pain"><div class="em">💬</div><div><div class="t">Müşteri şikayeti "mesajda" kalır</div><div class="d">WhatsApp'ta akıp giden mesaj. Kim ne zaman çözdü — kaybolur.</div></div></div>
-      <div class="pain"><div class="em">⏱️</div><div><div class="t">Rapor hazırlamak 4 saat sürer</div><div class="d">Excel'de elle rapor. Veri güvenilmez, grafik yoktur, anında güncellenemez.</div></div></div>
-      <div class="pain"><div class="em">🌙</div><div><div class="t">Gece vardiyası = kör nokta</div><div class="d">03:00'te ne yapıldı? Süpervizör sabah gelir, söylenene inanır.</div></div></div>
-      <div class="pain"><div class="em">📄</div><div><div class="t">Müşteriye sunacak kanıt yok</div><div class="d">"Her gün temizlik yapılıyor" sözü. Düzenlenebilir Excel. Müşteri güvenmez.</div></div></div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Problem Tespiti</span></div>
-  </div>
-
-  <!-- 3. GYS NEDIR / 4 PILLAR -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Çözüm</div><h2>GYS tek platform, 4 güçlü modül</h2><div class="sub">QR + NFC + Mobil + Web Paneli — sahadaki her işi kayıt altına alır, şeffaf raporlar.</div></div><div class="num">03 / 18</div></div>
-    <div class="pillars">
-      <div class="pillar"><div class="ico">${icon('clock', 44, '#065f46')}</div><div class="t">Frekansiyel Görevler</div><div class="d">Belirlediğiniz periyotlarda otomatik üretilen tekrarlı görevler. Personel QR okutur, 1 dokunuşta kapatır. Zamanında yapılmayanlar otomatik "sapma" veya "kayıp" olarak işaretlenir.</div></div>
-      <div class="pillar"><div class="ico">${icon('check', 44, '#065f46')}</div><div class="t">Spesifik Görevler</div><div class="d">Anlık talep ve bakım işleri. Yönetici atar, personel yapar, durum anında yansır. Çeklist, personel ataması, fotoğraf ekleme desteği.</div></div>
-      <div class="pillar"><div class="ico">${icon('star', 44, '#065f46')}</div><div class="t">Müşteri Değerlendirme</div><div class="d">Her lokasyonda QR/NFC ile ziyaretçi değerlendirmesi. Yıldız, yorum, fotoğraf. Yönetici aksiyon atar, trend izler.</div></div>
-      <div class="pillar"><div class="ico">${icon('chart', 44, '#065f46')}</div><div class="t">Yönetici Paneli &amp; Raporlar</div><div class="d">Canlı dashboard, 7+ hazır rapor, PDF/Excel çıktısı. Tamper-evident PDF müşteri sunumu için ispat niteliğinde.</div></div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Modül Özeti</span></div>
-  </div>
-
-  <!-- 4. NASIL CALISIR -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Kurulum &amp; Akış</div><h2>4 adımda saha operasyonu dijitale geçer</h2><div class="sub">Donanım gerektirmez, telefon yeter. 1 gün içinde canlıya alınır.</div></div><div class="num">04 / 18</div></div>
-    <div class="flow">
-      <div class="fs"><div class="n">1</div><div class="t">Lokasyonlar girilir</div><div class="d">WC, çay, ofis, atölye... Her nokta ağaç yapısında.</div></div>
-      <div class="fa">→</div>
-      <div class="fs"><div class="n">2</div><div class="t">QR/NFC etiket basılır</div><div class="d">Her lokasyona yapıştırılacak kod. Toplu PDF hazır.</div></div>
-      <div class="fa">→</div>
-      <div class="fs"><div class="n">3</div><div class="t">Personel QR okutur</div><div class="d">Görev listesi, çeklist, 1 dokunuş onay. Offline mod.</div></div>
-      <div class="fa">→</div>
-      <div class="fs"><div class="n">4</div><div class="t">Yönetici izler</div><div class="d">Canlı veri, haftalık rapor — tek ekran.</div></div>
-    </div>
-    <div style="margin-top:36px;padding:18px 22px;background:#dcfce7;border-radius:10px;font-size:13px;color:#065f46;line-height:1.6"><b>Donanım gerekmez.</b> QR kodlar A4 kağıda yazdırılıp yapıştırılır. Personel kendi telefonunu kullanabilir. Aylık abonelik, kurulum maliyeti yok.</div>
-    <div class="pf"><span>GYS Sunumu</span><span>Nasıl Çalışır</span></div>
-  </div>
-
-  <!-- 5. OZELLIK 1: FREKANSIYEL -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Modül 1 / 4</div><h2>Frekansiyel Görev Sistemi</h2><div class="sub">Tekrarlayan işleri sistem üretir, personel sadece yapar.</div></div><div class="num">05 / 18</div></div>
-    <div class="feature">
-      <div>
-        <div class="badge">⚡ Otomatik görev üretimi</div>
-        <h3>"Bu lokasyonda saat başı temizlik" dedi mi, sistem her saat otomatik görev açar.</h3>
-        <div class="desc">Yönetici bir kere kural tanımlar — "WC bölgesi, 2 saatte bir, 3 vardiya". Sistem her vardiyada otomatik görevler üretir. Zamanında yapılmayanlar renk kodlu sapma/kayıp olarak işaretlenir.</div>
-        <div class="bl">
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Kural bir kez tanımlanır</b>, görevler haftalarca otomatik üretilir.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Vardiya sistemi</b>: 1, 2 veya 3 vardiya desteği.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Sapma/kayıp ayrımı</b>: geç yapılan ≠ hiç yapılmayan.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Ekstra görev</b>: planlı olmayan iş yapıldığında "frekans dışı" kayıt.</div></div>
-        </div>
-      </div>
-      <div class="mock">
-        <div class="bar"><span></span><span></span><span></span></div>
-        <div class="scr">
-          <div class="title">Bugün — AR-GE Çay Bölgesi</div>
-          <div class="kpis"><div class="kpi"><div class="v">24</div><div class="l">Hedef</div></div><div class="kpi"><div class="v" style="color:#065f46">22</div><div class="l">Tamam</div></div><div class="kpi"><div class="v" style="color:#ef4444">2</div><div class="l">Kayıp</div></div></div>
-          <div class="row"><span><span class="dot g"></span>08:00 Vardiya 1</span><span style="color:#065f46;font-weight:800">✓</span></div>
-          <div class="row"><span><span class="dot g"></span>10:00 Saat başı</span><span style="color:#065f46;font-weight:800">✓</span></div>
-          <div class="row"><span><span class="dot a"></span>12:00 Öğle sonrası</span><span style="color:#f59e0b;font-weight:800">Sapma</span></div>
-          <div class="row"><span><span class="dot r"></span>14:00</span><span style="color:#ef4444;font-weight:800">Kayıp</span></div>
-          <div class="row"><span><span class="dot g"></span>16:00 Vardiya 2</span><span style="color:#065f46;font-weight:800">✓</span></div>
-        </div>
-      </div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Frekansiyel Görevler</span></div>
-  </div>
-
-  <!-- 6. OZELLIK 2: SPESIFIK -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Modül 2 / 4</div><h2>Spesifik Görevler</h2><div class="sub">Anlık talepler, bakım işleri, olağanüstü durumlar.</div></div><div class="num">06 / 18</div></div>
-    <div class="feature">
-      <div>
-        <div class="badge">🎯 Anlık görev atama</div>
-        <h3>Müşteri aradı, bir iş çıktı — 30 saniyede personele düşer.</h3>
-        <div class="desc">Yönetici panelden veya mobilden görev tanımlar, lokasyon ve personel seçer. Personel telefonuna anında bildirim. Kabul → başla → tamamla akışı kayıt altında.</div>
-        <div class="bl">
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Personel atama opsiyonel</b>: ilk müsait kabul etsin veya spesifik kişi atansın.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Çeklist desteği</b>: 5-50 maddelik kontrol listesi.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>İptal sebep takibi</b>: niye iptal, kim iptal — hepsi kayıt.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Arşiv otomatik</b>: 24 saat sonra tamamlananlar arşive.</div></div>
-        </div>
-      </div>
-      <div class="mock">
-        <div class="mobile-frame">
-          <div class="mobile-scr">
-            <div class="notch"></div>
-            <div style="font-size:11px;font-weight:900;margin-bottom:12px">GÖREVLERİM</div>
-            <div class="task done"><div class="t">✓ WC temizliği - Kat 2</div><div class="meta">14:30 · Tamamlandı · 6 dk</div></div>
-            <div class="task"><div class="t">Çay bölgesi düzen</div><div class="meta">⏱ Şimdi · V2 · 2. kat</div></div>
-            <div class="task"><div class="t">Lavabo sızıntı kontrol</div><div class="meta">⚠ Acil · Ofis 3B</div></div>
-            <div class="btn">QR OKUT &amp; BAŞLAT</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Spesifik Görevler</span></div>
-  </div>
-
-  <!-- 7. OZELLIK 3: MUSTERI DEG -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Modül 3 / 4</div><h2>Müşteri Değerlendirme</h2><div class="sub">QR/NFC → yıldız → yorum → fotoğraf → aksiyon.</div></div><div class="num">07 / 18</div></div>
-    <div class="feature">
-      <div>
-        <div class="badge">⭐ Dijital geri bildirim</div>
-        <h3>Müşteri telefonunu QR'a tutar, 20 saniyede değerlendirme gönderir.</h3>
-        <div class="desc">Her lokasyondaki QR → tarayıcı açılır → yıldız + yorum + fotoğraf. Yönetici anlık bildirim alır, aksiyon atar. Aylık trend grafiği memnuniyet değişimini gösterir.</div>
-        <div class="bl">
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Kişisel bilgi zorunlu değil</b>: isim/telefon opsiyonel, KVKK onayı akışta.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Personel bypass koruması</b>: kendi personeliniz gizli değerlendirme gönderemez.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Yetkili aksiyon akışı</b>: her değerlendirmeye yazılı cevap + fotoğraf.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Aylık trend</b>: yıldız ortalaması + yorum sayısı grafikleri.</div></div>
-        </div>
-      </div>
-      <div class="mock">
-        <div class="bar"><span></span><span></span><span></span></div>
-        <div class="scr">
-          <div class="title">Son Değerlendirmeler</div>
-          <div style="padding:10px;background:#dcfce7;border-radius:8px;margin-bottom:8px">
-            <div style="font-size:16px;color:#f59e0b">★★★★★</div>
-            <div style="font-size:11px;font-weight:700;margin-top:2px">AR-GE Çay Bölgesi</div>
-            <div style="font-size:9.5px;color:#475569;margin-top:3px">"Çok temiz ve düzenli" — 14:32</div>
-          </div>
-          <div style="padding:10px;background:#fef3c7;border-radius:8px;margin-bottom:8px">
-            <div style="font-size:16px;color:#f59e0b">★★★☆☆</div>
-            <div style="font-size:11px;font-weight:700;margin-top:2px">Erkek WC Kat 2</div>
-            <div style="font-size:9.5px;color:#475569;margin-top:3px">"Sabunlukta sabun yok" — 13:12</div>
-          </div>
-          <div style="padding:10px;background:#fee2e2;border-radius:8px">
-            <div style="font-size:16px;color:#f59e0b">★☆☆☆☆</div>
-            <div style="font-size:11px;font-weight:700;margin-top:2px">Sigara Bölgesi</div>
-            <div style="font-size:9.5px;color:#475569;margin-top:3px">"Küllükler temizlenmemiş" — 11:48</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Müşteri Değerlendirme</span></div>
-  </div>
-
-  <!-- 8. OZELLIK 4: RAPORLAMA -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Modül 4 / 4</div><h2>Yönetici Paneli &amp; Raporlar</h2><div class="sub">4 saatlik Excel raporu → 30 saniyede tek tık.</div></div><div class="num">08 / 18</div></div>
-    <div class="feature">
-      <div>
-        <div class="badge">📊 Hazır raporlar</div>
-        <h3>Canlı dashboard + 7 hazır rapor tipi, hiç kod yazmadan.</h3>
-        <div class="desc">Yönetici panele giriş yapar, firma/proje seçer, rapor tipini belirler. PDF/Excel. Grafikli özet sayfası PDF olarak müşteri sunumuna uygun — tamper-evident, değiştirilemez.</div>
-        <div class="bl">
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Rapor Merkezi</b>: Frekansiyel, Spesifik, Değerlendirme, Süre Analiz, Ham Veri, Çeklist, Grafiksel.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Özelleştirilebilir filtreler</b>: tarih, üst lokasyon, personel, vardiya.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>PDF + Excel</b>: PDF müşteriye sunum için, Excel iç analiz için.</div></div>
-          <div class="it"><div class="ic">✓</div><div class="tx"><b>Canlı dashboard</b>: anlık KPI, saatlik aktivite, personel bazlı başarı — tek ekran.</div></div>
-        </div>
-      </div>
-      <div class="mock">
-        <div class="bar"><span></span><span></span><span></span></div>
-        <div class="scr">
-          <div class="title">Dashboard — Son 24 Saat</div>
-          <div class="kpis"><div class="kpi"><div class="v" style="color:#1A5C2A">1.247</div><div class="l">Toplam</div></div><div class="kpi"><div class="v" style="color:#065f46">968</div><div class="l">Tamam</div></div><div class="kpi"><div class="v" style="color:#f59e0b">279</div><div class="l">Sapma</div></div></div>
-          <div style="margin-top:10px"><div style="font-size:9px;color:#6b7280;font-weight:800;text-transform:uppercase;margin-bottom:6px">Aktivite</div>
-            <div style="display:flex;align-items:end;gap:3px;height:60px">${[22, 35, 48, 62, 85, 72, 95, 110, 88, 75, 62, 48, 55, 68, 82, 95, 78, 65, 45, 38, 50, 65, 42, 28].map(v => `<div style="flex:1;background:#10b981;height:${v}%;border-radius:2px"></div>`).join('')}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Raporlama</span></div>
-  </div>
-
-  <!-- 9. KULLANIM KOLAYLIGI -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Kullanıcı Deneyimi</div><h2>Karmaşık değil, sade. Eğitim 15 dakika.</h2><div class="sub">Personel, yönetici ve müşteri için üç farklı arayüz — her biri rolünün gerektirdiği kadar.</div></div><div class="num">09 / 18</div></div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:10px">
-      <div style="padding:22px 24px;background:white;border:1px solid #e5e7eb;border-radius:14px">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">${icon('phone', 32)}<div style="font-size:15px;font-weight:900">Personel</div></div>
-        <div style="font-size:12px;color:#475569;line-height:1.6;margin-bottom:14px">Telefonu açar, uygulamayı başlatır. Bugünkü görevleri görür. QR'ı okutur. Kapatır.</div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <div style="font-size:11px">✓ Hiç menü karıştırmaz</div>
-          <div style="font-size:11px">✓ 1 dokunuşta görev kapatır</div>
-          <div style="font-size:11px">✓ Offline çalışır</div>
-          <div style="font-size:11px">✓ Mesai takibi otomatik</div>
-        </div>
-      </div>
-      <div style="padding:22px 24px;background:white;border:1px solid #e5e7eb;border-radius:14px">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">${icon('chart', 32)}<div style="font-size:15px;font-weight:900">Yönetici</div></div>
-        <div style="font-size:12px;color:#475569;line-height:1.6;margin-bottom:14px">Web panele giriş. Dashboard'da canlı KPI. Rapor alır, aksiyon atar, personel atar.</div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <div style="font-size:11px">✓ Canlı dashboard</div>
-          <div style="font-size:11px">✓ PDF/Excel rapor tek tık</div>
-          <div style="font-size:11px">✓ Personel karşılaştırması</div>
-          <div style="font-size:11px">✓ Anlık bildirim</div>
-        </div>
-      </div>
-      <div style="padding:22px 24px;background:white;border:1px solid #e5e7eb;border-radius:14px">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">${icon('star', 32)}<div style="font-size:15px;font-weight:900">Müşteri / Ziyaretçi</div></div>
-        <div style="font-size:12px;color:#475569;line-height:1.6;margin-bottom:14px">Lokasyondaki QR'ı telefonuna tutar. Tarayıcı açılır. Yıldız verir, yorum/foto ekler.</div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <div style="font-size:11px">✓ App indirmez</div>
-          <div style="font-size:11px">✓ Üye olmaz</div>
-          <div style="font-size:11px">✓ 20 saniyede biter</div>
-          <div style="font-size:11px">✓ KVKK uyumlu</div>
-        </div>
-      </div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Kullanım Kolaylığı</span></div>
-  </div>
-
-  <!-- 10. CANLI KANITI HERO -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Bir referans tesisimizde</div><h2>GYS gerçekten çalışıyor — 6 aylık canlı veri</h2><div class="sub">Rakamlar canlı veritabanı sorgularıyla doğrulandı, firma/proje anonim.</div></div><div class="num">10 / 18</div></div>
-    <div class="hero">
-      <div class="hc"><div class="v">${nf.format(toplam)}</div><div class="l">Toplam izlenen görev</div><div class="d">Her görev zaman damgalı, lokasyonlu, personelli</div></div>
-      <div class="hc g"><div class="v">%${basariPct.toFixed(1).replace('.', ',')}</div><div class="l">Başarı oranı</div><div class="d">Yapılan iş / toplam görev</div></div>
-      <div class="hc r"><div class="v">%${kayipPct.toFixed(1).replace('.', ',')}</div><div class="l">Kayıp oranı</div><div class="d">Dijital öncesi %10-20 iken</div></div>
-      <div class="hc"><div class="v">${farkliLok}</div><div class="l">İzlenen lokasyon</div><div class="d">WC, çay, ofis — her noktada QR</div></div>
-      <div class="hc"><div class="v">${aktifPersonel}</div><div class="l">Aktif saha personeli</div><div class="d">Her personel şeffaf izlenebilir</div></div>
-      <div class="hc"><div class="v">${medianSure}sn</div><div class="l">Medyan görev kapama</div><div class="d">Mobil 1-dokunuş — pano/kalem bitti</div></div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Canlı Referans</span></div>
-  </div>
-
-  <!-- 11. AYLIK BUYUME + ADOPTION -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Büyüme &amp; Benimseme</div><h2>Pilot → Tam kullanım: 1 ay</h2><div class="sub">Personel adoption sorunu yaşanmadı</div></div><div class="num">11 / 18</div></div>
-    <div class="g2">
-      <div class="cb"><div class="t">Aylık izlenen görev sayısı</div><div class="s">Pilot ayından itibaren hızlı büyüme</div>${svgBar(400, 220, aylikHacim)}</div>
-      <div class="cb"><div class="t">Aktif personel sayısı — aylık</div><div class="s">${persSerie[0]?.value ?? 0} → ${persSerie[persSerie.length - 1]?.value ?? 0} personel (${persSerie.length} ay)</div>${svgLine(400, 220, persSerie, '#1A5C2A')}</div>
-    </div>
-    <div style="margin-top:14px;padding:12px 16px;background:#F8FAFC;border-left:3px solid #10b981;border-radius:6px;font-size:12px"><b>Yorum:</b> Dijital öncesi aynı tesiste bu ${nf.format(toplam)} görevin ne kadarı yapıldığı <b>bilinmiyordu</b>. İlk 30 günde ${persSerie[1]?.value ?? 0} personel aktif kullanıma geçti.</div>
-    <div class="pf"><span>GYS Sunumu</span><span>Büyüme</span></div>
-  </div>
-
-  <!-- 12. MUSTERI MEMNUNIYETI TREND -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Müşteri Geri Bildirimi</div><h2>Veri haline gelen şikayet-öneri</h2><div class="sub">QR/NFC üzerinden toplanan değerlendirmeler</div></div><div class="num">12 / 18</div></div>
-    <div class="g2">
-      <div class="cb"><div class="t">Aylık yıldız ortalaması (1-5)</div><div class="s">Dijital öncesi: bilinmiyordu</div>${svgLine(400, 220, degYildiz, '#f59e0b', 5)}</div>
-      <div class="cb" style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px">
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Toplam değerlendirme</div>
-          <div style="font-size:60px;font-weight:900;color:#f59e0b;line-height:1;margin-top:4px">${degToplam}</div>
-          <div style="font-size:11px;color:#6b7280;margin-top:6px">6 ay içinde dijital olarak toplandı</div>
-        </div>
-        <div style="padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:11px;color:#78350f;max-width:280px;text-align:center"><b>Dijital öncesi:</b> "Şikayet var mı?" sorusunun cevabı tahmindi. Artık her değerlendirme kayıtlı, zaman-mekan-aksiyon takipli.</div>
-      </div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Müşteri Memnuniyeti</span></div>
-  </div>
-
-  <!-- 13. 24 SAAT KAPSAMA -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">7/24 İzleme</div><h2>Gece vardiyası dahil, her saat kayıt altında</h2><div class="sub">Saatlik tamamlanan görev — 6 ay toplamı</div></div><div class="num">13 / 18</div></div>
-    <div class="cb" style="padding:16px 20px">
-      <div class="t">24-Saat Aktivite Dağılımı</div>
-      <div class="s">Gece 03:00'te bile 2000+ görev kayıt altında</div>
-      <div class="hrs">${saatSerie.map(h => { const pct = (h.value / Math.max(...saatSerie.map(x => x.value), 1) * 100).toFixed(0); return `<div class="b" style="height:${pct}%"><span>${h.value >= 1000 ? Math.round(h.value / 1000) + 'k' : h.value}</span></div>` }).join('')}</div>
-      <div class="hrl">${saatSerie.map(h => `<span>${h.label}</span>`).join('')}</div>
-    </div>
-    <div style="margin-top:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
-      <div style="background:#dcfce7;padding:12px;border-radius:8px;text-align:center"><div style="font-size:9px;color:#065f46;font-weight:700;text-transform:uppercase">Pik saat</div><div style="font-size:22px;font-weight:900;color:#065f46;margin-top:4px">08:00</div></div>
-      <div style="background:#F8FAFC;padding:12px;border-radius:8px;text-align:center"><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">Gece (00-06)</div><div style="font-size:22px;font-weight:900;margin-top:4px">${nf.format(saatSerie.slice(0, 6).reduce((s, h) => s + h.value, 0))}</div></div>
-      <div style="background:#F8FAFC;padding:12px;border-radius:8px;text-align:center"><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">Gündüz (06-18)</div><div style="font-size:22px;font-weight:900;margin-top:4px">${nf.format(saatSerie.slice(6, 18).reduce((s, h) => s + h.value, 0))}</div></div>
-      <div style="background:#F8FAFC;padding:12px;border-radius:8px;text-align:center"><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">Akşam (18-24)</div><div style="font-size:22px;font-weight:900;margin-top:4px">${nf.format(saatSerie.slice(18, 24).reduce((s, h) => s + h.value, 0))}</div></div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>24-Saat Kapsama</span></div>
-  </div>
-
-  <!-- 14. ONCESI vs SONRASI -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Fark</div><h2>Dijital Öncesi vs Sonrası</h2><div class="sub">Aynı tesis, aynı ekip, farklı araç</div></div><div class="num">14 / 18</div></div>
-    <div class="vs">
-      <div class="vs-c b">
-        <div class="vs-h">⚠ Dijital Öncesi</div>
-        <div class="vs-i"><b>Operasyon izleme:</b> kağıt pano, hafızaya dayalı</div>
-        <div class="vs-i"><b>Kayıp görev:</b> %10-20 "normal" karşılanır</div>
-        <div class="vs-i"><b>Müşteri şikayeti:</b> "mesaj grubunda konuşalım"</div>
-        <div class="vs-i"><b>Yönetici raporu:</b> Excel'de 3-4 saat uğraş</div>
-        <div class="vs-i"><b>Gece vardiyası:</b> sabah tahmin edilir</div>
-        <div class="vs-i"><b>Personel verimliliği:</b> ölçülmez</div>
-        <div class="vs-i"><b>Rapor zamanında:</b> aylık rapor 1 hafta gecikir</div>
-        <div class="vs-i"><b>Müşteriye kanıt:</b> "sözlü söylüyoruz"</div>
-      </div>
-      <div class="vs-ar">→</div>
-      <div class="vs-c a">
-        <div class="vs-h">✓ GYS ile 6 Ay Sonra</div>
-        <div class="vs-i"><b>Operasyon izleme:</b> <b>${nf.format(toplam)}</b> görev, hepsi kayıtlı</div>
-        <div class="vs-i"><b>Kayıp görev:</b> <b>%${kayipPct.toFixed(1).replace('.', ',')}</b> — tek tıkla rapor</div>
-        <div class="vs-i"><b>Müşteri şikayeti:</b> <b>${degToplam}</b> dijital değerlendirme</div>
-        <div class="vs-i"><b>Yönetici raporu:</b> PDF/Excel, 30 saniye</div>
-        <div class="vs-i"><b>Gece vardiyası:</b> 03:00'te bile kayıt</div>
-        <div class="vs-i"><b>Personel verimliliği:</b> en iyi/kötü 3 otomatik</div>
-        <div class="vs-i"><b>Rapor zamanında:</b> real-time, her an güncel</div>
-        <div class="vs-i"><b>Müşteriye kanıt:</b> tamper-evident PDF</div>
-      </div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Öncesi vs Sonrası</span></div>
-  </div>
-
-  <!-- 15. 9 AVANTAJ -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Neden GYS?</div><h2>Rakiplerden ayıran 9 somut avantaj</h2><div class="sub">Her biri sahada denenmiş, canlı verilerle doğrulanmış</div></div><div class="num">15 / 18</div></div>
-    <div class="adv">
-      <div class="adv-c"><div class="h"><div class="ib">${icon('qr', 22)}</div><div class="t">QR + NFC Hibrit</div></div><div class="d">Telefon kamera veya temas. Donanım yok, A4 kağıda yazdırın.</div></div>
-      <div class="adv-c"><div class="h"><div class="ib">${icon('phone', 22)}</div><div class="t">Mobil + Web</div></div><div class="d">Personel mobilden, yönetici webden, müşteri QR'dan. Tek platform.</div></div>
-      <div class="adv-c"><div class="h"><div class="ib">${icon('clock', 22)}</div><div class="t">Vardiya Sistemi</div></div><div class="d">1, 2, 3 vardiya seçin. Sarkan vardiya otomatik handle.</div></div>
-      <div class="adv-c"><div class="h"><div class="ib">${icon('bell', 22)}</div><div class="t">Push Bildirim</div></div><div class="d">Yeni görev, iptal, değerlendirme — anında telefondan haber.</div></div>
-      <div class="adv-c"><div class="h"><div class="ib">${icon('shield', 22)}</div><div class="t">Tamper-Evident PDF</div></div><div class="d">Değiştirilemez PDF. Excel güvensizliği kalkar.</div></div>
-      <div class="adv-c"><div class="h"><div class="ib">${icon('users', 22)}</div><div class="t">Rol Bazlı Yetki</div></div><div class="d">SA, firma admin, personel, müşteri — her rol kendi ekranı.</div></div>
-      <div class="adv-c"><div class="h"><div class="ib">${icon('chart', 22)}</div><div class="t">7+ Hazır Rapor</div></div><div class="d">Frekansiyel, Spesifik, Değerlendirme, Süre, Grafiksel, Ham Veri.</div></div>
-      <div class="adv-c"><div class="h"><div class="ib">${icon('bolt', 22)}</div><div class="t">Offline Mod</div></div><div class="d">İnternet yoksa personel çalışır. Bağlantı gelince otomatik senkron.</div></div>
-      <div class="adv-c"><div class="h"><div class="ib">${icon('rocket', 22)}</div><div class="t">1 Günde Canlı</div></div><div class="d">Lokasyon → QR etiket → personel giriş. Günler değil saatler.</div></div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Avantajlar</span></div>
-  </div>
-
-  <!-- 16. ONBOARDING -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">Başlangıç</div><h2>GYS'yi başlatmak 3 adım, 1 gün</h2><div class="sub">Donanım yok, uzun eğitim yok. Hemen başlar, hemen rapor üretir.</div></div><div class="num">16 / 18</div></div>
-    <div class="steps">
-      <div class="step"><div class="n">1</div><div class="t">Lokasyon &amp; Personel</div><div class="d">Tesis alanları ağaç yapısında tanımlanır (üst → alt → nokta). Personel listesi Excel'den aktarılır.</div><div class="tm">1-2 saat</div></div>
-      <div class="step"><div class="n">2</div><div class="t">QR Etiketler &amp; Kurallar</div><div class="d">Her lokasyon için benzersiz QR üretilir, A4 PDF olarak yazdırılır. Frekansiyel kurallar tanımlanır.</div><div class="tm">2-3 saat</div></div>
-      <div class="step"><div class="n">3</div><div class="t">Test &amp; Canlıya Alma</div><div class="d">Personel mobil uygulamayı indirir, giriş yapar. İlk görevler yapılır. Sistem canlı veri toplar.</div><div class="tm">1-2 saat</div></div>
-    </div>
-    <div style="margin-top:36px;padding:20px 24px;background:linear-gradient(135deg,#dcfce7 0%,#86efac 100%);border-radius:14px">
-      <div style="font-size:16px;font-weight:900;color:#065f46;margin-bottom:8px">🚀 İlk 7 günde ne olur?</div>
-      <div style="font-size:12px;color:#065f46;line-height:1.7">
-        <b>1. gün:</b> Sistem canlıya alınır, personel giriş yapar.<br/>
-        <b>3. gün:</b> Tam adoption — tüm personel aktif kullanır, günlük rutin oturur.<br/>
-        <b>7. gün:</b> İlk haftalık yönetici raporu — hangi lokasyon risk altında, görünür.
-      </div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>Onboarding</span></div>
-  </div>
-
-  <!-- 17. BEKLENTI YANITI -->
-  <div class="page">
-    <div class="ph"><div><div class="tag">İtirazlar</div><h2>En sık sorulan 4 soruya net yanıt</h2><div class="sub">Potansiyel müşterinin kafasındaki gerçek sorular</div></div><div class="num">17 / 18</div></div>
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:10px">
-      <div style="padding:20px;background:white;border:1px solid #e5e7eb;border-radius:12px;border-top:3px solid #ef4444">
-        <div style="font-size:12px;font-weight:800;color:#991b1b;margin-bottom:6px">"Zaten elle de yapılabiliyor"</div>
-        <div style="font-size:12px;color:#475569;line-height:1.55">${nf.format(toplam)} görevi elle takip etmeyi deneyin. Ya kaydı tutmayacak ya da uyduracak ekibiniz. Dijital öncesi %10-20 kayıp "normal"di — dijitalle %${kayipPct.toFixed(1).replace('.', ',')}.</div>
-      </div>
-      <div style="padding:20px;background:white;border:1px solid #e5e7eb;border-radius:12px;border-top:3px solid #ef4444">
-        <div style="font-size:12px;font-weight:800;color:#991b1b;margin-bottom:6px">"Personelim teknolojiye alışamaz"</div>
-        <div style="font-size:12px;color:#475569;line-height:1.55">Referans tesiste 1 ay içinde ${persSerie[1]?.value ?? 100}+ personel aktif, 6 ayda ${aktifPersonel} personel sistemde. Pilot sorunu yaşanmadı. Uygulama 3 tıkla çalışır.</div>
-      </div>
-      <div style="padding:20px;background:white;border:1px solid #e5e7eb;border-radius:12px;border-top:3px solid #ef4444">
-        <div style="font-size:12px;font-weight:800;color:#991b1b;margin-bottom:6px">"Yatırımın geri dönüşü nasıl?"</div>
-        <div style="font-size:12px;color:#475569;line-height:1.55">Müşteri sözleşmesi şikayet kesintisi riskini azaltır. 1 ay kaçırılmış temizlikten gelen cezadan sistem bedelinin çoğu geri döner. Müşteri güvensizliğinden kayıp kontrat sistem maliyetinin 10 katı.</div>
-      </div>
-      <div style="padding:20px;background:white;border:1px solid #e5e7eb;border-radius:12px;border-top:3px solid #ef4444">
-        <div style="font-size:12px;font-weight:800;color:#991b1b;margin-bottom:6px">"Rakibimiz bunu zaten yapıyor"</div>
-        <div style="font-size:12px;color:#475569;line-height:1.55">Yapıyorsa iyi, oyun alanı eşitlenir. Yapmıyorsa farkı siz oluşturursunuz — potansiyel müşteriye "sektöre dijital standart getiren" olarak konumlanabilirsiniz.</div>
-      </div>
-    </div>
-    <div class="pf"><span>GYS Sunumu</span><span>İtiraz Yönetimi</span></div>
-  </div>
-
-  <!-- 18. CTA -->
-  <div class="page cta"><div class="cta-inner">
-    <div>
-      <div class="mini">BIR CUMLEDE</div>
-      <h2>Sahadaki her işi <span class="hi">sayılabilir, raporlanabilir ve ispat edilebilir</span> hale getirin.</h2>
-      <div class="lead">GYS bir uygulama değil — operasyonunuzu şeffaflaştıran bir yönetim platformudur. Referans tesisimizde 6 ayda ${nf.format(toplam)} görev izlendi, ${degToplam} müşteri değerlendirmesi toplandı, kayıp oranı %${kayipPct.toFixed(1).replace('.', ',')}'de kaldı.</div>
-      <div class="cards">
-        <div class="card"><div class="v">1 gün</div><div class="l">Kurulumdan canlıya</div></div>
-        <div class="card"><div class="v">15 dk</div><div class="l">Personel eğitimi</div></div>
-        <div class="card"><div class="v">0 TL</div><div class="l">Donanım yatırımı</div></div>
-      </div>
-      <div style="margin-top:36px"><div style="font-size:14px;font-weight:700;color:#86efac">→ Bir sonraki adım: 30 dakikalık canlı demo talep edin.</div></div>
-    </div>
-    <div class="foot">
-      <div>GYS Görev Yönetim Sistemi · İO Teknoloji · iogys.com.tr</div>
-      <div>${tarih}</div>
-    </div>
-  </div></div>
-
-</body></html>`
-
-    // ============ PUPPETEER: her sayfa PNG screenshot ============
-    const puppeteer = (await import('puppeteer')).default
-    const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] })
-    const pagePngs: Buffer[] = []
-    try {
-      const page = await browser.newPage()
-      // A4 landscape: 297mm x 210mm @ 96dpi = 1123 x 794 px
-      // 2x deviceScaleFactor retina kalitesi
-      await page.setViewport({ width: 1123, height: 794, deviceScaleFactor: 2 })
-      await page.setContent(html, { waitUntil: 'load' })
-      const pageEls = await page.$$('.page')
-      for (const el of pageEls) {
-        const png = await el.screenshot({ type: 'png', omitBackground: false }) as Buffer
-        pagePngs.push(png)
-      }
-    } finally {
-      await browser.close()
-    }
-
-    // ============ pptxgenjs: PPTX ============
+    // ============ PPTX INIT ============
     const pptx = new PptxGenJS()
-    pptx.layout = 'LAYOUT_WIDE' // 13.333 x 7.5 inch (16:9 widescreen)
+    pptx.layout = 'LAYOUT_WIDE' // 13.333 x 7.5 inch
     pptx.title = 'GYS Görev Yönetim Sistemi — Müşteri Tanıtım Sunumu'
     pptx.author = 'İO Teknoloji'
     pptx.company = 'İO Teknoloji'
 
-    // A4 landscape slayt boyutu (16:9'a gore hafif farkli). LAYOUT_WIDE'a tam sigdiralim.
-    const SLIDE_W = 13.333
-    const SLIDE_H = 7.5
+    const W = 13.333, H = 7.5
 
-    for (const png of pagePngs) {
-      const slide = pptx.addSlide()
-      slide.background = { color: 'FFFFFF' }
-      slide.addImage({
-        data: `data:image/png;base64,${png.toString('base64')}`,
-        x: 0, y: 0, w: SLIDE_W, h: SLIDE_H,
-      })
+    // ====== HELPER ======
+    function addHeader(slide: PptxGenJS.Slide, tag: string, title: string, sub: string, num: string) {
+      slide.addShape(pptx.ShapeType.rect, { x: 0.6, y: 0.5, w: W - 1.2, h: 0.04, fill: { color: C.green }, line: { color: C.green } })
+      slide.addText(tag, { x: 0.6, y: 0.2, w: 10, h: 0.3, fontSize: 10, bold: true, color: C.green, fontFace: 'Inter', charSpacing: 3 })
+      slide.addText(title, { x: 0.6, y: 0.5, w: 10, h: 0.8, fontSize: 26, bold: true, color: C.dark, fontFace: 'Inter' })
+      if (sub) slide.addText(sub, { x: 0.6, y: 1.3, w: 11, h: 0.4, fontSize: 13, color: C.grayMid, fontFace: 'Inter' })
+      slide.addText(num, { x: W - 2, y: 0.2, w: 1.4, h: 0.3, fontSize: 10, bold: true, color: C.gray, fontFace: 'Inter', align: 'right' })
+    }
+    function addFooter(slide: PptxGenJS.Slide, right: string) {
+      slide.addShape(pptx.ShapeType.rect, { x: 0.6, y: H - 0.4, w: W - 1.2, h: 0.01, fill: { color: C.border }, line: { color: C.border } })
+      slide.addText('GYS Müşteri Sunumu', { x: 0.6, y: H - 0.35, w: 5, h: 0.25, fontSize: 9, color: C.gray, fontFace: 'Inter' })
+      slide.addText(right, { x: W - 5.6, y: H - 0.35, w: 5, h: 0.25, fontSize: 9, color: C.gray, fontFace: 'Inter', align: 'right' })
     }
 
-    // Buffer olarak doner
-    const pptxBuffer = await pptx.write({ outputType: 'nodebuffer' }) as Buffer
-    const date = new Date().toISOString().slice(0, 10)
+    // Bir kart cizer (arka plan + baslik + metin)
+    function card(slide: PptxGenJS.Slide, x: number, y: number, w: number, h: number, opts: {
+      bg?: string; borderColor?: string; borderWidth?: number; borderLeft?: string; radius?: number
+    }) {
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x, y, w, h,
+        fill: { color: opts.bg ?? C.white },
+        line: { color: opts.borderColor ?? C.border, width: opts.borderWidth ?? 1 },
+        rectRadius: opts.radius ?? 0.08,
+      })
+      if (opts.borderLeft) {
+        slide.addShape(pptx.ShapeType.rect, {
+          x, y, w: 0.07, h,
+          fill: { color: opts.borderLeft }, line: { color: opts.borderLeft },
+        })
+      }
+    }
 
-    return new NextResponse(pptxBuffer as unknown as BodyInit, {
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 01 — KAPAK
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.dark }
+      // Dekoratif cember/overlay (opsiyonel yesil daireler)
+      s.addShape(pptx.ShapeType.ellipse, {
+        x: W - 3, y: -2, w: 6, h: 6,
+        fill: { color: C.green }, line: { color: C.green },
+        rotate: 0,
+      } as any)
+      s.addShape(pptx.ShapeType.ellipse, {
+        x: W - 1, y: 4, w: 4, h: 4,
+        fill: { color: C.darkGreen }, line: { color: C.darkGreen },
+      } as any)
+      // Logo
+      s.addShape(pptx.ShapeType.ellipse, { x: 0.7, y: 0.6, w: 0.22, h: 0.22, fill: { color: C.greenPale }, line: { color: C.greenPale } })
+      s.addText('GYS · Görev Yönetim Sistemi', { x: 1.0, y: 0.5, w: 8, h: 0.4, fontSize: 18, bold: true, color: C.white, fontFace: 'Inter' })
+      // Baslik
+      s.addText([
+        { text: 'Sahadaki her işin\n', options: { color: C.white } },
+        { text: 'dijital ispatı.', options: { color: C.greenPale } },
+      ], { x: 0.7, y: 2.2, w: 10, h: 2.8, fontSize: 56, bold: true, fontFace: 'Inter', paraSpaceAfter: 6 })
+      // Tagline
+      s.addText('Temizlik, bakım ve operasyon ekiplerinizi QR + Mobil + Yönetici Paneli ile şeffaf, ölçülebilir ve ispat edilebilir hale getirin.',
+        { x: 0.7, y: 5.1, w: 10.5, h: 1, fontSize: 18, color: C.white, fontFace: 'Inter' })
+      // Pills
+      const pillText = ['🏭 Sanayi tesisleri', '🏢 Site yönetimi', '🏨 AVM & otel', '🏥 Sağlık']
+      pillText.forEach((t, i) => {
+        s.addShape(pptx.ShapeType.roundRect, {
+          x: 0.7 + i * 2.5, y: 6.2, w: 2.3, h: 0.5,
+          fill: { color: C.dark, transparency: 20 },
+          line: { color: C.white, width: 0.5 },
+          rectRadius: 0.25,
+        })
+        s.addText(t, { x: 0.7 + i * 2.5, y: 6.2, w: 2.3, h: 0.5, fontSize: 11, bold: true, color: C.white, align: 'center', valign: 'middle', fontFace: 'Inter' })
+      })
+      // Alt
+      s.addText('Müşteri Tanıtım Sunumu · 2026', { x: 0.7, y: 7.05, w: 6, h: 0.3, fontSize: 10, color: C.greenPale, fontFace: 'Inter' })
+      s.addText(tarih, { x: W - 4, y: 7.05, w: 3.3, h: 0.3, fontSize: 10, color: C.greenPale, fontFace: 'Inter', align: 'right' })
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 02 — PROBLEM
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'DURUM TESPİTİ', 'Sahadaki ekibinizin bugün ne yaptığını biliyor musunuz?', 'Dijital olmayan operasyonlarda 6 tipik sorun:', '02 / 18')
+      const pains = [
+        ['📋', 'Kağıt pano, kaybolan evrak', 'Süpervizör imzalar, fiziksel evrak kaybolur, tahrif edilir. İş yapıldı mı belli değil.'],
+        ['🤷', 'Kaçan görevler fark edilmez', 'Dijital öncesi tesislerde görev kayıp oranı %10-20. Hangi vardiya, hangi lokasyon — belli olmaz.'],
+        ['💬', 'Müşteri şikayeti "mesajda" kalır', 'WhatsApp\'ta akıp giden mesaj. Kim ne zaman çözdü — kaybolur.'],
+        ['⏱️', 'Rapor hazırlamak 4 saat sürer', 'Excel\'de elle rapor. Veri güvenilmez, grafik yok, anında güncellenemez.'],
+        ['🌙', 'Gece vardiyası = kör nokta', '03:00\'te ne yapıldı? Süpervizör sabah gelir, söylenene inanır.'],
+        ['📄', 'Müşteriye sunacak kanıt yok', '"Her gün temizlik yapılıyor" sözü. Düzenlenebilir Excel. Müşteri güvenmez.'],
+      ]
+      const cols = 2, rowH = 1.4, colW = 5.9, gapX = 0.3, gapY = 0.3
+      pains.forEach((pn, i) => {
+        const col = i % cols, row = Math.floor(i / cols)
+        const x = 0.6 + col * (colW + gapX)
+        const y = 1.9 + row * (rowH + gapY)
+        card(s, x, y, colW, rowH, { bg: 'FEF2F2', borderColor: 'FECACA', radius: 0.1 })
+        // emoji kutu
+        s.addShape(pptx.ShapeType.roundRect, { x: x + 0.2, y: y + 0.2, w: 0.7, h: 0.7, fill: { color: 'FEE2E2' }, line: { color: 'FEE2E2' }, rectRadius: 0.1 })
+        s.addText(pn[0], { x: x + 0.2, y: y + 0.2, w: 0.7, h: 0.7, fontSize: 24, align: 'center', valign: 'middle' })
+        s.addText(pn[1], { x: x + 1.05, y: y + 0.18, w: colW - 1.2, h: 0.4, fontSize: 14, bold: true, color: C.redDark, fontFace: 'Inter' })
+        s.addText(pn[2], { x: x + 1.05, y: y + 0.58, w: colW - 1.2, h: 0.8, fontSize: 11, color: '7F1D1D', fontFace: 'Inter' })
+      })
+      addFooter(s, 'Problem Tespiti')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 03 — CÖZÜM / 4 PILLAR
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'ÇÖZÜM', 'GYS tek platform, 4 güçlü modül', 'QR + NFC + Mobil + Web Paneli — sahadaki her işi kayıt altına alır, şeffaf raporlar.', '03 / 18')
+      const pillars = [
+        ['Frekansiyel Görevler', 'Belirlediğiniz periyotlarda otomatik üretilen tekrarlı görevler. Personel QR okutur, 1 dokunuşta kapatır. Zamanında yapılmayanlar otomatik "sapma" veya "kayıp" olarak işaretlenir.'],
+        ['Spesifik Görevler', 'Anlık talep ve bakım işleri. Yönetici atar, personel yapar, durum anında yansır. Çeklist, personel ataması, fotoğraf ekleme desteği.'],
+        ['Müşteri Değerlendirme', 'Her lokasyonda QR/NFC ile ziyaretçi değerlendirmesi. Yıldız, yorum, fotoğraf. Yönetici aksiyon atar, trend izler.'],
+        ['Yönetici Paneli & Raporlar', 'Canlı dashboard, 7+ hazır rapor, PDF/Excel çıktısı. Tamper-evident PDF müşteri sunumu için ispat niteliğinde.'],
+      ]
+      const pW = 5.9, pH = 2.3, gap = 0.3
+      pillars.forEach((pr, i) => {
+        const col = i % 2, row = Math.floor(i / 2)
+        const x = 0.6 + col * (pW + gap)
+        const y = 2.0 + row * (pH + gap)
+        card(s, x, y, pW, pH, { bg: C.greenLight, borderColor: C.greenPale, borderWidth: 1, radius: 0.12 })
+        s.addText(pr[0], { x: x + 0.3, y: y + 0.3, w: pW - 0.6, h: 0.5, fontSize: 18, bold: true, color: C.greenMid, fontFace: 'Inter' })
+        s.addText(pr[1], { x: x + 0.3, y: y + 0.9, w: pW - 0.6, h: pH - 1.2, fontSize: 12, color: C.greenMid, fontFace: 'Inter' })
+      })
+      addFooter(s, 'Modül Özeti')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 04 — NASIL ÇALIŞIR / AKIŞ
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'KURULUM & AKIŞ', '4 adımda saha operasyonu dijitale geçer', 'Donanım gerektirmez, telefon yeter. 1 gün içinde canlıya alınır.', '04 / 18')
+      const steps = [
+        ['1', 'Lokasyonlar girilir', 'WC, çay, ofis, atölye... Her nokta ağaç yapısında.'],
+        ['2', 'QR/NFC etiket basılır', 'Her lokasyona yapıştırılacak kod. Toplu PDF hazır.'],
+        ['3', 'Personel QR okutur', 'Görev listesi, çeklist, 1 dokunuş onay. Offline mod.'],
+        ['4', 'Yönetici izler', 'Canlı veri, haftalık rapor — tek ekran.'],
+      ]
+      const sW = 2.75, sH = 2.0, gap = 0.2
+      steps.forEach((st, i) => {
+        const x = 0.75 + i * (sW + gap + 0.2)
+        const y = 2.5
+        card(s, x, y, sW, sH, { bg: C.white, borderColor: C.green, borderWidth: 2, radius: 0.15 })
+        // Numara dairesi
+        s.addShape(pptx.ShapeType.ellipse, { x: x + sW / 2 - 0.3, y: y + 0.25, w: 0.6, h: 0.6, fill: { color: C.green }, line: { color: C.green } })
+        s.addText(st[0], { x: x + sW / 2 - 0.3, y: y + 0.25, w: 0.6, h: 0.6, fontSize: 18, bold: true, color: C.white, align: 'center', valign: 'middle', fontFace: 'Inter' })
+        s.addText(st[1], { x: x + 0.15, y: y + 1.0, w: sW - 0.3, h: 0.5, fontSize: 13, bold: true, color: C.dark, align: 'center', fontFace: 'Inter' })
+        s.addText(st[2], { x: x + 0.15, y: y + 1.45, w: sW - 0.3, h: 0.6, fontSize: 10, color: C.grayMid, align: 'center', fontFace: 'Inter' })
+        // Ok
+        if (i < 3) {
+          s.addText('→', { x: x + sW, y: y + sH / 2 - 0.2, w: 0.4, h: 0.4, fontSize: 22, bold: true, color: C.green, align: 'center', valign: 'middle', fontFace: 'Inter' })
+        }
+      })
+      // Bilgi kutusu
+      card(s, 0.6, 5.3, W - 1.2, 1.1, { bg: C.greenLight, borderColor: C.greenLight, radius: 0.1 })
+      s.addText([
+        { text: 'Donanım gerekmez. ', options: { bold: true, color: C.greenMid } },
+        { text: 'QR kodlar A4 kağıda yazdırılıp yapıştırılır. Personel kendi telefonunu kullanabilir. Aylık abonelik, kurulum maliyeti yok.', options: { color: C.greenMid } },
+      ], { x: 0.9, y: 5.4, w: W - 1.8, h: 0.9, fontSize: 13, valign: 'middle', fontFace: 'Inter' })
+      addFooter(s, 'Nasıl Çalışır')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 05-08 — 4 ÖZELLİK
+    // ═══════════════════════════════════════════════════════════════
+    const features = [
+      {
+        tag: 'MODÜL 1 / 4',
+        title: 'Frekansiyel Görev Sistemi',
+        sub: 'Tekrarlayan işleri sistem üretir, personel sadece yapar.',
+        badge: '⚡ Otomatik görev üretimi',
+        hero: '"Bu lokasyonda saat başı temizlik" dedi mi, sistem her saat otomatik görev açar.',
+        desc: 'Yönetici bir kere kural tanımlar — "WC bölgesi, 2 saatte bir, 3 vardiya". Sistem her vardiyada otomatik görevler üretir. Zamanında yapılmayanlar renk kodlu sapma/kayıp olarak işaretlenir.',
+        bullets: [
+          ['Kural bir kez tanımlanır', 'görevler haftalarca otomatik üretilir.'],
+          ['Vardiya sistemi', '1, 2 veya 3 vardiya desteği.'],
+          ['Sapma/kayıp ayrımı', 'geç yapılan ≠ hiç yapılmayan.'],
+          ['Ekstra görev', 'planlı olmayan iş yapıldığında "frekans dışı" kayıt.'],
+        ],
+        footer: 'Frekansiyel Görevler',
+        num: '05 / 18',
+      },
+      {
+        tag: 'MODÜL 2 / 4',
+        title: 'Spesifik Görevler',
+        sub: 'Anlık talepler, bakım işleri, olağanüstü durumlar.',
+        badge: '🎯 Anlık görev atama',
+        hero: 'Müşteri aradı, bir iş çıktı — 30 saniyede personele düşer.',
+        desc: 'Yönetici panelden veya mobilden görev tanımlar, lokasyon ve personel seçer. Personel telefonuna anında bildirim. Kabul → başla → tamamla akışı kayıt altında.',
+        bullets: [
+          ['Personel atama opsiyonel', 'ilk müsait kabul etsin veya spesifik kişi atansın.'],
+          ['Çeklist desteği', '5-50 maddelik kontrol listesi.'],
+          ['İptal sebep takibi', 'niye iptal, kim iptal — hepsi kayıt.'],
+          ['Arşiv otomatik', '24 saat sonra tamamlananlar arşive.'],
+        ],
+        footer: 'Spesifik Görevler',
+        num: '06 / 18',
+      },
+      {
+        tag: 'MODÜL 3 / 4',
+        title: 'Müşteri Değerlendirme',
+        sub: 'QR/NFC → yıldız → yorum → fotoğraf → aksiyon.',
+        badge: '⭐ Dijital geri bildirim',
+        hero: 'Müşteri telefonunu QR\'a tutar, 20 saniyede değerlendirme gönderir.',
+        desc: 'Her lokasyondaki QR → tarayıcı açılır → yıldız + yorum + fotoğraf. Yönetici anlık bildirim alır, aksiyon atar. Aylık trend grafiği memnuniyet değişimini gösterir.',
+        bullets: [
+          ['Kişisel bilgi zorunlu değil', 'isim/telefon opsiyonel, KVKK onayı akışta.'],
+          ['Personel bypass koruması', 'kendi personeliniz gizli değerlendirme gönderemez.'],
+          ['Yetkili aksiyon akışı', 'her değerlendirmeye yazılı cevap + fotoğraf.'],
+          ['Aylık trend', 'yıldız ortalaması + yorum sayısı grafikleri.'],
+        ],
+        footer: 'Müşteri Değerlendirme',
+        num: '07 / 18',
+      },
+      {
+        tag: 'MODÜL 4 / 4',
+        title: 'Yönetici Paneli & Raporlar',
+        sub: '4 saatlik Excel raporu → 30 saniyede tek tık.',
+        badge: '📊 Hazır raporlar',
+        hero: 'Canlı dashboard + 7 hazır rapor tipi, hiç kod yazmadan.',
+        desc: 'Yönetici panele giriş yapar, firma/proje seçer, rapor tipini belirler. PDF/Excel. Grafikli özet sayfası PDF olarak müşteri sunumuna uygun — tamper-evident, değiştirilemez.',
+        bullets: [
+          ['Rapor Merkezi', 'Frekansiyel, Spesifik, Değerlendirme, Süre Analiz, Ham Veri, Çeklist, Grafiksel.'],
+          ['Özelleştirilebilir filtreler', 'tarih, üst lokasyon, personel, vardiya.'],
+          ['PDF + Excel', 'PDF müşteriye sunum için, Excel iç analiz için.'],
+          ['Canlı dashboard', 'anlık KPI, saatlik aktivite, personel bazlı başarı.'],
+        ],
+        footer: 'Raporlama',
+        num: '08 / 18',
+      },
+    ]
+    features.forEach(f => {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, f.tag, f.title, f.sub, f.num)
+      // Sol: metin + bullets
+      const leftX = 0.6, leftW = 6.2
+      // Badge
+      s.addShape(pptx.ShapeType.roundRect, { x: leftX, y: 1.95, w: 2.8, h: 0.35, fill: { color: C.greenLight }, line: { color: C.greenLight }, rectRadius: 0.17 })
+      s.addText(f.badge, { x: leftX, y: 1.95, w: 2.8, h: 0.35, fontSize: 10, bold: true, color: C.greenMid, align: 'center', valign: 'middle', fontFace: 'Inter' })
+      // Hero
+      s.addText(f.hero, { x: leftX, y: 2.45, w: leftW, h: 0.9, fontSize: 18, bold: true, color: C.dark, fontFace: 'Inter' })
+      s.addText(f.desc, { x: leftX, y: 3.4, w: leftW, h: 1.2, fontSize: 12, color: C.grayMid, fontFace: 'Inter' })
+      // Bullets
+      f.bullets.forEach((b, i) => {
+        const y = 4.7 + i * 0.4
+        s.addText('✓', { x: leftX, y, w: 0.3, h: 0.3, fontSize: 14, bold: true, color: C.green, fontFace: 'Inter' })
+        s.addText([
+          { text: b[0], options: { bold: true, color: C.greenMid } },
+          { text: ' — ' + b[1], options: { color: C.dark } },
+        ], { x: leftX + 0.3, y, w: leftW - 0.3, h: 0.35, fontSize: 11, fontFace: 'Inter' })
+      })
+      // Sag: mock dashboard
+      const rX = 7.3, rW = 5.4, rH = 4.9
+      card(s, rX, 1.95, rW, rH, { bg: C.dark, borderColor: C.dark, radius: 0.15 })
+      // Window dots
+      ;['EF4444', 'F59E0B', '10B981'].forEach((col, i) => {
+        s.addShape(pptx.ShapeType.ellipse, { x: rX + 0.15 + i * 0.25, y: 2.1, w: 0.15, h: 0.15, fill: { color: col }, line: { color: col } })
+      })
+      // Mock inner screen
+      card(s, rX + 0.15, 2.4, rW - 0.3, rH - 0.55, { bg: C.white, borderColor: C.white, radius: 0.1 })
+      // Mock content (feature-specific)
+      if (f.title.startsWith('Frekansiyel')) {
+        s.addText('BUGÜN — AR-GE ÇAY BÖLGESİ', { x: rX + 0.3, y: 2.55, w: rW - 0.6, h: 0.3, fontSize: 11, bold: true, color: C.dark, fontFace: 'Inter', charSpacing: 2 })
+        const kpiS = 1.5
+        ;[['24', 'Hedef', C.dark], ['22', 'Tamam', C.greenMid], ['2', 'Kayıp', C.red]].forEach((k, i) => {
+          card(s, rX + 0.3 + i * (kpiS + 0.1), 2.95, kpiS, 0.9, { bg: C.grayLight, borderColor: C.border, radius: 0.08 })
+          s.addText(k[0], { x: rX + 0.3 + i * (kpiS + 0.1), y: 3.0, w: kpiS, h: 0.5, fontSize: 22, bold: true, color: k[2], align: 'center', fontFace: 'Inter' })
+          s.addText(k[1], { x: rX + 0.3 + i * (kpiS + 0.1), y: 3.5, w: kpiS, h: 0.3, fontSize: 9, color: C.gray, align: 'center', fontFace: 'Inter' })
+        })
+        ;[
+          ['08:00 Vardiya 1', '✓', C.greenMid, 'g'],
+          ['10:00 Saat başı', '✓', C.greenMid, 'g'],
+          ['12:00 Öğle sonrası', 'Sapma', C.amber, 'a'],
+          ['14:00 Saat başı', 'Kayıp', C.red, 'r'],
+          ['16:00 Vardiya 2', '✓', C.greenMid, 'g'],
+        ].forEach((r, i) => {
+          const y = 4.1 + i * 0.4
+          s.addShape(pptx.ShapeType.ellipse, { x: rX + 0.3, y: y + 0.08, w: 0.1, h: 0.1, fill: { color: r[3] === 'g' ? C.green : r[3] === 'a' ? C.amber : C.red }, line: { color: 'FFFFFF' } })
+          s.addText(r[0], { x: rX + 0.5, y, w: rW - 1.6, h: 0.3, fontSize: 10, color: C.dark, fontFace: 'Inter' })
+          s.addText(r[1], { x: rX + rW - 1.3, y, w: 1, h: 0.3, fontSize: 10, bold: true, color: r[2], align: 'right', fontFace: 'Inter' })
+        })
+      } else if (f.title.startsWith('Spesifik')) {
+        // Mobil benzeri goruntu
+        s.addText('GÖREVLERİM', { x: rX + 0.3, y: 2.6, w: rW - 0.6, h: 0.3, fontSize: 12, bold: true, color: C.dark, fontFace: 'Inter', align: 'center' })
+        ;[
+          ['✓ WC temizliği - Kat 2', '14:30 · Tamamlandı · 6 dk', true],
+          ['Çay bölgesi düzen', 'Şimdi · V2 · 2. kat', false],
+          ['Lavabo sızıntı kontrol', '⚠ Acil · Ofis 3B', false],
+        ].forEach((t, i) => {
+          const y = 3.05 + i * 1
+          card(s, rX + 0.3, y, rW - 0.6, 0.85, { bg: t[2] ? C.greenLight : C.grayLight, borderColor: t[2] ? C.greenPale : C.border, radius: 0.08 })
+          s.addText(t[0] as string, { x: rX + 0.45, y: y + 0.1, w: rW - 0.9, h: 0.35, fontSize: 11, bold: true, color: C.dark, fontFace: 'Inter' })
+          s.addText(t[1] as string, { x: rX + 0.45, y: y + 0.45, w: rW - 0.9, h: 0.3, fontSize: 9, color: C.gray, fontFace: 'Inter' })
+        })
+        // Buton
+        card(s, rX + 0.3, 6.15, rW - 0.6, 0.55, { bg: C.green, borderColor: C.green, radius: 0.1 })
+        s.addText('QR OKUT & BAŞLAT', { x: rX + 0.3, y: 6.15, w: rW - 0.6, h: 0.55, fontSize: 12, bold: true, color: C.white, align: 'center', valign: 'middle', fontFace: 'Inter' })
+      } else if (f.title.startsWith('Müşteri')) {
+        s.addText('SON DEĞERLENDİRMELER', { x: rX + 0.3, y: 2.55, w: rW - 0.6, h: 0.3, fontSize: 11, bold: true, color: C.dark, fontFace: 'Inter', charSpacing: 2 })
+        ;[
+          ['★★★★★', 'AR-GE Çay Bölgesi', '"Çok temiz ve düzenli" — 14:32', C.greenLight],
+          ['★★★☆☆', 'Erkek WC Kat 2', '"Sabunlukta sabun yok" — 13:12', C.amberLight],
+          ['★☆☆☆☆', 'Sigara Bölgesi', '"Küllükler temizlenmemiş" — 11:48', C.redLight],
+        ].forEach((d, i) => {
+          const y = 3.0 + i * 1.3
+          card(s, rX + 0.3, y, rW - 0.6, 1.15, { bg: d[3], borderColor: d[3], radius: 0.08 })
+          s.addText(d[0], { x: rX + 0.45, y: y + 0.15, w: rW - 0.9, h: 0.35, fontSize: 18, color: C.amber, fontFace: 'Inter' })
+          s.addText(d[1], { x: rX + 0.45, y: y + 0.5, w: rW - 0.9, h: 0.3, fontSize: 11, bold: true, color: C.dark, fontFace: 'Inter' })
+          s.addText(d[2], { x: rX + 0.45, y: y + 0.8, w: rW - 0.9, h: 0.3, fontSize: 10, color: C.grayMid, fontFace: 'Inter' })
+        })
+      } else {
+        // Raporlama dashboard
+        s.addText('DASHBOARD — SON 24 SAAT', { x: rX + 0.3, y: 2.55, w: rW - 0.6, h: 0.3, fontSize: 11, bold: true, color: C.dark, fontFace: 'Inter', charSpacing: 2 })
+        const kpiS = 1.5
+        ;[['1.247', 'Toplam', C.darkGreen], ['968', 'Tamam', C.greenMid], ['279', 'Sapma', C.amber]].forEach((k, i) => {
+          card(s, rX + 0.3 + i * (kpiS + 0.1), 2.95, kpiS, 0.9, { bg: C.grayLight, borderColor: C.border, radius: 0.08 })
+          s.addText(k[0], { x: rX + 0.3 + i * (kpiS + 0.1), y: 3.0, w: kpiS, h: 0.5, fontSize: 20, bold: true, color: k[2], align: 'center', fontFace: 'Inter' })
+          s.addText(k[1], { x: rX + 0.3 + i * (kpiS + 0.1), y: 3.5, w: kpiS, h: 0.3, fontSize: 9, color: C.gray, align: 'center', fontFace: 'Inter' })
+        })
+        // Mini chart alt
+        s.addText('AKTİVİTE — Saat bazlı', { x: rX + 0.3, y: 4.1, w: rW - 0.6, h: 0.3, fontSize: 10, bold: true, color: C.gray, fontFace: 'Inter' })
+        // Bar chart (native)
+        const hourSample = Array.from({ length: 24 }, (_, h) => Math.max(1, Math.round(50 + Math.sin(h / 24 * Math.PI * 2 + 3) * 40 + Math.random() * 20)))
+        s.addChart(pptx.ChartType.bar, [{ name: 'Aktivite', labels: Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0')), values: hourSample }], {
+          x: rX + 0.3, y: 4.5, w: rW - 0.6, h: 2.2,
+          barDir: 'col', barGrouping: 'standard',
+          chartColors: [C.green],
+          showLegend: false,
+          showValue: false,
+          catAxisLabelFontSize: 7,
+          valAxisHidden: true,
+          plotArea: { fill: { color: C.white } },
+        })
+      }
+      addFooter(s, f.footer)
+    })
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 09 — KULLANIM KOLAYLIĞI (3 rol)
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'KULLANICI DENEYİMİ', 'Karmaşık değil, sade. Eğitim 15 dakika.', 'Personel, yönetici ve müşteri için üç farklı arayüz — her biri rolünün gerektirdiği kadar.', '09 / 18')
+      const roles = [
+        ['📱 Personel', 'Telefonu açar, uygulamayı başlatır. Bugünkü görevleri görür. QR\'ı okutur. Kapatır.',
+          ['Hiç menü karıştırmaz', '1 dokunuşta görev kapatır', 'Offline çalışır', 'Mesai takibi otomatik']],
+        ['📊 Yönetici', 'Web panele giriş. Dashboard\'da canlı KPI. Rapor alır, aksiyon atar, personel atar.',
+          ['Canlı dashboard', 'PDF/Excel rapor tek tık', 'Personel karşılaştırması', 'Anlık bildirim']],
+        ['⭐ Müşteri / Ziyaretçi', 'Lokasyondaki QR\'ı telefonuna tutar. Tarayıcı açılır. Yıldız verir, yorum/foto ekler.',
+          ['App indirmez', 'Üye olmaz', '20 saniyede biter', 'KVKK uyumlu']],
+      ]
+      roles.forEach((r, i) => {
+        const x = 0.6 + i * 4.15, y = 2.0, w = 3.9, h = 4.6
+        card(s, x, y, w, h, { bg: C.white, borderColor: C.border, borderWidth: 1, radius: 0.12 })
+        s.addText(r[0] as string, { x: x + 0.25, y: y + 0.25, w: w - 0.5, h: 0.5, fontSize: 17, bold: true, color: C.dark, fontFace: 'Inter' })
+        s.addText(r[1] as string, { x: x + 0.25, y: y + 0.85, w: w - 0.5, h: 1.3, fontSize: 12, color: C.grayMid, fontFace: 'Inter' })
+        ;(r[2] as string[]).forEach((bl, bi) => {
+          const by = y + 2.3 + bi * 0.5
+          s.addText('✓', { x: x + 0.25, y: by, w: 0.25, h: 0.35, fontSize: 13, bold: true, color: C.green, fontFace: 'Inter' })
+          s.addText(bl, { x: x + 0.55, y: by, w: w - 0.8, h: 0.35, fontSize: 11, color: C.dark, fontFace: 'Inter' })
+        })
+      })
+      addFooter(s, 'Kullanım Kolaylığı')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 10 — HERO KPI (6 büyük rakam)
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'BİR REFERANS TESİSİMİZDE', 'GYS gerçekten çalışıyor — 6 aylık canlı veri', 'Rakamlar canlı veritabanı sorgularıyla doğrulandı, firma/proje anonim.', '10 / 18')
+      const kpis = [
+        [nf.format(toplam), 'Toplam izlenen görev', 'Her görev zaman damgalı, lokasyonlu', C.white, C.dark, C.border],
+        [`%${basariPct.toFixed(1).replace('.', ',')}`, 'Başarı oranı', 'Yapılan iş / toplam görev', C.greenLight, C.greenMid, C.greenPale],
+        [`%${kayipPct.toFixed(1).replace('.', ',')}`, 'Kayıp oranı', 'Dijital öncesi %10-20 iken', C.redLight, C.redDark, 'FECACA'],
+        [String(farkliLok), 'İzlenen lokasyon', 'WC, çay, ofis — her noktada QR', C.white, C.dark, C.border],
+        [String(aktifPersonel), 'Aktif saha personeli', 'Her personel şeffaf izlenebilir', C.white, C.dark, C.border],
+        [`${medianSure}sn`, 'Medyan görev kapama', 'Mobil 1-dokunuş', C.white, C.dark, C.border],
+      ]
+      const cW = 4.0, cH = 2.4, gX = 0.15, gY = 0.2
+      kpis.forEach((k, i) => {
+        const col = i % 3, row = Math.floor(i / 3)
+        const x = 0.6 + col * (cW + gX)
+        const y = 2.0 + row * (cH + gY)
+        card(s, x, y, cW, cH, { bg: k[3], borderColor: k[5], borderWidth: 1, radius: 0.12 })
+        s.addText(k[0], { x, y: y + 0.3, w: cW, h: 1.0, fontSize: 48, bold: true, color: k[4], align: 'center', fontFace: 'Inter' })
+        s.addText(k[1], { x: x + 0.2, y: y + 1.45, w: cW - 0.4, h: 0.4, fontSize: 12, bold: true, color: C.grayMid, align: 'center', fontFace: 'Inter', charSpacing: 1 })
+        s.addText(k[2], { x: x + 0.2, y: y + 1.85, w: cW - 0.4, h: 0.4, fontSize: 10, color: C.gray, align: 'center', fontFace: 'Inter' })
+      })
+      addFooter(s, 'Canlı Referans')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 11 — AYLIK BÜYÜME (native bar chart) + ADOPTION (line)
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'BÜYÜME & BENİMSEME', 'Pilot → Tam kullanım: 1 ay', 'Personel adoption sorunu yaşanmadı', '11 / 18')
+      // Sol: aylik gorev bar chart
+      card(s, 0.6, 2.0, 6.0, 4.4, { bg: C.white, borderColor: C.border, radius: 0.1 })
+      s.addText('Aylık izlenen görev sayısı', { x: 0.8, y: 2.15, w: 5.6, h: 0.3, fontSize: 13, bold: true, color: C.dark, fontFace: 'Inter' })
+      s.addText('Pilot ayından itibaren hızlı büyüme', { x: 0.8, y: 2.45, w: 5.6, h: 0.25, fontSize: 10, color: C.gray, fontFace: 'Inter' })
+      if (aylik.length > 0) {
+        s.addChart(pptx.ChartType.bar, [{
+          name: 'Görev',
+          labels: aylik.map(a => a.ay),
+          values: aylik.map(a => a.toplam),
+        }], {
+          x: 0.8, y: 2.8, w: 5.6, h: 3.4,
+          barDir: 'col', chartColors: [C.green],
+          showLegend: false, showValue: true, dataLabelFontSize: 9, dataLabelColor: C.dark,
+          catAxisLabelFontSize: 10, valAxisLabelFontSize: 9, valAxisHidden: false,
+          showTitle: false,
+        })
+      }
+      // Sag: personel line chart
+      card(s, 6.75, 2.0, 6.0, 4.4, { bg: C.white, borderColor: C.border, radius: 0.1 })
+      s.addText('Aktif personel sayısı — aylık', { x: 6.95, y: 2.15, w: 5.6, h: 0.3, fontSize: 13, bold: true, color: C.dark, fontFace: 'Inter' })
+      s.addText(`${persAylik[0]?.pers ?? 0} → ${persAylik[persAylik.length - 1]?.pers ?? 0} personel (${persAylik.length} ay)`, { x: 6.95, y: 2.45, w: 5.6, h: 0.25, fontSize: 10, color: C.gray, fontFace: 'Inter' })
+      if (persAylik.length > 0) {
+        s.addChart(pptx.ChartType.line, [{
+          name: 'Personel',
+          labels: persAylik.map(a => a.ay),
+          values: persAylik.map(a => a.pers),
+        }], {
+          x: 6.95, y: 2.8, w: 5.6, h: 3.4,
+          chartColors: [C.darkGreen],
+          lineDataSymbol: 'circle', lineDataSymbolSize: 8, lineDataSymbolLineColor: C.darkGreen,
+          showLegend: false, showValue: true, dataLabelFontSize: 9, dataLabelColor: C.darkGreen,
+          catAxisLabelFontSize: 10, valAxisLabelFontSize: 9,
+          showTitle: false,
+        })
+      }
+      addFooter(s, 'Büyüme')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 12 — MÜŞTERİ MEMNUNİYETİ (line) + TOPLAM
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'MÜŞTERİ GERİ BİLDİRİMİ', 'Veri haline gelen şikayet-öneri', 'QR/NFC üzerinden toplanan değerlendirmeler', '12 / 18')
+      card(s, 0.6, 2.0, 7.5, 4.4, { bg: C.white, borderColor: C.border, radius: 0.1 })
+      s.addText('Aylık yıldız ortalaması (1-5)', { x: 0.8, y: 2.15, w: 7.1, h: 0.3, fontSize: 13, bold: true, color: C.dark, fontFace: 'Inter' })
+      s.addText('Dijital öncesi: bilinmiyordu', { x: 0.8, y: 2.45, w: 7.1, h: 0.25, fontSize: 10, color: C.gray, fontFace: 'Inter' })
+      if (degAylik.length > 0) {
+        s.addChart(pptx.ChartType.line, [{
+          name: 'Yıldız',
+          labels: degAylik.map(a => a.ay),
+          values: degAylik.map(a => a.yildiz),
+        }], {
+          x: 0.8, y: 2.8, w: 7.1, h: 3.4,
+          chartColors: [C.amber],
+          lineDataSymbol: 'circle', lineDataSymbolSize: 8, lineDataSymbolLineColor: C.amber,
+          showLegend: false, showValue: true, dataLabelFontSize: 10, dataLabelColor: C.amberDark,
+          catAxisLabelFontSize: 10, valAxisMinVal: 0, valAxisMaxVal: 5,
+        })
+      }
+      // Sag: Toplam hero
+      card(s, 8.25, 2.0, 4.5, 4.4, { bg: C.amberLight, borderColor: 'FDE68A', radius: 0.12 })
+      s.addText('TOPLAM DEĞERLENDİRME', { x: 8.25, y: 2.6, w: 4.5, h: 0.4, fontSize: 11, bold: true, color: C.gray, align: 'center', fontFace: 'Inter', charSpacing: 2 })
+      s.addText(String(degToplam), { x: 8.25, y: 3.0, w: 4.5, h: 1.5, fontSize: 72, bold: true, color: C.amber, align: 'center', fontFace: 'Inter' })
+      s.addText('6 ay içinde dijital olarak toplandı', { x: 8.25, y: 4.6, w: 4.5, h: 0.4, fontSize: 11, color: C.gray, align: 'center', fontFace: 'Inter' })
+      s.addText([
+        { text: 'Dijital öncesi: ', options: { bold: true, color: C.amberDark } },
+        { text: '"Şikayet var mı?" sorusu tahmindi. Artık her değerlendirme kayıtlı.', options: { color: C.amberDark } },
+      ], { x: 8.4, y: 5.2, w: 4.2, h: 1.1, fontSize: 10, align: 'center', valign: 'middle', fontFace: 'Inter' })
+      addFooter(s, 'Müşteri Memnuniyeti')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 13 — 24 SAAT KAPSAMA (native bar chart)
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, '7/24 İZLEME', 'Gece vardiyası dahil, her saat kayıt altında', 'Saatlik tamamlanan görev — 6 ay toplamı', '13 / 18')
+      card(s, 0.6, 2.0, W - 1.2, 3.2, { bg: C.white, borderColor: C.border, radius: 0.1 })
+      s.addText('24-Saat Aktivite Dağılımı', { x: 0.8, y: 2.1, w: 10, h: 0.3, fontSize: 13, bold: true, color: C.dark, fontFace: 'Inter' })
+      s.addText('Gece 03:00\'te bile yüksek aktivite', { x: 0.8, y: 2.4, w: 10, h: 0.25, fontSize: 10, color: C.gray, fontFace: 'Inter' })
+      s.addChart(pptx.ChartType.bar, [{
+        name: 'Tamamlanan',
+        labels: Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0')),
+        values: saatler,
+      }], {
+        x: 0.8, y: 2.75, w: W - 1.6, h: 2.3,
+        barDir: 'col', chartColors: [C.green],
+        showLegend: false, showValue: false,
+        catAxisLabelFontSize: 9, valAxisLabelFontSize: 9,
+      })
+      // Alt özet kutular
+      const stats = [
+        ['Pik saat', '08:00', C.greenLight, C.greenMid],
+        ['Gece (00-06)', nf.format(saatler.slice(0, 6).reduce((a, b) => a + b, 0)), C.grayLight, C.dark],
+        ['Gündüz (06-18)', nf.format(saatler.slice(6, 18).reduce((a, b) => a + b, 0)), C.grayLight, C.dark],
+        ['Akşam (18-24)', nf.format(saatler.slice(18, 24).reduce((a, b) => a + b, 0)), C.grayLight, C.dark],
+      ]
+      stats.forEach((st, i) => {
+        const x = 0.6 + i * 3.1, y = 5.4, w = 2.9, h = 1.2
+        card(s, x, y, w, h, { bg: st[2], borderColor: st[2], radius: 0.1 })
+        s.addText(st[0], { x, y: y + 0.15, w, h: 0.3, fontSize: 10, bold: true, color: C.gray, align: 'center', fontFace: 'Inter', charSpacing: 1 })
+        s.addText(st[1], { x, y: y + 0.4, w, h: 0.7, fontSize: 24, bold: true, color: st[3], align: 'center', fontFace: 'Inter' })
+      })
+      addFooter(s, '24-Saat Kapsama')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 14 — ÖNCESİ vs SONRASI
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'FARK', 'Dijital Öncesi vs Sonrası', 'Aynı tesis, aynı ekip, farklı araç', '14 / 18')
+      const bef = [
+        ['Operasyon izleme', 'kağıt pano, hafızaya dayalı'],
+        ['Kayıp görev', '%10-20 "normal" karşılanır'],
+        ['Müşteri şikayeti', '"mesaj grubunda konuşalım"'],
+        ['Yönetici raporu', 'Excel\'de 3-4 saat uğraş'],
+        ['Gece vardiyası', 'sabah tahmin edilir'],
+        ['Personel verimliliği', 'ölçülmez'],
+        ['Rapor zamanında', 'aylık rapor 1 hafta gecikir'],
+        ['Müşteriye kanıt', '"sözlü söylüyoruz"'],
+      ]
+      const aft = [
+        ['Operasyon izleme', `${nf.format(toplam)} görev, hepsi kayıtlı`],
+        ['Kayıp görev', `%${kayipPct.toFixed(1).replace('.', ',')} — tek tıkla rapor`],
+        ['Müşteri şikayeti', `${degToplam} dijital değerlendirme`],
+        ['Yönetici raporu', 'PDF/Excel, 30 saniye'],
+        ['Gece vardiyası', '03:00\'te bile kayıt'],
+        ['Personel verimliliği', 'en iyi/kötü 3 otomatik'],
+        ['Rapor zamanında', 'real-time, her an güncel'],
+        ['Müşteriye kanıt', 'tamper-evident PDF'],
+      ]
+      // Sol
+      card(s, 0.6, 2.0, 5.7, 5.0, { bg: C.redLight, borderColor: 'FECACA', radius: 0.12 })
+      s.addText('⚠ DİJİTAL ÖNCESİ', { x: 0.8, y: 2.15, w: 5.3, h: 0.4, fontSize: 14, bold: true, color: C.redDark, fontFace: 'Inter', charSpacing: 2 })
+      bef.forEach((b, i) => {
+        const y = 2.65 + i * 0.52
+        if (i > 0) s.addShape(pptx.ShapeType.rect, { x: 0.8, y, w: 5.3, h: 0.01, fill: { color: 'FECACA', transparency: 40 }, line: { color: 'FECACA' } })
+        s.addText([
+          { text: b[0] + ': ', options: { bold: true, color: C.redDark } },
+          { text: b[1], options: { color: C.redDark } },
+        ], { x: 0.9, y: y + 0.05, w: 5.1, h: 0.45, fontSize: 11, fontFace: 'Inter' })
+      })
+      // Ok
+      s.addText('→', { x: 6.4, y: 4.35, w: 0.6, h: 0.5, fontSize: 32, bold: true, color: C.green, align: 'center', valign: 'middle', fontFace: 'Inter' })
+      // Sag
+      card(s, 7.05, 2.0, 5.7, 5.0, { bg: C.greenLight, borderColor: C.greenPale, radius: 0.12 })
+      s.addText('✓ GYS İLE 6 AY SONRA', { x: 7.25, y: 2.15, w: 5.3, h: 0.4, fontSize: 14, bold: true, color: C.greenMid, fontFace: 'Inter', charSpacing: 2 })
+      aft.forEach((a, i) => {
+        const y = 2.65 + i * 0.52
+        if (i > 0) s.addShape(pptx.ShapeType.rect, { x: 7.25, y, w: 5.3, h: 0.01, fill: { color: C.greenPale, transparency: 40 }, line: { color: C.greenPale } })
+        s.addText([
+          { text: a[0] + ': ', options: { bold: true, color: C.greenMid } },
+          { text: a[1], options: { color: C.greenMid } },
+        ], { x: 7.35, y: y + 0.05, w: 5.1, h: 0.45, fontSize: 11, fontFace: 'Inter' })
+      })
+      addFooter(s, 'Öncesi vs Sonrası')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 15 — 9 AVANTAJ
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'NEDEN GYS?', 'Rakiplerden ayıran 9 somut avantaj', 'Her biri sahada denenmiş, canlı verilerle doğrulanmış', '15 / 18')
+      const advs = [
+        ['QR + NFC Hibrit', 'Telefon kamera veya temas. Donanım yok, A4 kağıda yazdırın.'],
+        ['Mobil + Web', 'Personel mobilden, yönetici webden, müşteri QR\'dan. Tek platform.'],
+        ['Vardiya Sistemi', '1, 2, 3 vardiya. Sarkan vardiya otomatik.'],
+        ['Push Bildirim', 'Yeni görev, iptal, değerlendirme — anında.'],
+        ['Tamper-Evident PDF', 'Değiştirilemez PDF. Excel güvensizliği kalkar.'],
+        ['Rol Bazlı Yetki', 'SA, admin, personel, müşteri — her rol kendi ekranı.'],
+        ['7+ Hazır Rapor', 'Frekansiyel, Spesifik, Değerlendirme, Süre, Grafiksel, Ham Veri.'],
+        ['Offline Mod', 'İnternet yoksa personel çalışır. Otomatik senkron.'],
+        ['1 Günde Canlı', 'Lokasyon → QR → personel. Günler değil saatler.'],
+      ]
+      const aW = 4.0, aH = 1.4, gX = 0.15, gY = 0.15
+      advs.forEach((a, i) => {
+        const col = i % 3, row = Math.floor(i / 3)
+        const x = 0.6 + col * (aW + gX)
+        const y = 2.0 + row * (aH + gY)
+        card(s, x, y, aW, aH, { bg: C.white, borderColor: C.border, borderLeft: C.green, radius: 0.08 })
+        s.addText(String(i + 1), { x: x + 0.2, y: y + 0.15, w: 0.5, h: 0.4, fontSize: 20, bold: true, color: C.green, fontFace: 'Inter' })
+        s.addText(a[0], { x: x + 0.6, y: y + 0.18, w: aW - 0.8, h: 0.4, fontSize: 13, bold: true, color: C.dark, fontFace: 'Inter' })
+        s.addText(a[1], { x: x + 0.2, y: y + 0.65, w: aW - 0.4, h: 0.7, fontSize: 10, color: C.grayMid, fontFace: 'Inter' })
+      })
+      addFooter(s, 'Avantajlar')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 16 — ONBOARDING
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'BAŞLANGIÇ', 'GYS\'yi başlatmak 3 adım, 1 gün', 'Donanım yok, uzun eğitim yok. Hemen başlar.', '16 / 18')
+      const stps = [
+        ['1', 'Lokasyon & Personel', 'Tesis alanları ağaç yapısında tanımlanır. Personel listesi Excel\'den aktarılır.', '1-2 saat'],
+        ['2', 'QR Etiketler & Kurallar', 'Her lokasyon için benzersiz QR üretilir, A4 PDF olarak yazdırılır. Frekansiyel kurallar.', '2-3 saat'],
+        ['3', 'Test & Canlıya Alma', 'Personel mobil uygulamayı indirir, giriş yapar. İlk görevler. Canlı veri toplanır.', '1-2 saat'],
+      ]
+      stps.forEach((st, i) => {
+        const x = 0.6 + i * 4.15, y = 2.3, w = 3.9, h = 3.0
+        card(s, x, y, w, h, { bg: C.grayLight, borderColor: C.border, radius: 0.15 })
+        // Numara dairesi (ustte)
+        s.addShape(pptx.ShapeType.ellipse, { x: x + w / 2 - 0.35, y: y - 0.35, w: 0.7, h: 0.7, fill: { color: C.green }, line: { color: C.green } })
+        s.addText(st[0], { x: x + w / 2 - 0.35, y: y - 0.35, w: 0.7, h: 0.7, fontSize: 22, bold: true, color: C.white, align: 'center', valign: 'middle', fontFace: 'Inter' })
+        s.addText(st[1], { x: x + 0.2, y: y + 0.5, w: w - 0.4, h: 0.4, fontSize: 15, bold: true, color: C.dark, align: 'center', fontFace: 'Inter' })
+        s.addText(st[2], { x: x + 0.3, y: y + 1.0, w: w - 0.6, h: 1.4, fontSize: 11, color: C.grayMid, align: 'center', fontFace: 'Inter' })
+        // Sure pill
+        s.addShape(pptx.ShapeType.roundRect, { x: x + w / 2 - 0.65, y: y + h - 0.55, w: 1.3, h: 0.35, fill: { color: C.greenLight }, line: { color: C.greenLight }, rectRadius: 0.17 })
+        s.addText(st[3], { x: x + w / 2 - 0.65, y: y + h - 0.55, w: 1.3, h: 0.35, fontSize: 10, bold: true, color: C.greenMid, align: 'center', valign: 'middle', fontFace: 'Inter' })
+      })
+      // Alt vurgu
+      card(s, 0.6, 5.7, W - 1.2, 1.3, { bg: C.greenLight, borderColor: C.greenLight, radius: 0.12 })
+      s.addText('🚀 İlk 7 günde ne olur?', { x: 0.9, y: 5.8, w: 12, h: 0.4, fontSize: 15, bold: true, color: C.greenMid, fontFace: 'Inter' })
+      s.addText([
+        { text: '1. gün: ', options: { bold: true } },
+        { text: 'Sistem canlıya alınır, personel giriş yapar.    ', options: {} },
+        { text: '3. gün: ', options: { bold: true } },
+        { text: 'Tam adoption, günlük rutin oturur.    ', options: {} },
+        { text: '7. gün: ', options: { bold: true } },
+        { text: 'İlk haftalık yönetici raporu — hangi lokasyon risk altında, görünür.', options: {} },
+      ], { x: 0.9, y: 6.2, w: W - 1.5, h: 0.75, fontSize: 11, color: C.greenMid, fontFace: 'Inter' })
+      addFooter(s, 'Onboarding')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 17 — İTİRAZLAR
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.white }
+      addHeader(s, 'İTİRAZLAR', 'En sık sorulan 4 soruya net yanıt', 'Potansiyel müşterinin kafasındaki gerçek sorular', '17 / 18')
+      const qs = [
+        ['"Zaten elle de yapılabiliyor"',
+          `${nf.format(toplam)} görevi elle takip etmeyi deneyin. Ya kaydı tutmayacak ya da uyduracak ekibiniz. Dijital öncesi %10-20 kayıp "normal"di — dijitalle %${kayipPct.toFixed(1).replace('.', ',')}.`],
+        ['"Personelim teknolojiye alışamaz"',
+          `Referans tesiste 1 ay içinde ${persAylik[1]?.pers ?? 100}+ personel aktif, 6 ayda ${aktifPersonel} personel sistemde. Pilot sorunu yok. Uygulama 3 tıkla çalışır.`],
+        ['"Yatırımın geri dönüşü nasıl?"',
+          '1 ay kaçırılmış temizlikten gelen cezadan sistem bedelinin çoğu geri döner. Müşteri güvensizliğinden kayıp kontrat, sistem maliyetinin 10 katıdır.'],
+        ['"Rakibimiz bunu zaten yapıyor"',
+          'Yapıyorsa iyi, oyun alanı eşitlenir. Yapmıyorsa farkı siz oluşturursunuz — potansiyel müşteriye "sektöre dijital standart getiren" olarak konumlanırsınız.'],
+      ]
+      qs.forEach((q, i) => {
+        const col = i % 2, row = Math.floor(i / 2)
+        const x = 0.6 + col * 6.1
+        const y = 2.0 + row * 2.4
+        card(s, x, y, 5.9, 2.2, { bg: C.white, borderColor: C.border, radius: 0.12 })
+        // Üst kırmızı şerit
+        s.addShape(pptx.ShapeType.rect, { x, y, w: 5.9, h: 0.08, fill: { color: C.red }, line: { color: C.red } })
+        s.addText(q[0], { x: x + 0.25, y: y + 0.25, w: 5.4, h: 0.5, fontSize: 13, bold: true, color: C.redDark, fontFace: 'Inter' })
+        s.addText(q[1], { x: x + 0.25, y: y + 0.85, w: 5.4, h: 1.3, fontSize: 11, color: C.grayMid, fontFace: 'Inter' })
+      })
+      addFooter(s, 'İtiraz Yönetimi')
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SLAYT 18 — CTA KAPANIŞ
+    // ═══════════════════════════════════════════════════════════════
+    {
+      const s = pptx.addSlide()
+      s.background = { color: C.dark }
+      // Dekoratif daireler
+      s.addShape(pptx.ShapeType.ellipse, { x: -2, y: -2, w: 5, h: 5, fill: { color: C.darkGreen }, line: { color: C.darkGreen } } as any)
+      s.addShape(pptx.ShapeType.ellipse, { x: W - 3, y: H - 3, w: 6, h: 6, fill: { color: C.green }, line: { color: C.green } } as any)
+      s.addText('BİR CÜMLEDE', { x: 0.7, y: 1.3, w: 5, h: 0.4, fontSize: 12, bold: true, color: C.greenPale, fontFace: 'Inter', charSpacing: 3 })
+      s.addText([
+        { text: 'Sahadaki her işi ', options: { color: C.white } },
+        { text: 'sayılabilir, raporlanabilir ve ispat edilebilir ', options: { color: C.greenPale } },
+        { text: 'hale getirin.', options: { color: C.white } },
+      ], { x: 0.7, y: 1.9, w: W - 1.4, h: 2.2, fontSize: 40, bold: true, fontFace: 'Inter' })
+      s.addText(`GYS bir uygulama değil — operasyonunuzu şeffaflaştıran bir yönetim platformudur. Referans tesisimizde 6 ayda ${nf.format(toplam)} görev izlendi, ${degToplam} müşteri değerlendirmesi toplandı, kayıp oranı %${kayipPct.toFixed(1).replace('.', ',')}'de kaldı.`,
+        { x: 0.7, y: 4.2, w: W - 1.4, h: 1.0, fontSize: 14, color: C.white, fontFace: 'Inter' })
+      // 3 kart
+      const ctaK = [['1 gün', 'Kurulumdan canlıya'], ['15 dk', 'Personel eğitimi'], ['0 TL', 'Donanım yatırımı']]
+      ctaK.forEach((k, i) => {
+        const x = 0.7 + i * 3.5, y = 5.4, w = 3.2, h = 1.2
+        s.addShape(pptx.ShapeType.roundRect, { x, y, w, h, fill: { color: C.dark, transparency: 25 }, line: { color: C.white, width: 0.5 }, rectRadius: 0.12 })
+        s.addText(k[0], { x, y: y + 0.15, w, h: 0.6, fontSize: 22, bold: true, color: C.greenPale, align: 'center', fontFace: 'Inter' })
+        s.addText(k[1], { x, y: y + 0.75, w, h: 0.35, fontSize: 11, color: C.white, align: 'center', fontFace: 'Inter' })
+      })
+      // Alt
+      s.addText('→ Bir sonraki adım: 30 dakikalık canlı demo talep edin.', { x: 0.7, y: 6.85, w: W - 1.4, h: 0.3, fontSize: 13, bold: true, color: C.greenPale, fontFace: 'Inter' })
+      s.addText('GYS Görev Yönetim Sistemi · İO Teknoloji · iogys.com.tr', { x: 0.7, y: 7.2, w: 8, h: 0.25, fontSize: 9, color: C.white, fontFace: 'Inter' })
+      s.addText(tarih, { x: W - 4, y: 7.2, w: 3.3, h: 0.25, fontSize: 9, color: C.white, align: 'right', fontFace: 'Inter' })
+    }
+
+    const buf = await pptx.write({ outputType: 'nodebuffer' }) as Buffer
+    const date = new Date().toISOString().slice(0, 10)
+    return new NextResponse(buf as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         'Content-Disposition': `attachment; filename="gys-musteri-sunumu-${date}.pptx"`,
